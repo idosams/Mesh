@@ -2220,8 +2220,8 @@ impl LiveDaemon {
     /// Inspect the complete native working folder while one exact agent assignment remains live.
     ///
     /// This is the sole assigned-workspace read exception. It is closed over the inventory and
-    /// file-inspection operations needed by Finish agent handoff; callers cannot supply a callback
-    /// or route a mutation through it. The shared custody lock remains held before
+    /// file-inspection operations needed by the read-only live monitor and Finish agent handoff;
+    /// callers cannot supply a callback or route a mutation through it. The shared custody lock remains held before
     /// `workspace_open` for the entire inspection, and the separate release transaction must
     /// compare the same generation again.
     pub fn inspect_agent_finish_preflight(

@@ -3,6 +3,20 @@
 Mesh is not yet a stable product. This changelog records public, installable releases; internal
 development commits and private test builds are deliberately omitted.
 
+## [0.1.0-alpha.2] — 2026-09-16
+
+Tester-feedback hotfix for the first macOS technical alpha.
+
+### Fixed
+
+- Review renders generic binary changes such as `.DS_Store` as exact metadata instead of failing
+  the whole page.
+- Files shows the managed folder hierarchy as an accessible tree.
+- Current monitors exact changed paths in an assigned agent folder without saving or approving
+  them, and offers direct switching among recent and agent-assigned workspaces.
+
+The signing, notarization, approval, platform, and backup limitations below are unchanged.
+
 ## [0.1.0-alpha.1] — 2026-09-16
 
 First public macOS technical alpha.
@@ -37,4 +51,5 @@ First public macOS technical alpha.
 - Filesystem changes made while Mesh is not running are inspected when the workspace is reopened;
   continuous background capture is not claimed.
 
+[0.1.0-alpha.2]: launch/v0.1.0-alpha.2.md
 [0.1.0-alpha.1]: launch/v0.1.0-alpha.1.md

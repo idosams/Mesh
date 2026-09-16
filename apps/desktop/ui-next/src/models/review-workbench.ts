@@ -1,4 +1,4 @@
-export type ArtifactKind = "text" | "pdf" | "presentation" | "document" | "spreadsheet";
+export type ArtifactKind = "text" | "pdf" | "presentation" | "document" | "spreadsheet" | "file";
 
 export type ReviewMode = "visual" | "content";
 

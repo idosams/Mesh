@@ -44,7 +44,7 @@ test('the document workbench keeps before and after visible at alpha window widt
   assert.ok(desktop.width < 1_280 && desktop.minWidth < 1_280);
   assert.ok(desktop.width >= 768 && desktop.minWidth >= 768);
   assert.match(organism, /xl:grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
-  assert.equal((organism.match(/md:grid-cols-2/g) || []).length, 3);
+  assert.equal((organism.match(/md:grid-cols-2/g) || []).length, 4);
   assert.doesNotMatch(organism, /lg:grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
   assert.match(navigator, /max-h-64[^"\n]*overflow-y-auto[^"\n]*xl:max-h-\[40rem\]/);
   assert.match(navigator, /xl:border-b-0 xl:border-r/);
@@ -170,6 +170,29 @@ test('the production review projection crosses one fail-closed typed adapter', a
   );
   assert.equal(importedText.changes[0].kind, 'text');
   assert.equal(importedText.changes[0].diffHunks[0].lines[0].text, '#!/bin/sh');
+  const genericBinaryProjection = structuredClone(projection);
+  genericBinaryProjection.bundle_changes[0] = {
+    ...projection.bundle_changes[0],
+    path_before: null,
+    path_after: '/.DS_Store',
+    before: null,
+    body: 'binary',
+    verified_text: null,
+  };
+  const genericBinary = adapter.reviewWorkbenchFromProjection(
+    'Alpha workspace',
+    'Saved version',
+    genericBinaryProjection,
+    authority,
+  );
+  assert.equal(genericBinary.changes[0].kind, 'file');
+  assert.equal(genericBinary.changes[0].kindLabel, 'File');
+  assert.equal(genericBinary.changes[0].impact, 'Exact saved artifact');
+  assert.deepEqual(genericBinary.changes[0].afterValues, [
+    '12 bytes',
+    `Digest ${'77'.repeat(6)}…`,
+    `Version ${'66'.repeat(6)}…`,
+  ]);
   const crossFormatRenames = [
     ['finance/plan.docx', 'finance/plan.pptx'],
     ['finance/plan.pdf', 'finance/plan.txt'],

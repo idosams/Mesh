@@ -945,6 +945,15 @@ test('agent handoff scans exact native files before an automatic safe save or st
     'agent custody must remain durable until the first complete native inspection succeeds',
   );
   assert.match(nativeHost, /fn inspect_agent_finish_preflight\([\s\S]*expected_workspace_root:[\s\S]*expected_workspace_digest:[\s\S]*expected_workspace_installation:[\s\S]*expected_agent_handoff_generation:/);
+  assert.match(nativeHost, /fn inspect_agent_live_work\([\s\S]*expected_workspace_root:[\s\S]*expected_workspace_digest:[\s\S]*expected_workspace_installation:[\s\S]*expected_agent_handoff_generation:/);
+  const liveMonitor = nativeHost.slice(
+    nativeHost.indexOf('async fn inspect_agent_live_work('),
+    nativeHost.indexOf('fn inspect_managed_file(', nativeHost.indexOf('async fn inspect_agent_live_work(')),
+  );
+  assert.match(liveMonitor, /daemon\.inspect_agent_finish_preflight/);
+  assert.doesNotMatch(liveMonitor, /record_agent_handoff_preflight|finish_managed_workspace_agent_handoff/);
+  assert.match(script, /inspect_agent_live_work/);
+  assert.match(script, /Monitoring never saves or approves work|Live changes are read-only/);
   assert.match(script, /mesh\.agent-finish-preflight\/v1/);
   assert.match(script, /Ordinary file reads stay[\s\S]*unavailable during assignment/);
   assert.ok(

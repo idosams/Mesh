@@ -71,6 +71,7 @@ function artifactText(
     presentation: Object.freeze(["mesh-pptx-slide-text-v1", "macos-quick-look-visible-text"]),
     document: Object.freeze(["mesh-docx-block-text-v1", "macos-quick-look-visible-text"]),
     spreadsheet: Object.freeze(["mesh-xlsx-cell-formula-v1", "macos-quick-look-visible-text"]),
+    file: Object.freeze([]),
   });
   if (typeof source !== "string" || !allowedSources[change.kind].includes(source)
     || !Array.isArray(linesValue) || linesValue.length === 0 || linesValue.length > 512

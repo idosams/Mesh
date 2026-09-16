@@ -1,10 +1,10 @@
 {
   "schema": "mesh.public-source/v1",
-  "source_revision": "879f3ce5d4a82610835c9701e23601e4be625940",
+  "source_revision": "60f3a7dc7e85b4536b50527dd5fb56d23e987f1c",
   "destination_repository": "idosams/Mesh",
   "history": "clean-root",
-  "file_count": 1036,
-  "tree_sha256": "0abbd53c6e112b6f77dfb1de6efdff6225110a5d06070d1a04dd90120e8c0a59",
+  "file_count": 1037,
+  "tree_sha256": "8767d9e6ee9a36a688c13f5bd2f6068788bdffe90f7f9683c399cecab32dea73",
   "files": [
     {
       "path": ".config/nextest.toml",
@@ -439,7 +439,7 @@
     {
       "path": "apps/desktop/src-tauri/main.rs",
       "mode": "100644",
-      "sha256": "c1849b67f1b583e9c4b92d3239fc79955cc8dcbe1dbf173aaf0d5b87122d7e9e"
+      "sha256": "bde737ad9544a5abcd68521651c0f47c36cb59ec9e909d191c935dbcd0f5decc"
     },
     {
       "path": "apps/desktop/src-tauri/native_capture_preference.rs",
@@ -489,12 +489,12 @@
     {
       "path": "apps/desktop/ui/app.js",
       "mode": "100644",
-      "sha256": "3f1634da990cca19ca11ad0730277018d27bc8bb32fddddf00a93f9c05521bb4"
+      "sha256": "91f7a504b2479a1dac56e461f6c6376d2fdda0b6aa58af3ce0291c8267312aee"
     },
     {
       "path": "apps/desktop/ui/app.test.mjs",
       "mode": "100644",
-      "sha256": "7d75667def97c2375d350f5620592bba7ed46742b2f909685bcd2a26cde5ff1c"
+      "sha256": "bb2ba7b2cd741d9ac6f10e27bbbbc2e4ea0e2e1e70ec491232f0d7f9048fbc1a"
     },
     {
       "path": "apps/desktop/ui/index.html",
@@ -514,7 +514,7 @@
     {
       "path": "apps/desktop/ui/post-mutation-refresh.test.mjs",
       "mode": "100644",
-      "sha256": "8821c8a6663040c909802d007ce629d9ac599ca7d26c5381908465227d5b2046"
+      "sha256": "c7c4e30d03a23c217f3c03484b4d26fcf262b88d4b7e9cf7a318a3f75263b790"
     },
     {
       "path": "apps/desktop/ui/renderer-proof.js",
@@ -629,7 +629,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/artifact-content-diff.ts",
       "mode": "100644",
-      "sha256": "841953a26e8a4204ec8f161719241da55a759dfef9dbcc1abaf40873a8016dc1"
+      "sha256": "baa097b08ac11703301178c8353d797cf5c2d4d7d959c7dbbe1205e3523fdf9d"
     },
     {
       "path": "apps/desktop/ui-next/src/models/confirmation.ts",
@@ -664,7 +664,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/review-artifact-preview.ts",
       "mode": "100644",
-      "sha256": "e6939134dcbfd2cf28209e9c25760132ffc18b2c65acd69e3c174aa2f5ca5e9e"
+      "sha256": "a2aa586f3c9135f28077f14de1d34d19492f62f2a41218c39fae87ac2f270928"
     },
     {
       "path": "apps/desktop/ui-next/src/models/review-page.ts",
@@ -674,7 +674,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/review-workbench-adapter.ts",
       "mode": "100644",
-      "sha256": "19c4fd85ef6c4863cc155f8b5263bd6fb5ae310a2902814051eff4c1383939a5"
+      "sha256": "59f4dd600d30b24e89983a15e25191b893071dc52da594c933aa60192ada9b34"
     },
     {
       "path": "apps/desktop/ui-next/src/models/review-workbench-envelope.ts",
@@ -684,7 +684,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/review-workbench.ts",
       "mode": "100644",
-      "sha256": "f9575130c4561909dcd67d976247dc086243b94631873faacff35b8cc1628f9d"
+      "sha256": "d31144620ef445c502d73027c933295445614e2630f64459d0db0139006c0b77"
     },
     {
       "path": "apps/desktop/ui-next/src/models/roving-selection.ts",
@@ -699,7 +699,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/workspace-current.ts",
       "mode": "100644",
-      "sha256": "d9c9446a6451f8b7f79a4c2741a11d7b7a5e528d30b76b164de715902a131c90"
+      "sha256": "1cfd5c1c6ca8b939dd3e7312035a2ec360ea2524785eb58e16fcdf44a1fe12fe"
     },
     {
       "path": "apps/desktop/ui-next/src/models/workspace-destination.ts",
@@ -714,7 +714,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/workspace-files-changes.ts",
       "mode": "100644",
-      "sha256": "fc437cd059058105ce1d3757a08946e833bea6738378af01e272e012b32497f6"
+      "sha256": "9d6d994c12ccaea790562dc3832df737160845b693461e73b6f29552485ebdac"
     },
     {
       "path": "apps/desktop/ui-next/src/models/workspace-overview.ts",
@@ -769,7 +769,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/artifact-review.tsx",
       "mode": "100644",
-      "sha256": "0d837bf427566433e08806c00f98b863e5fb63d8f9039fd7f2e13ced5f9d7461"
+      "sha256": "6b2118cb44e47fe975c7822b77ca91f086e914e1f2574067d6af61b57d57a701"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/confirmation-dialog.tsx",
@@ -799,7 +799,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-current.tsx",
       "mode": "100644",
-      "sha256": "26229f7432483730877f485542cc0d28736a14370cfe898685fe4edf6d27ade6"
+      "sha256": "247da7e8a3d94cf70858d04d5ce6f6f13a201d82d9509d9d186ef968dcac3b2e"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-destination.tsx",
@@ -814,7 +814,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-files-changes.tsx",
       "mode": "100644",
-      "sha256": "d273eb91d575440c5bd837129a1826e2fae2b20b61059b813ac08f41676e8e5b"
+      "sha256": "cbc4d78f885fb3b0ccc6e04797052fba4bc69cb75bdc4571ab56fe1aed0d439d"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-overview.tsx",
@@ -914,7 +914,7 @@
     {
       "path": "apps/desktop/ui-next/ui-next.test.mjs",
       "mode": "100644",
-      "sha256": "cd3dab96e9f340af5b52777f59a88e4538e930778914c9de52539b0190708194"
+      "sha256": "5e6cc8d64da9eb4fe25b7597e59917b4fed4d09c3581fbe5222802d5bbfb112d"
     },
     {
       "path": "apps/desktop/ui-next/vite.config.ts",
@@ -929,7 +929,7 @@
     {
       "path": "apps/desktop/ui-next/workspace-current.test.mjs",
       "mode": "100644",
-      "sha256": "f3fc9a258c56a366a326db88cb931e7f8149cc21bdc4496ae8674741bb0ec877"
+      "sha256": "8b2b5a31376e688e4b1dac8047f7f8df20b697fe2c11962975bb448c466c871a"
     },
     {
       "path": "apps/desktop/ui-next/workspace-destination.test.mjs",
@@ -939,7 +939,7 @@
     {
       "path": "apps/desktop/ui-next/workspace-files-changes.test.mjs",
       "mode": "100644",
-      "sha256": "84287f66ddb8ecbbb9006bd9e27a6f4d5af2332fd5b337018ed1d6cc2063de5c"
+      "sha256": "b4226a30e4e38ded5a6cfd7b4813e3569448f885796eb411f4f2d4a0d42b71fb"
     },
     {
       "path": "apps/desktop/ui-next/workspace-shell.test.mjs",
@@ -2404,7 +2404,7 @@
     {
       "path": "crates/mesh-daemon/src/live.rs",
       "mode": "100644",
-      "sha256": "9bbbdd342e1ffea46dae0e4ba690601d970e1ca9ddc800be92b3bedaa858c145"
+      "sha256": "ae039be228b1cd6b7ec4e8ba08b8109c6bfc49efa0ba5b55eb74e74cf6806f59"
     },
     {
       "path": "crates/mesh-daemon/src/main.rs",
@@ -3939,7 +3939,7 @@
     {
       "path": "docs/CHANGELOG.md",
       "mode": "100644",
-      "sha256": "99c71116d3f943590ddb7dc606b4be4ca4eb5886b315cfdb66fa33b99f8afe60"
+      "sha256": "635fd55f5755c41ae60de036bd9421d7481df9519ba13f8855db1f0024966d30"
     },
     {
       "path": "docs/charter.md",
@@ -3964,17 +3964,22 @@
     {
       "path": "docs/launch/public-alpha-contract.json",
       "mode": "100644",
-      "sha256": "6b08917359e705f7145e80ccd9057a361159994590defd667c52a897f830c542"
+      "sha256": "9afeecd587f5af01cb1b4f7beb7d3426a63327f4a1f5d59f949e449aab99328b"
     },
     {
       "path": "docs/launch/public-alpha.md",
       "mode": "100644",
-      "sha256": "5817bd36fe7a1cb0315e986af9d5c0110bfe4b5f5a27e4e8a4fad95a8b54e437"
+      "sha256": "a509f24fd8c6084253dad30f1bfc652fadabc78dfe8031ad526426bb84975a1d"
     },
     {
       "path": "docs/launch/v0.1.0-alpha.1.md",
       "mode": "100644",
       "sha256": "10cd178830617ec2b19a01cfd1bfc913cfcadd5bc52da260f6c9d9a2ab0852cc"
+    },
+    {
+      "path": "docs/launch/v0.1.0-alpha.2.md",
+      "mode": "100644",
+      "sha256": "703db5cdc351adce467d71afc36618489102715c1eccd7c28d399e502cb9400f"
     },
     {
       "path": "docs/local-mounted-demo.md",
@@ -4319,12 +4324,12 @@
     {
       "path": "package-lock.json",
       "mode": "100644",
-      "sha256": "e6d653af187417186d6954cbb27a5119d0b6418754bdd4beeea4f127ad44e7ca"
+      "sha256": "8f52e090932f08eb66a2850801c631b5befec83bb1b59ba9ec9b6adbcd5630b8"
     },
     {
       "path": "package.json",
       "mode": "100644",
-      "sha256": "85052aa8810056bdd71ceb98e9ed6bf50ef7afd0f6e07c8a0c8465580dcb6096"
+      "sha256": "67216895f1a6c50f76e052d9c13fd31f43879d86655d0014c279ae35b3044fe6"
     },
     {
       "path": "platform/macos-fskit/README.md",

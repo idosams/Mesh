@@ -8,7 +8,7 @@ const appDocument = document;
 const invoke = appWindow.__TAURI__?.core?.invoke;
 const $ = (id) => appDocument.getElementById(id);
 const noticeSource = createNoticeSource(appDocument, CustomEvent);
-const model = { source: null, destination: null, preview: null, workspace: null, workspaceVerified: false, checkpoint: null, agentFolder: null, agentHandoff: null, editor: null, folderChanges: [], nativeInspectionFailed: false, nativeCaptureEnabled: false, nativeCaptureAvailable: false, nativeCaptureChanging: false, exportPreview: null, exportBatchPreview: null, exportRoot: null, pullBackPrompt: null, restorePreview: null, restoreUndo: null, workspaceVersionPreview: null, workspaceVersionPreviewError: null, recent: null, activeFolder: null, approval: null };
+const model = { source: null, destination: null, preview: null, workspace: null, workspaceVerified: false, checkpoint: null, agentFolder: null, agentHandoff: null, agentLive: null, editor: null, folderChanges: [], nativeInspectionFailed: false, nativeCaptureEnabled: false, nativeCaptureAvailable: false, nativeCaptureChanging: false, exportPreview: null, exportBatchPreview: null, exportRoot: null, pullBackPrompt: null, restorePreview: null, restoreUndo: null, workspaceVersionPreview: null, workspaceVersionPreviewError: null, recent: null, activeFolder: null, approval: null };
 const LOCAL_SERVICE_COPY = Object.freeze({
   starting: 'Local service starting',
   ready: 'Local service ready',
@@ -54,6 +54,8 @@ let workspaceTransitionInFlight = false;
 let folderScanInFlight = false;
 let folderScanSettled = Promise.resolve();
 let nativeWorkspaceLaunchInFlight = false;
+let agentLiveInspectionInFlight = false;
+let agentLiveInspectionSequence = 0;
 let nextActionSnapshot = null;
 const NATIVE_SCAN_INTERVAL_MS = 5_000;
 // Background discovery is a hint, not the review/approval authority. A full exact scan still runs
@@ -356,6 +358,17 @@ function workspaceDestinationActionKey(intent) {
 function workspaceCurrentActionKey(intent) {
   if (intent === null || typeof intent !== 'object' || Array.isArray(intent)) return null;
   const keys = Object.keys(intent).sort();
+  if (intent.type === 'switch-workspace') {
+    return keys.length === 2
+      && keys[0] === 'path'
+      && keys[1] === 'type'
+      && typeof intent.path === 'string'
+      && intent.path.length > 0
+      && intent.path.length <= 4_096
+      && !/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(intent.path)
+      ? `switch-workspace:${intent.path}`
+      : null;
+  }
   if (keys.length !== 2 || keys[0] !== 'action' || keys[1] !== 'type' || intent.type !== 'activate') return null;
   return typeof intent.action === 'string' ? intent.action : null;
 }
@@ -1640,6 +1653,7 @@ function restoreAgentHandoffForWorkspace(
     && model.agentHandoff?.installation === workspace.installation
   ) return;
   const entry = recentWorkspaceEntries().find((candidate) => candidate.path === workspace.root);
+  const previousHandoff = model.agentHandoff;
   model.agentHandoff = entry?.agentHandoffInstallation === workspace.installation
     ? {
       root: workspace.root,
@@ -1647,6 +1661,13 @@ function restoreAgentHandoffForWorkspace(
       generation: entry.agentHandoffGeneration,
     }
     : null;
+  if (!model.agentHandoff
+    || previousHandoff?.root !== model.agentHandoff.root
+    || previousHandoff?.installation !== model.agentHandoff.installation
+    || previousHandoff?.generation !== model.agentHandoff.generation) {
+    model.agentLive = null;
+    agentLiveInspectionSequence += 1;
+  }
 }
 
 async function rememberWorkspace(path, exportRoot = null, originalUpdateVersion = null) {
@@ -3213,6 +3234,8 @@ function clearWorkspaceScopedState() {
   exportPreviewSequence += 1;
   pendingAgentVersionChoice = false;
   model.agentFolder = null;
+  model.agentLive = null;
+  agentLiveInspectionSequence += 1;
   model.editor = null;
   model.folderChanges = [];
   model.nativeInspectionFailed = false;
@@ -3659,6 +3682,34 @@ function currentWorkspacePresentation() {
   ];
   const entries = (data.entries.length ? data.entries : [{ path: 'No materialized paths', type: '' }])
     .map((entry) => `${entry.path}${entry.type ? ` · ${entry.type}` : ''}`);
+  const recentEntries = recentWorkspaceEntries();
+  const workspaces = recentEntries.map((entry) => {
+    const current = entry.path === data.root;
+    const agentAssigned = Boolean(entry.agentHandoffInstallation);
+    return Object.freeze({
+      path: entry.path,
+      label: workspaceDisplayName(
+        entry.path,
+        projectDisplayName(entry.projectRoot, recentEntries),
+        entry.sourcePointOrdinal,
+      ),
+      state: current ? 'current' : agentAssigned ? 'agent-assigned' : 'available',
+      canOpen: !current && !workspaceInteractionInFlight(),
+    });
+  });
+  const liveChanges = model.agentLive?.changes || [];
+  const liveState = workspaceInstallationMatchesHandoff()
+    ? model.agentLive?.state || 'scanning'
+    : 'idle';
+  const liveSummary = liveState === 'idle'
+    ? 'No agent currently owns this workspace.'
+    : liveState === 'scanning'
+      ? 'Reading the assigned folder without saving it…'
+      : liveState === 'error'
+        ? 'Mesh could not read the assigned folder. The handoff remains active; retry by returning to Mesh.'
+        : liveChanges.length
+          ? `${liveChanges.length} live ${liveChanges.length === 1 ? 'change' : 'changes'} detected. These remain unsaved until Finish agent handoff.`
+          : 'The assigned folder currently matches its saved starting point.';
   return Object.freeze({
     state: currentWorkspaceState(),
     recordSummary: `${data.records} durable record${data.records === 1 ? '' : 's'}`,
@@ -3675,6 +3726,15 @@ function currentWorkspacePresentation() {
     entryCount: data.entries.length,
     entries: Object.freeze(entries),
     conditions: Object.freeze(conditions),
+    agentActivity: Object.freeze({
+      state: liveState,
+      summary: liveSummary,
+      changes: Object.freeze(liveChanges.map((change) => Object.freeze({
+        path: change.path,
+        kind: change.kind,
+      }))),
+    }),
+    workspaces: Object.freeze(workspaces),
     actions: Object.freeze(actions),
   });
 }
@@ -3861,7 +3921,9 @@ function rememberAgentHandoff(binding, generation = null) {
     installation: binding.installation,
     generation: canonicalAgentHandoffGeneration(generation),
   };
+  model.agentLive = null;
   renderNextAction();
+  void inspectLiveAgentWork();
 }
 
 function agentHandoffMatches(expected) {
@@ -4182,6 +4244,105 @@ function refuseOrdinaryInspectionDuringAgentHandoff({ automatic = false } = {}) 
   return true;
 }
 
+const AGENT_LIVE_CHANGE_KINDS = Object.freeze([
+  'modified-file', 'new-file', 'new-folder', 'missing-file', 'unsupported',
+]);
+
+function validateAgentLiveInspection(value, binding) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Mesh received an invalid live agent-work inspection.');
+  }
+  const keys = Object.keys(value).sort();
+  const expected = [
+    'agent_handoff_generation', 'changes', 'schema', 'workspace_digest',
+    'workspace_installation', 'workspace_root',
+  ].sort();
+  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
+    throw new Error('Mesh received an unrecognized live agent-work inspection.');
+  }
+  if (value.schema !== 'mesh.agent-live-work/v1'
+    || value.workspace_root !== binding.root
+    || value.workspace_digest !== binding.digest
+    || value.workspace_installation !== binding.installation
+    || value.agent_handoff_generation !== binding.generation
+    || !Array.isArray(value.changes)
+    || value.changes.length > 10_000) {
+    throw new Error('The live agent-work inspection did not match this exact assigned workspace.');
+  }
+  const seen = new Set();
+  const changes = value.changes.map((candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)
+      || Object.keys(candidate).sort().join(',') !== 'kind,path'
+      || typeof candidate.path !== 'string'
+      || !candidate.path
+      || candidate.path.length > 4_096
+      || /[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(candidate.path)
+      || !AGENT_LIVE_CHANGE_KINDS.includes(candidate.kind)) {
+      throw new Error('Mesh received an invalid live agent-work entry.');
+    }
+    const identity = `${candidate.kind}\u0000${candidate.path}`;
+    if (seen.has(identity)) throw new Error('The live agent-work inspection repeated an entry.');
+    seen.add(identity);
+    return Object.freeze({ path: candidate.path, kind: candidate.kind });
+  });
+  return Object.freeze(changes);
+}
+
+function agentLiveInspectionStillCurrent(binding) {
+  return Boolean(
+    model.workspaceVerified
+    && model.workspace?.root === binding.root
+    && model.workspace?.digest === binding.digest
+    && model.workspace?.installation === binding.installation
+    && model.agentHandoff?.generation === binding.generation
+    && workspaceInstallationMatchesHandoff()
+  );
+}
+
+async function inspectLiveAgentWork() {
+  if (agentLiveInspectionInFlight || !workspaceInstallationMatchesHandoff()) return false;
+  const generation = canonicalAgentHandoffGeneration(model.agentHandoff?.generation);
+  if (!generation || !model.workspaceVerified || !model.workspace) return false;
+  const binding = Object.freeze({
+    root: model.workspace.root,
+    digest: model.workspace.digest,
+    installation: model.workspace.installation,
+    generation,
+    sequence: ++agentLiveInspectionSequence,
+  });
+  agentLiveInspectionInFlight = true;
+  if (!model.agentLive) {
+    model.agentLive = Object.freeze({ state: 'scanning', changes: Object.freeze([]) });
+    renderWorkspaceCurrentNext();
+  }
+  try {
+    const result = JSON.parse(await invoke('inspect_agent_live_work', {
+      expectedWorkspaceRoot: binding.root,
+      expectedWorkspaceDigest: binding.digest,
+      expectedWorkspaceInstallation: binding.installation,
+      expectedAgentHandoffGeneration: binding.generation,
+    }));
+    if (binding.sequence !== agentLiveInspectionSequence || !agentLiveInspectionStillCurrent(binding)) return false;
+    const changes = validateAgentLiveInspection(result, binding);
+    const next = Object.freeze({ state: 'ready', changes });
+    if (JSON.stringify(model.agentLive) !== JSON.stringify(next)) {
+      model.agentLive = next;
+      renderWorkspaceCurrentNext();
+    }
+    return true;
+  } catch (error) {
+    if (binding.sequence !== agentLiveInspectionSequence || !agentLiveInspectionStillCurrent(binding)) return false;
+    const next = Object.freeze({ state: 'error', changes: Object.freeze([]) });
+    if (JSON.stringify(model.agentLive) !== JSON.stringify(next)) {
+      model.agentLive = next;
+      renderWorkspaceCurrentNext();
+    }
+    return false;
+  } finally {
+    agentLiveInspectionInFlight = false;
+  }
+}
+
 function renderNextAction() {
   nextActionSnapshot = freezeRecommendedAction(recommendedNextAction());
   renderWorkspaceOverviewNext();
@@ -4401,7 +4562,8 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
         files: Object.freeze({
           entries: Object.freeze((data.entries || []).map((entry) => Object.freeze({
             value: entry.path,
-            label: `${entry.path} · ${entry.type}`,
+            label: entry.path,
+            kind: entry.type,
           }))),
           newPath: workspaceFilesState.newPath,
           selectedEntry: workspaceFilesState.selectedEntry,
@@ -4784,6 +4946,33 @@ async function activateProjectedCurrentAction(authority, actionId) {
   return true;
 }
 
+async function activateProjectedWorkspaceSwitch(authority, path) {
+  const entry = recentWorkspaceEntries().find((candidate) => candidate.path === path) || null;
+  const projected = currentWorkspacePresentation()?.workspaces.find((candidate) => candidate.path === path) || null;
+  if (
+    !entry
+    || !projected?.canOpen
+    || !currentWorkspaceActionAuthorityIsCurrent(authority)
+    || workspaceInteractionInFlight()
+  ) {
+    showNotice('That workspace is no longer available to switch. Refresh and choose it again.', true);
+    return false;
+  }
+  const expectedContinuityKey = workspaceProjectionContinuityKey();
+  const opened = await openRecentWorkspacePath(
+    path,
+    () => recentWorkspaceEntries().some((candidate) => candidate.path === path)
+      && workspaceProjectionContinuityKey() === expectedContinuityKey,
+    'The workspace list changed while Mesh was opening that folder. Review the current workspace and choose again.',
+  );
+  if (opened && entry.agentHandoffInstallation && workspaceInstallationMatchesHandoff()) {
+    focusReactWorkspacePage('current');
+    showNotice('Opened the exact workspace assigned to a running agent. Live changes are read-only until you finish that handoff.');
+    void inspectLiveAgentWork();
+  }
+  return opened;
+}
+
 function renderWorkspaceCurrentNext() {
   const data = model.workspace;
   if (!workspaceCurrentNextAvailable || !data || rememberedWorkspaceNeedsImport(data)) {
@@ -4800,6 +4989,14 @@ function renderWorkspaceCurrentNext() {
   for (const action of current.actions) {
     if (action.enabled) {
       actionHandlers.set(action.id, () => activateProjectedCurrentAction(authority, action.id));
+    }
+  }
+  for (const workspace of current.workspaces) {
+    if (workspace.canOpen) {
+      actionHandlers.set(
+        `switch-workspace:${workspace.path}`,
+        () => activateProjectedWorkspaceSwitch(authority, workspace.path),
+      );
     }
   }
   const continuityKey = workspaceProjectionContinuityKey();
@@ -11063,9 +11260,12 @@ async function loadNativeCapturePreference() {
   }
   renderEditorChoices();
 }
-appWindow.addEventListener?.('focus', () => scanNativeFolder({ automatic: true }));
+appWindow.addEventListener?.('focus', () => workspaceInstallationMatchesHandoff()
+  ? inspectLiveAgentWork()
+  : scanNativeFolder({ automatic: true }));
 appWindow.setInterval?.(() => {
-  void scanNativeFolder({ automatic: true, periodic: true });
+  if (workspaceInstallationMatchesHandoff()) void inspectLiveAgentWork();
+  else void scanNativeFolder({ automatic: true, periodic: true });
 }, NATIVE_SCAN_INTERVAL_MS);
 void refreshApprovalStatus();
 void (async () => {

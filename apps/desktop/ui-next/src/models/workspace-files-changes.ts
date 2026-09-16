@@ -21,10 +21,15 @@ export type WorkspaceWorkField =
 
 export type WorkspaceWorkAction = Readonly<{ id: WorkspaceWorkActionId; label: string; enabled: boolean }>;
 export type WorkspaceWorkChoice = Readonly<{ value: string; label: string }>;
+export type WorkspaceEntryChoice = Readonly<{
+  value: string;
+  label: string;
+  kind: "file" | "folder";
+}>;
 
 export type WorkspaceFilesChangesModel = Readonly<{
   files: Readonly<{
-    entries: readonly WorkspaceWorkChoice[];
+    entries: readonly WorkspaceEntryChoice[];
     newPath: string;
     selectedEntry: string;
     movePath: string;
@@ -136,6 +141,24 @@ function choices(value: unknown, label: string): readonly WorkspaceWorkChoice[] 
   }));
 }
 
+function entries(value: unknown): readonly WorkspaceEntryChoice[] {
+  if (!Array.isArray(value) || value.length > 10_000) throw new Error("managed entries were invalid or unbounded.");
+  const seen = new Set<string>();
+  return Object.freeze(value.map((candidate, index) => {
+    const item = record(candidate, `managed entry ${index + 1}`);
+    exactKeys(item, ["kind", "label", "value"], `managed entry ${index + 1}`);
+    const itemValue = text(item.value, `managed entry ${index + 1} value`, 4_096);
+    if (seen.has(itemValue)) throw new Error("managed entries repeated a value.");
+    seen.add(itemValue);
+    if (item.kind !== "file" && item.kind !== "folder") throw new Error("A managed entry kind was unknown.");
+    return Object.freeze({
+      value: itemValue,
+      label: text(item.label, `managed entry ${index + 1} label`, 4_096),
+      kind: item.kind,
+    });
+  }));
+}
+
 function lines(value: unknown, label: string): readonly string[] {
   if (!Array.isArray(value) || value.length > 10_000) throw new Error(`${label} was invalid or unbounded.`);
   return Object.freeze(value.map((item, index) => text(item, `${label} ${index + 1}`, 4_096)));
@@ -199,7 +222,7 @@ export function workspaceFilesChangesEnvelope(value: unknown, previousGeneration
     generation: envelope.generation as number,
     model: Object.freeze({
       files: Object.freeze({
-        entries: choices(files.entries, "managed entries"),
+        entries: entries(files.entries),
         newPath: text(files.newPath, "new path", 4_096, true),
         selectedEntry: text(files.selectedEntry, "selected entry", 4_096, true),
         movePath: text(files.movePath, "move path", 4_096, true),

@@ -709,7 +709,7 @@ function fakeDocument() {
         }));
       }
       document.dispatchEvent(new FakeCustomEvent('mesh:workspace-current-intent', {
-        detail: { generation, intent: { type: 'activate', action } },
+        detail: { generation, intent: typeof action === 'string' ? { type: 'activate', action } : action },
       }));
       await Promise.resolve();
       await Promise.resolve();
@@ -8403,6 +8403,22 @@ test('an agent-assigned recent workspace switches directly to its verified finis
     if (command === 'recent_workspace_status') {
       return JSON.stringify(recentStatus());
     }
+    if (command === 'inspect_agent_live_work') {
+      assert.deepEqual(parameters, {
+        expectedWorkspaceRoot: assigned,
+        expectedWorkspaceDigest: assignedWorkspace.digest,
+        expectedWorkspaceInstallation: assignedInstallation,
+        expectedAgentHandoffGeneration: TEST_AGENT_HANDOFF_GENERATION,
+      });
+      return JSON.stringify({
+        schema: 'mesh.agent-live-work/v1',
+        workspace_root: assigned,
+        workspace_digest: assignedWorkspace.digest,
+        workspace_installation: assignedInstallation,
+        agent_handoff_generation: TEST_AGENT_HANDOFF_GENERATION,
+        changes: [{ path: 'notes/live.txt', kind: 'new-file' }],
+      });
+    }
     if (command === 'forget_managed_workspace') {
       forgetCalls += 1;
       throw new Error(`assigned workspace reached native forget: ${parameters.path}`);
@@ -8441,31 +8457,30 @@ test('an agent-assigned recent workspace switches directly to its verified finis
   await import(`./app.js?assigned-recent-custody=${Date.now()}`);
   await waitFor(() => document.serviceState.state === 'ready');
 
-  const selector = document.getElementById('recent-workspace');
-  selector.value = assigned;
-  await selector.emit('change');
-  assert.equal(selector.value, assigned);
-  assert.match(selector.children[1].textContent, /Agent assigned/);
-  assert.equal(document.getElementById('open-recent-workspace').textContent, 'Switch to finish agent');
-  assert.equal(document.getElementById('open-recent-workspace').disabled, false);
-  assert.equal(document.getElementById('forget-recent-workspace').disabled, true);
-  assert.match(document.getElementById('recent-workspace-hint').textContent, /assigned to an agent/);
-  assert.match(document.getElementById('recent-workspace-hint').textContent, /Finish agent handoff/);
-  await document.getElementById('forget-recent-workspace').emit('click');
+  const assignedChoice = document.workspaceCurrent.current.workspaces.find((candidate) => candidate.path === assigned);
+  assert.deepEqual(assignedChoice, {
+    path: assigned,
+    label: 'assigned-agent-custody',
+    state: 'agent-assigned',
+    canOpen: true,
+  });
   assert.equal(forgetCalls, 0);
-  assert.equal(document.workspaceEntry.entry.canForgetRecent, false);
 
-  await document.getElementById('open-recent-workspace').emit('click');
+  await document.emitWorkspaceCurrentIntent({ type: 'switch-workspace', path: assigned });
   await waitFor(() => (document.workspaceCurrent?.current?.agentFolder ?? '') === assigned);
+  await waitFor(() => document.workspaceCurrent?.current?.agentActivity?.state === 'ready');
   assert.equal((document.workspaceCurrent?.current?.agentFolder ?? ''), assigned);
   assert.equal(Boolean(document.workspaceCurrentAction('finish-agent')), true);
   assert.equal(!document.workspaceCurrentAction('finish-agent')?.enabled, false);
+  assert.deepEqual(document.workspaceCurrent.current.agentActivity.changes, [
+    { path: 'notes/live.txt', kind: 'new-file' },
+  ]);
   document.dispatchEvent(new FakeCustomEvent('mesh:workspace-current-mounted', {
     detail: { generation: document.workspaceCurrent.generation },
   }));
   assert.equal(document.getElementById('workspace-current-next').classList.contains('hidden'), false);
-  assert.match(document.getElementById('notice').textContent, /Returned to the exact folder assigned to this agent/);
-  assert.match(document.getElementById('notice').textContent, /inspect the folder for unsaved native work/);
+  assert.match(document.getElementById('notice').textContent, /Opened the exact workspace assigned to a running agent/);
+  assert.match(document.getElementById('notice').textContent, /Live changes are read-only/);
 });
 
 test('rollback removes the stable folder through the canonical deleted workspace identity', async () => {

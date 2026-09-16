@@ -47,6 +47,18 @@ const projection = {
   entryCount: 2,
   entries: ["forecast.xlsx · file", "reports · folder"],
   conditions: ["Finish agent handoff before changing this folder."],
+  agentActivity: {
+    state: "ready",
+    summary: "2 live changes detected. These remain unsaved until Finish agent handoff.",
+    changes: [
+      { path: "forecast.xlsx", kind: "modified-file" },
+      { path: "notes/today.txt", kind: "new-file" },
+    ],
+  },
+  workspaces: [
+    { path: "/private/mesh/workspace", label: "Finance · point 4", state: "current", canOpen: false },
+    { path: "/private/mesh/agent-two", label: "Finance · point 3", state: "agent-assigned", canOpen: true },
+  ],
   actions: [
     ...requiredActions.map((id) => ({ id, label: id, enabled: id !== "rollback" })),
     { id: "finish-agent", label: "Finish agent handoff", enabled: true },
@@ -61,9 +73,15 @@ test("the detailed current projection is bounded, complete, and generation-bound
   assert.equal(accepted.model.actions.length, 12);
   assert.equal(Object.isFrozen(accepted.model.actions), true);
   assert.equal(Object.isFrozen(accepted.model.entries), true);
+  assert.equal(accepted.model.agentActivity.changes[0].kind, "modified-file");
+  assert.equal(accepted.model.workspaces[1].state, "agent-assigned");
   assert.deepEqual(module.workspaceCurrentIntent({ type: "activate", action: "finish-agent" }), {
     type: "activate",
     action: "finish-agent",
+  });
+  assert.deepEqual(module.workspaceCurrentIntent({ type: "switch-workspace", path: "/private/mesh/agent-two" }), {
+    type: "switch-workspace",
+    path: "/private/mesh/agent-two",
   });
   assert.throws(
     () => module.workspaceCurrentEnvelope({ generation: 4, current: projection }, 4),
@@ -102,6 +120,11 @@ test("the detailed current view exposes custody, conditions, destination, diagno
   assert.match(html, /Agent folder assigned/);
   assert.match(html, /In custody/);
   assert.match(html, /Original or destination folder/);
+  assert.match(html, /Workspaces and agents/);
+  assert.match(html, /Agent running/);
+  assert.match(html, /Live agent work/);
+  assert.match(html, /forecast\.xlsx/);
+  assert.match(html, /Monitoring never saves or approves work/);
   assert.match(html, /Conditions and unavailable controls \(1\)/);
   assert.match(html, />copy-diagnostics</);
   assert.match(html, />rollback</);
@@ -127,13 +150,16 @@ test("the Current organism emits exact action intents without a legacy control p
   const start = buttons.find((button) => button.props.children === "start-codex");
   const finish = buttons.find((button) => button.props.children === "Finish agent handoff");
   const rollback = buttons.find((button) => button.props.children === "rollback");
+  const switchWorkspace = buttons.find((button) => button.props["data-mesh-current-workspace"] === "/private/mesh/agent-two");
   assert.equal(start.props.disabled, false);
   assert.equal(finish.props.disabled, false);
   assert.equal(rollback.props.disabled, true);
   start.props.onClick();
   finish.props.onClick();
+  switchWorkspace.props.onClick();
   assert.deepEqual(intents, [
     { type: "activate", action: "start-codex" },
     { type: "activate", action: "finish-agent" },
+    { type: "switch-workspace", path: "/private/mesh/agent-two" },
   ]);
 });

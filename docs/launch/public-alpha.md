@@ -14,12 +14,11 @@ are unavailable in this build. Test exports only to a separate empty destination
 
 ## Install
 
-1. Download the delivery ZIP from the GitHub prerelease and expand it.
-2. Verify the inner app archive against the included SHA-256 checksum.
-3. Expand the app archive and move `Mesh.app` to `/Applications`.
-4. In Finder, explicitly choose **Open** for this unnotarized technical-alpha build. Never disable
+1. Download the Apple-silicon DMG from the latest GitHub prerelease.
+2. Open the DMG and drag `Mesh.app` to the Applications shortcut.
+3. In Finder, explicitly choose **Open** for this unnotarized technical-alpha build. Never disable
    Gatekeeper globally and never remove quarantine metadata.
-5. Use only a disposable or backed-up project during the alpha.
+4. Use only a disposable or backed-up project during the alpha.
 
 ## Uninstall
 

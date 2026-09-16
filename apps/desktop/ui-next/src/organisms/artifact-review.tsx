@@ -117,7 +117,20 @@ export function ArtifactReview({
             </section>
           ) : null}
 
-          {model.mode === "visual" && change.kind !== "text" ? (
+          {change.kind === "file" ? (
+            <div className="grid gap-4">
+              <section className="rounded-lg border border-border bg-muted/20 p-4" aria-label="Saved file metadata comparison">
+                <h4 className="font-semibold">Exact file metadata</h4>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Mesh saved and compared the exact bytes, but this file type has no specialized visual or text preview. The metadata below remains part of this review; inspect the file in its owning application when content-level review is required.
+                </p>
+              </section>
+              <div className="grid gap-4 md:grid-cols-2">
+                <ReviewPanel label={change.beforeLabel} tone="before" values={change.beforeValues} />
+                <ReviewPanel label={change.afterLabel} tone="after" values={change.afterValues} />
+              </div>
+            </div>
+          ) : model.mode === "visual" && change.kind !== "text" ? (
             <ArtifactVisualComparison
               change={change}
               preview={artifactPreview?.changeId === change.id ? artifactPreview : null}
@@ -161,7 +174,7 @@ export function ArtifactReview({
           <div className="mt-6 grid gap-2">
             <Button
               variant="secondary"
-              disabled={change.kind === "text" || !model.canInspectExactCopies}
+              disabled={change.kind === "text" || change.kind === "file" || !model.canInspectExactCopies}
               onClick={() => onIntent({ type: "inspect-exact-copies", changeId: change.id })}
             >
               Inspect exact copies

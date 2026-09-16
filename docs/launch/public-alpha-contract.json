@@ -1,6 +1,6 @@
 {
   "schema": "mesh.public-alpha-contract/v1",
-  "tag": "v0.1.0-alpha.1",
+  "tag": "v0.1.0-alpha.2",
   "product_version": "0.1.0",
   "channel": "public-technical-alpha",
   "repository": "idosams/Mesh",
@@ -16,7 +16,7 @@
   },
   "required_documents": {
     "changelog": "docs/CHANGELOG.md",
-    "release_notes": "docs/launch/v0.1.0-alpha.1.md",
+    "release_notes": "docs/launch/v0.1.0-alpha.2.md",
     "protocol": "protocol/README.md",
     "conformance_report": "protocol/conformance/reports/second-client-r14.md",
     "benchmark_report": "docs/benchmarks.md"

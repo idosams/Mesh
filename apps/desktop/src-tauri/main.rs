@@ -3979,6 +3979,79 @@ mod desktop {
         .encode())
     }
 
+    #[tauri::command]
+    async fn inspect_agent_live_work(
+        runtime: State<'_, DesktopRuntime>,
+        expected_workspace_root: String,
+        expected_workspace_digest: String,
+        expected_workspace_installation: String,
+        expected_agent_handoff_generation: String,
+    ) -> Result<String, String> {
+        parse_agent_handoff_generation(&expected_agent_handoff_generation)?;
+        let daemon = Arc::clone(&runtime.daemon);
+        let inspection = tauri::async_runtime::spawn_blocking(move || {
+            daemon.inspect_agent_finish_preflight(
+                &expected_workspace_root,
+                &expected_workspace_digest,
+                &expected_workspace_installation,
+                &expected_agent_handoff_generation,
+            )
+        })
+        .await
+        .map_err(|_| "The live agent inspection stopped unexpectedly".to_owned())?
+        .map_err(|error| error.to_string())?;
+        let mut changes = inspection
+            .managed_files()
+            .iter()
+            .filter(|file| file.modified_from_current_version())
+            .map(|file| {
+                Json::object([
+                    ("path", Json::text(file.path())),
+                    ("kind", Json::text("modified-file")),
+                ])
+            })
+            .collect::<Vec<_>>();
+        changes.extend(inspection.native_files().iter().map(|file| {
+            Json::object([
+                ("path", Json::text(file.path())),
+                ("kind", Json::text("new-file")),
+            ])
+        }));
+        changes.extend(inspection.native_directories().iter().map(|directory| {
+            Json::object([
+                ("path", Json::text(directory.path())),
+                ("kind", Json::text("new-folder")),
+            ])
+        }));
+        changes.extend(inspection.missing_files().iter().map(|file| {
+            Json::object([
+                ("path", Json::text(file.path())),
+                ("kind", Json::text("missing-file")),
+            ])
+        }));
+        changes.extend(inspection.unsupported_entries().iter().map(|entry| {
+            Json::object([
+                ("path", Json::text(entry.path())),
+                ("kind", Json::text("unsupported")),
+            ])
+        }));
+        Ok(Json::object([
+            ("schema", Json::text("mesh.agent-live-work/v1")),
+            ("workspace_root", Json::text(inspection.root())),
+            ("workspace_digest", Json::text(inspection.digest())),
+            (
+                "workspace_installation",
+                Json::text(inspection.installation()),
+            ),
+            (
+                "agent_handoff_generation",
+                Json::text(inspection.generation()),
+            ),
+            ("changes", Json::Array(changes)),
+        ])
+        .encode())
+    }
+
     #[tauri::command(async)]
     fn inspect_managed_file(
         runtime: State<'_, DesktopRuntime>,
@@ -5569,6 +5642,7 @@ mod desktop {
                 native_capture_preference,
                 set_native_capture_preference,
                 inspect_agent_finish_preflight,
+                inspect_agent_live_work,
                 inspect_managed_file,
                 inspect_native_file,
                 inspect_managed_directory_installation,

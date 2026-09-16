@@ -19,6 +19,22 @@ export type WorkspaceCurrentAction = Readonly<{
   enabled: boolean;
 }>;
 
+export type WorkspaceCurrentWorkspace = Readonly<{
+  path: string;
+  label: string;
+  state: "current" | "agent-assigned" | "available";
+  canOpen: boolean;
+}>;
+
+export type WorkspaceAgentActivity = Readonly<{
+  state: "idle" | "scanning" | "ready" | "error";
+  summary: string;
+  changes: readonly Readonly<{
+    path: string;
+    kind: "modified-file" | "new-file" | "new-folder" | "missing-file" | "unsupported";
+  }>[];
+}>;
+
 export type WorkspaceCurrentModel = Readonly<{
   state: "Working" | "Saved privately" | "Available to team" | "Ready for review" | "Needs attention" | "Approved";
   recordSummary: string;
@@ -35,13 +51,14 @@ export type WorkspaceCurrentModel = Readonly<{
   entryCount: number;
   entries: readonly string[];
   conditions: readonly string[];
+  agentActivity: WorkspaceAgentActivity;
+  workspaces: readonly WorkspaceCurrentWorkspace[];
   actions: readonly WorkspaceCurrentAction[];
 }>;
 
-export type WorkspaceCurrentIntent = Readonly<{
-  type: "activate";
-  action: WorkspaceCurrentActionId;
-}>;
+export type WorkspaceCurrentIntent =
+  | Readonly<{ type: "activate"; action: WorkspaceCurrentActionId }>
+  | Readonly<{ type: "switch-workspace"; path: string }>;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -153,6 +170,56 @@ function actions(value: unknown): readonly WorkspaceCurrentAction[] {
   return Object.freeze(parsed);
 }
 
+function agentActivity(value: unknown): WorkspaceAgentActivity {
+  const activity = record(value, "live agent activity");
+  exactKeys(activity, ["changes", "state", "summary"], "live agent activity");
+  if (!["idle", "scanning", "ready", "error"].includes(activity.state as string)) {
+    throw new Error("The live agent activity state was not recognized.");
+  }
+  if (!Array.isArray(activity.changes) || activity.changes.length > 10_000) {
+    throw new Error("Live agent changes were invalid or unbounded.");
+  }
+  const seen = new Set<string>();
+  const changes = activity.changes.map((candidate, index) => {
+    const change = record(candidate, `live agent change ${index + 1}`);
+    exactKeys(change, ["kind", "path"], `live agent change ${index + 1}`);
+    const path = safeText(change.path, `live agent change ${index + 1} path`, 4_096);
+    const kinds = ["modified-file", "new-file", "new-folder", "missing-file", "unsupported"] as const;
+    if (!kinds.includes(change.kind as typeof kinds[number])) throw new Error("A live agent change kind was unknown.");
+    const identity = `${change.kind as string}\u0000${path}`;
+    if (seen.has(identity)) throw new Error("Live agent changes repeated an entry.");
+    seen.add(identity);
+    return Object.freeze({ path, kind: change.kind as typeof kinds[number] });
+  });
+  return Object.freeze({
+    state: activity.state as WorkspaceAgentActivity["state"],
+    summary: safeText(activity.summary, "live agent activity summary", 1_024),
+    changes: Object.freeze(changes),
+  });
+}
+
+function workspaces(value: unknown): readonly WorkspaceCurrentWorkspace[] {
+  if (!Array.isArray(value) || value.length > 1_000) throw new Error("Recent workspaces were invalid or unbounded.");
+  const seen = new Set<string>();
+  const parsed = value.map((candidate, index) => {
+    const workspace = record(candidate, `recent workspace ${index + 1}`);
+    exactKeys(workspace, ["canOpen", "label", "path", "state"], `recent workspace ${index + 1}`);
+    const path = safeText(workspace.path, `recent workspace ${index + 1} path`, 4_096);
+    if (seen.has(path)) throw new Error("Recent workspaces repeated a path.");
+    seen.add(path);
+    if (!["current", "agent-assigned", "available"].includes(workspace.state as string)) {
+      throw new Error("A recent workspace state was not recognized.");
+    }
+    return Object.freeze({
+      path,
+      label: safeText(workspace.label, `recent workspace ${index + 1} label`, 512),
+      state: workspace.state as WorkspaceCurrentWorkspace["state"],
+      canOpen: boolean(workspace.canOpen, `recent workspace ${index + 1} authority`),
+    });
+  });
+  return Object.freeze(parsed);
+}
+
 export function workspaceCurrentEnvelope(
   value: unknown,
   previousGeneration: number,
@@ -166,6 +233,7 @@ export function workspaceCurrentEnvelope(
   const current = record(envelope.current, "workspace current projection");
   exactKeys(current, [
     "actions",
+    "agentActivity",
     "agentAssigned",
     "agentFolder",
     "agentFolderLabel",
@@ -181,6 +249,7 @@ export function workspaceCurrentEnvelope(
     "sharedVersionTitle",
     "state",
     "workingFolder",
+    "workspaces",
   ], "workspace current projection");
   if (!STATES.includes(current.state as WorkspaceCurrentModel["state"])) {
     throw new Error("The workspace current state was not recognized.");
@@ -203,6 +272,8 @@ export function workspaceCurrentEnvelope(
       entryCount: count(current.entryCount, "entry count"),
       entries: safeList(current.entries, "materialized paths", 10_000, 4_096),
       conditions: safeList(current.conditions, "workspace conditions", 2_048, 2_048),
+      agentActivity: agentActivity(current.agentActivity),
+      workspaces: workspaces(current.workspaces),
       actions: actions(current.actions),
     }),
   });
@@ -210,6 +281,13 @@ export function workspaceCurrentEnvelope(
 
 export function workspaceCurrentIntent(value: unknown): WorkspaceCurrentIntent {
   const intent = record(value, "workspace current intent");
+  if (intent.type === "switch-workspace") {
+    exactKeys(intent, ["path", "type"], "workspace current intent");
+    return Object.freeze({
+      type: "switch-workspace",
+      path: safeText(intent.path, "workspace switch path", 4_096),
+    });
+  }
   exactKeys(intent, ["action", "type"], "workspace current intent");
   if (intent.type !== "activate" || !ACTION_IDS.includes(intent.action as WorkspaceCurrentActionId)) {
     throw new Error("The workspace current intent was not recognized.");

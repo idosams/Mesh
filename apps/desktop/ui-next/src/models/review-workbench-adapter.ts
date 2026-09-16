@@ -32,6 +32,7 @@ const artifactLabels: Readonly<Record<ArtifactKind, string>> = Object.freeze({
   presentation: "PowerPoint",
   document: "Word",
   spreadsheet: "Excel",
+  file: "File",
 });
 
 function record(value: unknown, label: string): JsonRecord {
@@ -115,7 +116,10 @@ function pathArtifactKind(
   // specific evidence and is already identity-checked below; use it for the text workbench rather
   // than rejecting ordinary extensionless, script, and text files.
   if (body === "text" || verifiedText !== null) return "text";
-  throw new Error("The review change has no supported comparison surface.");
+  // Unknown binary formats are still exact saved changes. They do not gain visual/content
+  // preview authority, but one ordinary file (for example .DS_Store or a project-specific
+  // binary) must not make the complete review bundle unrenderable.
+  return "file";
 }
 
 function artifactKind(

@@ -55,6 +55,63 @@ export function WorkspaceCurrent({ model, onIntent }: {
         </div>
       </header>
 
+      <section className="rounded-xl border border-border bg-background/40 p-4" aria-labelledby="workspace-switcher-heading">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspaces and agents</p>
+            <h3 id="workspace-switcher-heading" className="mt-1 font-semibold">Switch without losing agent context</h3>
+          </div>
+          <span className="text-xs text-muted-foreground">{model.workspaces.length} recent</span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {model.workspaces.map((workspace) => (
+            <button
+              key={workspace.path}
+              type="button"
+              className="min-h-14 rounded-lg border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-65"
+              disabled={!workspace.canOpen}
+              aria-current={workspace.state === "current" ? "true" : undefined}
+              title={workspace.path}
+              onClick={() => onIntent({ type: "switch-workspace", path: workspace.path })}
+              data-mesh-current-workspace={workspace.path}
+            >
+              <span className="block truncate font-medium">{workspace.label}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {workspace.state === "current" ? "Current workspace" : workspace.state === "agent-assigned" ? "Agent running" : "Available"}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="live-agent-heading">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Read-only monitor</p>
+            <h3 id="live-agent-heading" className="mt-1 font-semibold">Live agent work</h3>
+          </div>
+          <Badge tone={model.agentActivity.state === "error" ? "warning" : model.agentAssigned ? "positive" : "neutral"}>
+            {model.agentActivity.state === "scanning" ? "Checking" : model.agentAssigned ? "Monitoring" : "No active agent"}
+          </Badge>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground" role="status" aria-live="polite">
+          {model.agentActivity.summary}
+        </p>
+        {model.agentActivity.changes.length ? (
+          <ul className="mt-3 max-h-56 space-y-2 overflow-auto" data-mesh-live-agent-work="true">
+            {model.agentActivity.changes.map((change) => (
+              <li key={`${change.kind}:${change.path}`} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm">
+                <span className="min-w-0 break-all font-mono">{change.path}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{change.kind.replaceAll("-", " ")}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {model.agentAssigned ? (
+          <p className="mt-3 text-xs text-muted-foreground">Monitoring never saves or approves work. Finish agent handoff still performs the authoritative complete scan before the work enters private history and Review.</p>
+        ) : null}
+      </section>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-border bg-background/40 p-4" aria-labelledby="working-folder-heading">
           <p id="working-folder-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Working folder</p>

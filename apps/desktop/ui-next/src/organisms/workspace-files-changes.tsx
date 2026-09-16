@@ -3,6 +3,7 @@ import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import { SegmentedControl } from "../atoms/segmented-control";
 import type {
+  WorkspaceEntryChoice,
   WorkspaceFilesChangesIntent,
   WorkspaceFilesChangesModel,
   WorkspaceWorkActionId,
@@ -15,6 +16,97 @@ type WorkbenchProps = {
 
 function actionMap(model: WorkspaceFilesChangesModel) {
   return new Map(model.actions.map((action) => [action.id, action]));
+}
+
+type WorkspaceTreeNode = {
+  name: string;
+  path: string;
+  kind: "file" | "folder";
+  explicit: boolean;
+  children: WorkspaceTreeNode[];
+};
+
+function workspaceTree(entries: readonly WorkspaceEntryChoice[]): WorkspaceTreeNode[] {
+  const roots: WorkspaceTreeNode[] = [];
+  const byPath = new Map<string, WorkspaceTreeNode>();
+  for (const entry of entries) {
+    const parts = entry.value.split("/").filter(Boolean);
+    let siblings = roots;
+    let path = "";
+    for (let index = 0; index < parts.length; index += 1) {
+      const name = parts[index];
+      path = path ? `${path}/${name}` : name;
+      let node = byPath.get(path);
+      if (!node) {
+        node = {
+          name,
+          path,
+          kind: index === parts.length - 1 ? entry.kind : "folder",
+          explicit: index === parts.length - 1,
+          children: [],
+        };
+        byPath.set(path, node);
+        siblings.push(node);
+      } else if (index === parts.length - 1) {
+        node.kind = entry.kind;
+        node.explicit = true;
+      }
+      siblings = node.children;
+    }
+  }
+  const sort = (nodes: WorkspaceTreeNode[]) => {
+    nodes.sort((left, right) => left.kind === right.kind
+      ? left.name.localeCompare(right.name)
+      : left.kind === "folder" ? -1 : 1);
+    nodes.forEach((node) => sort(node.children));
+  };
+  sort(roots);
+  return roots;
+}
+
+function WorkspaceTree({ entries, selectedEntry, disabled, onSelect, level = 1 }: {
+  entries: readonly WorkspaceTreeNode[];
+  selectedEntry: string;
+  disabled: boolean;
+  onSelect: (path: string) => void;
+  level?: number;
+}) {
+  return (
+    <ul role={level === 1 ? "tree" : "group"} aria-label={level === 1 ? "Workspace tree" : undefined} className={level === 1 ? "grid gap-1" : "ml-5 grid gap-1 border-l border-border pl-3"}>
+      {entries.map((entry) => (
+        <li
+          key={entry.path}
+          role="treeitem"
+          aria-level={level}
+          aria-expanded={entry.kind === "folder" ? true : undefined}
+        >
+          {entry.explicit ? (
+            <button
+              type="button"
+              className="flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left font-mono text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              aria-current={selectedEntry === entry.path ? "true" : undefined}
+              disabled={disabled}
+              onClick={() => onSelect(entry.path)}
+              data-mesh-work-entry={entry.path}
+            >
+              <span aria-hidden="true" className="w-5 text-center">{entry.kind === "folder" ? "▾" : "·"}</span>
+              <span className="min-w-0 flex-1 break-all">{entry.name}</span>
+              <span className="text-xs text-muted-foreground">{entry.kind}</span>
+            </button>
+          ) : (
+            <div className="flex min-h-10 items-center gap-2 px-2 font-mono text-sm text-muted-foreground">
+              <span aria-hidden="true" className="w-5 text-center">▾</span>
+              <span className="min-w-0 flex-1 break-all">{entry.name}</span>
+              <span className="text-xs">folder</span>
+            </div>
+          )}
+          {entry.children.length ? (
+            <WorkspaceTree entries={entry.children} selectedEntry={selectedEntry} disabled={disabled} onSelect={onSelect} level={level + 1} />
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function WorkAction({ id, actions, onIntent, variant = "secondary", activationEcho, activationIntent, enabledOverride }: {
@@ -41,6 +133,7 @@ function WorkAction({ id, actions, onIntent, variant = "secondary", activationEc
 
 export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
   const actions = useMemo(() => actionMap(model), [model]);
+  const tree = useMemo(() => workspaceTree(model.files.entries), [model.files.entries]);
   const newPathRef = useRef<HTMLInputElement>(null);
   const movePathRef = useRef<HTMLInputElement>(null);
   return (
@@ -52,7 +145,24 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
           Accepted changes are signed and added to private history before Mesh reports them saved.
         </p>
       </header>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[minmax(18rem,0.9fr)_minmax(22rem,1.1fr)]">
+        <section className="min-w-0 rounded-xl border border-border bg-background/40 p-4" aria-labelledby="workspace-tree-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 id="workspace-tree-heading" className="font-semibold">Workspace tree</h3>
+            <span className="text-xs text-muted-foreground">{model.files.entries.length} saved entries</span>
+          </div>
+          <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg border border-border bg-background p-2">
+            {tree.length ? (
+              <WorkspaceTree
+                entries={tree}
+                selectedEntry={model.files.selectedEntry}
+                disabled={!model.files.canSelectEntry}
+                onSelect={(value) => onIntent({ type: "set-field", field: "selectedEntry", value })}
+              />
+            ) : <p className="p-3 text-sm text-muted-foreground">No files or folders yet.</p>}
+          </div>
+        </section>
+        <div className="grid min-w-0 gap-4">
         <section className="rounded-xl border border-border bg-background/40 p-4" aria-labelledby="new-entry-heading">
           <h3 id="new-entry-heading" className="font-semibold">New entry</h3>
           <label className="mt-3 grid gap-2 text-sm font-medium">
@@ -72,19 +182,10 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
           </div>
         </section>
         <section className="rounded-xl border border-border bg-background/40 p-4" aria-labelledby="existing-entry-heading">
-          <h3 id="existing-entry-heading" className="font-semibold">Existing entry</h3>
-          <label className="mt-3 grid gap-2 text-sm font-medium">
-            File or folder
-            <select
-              className="min-h-11 rounded-lg border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              value={model.files.selectedEntry}
-              disabled={!model.files.canSelectEntry}
-              onChange={(event) => onIntent({ type: "set-field", field: "selectedEntry", value: event.currentTarget.value })}
-            >
-              <option value="">{model.files.entries.length ? "Choose an entry" : "No entries yet"}</option>
-              {model.files.entries.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-            </select>
-          </label>
+          <h3 id="existing-entry-heading" className="font-semibold">Selected entry</h3>
+          <p className="mt-3 min-h-11 break-all rounded-lg border border-border bg-background px-3 py-3 font-mono text-sm">
+            {model.files.selectedEntry || "Choose a file or folder from the tree."}
+          </p>
           <label className="mt-3 grid gap-2 text-sm font-medium">
             Move or rename to
             <input
@@ -101,6 +202,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
             <WorkAction id="delete-entry" actions={actions} onIntent={onIntent} variant="danger" />
           </div>
         </section>
+        </div>
       </div>
       <p className="rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground" role="status" aria-live="polite">
         {model.files.status}

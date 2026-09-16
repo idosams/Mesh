@@ -26,14 +26,18 @@ const actionIds = [
 
 const workbench = {
   files: {
-    entries: [{ value: "report.txt", label: "report.txt · file" }],
+    entries: [
+      { value: "assets", label: "assets", kind: "folder" },
+      { value: "assets/images/hero.png", label: "assets/images/hero.png", kind: "file" },
+      { value: "report.txt", label: "report.txt", kind: "file" },
+    ],
     newPath: "notes/alpha.txt",
     selectedEntry: "report.txt",
     movePath: "reports/final.txt",
     canEditNewPath: true,
     canSelectEntry: true,
     canEditMovePath: true,
-    status: "1 materialized entry available to manage.",
+    status: "3 materialized entries available to manage.",
   },
   changes: {
     files: [{ value: "report.txt", label: "report.txt" }],
@@ -70,6 +74,7 @@ test("the files and changes projection is closed, bounded, and generation-bound"
   const accepted = module.workspaceFilesChangesEnvelope({ generation: 8, workbench }, 7);
 
   assert.equal(accepted.model.changes.editorText, "after\n");
+  assert.equal(accepted.model.files.entries[1].kind, "file");
   assert.equal(Object.isFrozen(accepted.model), true);
   assert.equal(Object.isFrozen(accepted.model.changes.queue), true);
   assert.equal(Object.isFrozen(accepted.model.actions), true);
@@ -178,6 +183,10 @@ test("the component workbench exposes text review, native queue truth, and sourc
   }));
 
   assert.match(filesHtml, /Create and organize workspace entries/);
+  assert.match(filesHtml, /Workspace tree/);
+  assert.match(filesHtml, /assets\/images/);
+  assert.match(filesHtml, /hero\.png/);
+  assert.match(filesHtml, /aria-current="true"[^>]*data-mesh-work-entry="report\.txt"/);
   assert.match(filesHtml, /Relative path/);
   assert.match(changesHtml, /Text workspace view/);
   assert.match(changesHtml, />Inline</);

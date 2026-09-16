@@ -138,6 +138,7 @@ function exactBytesCopy(kind: ReviewChange["kind"]): Readonly<{ title: string; n
     presentation: "presentation",
     document: "document",
     spreadsheet: "workbook",
+    file: "file",
   })[kind];
   return Object.freeze({
     title: `Exact ${artifact} bytes match`,
