@@ -1,0 +1,62 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "vscode-atomic-replace",
+  "title": "Visual Studio Code saves a document by writing a .vsctmp file and renaming it over the target",
+  "category": "editor",
+  "tool": { "name": "Visual Studio Code", "version": "1.132.0", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "derived-from-shipped-binary",
+    "evidence": "The installed 1.132.0 bundle asks for the atomic write by name. `out/vs/workbench/workbench.desktop.main.js` holds `enforceAtomicWriteFile(e){return this.atomicReadWriteResources.has(e)?{postfix:\".vsctmp\"}:!1}` and `out/main.js` holds `this.fileService.writeFile(this.storagePath,q.fromString(e),{atomic:{postfix:\".vsctmp\"}})`. The postfix is what names the temporary; the rename over the target is the second half of the same option.",
+    "reproduce": "grep -ro 'vsctmp' '/Applications/Visual Studio Code.app/Contents/Resources/app/out'",
+    "not_observed": "The editor's document-save path could not be driven headlessly on this host, so the ORDER below is the POSIX order the option implies rather than a captured one. The cold CLI path WAS captured (`code --user-data-dir <fresh> --list-extensions`, 8 readings) and it writes `machineid` in place without a temporary, which is a different path and is not this pattern.",
+    "blind_spots": ["open, flush, fsync and close are not visible to any capture method available on this host"]
+  },
+  "objects": [
+    { "object": 1, "role": "the document, as it was before the save" },
+    { "object": 2, "role": "the .vsctmp temporary" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Flushed", "object": 2 },
+        { "sequence": 4, "kind": "Closed", "object": 2 },
+        { "sequence": 5, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [
+        { "through": 4, "reason": "Closed" },
+        { "through": 5, "reason": "RenamedIntoPlace" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1]],
+      "omission_note": "A .vsctmp that lives for less than one reading is never seen. Dropping event 1 must still yield exactly one checkpoint, ending at the last surviving event."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 5, "reason": "RenamedIntoPlace" } ], "boundary_evidence": { "through": 5, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 2, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 5, "folder": 2 },
+    "meaningful_durable_change": "The document holds the edited text and no .vsctmp file exists. One durable change, not two.",
+    "forbidden_sequence_points": {
+      "mount": [1, 2, 3, 4],
+      "folder": [1]
+    },
+    "forbidden_note": "A checkpoint at mount sequence 4 records a durable .vsctmp file alongside an unedited document: the save is invisible and a stray temporary is permanent. That is the four-durable-changes failure 01KZC2YXH6FG9C67JP9DQX7JH6 names, seen from the inside.",
+    "coalescable": "safely"
+  },
+  "notes": [
+    "The replacing rename at event 5 is the operation mesh-workspace-adapter/0 does not publish today: `rename` and `move_entry` both answer AlreadyExists for a bound destination (01KZHA2H9FZ52HXJNCNG097JQJ, design 01KZHK4VWAZRYZ65TM35T4DAY5). Until that lands the only expressible substitute is unlink-then-rename, which inserts one more forbidden sequence point at which the document does not exist at all.",
+    "The displaced object 1 produces no event of its own: a replacing rename is one operation on one name binding."
+  ]
+}

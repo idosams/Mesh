@@ -1,0 +1,77 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "linux-npm-install-cold",
+  "title": "A cold package-manager install on Linux creates a tree of files that each appear empty first, and truncates the manifest it was given",
+  "category": "package-manager",
+  "tool": { "name": "npm", "version": "9.2.0", "platform": "linux 6.10.14 aarch64, Debian 12 (bookworm), overlayfs" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["npm", "install", "--offline", "--no-audit", "--no-fund", "./dep.tgz"],
+    "evidence": "Twelve changes over the run. Every created file is seen at size 0 before it is seen with content: node_modules/dep/i.js at inode 550265 appears at 0 then reaches 18; package.json at inode 550268 appears at 0 then 47; package-lock.json at 550269 appears at 0 then 444; node_modules/.package-lock.json at 550270 appears at 0 then 317. The manifest the caller already had, package.json at inode 550260, is TRUNCATED IN PLACE: 34 -> 0 -> 71. Captured by tests/compatibility/save-patterns/v0/capture.mjs with a locally packed tarball, so the run needs no network.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "a file created and removed inside one reading is invisible — a package manager's temporary staging is the likeliest thing this method misses"]
+  },
+  "objects": [
+    { "object": 1, "role": "package.json, the caller's own manifest — one identity, truncated through zero and rewritten" },
+    { "object": 2, "role": "node_modules/dep/i.js — created" },
+    { "object": 3, "role": "package-lock.json — created" },
+    { "object": 4, "role": "node_modules/.package-lock.json — created" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Closed", "object": 2 },
+        { "sequence": 4, "kind": "Opened", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 1 },
+        { "sequence": 6, "kind": "Written", "object": 1 },
+        { "sequence": 7, "kind": "Closed", "object": 1 },
+        { "sequence": 8, "kind": "Opened", "object": 3 },
+        { "sequence": 9, "kind": "Written", "object": 3 },
+        { "sequence": 10, "kind": "Closed", "object": 3 },
+        { "sequence": 11, "kind": "Opened", "object": 4 },
+        { "sequence": 12, "kind": "Written", "object": 4 },
+        { "sequence": 13, "kind": "Closed", "object": 4 }
+      ],
+      "candidates": [
+        { "through": 3, "reason": "Closed" },
+        { "through": 7, "reason": "Closed" },
+        { "through": 10, "reason": "Closed" },
+        { "through": 13, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Written", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 3 },
+        { "sequence": 6, "kind": "Written", "object": 3 },
+        { "sequence": 7, "kind": "Written", "object": 4 },
+        { "sequence": 8, "kind": "Written", "object": 4 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [5], [7], [1, 5], [1, 7], [5, 7], [1, 5, 7]],
+      "omission_note": "Each created file's empty appearance may be missed if the write lands inside one reading — and missing it is the SAFE direction, because the empty appearance is exactly the state that must never be checkpointed. Sequence 3 is NOT omissible: it is the caller's existing manifest being truncated, and a backend that missed it would have no record that the file changed at all."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 13, "reason": "Closed" } ], "boundary_evidence": { "through": 13, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 8, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 13, "folder": 8 },
+    "meaningful_durable_change": "The dependency is installed: node_modules holds it, both lock files describe it, and package.json names it. One durable change for one install — never one per file.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "folder": [1, 2, 3, 4, 5, 6, 7] },
+    "forbidden_note": "Four Closed candidates are offered and only the last is meaningful. Every earlier one is a partially-installed tree: sequence 7 in particular has a rewritten package.json naming a dependency whose lock files do not exist yet. Mount 5 and folder 3 are the manifest at length zero — the caller's OWN file, momentarily empty, in the middle of a command they would describe as additive.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "This is the pattern that most punishes a per-file or per-Closed trigger. Thirteen mount events, four legitimate Closed anchors, one meaningful point. A trigger that checkpointed on each Closed would produce four records of a broken tree and one of a working one, with nothing in the record to say which is which.",
+    "It agrees with the darwin capture on the shape that matters — everything appears empty first, and the caller's manifest is truncated in place — while being far smaller (12 changes against 12,225 over 5,662 paths). The small case is the one worth replaying; the large one is the one worth remembering when sizing a byte-budget trigger.",
+    "The `--offline` flag against a locally packed tarball is what lets this be replayed on a machine with the network off, which the corpus needs and a registry install could not give."
+  ]
+}

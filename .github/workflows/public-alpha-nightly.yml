@@ -1,0 +1,33 @@
+name: public-alpha-nightly
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-alpha-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-public-source:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.6.0
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@cargo-deny
+      - name: Verify Rust and desktop source
+        run: npm test
+      - name: Verify dependency policy
+        run: cargo deny check
+      - name: Verify source manifest exists
+        run: test -f PUBLIC-SOURCE.json

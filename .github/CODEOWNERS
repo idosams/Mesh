@@ -1,0 +1,43 @@
+# .github/CODEOWNERS — which paths pull a named human into the review.
+#
+# This file requests reviewers. It does NOT block a merge on its own: enforcement
+# requires a repository ruleset that opts in to code-owner review, and this
+# repository has no ruleset at all today (the rulesets and branch-protection APIs
+# both return HTTP 403 "Upgrade to GitHub Pro or make this repository public",
+# verified 2026-08-07). So this file is the reviewer routing described in
+# CONTRIBUTING.md "Review, and what requires a human reviewer", and the rule it
+# encodes becomes enforceable the moment a ruleset can exist.
+#
+# Keep it narrow. A CODEOWNERS entry on every path assigns one person to every
+# pull request, which is how a review requirement decays into a rubber stamp.
+
+# --- Security-sensitive: cryptography, identity, authorization, publication ----
+# A change here always carries a named human security reviewer. An autonomous
+# lane never merges one on its own authority.
+/crates/mesh-crypto/          @idosams
+/crates/mesh-approval/        @idosams
+/crates/mesh-policy/          @idosams
+/tests/authorization/         @idosams
+
+# --- The protocol -------------------------------------------------------------
+# A protocol schema and its implementation are never changed in one unsupervised
+# run; the second pair of eyes is the mechanism.
+/protocol/                    @idosams
+/crates/mesh-sync-protocol/   @idosams
+/crates/mesh-types/           @idosams
+
+# --- Licensing and the edition boundary ---------------------------------------
+# Adding a licence to the allow-list is a decision, never a local edit.
+/LICENSE                      @idosams
+/deny.toml                    @idosams
+/docs/launch/                 @idosams
+/tools/program/license-check.mjs  @idosams
+
+# --- The gate suite and CI definition -----------------------------------------
+# A change that makes a gate quieter is reviewed as a policy change.
+/.github/                     @idosams
+/tools/program/               @idosams
+
+# --- Repository governance ----------------------------------------------------
+/CLAUDE.md                    @idosams
+/.claude/                     @idosams

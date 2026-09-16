@@ -1,0 +1,70 @@
+# Dependency policy — plan §8.1 (cargo-deny and vulnerability scanning) and
+# §13.4 (cargo-deny/audit is a required per-merge gate).
+#
+# The licence allow-list is deliberately narrow: the community edition ships
+# under Apache-2.0 (LICENSE, in force since 01KZC23NED0RVR69QKFXCQKXWY), so a
+# copyleft dependency is a licensing incident, not a warning. Adding a licence
+# here is a decision doc, never a local edit. `tools/program/license-check.mjs`
+# R7 fails the build if a copyleft identifier ever appears in the list below.
+#
+# Run it: `cargo deny check licenses` (or `cargo deny check` for advisories,
+# bans and sources too).
+
+[advisories]
+version = 2
+yanked = "deny"
+# Tauri's current cross-platform webview closure still brings these exact
+# unmaintained build/parser crates into Cargo.lock. They are not vulnerability
+# advisories, no safe upgrade is available, and the public alpha is exercised
+# end-to-end on macOS. Keep the exceptions exact so any new advisory still
+# fails, and remove them as soon as the upstream Tauri/GTK closure migrates.
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "transitive GTK macro dependency; no safe upgrade is available" },
+    { id = "RUSTSEC-2025-0075", reason = "transitive Tauri urlpattern dependency; no safe upgrade is available" },
+    { id = "RUSTSEC-2025-0080", reason = "transitive Tauri urlpattern dependency; no safe upgrade is available" },
+    { id = "RUSTSEC-2025-0081", reason = "transitive Tauri urlpattern dependency; no safe upgrade is available" },
+    { id = "RUSTSEC-2025-0098", reason = "transitive Tauri urlpattern dependency; no safe upgrade is available" },
+    { id = "RUSTSEC-2025-0100", reason = "transitive Tauri urlpattern dependency; no safe upgrade is available" },
+]
+
+[licenses]
+version = 2
+# cargo-deny v2 denies anything not listed here, so this list is exhaustive by
+# construction — there is no separate deny-list to keep in sync with it.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.9
+
+# TASK-01M0JKNFDNKZGF1K88M5QVWD5A approved Tauri 2 as the native desktop shell.
+# Its current webview/build closure contains these five unmodified MPL-2.0 crates. Keep them exact
+# and exceptional rather than admitting MPL globally: any new crate or version still fails.
+# Mozilla's file-level terms allow these sources to remain MPL inside Mesh's larger Apache work;
+# Mesh does not modify or relicense them.
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "cssparser@0.36.0" },
+    { allow = ["MPL-2.0"], crate = "cssparser-macros@0.6.1" },
+    { allow = ["MPL-2.0"], crate = "dtoa-short@0.3.5" },
+    { allow = ["MPL-2.0"], crate = "option-ext@0.2.0" },
+    { allow = ["MPL-2.0"], crate = "selectors@0.36.1" },
+]
+# `license-not-encountered` stays a warning, not an error. The workspace has no
+# third-party dependencies yet, so every entry above is currently unmatched and
+# erroring on that would fail a correct tree. Once dependencies land it becomes a
+# useful signal: an allowance nothing needs is one to delete.
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -1,0 +1,362 @@
+{
+  "contract": "mesh-checkpoint-settling-tool-capture/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "repository_commit": "c83420f6eae060507dae3da676628694710a84cc",
+  "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900",
+  "seed": 347002,
+  "platform": {
+    "tag": "linux-overlayfs",
+    "os": "linux",
+    "os_version": "6.10.14-linuxkit",
+    "arch": "arm64",
+    "filesystem": "overlayfs",
+    "filesystem_type": "2035054128",
+    "node": "v18.20.4",
+    "docker_image": "sha256:bf6af1850d16b391f3df4a1969afe8c80d2cadaad5ccfb5c95433c6715c48622",
+    "hardware": {
+      "cpu_model": "-",
+      "cpu_vendor": "Apple",
+      "logical_cores": 10,
+      "physical_cores": 10,
+      "memory_bytes": 8218034176
+    }
+  },
+  "network_evidence": "docker-network-none",
+  "cache_state": "fresh-private-tool-state-per-sample",
+  "sample_count_per_arm": 5,
+  "invocation": [
+    "/repo/benchmarks/checkpoint-settling/capture-tools.mjs",
+    "--platform",
+    "linux-overlayfs",
+    "--commit",
+    "c83420f6eae060507dae3da676628694710a84cc",
+    "--families",
+    "vscode",
+    "--samples",
+    "5",
+    "--vscode",
+    "/usr/bin/code",
+    "--xvfb-run",
+    "/usr/bin/xvfb-run",
+    "--network-evidence",
+    "docker-network-none",
+    "--image",
+    "sha256:bf6af1850d16b391f3df4a1969afe8c80d2cadaad5ccfb5c95433c6715c48622",
+    "--out",
+    "/out/linux-vscode-v2.json"
+  ],
+  "arms": [
+    {
+      "id": "vscode",
+      "family": "VS Code",
+      "pattern": "vscode-linux-in-place-truncate",
+      "tool_path": "/usr/bin/code",
+      "tool_version": "",
+      "input_digest": "sha256:db555e3a756c453f1a523106835663b4e09943bc35ae902113df124c5b9215b7",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/usr/bin/xvfb-run",
+            "-a",
+            "/usr/bin/code",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "<temporary-path>",
+            "--extensions-dir",
+            "<temporary-path>",
+            "--extensionDevelopmentPath",
+            "<temporary-path>",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:02c727d630514eddacc5ff7a837eb5290245d1632da609412f5431d4865b3e48",
+          "final_tree_digest": "sha256:b356239d58425c4cbb9ec8ffe4dd8098bd247936289784b5aa3773232501c5dc",
+          "polls": 232966,
+          "elapsed_ms": 3235.837,
+          "observations": [
+            {
+              "at_ms": 3036.816,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 30,
+                  "bytes_delta": 30
+                }
+              ]
+            },
+            {
+              "at_ms": 3037.068,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/usr/bin/xvfb-run",
+            "-a",
+            "/usr/bin/code",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "<temporary-path>",
+            "--extensions-dir",
+            "<temporary-path>",
+            "--extensionDevelopmentPath",
+            "<temporary-path>",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:98064b23e9ac723bad3a5ff9213875d353059a61423fceb10736a69391ecc595",
+          "final_tree_digest": "sha256:79546994bb35c160dd8c809d90ac890f41fded427d0689d21dc78ac69f652586",
+          "polls": 157825,
+          "elapsed_ms": 2012.444,
+          "observations": [
+            {
+              "at_ms": 1814.248,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1814.295,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/usr/bin/xvfb-run",
+            "-a",
+            "/usr/bin/code",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "<temporary-path>",
+            "--extensions-dir",
+            "<temporary-path>",
+            "--extensionDevelopmentPath",
+            "<temporary-path>",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:64e6a6e2977cc3bd88c1875e611869b045c0f91ebb7aaae318e17e08955d9cfd",
+          "final_tree_digest": "sha256:07d5858932768cb709890ee3d881053dc3a508a405750a7d44bb3b3712f192d4",
+          "polls": 162132,
+          "elapsed_ms": 1948.431,
+          "observations": [
+            {
+              "at_ms": 1712.831,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1712.937,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/usr/bin/xvfb-run",
+            "-a",
+            "/usr/bin/code",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "<temporary-path>",
+            "--extensions-dir",
+            "<temporary-path>",
+            "--extensionDevelopmentPath",
+            "<temporary-path>",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:ff018dd028058245c4bc0858f2eba667636460770f77fe69585f22ef0d768da3",
+          "final_tree_digest": "sha256:df996a0772fa4838ab415a770b872de0199aa06fcd396ff35af559e6c3c2b27a",
+          "polls": 161837,
+          "elapsed_ms": 1968.624,
+          "observations": [
+            {
+              "at_ms": 1732.769,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/usr/bin/xvfb-run",
+            "-a",
+            "/usr/bin/code",
+            "--no-sandbox",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "<temporary-path>",
+            "--extensions-dir",
+            "<temporary-path>",
+            "--extensionDevelopmentPath",
+            "<temporary-path>",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:396f9933eeb2eedaf8e75a467846bb4bd0414b4552e76cc636df0b850d90e768",
+          "final_tree_digest": "sha256:7de1a84580d7d8dad4ba2b990921343aa8ee3ee8fff7e96224d65b0cecb749ff",
+          "polls": 162251,
+          "elapsed_ms": 1971.697,
+          "observations": [
+            {
+              "at_ms": 1741.885,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1742.18,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 0,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1742.193,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 651866,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        }
+      ]
+    }
+  ],
+  "corpus_digest": "sha256:ae16858a1dff710eb7a73e1711081641a215ab8f768be5e4895030dff875561a"
+}

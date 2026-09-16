@@ -1,0 +1,41 @@
+# `mesh-crypto` is the one crate in this workspace with third-party dependencies, and
+# the reason is recorded twice: ADR-0014 (why the `Cargo.lock` fence is narrowed for an
+# audited cryptographic dependency and for nothing else) and the decision doc it cites.
+#
+# Every dependency below is pinned to an exact version with `=`. A caret range on a
+# signature primitive means the bytes a peer's signature is checked against can change
+# on `cargo update`, which is a protocol change arriving as a lockfile diff.
+
+[package]
+name = "mesh-crypto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The workspace's own types. `PublicKey` and `Signature` have exactly one home
+# (`docs/protocol.md` §1.1) and this crate stopped carrying a second spelling of them.
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+
+# The audited Ed25519. Pinned exactly; see `crates/mesh-crypto/src/ed25519.rs` for what
+# each feature is and, more to the point, which feature must never be enabled.
+#
+# `default-features = false` is load-bearing rather than tidy. ed25519-dalek's defaults
+# are `fast`, `std` and `zeroize`; none of them is harmful, but starting from the empty
+# set means every feature this crate compiles is one somebody chose. `legacy_compatibility`
+# is the feature that removes the `S < L` check and makes every signature malleable, and
+# it is never enabled here — `crates/mesh-crypto/src/ed25519.rs` also refuses a
+# non-canonical scalar itself so that the rejection does not depend on this line alone.
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }
+
+[dev-dependencies]
+# Test-only. Signing needs a secret half, and this crate deliberately holds none: the
+# signing side is a `KeyCustody` backend in a platform crate. The tests need to produce a
+# real signature to prove a real one verifies, and a dev-dependency is not reachable from
+# any production build — `tests/` is a separate crate that ships in no binary.
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }

@@ -1,0 +1,22 @@
+[package]
+name = "mesh-policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# `mesh-types` owns `PolicyEpoch` and `ActorKind`. This crate compares a capability's epoch to the
+# epoch a ChangeSet was sealed under, so both sides must be the *same* type — plan §8.3, and the
+# note in `crates/mesh-crypto/src/capability.rs`.
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+
+# The capability model. `Capability<HumanHeld>` and `Capability<Delegated>` are distinct types, and
+# that distinction is what makes `AdvanceCanonicalHead` impossible to *pass* to the publication
+# guard rather than merely rejected by it. Both crates are `core-services`, so the edge is level,
+# not upward.
+mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }

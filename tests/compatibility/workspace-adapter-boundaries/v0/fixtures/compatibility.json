@@ -1,0 +1,40 @@
+{
+  "contract": "mesh-workspace-adapter-boundaries/0",
+  "cases": [
+    {
+      "id": "adapter-0-closed",
+      "source_contract": "mesh-workspace-adapter/0",
+      "target_contract": "mesh-workspace-adapter/1",
+      "input": { "reason": "Closed" },
+      "expected": { "result": "valid", "reason": "Closed" }
+    },
+    {
+      "id": "adapter-0-synced",
+      "source_contract": "mesh-workspace-adapter/0",
+      "target_contract": "mesh-workspace-adapter/1",
+      "input": { "reason": "Synced" },
+      "expected": { "result": "valid", "reason": "Synced" }
+    },
+    {
+      "id": "adapter-0-rename-without-binding-evidence",
+      "source_contract": "mesh-workspace-adapter/0",
+      "target_contract": "mesh-workspace-adapter/1",
+      "input": { "reason": "RenamedIntoPlace" },
+      "expected": { "result": "unsupported", "code": "rename-binding-evidence-unavailable" }
+    },
+    {
+      "id": "adapter-0-metadata-settled",
+      "source_contract": "mesh-workspace-adapter/0",
+      "target_contract": "mesh-workspace-adapter/1",
+      "input": { "reason": "MetadataSettled" },
+      "expected": { "result": "incompatible", "code": "removed-boundary-reason" }
+    },
+    {
+      "id": "unknown-adapter-contract",
+      "source_contract": "mesh-workspace-adapter/unknown",
+      "target_contract": "mesh-workspace-adapter/1",
+      "input": { "reason": "Closed" },
+      "expected": { "result": "refused", "code": "unknown-adapter-contract" }
+    }
+  ]
+}

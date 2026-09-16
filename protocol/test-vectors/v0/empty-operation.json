@@ -1,0 +1,21 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "record": "mesh.v0.empty-operation",
+  "signed_record": false,
+  "summary": "The placeholder operation, carrying no field. It is not itself signed; it appears inside a ChangeSet's operations sequence, and mesh-operations replaces it with the real vocabulary and publishes vectors for each member.",
+  "schema": {
+    "domain_tag": "mesh.v0.empty-operation",
+    "fields": []
+  },
+  "vectors": [
+    {
+      "name": "the-only-value",
+      "description": "The empty operation has exactly one encoding: a one-element array holding its domain tag.",
+      "record": {},
+      "canonical_encoding_hex": "81776d6573682e76302e656d7074792d6f7065726174696f6e",
+      "canonical_encoding_length": 25,
+      "canonical_encoding_digest_hex": "fc8cfd22f8aa6e43a67ebb76cd7944459f2c101656a6ffd1974a47b6fdbbfe4d"
+    }
+  ]
+}

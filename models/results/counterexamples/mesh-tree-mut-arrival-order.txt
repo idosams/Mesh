@@ -1,0 +1,36 @@
+Error: Invariant ConcurrentMovesResolveIdenticallyOnEveryPeer is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ arrivals = (p1 :> <<>> @@ p2 :> <<>>)
+/\ held = (p1 :> {} @@ p2 :> {})
+/\ op = <<[obj |-> r, dest |-> r, depth |-> 0], [obj |-> r, dest |-> r, depth |-> 0]>>
+/\ authored = 0
+
+State 2: <Author line 183, col 5 to line 200, col 39 of module mesh_tree>
+/\ arrivals = (p1 :> <<1>> @@ p2 :> <<>>)
+/\ held = (p1 :> {1} @@ p2 :> {})
+/\ op = <<[obj |-> a, dest |-> c, depth |-> 0], [obj |-> r, dest |-> r, depth |-> 0]>>
+/\ authored = 1
+
+State 3: <Author line 183, col 5 to line 200, col 39 of module mesh_tree>
+/\ arrivals = (p1 :> <<1, 2>> @@ p2 :> <<>>)
+/\ held = (p1 :> {1, 2} @@ p2 :> {})
+/\ op = <<[obj |-> a, dest |-> c, depth |-> 0], [obj |-> a, dest |-> b, depth |-> 1]>>
+/\ authored = 2
+
+State 4: <Deliver line 206, col 5 to line 213, col 35 of module mesh_tree>
+/\ arrivals = (p1 :> <<1, 2>> @@ p2 :> <<2>>)
+/\ held = (p1 :> {1, 2} @@ p2 :> {2})
+/\ op = <<[obj |-> a, dest |-> c, depth |-> 0], [obj |-> a, dest |-> b, depth |-> 1]>>
+/\ authored = 2
+
+State 5: <Deliver line 206, col 5 to line 213, col 35 of module mesh_tree>
+/\ arrivals = (p1 :> <<1, 2>> @@ p2 :> <<2, 1>>)
+/\ held = (p1 :> {1, 2} @@ p2 :> {1, 2})
+/\ op = <<[obj |-> a, dest |-> c, depth |-> 0], [obj |-> a, dest |-> b, depth |-> 1]>>
+/\ authored = 2
+
+186 states generated, 181 distinct states found, 143 states left on queue.
+The depth of the complete state graph search is 5.
+The average outdegree of the complete state graph is 5 (minimum is 1, the maximum 12 and the 95th percentile is 12).
+Finished in 00s at (2026-08-07 20:54:21)

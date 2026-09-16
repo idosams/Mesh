@@ -1,0 +1,105 @@
+# Mesh workspace — the plan §8.2 crate layout.
+#
+# Dependency rules (plan §8.3) are CHECKABLE and are NOT CHECKED AUTOMATICALLY.
+# `tools/program/arch-check` decides them, and nothing invokes it: `grep -n arch
+# package.json` returns nothing, so `npm test` proves nothing about §8.3 and a lane
+# that adds an illegal edge learns about it only if somebody types
+#
+#     node tools/program/arch-check/check.mjs
+#
+# The one `verify:arch` line that would change that is printed by the checker's own
+# `NOT ON THE MERGE PATH` banner and is not written here, because `package.json` is
+# held by `01KZCYQRPHJNB7E87W57JTWMPB` — in progress — and `docs/agent-development.md`
+# §11.4 rule 3 escalates a contested path rather than winning it. The escalation is
+# task `01KZDSS6BF004PFM0330YYBK0X`. Until it lands, run the command.
+#
+# The machine form of the rules — which crate is in which layer, which capabilities it
+# carries, which third-party crate is registered with what, and which epic owns it — is
+# `tools/program/arch-check/architecture.json`; the prose is
+# `docs/agent-development.md` §13. Adding a member below without adding it there turns
+# the check red.
+#
+# What that check does and does not establish, stated here because this is the file
+# a lane edits when it adds a dependency:
+#
+#  - It reads `[dependencies]` and `[build-dependencies]` as a graph and rejects an
+#    edge that points up the layer ladder, or that reaches a forbidden capability.
+#    `[dev-dependencies]` are registered but not closure-checked: they compile into
+#    test binaries only.
+#  - A dependency that is not a workspace crate is a node too. It must be registered
+#    in the map's `externals` with the capabilities it carries, and those capabilities
+#    stand for the crate AND everything it pulls in — nothing here reads a lockfile,
+#    so a registration is a human claim that the check then enforces.
+#  - It scans `src/` of the pure-core crates for `std::fs`, `std::net`,
+#    `std::process` and `std::os`, because no dependency is needed to break the
+#    first §8.3 bullet — std supplies all four. That scan is a lint over source
+#    text, not a proof; `crates/mesh-types/src/no_ambient_io.rs` states the limit
+#    it inherits.
+#  - Only `mesh-crypto` declares a dependency at all, so on this tree the graph rules
+#    hold over one workspace edge and two edges onto one registered third-party crate,
+#    one of those dev-only. The evidence that they bite is `node
+#    tools/program/arch-check/check.mjs --self-test`, which mutates synthetic copies
+#    of this tree and asserts each rule rejects the illegal change and accepts the
+#    legal one.
+#
+# Task 01KZC25P0N5WMX8FY2Q7BFH84Z wrote it and owns `tools/program/arch-check/**`.
+
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop/src-tauri",
+  "crates/mesh-types",
+  "crates/mesh-crypto",
+  "crates/mesh-operations",
+  "crates/mesh-state",
+  "crates/mesh-materializer",
+  "crates/mesh-conflicts",
+  "crates/mesh-cas",
+  "crates/mesh-chunking",
+  "crates/mesh-store",
+  "crates/mesh-sync-protocol",
+  "crates/mesh-sync-engine",
+  "crates/mesh-policy",
+  "crates/mesh-approval",
+  "crates/mesh-context-ledger",
+  "crates/mesh-context-compiler",
+  "crates/mesh-derivations",
+  "crates/mesh-git-bridge",
+  "crates/mesh-validator",
+  "crates/mesh-daemon",
+  "crates/mesh-fuse",
+  "crates/mesh-fskit-ffi",
+  "crates/mesh-mcp",
+  "crates/mesh-agent-sdk",
+  "crates/mesh-simulator",
+  "crates/mesh-bench",
+  # The platform key-custody backends (task 01KZC2CDEKQ0BDNVZ96ZMM100P). Under `platform/`
+  # rather than `crates/` because plan §8.2 puts the platform adapters there and because the
+  # separation is load-bearing: this is the one crate in the workspace that holds a secret, and
+  # `crates/mesh-crypto/src/no_secret_material.rs` fails the BUILD if that ever becomes true of
+  # `crates/`. Adding it here rewrites `Cargo.lock` with one workspace entry and no new
+  # third-party package, which ADR-0014 admits without its five conditions.
+  "platform/mesh-keychain",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/idosams/Mesh"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.bench]
+inherits = "release"
+debug = true

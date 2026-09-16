@@ -1,0 +1,40 @@
+# Mesh changelog
+
+Mesh is not yet a stable product. This changelog records public, installable releases; internal
+development commits and private test builds are deliberately omitted.
+
+## [0.1.0-alpha.1] — 2026-09-16
+
+First public macOS technical alpha.
+
+### Included
+
+- A React-only desktop interface organized into route pages and reusable atoms, molecules,
+  organisms, layouts, and pages.
+- Protected import into an application-managed working copy while retaining the selected source
+  folder as an untouched backup.
+- Explicit private saves, retained workspace points, restore and undo, review, and guarded export
+  to a separate ordinary folder.
+- Isolated Codex and terminal handoffs, complete finish-time inspection, Git-backed workspaces, and
+  reviewed Git export.
+- Text, image, PDF, and Office review previews with exact source-revision and packaged-window proof.
+- An ad-hoc-signed, unnotarized macOS archive with a canonical manifest and SHA-256 checksum.
+
+### Supported environment
+
+- Apple-silicon Mac (`arm64`).
+- macOS 11 or newer.
+- Local workspaces only. Hosted collaboration and multi-device synchronization are not included.
+
+### Known limitations
+
+- The downloaded app requires an explicit macOS **Open** confirmation. Never disable Gatekeeper
+  globally or remove quarantine metadata.
+- Human approval and **Update original folder** are unavailable in this ad-hoc build because both
+  require a stable Developer ID application identity.
+- There is no automatic update channel. Quit every running Mesh process before replacing the app.
+- Windows and supported Linux installers are not part of this release.
+- Filesystem changes made while Mesh is not running are inspected when the workspace is reopened;
+  continuous background capture is not claimed.
+
+[0.1.0-alpha.1]: launch/v0.1.0-alpha.1.md

@@ -1,0 +1,37 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "schema": "protocol/schemas/canonical-encoding-v0.json",
+  "files": [
+    {
+      "record": "mesh.v0.file-manifest",
+      "file": "file-manifest.json",
+      "signed_record": true,
+      "vector_count": 3
+    },
+    {
+      "record": "mesh.v0.file-version",
+      "file": "file-version.json",
+      "signed_record": true,
+      "vector_count": 2
+    },
+    {
+      "record": "mesh.v0.directory-version",
+      "file": "directory-version.json",
+      "signed_record": true,
+      "vector_count": 2
+    },
+    {
+      "record": "mesh.v0.changeset",
+      "file": "changeset.json",
+      "signed_record": true,
+      "vector_count": 2
+    },
+    {
+      "record": "mesh.v0.empty-operation",
+      "file": "empty-operation.json",
+      "signed_record": false,
+      "vector_count": 1
+    }
+  ]
+}

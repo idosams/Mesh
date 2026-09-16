@@ -1,0 +1,33 @@
+[package]
+name = "mesh-approval"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# `mesh-types` owns the public key, signature and actor-role vocabulary used by a receipt.  The
+# receipt must not grow local mirrors of security-sensitive identity types.
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+
+# Signature verification is composed through the workspace's single audited Ed25519 adapter.
+# `mesh-approval` never handles a private key and never implements a second verifier.
+mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }
+
+# Receipt bytes and a valid signature are evidence, not publication authority.  The only type that
+# can turn them into a canonical-head advance is minted by mesh-policy's recorded HumanHeld gate.
+mesh-policy = { path = "../mesh-policy", version = "=0.0.0" }
+
+# Production human-approval receipts use the same P-256/SHA-256/DER shape emitted by Apple's
+# Secure Enclave. `mesh-approval` verifies public data only: private-key custody and the user-
+# presence ceremony remain in the platform adapter.
+ring = { version = "=0.17.14", default-features = false }
+
+[dev-dependencies]
+# Test-only signing counterpart for the production `mesh_crypto::Ed25519` verifier.  This is the
+# same exact pin and feature set already audited for `mesh-crypto`; no signing key enters `src/`.
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }

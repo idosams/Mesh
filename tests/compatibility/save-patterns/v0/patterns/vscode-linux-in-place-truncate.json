@@ -1,0 +1,55 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "vscode-linux-in-place-truncate",
+  "title": "Visual Studio Code on Linux saves this document by truncating and rewriting the same object",
+  "category": "editor",
+  "tool": { "name": "Visual Studio Code", "version": "1.133.0 (a5b500951314efd502d07465bd138dfbd714a960)", "platform": "linux 6.10.14 aarch64, Debian 12, overlayfs, Xvfb" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["node", "<repo>/tests/compatibility/save-patterns/v0/capture.mjs", "--root", "<root>", "--out", "<capture.json>", "--", "node", "<repo>/tests/compatibility/save-patterns/v0/drivers/vscode-linux-cdp.mjs", "<root>"],
+    "fixture": "Before each run, <root>/doc.txt contained exactly `alpha original document\\n`. The pinned official arm64 Debian package ran under Xvfb with network disabled. The driver opened that file in a fresh VS Code profile, discovered that owned child through its OS-assigned loopback DevToolsActivePort, validated the real document editor, typed `VS Code edit: `, invoked Ctrl-S and rejected any final bytes other than `VS Code edit: alpha original document\\n`.",
+    "evidence": "Four independent fresh-profile runs exited 0 in 3.27 s, 3.54 s, 3.49 s and 3.61 s. Every run kept `doc.txt` at inode 255 and changed 24 bytes to 38 exact bytes. One run observed the SAME inode at 0 bytes between them; three polling runs saw 24 -> 38 directly. No temporary path appeared in any reading. The fourth run used an image built from the checked-in editor-artifact-pinned rebuild recipe.",
+    "surprise": "The Linux result agrees with the real macOS document-save path rather than the older atomic-write binary derivation. The transient empty state was visible in one of four Linux runs, demonstrating both the in-place truncate hazard and the polling backend's admissible omission of that intermediate state.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "three of four runs completed truncation and rewrite between readings", "a temporary created and removed entirely between two readings would be missed, but the unchanged inode proves that no temporary replaced doc.txt"]
+  },
+  "objects": [
+    { "object": 1, "role": "doc.txt, the document — one identity throughout" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Closed", "object": 1 }
+      ],
+      "candidates": [ { "through": 4, "reason": "Closed" } ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1]],
+      "omission_note": "Three of four runs observed exactly this omission: truncation and rewrite completed between readings, so the folder view saw one Written. The run that caught both writes proves the skipped state can be an unsafe empty document."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 4, "reason": "Closed" } ], "boundary_evidence": { "through": 4, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 2, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 4, "folder": 2 },
+    "meaningful_durable_change": "doc.txt holds the exact edited text in the same object identity. The zero-length intermediate state is not a meaningful save.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3], "folder": [1] },
+    "forbidden_note": "Mount sequence 2 and folder sequence 1 are the zero-length state observed in one repetition. A checkpoint there would turn one ordinary VS Code save into a durable empty document; the two omitted observations do not make that state safe.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "The official package and every dependency were downloaded while building the image; the editor package alone is checksum pinned, and the four actual editor captures ran with Docker network disabled.",
+    "On a mount, Closed anchors the meaningful boundary. On a folder backend, only established settling can close the window after the rewrite."
+  ]
+}

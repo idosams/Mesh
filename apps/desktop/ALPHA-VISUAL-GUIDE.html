@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mesh alpha - visual first session</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b0e;
+      --panel: #10151b;
+      --panel-soft: #151b22;
+      --line: #344253;
+      --text: #f4f6f8;
+      --muted: #a8b0ba;
+      --mint: #9be8c8;
+      --mint-ink: #07130e;
+      --amber: #f2c86f;
+      --danger: #ff8f8f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 50% -10%, #18251f 0, var(--bg) 32rem);
+      color: var(--text);
+      font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--mint); }
+    .shell { width: min(1160px, calc(100% - 36px)); margin: 0 auto; }
+    header { padding: 64px 0 34px; }
+    .brand { display: flex; align-items: center; gap: 14px; color: var(--muted); }
+    .mark {
+      display: grid; place-items: center; width: 46px; height: 46px; border-radius: 15px;
+      background: var(--mint); color: var(--mint-ink); font-weight: 800;
+    }
+    .eyebrow { color: var(--mint); font-size: 13px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { max-width: 820px; margin: 18px 0 14px; font-size: clamp(42px, 7vw, 76px); line-height: 1.02; letter-spacing: -.045em; }
+    h2 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 42px); line-height: 1.12; letter-spacing: -.025em; }
+    h3 { margin: 0 0 8px; font-size: 21px; }
+    p { margin: 0 0 14px; }
+    .lede { max-width: 790px; color: var(--muted); font-size: 21px; }
+    .truth {
+      margin-top: 28px; padding: 18px 20px; border: 1px solid #436657; border-radius: 16px;
+      background: #0e1b16; color: #d9f7ea;
+    }
+    section { padding: 34px 0; }
+    .flow { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 12px; margin-top: 24px; }
+    .step { position: relative; min-height: 150px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+    .step b { display: block; margin-bottom: 8px; color: var(--mint); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+    .step span { color: var(--muted); font-size: 15px; }
+    .step:not(:last-child)::after { content: "\2192"; position: absolute; right: -13px; top: 58px; z-index: 2; color: var(--mint); font-weight: 900; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .card { padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); }
+    .card p, .card li { color: var(--muted); }
+    .path { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; }
+    .number { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--mint); color: var(--mint-ink); font-weight: 850; }
+    .screenshot { margin-top: 22px; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: #07090c; }
+    .screenshot img { display: block; width: 100%; height: auto; }
+    .caption { padding: 15px 18px; color: var(--muted); font-size: 14px; background: var(--panel); }
+    .callout { border-left: 4px solid var(--amber); }
+    .stop { border-color: #6b3838; background: #1c1012; }
+    .stop h3 { color: var(--danger); }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; overflow: hidden; border-radius: 16px; }
+    th, td { padding: 15px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--panel-soft); }
+    td { color: var(--muted); }
+    code { color: #d8e6ff; overflow-wrap: anywhere; }
+    footer { padding: 42px 0 70px; color: var(--muted); border-top: 1px solid var(--line); }
+    @media (max-width: 900px) {
+      .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .step:not(:last-child)::after { display: none; }
+    }
+    @media (max-width: 650px) {
+      .grid, .flow { grid-template-columns: 1fr; }
+      header { padding-top: 38px; }
+      .shell { width: min(100% - 24px, 1160px); }
+      .card { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell">
+    <div class="brand"><span class="mark">M</span><strong>Mesh technical alpha</strong></div>
+    <p class="eyebrow">Visual first session</p>
+    <h1>Make one agent change. Understand it. Recover it safely.</h1>
+    <p class="lede">This page is the quick visual companion to <strong>START-HERE.txt</strong> and <strong>FIRST-SESSION.txt</strong>. Read START-HERE first for checksum and macOS safety instructions.</p>
+    <div class="truth"><strong>Your original project is the backup.</strong> Mesh imports it into a separate private workspace. Agent work remains private until you deliberately export or, in a signed build, approve an exact update.</div>
+  </header>
+
+  <main>
+    <section class="shell" aria-labelledby="flow-title">
+      <p class="eyebrow">The whole journey</p>
+      <h2 id="flow-title">Six visible checkpoints</h2>
+      <div class="flow">
+        <div class="step"><b>1 · Import</b>Preview a small original project.</div>
+        <div class="step"><b>2 · Private</b><span>Mesh creates a separate managed workspace.</span></div>
+        <div class="step"><b>3 · Agent</b><span>Start one pinned Codex or agent folder.</span></div>
+        <div class="step"><b>4 · Finish</b><span>Stop every process, then finish the handoff.</span></div>
+        <div class="step"><b>5 · Review</b><span>Record the current saved version and inspect it.</span></div>
+        <div class="step"><b>6 · Recover</b><span>Export to a new empty folder in this ad-hoc build.</span></div>
+      </div>
+    </section>
+
+    <section class="shell" aria-labelledby="mission-title">
+      <p class="eyebrow">20-minute mission</p>
+      <h2 id="mission-title">What to click and what should happen</h2>
+      <div class="grid">
+        <article class="card path"><span class="number">1</span><div><h3>Workspaces → Choose a folder</h3><p>Select a small disposable project. Read the Import preview and confirm that the original folder will remain unchanged.</p></div></article>
+        <article class="card path"><span class="number">2</span><div><h3>Create workspace and open folder</h3><p>Mesh opens a separate working folder. Make sure its path is not your original project path.</p></div></article>
+        <article class="card path"><span class="number">3</span><div><h3>Current → Start Codex on this version</h3><p>Ask for one recognizable change. Never give the same writable agent folder to two agents.</p></div></article>
+        <article class="card path"><span class="number">4</span><div><h3>Current → Finish agent handoff</h3><p>First stop Codex, terminals, and editors using that folder. Confirm Finish. Mesh scans the complete result and privately saves safe changes.</p></div></article>
+        <article class="card path"><span class="number">5</span><div><h3>Review → Record reviewed version</h3><p>Review displays an exact recorded version, not every live filesystem change. If your new file is missing, use Current → Refresh, then return to Review and record the version.</p></div></article>
+        <article class="card path"><span class="number">6</span><div><h3>Choose export folder</h3><p>Approval is unavailable in the ad-hoc build. Select a new empty destination, preview the whole saved tree, and confirm only the plan you expect.</p></div></article>
+      </div>
+    </section>
+
+    <section class="shell" aria-labelledby="review-title">
+      <p class="eyebrow">What Review looks like</p>
+      <h2 id="review-title">Select a changed file, then choose the comparison</h2>
+      <p class="lede">These screenshots use fictional data rendered by the exact React review components. They are interface previews, not a claim that the pictured example was processed by the native app.</p>
+      <figure class="screenshot">
+        <img src="alpha-guide/screenshots/review-workbench.jpg" alt="Mesh Review workbench with changed files on the left, selected comparison in the center, and review decision details on the right">
+        <figcaption class="caption"><strong>Review overview.</strong> Changed files stay together with the exact saved-version decision. In the real app, enabled actions depend on verified native state.</figcaption>
+      </figure>
+      <div class="grid">
+        <figure class="screenshot">
+          <img src="alpha-guide/screenshots/review-pdf.jpg" alt="Mesh Review workbench with a PDF selected in Visual mode">
+          <figcaption class="caption"><strong>PDF, Word, Excel, or PowerPoint.</strong> Choose <em>Visual</em>, select the file, then load the exact saved comparison when offered.</figcaption>
+        </figure>
+        <figure class="screenshot">
+          <img src="alpha-guide/screenshots/review-text-diff.jpg" alt="Mesh Review workbench showing a split before and after text comparison">
+          <figcaption class="caption"><strong>Text and source files.</strong> Choose <em>Content changes</em>, then use Split or Inline to explain the exact change.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="shell" aria-labelledby="missing-title">
+      <p class="eyebrow">When a file seems missing</p>
+      <h2 id="missing-title">Use the folder and state to find the next step</h2>
+      <table>
+        <thead><tr><th>What you see</th><th>What it usually means</th><th>Next action</th></tr></thead>
+        <tbody>
+          <tr><td>The file is in an agent folder but not Review.</td><td>The handoff or recorded review is still older than the file.</td><td>Stop every process using the agent folder, choose <strong>Finish agent handoff</strong>, open Review, then choose <strong>Record reviewed version</strong>.</td></tr>
+          <tr><td>The file appears under Changes.</td><td>Mesh found native work that is not yet in the private saved version.</td><td>Read the queue. Choose <strong>Save all privately</strong> only for the exact safe changes you expect; resolve moves, deletions, links, and unsupported entries explicitly.</td></tr>
+          <tr><td>Review still shows an earlier file.</td><td>Review intentionally shows a recorded exact version.</td><td>Use <strong>Current → Refresh</strong>, then return to Review and choose <strong>Record reviewed version</strong>. Do not expect a live filesystem browser.</td></tr>
+          <tr><td>Approval unavailable.</td><td>The ad-hoc build has no Apple-validated application identity.</td><td>Use <strong>Choose export folder</strong> and a new empty folder. Do not select the original project.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="shell">
+      <div class="grid">
+        <article class="card callout"><h3>Good feedback</h3><p>Send the Build value, the page and action, elapsed minutes, safe diagnostics, and one sentence: “I expected ___, but Mesh ___.” Remove confidential names and paths from screenshots.</p></article>
+        <article class="card stop"><h3>Stop immediately</h3><p>Stop if the original changes without an explicit approved update, a file disappears, the wrong saved version opens, an agent folder silently moves, or Mesh claims success after an error.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="shell">Mesh is an invite-only technical alpha. Keep your original project as an untouched backup and do not use Mesh as the only copy of important work.</div></footer>
+</body>
+</html>

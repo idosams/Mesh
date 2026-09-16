@@ -1,0 +1,35 @@
+{
+  "schema": "mesh.public-alpha-contract/v1",
+  "tag": "v0.1.0-alpha.1",
+  "product_version": "0.1.0",
+  "channel": "public-technical-alpha",
+  "repository": "idosams/Mesh",
+  "artifact": {
+    "schema": "mesh-macos-alpha-archive/v2",
+    "platform": "macos",
+    "architecture": "arm64",
+    "minimum_macos": "11.0",
+    "bundle_signature": "adhoc",
+    "developer_id_signed": false,
+    "notarized": false,
+    "human_approval_available": false
+  },
+  "required_documents": {
+    "changelog": "docs/CHANGELOG.md",
+    "release_notes": "docs/launch/v0.1.0-alpha.1.md",
+    "protocol": "protocol/README.md",
+    "conformance_report": "protocol/conformance/reports/second-client-r14.md",
+    "benchmark_report": "docs/benchmarks.md"
+  },
+  "hard_gates": [
+    "exact-tagged-source",
+    "clean-source-tree",
+    "public-repository",
+    "private-vulnerability-reporting",
+    "successful-public-ci",
+    "checksummed-adhoc-renderer-proved-artifact",
+    "explicit-unnotarized-install-guidance",
+    "zero-unresolved-p0-data-safety-defects",
+    "human-ship-decision"
+  ]
+}

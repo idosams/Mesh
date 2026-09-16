@@ -1,0 +1,498 @@
+{
+  "$comment": "The local IPC contract between the Mesh desktop application and the Mesh daemon, published by the daemon because the daemon owns the surface (task 01KZC2NJ6WEZ0ZHP6Z03FJGVF3, `## Scope`). ONE file, read by both implementations, so that neither can drift without a test going red: `crates/mesh-daemon/tests/ipc.rs` checks the Rust side against it and `apps/desktop/src/ipc/contract.test.ts` checks the TypeScript side. `vectors` are exact wire lines: each side decodes one, re-encodes it, and compares BYTE FOR BYTE. That is what makes `deterministic encoding` a measurement rather than a claim. This is NOT the canonical signed encoding of plan §4 — that is CBOR and it lives in `mesh-types`. Nothing on this socket is signed.",
+  "protocol": "mesh-ipc",
+  "surface_version": 7,
+  "supported_versions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "framing": {
+    "kind": "newline-delimited-json",
+    "encoding": "utf-8",
+    "terminator": "\n",
+    "max_line_bytes": 65536,
+    "max_message_bytes": 16777216,
+    "chunk_data_bytes": 30000,
+    "chunk_since": 7,
+    "note": "Each line remains bounded. Surface 7 splits a larger canonical daemon message into ordered lower-case-hex chunk frames and reconstructs at most max_message_bytes; older clients receive a small response-too-large failure."
+  },
+  "transport": {
+    "kind": "unix-domain-socket",
+    "network_listener": false,
+    "note": "The daemon binds a filesystem path and never a network address; the desktop client connects to a filesystem path and never opens a listener of any kind. Both claims are tested: `crates/mesh-daemon/tests/ipc.rs` and `apps/desktop/src/ipc/no-network.test.ts`."
+  },
+  "limits": {
+    "max_method_bytes": 64,
+    "max_session_bytes": 128,
+    "max_versions_per_hello": 32,
+    "max_json_depth": 16,
+    "max_connections": 16
+  },
+  "compatibility": {
+    "additive_within_a_version": "An ANSWER may gain keys inside a surface version, and a client ignores what it does not recognise. Removing a key, renaming one, or changing what an existing key means is NOT additive and needs a new surface version. `workspace.state` gained `private_version` that way: the method catalogue did not move, `supported_versions` did not move, and a version 1 client still cannot reach the method at all.",
+    "note": "Stated here rather than in a commit message, because the reader who needs it is a client author outside this repository."
+  },
+  "answers": {
+    "workspace.state": {
+      "private_version": {
+        "derivation": "blake3/mesh.v0.actor-head",
+        "checked_against_author_claim": false,
+        "note": "`version` is this replica's own version identifier, derived by mesh-state over the saved changes actually on disk, using each record's own causal parents; it is null when there are no saved changes and therefore no head. It is NOT checked against what the authors claimed: a ChangeSet carries a base and a resulting version, the saved record persists neither, so there is no claim on disk to disagree with. `state` is the review-axis word - working, ready for review, superseded or archived. `waiting` reports every waiting change and every absent parent, while `waiting_not_listed` remains zero as a compatibility field. `apply_order_agrees` reports whether mesh-state and mesh-materializer, two independent implementations of causal depth then identifier, produced the same order over the same complete on-disk record set."
+      },
+      "shared_version": {
+        "derivation": "ordered durable HumanHeld publication decisions plus canonical approval receipts",
+        "note": "The value remains null and `not_yet` retains the shared-version refusal until the immutable journal can carry mesh-policy's recorded HumanHeld publication authority beside the exact signed receipt. A configured public key or a software-held signature alone never advances it."
+      },
+      "file_histories": {
+        "derivation": "complete materialized state reconstructed from verified immutable operation payloads",
+        "note": "Each row binds a currently materialized file path and stable object identifier to every retained immutable version and manifest identifier. It is read-only discovery for `workspace.restore.preview`, not restore authority. An incomplete materialization returns no history and reports the recoverable conditions instead of exposing a plausible partial list."
+      },
+      "workspace_versions": {
+        "derivation": "causally complete durable operation points in deterministic causal order",
+        "note": "Each row is a read-only operation identity that can be supplied to workspace.version.fork. A fork reconstructs only that operation and its transitive parents, verifies every manifest and chunk, and creates a new independent private store plus ordinary mounts working folder. It never rewinds or mutates the source workspace."
+      },
+      "native_untracked_files": {
+        "derivation": "metadata-only enumeration of regular files in the presented native folder minus complete durable materialization paths",
+        "note": "This additive list is nonauthoritative discovery for local clients. It never follows symlinks, reads file contents, creates an operation, or claims that a short-lived or unreadable file is absent. A client must use the native inspect-and-adopt path, bound to the exact workspace installation and content digest, before representing a listed file as saved."
+      },
+      "native_unsupported_entries": {
+        "derivation": "metadata-only classification of included symbolic links, special objects, and re-included paths below excluded parents in the presented native folder",
+        "note": "This additive list makes unsupported native content visible without following or reading it. Each row has a root-relative path and the closed kind symbolic-link, special, or excluded-ancestor. The exact app-owned .codex navigation link is excluded only when its target, private directory permissions, and one-file generated configuration shape all match. An excluded-ancestor row requires the person to include its parent too or keep the descendant excluded. Clients must block complete-save and review claims until every listed entry is made representable, excluded by an explicit rule, or removed."
+      },
+      "native_inventory_complete": {
+        "derivation": "whether the metadata-only native inventory read and classified every directory entry it encountered",
+        "note": "False is a fail-closed signal: the response may still carry paths Mesh did observe, but a client must not claim the workspace is completely scanned or allow review and approval until a fresh inventory completes. Older clients may ignore this additive key; this desktop treats an absent key from an older daemon as its prior compatibility behavior."
+      },
+      "support_bundle": {
+        "derivation": "the running daemon's already-verified journal boundary and restored checkpoint snapshot",
+        "note": "This additive answer is the same allowlisted mesh-support-bundle/v1 document available from the endpoint-free inspector, but it consumes the open daemon's coherent in-memory truth so an ordinary live SQLite WAL family is not mislabeled as crash damage. Clients must bind the returned root to the workspace they intended before displaying the document."
+      }
+    },
+    "performance.counters": {
+      "conditions": "a load-dependent reading is wall-clock nanoseconds and moves with machine load; the conditions a timing number is taken under are benchmarks/runners/README.md, `Getting a trustworthy number`",
+      "integer_encoding": "decimal-u64",
+      "catalogue_count": 80,
+      "catalogue": [
+        "context.cache.hits",
+        "context.cache.lookups",
+        "context.harness.assemblies",
+        "context.harness.fixed_bytes",
+        "context.output.accepted",
+        "context.output.rejected",
+        "context.stale_input.checks",
+        "context.stale_input.detected",
+        "context.task.completions",
+        "context.task.ns",
+        "context.tokens.repeated",
+        "context.tokens.unique",
+        "local_filesystem.build_test.baseline_ns",
+        "local_filesystem.build_test.ns",
+        "local_filesystem.build_test.runs",
+        "local_filesystem.context_switches.count",
+        "local_filesystem.context_switches.samples",
+        "local_filesystem.cpu.busy_ns",
+        "local_filesystem.cpu.samples",
+        "local_filesystem.create.ns",
+        "local_filesystem.create.ops",
+        "local_filesystem.directory_enumeration.entries",
+        "local_filesystem.directory_enumeration.ns",
+        "local_filesystem.directory_enumeration.ops",
+        "local_filesystem.lookup.ns",
+        "local_filesystem.lookup.ops",
+        "local_filesystem.memory.resident_bytes",
+        "local_filesystem.memory.samples",
+        "local_filesystem.open.ns",
+        "local_filesystem.open.ops",
+        "local_filesystem.random_read.bytes",
+        "local_filesystem.random_read.ns",
+        "local_filesystem.random_read.ops",
+        "local_filesystem.random_write.bytes",
+        "local_filesystem.random_write.ns",
+        "local_filesystem.random_write.ops",
+        "local_filesystem.rename.ns",
+        "local_filesystem.rename.ops",
+        "local_filesystem.sequential_read.bytes",
+        "local_filesystem.sequential_read.ns",
+        "local_filesystem.sequential_read.ops",
+        "local_filesystem.sequential_write.bytes",
+        "local_filesystem.sequential_write.ns",
+        "local_filesystem.sequential_write.ops",
+        "synchronization.duplicate_operations.bytes",
+        "synchronization.duplicate_operations.count",
+        "synchronization.reconnect_convergence.ns",
+        "synchronization.reconnect_convergence.ops",
+        "synchronization.relay.cpu_busy_ns",
+        "synchronization.relay.cpu_samples",
+        "synchronization.relay.storage_bytes",
+        "synchronization.relay.storage_samples",
+        "synchronization.remote_metadata_visibility.ns",
+        "synchronization.remote_metadata_visibility.ops",
+        "synchronization.remote_small_file_availability.ns",
+        "synchronization.remote_small_file_availability.ops",
+        "synchronization.throughput.bytes",
+        "synchronization.throughput.ns",
+        "synchronization.throughput.transfers",
+        "synchronization.transferred.bytes",
+        "synchronization.transferred.messages",
+        "workspace_operations.actor_view_creation.ns",
+        "workspace_operations.actor_view_creation.ops",
+        "workspace_operations.canonical_publication.ns",
+        "workspace_operations.canonical_publication.ops",
+        "workspace_operations.checkpoint_creation.bytes",
+        "workspace_operations.checkpoint_creation.ns",
+        "workspace_operations.checkpoint_creation.ops",
+        "workspace_operations.crash_recovery.ns",
+        "workspace_operations.crash_recovery.ops",
+        "workspace_operations.crash_recovery.records",
+        "workspace_operations.index_reconstruction.ns",
+        "workspace_operations.index_reconstruction.ops",
+        "workspace_operations.index_reconstruction.rows",
+        "workspace_operations.review_bundle_calculation.ns",
+        "workspace_operations.review_bundle_calculation.ops",
+        "workspace_operations.selective_approval.ns",
+        "workspace_operations.selective_approval.ops",
+        "workspace_operations.shadow_view_opening.ns",
+        "workspace_operations.shadow_view_opening.ops"
+      ],
+      "unit_partitions": {
+        "bytes": [
+          "context.harness.fixed_bytes",
+          "local_filesystem.memory.resident_bytes",
+          "local_filesystem.random_read.bytes",
+          "local_filesystem.random_write.bytes",
+          "local_filesystem.sequential_read.bytes",
+          "local_filesystem.sequential_write.bytes",
+          "synchronization.duplicate_operations.bytes",
+          "synchronization.relay.storage_bytes",
+          "synchronization.throughput.bytes",
+          "synchronization.transferred.bytes",
+          "workspace_operations.checkpoint_creation.bytes"
+        ],
+        "nanoseconds": [
+          "context.task.ns",
+          "local_filesystem.build_test.baseline_ns",
+          "local_filesystem.build_test.ns",
+          "local_filesystem.cpu.busy_ns",
+          "local_filesystem.create.ns",
+          "local_filesystem.directory_enumeration.ns",
+          "local_filesystem.lookup.ns",
+          "local_filesystem.open.ns",
+          "local_filesystem.random_read.ns",
+          "local_filesystem.random_write.ns",
+          "local_filesystem.rename.ns",
+          "local_filesystem.sequential_read.ns",
+          "local_filesystem.sequential_write.ns",
+          "synchronization.reconnect_convergence.ns",
+          "synchronization.relay.cpu_busy_ns",
+          "synchronization.remote_metadata_visibility.ns",
+          "synchronization.remote_small_file_availability.ns",
+          "synchronization.throughput.ns",
+          "workspace_operations.actor_view_creation.ns",
+          "workspace_operations.canonical_publication.ns",
+          "workspace_operations.checkpoint_creation.ns",
+          "workspace_operations.crash_recovery.ns",
+          "workspace_operations.index_reconstruction.ns",
+          "workspace_operations.review_bundle_calculation.ns",
+          "workspace_operations.selective_approval.ns",
+          "workspace_operations.shadow_view_opening.ns"
+        ],
+        "events_are_catalogue_remainder": true
+      },
+      "producer_partitions": {
+        "wired": [
+          "local_filesystem.sequential_read.bytes",
+          "local_filesystem.sequential_read.ops",
+          "workspace_operations.checkpoint_creation.bytes",
+          "workspace_operations.checkpoint_creation.ops",
+          "workspace_operations.crash_recovery.ns",
+          "workspace_operations.crash_recovery.ops",
+          "workspace_operations.crash_recovery.records",
+          "workspace_operations.index_reconstruction.ns",
+          "workspace_operations.index_reconstruction.ops",
+          "workspace_operations.index_reconstruction.rows"
+        ],
+        "not_yet_reason_groups": [
+          {
+            "reason": "this build assembles no agent context, so nothing here is ever observed in it",
+            "keys": [
+              "context.cache.hits",
+              "context.cache.lookups",
+              "context.harness.assemblies",
+              "context.harness.fixed_bytes",
+              "context.output.accepted",
+              "context.output.rejected",
+              "context.stale_input.checks",
+              "context.stale_input.detected",
+              "context.task.completions",
+              "context.task.ns",
+              "context.tokens.repeated",
+              "context.tokens.unique"
+            ]
+          },
+          {
+            "reason": "the filesystem operation exists, but no operation-level metric producer is wired in this build",
+            "keys": [
+              "local_filesystem.create.ns",
+              "local_filesystem.create.ops",
+              "local_filesystem.directory_enumeration.entries",
+              "local_filesystem.directory_enumeration.ns",
+              "local_filesystem.directory_enumeration.ops",
+              "local_filesystem.lookup.ns",
+              "local_filesystem.lookup.ops",
+              "local_filesystem.open.ns",
+              "local_filesystem.open.ops",
+              "local_filesystem.random_read.bytes",
+              "local_filesystem.random_read.ns",
+              "local_filesystem.random_read.ops",
+              "local_filesystem.random_write.bytes",
+              "local_filesystem.random_write.ns",
+              "local_filesystem.random_write.ops",
+              "local_filesystem.rename.ns",
+              "local_filesystem.rename.ops",
+              "local_filesystem.sequential_write.bytes",
+              "local_filesystem.sequential_write.ns",
+              "local_filesystem.sequential_write.ops"
+            ]
+          },
+          {
+            "reason": "the read is not timed apart from the fold that follows it; the whole open is recorded on workspace_operations.index_reconstruction.ns",
+            "keys": [
+              "local_filesystem.sequential_read.ns"
+            ]
+          },
+          {
+            "reason": "no build or test runs inside a Mesh workspace are measured here",
+            "keys": [
+              "local_filesystem.build_test.baseline_ns",
+              "local_filesystem.build_test.ns",
+              "local_filesystem.build_test.runs"
+            ]
+          },
+          {
+            "reason": "no process accounting is read on any platform in this build",
+            "keys": [
+              "local_filesystem.context_switches.count",
+              "local_filesystem.context_switches.samples",
+              "local_filesystem.cpu.busy_ns",
+              "local_filesystem.cpu.samples",
+              "local_filesystem.memory.resident_bytes",
+              "local_filesystem.memory.samples"
+            ]
+          },
+          {
+            "reason": "this build opens no network transport, so nothing here is ever observed in it",
+            "keys": [
+              "synchronization.duplicate_operations.bytes",
+              "synchronization.duplicate_operations.count",
+              "synchronization.reconnect_convergence.ns",
+              "synchronization.reconnect_convergence.ops",
+              "synchronization.relay.cpu_busy_ns",
+              "synchronization.relay.cpu_samples",
+              "synchronization.relay.storage_bytes",
+              "synchronization.relay.storage_samples",
+              "synchronization.remote_metadata_visibility.ns",
+              "synchronization.remote_metadata_visibility.ops",
+              "synchronization.remote_small_file_availability.ns",
+              "synchronization.remote_small_file_availability.ops",
+              "synchronization.throughput.bytes",
+              "synchronization.throughput.ns",
+              "synchronization.throughput.transfers",
+              "synchronization.transferred.bytes",
+              "synchronization.transferred.messages"
+            ]
+          },
+          {
+            "reason": "the operation exists, but no workspace-operation metric producer is wired in this build",
+            "keys": [
+              "workspace_operations.actor_view_creation.ns",
+              "workspace_operations.actor_view_creation.ops",
+              "workspace_operations.canonical_publication.ns",
+              "workspace_operations.canonical_publication.ops",
+              "workspace_operations.checkpoint_creation.ns",
+              "workspace_operations.review_bundle_calculation.ns",
+              "workspace_operations.review_bundle_calculation.ops",
+              "workspace_operations.selective_approval.ns",
+              "workspace_operations.selective_approval.ops",
+              "workspace_operations.shadow_view_opening.ns",
+              "workspace_operations.shadow_view_opening.ops"
+            ]
+          }
+        ]
+      },
+      "atomic_writes_per_observation": 5,
+      "atomic_writes_per_group": 2,
+      "allocations_per_observation": 0,
+      "consistency": "Related product counters remain under one writer bracket, and the client independently re-derives the saturating observation sum and snapshot_consistent verdict from the published readings; the daemon flag is not trusted by itself."
+    }
+  },
+  "push": {
+    "message": "event",
+    "since": 2,
+    "requires": "events.subscribe",
+    "note": "The one line the daemon sends that no client message asked for, and it is sent only to a connection that called `events.subscribe`. Its `id` is that call's identifier, so a client correlates a push with the request that opened the stream. `sequence` orders entries ON THIS SOCKET and nothing else: ordering of work in Mesh is `lamport -> event id -> content hash`, and a feed sequence establishes none of those. A client that never subscribes never receives one, which is what makes version 2 additive."
+  },
+  "methods": [
+    {
+      "name": "daemon.status",
+      "since": 1,
+      "summary": "whether the background service is serving requests, and which surface it speaks"
+    },
+    {
+      "name": "startup.report",
+      "since": 1,
+      "summary": "what the background service found when it last started"
+    },
+    {
+      "name": "surface.describe",
+      "since": 1,
+      "summary": "this catalogue, so a client can tell whether it is talking to a newer service"
+    },
+    {
+      "name": "workspace.open",
+      "since": 2,
+      "summary": "open the workspace in a folder and read back what is saved there"
+    },
+    {
+      "name": "workspace.state",
+      "since": 2,
+      "summary": "what the open workspace holds, and what this build cannot answer yet"
+    },
+    {
+      "name": "review.open",
+      "since": 2,
+      "summary": "open or reuse an exact review bundle over one saved change"
+    },
+    {
+      "name": "review.open-current",
+      "since": 6,
+      "summary": "compute and open the exact first-publication review for the current private head"
+    },
+    {
+      "name": "review.approve",
+      "since": 2,
+      "summary": "request shared publication; unavailable until HumanHeld authority is durable"
+    },
+    {
+      "name": "events.subscribe",
+      "since": 2,
+      "summary": "hear about what the background service is doing, as it happens"
+    },
+    {
+      "name": "folder.import.preview",
+      "since": 3,
+      "summary": "hash one selected local folder without changing it or creating a managed copy"
+    },
+    {
+      "name": "folder.import.confirm",
+      "since": 3,
+      "summary": "verify the accepted summary, create durable private history, and open the managed copy"
+    },
+    {
+      "name": "folder.import.rollback",
+      "since": 3,
+      "summary": "remove an unchanged receipt-owned managed copy while preserving the original"
+    },
+    {
+      "name": "workspace.restore.preview",
+      "since": 3,
+      "summary": "preview an exact append-only earlier-version restore without authorizing it"
+    },
+    {
+      "name": "workspace.version.fork",
+      "since": 5,
+      "summary": "open one durable version of the exact displayed workspace as a new independent native working folder"
+    },
+    {
+      "name": "performance.counters",
+      "since": 4,
+      "summary": "read every live performance counter and its collection conditions"
+    }
+  ],
+  "vectors": [
+    {
+      "name": "hello",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1],\"session\":\"desktop-01\"}"
+    },
+    {
+      "name": "call",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"call\",\"id\":2,\"method\":\"daemon.status\",\"version\":1,\"params\":{}}"
+    },
+    {
+      "name": "call-with-parameters",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"call\",\"id\":3,\"method\":\"startup.report\",\"version\":1,\"params\":{\"detail\":\"brief\",\"quoted\":\"a \\\"quoted\\\" \\\\ value\",\"line\":\"a\\nb\"}}"
+    },
+    {
+      "name": "welcome",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"welcome\",\"id\":1,\"version\":1,\"session\":\"desktop-01\",\"resumed\":false,\"surface_version\":1}"
+    },
+    {
+      "name": "refused",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"refused\",\"id\":1,\"code\":\"unsupported-version\",\"message\":\"This app and the Mesh background service are too far apart in age to talk to each other. Update both to the same release and try again.\",\"supported\":[1]}"
+    },
+    {
+      "name": "result",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"result\",\"id\":2,\"value\":{\"serving\":true,\"surface_version\":1}}"
+    },
+    {
+      "name": "failed",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"failed\",\"id\":4,\"code\":\"unknown-method\",\"message\":\"The Mesh background service does not offer this operation. Nothing was changed. Updating both the app and the service usually fixes this.\"}"
+    },
+    {
+      "name": "chunk",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"chunk\",\"id\":2,\"index\":0,\"parts\":2,\"total_bytes\":70000,\"hex\":\"7b7d\"}"
+    },
+    {
+      "name": "hello-version-two",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2],\"session\":\"desktop-01\"}"
+    },
+    {
+      "name": "call-workspace-open",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"call\",\"id\":5,\"method\":\"workspace.open\",\"version\":2,\"params\":{\"path\":\"/home/ada/work\"}}"
+    },
+    {
+      "name": "call-events-subscribe",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"call\",\"id\":6,\"method\":\"events.subscribe\",\"version\":2,\"params\":{}}"
+    },
+    {
+      "name": "result-workspace-state",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"result\",\"id\":5,\"value\":{\"root\":\"/home/ada/work\",\"records\":3,\"unfinished_bytes\":0,\"operations\":2,\"actors\":1,\"manifests\":0,\"peers\":1,\"reviews\":0,\"digest\":\"3f2b0c8d1e4a5967b8c0d1e2f3a4b5c6\",\"private_version\":{\"version\":\"c6f0f4c2a0b1d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8\",\"state\":\"working\",\"changes_applied\":2,\"concurrent_changes\":1,\"waiting\":[],\"waiting_not_listed\":0,\"apply_order_agrees\":true,\"derivation\":\"blake3/mesh.v0.actor-head\",\"checked_against_author_claim\":false},\"shared_version\":null,\"entries\":[],\"conditions\":[],\"not_yet\":[]}}"
+    },
+    {
+      "name": "event",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"event\",\"id\":6,\"sequence\":2,\"kind\":\"workspace-opened\",\"value\":{\"records\":3}}"
+    },
+    {
+      "name": "event-with-no-fields",
+      "direction": "daemon-to-client",
+      "line": "{\"t\":\"event\",\"id\":6,\"sequence\":3,\"kind\":\"stopping\",\"value\":{}}"
+    },
+    {
+      "name": "hello-version-three",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2,3],\"session\":\"mesh-desktop\"}"
+    },
+    {
+      "name": "call-folder-import-confirm",
+      "direction": "client-to-daemon",
+      "line": "{\"t\":\"call\",\"id\":7,\"method\":\"folder.import.confirm\",\"version\":3,\"params\":{\"source\":\"/home/ada/project\",\"destination\":\"/home/ada/Mesh/project\",\"summary\":\"0404040404040404040404040404040404040404040404040404040404040404\"}}"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": "mesh-baseline/versions/v1",
+  "note": "A baseline is a configured, versioned artefact. This file is the pin: the runner reads the tool's own version at run time, compares it against `accepted`, and refuses to publish a row on a version that is not on the list. A drifted version is not a regression, it is a different baseline — so the honest outcome is a refusal with the observed version named, not a row with an asterisk. `--exploratory` still runs it and marks the row `pin_satisfied: false`.",
+  "baselines": [
+    {
+      "id": "native-fs",
+      "title": "Native filesystem (copy-per-version)",
+      "tool": "kernel filesystem",
+      "version_command": null,
+      "version_source": "platform.filesystem and platform.os_version of the row — the baseline is the host filesystem itself, which has no separate version string",
+      "accepted": null,
+      "pin_mode": "host-recorded",
+      "terms": "No third-party terms. The host's own filesystem.",
+      "publishable": true
+    },
+    {
+      "id": "git-worktree",
+      "title": "Git worktrees",
+      "tool": "git",
+      "version_command": ["git", "--version"],
+      "version_source": "`git --version`",
+      "accepted": ["2.51.0"],
+      "pin_mode": "exact",
+      "terms": "GPL-2.0-only. Publishing measurements of Git carries no restriction; Git imposes no benchmark-publication term.",
+      "publishable": true
+    },
+    {
+      "id": "jujutsu",
+      "title": "Jujutsu workspaces",
+      "tool": "jj",
+      "version_command": ["jj", "--version"],
+      "version_source": "`jj --version`",
+      "accepted": ["0.34.0"],
+      "pin_mode": "exact",
+      "terms": "Apache-2.0. No benchmark-publication restriction.",
+      "publishable": true
+    },
+    {
+      "id": "replication",
+      "title": "Folder replication (rsync)",
+      "tool": "rsync",
+      "version_command": ["rsync", "--version"],
+      "version_source": "first line of `rsync --version`",
+      "accepted": ["3.4.1", "3.3.0", "3.2.7", "2.6.9"],
+      "pin_mode": "exact",
+      "terms": "GPL-3.0-or-later. No benchmark-publication restriction. Syncthing (MPL-2.0) is the other member of this family and is equally publishable; it is not implemented here because it needs two live daemons and a network, which is a different runner.",
+      "publishable": true
+    }
+  ],
+  "competitor_products": [
+    {
+      "id": "dropbox",
+      "publishable": false,
+      "reason": "Dropbox Terms of Service §Acceptable Use prohibits publishing benchmark results without written consent. No consent has been sought, so no runner exists and no number may be quoted — including from a third-party blog post."
+    },
+    {
+      "id": "google-drive",
+      "publishable": false,
+      "reason": "Google APIs Terms of Service §3(d) prohibits publishing benchmarks of the services without prior written consent. Same conclusion."
+    },
+    {
+      "id": "perforce-helix-core",
+      "publishable": false,
+      "reason": "The Perforce end-user licence agreement prohibits disclosure of benchmark or performance results. Same conclusion."
+    }
+  ]
+}

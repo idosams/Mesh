@@ -1,0 +1,333 @@
+{
+  "contract": "mesh-checkpoint-settling-tool-capture/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "repository_commit": "c83420f6eae060507dae3da676628694710a84cc",
+  "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900",
+  "seed": 347002,
+  "platform": {
+    "tag": "macos-apfs",
+    "os": "darwin",
+    "os_version": "25.6.0",
+    "arch": "arm64",
+    "filesystem": "apfs",
+    "filesystem_type": "26",
+    "node": "v24.7.0",
+    "docker_image": null,
+    "hardware": {
+      "cpu_model": "Apple M2 Pro",
+      "cpu_vendor": "Apple",
+      "logical_cores": 10,
+      "physical_cores": 10,
+      "memory_bytes": 17179869184
+    }
+  },
+  "network_evidence": "host-network-not-used",
+  "cache_state": "fresh-private-tool-state-per-sample",
+  "sample_count_per_arm": 5,
+  "invocation": [
+    "/private/tmp/mesh-task347-complete-matrix/benchmarks/checkpoint-settling/capture-tools.mjs",
+    "--platform",
+    "macos-apfs",
+    "--commit",
+    "c83420f6eae060507dae3da676628694710a84cc",
+    "--families",
+    "vscode",
+    "--samples",
+    "5",
+    "--vscode",
+    "/opt/homebrew/bin/code",
+    "--network-evidence",
+    "host-network-not-used",
+    "--out",
+    "benchmarks/checkpoint-settling/captures/macos-vscode-v2.json"
+  ],
+  "arms": [
+    {
+      "id": "vscode",
+      "family": "VS Code",
+      "pattern": "vscode-macos-in-place-truncate",
+      "tool_path": "/opt/homebrew/bin/code",
+      "tool_version": "1.132.1",
+      "input_digest": "sha256:158aa19f7b506e5eacc8d7648a2f9f31b3b6d061ea50438051ab71dcaf2e774b",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/opt/homebrew/bin/code",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "/private/tmp/mesh-settling-vscode-1-v3q1xc/tool-state/user-data",
+            "--extensions-dir",
+            "/private/tmp/mesh-settling-vscode-1-v3q1xc/tool-state/extensions",
+            "--extensionDevelopmentPath",
+            "/private/tmp/mesh-settling-vscode-1-v3q1xc/tool-state/extension",
+            "/private/tmp/mesh-settling-vscode-1-v3q1xc/workspace/document.txt"
+          ],
+          "initial_tree_digest": "sha256:02c727d630514eddacc5ff7a837eb5290245d1632da609412f5431d4865b3e48",
+          "final_tree_digest": "sha256:b356239d58425c4cbb9ec8ffe4dd8098bd247936289784b5aa3773232501c5dc",
+          "polls": 53231,
+          "elapsed_ms": 3433.102,
+          "observations": [
+            {
+              "at_ms": 2557.9,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119241,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2558.044,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119241,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/opt/homebrew/bin/code",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "/private/tmp/mesh-settling-vscode-2-AxRd8U/tool-state/user-data",
+            "--extensions-dir",
+            "/private/tmp/mesh-settling-vscode-2-AxRd8U/tool-state/extensions",
+            "--extensionDevelopmentPath",
+            "/private/tmp/mesh-settling-vscode-2-AxRd8U/tool-state/extension",
+            "/private/tmp/mesh-settling-vscode-2-AxRd8U/workspace/document.txt"
+          ],
+          "initial_tree_digest": "sha256:98064b23e9ac723bad3a5ff9213875d353059a61423fceb10736a69391ecc595",
+          "final_tree_digest": "sha256:79546994bb35c160dd8c809d90ac890f41fded427d0689d21dc78ac69f652586",
+          "polls": 60168,
+          "elapsed_ms": 3253.025,
+          "observations": [
+            {
+              "at_ms": 2089.11,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119441,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2089.254,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119441,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/opt/homebrew/bin/code",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "/private/tmp/mesh-settling-vscode-3-6IAdxI/tool-state/user-data",
+            "--extensions-dir",
+            "/private/tmp/mesh-settling-vscode-3-6IAdxI/tool-state/extensions",
+            "--extensionDevelopmentPath",
+            "/private/tmp/mesh-settling-vscode-3-6IAdxI/tool-state/extension",
+            "/private/tmp/mesh-settling-vscode-3-6IAdxI/workspace/document.txt"
+          ],
+          "initial_tree_digest": "sha256:64e6a6e2977cc3bd88c1875e611869b045c0f91ebb7aaae318e17e08955d9cfd",
+          "final_tree_digest": "sha256:07d5858932768cb709890ee3d881053dc3a508a405750a7d44bb3b3712f192d4",
+          "polls": 59775,
+          "elapsed_ms": 3246.628,
+          "observations": [
+            {
+              "at_ms": 2033.837,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119641,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2033.948,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119641,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/opt/homebrew/bin/code",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "/private/tmp/mesh-settling-vscode-4-sERxA6/tool-state/user-data",
+            "--extensions-dir",
+            "/private/tmp/mesh-settling-vscode-4-sERxA6/tool-state/extensions",
+            "--extensionDevelopmentPath",
+            "/private/tmp/mesh-settling-vscode-4-sERxA6/tool-state/extension",
+            "/private/tmp/mesh-settling-vscode-4-sERxA6/workspace/document.txt"
+          ],
+          "initial_tree_digest": "sha256:ff018dd028058245c4bc0858f2eba667636460770f77fe69585f22ef0d768da3",
+          "final_tree_digest": "sha256:df996a0772fa4838ab415a770b872de0199aa06fcd396ff35af559e6c3c2b27a",
+          "polls": 57087,
+          "elapsed_ms": 3248.942,
+          "observations": [
+            {
+              "at_ms": 2178.545,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119843,
+                  "from": 30,
+                  "size": 30,
+                  "bytes_delta": 30
+                }
+              ]
+            },
+            {
+              "at_ms": 2178.99,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247119843,
+                  "from": 30,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/opt/homebrew/bin/code",
+            "--wait",
+            "--new-window",
+            "--disable-workspace-trust",
+            "--disable-telemetry",
+            "--skip-welcome",
+            "--skip-release-notes",
+            "--user-data-dir",
+            "/private/tmp/mesh-settling-vscode-5-mE9UZ0/tool-state/user-data",
+            "--extensions-dir",
+            "/private/tmp/mesh-settling-vscode-5-mE9UZ0/tool-state/extensions",
+            "--extensionDevelopmentPath",
+            "/private/tmp/mesh-settling-vscode-5-mE9UZ0/tool-state/extension",
+            "/private/tmp/mesh-settling-vscode-5-mE9UZ0/workspace/document.txt"
+          ],
+          "initial_tree_digest": "sha256:396f9933eeb2eedaf8e75a467846bb4bd0414b4552e76cc636df0b850d90e768",
+          "final_tree_digest": "sha256:7de1a84580d7d8dad4ba2b990921343aa8ee3ee8fff7e96224d65b0cecb749ff",
+          "polls": 64433,
+          "elapsed_ms": 3249.185,
+          "observations": [
+            {
+              "at_ms": 2077.791,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247120051,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2077.85,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "document.txt",
+                  "inode": 247120051,
+                  "from": 0,
+                  "size": 27,
+                  "bytes_delta": 27
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        }
+      ]
+    }
+  ],
+  "corpus_digest": "sha256:ed7f6efba93609ac7b311804423b04c91cc5a2bcd21f372602702e351319c4d5"
+}

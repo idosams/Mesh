@@ -1,0 +1,277 @@
+// The protobuf projection of the CWP message set.
+//
+// Plan §8.1 splits the wire in two: "Protobuf for network; canonical CBOR for signed records."
+// `records.proto` is the network half for the record types. This file is the network half for the
+// eighteen messages of `docs/protocol.md` §7.3, and it is deliberately *only* that.
+//
+// WHAT IS HERE. One message per CWP message, named after the `SyncMessage` variant it projects,
+// with the same fields in the same order as §7.3's table and as
+// `../../../wire/v0/messages.json`. Plus one message per compound element those messages carry —
+// `HeadAdvertisement`, `SparseChangeSet`, `CarriedChangeSet`, `ChunkRequest`, `ChunkPart`,
+// `MerkleSummary`, `SummaryNode` — under the names `crates/mesh-sync-protocol` gives them.
+//
+// The agreement is machine-checked. `crates/mesh-sync-protocol/tests/proto_projection.rs` parses
+// this file and fails if any message's field names or order drift from the Rust definition it
+// projects, if a message is declared here that no expectation covers, or if a `SyncMessage`
+// variant is added with no message here. Two descriptions of one message that nothing compares
+// are two descriptions that will disagree.
+//
+// PROTOBUF IS NOT THE ENCODING CWP MESSAGES ARE DEFINED IN. A CWP message is defined as a
+// two-element array — the wire tag, then the fields below in order — in `mesh-cbor/0`, the same
+// canonical encoding a signed record uses (§7.3, "Encoding"). Protobuf serialization is not
+// deterministic: field ordering, varint width and unknown-field retention are all encoder
+// choices. **A peer re-encodes to `mesh-cbor/0` before comparing bytes** — before checking a
+// record identifier, before verifying a signature over a carried body, and before comparing two
+// encodings of one message for equality. Nothing in the protocol is decided on protobuf bytes.
+//
+// WHY THERE IS NO `service` AND NO ENVELOPE. The wire tag is what selects a message, and it is
+// carried by the `mesh-cbor/0` frame rather than by anything here. Three alternatives were
+// considered and each was rejected for a stated reason:
+//
+//   * A `service` with an RPC per message would publish a request/response pairing the protocol
+//     does not have — `ADVERTISE_FRONTIER` has no response, one `REQUEST_OPERATIONS` may be
+//     answered by several `OPERATIONS_BATCH`es, and `ERROR` answers anything.
+//   * A `oneof` envelope would make the set closed in the type system, and its field numbers would
+//     become a SECOND tag table, assigned here and free to disagree with `MessageKind::tag` — two
+//     answers to "which message is this". If a transport later needs one, generate it from
+//     `MessageKind::tag` rather than hand-writing it.
+//   * Protobuf enums for the three closed tag sets would be more idiomatic, and proto3 requires a
+//     zero-valued member. All three sets start at one precisely so that "tag 0" is not a value: a
+//     decoder answers `unknown message` for an undefined tag, and an enum default would turn that
+//     refusal into a silent zero.
+//
+// The ADR that records this with its full alternatives and its "what would change our mind" is
+// owed by task `01KZGA1KHXE7D9W6DC9MK0D01K`; `docs/adr/**` is held by four in-progress tasks, and
+// `docs/adr/README.md` says to escalate rather than write into a claimed directory.
+//
+// FIELD NUMBERS ARE PROTOCOL. A number here is assigned once, never reused and never renumbered;
+// a removed field is `reserved`. Field *order* mirrors §7.3 so the two can be compared by eye as
+// well as by the test, and the numbers run sequentially from one so the eye check is the same
+// check the test makes.
+//
+// CLOSED TAG SETS TRAVEL AS THEIR TAGS. `PresenceState`, `ErrorCode` and `MessageKind` are closed
+// enumerations with assigned wire tags, and they are projected as `uint64` carrying exactly those
+// tags rather than as protobuf enums. A proto3 enum needs a zero-valued member, and every one of
+// these three sets starts at one precisely so that "tag 0" is not a value — a decoder answers
+// `unknown message` for a tag it does not define, and an enum default would turn that refusal into
+// a silent zero. The tag values are in `MessageKind::tag`, `ErrorCode::tag` and
+// `PresenceState::tag`, and are published in `../../../wire/v0/messages.json`.
+
+syntax = "proto3";
+
+package mesh.v0;
+
+// ------------------------------------------------------------------------------------------------
+// Compound elements
+// ------------------------------------------------------------------------------------------------
+
+// One ChangeSet a peer holds beyond its contiguous run, with the sequence it sits at.
+//
+// The sequence travels with the identifier because without it a receiver knows a ChangeSet is
+// beyond some hole but not which, and so cannot ask for what is between.
+message SparseChangeSet {
+  uint64 sequence = 1;
+  bytes id = 2;
+}
+
+// What one peer advertises about one actor: the head it holds, how much of that actor's sequence
+// it holds contiguously, and anything it holds beyond the contiguous part.
+message HeadAdvertisement {
+  bytes actor = 1;
+  bytes head = 2;
+  uint64 contiguous_through = 3;
+  repeated SparseChangeSet sparse = 4;
+}
+
+// One ChangeSet as it travels the metadata plane: its canonical bytes, plus the fields a receiver
+// needs before it has decoded them.
+//
+// `body` is the ChangeSet's `mesh-cbor/0` encoding, exactly as its author signed it — the same
+// bytes `ChangeSet` in `records.proto` projects field by field. The record travels opaque because
+// its signature was made over those bytes; a second description of a signed record is a
+// description that will one day disagree with what was signed.
+//
+// **`id` is not recomputable from published material today, and that is an open question rather
+// than an omission.** ADR-0015 requires a receiver to recompute this identifier from `body` under
+// the protocol digest before the identifier may reach head advancement. `docs/protocol.md` §2.1
+// says a content-derived name is computed under the canonical encoding, while §3.10's
+// `DigestWriter` row says the identity framing is *not* the canonical encoding — and `derive_id`
+// uses the framing. So an external implementation built from `protocol/` can recompute a record's
+// `canonical_encoding_digest_hex` and **cannot** recompute its `record_id_hex`. Which of the two
+// moves is a protocol change under `docs/protocol.md` §8, so it is tracked as
+// `01KZCZDTVD0D36W5YRGX8CNE17` and is not resolved here.
+//
+// Every field beside `body` is redundant with it: they are what a receiver needs to plan its next
+// request before it has decoded anything, and none of them is evidence.
+message CarriedChangeSet {
+  bytes id = 1;
+  bytes author = 2;
+  uint64 sequence = 3;
+  repeated bytes parents = 4;
+  bytes base_head = 5;
+  bytes resulting_head = 6;
+  uint64 policy_epoch = 7;
+  bytes body = 8;
+}
+
+// A request for chunk bytes, resumable from an offset.
+message ChunkRequest {
+  bytes content = 1;
+  uint64 from_offset = 2;
+  uint64 max_bytes = 3;
+}
+
+// A part of one chunk's bytes.
+message ChunkPart {
+  bytes content = 1;
+  uint64 offset = 2;
+  bytes bytes = 3;
+  bool is_final = 4;
+}
+
+// One leaf of an anti-entropy summary: a contiguous run of one actor's sequence, and the digest of
+// what that run holds.
+message SummaryNode {
+  uint64 first = 1;
+  uint64 last = 2;
+  bytes digest = 3;
+}
+
+// A summary of one actor's history: leaves over contiguous sequence runs.
+//
+// The canonical encoding *flattens* this — element 1 of `ANTI_ENTROPY_SUMMARY`'s body array is the
+// node list itself, with no wrapper — while the Rust variant and §7.3 both name a `MerkleSummary`.
+// The wrapper is kept here because this file projects the message set, not the encoding, and a
+// reader who needs the exact byte layout reads `../../../wire/v0/messages.json`.
+message MerkleSummary {
+  repeated SummaryNode nodes = 1;
+}
+
+// ------------------------------------------------------------------------------------------------
+// The eighteen messages, in wire-tag order
+// ------------------------------------------------------------------------------------------------
+
+// Wire tag 1, handshake plane. Opens a session.
+message Hello {
+  uint32 protocol_version = 1;
+  string encoding_profile = 2;
+  bytes actor = 3;
+  bytes challenge = 4;
+}
+
+// Wire tag 2, handshake plane. Offers a signature over the peer's challenge.
+message Authenticate {
+  bytes actor = 1;
+  bytes challenge = 2;
+  bytes signature = 3;
+}
+
+// Wire tag 3, metadata plane. Offers this peer's actor heads.
+//
+// `canonical_head` is the one optional field in the set and is projected as a repeated field of at
+// most one element, because `mesh-cbor/0` has no absence marker at all: absent is `[]` and present
+// is `[head]`. A proto3 `optional` would introduce a presence bit the canonical encoding cannot
+// carry, so a round trip through it would have two spellings of "absent".
+message AdvertiseFrontier {
+  repeated HeadAdvertisement heads = 1;
+  repeated bytes canonical_head = 2;
+  uint64 policy_epoch = 3;
+}
+
+// Wire tag 4, metadata plane. Asks for ChangeSets.
+message RequestOperations {
+  bytes actor = 1;
+  uint64 from_sequence = 2;
+  repeated bytes specific = 3;
+  uint32 max_count = 4;
+}
+
+// Wire tag 5, metadata plane. Carries ChangeSets.
+message OperationsBatch {
+  repeated CarriedChangeSet changesets = 1;
+}
+
+// Wire tag 6, metadata plane. Reports what the sender now holds of one actor's sequence.
+message AckOperations {
+  bytes actor = 1;
+  uint64 contiguous_through = 2;
+  repeated SparseChangeSet sparse = 3;
+}
+
+// Wire tag 7, metadata plane. Offers the file manifests the sender holds.
+message AdvertiseManifests {
+  repeated bytes manifests = 1;
+}
+
+// Wire tag 8, content plane. Asks for chunk bytes.
+message RequestChunks {
+  repeated ChunkRequest requests = 1;
+}
+
+// Wire tag 9, content plane. Carries chunk bytes.
+message ChunkBatch {
+  repeated ChunkPart parts = 1;
+}
+
+// Wire tag 10, content plane. Reports which chunks the sender has verified on receipt.
+message AckChunks {
+  repeated bytes verified = 1;
+}
+
+// Wire tag 11, metadata plane. Announces a new actor head.
+message UpdateActorHead {
+  bytes actor = 1;
+  bytes head = 2;
+  uint64 sequence = 3;
+}
+
+// Wire tag 12, metadata plane. Announces a new canonical head.
+message UpdateCanonicalHead {
+  bytes head = 1;
+  uint64 policy_epoch = 2;
+  bytes receipt = 3;
+}
+
+// Wire tag 13, metadata plane. Announces that an actor is reachable, for a bounded time.
+//
+// `state` carries a `PresenceState` tag: 1 active, 2 idle, 3 away.
+message Presence {
+  bytes actor = 1;
+  uint64 state = 2;
+  uint64 expires_after_millis = 3;
+}
+
+// Wire tag 14, metadata plane. Carries a review bundle as its canonical bytes.
+message ReviewBundle {
+  bytes id = 1;
+  bytes body = 2;
+}
+
+// Wire tag 15, metadata plane. Carries a validation receipt about one ChangeSet.
+message ValidationReceipt {
+  bytes about = 1;
+  bytes body = 2;
+}
+
+// Wire tag 16, metadata plane. Carries a signed approval envelope.
+message ApprovalEnvelope {
+  bytes id = 1;
+  bytes body = 2;
+}
+
+// Wire tag 17, metadata plane. Offers a summary of one actor's history.
+message AntiEntropySummary {
+  bytes actor = 1;
+  MerkleSummary summary = 2;
+}
+
+// Wire tag 18, handshake plane. Refuses a message.
+//
+// The three fields are `ProtocolError`'s, which is what the `SyncMessage::Error` variant carries.
+// `code` is an `ErrorCode` tag and `about` is a `MessageKind` tag; `detail` is diagnostic and is
+// never parsed — a sender decides what to do from `code` alone.
+message Error {
+  uint64 code = 1;
+  uint64 about = 2;
+  string detail = 3;
+}

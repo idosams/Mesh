@@ -1,0 +1,267 @@
+{
+  "schema_format": "mesh-record-schema/0",
+  "encoding_profile": {
+    "name": "mesh-cbor/0",
+    "base": "RFC 8949 (CBOR)",
+    "admitted_major_types": [
+      {
+        "name": "unsigned",
+        "cbor_major_type": 0,
+        "rule": "An unsigned integer, in the shortest head that holds it."
+      },
+      {
+        "name": "bytes",
+        "cbor_major_type": 2,
+        "rule": "A definite-length byte string."
+      },
+      {
+        "name": "text",
+        "cbor_major_type": 3,
+        "rule": "A definite-length UTF-8 text string."
+      },
+      {
+        "name": "array",
+        "cbor_major_type": 4,
+        "rule": "A definite-length array."
+      },
+      {
+        "name": "bool",
+        "cbor_major_type": 7,
+        "rule": "0xf4 for false and 0xf5 for true, and no other simple value."
+      }
+    ],
+    "excluded": [
+      "negative integers",
+      "maps",
+      "tags",
+      "floating point",
+      "null and undefined",
+      "indefinite-length items",
+      "any simple value other than true and false"
+    ],
+    "rules": [
+      "Every head uses the shortest form: an argument below 24 rides in the head byte, then one, two, four and eight big-endian bytes.",
+      "A record encodes as an array whose first element is the record's domain tag and whose remaining elements are its fields in schema order, one element per field.",
+      "Field order is the schema's; the bytes carry position, never a field name.",
+      "There is no optional field. A field that may be absent is a sequence of at most one element: [] for absent, [value] for present.",
+      "A sequence of groups that models a keyed collection is in ascending byte-lexicographic order of its key's UTF-8 bytes.",
+      "A nested record is spliced in whole and carries its own domain tag."
+    ]
+  },
+  "records": [
+    {
+      "record": "mesh.v0.file-manifest",
+      "signed_record": true,
+      "summary": "The ordered chunk references that reconstruct one file version's bytes exactly.",
+      "schema": {
+        "domain_tag": "mesh.v0.file-manifest",
+        "fields": [
+          {
+            "name": "byte_length",
+            "type": "unsigned"
+          },
+          {
+            "name": "content_hash",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          {
+            "name": "chunks",
+            "type": "sequence",
+            "element": {
+              "name": "element",
+              "type": "group",
+              "fields": [
+                {
+                  "name": "content_hash",
+                  "type": "bytes",
+                  "byte_length": 32
+                },
+                {
+                  "name": "offset",
+                  "type": "unsigned"
+                },
+                {
+                  "name": "length",
+                  "type": "unsigned"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "record": "mesh.v0.file-version",
+      "signed_record": true,
+      "summary": "One immutable version of one file object.",
+      "schema": {
+        "domain_tag": "mesh.v0.file-version",
+        "fields": [
+          {
+            "name": "object_id",
+            "type": "bytes",
+            "byte_length": 16
+          },
+          {
+            "name": "parent_versions",
+            "type": "sequence",
+            "element": {
+              "name": "element",
+              "type": "bytes",
+              "byte_length": 32
+            }
+          },
+          {
+            "name": "manifest_id",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          {
+            "name": "portable_metadata",
+            "type": "group",
+            "fields": [
+              {
+                "name": "executable",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "created_by",
+            "type": "bytes",
+            "byte_length": 32
+          }
+        ]
+      }
+    },
+    {
+      "record": "mesh.v0.directory-version",
+      "signed_record": true,
+      "summary": "One immutable version of one directory object: its name-to-child bindings.",
+      "schema": {
+        "domain_tag": "mesh.v0.directory-version",
+        "fields": [
+          {
+            "name": "object_id",
+            "type": "bytes",
+            "byte_length": 16
+          },
+          {
+            "name": "entries",
+            "type": "sequence",
+            "element": {
+              "name": "element",
+              "type": "group",
+              "fields": [
+                {
+                  "name": "name",
+                  "type": "text"
+                },
+                {
+                  "name": "object_id",
+                  "type": "bytes",
+                  "byte_length": 16
+                },
+                {
+                  "name": "version_id",
+                  "type": "bytes",
+                  "byte_length": 32
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "record": "mesh.v0.changeset",
+      "signed_record": true,
+      "summary": "One authored transition. The encoding binds ten fields and never the signature, because the signature is made over the record.",
+      "schema": {
+        "domain_tag": "mesh.v0.changeset",
+        "fields": [
+          {
+            "name": "workspace_id",
+            "type": "bytes",
+            "byte_length": 16
+          },
+          {
+            "name": "actor_id",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          {
+            "name": "session_id",
+            "type": "bytes",
+            "byte_length": 16
+          },
+          {
+            "name": "actor_sequence",
+            "type": "unsigned"
+          },
+          {
+            "name": "causal_parents",
+            "type": "sequence",
+            "element": {
+              "name": "element",
+              "type": "bytes",
+              "byte_length": 32
+            }
+          },
+          {
+            "name": "base_head",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          {
+            "name": "resulting_head",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          {
+            "name": "operations",
+            "type": "sequence",
+            "element": {
+              "name": "element",
+              "type": "record"
+            }
+          },
+          {
+            "name": "policy_epoch",
+            "type": "unsigned"
+          },
+          {
+            "name": "hybrid_logical_time",
+            "type": "group",
+            "fields": [
+              {
+                "name": "physical_millis",
+                "type": "unsigned"
+              },
+              {
+                "name": "logical",
+                "type": "unsigned"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "record": "mesh.v0.empty-operation",
+      "signed_record": false,
+      "summary": "The placeholder operation, carrying no field. It is not itself signed; it appears inside a ChangeSet's operations sequence, and mesh-operations replaces it with the real vocabulary and publishes vectors for each member.",
+      "schema": {
+        "domain_tag": "mesh.v0.empty-operation",
+        "fields": []
+      }
+    }
+  ],
+  "digest": {
+    "algorithm": "BLAKE3",
+    "output_bytes": 32,
+    "canonical_encoding_digest": "BLAKE3 of the canonical encoding bytes. This is the digest a signature over a record's bytes covers, and it is also the record's name.",
+    "record_id": "A record's name: BLAKE3 of its canonical encoding, which is the same value as canonical_encoding_digest. A chunk has no schema and is named by BLAKE3 of its own bytes instead; those are the only two rules. Ruled in docs/adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md. The values published TODAY are still the retired identity framing's output and do NOT equal canonical_encoding_digest: use canonical_encoding_digest as the name until task 01KZFMZC4MTHTT3BW4Y0BW6NYA moves the implementation onto the rule, which makes the two equal without moving any encoded byte."
+  }
+}

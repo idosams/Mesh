@@ -1,0 +1,67 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "vim-in-place-truncate",
+  "title": "vim saves in place: the document keeps its identity and passes through length zero",
+  "category": "editor",
+  "tool": { "name": "vim", "version": "9.0 (2022 Jun 28, compiled 2024 Apr 13)", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["vim", "-e", "-s", "-c", "set backup backupcopy=no", "-c", "normal! ggdGishort", "-c", "wq", "doc.txt"],
+    "evidence": "Eight readings. The swap file `.doc.txt.swp` appears (inode 190994899), vanishes, reappears under a NEW inode (190994901) and grows 0 -> 4096 -> 8192 -> 12288. Then `doc.txt` is seen at inode 190994875 with size 26, then the SAME inode at size 0, then the SAME inode at size 6, then the swap vanishes. The document's inode never changes.",
+    "surprise": "`backupcopy=no` asks vim to rename the original aside and write a new file, which would change the object's identity. On this APFS volume it did not: the inode is the same before and after, so vim wrote in place anyway. The captured behaviour is what is recorded; the setting's documented behaviour is not.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "anything created and removed inside one reading is missed — the first swap file was caught only because it survived a reading"]
+  },
+  "objects": [
+    { "object": 1, "role": "doc.txt, the document — one identity throughout" },
+    { "object": 2, "role": ".doc.txt.swp, the swap file" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 2 },
+        { "sequence": 4, "kind": "Opened", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 1 },
+        { "sequence": 6, "kind": "Written", "object": 1 },
+        { "sequence": 7, "kind": "Closed", "object": 1 },
+        { "sequence": 8, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [ { "through": 7, "reason": "Closed" } ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 2 },
+        { "sequence": 4, "kind": "Written", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 1 },
+        { "sequence": 6, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [1, 2], [1, 2, 3]],
+      "omission_note": "The swap file's whole life may fall between two readings."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 8, "reason": "Closed" } ], "boundary_evidence": { "through": 7, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 6, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 8, "folder": 6 },
+    "meaningful_durable_change": "doc.txt holds the edited text and no swap file exists. The document's identity is unchanged, so nothing about this save is a replacement.",
+    "forbidden_sequence_points": {
+      "mount": [1, 2, 3, 4, 5, 6, 7],
+      "folder": [1, 2, 3, 4, 5]
+    },
+    "forbidden_note": "Mount sequence 5 and folder sequence 4 are the SAME captured state: the document exists, is the same object, and is EMPTY. It was measured, not imagined — reading 6 of the capture shows doc.txt at inode 190994875 with size 0. A checkpoint there is a durable record of the person having deleted the contents of their file.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "On a mount, the Closed at sequence 7 anchors the checkpoint and the empty state is never a candidate: the rule is safe here because the backend can prove where the save ended.",
+    "On a folder-watching backend there is NO candidate anywhere in this stream, so the only thing that ends the window is quiescence. If the process is killed between folder sequences 4 and 5, the last durable state is the empty document, and Mesh has no way to know it was mid-save. That is exactly the restriction already shipped as FALLBACK_NO_SAVE_POINT_FROM_THE_FOLDER, met from the other direction.",
+    "The truncate at sequence 5 is not expressible at mesh-workspace-adapter/0: there is no truncate and no size in PortableMetadata (01KZHAGG8Q83Q0YBHGDXSS8J1M). It is recorded here as the two Written events a backend would emit, because that is what the corpus can honestly say."
+  ]
+}

@@ -1,0 +1,5489 @@
+{
+  "contract": "mesh-checkpoint-settling-tool-capture/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "repository_commit": "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+  "capture_script_digest": "sha256:d459385259930e079fac709255d88cc17c7d72a55c669abe0b574a50cca14010",
+  "seed": 347002,
+  "platform": {
+    "tag": "linux-overlayfs",
+    "os": "linux",
+    "os_version": "6.10.14-linuxkit",
+    "arch": "arm64",
+    "filesystem": "overlayfs",
+    "filesystem_type": "2035054128",
+    "node": "v18.20.4",
+    "docker_image": "sha256:d7822204014be3d8d263ae9f3ddca7662670cccbb254ab1421d80dd3d4999818",
+    "hardware": {
+      "cpu_model": "-",
+      "cpu_vendor": "Apple",
+      "logical_cores": 10,
+      "physical_cores": 10,
+      "memory_bytes": 8218034176
+    }
+  },
+  "network_evidence": "docker-network-none",
+  "cache_state": "fresh-private-tool-state-per-sample",
+  "sample_count_per_arm": 5,
+  "invocation": [
+    "/repo/benchmarks/checkpoint-settling/capture-tools.mjs",
+    "--platform",
+    "linux-overlayfs",
+    "--commit",
+    "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+    "--families",
+    "git",
+    "--samples",
+    "5",
+    "--git",
+    "/usr/bin/git",
+    "--network-evidence",
+    "docker-network-none",
+    "--image",
+    "sha256:d7822204014be3d8d263ae9f3ddca7662670cccbb254ab1421d80dd3d4999818",
+    "--out",
+    "/out/linux-git-v1.json"
+  ],
+  "arms": [
+    {
+      "id": "git",
+      "family": "Git operations",
+      "pattern": "linux-git-checkout-in-place",
+      "tool_path": "/usr/bin/git",
+      "tool_version": "git version 2.39.5",
+      "input_digest": "sha256:1d734ef645f91f6d4b4906472a92387da9345aaf592404b73d9c701540eb2ce0",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/usr/bin/git",
+            "checkout",
+            "other"
+          ],
+          "initial_tree_digest": "sha256:359075b306d182c71314a7bce55ec1e0e6aa6782ee8bdbe05d0fec25fd3ab706",
+          "final_tree_digest": "sha256:eacf361ac28bb6b2222fd81e00b079daf14a3745ab68d996981cecc3f8b1e734",
+          "polls": 22,
+          "elapsed_ms": 123.065,
+          "observations": [
+            {
+              "at_ms": 16.597,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": ".git/index.lock",
+                  "inode": 652252,
+                  "size": 0,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": "f000.txt",
+                  "inode": 651889,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f001.txt",
+                  "inode": 651890,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f002.txt",
+                  "inode": 651891,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f003.txt",
+                  "inode": 651892,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f004.txt",
+                  "inode": 651893,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f005.txt",
+                  "inode": 651894,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f006.txt",
+                  "inode": 651895,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f007.txt",
+                  "inode": 651896,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f008.txt",
+                  "inode": 651897,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f009.txt",
+                  "inode": 651898,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f010.txt",
+                  "inode": 651899,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f011.txt",
+                  "inode": 651900,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f012.txt",
+                  "inode": 651901,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f013.txt",
+                  "inode": 651902,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f014.txt",
+                  "inode": 651903,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f015.txt",
+                  "inode": 651904,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f016.txt",
+                  "inode": 651905,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f017.txt",
+                  "inode": 651906,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f018.txt",
+                  "inode": 651907,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f019.txt",
+                  "inode": 651908,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f020.txt",
+                  "inode": 651909,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f021.txt",
+                  "inode": 651910,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f022.txt",
+                  "inode": 651911,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f023.txt",
+                  "inode": 651912,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f024.txt",
+                  "inode": 651913,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f025.txt",
+                  "inode": 651914,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f026.txt",
+                  "inode": 651915,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f027.txt",
+                  "inode": 651916,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f028.txt",
+                  "inode": 651917,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f029.txt",
+                  "inode": 651918,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f030.txt",
+                  "inode": 651919,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f031.txt",
+                  "inode": 651920,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f032.txt",
+                  "inode": 651921,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f033.txt",
+                  "inode": 651922,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f034.txt",
+                  "inode": 651923,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f035.txt",
+                  "inode": 651924,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f036.txt",
+                  "inode": 651925,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f037.txt",
+                  "inode": 651926,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f038.txt",
+                  "inode": 651927,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f039.txt",
+                  "inode": 651928,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f040.txt",
+                  "inode": 651929,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f041.txt",
+                  "inode": 651930,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f042.txt",
+                  "inode": 651931,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f043.txt",
+                  "inode": 651932,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f044.txt",
+                  "inode": 651933,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f045.txt",
+                  "inode": 651934,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f046.txt",
+                  "inode": 651935,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f047.txt",
+                  "inode": 651936,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f048.txt",
+                  "inode": 651937,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f049.txt",
+                  "inode": 651938,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f050.txt",
+                  "inode": 651939,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f051.txt",
+                  "inode": 651940,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f052.txt",
+                  "inode": 651941,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f053.txt",
+                  "inode": 651942,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f054.txt",
+                  "inode": 651943,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f055.txt",
+                  "inode": 651944,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f056.txt",
+                  "inode": 651945,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f057.txt",
+                  "inode": 651946,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f058.txt",
+                  "inode": 651947,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f059.txt",
+                  "inode": 651948,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f060.txt",
+                  "inode": 651949,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f061.txt",
+                  "inode": 651950,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f062.txt",
+                  "inode": 651951,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f063.txt",
+                  "inode": 651952,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f064.txt",
+                  "inode": 651953,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f065.txt",
+                  "inode": 651954,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f066.txt",
+                  "inode": 651955,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f067.txt",
+                  "inode": 651956,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f068.txt",
+                  "inode": 651957,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f069.txt",
+                  "inode": 651958,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f070.txt",
+                  "inode": 651959,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f071.txt",
+                  "inode": 651960,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f072.txt",
+                  "inode": 651961,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f073.txt",
+                  "inode": 651962,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f074.txt",
+                  "inode": 651963,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f075.txt",
+                  "inode": 651964,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f076.txt",
+                  "inode": 651965,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f077.txt",
+                  "inode": 651966,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f078.txt",
+                  "inode": 651967,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f079.txt",
+                  "inode": 651968,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f080.txt",
+                  "inode": 651969,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f081.txt",
+                  "inode": 651970,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f082.txt",
+                  "inode": 651971,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f083.txt",
+                  "inode": 651972,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f084.txt",
+                  "inode": 651973,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f085.txt",
+                  "inode": 651974,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f086.txt",
+                  "inode": 651975,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f087.txt",
+                  "inode": 651976,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f088.txt",
+                  "inode": 651977,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f089.txt",
+                  "inode": 651978,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f090.txt",
+                  "inode": 651979,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f091.txt",
+                  "inode": 651980,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f092.txt",
+                  "inode": 651981,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f093.txt",
+                  "inode": 651982,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f094.txt",
+                  "inode": 651983,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f095.txt",
+                  "inode": 651984,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f096.txt",
+                  "inode": 651985,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f097.txt",
+                  "inode": 651986,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f098.txt",
+                  "inode": 651987,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f099.txt",
+                  "inode": 651988,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f100.txt",
+                  "inode": 651989,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f101.txt",
+                  "inode": 651990,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f102.txt",
+                  "inode": 651991,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f103.txt",
+                  "inode": 651992,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f104.txt",
+                  "inode": 651993,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f105.txt",
+                  "inode": 651994,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f106.txt",
+                  "inode": 651995,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f107.txt",
+                  "inode": 651996,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f108.txt",
+                  "inode": 651997,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f109.txt",
+                  "inode": 651998,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f110.txt",
+                  "inode": 651999,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f111.txt",
+                  "inode": 652000,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f112.txt",
+                  "inode": 652001,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f113.txt",
+                  "inode": 652002,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f114.txt",
+                  "inode": 652003,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f115.txt",
+                  "inode": 652004,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f116.txt",
+                  "inode": 652005,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f117.txt",
+                  "inode": 652006,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f118.txt",
+                  "inode": 652007,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f119.txt",
+                  "inode": 652008,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f120.txt",
+                  "inode": 652009,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f121.txt",
+                  "inode": 652010,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f122.txt",
+                  "inode": 652011,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f123.txt",
+                  "inode": 652012,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f124.txt",
+                  "inode": 652013,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f125.txt",
+                  "inode": 652014,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f126.txt",
+                  "inode": 652015,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f127.txt",
+                  "inode": 652016,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                }
+              ]
+            },
+            {
+              "at_ms": 30.035,
+              "changes": [
+                {
+                  "change": "replaced",
+                  "path": ".git/HEAD",
+                  "from_inode": 652239,
+                  "inode": 652244,
+                  "size": 22,
+                  "bytes_delta": 22
+                },
+                {
+                  "change": "replaced",
+                  "path": ".git/index",
+                  "from_inode": 652244,
+                  "inode": 652252,
+                  "size": 9283,
+                  "bytes_delta": 9283
+                },
+                {
+                  "change": "vanished",
+                  "path": ".git/index.lock",
+                  "inode": 652252,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": ".git/logs/HEAD",
+                  "inode": 652247,
+                  "from": 681,
+                  "size": 860,
+                  "bytes_delta": 860
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "branch": "other",
+            "files": 128
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/usr/bin/git",
+            "checkout",
+            "other"
+          ],
+          "initial_tree_digest": "sha256:1e358ac8a045be33eb1d520a16c093b6a26da2f014d47c4e94a6e44b855fa0b0",
+          "final_tree_digest": "sha256:0107d842f4adf9427373592b12e3775778e88ab6c63c77f36c7b4ad1f8d074af",
+          "polls": 27,
+          "elapsed_ms": 118.25,
+          "observations": [
+            {
+              "at_ms": 11.662,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "f000.txt",
+                  "inode": 651889,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f001.txt",
+                  "inode": 651890,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f002.txt",
+                  "inode": 651891,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f003.txt",
+                  "inode": 651892,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f004.txt",
+                  "inode": 651893,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f005.txt",
+                  "inode": 651894,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f006.txt",
+                  "inode": 651895,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f007.txt",
+                  "inode": 651896,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f008.txt",
+                  "inode": 651897,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f009.txt",
+                  "inode": 651898,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f010.txt",
+                  "inode": 651899,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f011.txt",
+                  "inode": 651900,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f012.txt",
+                  "inode": 651901,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f013.txt",
+                  "inode": 651902,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f014.txt",
+                  "inode": 651903,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f015.txt",
+                  "inode": 651904,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f016.txt",
+                  "inode": 651905,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f017.txt",
+                  "inode": 651906,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f018.txt",
+                  "inode": 651907,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f019.txt",
+                  "inode": 651908,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f020.txt",
+                  "inode": 651909,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f021.txt",
+                  "inode": 651910,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f022.txt",
+                  "inode": 651911,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f023.txt",
+                  "inode": 651912,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f024.txt",
+                  "inode": 651913,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f025.txt",
+                  "inode": 651914,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f026.txt",
+                  "inode": 651915,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f027.txt",
+                  "inode": 651916,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f028.txt",
+                  "inode": 651917,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f029.txt",
+                  "inode": 651918,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f030.txt",
+                  "inode": 651919,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f031.txt",
+                  "inode": 651920,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f032.txt",
+                  "inode": 651921,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f033.txt",
+                  "inode": 651922,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f034.txt",
+                  "inode": 651923,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f035.txt",
+                  "inode": 651924,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f036.txt",
+                  "inode": 651925,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f037.txt",
+                  "inode": 651926,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f038.txt",
+                  "inode": 651927,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f039.txt",
+                  "inode": 651928,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f040.txt",
+                  "inode": 651929,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f041.txt",
+                  "inode": 651930,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f042.txt",
+                  "inode": 651931,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f043.txt",
+                  "inode": 651932,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f044.txt",
+                  "inode": 651933,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f045.txt",
+                  "inode": 651934,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f046.txt",
+                  "inode": 651935,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f047.txt",
+                  "inode": 651936,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f048.txt",
+                  "inode": 651937,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f049.txt",
+                  "inode": 651938,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f050.txt",
+                  "inode": 651939,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f051.txt",
+                  "inode": 651940,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f052.txt",
+                  "inode": 651941,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f053.txt",
+                  "inode": 651942,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f054.txt",
+                  "inode": 651943,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f055.txt",
+                  "inode": 651944,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f056.txt",
+                  "inode": 651945,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f057.txt",
+                  "inode": 651946,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f058.txt",
+                  "inode": 651947,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f059.txt",
+                  "inode": 651948,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f060.txt",
+                  "inode": 651949,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f061.txt",
+                  "inode": 651950,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f062.txt",
+                  "inode": 651951,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f063.txt",
+                  "inode": 651952,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f064.txt",
+                  "inode": 651953,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f065.txt",
+                  "inode": 651954,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f066.txt",
+                  "inode": 651955,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f067.txt",
+                  "inode": 651956,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f068.txt",
+                  "inode": 651957,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f069.txt",
+                  "inode": 651958,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f070.txt",
+                  "inode": 651959,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f071.txt",
+                  "inode": 651960,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f072.txt",
+                  "inode": 651961,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f073.txt",
+                  "inode": 651962,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f074.txt",
+                  "inode": 651963,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f075.txt",
+                  "inode": 651964,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f076.txt",
+                  "inode": 651965,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f077.txt",
+                  "inode": 651966,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f078.txt",
+                  "inode": 651967,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f079.txt",
+                  "inode": 651968,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f080.txt",
+                  "inode": 651969,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f081.txt",
+                  "inode": 651970,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f082.txt",
+                  "inode": 651971,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f083.txt",
+                  "inode": 651972,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f084.txt",
+                  "inode": 651973,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f085.txt",
+                  "inode": 651974,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f086.txt",
+                  "inode": 651975,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f087.txt",
+                  "inode": 651976,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f088.txt",
+                  "inode": 651977,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f089.txt",
+                  "inode": 651978,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f090.txt",
+                  "inode": 651979,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f091.txt",
+                  "inode": 651980,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f092.txt",
+                  "inode": 651981,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f093.txt",
+                  "inode": 651982,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f094.txt",
+                  "inode": 651983,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f095.txt",
+                  "inode": 651984,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f096.txt",
+                  "inode": 651985,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f097.txt",
+                  "inode": 651986,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f098.txt",
+                  "inode": 651987,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f099.txt",
+                  "inode": 651988,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f100.txt",
+                  "inode": 651989,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f101.txt",
+                  "inode": 651990,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f102.txt",
+                  "inode": 651991,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f103.txt",
+                  "inode": 651992,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f104.txt",
+                  "inode": 651993,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f105.txt",
+                  "inode": 651994,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f106.txt",
+                  "inode": 651995,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f107.txt",
+                  "inode": 651996,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f108.txt",
+                  "inode": 651997,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f109.txt",
+                  "inode": 651998,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f110.txt",
+                  "inode": 651999,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f111.txt",
+                  "inode": 652000,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f112.txt",
+                  "inode": 652001,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f113.txt",
+                  "inode": 652002,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f114.txt",
+                  "inode": 652003,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f115.txt",
+                  "inode": 652004,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f116.txt",
+                  "inode": 652005,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f117.txt",
+                  "inode": 652006,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f118.txt",
+                  "inode": 652007,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f119.txt",
+                  "inode": 652008,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f120.txt",
+                  "inode": 652009,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f121.txt",
+                  "inode": 652010,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f122.txt",
+                  "inode": 652011,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f123.txt",
+                  "inode": 652012,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f124.txt",
+                  "inode": 652013,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f125.txt",
+                  "inode": 652014,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f126.txt",
+                  "inode": 652015,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f127.txt",
+                  "inode": 652016,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                }
+              ]
+            },
+            {
+              "at_ms": 17.535,
+              "changes": [
+                {
+                  "change": "replaced",
+                  "path": ".git/HEAD",
+                  "from_inode": 652248,
+                  "inode": 652252,
+                  "size": 22,
+                  "bytes_delta": 22
+                },
+                {
+                  "change": "replaced",
+                  "path": ".git/index",
+                  "from_inode": 652252,
+                  "inode": 652260,
+                  "size": 9283,
+                  "bytes_delta": 9283
+                },
+                {
+                  "change": "written",
+                  "path": ".git/logs/HEAD",
+                  "inode": 652255,
+                  "from": 681,
+                  "size": 860,
+                  "bytes_delta": 860
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "branch": "other",
+            "files": 128
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/usr/bin/git",
+            "checkout",
+            "other"
+          ],
+          "initial_tree_digest": "sha256:0b98edc1546a09c41788941727b77128ce354081492d02c521ad11e8d8ee5683",
+          "final_tree_digest": "sha256:6eee008f3c332d069bc80f777d4101d8520ea2429a6b6a4d6b63ee5512700e37",
+          "polls": 28,
+          "elapsed_ms": 116.154,
+          "observations": [
+            {
+              "at_ms": 9.139,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "f000.txt",
+                  "inode": 651889,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f001.txt",
+                  "inode": 651890,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f002.txt",
+                  "inode": 651891,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f003.txt",
+                  "inode": 651892,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f004.txt",
+                  "inode": 651893,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f005.txt",
+                  "inode": 651894,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f006.txt",
+                  "inode": 651895,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f007.txt",
+                  "inode": 651896,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f008.txt",
+                  "inode": 651897,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f009.txt",
+                  "inode": 651898,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f010.txt",
+                  "inode": 651899,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f011.txt",
+                  "inode": 651900,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f012.txt",
+                  "inode": 651901,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f013.txt",
+                  "inode": 651902,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f014.txt",
+                  "inode": 651903,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f015.txt",
+                  "inode": 651904,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f016.txt",
+                  "inode": 651905,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f017.txt",
+                  "inode": 651906,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f018.txt",
+                  "inode": 651907,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f019.txt",
+                  "inode": 651908,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f020.txt",
+                  "inode": 651909,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f021.txt",
+                  "inode": 651910,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f022.txt",
+                  "inode": 651911,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f023.txt",
+                  "inode": 651912,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f024.txt",
+                  "inode": 651913,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f025.txt",
+                  "inode": 651914,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f026.txt",
+                  "inode": 651915,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f027.txt",
+                  "inode": 651916,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f028.txt",
+                  "inode": 651917,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f029.txt",
+                  "inode": 651918,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f030.txt",
+                  "inode": 651919,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f031.txt",
+                  "inode": 651920,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f032.txt",
+                  "inode": 651921,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f033.txt",
+                  "inode": 651922,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f034.txt",
+                  "inode": 651923,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f035.txt",
+                  "inode": 651924,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f036.txt",
+                  "inode": 651925,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f037.txt",
+                  "inode": 651926,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f038.txt",
+                  "inode": 651927,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f039.txt",
+                  "inode": 651928,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f040.txt",
+                  "inode": 651929,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f041.txt",
+                  "inode": 651930,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f042.txt",
+                  "inode": 651931,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f043.txt",
+                  "inode": 651932,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f044.txt",
+                  "inode": 651933,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f045.txt",
+                  "inode": 651934,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f046.txt",
+                  "inode": 651935,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f047.txt",
+                  "inode": 651936,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f048.txt",
+                  "inode": 651937,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f049.txt",
+                  "inode": 651938,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f050.txt",
+                  "inode": 651939,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f051.txt",
+                  "inode": 651940,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f052.txt",
+                  "inode": 651941,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f053.txt",
+                  "inode": 651942,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f054.txt",
+                  "inode": 651943,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f055.txt",
+                  "inode": 651944,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f056.txt",
+                  "inode": 651945,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f057.txt",
+                  "inode": 651946,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f058.txt",
+                  "inode": 651947,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f059.txt",
+                  "inode": 651948,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f060.txt",
+                  "inode": 651949,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f061.txt",
+                  "inode": 651950,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f062.txt",
+                  "inode": 651951,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f063.txt",
+                  "inode": 651952,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f064.txt",
+                  "inode": 651953,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f065.txt",
+                  "inode": 651954,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f066.txt",
+                  "inode": 651955,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f067.txt",
+                  "inode": 651956,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f068.txt",
+                  "inode": 651957,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f069.txt",
+                  "inode": 651958,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f070.txt",
+                  "inode": 651959,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f071.txt",
+                  "inode": 651960,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f072.txt",
+                  "inode": 651961,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f073.txt",
+                  "inode": 651962,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f074.txt",
+                  "inode": 651963,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f075.txt",
+                  "inode": 651964,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f076.txt",
+                  "inode": 651965,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f077.txt",
+                  "inode": 651966,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f078.txt",
+                  "inode": 651967,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f079.txt",
+                  "inode": 651968,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f080.txt",
+                  "inode": 651969,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f081.txt",
+                  "inode": 651970,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f082.txt",
+                  "inode": 651971,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f083.txt",
+                  "inode": 651972,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f084.txt",
+                  "inode": 651973,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f085.txt",
+                  "inode": 651974,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f086.txt",
+                  "inode": 651975,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f087.txt",
+                  "inode": 651976,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f088.txt",
+                  "inode": 651977,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f089.txt",
+                  "inode": 651978,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f090.txt",
+                  "inode": 651979,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f091.txt",
+                  "inode": 651980,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f092.txt",
+                  "inode": 651981,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f093.txt",
+                  "inode": 651982,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f094.txt",
+                  "inode": 651983,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f095.txt",
+                  "inode": 651984,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f096.txt",
+                  "inode": 651985,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f097.txt",
+                  "inode": 651986,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f098.txt",
+                  "inode": 651987,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f099.txt",
+                  "inode": 651988,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f100.txt",
+                  "inode": 651989,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f101.txt",
+                  "inode": 651990,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f102.txt",
+                  "inode": 651991,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f103.txt",
+                  "inode": 651992,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f104.txt",
+                  "inode": 651993,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f105.txt",
+                  "inode": 651994,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f106.txt",
+                  "inode": 651995,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f107.txt",
+                  "inode": 651996,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f108.txt",
+                  "inode": 651997,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f109.txt",
+                  "inode": 651998,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f110.txt",
+                  "inode": 651999,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f111.txt",
+                  "inode": 652000,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f112.txt",
+                  "inode": 652001,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f113.txt",
+                  "inode": 652002,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f114.txt",
+                  "inode": 652003,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f115.txt",
+                  "inode": 652004,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f116.txt",
+                  "inode": 652005,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f117.txt",
+                  "inode": 652006,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f118.txt",
+                  "inode": 652007,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f119.txt",
+                  "inode": 652008,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f120.txt",
+                  "inode": 652009,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f121.txt",
+                  "inode": 652010,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f122.txt",
+                  "inode": 652011,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f123.txt",
+                  "inode": 652012,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f124.txt",
+                  "inode": 652013,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f125.txt",
+                  "inode": 652014,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f126.txt",
+                  "inode": 652015,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f127.txt",
+                  "inode": 652016,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                }
+              ]
+            },
+            {
+              "at_ms": 14.238,
+              "changes": [
+                {
+                  "change": "replaced",
+                  "path": ".git/HEAD",
+                  "from_inode": 652249,
+                  "inode": 652253,
+                  "size": 22,
+                  "bytes_delta": 22
+                },
+                {
+                  "change": "replaced",
+                  "path": ".git/index",
+                  "from_inode": 652253,
+                  "inode": 652261,
+                  "size": 9283,
+                  "bytes_delta": 9283
+                },
+                {
+                  "change": "written",
+                  "path": ".git/logs/HEAD",
+                  "inode": 652256,
+                  "from": 681,
+                  "size": 860,
+                  "bytes_delta": 860
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "branch": "other",
+            "files": 128
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/usr/bin/git",
+            "checkout",
+            "other"
+          ],
+          "initial_tree_digest": "sha256:633b024db9d2a4e8e1b23d2093830cce44a1913a780aac78ee16aee1569db417",
+          "final_tree_digest": "sha256:8a96ea2fc3fa9789701257ede3b0197ecf28c38885409d522637fc9a8030d6ca",
+          "polls": 27,
+          "elapsed_ms": 116.292,
+          "observations": [
+            {
+              "at_ms": 10.344,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": ".git/index.lock",
+                  "inode": 652252,
+                  "size": 0,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": "f000.txt",
+                  "inode": 651889,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f001.txt",
+                  "inode": 651890,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f002.txt",
+                  "inode": 651891,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f003.txt",
+                  "inode": 651892,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f004.txt",
+                  "inode": 651893,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f005.txt",
+                  "inode": 651894,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f006.txt",
+                  "inode": 651895,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f007.txt",
+                  "inode": 651896,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f008.txt",
+                  "inode": 651897,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f009.txt",
+                  "inode": 651898,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f010.txt",
+                  "inode": 651899,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f011.txt",
+                  "inode": 651900,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f012.txt",
+                  "inode": 651901,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f013.txt",
+                  "inode": 651902,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f014.txt",
+                  "inode": 651903,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f015.txt",
+                  "inode": 651904,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f016.txt",
+                  "inode": 651905,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f017.txt",
+                  "inode": 651906,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f018.txt",
+                  "inode": 651907,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f019.txt",
+                  "inode": 651908,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f020.txt",
+                  "inode": 651909,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f021.txt",
+                  "inode": 651910,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f022.txt",
+                  "inode": 651911,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f023.txt",
+                  "inode": 651912,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f024.txt",
+                  "inode": 651913,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f025.txt",
+                  "inode": 651914,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f026.txt",
+                  "inode": 651915,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f027.txt",
+                  "inode": 651916,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f028.txt",
+                  "inode": 651917,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f029.txt",
+                  "inode": 651918,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f030.txt",
+                  "inode": 651919,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f031.txt",
+                  "inode": 651920,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f032.txt",
+                  "inode": 651921,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f033.txt",
+                  "inode": 651922,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f034.txt",
+                  "inode": 651923,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f035.txt",
+                  "inode": 651924,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f036.txt",
+                  "inode": 651925,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f037.txt",
+                  "inode": 651926,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f038.txt",
+                  "inode": 651927,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f039.txt",
+                  "inode": 651928,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f040.txt",
+                  "inode": 651929,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f041.txt",
+                  "inode": 651930,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f042.txt",
+                  "inode": 651931,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f043.txt",
+                  "inode": 651932,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f044.txt",
+                  "inode": 651933,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f045.txt",
+                  "inode": 651934,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f046.txt",
+                  "inode": 651935,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f047.txt",
+                  "inode": 651936,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f048.txt",
+                  "inode": 651937,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f049.txt",
+                  "inode": 651938,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f050.txt",
+                  "inode": 651939,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f051.txt",
+                  "inode": 651940,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f052.txt",
+                  "inode": 651941,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f053.txt",
+                  "inode": 651942,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f054.txt",
+                  "inode": 651943,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f055.txt",
+                  "inode": 651944,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f056.txt",
+                  "inode": 651945,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f057.txt",
+                  "inode": 651946,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f058.txt",
+                  "inode": 651947,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f059.txt",
+                  "inode": 651948,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f060.txt",
+                  "inode": 651949,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f061.txt",
+                  "inode": 651950,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f062.txt",
+                  "inode": 651951,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f063.txt",
+                  "inode": 651952,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f064.txt",
+                  "inode": 651953,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f065.txt",
+                  "inode": 651954,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f066.txt",
+                  "inode": 651955,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f067.txt",
+                  "inode": 651956,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f068.txt",
+                  "inode": 651957,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f069.txt",
+                  "inode": 651958,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f070.txt",
+                  "inode": 651959,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f071.txt",
+                  "inode": 651960,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f072.txt",
+                  "inode": 651961,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f073.txt",
+                  "inode": 651962,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f074.txt",
+                  "inode": 651963,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f075.txt",
+                  "inode": 651964,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f076.txt",
+                  "inode": 651965,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f077.txt",
+                  "inode": 651966,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f078.txt",
+                  "inode": 651967,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f079.txt",
+                  "inode": 651968,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f080.txt",
+                  "inode": 651969,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f081.txt",
+                  "inode": 651970,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f082.txt",
+                  "inode": 651971,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f083.txt",
+                  "inode": 651972,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f084.txt",
+                  "inode": 651973,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f085.txt",
+                  "inode": 651974,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f086.txt",
+                  "inode": 651975,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f087.txt",
+                  "inode": 651976,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f088.txt",
+                  "inode": 651977,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f089.txt",
+                  "inode": 651978,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f090.txt",
+                  "inode": 651979,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f091.txt",
+                  "inode": 651980,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f092.txt",
+                  "inode": 651981,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f093.txt",
+                  "inode": 651982,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f094.txt",
+                  "inode": 651983,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f095.txt",
+                  "inode": 651984,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f096.txt",
+                  "inode": 651985,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f097.txt",
+                  "inode": 651986,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f098.txt",
+                  "inode": 651987,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f099.txt",
+                  "inode": 651988,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f100.txt",
+                  "inode": 651989,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f101.txt",
+                  "inode": 651990,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f102.txt",
+                  "inode": 651991,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f103.txt",
+                  "inode": 651992,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f104.txt",
+                  "inode": 651993,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f105.txt",
+                  "inode": 651994,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f106.txt",
+                  "inode": 651995,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f107.txt",
+                  "inode": 651996,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f108.txt",
+                  "inode": 651997,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f109.txt",
+                  "inode": 651998,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f110.txt",
+                  "inode": 651999,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f111.txt",
+                  "inode": 652000,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f112.txt",
+                  "inode": 652001,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f113.txt",
+                  "inode": 652002,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f114.txt",
+                  "inode": 652003,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f115.txt",
+                  "inode": 652004,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f116.txt",
+                  "inode": 652005,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f117.txt",
+                  "inode": 652006,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f118.txt",
+                  "inode": 652007,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f119.txt",
+                  "inode": 652008,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f120.txt",
+                  "inode": 652009,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f121.txt",
+                  "inode": 652010,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f122.txt",
+                  "inode": 652011,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f123.txt",
+                  "inode": 652012,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f124.txt",
+                  "inode": 652013,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f125.txt",
+                  "inode": 652014,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f126.txt",
+                  "inode": 652015,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f127.txt",
+                  "inode": 652016,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                }
+              ]
+            },
+            {
+              "at_ms": 14.76,
+              "changes": [
+                {
+                  "change": "replaced",
+                  "path": ".git/HEAD",
+                  "from_inode": 652239,
+                  "inode": 652244,
+                  "size": 22,
+                  "bytes_delta": 22
+                },
+                {
+                  "change": "replaced",
+                  "path": ".git/index",
+                  "from_inode": 652244,
+                  "inode": 652252,
+                  "size": 9283,
+                  "bytes_delta": 9283
+                },
+                {
+                  "change": "vanished",
+                  "path": ".git/index.lock",
+                  "inode": 652252,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": ".git/logs/HEAD",
+                  "inode": 652247,
+                  "from": 681,
+                  "size": 860,
+                  "bytes_delta": 860
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "branch": "other",
+            "files": 128
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/usr/bin/git",
+            "checkout",
+            "other"
+          ],
+          "initial_tree_digest": "sha256:539312c569c8fb8c44fa11da46e5c855d57b687436ff42d7ce174d44a00110c1",
+          "final_tree_digest": "sha256:9cc252fca616c8695ca76fafca5c318a628d0a20d6dd04f717fbd49066cd93b7",
+          "polls": 25,
+          "elapsed_ms": 117.215,
+          "observations": [
+            {
+              "at_ms": 12.431,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": ".git/index.lock",
+                  "inode": 652251,
+                  "size": 0,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": "f000.txt",
+                  "inode": 651889,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f001.txt",
+                  "inode": 651890,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f002.txt",
+                  "inode": 651891,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f003.txt",
+                  "inode": 651892,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f004.txt",
+                  "inode": 651893,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f005.txt",
+                  "inode": 651894,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f006.txt",
+                  "inode": 651895,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f007.txt",
+                  "inode": 651896,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f008.txt",
+                  "inode": 651897,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f009.txt",
+                  "inode": 651898,
+                  "from": 16,
+                  "size": 17,
+                  "bytes_delta": 17
+                },
+                {
+                  "change": "written",
+                  "path": "f010.txt",
+                  "inode": 651899,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f011.txt",
+                  "inode": 651900,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f012.txt",
+                  "inode": 651901,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f013.txt",
+                  "inode": 651902,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f014.txt",
+                  "inode": 651903,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f015.txt",
+                  "inode": 651904,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f016.txt",
+                  "inode": 651905,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f017.txt",
+                  "inode": 651906,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f018.txt",
+                  "inode": 651907,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f019.txt",
+                  "inode": 651908,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f020.txt",
+                  "inode": 651909,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f021.txt",
+                  "inode": 651910,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f022.txt",
+                  "inode": 651911,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f023.txt",
+                  "inode": 651912,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f024.txt",
+                  "inode": 651913,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f025.txt",
+                  "inode": 651914,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f026.txt",
+                  "inode": 651915,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f027.txt",
+                  "inode": 651916,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f028.txt",
+                  "inode": 651917,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f029.txt",
+                  "inode": 651918,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f030.txt",
+                  "inode": 651919,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f031.txt",
+                  "inode": 651920,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f032.txt",
+                  "inode": 651921,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f033.txt",
+                  "inode": 651922,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f034.txt",
+                  "inode": 651923,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f035.txt",
+                  "inode": 651924,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f036.txt",
+                  "inode": 651925,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f037.txt",
+                  "inode": 651926,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f038.txt",
+                  "inode": 651927,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f039.txt",
+                  "inode": 651928,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f040.txt",
+                  "inode": 651929,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f041.txt",
+                  "inode": 651930,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f042.txt",
+                  "inode": 651931,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f043.txt",
+                  "inode": 651932,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f044.txt",
+                  "inode": 651933,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f045.txt",
+                  "inode": 651934,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f046.txt",
+                  "inode": 651935,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f047.txt",
+                  "inode": 651936,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f048.txt",
+                  "inode": 651937,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f049.txt",
+                  "inode": 651938,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f050.txt",
+                  "inode": 651939,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f051.txt",
+                  "inode": 651940,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f052.txt",
+                  "inode": 651941,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f053.txt",
+                  "inode": 651942,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f054.txt",
+                  "inode": 651943,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f055.txt",
+                  "inode": 651944,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f056.txt",
+                  "inode": 651945,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f057.txt",
+                  "inode": 651946,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f058.txt",
+                  "inode": 651947,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f059.txt",
+                  "inode": 651948,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f060.txt",
+                  "inode": 651949,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f061.txt",
+                  "inode": 651950,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f062.txt",
+                  "inode": 651951,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f063.txt",
+                  "inode": 651952,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f064.txt",
+                  "inode": 651953,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f065.txt",
+                  "inode": 651954,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f066.txt",
+                  "inode": 651955,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f067.txt",
+                  "inode": 651956,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f068.txt",
+                  "inode": 651957,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f069.txt",
+                  "inode": 651958,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f070.txt",
+                  "inode": 651959,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f071.txt",
+                  "inode": 651960,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f072.txt",
+                  "inode": 651961,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f073.txt",
+                  "inode": 651962,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f074.txt",
+                  "inode": 651963,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f075.txt",
+                  "inode": 651964,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f076.txt",
+                  "inode": 651965,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f077.txt",
+                  "inode": 651966,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f078.txt",
+                  "inode": 651967,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f079.txt",
+                  "inode": 651968,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f080.txt",
+                  "inode": 651969,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f081.txt",
+                  "inode": 651970,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f082.txt",
+                  "inode": 651971,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f083.txt",
+                  "inode": 651972,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f084.txt",
+                  "inode": 651973,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f085.txt",
+                  "inode": 651974,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f086.txt",
+                  "inode": 651975,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f087.txt",
+                  "inode": 651976,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f088.txt",
+                  "inode": 651977,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f089.txt",
+                  "inode": 651978,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f090.txt",
+                  "inode": 651979,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f091.txt",
+                  "inode": 651980,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f092.txt",
+                  "inode": 651981,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f093.txt",
+                  "inode": 651982,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f094.txt",
+                  "inode": 651983,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f095.txt",
+                  "inode": 651984,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f096.txt",
+                  "inode": 651985,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f097.txt",
+                  "inode": 651986,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f098.txt",
+                  "inode": 651987,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f099.txt",
+                  "inode": 651988,
+                  "from": 17,
+                  "size": 18,
+                  "bytes_delta": 18
+                },
+                {
+                  "change": "written",
+                  "path": "f100.txt",
+                  "inode": 651989,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f101.txt",
+                  "inode": 651990,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f102.txt",
+                  "inode": 651991,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f103.txt",
+                  "inode": 651992,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f104.txt",
+                  "inode": 651993,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f105.txt",
+                  "inode": 651994,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f106.txt",
+                  "inode": 651995,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f107.txt",
+                  "inode": 651996,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f108.txt",
+                  "inode": 651997,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f109.txt",
+                  "inode": 651998,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f110.txt",
+                  "inode": 651999,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f111.txt",
+                  "inode": 652000,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f112.txt",
+                  "inode": 652001,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f113.txt",
+                  "inode": 652002,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f114.txt",
+                  "inode": 652003,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f115.txt",
+                  "inode": 652004,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f116.txt",
+                  "inode": 652005,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f117.txt",
+                  "inode": 652006,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f118.txt",
+                  "inode": 652007,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f119.txt",
+                  "inode": 652008,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f120.txt",
+                  "inode": 652009,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f121.txt",
+                  "inode": 652010,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f122.txt",
+                  "inode": 652011,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f123.txt",
+                  "inode": 652012,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f124.txt",
+                  "inode": 652013,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f125.txt",
+                  "inode": 652014,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f126.txt",
+                  "inode": 652015,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                },
+                {
+                  "change": "written",
+                  "path": "f127.txt",
+                  "inode": 652016,
+                  "from": 18,
+                  "size": 19,
+                  "bytes_delta": 19
+                }
+              ]
+            },
+            {
+              "at_ms": 16.721,
+              "changes": [
+                {
+                  "change": "replaced",
+                  "path": ".git/HEAD",
+                  "from_inode": 652239,
+                  "inode": 652243,
+                  "size": 22,
+                  "bytes_delta": 22
+                },
+                {
+                  "change": "replaced",
+                  "path": ".git/index",
+                  "from_inode": 652243,
+                  "inode": 652251,
+                  "size": 9283,
+                  "bytes_delta": 9283
+                },
+                {
+                  "change": "vanished",
+                  "path": ".git/index.lock",
+                  "inode": 652251,
+                  "bytes_delta": 0
+                },
+                {
+                  "change": "written",
+                  "path": ".git/logs/HEAD",
+                  "inode": 652246,
+                  "from": 681,
+                  "size": 860,
+                  "bytes_delta": 860
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "branch": "other",
+            "files": 128
+          }
+        }
+      ]
+    }
+  ],
+  "corpus_digest": "sha256:47cbe19bf850be2f451e476dc874086c7ffe5d8f0c0dd4bd92849de3a4dc3a59"
+}

@@ -1,0 +1,167 @@
+{
+  "contract": "mesh-workspace-adapter-boundaries/0",
+  "task": "01KZM79S1CNB92505KBB9EZPBM",
+  "design": "01M0E2ZW2VPM66R1FZXQRR2CV5",
+  "adapter_transition": {
+    "from": "mesh-workspace-adapter/0",
+    "to": "mesh-workspace-adapter/1",
+    "negotiation": "exact-contract-string",
+    "composition": [
+      "replacing-rename",
+      "rename-binding-evidence",
+      "closed-boundary-reason-producers"
+    ]
+  },
+  "association": {
+    "carrier": "separate-evidence-object",
+    "event_key": [
+      "view",
+      "sequence"
+    ],
+    "cardinality": "zero-or-one",
+    "absence": "explicit-unsupported"
+  },
+  "ordering": {
+    "view_extent": "EventSequence-ascending-within-one-view",
+    "concurrent_evidence": [
+      "lamport",
+      "event_ulid",
+      "content_hash"
+    ],
+    "winner": "lexicographic-maximum",
+    "wall_clock": "forbidden"
+  },
+  "normalization": {
+    "parent": "ObjectId-exact",
+    "name": "NormalizedName-utf8-bytes-exact",
+    "unicode_normalization": "none",
+    "case_folding": "none"
+  },
+  "evidence": {
+    "available_fields": [
+      "view",
+      "sequence",
+      "source_before.parent",
+      "source_before.name",
+      "source_before.object",
+      "destination_before.state",
+      "destination_before.object",
+      "destination_after.parent",
+      "destination_after.name",
+      "destination_after.object"
+    ],
+    "destination_before_states": [
+      "unbound",
+      "bound"
+    ],
+    "unsupported": {
+      "result": "unsupported",
+      "code": "rename-binding-evidence-unavailable",
+      "missing_members": [
+        "source_before.parent",
+        "source_before.name",
+        "source_before.object",
+        "destination_before.state",
+        "destination_before.object",
+        "destination_after.parent",
+        "destination_after.name",
+        "destination_after.object"
+      ],
+      "guessing": "forbidden"
+    }
+  },
+  "identity_predicate": {
+    "moved_object_identity": {
+      "preserved_when": "source_before.object == destination_after.object",
+      "changed_when": "source_before.object != destination_after.object"
+    },
+    "destination_binding": {
+      "created_when": "destination_before.state == unbound",
+      "preserved_when": "destination_before.state == bound && destination_before.object == destination_after.object",
+      "replaced_when": "destination_before.state == bound && destination_before.object != destination_after.object"
+    },
+    "directory_descendants": {
+      "outcome": "preserved-by-ancestor",
+      "requires": [
+        "moved-directory-object-preserved",
+        "relative-descendant-bindings-unchanged"
+      ],
+      "synthetic_child_events": "forbidden"
+    }
+  },
+  "boundary_reasons": {
+    "retained": [
+      "Closed",
+      "Synced",
+      "RenamedIntoPlace"
+    ],
+    "removed": [
+      {
+        "reason": "MetadataSettled",
+        "compatibility": "adapter-0-only-rejected-by-adapter-1",
+        "why": "No backend has a reproducible producer that proves metadata has settled."
+      }
+    ]
+  },
+  "producers": [
+    {
+      "reason": "Closed",
+      "producer": "mesh-fuse/last-modified-handle-closed",
+      "backend": "mount",
+      "requires": [
+        "ObserveDurableBoundary",
+        "modified-handle-count-reaches-zero"
+      ]
+    },
+    {
+      "reason": "Synced",
+      "producer": "mesh-fuse/successful-fsync",
+      "backend": "mount",
+      "requires": [
+        "ObserveDurableBoundary",
+        "fsync-returned-success"
+      ]
+    },
+    {
+      "reason": "RenamedIntoPlace",
+      "producer": "mesh-fuse/atomic-replace-with-binding-evidence",
+      "backend": "mount",
+      "requires": [
+        "ObserveDurableBoundary",
+        "atomic-replace-succeeded",
+        "complete-rename-binding-evidence"
+      ]
+    }
+  ],
+  "backend_claims": [
+    {
+      "backend": "mount",
+      "rename_binding_evidence": "supported-when-capability-declared",
+      "durable_boundary_evidence": "supported-when-capability-declared"
+    },
+    {
+      "backend": "folder",
+      "rename_binding_evidence": "unsupported",
+      "durable_boundary_evidence": "unsupported",
+      "rename_code": "rename-binding-evidence-unavailable",
+      "boundary_code": "durable-boundary-evidence-unavailable",
+      "why": "Polling can observe a later tree but cannot prove handle close, fsync, atomic replacement, or the missing intermediate binding."
+    }
+  ],
+  "compatibility": {
+    "adapter_0": "frozen-readable",
+    "adapter_1": "explicit-opt-in",
+    "unknown_contract": "refuse",
+    "silent_translation": "forbidden"
+  },
+  "handoffs": {
+    "task_73": {
+      "task": "01KZC2YXH6FG9C67JP9DQX7JH6",
+      "rule": "Coalescing may treat a rename as moved-object-preserving only when complete evidence proves source_before.object equals destination_after.object. A replaced destination binding is recorded separately and is not an identity substitution of the moved object. Unsupported evidence never authorizes coalescing across the rename."
+    },
+    "task_350": {
+      "task": "01KZM96X4Y849Y23CC2SDX212H",
+      "rule": "Publish adapter/1, add the separate evidence object and explicit unsupported result, implement atomic Replace and producers, migrate the closed vocabulary, and keep adapter/0 fixtures frozen."
+    }
+  }
+}

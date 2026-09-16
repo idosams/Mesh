@@ -1,0 +1,21 @@
+[package]
+name = "mesh-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+# `vectors` builds the published corpus — the exact text of every file under `protocol/schemas/`
+# and `protocol/test-vectors/`. It is ON BY DEFAULT so that `cargo test --workspace` compares the
+# corpus to the working tree; that comparison is what makes an encoding change without a vector
+# update fail CI. A dependent that wants the types and not the corpus builds with
+# `--no-default-features`, which is checked by `cargo check -p mesh-types --no-default-features`.
+[features]
+default = ["vectors"]
+vectors = []
+
+[dependencies]

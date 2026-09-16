@@ -1,0 +1,15 @@
+[package]
+name = "mesh-materializer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The operation vocabulary is owned by `mesh-operations`; materialization consumes that exact
+# type so canonical bytes can move from decoding to application without a bridge.
+mesh-operations = { path = "../mesh-operations", version = "=0.0.0" }

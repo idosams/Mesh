@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/mesh-types",
+  "crates/mesh-operations",
+  "crates/mesh-state",
+  "crates/mesh-materializer",
+  "crates/mesh-cas",
+  "crates/mesh-chunking",
+  "crates/mesh-bench",
+  "crates/mesh-store",
+  "crates/mesh-crypto",
+  "crates/mesh-approval",
+  "crates/mesh-daemon",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/idosams/Mesh"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

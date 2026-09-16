@@ -1,0 +1,53 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "rustfmt-in-place-truncate",
+  "title": "A formatter rewrites a source file in place and it passes through length zero",
+  "category": "formatter",
+  "tool": { "name": "rustfmt, via cargo fmt", "version": "rustfmt 1.9.0-stable (8bab26f4f6 2026-07-14)", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["cargo", "fmt"],
+    "evidence": "Two readings. `src/main.rs` at inode 190962360 goes 42 -> 0 bytes, then the SAME inode goes 0 -> 52 bytes. No temporary file appears at any reading; the inode never changes.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling"]
+  },
+  "objects": [
+    { "object": 1, "role": "src/main.rs, the source file — one identity throughout" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Closed", "object": 1 }
+      ],
+      "candidates": [ { "through": 4, "reason": "Closed" } ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1]],
+      "omission_note": "A formatter fast enough to finish inside one reading is seen as a single Written, which is the folder-watching backend's FIRST declared restriction working exactly as declared — and here it is the SAFE outcome, because the empty state is what gets skipped."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 4, "reason": "Closed" } ], "boundary_evidence": { "through": 4, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 2, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 4, "folder": 2 },
+    "meaningful_durable_change": "src/main.rs holds the formatted text. One durable change for one formatter run over one file.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3], "folder": [1] },
+    "forbidden_note": "Mount sequence 2 and folder sequence 1 are the measured zero-length state. A formatter run over a large tree makes this the common case rather than the rare one: every file in the tree is momentarily empty, and a trigger firing mid-run would checkpoint a tree of empty source files.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "The formatter and the editor produce the SAME hazard from completely different code: in-place truncate-then-rewrite is not an editor quirk, it is the ordinary shape of `File::create` followed by `write`.",
+    "This is the pattern that makes the maximum-uncheckpointed-bytes trigger dangerous. A whole-repository format is thousands of files each passing through zero; a byte-budget trigger that fires without an anchor would checkpoint one of those moments."
+  ]
+}

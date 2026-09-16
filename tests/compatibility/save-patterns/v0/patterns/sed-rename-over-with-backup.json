@@ -1,0 +1,61 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "sed-rename-over-with-backup",
+  "title": "The plan §4.5 four-step, captured: temporary, backup by rename, rename over the destination",
+  "category": "cli-tool",
+  "tool": { "name": "BSD sed", "version": "shipped with macOS 14.5", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["sed", "-i.bak", "s/alpha/ALPHA/", "doc.txt"],
+    "evidence": "Three readings, and the middle one carries the whole shape. Reading 1: `.!18025!doc.txt` appears at inode 190994936, size 0. Reading 2: that temporary is at size 6 AND `doc.txt.bak` appears at inode 190994920 — the ORIGINAL document's inode, so the backup is the original renamed rather than a copy. Reading 3: `doc.txt` changes from inode 190994920 to 190994936 and the temporary's name vanishes.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling"]
+  },
+  "objects": [
+    { "object": 1, "role": "the original document, which becomes doc.txt.bak" },
+    { "object": 2, "role": ".!18025!doc.txt, the temporary, which becomes doc.txt" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Closed", "object": 2 },
+        { "sequence": 4, "kind": "Renamed", "object": 1 },
+        { "sequence": 5, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [
+        { "through": 3, "reason": "Closed" },
+        { "through": 4, "reason": "RenamedIntoPlace" },
+        { "through": 5, "reason": "RenamedIntoPlace" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Renamed", "object": 1 },
+        { "sequence": 4, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [1, 2]],
+      "omission_note": "Readings 2 and 3 of the capture arrived one loop apart; a slower poll would see the backup and the replacement as one change."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 5, "reason": "RenamedIntoPlace" } ], "boundary_evidence": { "through": 5, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 4, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 5, "folder": 4 },
+    "meaningful_durable_change": "doc.txt holds the substituted text and doc.txt.bak holds what it replaced. The backup is part of the save, not a leftover: the person asked for it, so a checkpoint that lacked it would be wrong.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4], "folder": [1, 2, 3] },
+    "forbidden_note": "Mount sequence 4 is the deletion window, measured: the original has become doc.txt.bak and nothing is bound to doc.txt yet. A checkpoint there records the document as gone.",
+    "coalescable": "safely"
+  },
+  "notes": [
+    "Plan §4.5 writes the pattern as 'write temporary file / flush temporary file / rename over destination / remove backup'. The capture says the fourth step is OPTIONAL and tool-chosen: `sed -i.bak` keeps the backup and `sed -i ''` never makes one. A coalescing rule that waits for a backup removal would hang on both.",
+    "It also says the backup is made by RENAMING the original, not by copying it, which is why the document's name is briefly unbound. Any rule that tries to recognise this family by counting renames has to accept both one and two."
+  ]
+}

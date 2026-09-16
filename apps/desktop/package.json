@@ -1,0 +1,30 @@
+{
+  "name": "@mesh/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The Mesh desktop client: the local IPC surface it talks to the Mesh daemon over, and nothing else.",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts",
+    "ui:next:dev": "npm --prefix ui-next run dev",
+    "ui:next:install": "npm --prefix ui-next ci --ignore-scripts --no-audit --no-fund",
+    "ui:next:build": "npm --prefix ui-next run build",
+    "ui:next:build:island": "npm --prefix ui-next run build:island",
+    "ui:next:check": "npm --prefix ui-next run check",
+    "tauri:dev": "cargo run --manifest-path src-tauri/Cargo.toml",
+    "tauri:build": "cargo build --manifest-path src-tauri/Cargo.toml",
+    "tauri:bundle-local": "node scripts/build-local-app.mjs",
+    "tauri:archive-alpha": "node scripts/archive-alpha-app.mjs",
+    "tauri:archive-signed-alpha": "node scripts/archive-signed-alpha-app.mjs",
+    "tauri:signing-preflight": "node scripts/macos-signing-preflight.mjs",
+    "tauri:verify-alpha": "node scripts/verify-alpha-archive.mjs",
+    "tauri:verify-signed-alpha": "node scripts/verify-signed-alpha-archive.mjs",
+    "tauri:prove-local": "node scripts/prove-rendered-app.mjs",
+    "lint:vocab": "node ../../tools/program/vocab-lint/lint.mjs --user-facing",
+    "test": "npm run ui:next:install && npm run ui:next:check && npm run lint:vocab && node --test \"src/**/*.test.ts\" \"ui/**/*.test.mjs\" \"scripts/**/*.test.mjs\""
+  }
+}

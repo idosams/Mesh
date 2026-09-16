@@ -1,0 +1,65 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "git-checkout-switch-branch",
+  "title": "A version-control checkout removes and recreates files with no temporary and no boundary anywhere",
+  "category": "version-control",
+  "tool": { "name": "git", "version": "2.51.0", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["git", "checkout", "other"],
+    "evidence": "Five readings. `a.txt` VANISHES at inode 190956880. It reappears at a NEW inode 190956887 with size 0, then the same new inode reaches size 12. Then `c.txt` appears at inode 190956888 size 0 and reaches size 6. No temporary file appears at any reading and no name is ever renamed.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling"]
+  },
+  "objects": [
+    { "object": 1, "role": "a.txt on the branch being left" },
+    { "object": 2, "role": "a.txt on the branch being entered — a different object" },
+    { "object": 3, "role": "c.txt, which exists only on the branch being entered" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Unlinked", "object": 1 },
+        { "sequence": 2, "kind": "Opened", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 2 },
+        { "sequence": 4, "kind": "Closed", "object": 2 },
+        { "sequence": 5, "kind": "Opened", "object": 3 },
+        { "sequence": 6, "kind": "Written", "object": 3 },
+        { "sequence": 7, "kind": "Closed", "object": 3 }
+      ],
+      "candidates": [
+        { "through": 4, "reason": "Closed" },
+        { "through": 7, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Unlinked", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 2 },
+        { "sequence": 4, "kind": "Written", "object": 3 },
+        { "sequence": 5, "kind": "Written", "object": 3 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[2], [4], [2, 4]],
+      "omission_note": "The zero-length readings of each new file can fall between two readings; the unlink of object 1 cannot, because its replacement has a different identity."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 7, "reason": "Closed" } ], "boundary_evidence": { "through": 7, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 5, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 7, "folder": 5 },
+    "meaningful_durable_change": "The whole working tree matches the branch that was entered. There is no smaller meaningful unit: half a checkout is not a state anyone asked for.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6], "folder": [1, 2, 3, 4] },
+    "forbidden_note": "Mount sequence 4 is the trap. It IS a boundary candidate — a.txt was closed — and it is still a half-switched tree, because c.txt does not exist yet. The anchor rule alone does not save this pattern; only quiescence does.",
+    "coalescable": "only-by-quiescence"
+  },
+  "notes": [
+    "This is the pattern that proves a boundary candidate is not a safe meaningful-save cut. A mid-stream trigger at sequence 4 sees a genuine Closed candidate and still sits inside a half-switched tree. The oracle schedules that trigger and requires the meaningful window to remain open until quiescence at 7.",
+    "It is declared NOT safely coalescable in the strong sense: nothing in either stream marks the extent of the operation. A crash inside a checkout leaves a half-switched tree, and the honest response is to record that state rather than to invent the completed one.",
+    "There is a real deletion window at sequence 1: a.txt is gone and its replacement has not been created. It is not a save gone wrong — the file genuinely was removed — but a checkpoint there attributes a deletion to the person rather than to the checkout."
+  ]
+}

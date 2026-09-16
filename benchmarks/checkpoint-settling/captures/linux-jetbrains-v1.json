@@ -1,0 +1,395 @@
+{
+  "contract": "mesh-checkpoint-settling-tool-capture/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "repository_commit": "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+  "capture_script_digest": "sha256:d459385259930e079fac709255d88cc17c7d72a55c669abe0b574a50cca14010",
+  "seed": 347002,
+  "platform": {
+    "tag": "linux-overlayfs",
+    "os": "linux",
+    "os_version": "6.10.14-linuxkit",
+    "arch": "arm64",
+    "filesystem": "overlayfs",
+    "filesystem_type": "2035054128",
+    "node": "v18.20.4",
+    "docker_image": "sha256:8fecaf211ec975dd8c3566703bbe0f1c786033f6322b27444f6425c65bac865b",
+    "hardware": {
+      "cpu_model": "-",
+      "cpu_vendor": "Apple",
+      "logical_cores": 10,
+      "physical_cores": 10,
+      "memory_bytes": 8218034176
+    }
+  },
+  "network_evidence": "docker-network-none",
+  "cache_state": "fresh-private-tool-state-per-sample",
+  "sample_count_per_arm": 5,
+  "invocation": [
+    "/repo/benchmarks/checkpoint-settling/capture-tools.mjs",
+    "--platform",
+    "linux-overlayfs",
+    "--commit",
+    "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+    "--families",
+    "jetbrains",
+    "--samples",
+    "5",
+    "--idea-format",
+    "/opt/idea/bin/format.sh",
+    "--network-evidence",
+    "docker-network-none",
+    "--image",
+    "sha256:8fecaf211ec975dd8c3566703bbe0f1c786033f6322b27444f6425c65bac865b",
+    "--out",
+    "/out/linux-jetbrains-v1.json"
+  ],
+  "arms": [
+    {
+      "id": "jetbrains",
+      "family": "a JetBrains IDE",
+      "pattern": "jetbrains-linux-backup-in-place-truncate",
+      "tool_path": "/opt/idea/bin/format.sh",
+      "tool_version": "2026.2.1",
+      "input_digest": "sha256:400011b50049536a448105e247064dfc908d878e46e22b6cbae7d33b60d09ea6",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/opt/idea/bin/format.sh",
+            "-allowDefaults",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:cc0db79e9db49430e43120887db4477d8d8e2a7d07cd3cac1ae1d631a2c78dd7",
+          "final_tree_digest": "sha256:b8d4329334806400240210140206efb3cd63358b53068824f272d30cc8fe870d",
+          "polls": 304516,
+          "elapsed_ms": 4357.91,
+          "observations": [
+            {
+              "at_ms": 2922.814,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": "Example.java~",
+                  "inode": 653958,
+                  "size": 86,
+                  "bytes_delta": 86
+                }
+              ]
+            },
+            {
+              "at_ms": 2924.109,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 86,
+                  "size": 109,
+                  "bytes_delta": 109
+                }
+              ]
+            },
+            {
+              "at_ms": 2927.822,
+              "changes": [
+                {
+                  "change": "vanished",
+                  "path": "Example.java~",
+                  "inode": 653958,
+                  "bytes_delta": 0
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "content_digest": "sha256:6a198657f243edf7341c1fea4124915aceeb7b223165c938027442d74859ef30"
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/opt/idea/bin/format.sh",
+            "-allowDefaults",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:191cbb6b1c7c80c14b71b0d8b818245ef6ac0d9a3c25b4ec053cae88bc68a0a0",
+          "final_tree_digest": "sha256:6d65dc895ae8531a071a1cbe6c5098bb0d0b876bd2fcab3e15e3d0ffbd355618",
+          "polls": 266904,
+          "elapsed_ms": 4056.223,
+          "observations": [
+            {
+              "at_ms": 2726.786,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": "Example.java~",
+                  "inode": 653967,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2733.045,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 86,
+                  "size": 109,
+                  "bytes_delta": 109
+                },
+                {
+                  "change": "written",
+                  "path": "Example.java~",
+                  "inode": 653967,
+                  "from": 0,
+                  "size": 86,
+                  "bytes_delta": 86
+                }
+              ]
+            },
+            {
+              "at_ms": 2733.175,
+              "changes": [
+                {
+                  "change": "vanished",
+                  "path": "Example.java~",
+                  "inode": 653967,
+                  "bytes_delta": 0
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "content_digest": "sha256:3c7d2686aead51badd0c1c9d6ba4ab1999d3e0597fa2091e9a657c316c4d6001"
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/opt/idea/bin/format.sh",
+            "-allowDefaults",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:28f0287cfce437308c95b84632f98245aff77da7b9d61e09a9a8570ed3b90fb5",
+          "final_tree_digest": "sha256:b4e851504385f49b76482663906043af249f7dfdcaf6b47d6c56cc4a477623c8",
+          "polls": 267604,
+          "elapsed_ms": 4227.035,
+          "observations": [
+            {
+              "at_ms": 3331.705,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": "Example.java~",
+                  "inode": 653972,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 3331.855,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java~",
+                  "inode": 653972,
+                  "from": 0,
+                  "size": 86,
+                  "bytes_delta": 86
+                }
+              ]
+            },
+            {
+              "at_ms": 3332.182,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 86,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 3332.207,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 0,
+                  "size": 109,
+                  "bytes_delta": 109
+                }
+              ]
+            },
+            {
+              "at_ms": 3338.986,
+              "changes": [
+                {
+                  "change": "vanished",
+                  "path": "Example.java~",
+                  "inode": 653972,
+                  "bytes_delta": 0
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "content_digest": "sha256:d2cfac5dc0e57641855b8f2366b1f84dd9c5affc026c7e42be6a5d4860e70f56"
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/opt/idea/bin/format.sh",
+            "-allowDefaults",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:8c4e0a28e3106b55bb9468694c41ec05386052c5bff78364295ff04967356ad0",
+          "final_tree_digest": "sha256:762f05f5f9d4f71d1061c0e364cc3be8f3ddf8e4ad26b2449e017e37bdac4ce1",
+          "polls": 267950,
+          "elapsed_ms": 3952.474,
+          "observations": [
+            {
+              "at_ms": 2534.369,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": "Example.java~",
+                  "inode": 653976,
+                  "size": 86,
+                  "bytes_delta": 86
+                }
+              ]
+            },
+            {
+              "at_ms": 2534.553,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 86,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2534.581,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 0,
+                  "size": 109,
+                  "bytes_delta": 109
+                }
+              ]
+            },
+            {
+              "at_ms": 2539.195,
+              "changes": [
+                {
+                  "change": "vanished",
+                  "path": "Example.java~",
+                  "inode": 653976,
+                  "bytes_delta": 0
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "content_digest": "sha256:991b6c6cb787d073cb7efcaf1226ffc14f26f76acba2225c8c7c6c1fd7f51c98"
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/opt/idea/bin/format.sh",
+            "-allowDefaults",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:ae60ba6d79236d6955b3a94ef58efa02e3763b1caa2c8f8ef88299d4e38d2184",
+          "final_tree_digest": "sha256:016c63a820f4065bea5c35ac719b14a9e69cf32e50878139e9eb25f35376564e",
+          "polls": 265131,
+          "elapsed_ms": 4322.976,
+          "observations": [
+            {
+              "at_ms": 2936.617,
+              "changes": [
+                {
+                  "change": "appeared",
+                  "path": "Example.java~",
+                  "inode": 653978,
+                  "size": 86,
+                  "bytes_delta": 86
+                }
+              ]
+            },
+            {
+              "at_ms": 2936.807,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 86,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2936.924,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "Example.java",
+                  "inode": 651862,
+                  "from": 0,
+                  "size": 109,
+                  "bytes_delta": 109
+                }
+              ]
+            },
+            {
+              "at_ms": 2939.667,
+              "changes": [
+                {
+                  "change": "vanished",
+                  "path": "Example.java~",
+                  "inode": 653978,
+                  "bytes_delta": 0
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "content_digest": "sha256:4037b4cabc9dd56d8f53e3f3cb508810ab721926ae612bf0d3a170a3b2c1e670"
+          }
+        }
+      ]
+    }
+  ],
+  "corpus_digest": "sha256:a422b6fbeb74911ce72e1661f0059fb31d987cd7268e04c627fdced1bd41cfab"
+}

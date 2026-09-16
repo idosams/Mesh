@@ -1,0 +1,944 @@
+{
+  "wire_format": "mesh-cwp-wire/0",
+  "record_encoding_profile": "mesh-cbor/0",
+  "protocol_version": 0,
+  "summary": "Every CWP message, its wire tag, its plane, its fields in encoding order, and one complete example of each with its exact bytes. Read protocol/wire/README.md first.",
+  "frame": "A message is a two-element array: the wire tag, then the fields as an array in the order listed under `fields`.",
+  "identifier_byte_length": 32,
+  "limits": {
+    "max_operations_per_batch": 256,
+    "max_chunk_part_bytes": 1048576
+  },
+  "planes": [
+    {
+      "name": "handshake",
+      "meaning": "Session establishment and refusal. Neither plane's latency budget covers it."
+    },
+    {
+      "name": "metadata",
+      "meaning": "Heads, ChangeSets, manifests, availability — everything except chunk bytes."
+    },
+    {
+      "name": "content",
+      "meaning": "Chunk bytes, resumable and verified on receipt."
+    }
+  ],
+  "presence_states": [
+    {
+      "name": "active",
+      "tag": 1
+    },
+    {
+      "name": "idle",
+      "tag": 2
+    },
+    {
+      "name": "away",
+      "tag": 3
+    }
+  ],
+  "error_codes": [
+    {
+      "name": "unsupported version",
+      "tag": 1,
+      "retryable": false
+    },
+    {
+      "name": "unknown message",
+      "tag": 2,
+      "retryable": false
+    },
+    {
+      "name": "unauthenticated session",
+      "tag": 3,
+      "retryable": false
+    },
+    {
+      "name": "unverified peer",
+      "tag": 4,
+      "retryable": false
+    },
+    {
+      "name": "malformed message",
+      "tag": 5,
+      "retryable": false
+    },
+    {
+      "name": "unknown actor",
+      "tag": 6,
+      "retryable": false
+    },
+    {
+      "name": "sequence gap",
+      "tag": 7,
+      "retryable": false
+    },
+    {
+      "name": "unknown ChangeSet",
+      "tag": 8,
+      "retryable": false
+    },
+    {
+      "name": "unknown chunk",
+      "tag": 9,
+      "retryable": false
+    },
+    {
+      "name": "offset past end",
+      "tag": 10,
+      "retryable": false
+    },
+    {
+      "name": "integrity failure",
+      "tag": 11,
+      "retryable": false
+    },
+    {
+      "name": "unknown policy epoch",
+      "tag": 12,
+      "retryable": true
+    },
+    {
+      "name": "batch too large",
+      "tag": 13,
+      "retryable": false
+    },
+    {
+      "name": "busy",
+      "tag": 14,
+      "retryable": true
+    }
+  ],
+  "messages": [
+    {
+      "name": "HELLO",
+      "tag": 1,
+      "plane": "handshake",
+      "summary": "Opens a session and states which protocol version and record encoding profile the sender speaks.",
+      "fields": [
+        {
+          "name": "protocol_version",
+          "type": "unsigned"
+        },
+        {
+          "name": "encoding_profile",
+          "type": "text"
+        },
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32,
+          "note": "A claim, not evidence. AUTHENTICATE is what turns it into evidence."
+        },
+        {
+          "name": "challenge",
+          "type": "bytes",
+          "byte_length": 32
+        }
+      ],
+      "preconditions": [
+        "protocol_version equals the receiver's, else `unsupported version`.",
+        "encoding_profile equals `mesh-cbor/0`, else `unsupported version`."
+      ],
+      "vector": {
+        "name": "hello-example",
+        "value": {
+          "protocol_version": 0,
+          "encoding_profile": "mesh-cbor/0",
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "challenge": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "bytes_hex": "820184006b6d6573682d63626f722f305820111111111111111111111111111111111111111111111111111111111111111158202222222222222222222222222222222222222222222222222222222222222222",
+        "byte_length": 84
+      }
+    },
+    {
+      "name": "AUTHENTICATE",
+      "tag": 2,
+      "plane": "handshake",
+      "summary": "Offers a signature over the peer's challenge.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "challenge",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "preconditions": [
+        "signature is non-empty, else `malformed message`.",
+        "HELLO came first on this session, and named the same actor."
+      ],
+      "vector": {
+        "name": "authenticate-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "challenge": "2222222222222222222222222222222222222222222222222222222222222222",
+          "signature": "33333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"
+        },
+        "bytes_hex": "8202835820111111111111111111111111111111111111111111111111111111111111111158202222222222222222222222222222222222222222222222222222222222222222584033333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333",
+        "byte_length": 137
+      }
+    },
+    {
+      "name": "ADVERTISE_FRONTIER",
+      "tag": 3,
+      "plane": "metadata",
+      "summary": "Offers every actor head the sender holds, with how much of each actor's sequence it holds contiguously.",
+      "fields": [
+        {
+          "name": "heads",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "actor",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "head",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "contiguous_through",
+                "type": "unsigned"
+              },
+              {
+                "name": "sparse",
+                "type": "sequence",
+                "element": {
+                  "name": "element",
+                  "type": "group",
+                  "fields": [
+                    {
+                      "name": "sequence",
+                      "type": "unsigned"
+                    },
+                    {
+                      "name": "id",
+                      "type": "bytes",
+                      "byte_length": 32
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "canonical_head",
+          "type": "sequence",
+          "max_elements": 1,
+          "element": {
+            "name": "element",
+            "type": "bytes",
+            "byte_length": 32
+          },
+          "note": "Absent is the empty sequence; present is a one-element sequence."
+        },
+        {
+          "name": "policy_epoch",
+          "type": "unsigned"
+        }
+      ],
+      "preconditions": [
+        "heads ascend by actor, so two peers holding the same set send the same bytes.",
+        "each sparse set ascends by sequence and lies strictly beyond contiguous_through, else `sequence gap`."
+      ],
+      "vector": {
+        "name": "advertise-frontier-example",
+        "value": {
+          "heads": [
+            {
+              "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+              "head": "4444444444444444444444444444444444444444444444444444444444444444",
+              "contiguous_through": 3,
+              "sparse": [
+                {
+                  "sequence": 9,
+                  "id": "5555555555555555555555555555555555555555555555555555555555555555"
+                }
+              ]
+            },
+            {
+              "actor": "6666666666666666666666666666666666666666666666666666666666666666",
+              "head": "7777777777777777777777777777777777777777777777777777777777777777",
+              "contiguous_through": 1,
+              "sparse": []
+            }
+          ],
+          "canonical_head": [
+            "8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "policy_epoch": 2
+        },
+        "bytes_hex": "8203838284582011111111111111111111111111111111111111111111111111111111111111115820444444444444444444444444444444444444444444444444444444444444444403818209582055555555555555555555555555555555555555555555555555555555555555558458206666666666666666666666666666666666666666666666666666666666666666582077777777777777777777777777777777777777777777777777777777777777770180815820888888888888888888888888888888888888888888888888888888888888888802",
+        "byte_length": 218
+      }
+    },
+    {
+      "name": "REQUEST_OPERATIONS",
+      "tag": 4,
+      "plane": "metadata",
+      "summary": "Asks for ChangeSets: a resume point in one actor's sequence, plus any specific ChangeSets wanted regardless of sequence.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "from_sequence",
+          "type": "unsigned"
+        },
+        {
+          "name": "specific",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "bytes",
+            "byte_length": 32
+          }
+        },
+        {
+          "name": "max_count",
+          "type": "unsigned"
+        }
+      ],
+      "preconditions": [
+        "max_count is non-zero, else `malformed message`.",
+        "specific ascends and holds no duplicate."
+      ],
+      "vector": {
+        "name": "request-operations-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "from_sequence": 3,
+          "specific": [
+            "5555555555555555555555555555555555555555555555555555555555555555",
+            "9999999999999999999999999999999999999999999999999999999999999999"
+          ],
+          "max_count": 64
+        },
+        "bytes_hex": "82048458201111111111111111111111111111111111111111111111111111111111111111038258205555555555555555555555555555555555555555555555555555555555555555582099999999999999999999999999999999999999999999999999999999999999991840",
+        "byte_length": 109
+      }
+    },
+    {
+      "name": "OPERATIONS_BATCH",
+      "tag": 5,
+      "plane": "metadata",
+      "summary": "Carries ChangeSets, each as its canonical bytes plus the fields a receiver needs before decoding them.",
+      "fields": [
+        {
+          "name": "changesets",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "id",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "author",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "sequence",
+                "type": "unsigned"
+              },
+              {
+                "name": "parents",
+                "type": "sequence",
+                "element": {
+                  "name": "element",
+                  "type": "bytes",
+                  "byte_length": 32
+                }
+              },
+              {
+                "name": "base_head",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "resulting_head",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "policy_epoch",
+                "type": "unsigned"
+              },
+              {
+                "name": "body",
+                "type": "bytes",
+                "note": "The ChangeSet's mesh-cbor/0 bytes, exactly as its author signed them."
+              }
+            ]
+          }
+        }
+      ],
+      "preconditions": [
+        "changesets is non-empty.",
+        "at most 256 elements, else `batch too large`.",
+        "every body is non-empty and no sequence is zero, else `malformed message`."
+      ],
+      "vector": {
+        "name": "operations-batch-example",
+        "value": {
+          "changesets": [
+            {
+              "id": "0404040404040404040404040404040404040404040404040404040404040404",
+              "author": "1111111111111111111111111111111111111111111111111111111111111111",
+              "sequence": 4,
+              "parents": [
+                "0303030303030303030303030303030303030303030303030303030303030303"
+              ],
+              "base_head": "0303030303030303030303030303030303030303030303030303030303030303",
+              "resulting_head": "0404040404040404040404040404040404040404040404040404040404040404",
+              "policy_epoch": 0,
+              "body": "83010203"
+            },
+            {
+              "id": "0505050505050505050505050505050505050505050505050505050505050505",
+              "author": "1111111111111111111111111111111111111111111111111111111111111111",
+              "sequence": 5,
+              "parents": [
+                "0404040404040404040404040404040404040404040404040404040404040404"
+              ],
+              "base_head": "0404040404040404040404040404040404040404040404040404040404040404",
+              "resulting_head": "0505050505050505050505050505050505050505050505050505050505050505",
+              "policy_epoch": 0,
+              "body": "83010203"
+            }
+          ]
+        },
+        "bytes_hex": "8205818288582004040404040404040404040404040404040404040404040404040404040404045820111111111111111111111111111111111111111111111111111111111111111104815820030303030303030303030303030303030303030303030303030303030303030358200303030303030303030303030303030303030303030303030303030303030303582004040404040404040404040404040404040404040404040404040404040404040044830102038858200505050505050505050505050505050505050505050505050505050505050505582011111111111111111111111111111111111111111111111111111111111111110581582004040404040404040404040404040404040404040404040404040404040404045820040404040404040404040404040404040404040404040404040404040404040458200505050505050505050505050505050505050505050505050505050505050505004483010203",
+        "byte_length": 362
+      }
+    },
+    {
+      "name": "ACK_OPERATIONS",
+      "tag": 6,
+      "plane": "metadata",
+      "summary": "Reports what the sender now holds of one actor's sequence.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "contiguous_through",
+          "type": "unsigned"
+        },
+        {
+          "name": "sparse",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "sequence",
+                "type": "unsigned"
+              },
+              {
+                "name": "id",
+                "type": "bytes",
+                "byte_length": 32
+              }
+            ]
+          }
+        }
+      ],
+      "preconditions": [
+        "the sparse rule of ADVERTISE_FRONTIER."
+      ],
+      "vector": {
+        "name": "ack-operations-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "contiguous_through": 5,
+          "sparse": [
+            {
+              "sequence": 9,
+              "id": "5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          ]
+        },
+        "bytes_hex": "820683582011111111111111111111111111111111111111111111111111111111111111110581820958205555555555555555555555555555555555555555555555555555555555555555",
+        "byte_length": 75
+      }
+    },
+    {
+      "name": "ADVERTISE_MANIFESTS",
+      "tag": 7,
+      "plane": "metadata",
+      "summary": "Offers the file manifests the sender holds.",
+      "fields": [
+        {
+          "name": "manifests",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "bytes",
+            "byte_length": 32
+          }
+        }
+      ],
+      "preconditions": [
+        "ascending, no duplicate."
+      ],
+      "vector": {
+        "name": "advertise-manifests-example",
+        "value": {
+          "manifests": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ]
+        },
+        "bytes_hex": "820781815820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "byte_length": 38
+      }
+    },
+    {
+      "name": "REQUEST_CHUNKS",
+      "tag": 8,
+      "plane": "content",
+      "summary": "Asks for chunk bytes, resumable from an offset and bounded in size.",
+      "fields": [
+        {
+          "name": "requests",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "content",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "from_offset",
+                "type": "unsigned"
+              },
+              {
+                "name": "max_bytes",
+                "type": "unsigned"
+              }
+            ]
+          }
+        }
+      ],
+      "preconditions": [
+        "requests is non-empty and ascends by content.",
+        "every max_bytes is non-zero."
+      ],
+      "vector": {
+        "name": "request-chunks-example",
+        "value": {
+          "requests": [
+            {
+              "content": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "from_offset": 4096,
+              "max_bytes": 65536
+            }
+          ]
+        },
+        "bytes_hex": "82088181835820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1910001a00010000",
+        "byte_length": 47
+      }
+    },
+    {
+      "name": "CHUNK_BATCH",
+      "tag": 9,
+      "plane": "content",
+      "summary": "Carries chunk bytes as parts, each saying whether it completes its chunk.",
+      "fields": [
+        {
+          "name": "parts",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "content",
+                "type": "bytes",
+                "byte_length": 32
+              },
+              {
+                "name": "offset",
+                "type": "unsigned"
+              },
+              {
+                "name": "bytes",
+                "type": "bytes"
+              },
+              {
+                "name": "is_final",
+                "type": "bool",
+                "note": "When true the receiver verifies the chunk's content hash."
+              }
+            ]
+          }
+        }
+      ],
+      "preconditions": [
+        "parts is non-empty; every part is non-empty and at most 1048576 bytes.",
+        "no part ends past the largest representable offset, else `offset past end`."
+      ],
+      "vector": {
+        "name": "chunk-batch-example",
+        "value": {
+          "parts": [
+            {
+              "content": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "offset": 4096,
+              "bytes": "cccccccccccccccc",
+              "is_final": true
+            }
+          ]
+        },
+        "bytes_hex": "82098181845820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb19100048ccccccccccccccccf5",
+        "byte_length": 52
+      }
+    },
+    {
+      "name": "ACK_CHUNKS",
+      "tag": 10,
+      "plane": "content",
+      "summary": "Reports which chunks the sender hashed on receipt and found to match.",
+      "fields": [
+        {
+          "name": "verified",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "bytes",
+            "byte_length": 32
+          }
+        }
+      ],
+      "preconditions": [
+        "ascending, no duplicate."
+      ],
+      "vector": {
+        "name": "ack-chunks-example",
+        "value": {
+          "verified": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        },
+        "bytes_hex": "820a81815820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "byte_length": 38
+      }
+    },
+    {
+      "name": "UPDATE_ACTOR_HEAD",
+      "tag": 11,
+      "plane": "metadata",
+      "summary": "Announces a new actor head.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "head",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "sequence",
+          "type": "unsigned"
+        }
+      ],
+      "preconditions": [
+        "sequence is non-zero: an actor with no ChangeSets has no head."
+      ],
+      "vector": {
+        "name": "update-actor-head-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "head": "4444444444444444444444444444444444444444444444444444444444444444",
+          "sequence": 5
+        },
+        "bytes_hex": "820b83582011111111111111111111111111111111111111111111111111111111111111115820444444444444444444444444444444444444444444444444444444444444444405",
+        "byte_length": 72
+      }
+    },
+    {
+      "name": "UPDATE_CANONICAL_HEAD",
+      "tag": 12,
+      "plane": "metadata",
+      "summary": "Announces a new canonical head and the publication receipt that witnesses it.",
+      "fields": [
+        {
+          "name": "head",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "policy_epoch",
+          "type": "unsigned"
+        },
+        {
+          "name": "receipt",
+          "type": "bytes",
+          "byte_length": 32
+        }
+      ],
+      "preconditions": [
+        "none beyond decoding; the receipt is verified where its bytes are."
+      ],
+      "vector": {
+        "name": "update-canonical-head-example",
+        "value": {
+          "head": "8888888888888888888888888888888888888888888888888888888888888888",
+          "policy_epoch": 2,
+          "receipt": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "bytes_hex": "820c8358208888888888888888888888888888888888888888888888888888888888888888025820dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "byte_length": 72
+      }
+    },
+    {
+      "name": "PRESENCE",
+      "tag": 13,
+      "plane": "metadata",
+      "summary": "Announces that an actor is reachable, for a bounded time.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "state",
+          "type": "unsigned",
+          "note": "A presence-state tag; see presence_states."
+        },
+        {
+          "name": "expires_after_millis",
+          "type": "unsigned"
+        }
+      ],
+      "preconditions": [
+        "expires_after_millis is non-zero.",
+        "state names a defined presence state."
+      ],
+      "vector": {
+        "name": "presence-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state": 1,
+          "expires_after_millis": 30000
+        },
+        "bytes_hex": "820d835820111111111111111111111111111111111111111111111111111111111111111101197530",
+        "byte_length": 41
+      }
+    },
+    {
+      "name": "REVIEW_BUNDLE",
+      "tag": 14,
+      "plane": "metadata",
+      "summary": "Carries a review bundle as its canonical bytes.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "body",
+          "type": "bytes"
+        }
+      ],
+      "preconditions": [
+        "body is non-empty."
+      ],
+      "vector": {
+        "name": "review-bundle-example",
+        "value": {
+          "id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "body": "8100"
+        },
+        "bytes_hex": "820e825820eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee428100",
+        "byte_length": 40
+      }
+    },
+    {
+      "name": "VALIDATION_RECEIPT",
+      "tag": 15,
+      "plane": "metadata",
+      "summary": "Carries a validation receipt about one ChangeSet, as its canonical bytes.",
+      "fields": [
+        {
+          "name": "about",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "body",
+          "type": "bytes"
+        }
+      ],
+      "preconditions": [
+        "body is non-empty."
+      ],
+      "vector": {
+        "name": "validation-receipt-example",
+        "value": {
+          "about": "0404040404040404040404040404040404040404040404040404040404040404",
+          "body": "8101"
+        },
+        "bytes_hex": "820f8258200404040404040404040404040404040404040404040404040404040404040404428101",
+        "byte_length": 40
+      }
+    },
+    {
+      "name": "APPROVAL_ENVELOPE",
+      "tag": 16,
+      "plane": "metadata",
+      "summary": "Carries a signed approval envelope as its canonical bytes.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "body",
+          "type": "bytes"
+        }
+      ],
+      "preconditions": [
+        "body is non-empty."
+      ],
+      "vector": {
+        "name": "approval-envelope-example",
+        "value": {
+          "id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "body": "8102"
+        },
+        "bytes_hex": "8210825820dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd428102",
+        "byte_length": 40
+      }
+    },
+    {
+      "name": "ANTI_ENTROPY_SUMMARY",
+      "tag": 17,
+      "plane": "metadata",
+      "summary": "Offers a summary of one actor's history: a leaf per contiguous sequence run.",
+      "fields": [
+        {
+          "name": "actor",
+          "type": "bytes",
+          "byte_length": 32
+        },
+        {
+          "name": "nodes",
+          "type": "sequence",
+          "element": {
+            "name": "element",
+            "type": "group",
+            "fields": [
+              {
+                "name": "first",
+                "type": "unsigned"
+              },
+              {
+                "name": "last",
+                "type": "unsigned"
+              },
+              {
+                "name": "digest",
+                "type": "bytes",
+                "byte_length": 32
+              }
+            ]
+          }
+        }
+      ],
+      "preconditions": [
+        "runs are non-empty, ascending and contiguous; a hole is refused."
+      ],
+      "vector": {
+        "name": "anti-entropy-summary-example",
+        "value": {
+          "actor": "1111111111111111111111111111111111111111111111111111111111111111",
+          "nodes": [
+            {
+              "first": 1,
+              "last": 2,
+              "digest": "29367279239ac5b4d286ae698921fc147358b69a50d5cd31243f828526ce4f24"
+            },
+            {
+              "first": 3,
+              "last": 4,
+              "digest": "6749ed671bc64d6131c21a5d1aa5a4ca78c9ac2638434ba354b4994ce93dace3"
+            }
+          ]
+        },
+        "bytes_hex": "8211825820111111111111111111111111111111111111111111111111111111111111111182830102582029367279239ac5b4d286ae698921fc147358b69a50d5cd31243f828526ce4f2483030458206749ed671bc64d6131c21a5d1aa5a4ca78c9ac2638434ba354b4994ce93dace3",
+        "byte_length": 112
+      }
+    },
+    {
+      "name": "ERROR",
+      "tag": 18,
+      "plane": "handshake",
+      "summary": "Refuses a message, naming the code and the message it is about.",
+      "fields": [
+        {
+          "name": "code",
+          "type": "unsigned",
+          "note": "An error-code tag; see error_codes."
+        },
+        {
+          "name": "about",
+          "type": "unsigned",
+          "note": "The wire tag of the message being refused."
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "note": "Diagnostic. No peer parses it."
+        }
+      ],
+      "preconditions": [
+        "none: a refusal must always be sendable."
+      ],
+      "vector": {
+        "name": "error-example",
+        "value": {
+          "code": 7,
+          "about": 4,
+          "detail": "asked from 9 while holding through 5"
+        },
+        "bytes_hex": "8212830704782461736b65642066726f6d2039207768696c6520686f6c64696e67207468726f7567682035",
+        "byte_length": 43
+      }
+    }
+  ]
+}

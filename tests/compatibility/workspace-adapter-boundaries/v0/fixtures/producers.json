@@ -1,0 +1,53 @@
+{
+  "contract": "mesh-workspace-adapter-boundaries/0",
+  "cases": [
+    {
+      "id": "mount-close",
+      "backend": "mount",
+      "reason": "Closed",
+      "producer": "mesh-fuse/last-modified-handle-closed",
+      "result": "produced",
+      "evidence": ["ObserveDurableBoundary", "modified-handle-count-reaches-zero"]
+    },
+    {
+      "id": "mount-sync",
+      "backend": "mount",
+      "reason": "Synced",
+      "producer": "mesh-fuse/successful-fsync",
+      "result": "produced",
+      "evidence": ["ObserveDurableBoundary", "fsync-returned-success"]
+    },
+    {
+      "id": "mount-atomic-replace",
+      "backend": "mount",
+      "reason": "RenamedIntoPlace",
+      "producer": "mesh-fuse/atomic-replace-with-binding-evidence",
+      "result": "produced",
+      "evidence": ["ObserveDurableBoundary", "atomic-replace-succeeded", "complete-rename-binding-evidence"]
+    },
+    {
+      "id": "folder-close-unsupported",
+      "backend": "folder",
+      "reason": "Closed",
+      "producer": null,
+      "result": "unsupported",
+      "code": "durable-boundary-evidence-unavailable"
+    },
+    {
+      "id": "folder-sync-unsupported",
+      "backend": "folder",
+      "reason": "Synced",
+      "producer": null,
+      "result": "unsupported",
+      "code": "durable-boundary-evidence-unavailable"
+    },
+    {
+      "id": "folder-replace-unsupported",
+      "backend": "folder",
+      "reason": "RenamedIntoPlace",
+      "producer": null,
+      "result": "unsupported",
+      "code": "durable-boundary-evidence-unavailable"
+    }
+  ]
+}

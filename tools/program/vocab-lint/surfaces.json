@@ -1,0 +1,52 @@
+{
+  "$comment": "Which files are user-facing, and therefore bound by the product vocabulary. Add a surface here the moment it starts shipping strings to a person: a status catalogue, an error-message table, onboarding copy, CLI help text. Globs are deliberately narrow — a broad glob turns this gate into background noise that lanes learn to route around.",
+  "surfaces": [
+    {
+      "id": "product-prd",
+      "path": "docs/product-prd.md",
+      "mode": "prose",
+      "rules": ["forbidden-words", "six-state", "requirements", "journey", "mapping"],
+      "allowRegionBudget": 4,
+      "required": true,
+      "note": "The master PRD. Carries the state mapping, the six status words, the ceremony-free journey and the whole requirement inventory, so it opts into every rule."
+    },
+    {
+      "id": "desktop-status-catalog",
+      "glob": "apps/desktop/src/strings/status*.json",
+      "mode": "status-catalog",
+      "rules": ["forbidden-words", "six-state"],
+      "statusPath": "$.states.*.status",
+      "allowRegionBudget": 0,
+      "required": true,
+      "note": "T174 (`01KZC2SCYPFMTDBTR35V9NXYXN`) landed the file this entry was the standing contract for, so `required` went true the same day: the surface now fails if the catalogue is deleted, rather than quietly resolving to nothing again. `statusPath` selects the status of each of the six entries. The wordings under `$.internalStates` are deliberately NOT selected: four of them — Their work, Shared version, Approve to shared version, Earlier version — name a thing rather than a state, and checking them against the six words would force a seventh meaning onto one of the six."
+    },
+    {
+      "id": "desktop-strings-json",
+      "glob": "apps/desktop/src/strings/**/*.json",
+      "mode": "json-strings",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 0,
+      "required": false,
+      "note": "Shipped copy has no exemption: a suppression directive found here is itself a finding."
+    },
+    {
+      "id": "desktop-source",
+      "glob": "apps/desktop/src/**/*.ts",
+      "exclude": ["apps/desktop/src/**/*.test.ts"],
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 0,
+      "required": true,
+      "note": "Every shipped TypeScript source in the desktop application, not only the copy directory. It covered `src/strings/**` alone until T174, which is the shape of coverage that reads well and misses the thing that actually leaks: two sentences a person can read were written inline at the `throw` site in `src/app/operations.ts`, outside every surface named here. An error message is copy. Tests are excluded because they ship to nobody and because a fixture must be able to contain the term it is proving the matcher catches. The excluded pattern must match something or the manifest fails, so it cannot rot into a hole. The mode is `source-strings` and not `json-strings` for the reason the old id recorded: a single `{json,ts}` glob in json-strings mode covered both extensions and the JSON extractor only sees double-quoted literals, so every forbidden term written in idiomatic single quotes or a template literal was invisible and the surface reported clean. Mode and extension are cross-validated at manifest load, so that pairing cannot be written again."
+    },
+    {
+      "id": "daemon-user-messages",
+      "glob": "crates/mesh-daemon/src/user_messages.rs",
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 0,
+      "required": false,
+      "note": "Error and notification text the desktop client renders verbatim."
+    }
+  ]
+}

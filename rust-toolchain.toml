@@ -1,0 +1,6 @@
+# Pinned so every lane and CI runner build the same compiler.
+# Bumping this is its own task, never a side effect of another change.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
+profile = "default"

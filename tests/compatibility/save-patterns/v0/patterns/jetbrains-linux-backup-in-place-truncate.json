@@ -1,0 +1,67 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "jetbrains-linux-backup-in-place-truncate",
+  "title": "IntelliJ IDEA LightEdit on Linux creates a short-lived backup-named path, truncates and rewrites the document in place, then removes the transient path",
+  "category": "editor",
+  "tool": { "name": "IntelliJ IDEA Ultimate", "version": "2026.2.1 (IU-262.9437.185)", "platform": "linux 6.10.14 aarch64, Debian 12, overlayfs, Xvfb" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["node", "<repo>/tests/compatibility/save-patterns/v0/capture.mjs", "--root", "<root>", "--out", "<capture.json>", "--", "node", "<repo>/tests/compatibility/save-patterns/v0/drivers/jetbrains-linux-xdotool.mjs", "<root>"],
+    "fixture": "Before every run, <root>/doc.txt contained exactly `alpha original document\\n`. The pinned official aarch64 IntelliJ IDEA archive ran in LightEdit mode under Xvfb with the container network disabled. A fresh profile accepted the user agreement, declined telemetry, focused only the supplied document, typed `JetBrains edit: ` and invoked Ctrl-S. The driver rejected any final bytes other than `JetBrains edit: alpha original document\\n`, terminated and waited for the exact IDEA and Xvfb children, and only then removed the profile.",
+    "evidence": "Seven independent fresh-profile runs exited 0 in 19.699 s, 17.629 s, 17.278 s, 17.303 s, 17.404 s, 16.904 s and 10.124 s. Every run kept doc.txt at one inode and changed 24 bytes to 40 exact bytes. Every run observed a short-lived doc.txt~ at 24 bytes and its later deletion; the metadata poller did not read that path, so its content is unknown. Four runs caught doc.txt at 0 bytes between 24 and 40; three completed truncation and rewrite between readings. Five runs caught doc.txt~ first at 0 bytes; two first saw it already at 24 bytes. The final three successful runs used an image built from the checked-in editor-artifact-pinned rebuild recipe. One additional uncounted run correctly refused without changing doc.txt when a fixed readiness delay expired too early; the final driver instead waits for the exact supplied-document X11 title and validates its PID before input.",
+    "surprise": "The measured current IDE does not implement the older documentation-derived two-rename `___jb_tmp___`/`___jb_old___` shape for this LightEdit save. It creates a transient backup-named path whose content this poller cannot establish, and exposes an in-place zero-length document before the rewrite on four of seven successful polling runs.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "three of seven runs completed document truncation and rewrite between readings", "two runs completed backup creation and population between readings", "the mount stream is derived from the observed object transitions and does not claim a syscall trace"]
+  },
+  "objects": [
+    { "object": 1, "role": "doc.txt, the document — one identity throughout" },
+    { "object": 2, "role": "doc.txt~, a short-lived 24-byte path whose content was not observed" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Closed", "object": 2 },
+        { "sequence": 4, "kind": "Opened", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 1 },
+        { "sequence": 6, "kind": "Written", "object": 1 },
+        { "sequence": 7, "kind": "Closed", "object": 1 },
+        { "sequence": 8, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [
+        { "through": 3, "reason": "Closed" },
+        { "through": 7, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Written", "object": 1 },
+        { "sequence": 5, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [3], [1, 3]],
+      "omission_note": "The seven successful captures measured all three cases. A reading can miss the empty backup, the empty document, or both when population/rewrite completes between readings; it cannot treat either unsafe intermediate state as a meaningful save when the state is visible."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 8, "reason": "Closed" } ], "boundary_evidence": { "through": 7, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 5, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 8, "folder": 5 },
+    "meaningful_durable_change": "doc.txt holds the exact edited text in the original object identity and the short-lived doc.txt~ path no longer exists.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6, 7], "folder": [1, 2, 3, 4] },
+    "forbidden_note": "Mount 5 and folder 3 are the zero-length document observed in four repetitions. Mount 7 and folder 4 have the correct document bytes but still present doc.txt~ as durable workspace state. Closing on the backup or document candidate would split one ordinary Ctrl-S save or preserve a transient file the person did not create.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "The official archive and dependencies were downloaded while building the image; the editor archive alone is checksum pinned. All seven successful editor captures and the refused readiness probe ran with Docker network disabled.",
+    "This observation falsifies the old documentation derivation for the measured LightEdit path without claiming that every JetBrains product, mode or configuration uses this shape.",
+    "On a mount, the document close supplies exact boundary evidence but settling after backup deletion closes the meaningful window. On a folder backend, only established settling can do so."
+  ]
+}

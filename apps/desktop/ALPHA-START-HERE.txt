@@ -1,0 +1,97 @@
+MESH TECHNICAL ALPHA — START HERE
+
+This is a consented technical-alpha build. It is sealed and checksum-verifiable, but it is not
+signed with an Apple Developer ID and is not notarized. Do not disable Gatekeeper or remove
+quarantine metadata.
+
+1. You should be reading this guide from the folder created when you expanded the one received
+   Mesh-alpha-<revision>-macos-<architecture>-delivery.zip. Keep this guide and its visual assets
+   together:
+   - START-HERE.txt
+   - FIRST-SESSION.txt
+   - VISUAL-GUIDE.html
+   - alpha-guide/screenshots/
+   - Mesh-alpha-<revision>-macos-<architecture>.zip
+   - Mesh-alpha-<revision>-macos-<architecture>.json
+   - Mesh-alpha-<revision>-macos-<architecture>.sha256
+
+2. Open Terminal in that folder and run:
+
+   shasum -a 256 -c ./Mesh-alpha-*.sha256
+
+   Continue only if the result says OK. A checksum failure means the received app must not be
+   opened.
+
+3. Quit every running copy of Mesh before extracting or opening this build. macOS can otherwise
+   send the new Open request to the already-running older process. Never extract a new build over
+   a Mesh.app that is running; keep each received build in its own new folder.
+
+4. Extract the exact inner application archive (not the outer delivery ZIP):
+
+   ditto -x -k ./Mesh-alpha-*.zip .
+
+5. In Finder, try to open Mesh.app once. This ad-hoc build may be blocked because macOS cannot
+   verify its developer. On macOS 15 or later, open System Settings → Privacy & Security within
+   about one hour of that blocked attempt, scroll to Security, choose Open Anyway for Mesh,
+   authenticate, then read the warning and choose Open.
+
+   Continue only when the warning says macOS cannot verify the developer. If macOS says the app
+   is damaged, will damage your computer, or contains malware, stop and report the exact message;
+   do not choose Open Anyway. Never disable Gatekeeper or remove quarantine metadata.
+
+   Compare the 12-character Build value in Mesh's footer with the revision in the received ZIP,
+   JSON, and SHA256 filenames.
+
+   Then open VISUAL-GUIDE.html for the illustrated flow and FIRST-SESSION.txt for the short,
+   observable alpha mission and feedback checklist. This START-HERE guide remains the safety and
+   recovery reference.
+
+6. Keep the original project folder as your untouched backup. In Mesh:
+   - the React shell is the only visible alpha interface; Workspaces, Import, Current, Files,
+     Changes, Review, Versions, Update destination, and Restore are separate pages
+     if a new screen fails or you need to compare behavior;
+   - choose or paste the original folder and preview it;
+   - create the private workspace;
+   - use Start Codex on this version for one agent, or Start another agent copy for a second independent folder;
+   - never give the same pinned agent folder to two agents;
+   - after every Codex session, terminal, and editor using that agent folder stops, choose
+     Finish agent handoff and confirm;
+   - that confirmed Finish inspects the complete native result and privately saves unambiguous
+     file and folder changes in one action;
+   - if Mesh finds a rename, deletion, symbolic link, or unsupported entry, review and resolve the
+     explicit queue instead; Mesh never guesses structural identity;
+   - inspect and record the review;
+   - Review shows a recorded exact saved version, not a live filesystem browser. If a new file is
+     already saved but Review still shows an earlier version, use Current → Refresh, then return
+     to Review and choose Record reviewed version. The visual guide includes this recovery path;
+   - because approval is unavailable in this ad-hoc build, use Choose export folder after the
+     review to recover useful saved work into a different ordinary folder. Preview the whole saved
+     workspace, read every create/replace/remove batch, and confirm only the exact plan you expect;
+     never select the untouched original project as this private-export destination;
+   - use Workspace versions to open earlier or current saved points as independent native folders.
+   - if something fails, open More workspace actions and choose Copy safe diagnostics. The copied
+     summary excludes file contents, paths, configuration, event history, and keys; paste it into
+     feedback together with the 12-character Build value.
+
+This ad-hoc build has no Apple-validated application identity. macOS therefore cannot grant it the
+app-scoped data-protection keychain access required for Mesh's Secure Enclave approval credential.
+The app reports Approval unavailable instead of offering a setup action. Do not use this archive to
+test approval or Update original folder: both require a separately Developer-ID-signed build with
+validated application identity and continuity across upgrades. The explicit private export above is
+the supported way to copy reviewed alpha work out without claiming approval or changing the original.
+The original project remains the untouched backup while you test native folders, agents, private saves, reviews, and version switches, plus private export.
+
+The stable working-folder shortcut follows the workspace version you open in Mesh. A pinned agent
+folder deliberately does not: it stays on the exact version that agent received. Mesh never
+silently synchronizes changes back to the original folder and preserves external conflicts for
+manual review.
+
+For ordinary editor work, you may enable Automatically save safe native edits privately. The
+choice survives app restart and reuses the exact inspected, signed Save all privately path. The
+window may be hidden while the Mesh process remains running; returning to it performs an immediate
+check if macOS deferred the background timer.
+Deletions, renames, links, special entries, active agent folders, and changing files still stop for
+review. A full quit performs no capture; reopening performs another complete scan.
+
+Do not use this alpha as the only copy of important work. Report any unexpected write, lost file,
+wrong-version folder, checksum failure, or approval mismatch before continuing the test.

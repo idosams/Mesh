@@ -1,0 +1,4 @@
+{
+  "working": { "label": "Working", "icon": "spinner", "help": "An actor is changing files." },
+  "blocked": { "label": "Blocked", "icon": "alert", "help": "Something is in the way." }
+}

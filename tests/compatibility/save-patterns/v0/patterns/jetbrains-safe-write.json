@@ -1,0 +1,69 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "jetbrains-safe-write",
+  "title": "A JetBrains IDE saves with safe write: temporary, rename the original aside, rename the temporary into place, remove the original",
+  "category": "editor",
+  "tool": { "name": "IntelliJ-platform IDE (safe write enabled, the shipped default)", "version": "not installed on the capture host", "platform": "not captured" },
+  "provenance": {
+    "method": "derived-from-documentation",
+    "evidence": "The IntelliJ platform's `Use safe write` setting is documented as: save changes to a temporary file first, and replace the original only once the temporary is complete. The temporary and the displaced original are the `___jb_tmp___` and `___jb_old___` names the platform is widely observed to use.",
+    "not_observed": "NO JetBrains IDE is installed on the capture host and none was installed to capture this. This is the ONE pattern in the corpus with no local evidence of any kind, and it is the one acceptance criterion 1 requires that this run could not observe. Read it as a shape to be confirmed, not as a measurement.",
+    "falsifier": "Install any IntelliJ-platform IDE, save a file with safe write on, and re-capture with the procedure in ../README.md section 5. If the two renames are not both present, this file is wrong and the corpus must be corrected rather than the observation discarded.",
+    "blind_spots": ["everything: nothing here was measured"]
+  },
+  "objects": [
+    { "object": 1, "role": "the document, as it was before the save" },
+    { "object": 2, "role": "the ___jb_tmp___ temporary" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Flushed", "object": 2 },
+        { "sequence": 4, "kind": "Synced", "object": 2 },
+        { "sequence": 5, "kind": "Closed", "object": 2 },
+        { "sequence": 6, "kind": "Renamed", "object": 1 },
+        { "sequence": 7, "kind": "Renamed", "object": 2 },
+        { "sequence": 8, "kind": "Unlinked", "object": 1 }
+      ],
+      "candidates": [
+        { "through": 4, "reason": "Synced" },
+        { "through": 5, "reason": "Closed" },
+        { "through": 6, "reason": "RenamedIntoPlace" },
+        { "through": 7, "reason": "RenamedIntoPlace" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Renamed", "object": 1 },
+        { "sequence": 3, "kind": "Renamed", "object": 2 },
+        { "sequence": 4, "kind": "Unlinked", "object": 1 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [1, 2]],
+      "omission_note": "Both the temporary and the displaced original can live for less than one reading. Dropping either prefix must still yield exactly one checkpoint."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 8, "reason": "RenamedIntoPlace" } ], "boundary_evidence": { "through": 7, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 4, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 8, "folder": 4 },
+    "meaningful_durable_change": "The document holds the edited text; neither the temporary nor the displaced original exists.",
+    "forbidden_sequence_points": {
+      "mount": [1, 2, 3, 4, 5, 6, 7],
+      "folder": [1, 2, 3]
+    },
+    "forbidden_note": "Sequence 6 is the sharp one on both streams: the original has been renamed aside and the temporary is not yet in place, so the document DOES NOT EXIST. A checkpoint there is a durable record of a deletion the person never performed. Sequence 7 is not a deletion but records a stray backup as permanent. Only the last point is the save.",
+    "coalescable": "safely"
+  },
+  "notes": [
+    "This is the four-step plan §4.5 names — write temporary, flush temporary, rename over destination, remove backup — and it is the reason the rule anchors on the LAST candidate rather than the first. Four candidates are offered; three of them are wrong answers.",
+    "Two renames in one save is also why a rule that recognises 'a rename means the save finished' is not safe: the first rename finishes nothing."
+  ]
+}

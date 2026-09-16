@@ -1,0 +1,331 @@
+{
+  "$comment": "Every fixture, and what it must produce. A fixture declares its own extraction mode and rule set so that one rule's fixture cannot be quietly satisfied by another rule firing. The self-test additionally asserts that all nine forbidden terms are covered here — adding a term to vocabulary.mjs without a fixture fails the run.",
+  "fixtures": [
+    {
+      "file": "forbidden/dag.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "dag" }]
+    },
+    {
+      "file": "forbidden/frontier.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "frontier" }]
+    },
+    {
+      "file": "forbidden/vector-clock.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "vector-clock" }]
+    },
+    {
+      "file": "forbidden/staging.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "staging" }]
+    },
+    {
+      "file": "forbidden/operation-log.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "operation-log" }]
+    },
+    {
+      "file": "forbidden/branch.ts",
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "branch" }]
+    },
+    {
+      "file": "forbidden/commit.ts",
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "commit" }]
+    },
+    {
+      "file": "forbidden/ref.rs",
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "ref" }]
+    },
+    {
+      "file": "forbidden/rebase.json",
+      "mode": "json-strings",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "termId": "rebase" }]
+    },
+    {
+      "file": "forbidden/shipped-suppression.json",
+      "mode": "json-strings",
+      "rules": ["forbidden-words"],
+      "expect": [{ "rule": "forbidden-words", "messageIncludes": "has no exemption" }]
+    },
+    {
+      "file": "clean/near-misses.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "expect": "clean"
+    },
+    {
+      "file": "clean/ui-strings.ts",
+      "mode": "source-strings",
+      "rules": ["forbidden-words"],
+      "expect": "clean"
+    },
+    {
+      "file": "clean/status-catalog.json",
+      "mode": "status-catalog",
+      "rules": ["forbidden-words", "six-state"],
+      "expect": "clean"
+    },
+    {
+      "file": "six-state/seventh-word.json",
+      "mode": "status-catalog",
+      "rules": ["six-state"],
+      "expect": [{ "rule": "six-state", "messageIncludes": "\"Blocked\" (at $.blocked) is not one of the six" }]
+    },
+    {
+      "$comment": "The realistic catalogue shape: a status object per key, with an icon and help text beside the label. Scanning every string in the file used to fail this on \"spinner\" and on every help sentence, so the only survivable catalogue was a flat six-key map.",
+      "file": "clean/status-catalog-nested.json",
+      "mode": "status-catalog",
+      "rules": ["forbidden-words", "six-state"],
+      "statusPath": "$.*.label",
+      "expect": "clean"
+    },
+    {
+      "file": "six-state/nested-seventh-word.json",
+      "mode": "status-catalog",
+      "rules": ["six-state"],
+      "statusPath": "$.*.label",
+      "expect": [{ "rule": "six-state", "messageIncludes": "\"Blocked\" (at $.blocked.label) is not one of the six" }]
+    },
+    {
+      "$comment": "A statusPath that matches nothing must fail loudly. Selecting no values is how this rule would go back to scanning nothing while reporting clean.",
+      "file": "six-state/path-selects-nothing.json",
+      "mode": "status-catalog",
+      "rules": ["six-state"],
+      "statusPath": "$.*.label",
+      "expect": [{ "rule": "six-state", "messageIncludes": "selects nothing in this file" }]
+    },
+    {
+      "$comment": "Pins the *position*, not just the expected word: a loose \"expected \\\"Saved privately\\\"\" still matched after swapping status 1 and 2, so the suite stayed green over a real ordering break.",
+      "file": "six-state/wrong-order.md",
+      "mode": "prose",
+      "rules": ["six-state"],
+      "expect": [
+        { "rule": "six-state", "messageIncludes": "status 2 is \"Approved\", expected \"Saved privately\"" },
+        { "rule": "six-state", "messageIncludes": "status words missing from the table" }
+      ]
+    },
+    {
+      "$comment": "All six positions pinned exactly, so ANY permutation of APPROVED_STATUS breaks at least one expectation. This is the fixture that makes --self-test alone trustworthy for status order.",
+      "file": "six-state/full-order.md",
+      "mode": "prose",
+      "rules": ["six-state"],
+      "expect": [
+        { "rule": "six-state", "messageIncludes": "status 1 is \"Approved\", expected \"Working\"" },
+        { "rule": "six-state", "messageIncludes": "status 2 is \"Needs attention\", expected \"Saved privately\"" },
+        { "rule": "six-state", "messageIncludes": "status 3 is \"Ready for review\", expected \"Available to team\"" },
+        { "rule": "six-state", "messageIncludes": "status 4 is \"Available to team\", expected \"Ready for review\"" },
+        { "rule": "six-state", "messageIncludes": "status 5 is \"Saved privately\", expected \"Needs attention\"" },
+        { "rule": "six-state", "messageIncludes": "status 6 is \"Working\", expected \"Approved\"" }
+      ]
+    },
+    {
+      "file": "journey/ceremony-step.md",
+      "mode": "prose",
+      "rules": ["journey"],
+      "expect": [
+        { "rule": "journey", "messageIncludes": "asks the user to create \"A task\"" },
+        { "rule": "journey", "messageIncludes": "the user never handles a unit of work" }
+      ]
+    },
+    {
+      "file": "journey/ceremony-free.md",
+      "mode": "prose",
+      "rules": ["journey"],
+      "expect": "clean"
+    },
+    {
+      "file": "mapping/asymmetric.md",
+      "mode": "prose",
+      "rules": ["mapping"],
+      "expect": [{ "rule": "mapping", "messageIncludes": "has no row in the reverse mapping" }]
+    },
+    {
+      "file": "mapping/symmetric.md",
+      "mode": "prose",
+      "rules": ["mapping"],
+      "expect": "clean"
+    },
+    {
+      "$comment": "Perfectly symmetric and still wrong: symmetry alone never notices that both tables agree on a word the six-state model does not contain.",
+      "file": "mapping/unapproved-wording.md",
+      "mode": "prose",
+      "rules": ["mapping"],
+      "expect": [
+        { "rule": "mapping", "messageIncludes": "\"Needs review\" is not approved user-facing wording" }
+      ]
+    },
+    {
+      "file": "requirements/duplicate-and-missing.md",
+      "mode": "prose",
+      "rules": ["requirements"],
+      "expect": [
+        { "rule": "requirements", "messageIncludes": "duplicate requirement ID WSP-001" },
+        { "rule": "requirements", "messageIncludes": "ZZZ-999 is not in the plan §3.5 inventory" },
+        { "rule": "requirements", "messageIncludes": "WSP-002 has priority \"P3\"" },
+        { "rule": "requirements", "messageIncludes": "WSP-003 has no acceptance condition" },
+        { "rule": "requirements", "messageIncludes": "is missing from this document" }
+      ]
+    },
+    {
+      "file": "allow/reasoned.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 1,
+      "expect": "clean"
+    },
+    {
+      "file": "allow/unreasoned.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 1,
+      "expect": [{ "rule": "allow-region", "messageIncludes": "needs a non-empty reason" }]
+    },
+    {
+      "file": "allow/over-budget.md",
+      "mode": "prose",
+      "rules": ["forbidden-words"],
+      "allowRegionBudget": 1,
+      "expect": [{ "rule": "allow-region", "messageIncludes": "budget is 1" }]
+    }
+  ],
+  "$manifestComment": "Fixtures prove the rules fire; these prove the manifest validator refuses configurations that would stop a surface being scanned at all. The first case is the exact entry that shipped in surfaces.json and silently scanned no TypeScript.",
+  "manifestCases": [
+    {
+      "name": "json-strings mode over a {json,ts} glob is rejected",
+      "surface": {
+        "id": "desktop-strings",
+        "glob": "apps/desktop/src/strings/**/*.{json,ts}",
+        "mode": "json-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "would be scanned to nothing"
+    },
+    {
+      "name": "status-catalog mode over a .ts glob is rejected",
+      "surface": {
+        "id": "catalog-in-typescript",
+        "glob": "apps/desktop/src/strings/status.ts",
+        "mode": "status-catalog",
+        "rules": ["six-state"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "that mode only reads .json"
+    },
+    {
+      "name": "source-strings mode over a .md glob is rejected",
+      "surface": {
+        "id": "prose-as-source",
+        "glob": "docs/**/*.md",
+        "mode": "source-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "would be scanned to nothing"
+    },
+    {
+      "name": "an unbounded glob is rejected because no mode can be shown to read it",
+      "surface": {
+        "id": "everything",
+        "glob": "apps/desktop/src/strings/**",
+        "mode": "json-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "extension is unbounded"
+    },
+    {
+      "name": "the split TypeScript surface validates",
+      "surface": {
+        "id": "desktop-strings-source",
+        "glob": "apps/desktop/src/strings/**/*.ts",
+        "mode": "source-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      }
+    },
+    {
+      "name": "a whole-application surface that excludes its tests validates",
+      "surface": {
+        "id": "desktop-source",
+        "glob": "apps/desktop/src/**/*.ts",
+        "exclude": ["apps/desktop/src/**/*.test.ts"],
+        "mode": "source-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": true
+      }
+    },
+    {
+      "name": "an exclude that is not a list of globs is rejected",
+      "surface": {
+        "id": "exclude-not-a-list",
+        "glob": "apps/desktop/src/**/*.ts",
+        "exclude": "apps/desktop/src/**/*.test.ts",
+        "mode": "source-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "not a non-empty array of globs"
+    },
+    {
+      "name": "an empty exclude pattern is rejected, since it narrows nothing while reading as if it did",
+      "surface": {
+        "id": "exclude-empty-pattern",
+        "glob": "apps/desktop/src/**/*.ts",
+        "exclude": [""],
+        "mode": "source-strings",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": false
+      },
+      "expectError": "has an empty \"exclude\" pattern"
+    },
+    {
+      "name": "exclude beside a single named file is rejected",
+      "surface": {
+        "id": "exclude-on-a-path",
+        "path": "docs/product-prd.md",
+        "exclude": ["docs/**/*.md"],
+        "mode": "prose",
+        "rules": ["forbidden-words"],
+        "allowRegionBudget": 0,
+        "required": true
+      },
+      "expectError": "a single named file is either a surface or it is not"
+    },
+    {
+      "$comment": "The desktop catalogue surface as it actually ships. Its statusPath is parsed at load, so a typo in it — the way a status check goes back to selecting nothing and reporting clean — is a startup error rather than a green run.",
+      "name": "the desktop status catalogue validates with the status path it ships with",
+      "surface": {
+        "id": "desktop-status-catalog",
+        "glob": "apps/desktop/src/strings/status*.json",
+        "mode": "status-catalog",
+        "statusPath": "$.states.*.status",
+        "rules": ["forbidden-words", "six-state"],
+        "allowRegionBudget": 0,
+        "required": true
+      }
+    }
+  ]
+}

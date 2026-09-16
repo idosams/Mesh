@@ -1,0 +1,61 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "linux-vim-rename-over-with-backup",
+  "title": "vim on Linux replaces the document's identity and keeps the old one as a backup — where the same vim on darwin kept it",
+  "category": "editor",
+  "tool": { "name": "vim", "version": "9.0 (2022 Jun 28, compiled Feb 16 2025 05:23:41)", "platform": "linux 6.10.14 aarch64, Debian 12 (bookworm), overlayfs" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["vim", "-e", "-s", "-c", "set backup backupcopy=no", "-c", "normal! ggdGishort", "-c", "wq", "doc.txt"],
+    "evidence": "Four readings. `.doc.txt.swp` appears at inode 550185. `doc.txt` KEEPS ITS NAME AND CHANGES INODE, 550184 -> 550186, at size 6. `doc.txt~` then appears AT THE OLD INODE 550184 carrying the original 23 bytes. The swap file vanishes. The document is never seen at length zero, because it is never truncated: a new object is written and the old one is renamed aside. Captured by tests/compatibility/save-patterns/v0/capture.mjs, same command and same vim 9.0 major as the darwin capture.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "polling cannot order the rename of the original against the creation of the replacement when both land inside one reading"]
+  },
+  "objects": [
+    { "object": 1, "role": "the ORIGINAL doc.txt at inode 550184 — renamed aside to doc.txt~, never truncated" },
+    { "object": 2, "role": ".doc.txt.swp, the swap file" },
+    { "object": 3, "role": "the REPLACEMENT doc.txt at inode 550186 — a different object under the same name" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Renamed", "object": 1 },
+        { "sequence": 4, "kind": "Opened", "object": 3 },
+        { "sequence": 5, "kind": "Written", "object": 3 },
+        { "sequence": 6, "kind": "Closed", "object": 3 },
+        { "sequence": 7, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [ { "through": 6, "reason": "Closed" } ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Renamed", "object": 3 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [],
+      "omission_note": "No omission is declared admissible. Every reading in this capture carried a distinct object, so a dropped reading loses an object rather than merging two views of one — which is a different pattern, not this one seen imperfectly."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 7, "reason": "Closed" } ], "boundary_evidence": { "through": 6, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 4, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 7, "folder": 4 },
+    "meaningful_durable_change": "doc.txt holds `short`. One durable change for one editor save — but the object carrying it is NOT the object the workspace held before, and doc.txt~ is a real new file the person now has.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6], "folder": [1, 2, 3] },
+    "forbidden_note": "Mount 3 is the moment the original has been renamed aside and the replacement does not exist yet: a checkpoint there records a workspace whose document has VANISHED and whose only trace is a backup file. That is the hazard this pattern contributes, and it is the mirror image of the darwin hazard — there the danger is a file momentarily EMPTY, here it is a file momentarily ABSENT. The checkpoint runs through 7 while its boundary evidence stops at 6: the window closes on settling after the swap file is unlinked, but the last thing the backend could PROVE was the replacement closing.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "THE CROSS-PLATFORM DIVERGENCE. The darwin capture of this same command, at the same vim major version, produced vim-in-place-truncate: ONE inode going 23 -> 0 -> 6, no backup file in the tree. Linux produced a rename-aside and a fresh object. Same tool, same flags, opposite object-identity semantics.",
+    "This falsifies any coalescing rule inferred from the darwin corpus alone. 01KZC2YXH6FG9C67JP9DQX7JH6's line 'never coalesce across a rename that changes object identity' does not fire at all on darwin vim and fires on every Linux vim save — so a rule validated only on darwin would look correct while never having been exercised.",
+    "It also means `doc.txt~` is a durable artifact of an ordinary save. A workspace that captures it presents the person a file they did not create; one that filters it is filtering by name, which is a heuristic and must be declared as one."
+  ]
+}

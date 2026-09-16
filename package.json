@@ -1,0 +1,14 @@
+{
+  "name": "mesh",
+  "version": "0.1.0-alpha.1",
+  "description": "Mesh local-first workspace protocol and desktop client",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "npm run verify:license && npm run verify:rust && npm run verify:desktop",
+    "verify:license": "node tools/program/license-check.mjs && node tools/program/license-check.mjs --self-test",
+    "verify:rust": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo fmt --all --check && PATH=\"$HOME/.cargo/bin:$PATH\" cargo clippy --workspace --all-targets -- -D warnings && PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run --workspace",
+    "verify:desktop": "npm --prefix apps/desktop test"
+  }
+}

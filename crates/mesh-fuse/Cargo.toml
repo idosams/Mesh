@@ -1,0 +1,30 @@
+[package]
+name = "mesh-fuse"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The Linux FUSE adapter — the filesystem conformance reference."
+
+[lints]
+workspace = true
+
+# One edge, and it is an intra-workspace `path` edge.
+#
+# A `WorkspaceAdapter` implementation has to name the trait it implements, and the trait lives in
+# `mesh-materializer`. `docs/adr/0014-narrow-the-lockfile-fence-to-admit-an-audited-cryptographic-dependency.md`
+# admits a `path` edge between two members of this workspace without its five conditions — no
+# supply chain, no licence and no advisory surface; it edits `Cargo.lock` only because Cargo
+# records the edge — and `tools/program/contract/lib/lockfile.mjs` is the check that decides it.
+# `tools/program/arch-check/architecture.json` puts this crate in the `adapter` layer and
+# `mesh-materializer` in `core`, so the edge points down the ladder.
+#
+# THERE IS NO `fuser` HERE, AND THAT IS A DECISION RATHER THAN AN OMISSION. `fuser` is a
+# third-party crate carrying a filesystem capability and a C library (`libfuse`); ADR-0014's fence
+# admits an audited *cryptographic* dependency and nothing else, so taking it is an escalation
+# this run is not entitled to make. Whether the fence widens is task
+# `01KZHAPMMK7YGF9AJ8QGPV3EP7`. What that costs, and which acceptance criteria it leaves unmet, is
+# stated in `src/lib.rs` under "What this crate is not" rather than left to be discovered.
+[dependencies]
+mesh-materializer = { path = "../mesh-materializer", version = "=0.0.0" }

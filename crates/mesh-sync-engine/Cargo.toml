@@ -1,0 +1,29 @@
+[package]
+name = "mesh-sync-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The canonical encoding and the identity derivation. The receipt check recomputes a ChangeSet's
+# identifier with `derive_id::<Blake3, _>` — the *same* public function that names a record — so
+# there is no second implementation of identity in the transport to disagree with the first.
+# ADR-0015 decision point 4 places that obligation on this crate by name.
+#
+# `docs/adr/0014-narrow-the-lockfile-fence-to-admit-an-audited-cryptographic-dependency.md` admits a
+# `path` edge between two members of this workspace without its five conditions: it adds no supply
+# chain, no licence and no advisory surface, and it edits `Cargo.lock` only because Cargo records
+# the edge. Both edges below point DOWN the plan §8.3 ladder — this crate is `engine` (rank 3),
+# `mesh-types` is `foundation` (rank 0) and `mesh-sync-protocol` is `core-services` (rank 2).
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+# The CWP message set. `CarriedChangeSet` is the thing that arrives, and its `body` field is the
+# only input the check trusts.
+mesh-sync-protocol = { path = "../mesh-sync-protocol", version = "=0.0.0" }
+# Durable delivery receipts advance mesh-store's reconstructable peer watermark. The record journal
+# remains source of truth; SQLite is the derived restart accelerator.
+mesh-store = { path = "../mesh-store", version = "=0.0.0" }

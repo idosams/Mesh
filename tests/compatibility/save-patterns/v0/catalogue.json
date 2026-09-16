@@ -1,0 +1,107 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "task": "01KZC2VTSZCB4Q7DC9C9X5NM1V",
+  "consumed_by": "01KZC2YXH6FG9C67JP9DQX7JH6",
+  "adr": "docs/adr/0039-anchor-a-checkpoint-on-the-last-boundary-a-backend-can-prove-and-close-the-window-on-quiescence.md",
+  "note": "The published save-pattern corpus for research item R5. Every `kind` is a member of `event_kinds` in ../../adapter/v0/vocabulary.json, every `reason` a member of `boundary_reasons`, and every `boundary_evidence.confidence` a variant of mesh_materializer::AttributionConfidence. Boundary evidence is separate from the emitted checkpoint because the checkpoint confidence field is not ratified.",
+  "borrowed_vocabularies": {
+    "event_kinds": "tests/compatibility/adapter/v0/vocabulary.json#event_kinds",
+    "boundary_reasons": "tests/compatibility/adapter/v0/vocabulary.json#boundary_reasons",
+    "confidence": "crates/mesh-materializer/src/operation.rs — AttributionConfidence::ALL"
+  },
+  "rule": {
+    "name": "candidate-recorded, settling-closed, view-scoped",
+    "stated_so_two_implementations_agree": "A checkpoint is a STATE AT ONE SEQUENCE POINT of one view, never a set of edits. Coalescing therefore only chooses which sequence points get a meaningful checkpoint; it can never synthesise a state that did not exist. One window is open at a time per view. Every event extends the window. A CheckpointCandidate offered at sequence s records boundary evidence but does not prove that the whole view settled. Only settling established after the final observed event emits [from, last]. Every other plan trigger preserves recovery data without claiming a meaningful completed save.",
+    "clock_free": "Coalescing reads no clock. EventSequence decides EXTENT; a trigger decides WHEN a window may close. The corpus can establish settling only after its final observed event. The replay oracle enumerates every declared trigger at every position its declaration admits, with no timer and without reading future events.",
+    "triggers": [
+      { "name": "actor-becomes-idle-after-settling", "plan_trigger": "actor becomes idle for a configurable interval", "admissible_positions": "after-final-event", "effect": "emit-meaningful-checkpoint" },
+      { "name": "integrated-agent-requests-flush", "plan_trigger": "integrated agent requests a flush", "admissible_positions": "after-each-event", "effect": "preserve-recovery-only" },
+      { "name": "actor-process-exits", "plan_trigger": "actor process exits", "admissible_positions": "after-each-event", "effect": "preserve-recovery-only" },
+      { "name": "maximum-uncheckpointed-bytes-or-time", "plan_trigger": "maximum uncheckpointed bytes or time is reached", "admissible_positions": "after-each-event", "effect": "preserve-recovery-only" },
+      { "name": "user-opens-review", "plan_trigger": "user opens review", "admissible_positions": "after-each-event", "effect": "preserve-recovery-only" },
+      { "name": "actor-disconnects", "plan_trigger": "actor disconnects", "admissible_positions": "after-each-event", "effect": "preserve-recovery-only" }
+    ],
+    "boundary_evidence_not_triggers": [
+      "modified file handle closes",
+      "fsync completes",
+      "atomic replacement completes"
+    ],
+    "boundary_evidence": {
+      "ExactFilesystemRange": "the recorded candidate `through` is a sequence at which the backend offered a CheckpointCandidate; it need not equal the later meaningful checkpoint `through`",
+      "RecoveryDetected": "the stream supplied no candidate — the folder-watching backend's limitation",
+      "checkpoint_field": "undecided; confidence is evidence in this corpus, not part of the emitted checkpoint"
+    },
+    "parameters_not_decided_here": [
+      "the idle interval",
+      "maximum uncheckpointed bytes",
+      "maximum uncheckpointed time"
+    ]
+  },
+  "coverage": {
+    "note": "The capture matrix in 01KZC2VTSZCB4Q7DC9C9X5NM1V is six tool families by TWO PLATFORMS — twelve required cells, not six. An earlier version of this block listed six families with no platform axis and recorded VS Code and a JetBrains IDE as `met_by` patterns whose provenance is derived rather than observed, which acceptance criterion 5 forbids in terms: documentation-derived and synthetic sequences supplement but never satisfy an observed cell. It therefore reported full coverage while eight of the twelve cells were empty. This block states each cell separately and names what actually fills it; contract-check.mjs rejects any cell claimed observed whose pattern is not.",
+    "required_cells": 12,
+    "observed_cells_filled": 12,
+    "cells": {
+      "VS Code": {
+        "macOS": { "pattern": "vscode-macos-in-place-truncate", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "vscode-linux-in-place-truncate", "method": "observed-by-polling", "observed": true }
+      },
+      "a JetBrains IDE": {
+        "macOS": { "pattern": "jetbrains-macos-command-line-format-backup-in-place-truncate", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "jetbrains-linux-backup-in-place-truncate", "method": "observed-by-polling", "observed": true }
+      },
+      "vim or neovim": {
+        "macOS": { "pattern": "vim-in-place-truncate", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "linux-vim-rename-over-with-backup", "method": "observed-by-polling", "observed": true }
+      },
+      "Git operations": {
+        "macOS": { "pattern": "git-checkout-switch-branch", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "linux-git-checkout-in-place", "method": "observed-by-polling", "observed": true }
+      },
+      "a formatter": {
+        "macOS": { "pattern": "rustfmt-in-place-truncate", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "linux-rustfmt-in-place-truncate", "method": "observed-by-polling", "observed": true }
+      },
+      "a package manager install": {
+        "macOS": { "pattern": "npm-install-cold", "method": "observed-by-polling", "observed": true },
+        "Linux": { "pattern": "linux-npm-install-cold", "method": "observed-by-polling", "observed": true }
+      }
+    },
+    "unmet": []
+  },
+  "patterns": [
+    { "pattern": "vscode-macos-in-place-truncate", "file": "patterns/vscode-macos-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "vscode-linux-in-place-truncate", "file": "patterns/vscode-linux-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "vscode-atomic-replace", "file": "patterns/vscode-atomic-replace.json", "provenance": "derived-from-shipped-binary", "coalescable": "safely" },
+    { "pattern": "jetbrains-safe-write", "file": "patterns/jetbrains-safe-write.json", "provenance": "derived-from-documentation", "coalescable": "safely" },
+    { "pattern": "jetbrains-macos-command-line-format-backup-in-place-truncate", "file": "patterns/jetbrains-macos-command-line-format-backup-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "jetbrains-linux-backup-in-place-truncate", "file": "patterns/jetbrains-linux-backup-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "vim-in-place-truncate", "file": "patterns/vim-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "rustfmt-in-place-truncate", "file": "patterns/rustfmt-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "sed-rename-over", "file": "patterns/sed-rename-over.json", "provenance": "observed-by-polling", "coalescable": "safely" },
+    { "pattern": "sed-rename-over-with-backup", "file": "patterns/sed-rename-over-with-backup.json", "provenance": "observed-by-polling", "coalescable": "safely" },
+    { "pattern": "git-checkout-switch-branch", "file": "patterns/git-checkout-switch-branch.json", "provenance": "observed-by-polling", "coalescable": "only-by-quiescence" },
+    { "pattern": "npm-install-cold", "file": "patterns/npm-install-cold.json", "provenance": "observed-by-polling", "coalescable": "only-by-quiescence" },
+    { "pattern": "linux-vim-rename-over-with-backup", "file": "patterns/linux-vim-rename-over-with-backup.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "linux-git-checkout-in-place", "file": "patterns/linux-git-checkout-in-place.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "linux-rustfmt-in-place-truncate", "file": "patterns/linux-rustfmt-in-place-truncate.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" },
+    { "pattern": "linux-npm-install-cold", "file": "patterns/linux-npm-install-cold.json", "provenance": "observed-by-polling", "coalescable": "not-on-a-folder-backend" }
+  ],
+  "not_in_the_corpus": [
+    {
+      "what": "A file created and removed again between two readings of a watched folder.",
+      "why": "The folder-watching backend's second declared restriction — crates/mesh-daemon/src/user_messages.rs FALLBACK_SHORT_LIVED_WORK_IS_MISSED. There is no event stream to record, so there is no pattern to replay. It is a declared restriction, not an approximated pattern.",
+      "owner": "runtime and platform"
+    },
+    {
+      "what": "A save that shortens a file, expressed at mesh-workspace-adapter/0.",
+      "why": "The contract publishes no truncate, so the observed transition (same object, length 26 -> 0 -> 6) is recorded here as two Written events and is NOT expressible as a backend operation. Task 01KZHAGG8Q83Q0YBHGDXSS8J1M, design 01KZHK4VWAZRYZ65TM35T4DAY5.",
+      "owner": "protocol and correctness"
+    },
+    {
+      "what": "Whether a Renamed event's target name was already bound — an object-identity change.",
+      "why": "FsEvent carries { view, sequence, kind, object } and no name, so a coalescer cannot tell an atomic replace from an unrelated move. 01KZC2YXH6FG9C67JP9DQX7JH6's failure-and-recovery line 'never coalesce across a rename that changes object identity' is therefore not implementable at contract 0 today. The rule in this corpus does not need it; the stronger claim does.",
+      "owner": "protocol and correctness"
+    }
+  ]
+}

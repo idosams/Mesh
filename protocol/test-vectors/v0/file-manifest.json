@@ -1,0 +1,107 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "record": "mesh.v0.file-manifest",
+  "signed_record": true,
+  "summary": "The ordered chunk references that reconstruct one file version's bytes exactly.",
+  "schema": {
+    "domain_tag": "mesh.v0.file-manifest",
+    "fields": [
+      {
+        "name": "byte_length",
+        "type": "unsigned"
+      },
+      {
+        "name": "content_hash",
+        "type": "bytes",
+        "byte_length": 32
+      },
+      {
+        "name": "chunks",
+        "type": "sequence",
+        "element": {
+          "name": "element",
+          "type": "group",
+          "fields": [
+            {
+              "name": "content_hash",
+              "type": "bytes",
+              "byte_length": 32
+            },
+            {
+              "name": "offset",
+              "type": "unsigned"
+            },
+            {
+              "name": "length",
+              "type": "unsigned"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "name": "empty-file",
+      "description": "A zero-length file: no chunks, and the content hash of the empty byte string.",
+      "record": {
+        "byte_length": 0,
+        "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+        "chunks": []
+      },
+      "canonical_encoding_hex": "84756d6573682e76302e66696c652d6d616e6966657374005820af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f326280",
+      "canonical_encoding_length": 59,
+      "canonical_encoding_digest_hex": "d47331c6e69f12b9b8aaa131dc1261508971018aa1ebf817eeb1ab17495100bc",
+      "record_id_hex": "60ccbab7c3f07d7d08923202ff835098649aa96d63e2c07e5080517306834d37"
+    },
+    {
+      "name": "single-chunk",
+      "description": "One chunk covering the whole file. Both digests are BLAKE3 of the ASCII text \"hello, mesh\\n\", so an implementer can recompute them.",
+      "record": {
+        "byte_length": 12,
+        "content_hash": "88f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf",
+        "chunks": [
+          {
+            "content_hash": "88f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf",
+            "offset": 0,
+            "length": 12
+          }
+        ]
+      },
+      "canonical_encoding_hex": "84756d6573682e76302e66696c652d6d616e69666573740c582088f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf8183582088f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf000c",
+      "canonical_encoding_length": 96,
+      "canonical_encoding_digest_hex": "82327ad8cf97a83a57d301373d0bea9f2b1e354e96b9254117f8cdd03434460b",
+      "record_id_hex": "7c8381c7088b84ec32fc46923dfc7231b27da2329af53f5356450475da6c89e8"
+    },
+    {
+      "name": "three-chunks-across-head-widths",
+      "description": "Chunk lengths 23, 24 and 256 straddle the one-, two- and three-byte integer head boundaries; the byte offsets do the same.",
+      "record": {
+        "byte_length": 303,
+        "content_hash": "0fbd80c095cbb5d21be0ad57a1ba3b8a7407ee4e6f755990d3da53827b1e3dbf",
+        "chunks": [
+          {
+            "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "offset": 0,
+            "length": 23
+          },
+          {
+            "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+            "offset": 23,
+            "length": 24
+          },
+          {
+            "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+            "offset": 47,
+            "length": 256
+          }
+        ]
+      },
+      "canonical_encoding_hex": "84756d6573682e76302e66696c652d6d616e696665737419012f58200fbd80c095cbb5d21be0ad57a1ba3b8a7407ee4e6f755990d3da53827b1e3dbf838358201111111111111111111111111111111111111111111111111111111111111111001783582022222222222222222222222222222222222222222222222222222222222222221718188358203333333333333333333333333333333333333333333333333333333333333333182f190100",
+      "canonical_encoding_length": 176,
+      "canonical_encoding_digest_hex": "1f7c3d1972af52fd252051d4bb0cede9dea35d483eaa0772aba5daffb9dcbce3",
+      "record_id_hex": "65e6734fa2b7da0132a82eb64546e07321685d333abad766cfaff873deb78945"
+    }
+  ]
+}

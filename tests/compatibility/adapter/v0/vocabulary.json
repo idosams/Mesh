@@ -1,0 +1,267 @@
+{
+  "contract": "mesh-workspace-adapter/0",
+  "design": "01KZEZGDPMZ5RH7E60WDYDYYEE",
+  "task": "01KZC2M9305RFTMVSHJPG7HJGT",
+  "note": "The closed lists a workspace adapter is graded against. This file is not a description of the Rust; crates/mesh-materializer/tests/adapter-conformance.rs holds the two against each other in BOTH directions, so a capability, error, event kind or boundary reason added to one and not the other turns the suite red. That check also compares the `pub enum AdapterCapability` body as source text against AdapterCapability::ALL, which is the one gap src/adapter.rs states it cannot close from inside: a variant appended after Symlink and never added to ALL compiles clean under every guard in that file.",
+  "capabilities": [
+    {
+      "name": "Lookup",
+      "operation": "lookup",
+      "what": "Resolve one entry name inside one directory."
+    },
+    {
+      "name": "Enumerate",
+      "operation": "enumerate",
+      "what": "List a directory's entries in ascending byte-lexicographic order of the name's UTF-8 bytes."
+    },
+    {
+      "name": "Open",
+      "operation": "open / close",
+      "what": "Take and release a handle on an object."
+    },
+    {
+      "name": "Read",
+      "operation": "read",
+      "what": "Fill a caller-supplied buffer from an offset and return how many bytes were filled."
+    },
+    {
+      "name": "Write",
+      "operation": "write",
+      "what": "Take bytes from a caller-supplied slice at an offset and return how many were taken."
+    },
+    {
+      "name": "SetFileLength",
+      "operation": "set_file_length",
+      "what": "Set a file's exact byte length; shrinking removes the tail and growing fills the added range with zero bytes."
+    },
+    {
+      "name": "CreateFile",
+      "operation": "create_file",
+      "what": "Bind a new file object under a name in a directory."
+    },
+    {
+      "name": "CreateDirectory",
+      "operation": "create_directory",
+      "what": "Bind a new directory object under a name in a directory."
+    },
+    {
+      "name": "Rename",
+      "operation": "rename",
+      "what": "Change an entry's name within one directory."
+    },
+    {
+      "name": "Move",
+      "operation": "move_entry",
+      "what": "Move an entry from one directory to another, at constant metadata cost."
+    },
+    {
+      "name": "Unlink",
+      "operation": "unlink",
+      "what": "Remove a name binding for a file."
+    },
+    {
+      "name": "RemoveDirectory",
+      "operation": "remove_directory",
+      "what": "Remove a name binding for an empty directory."
+    },
+    {
+      "name": "ReadMetadata",
+      "operation": "metadata",
+      "what": "Read an object's portable metadata."
+    },
+    {
+      "name": "WriteMetadata",
+      "operation": "set_metadata",
+      "what": "Set an object's portable metadata."
+    },
+    {
+      "name": "MountActorView",
+      "operation": "mount_actor_view",
+      "what": "Present one actor's own state at a mountpoint, read-write."
+    },
+    {
+      "name": "MaterializeReadonlyView",
+      "operation": "materialize_readonly_view",
+      "what": "Present a named head at a target path, read-only."
+    },
+    {
+      "name": "ObserveDurableBoundary",
+      "operation": "observe_durable_boundary",
+      "what": "Decide, from one filesystem event, whether a durable boundary has been reached."
+    },
+    {
+      "name": "Symlink",
+      "operation": "reserved",
+      "what": "Reserved. Declaring it opts an adapter into the adversarial symlink corpus, which is a separate task; an adapter that does not declare it must refuse symlink creation with Unsupported."
+    }
+  ],
+  "errors": [
+    {
+      "name": "Unsupported",
+      "when": "The capability was not declared. This is the only error an undeclared capability may return, and returning anything else — including Ok — is a conformance failure."
+    },
+    {
+      "name": "NotFound",
+      "when": "No entry, object or handle by that name or identifier."
+    },
+    {
+      "name": "AlreadyExists",
+      "when": "The name is already bound in that directory."
+    },
+    {
+      "name": "NotADirectory",
+      "when": "A directory operation was addressed to a file."
+    },
+    {
+      "name": "IsADirectory",
+      "when": "A file operation was addressed to a directory."
+    },
+    {
+      "name": "DirectoryNotEmpty",
+      "when": "remove_directory was called on a directory that still has entries."
+    },
+    {
+      "name": "NameRejected",
+      "when": "The name broke a portable-name rule. Carries the existing NameError (Empty, Relative, Separator, Nul) rather than restating those four rules a second time. Produced from the mountpoint of mount_actor_view and the target of materialize_readonly_view, and from nowhere else: every WorkspaceView method takes a &NormalizedName, which cannot be constructed from a refused name, so no view method can be handed one. A NameRejected branch inside a view method is a branch nothing can reach. Ruled under 01KZFXF9N49NHJ7XS3MD0MX3BR."
+    },
+    {
+      "name": "OutsideWorkspace",
+      "when": "The operation would resolve to a path outside the workspace."
+    },
+    {
+      "name": "ReadOnly",
+      "when": "A mutating operation was addressed to a view whose access is ReadOnly."
+    },
+    {
+      "name": "UnknownView",
+      "when": "The ViewId was never issued, or has been released."
+    },
+    {
+      "name": "WouldCycle",
+      "when": "The move would place a directory inside its own subtree."
+    },
+    {
+      "name": "Backend",
+      "when": "A platform failure the contract does not name. Carries a message. It is never the right answer to a case in this catalogue, and a case answered with Backend is a failure."
+    }
+  ],
+  "event_kinds": [
+    "Opened",
+    "Written",
+    "Flushed",
+    "Synced",
+    "Closed",
+    "Renamed",
+    "Unlinked",
+    "MetadataChanged"
+  ],
+  "boundary_reasons": [
+    "Closed",
+    "Synced",
+    "RenamedIntoPlace",
+    "MetadataSettled"
+  ],
+  "results": [
+    {
+      "name": "pass",
+      "affects_verdict": false,
+      "what": "The adapter answered, and the answer matches the rule."
+    },
+    {
+      "name": "fail",
+      "affects_verdict": true,
+      "what": "The adapter answered and broke a rule, or panicked, or refused a capability it declared."
+    },
+    {
+      "name": "unsupported",
+      "affects_verdict": false,
+      "what": "The capability was not declared AND was refused cleanly with Unsupported."
+    }
+  ],
+  "families": [
+    {
+      "id": "CAP",
+      "what": "The declaration itself: the contract string, a declared capability refused, an undeclared capability answered, an undeclared capability that did not refuse cleanly."
+    },
+    {
+      "id": "OP",
+      "what": "The pre- and post-conditions of the fourteen filesystem operations."
+    },
+    {
+      "id": "RO",
+      "what": "A read-only view refuses every mutating operation with ReadOnly."
+    },
+    {
+      "id": "NAME",
+      "what": "Every name the portable-name rules refuse is refused, with NameRejected. Graded at the PATH surface — the mountpoint of mount_actor_view and the target of materialize_readonly_view — because NormalizedName cannot be constructed from a refused name, so no WorkspaceView method can be handed one and NameRejected is unreachable through every method on the view. On the view the TYPE is the enforcement, which is the ruling and not a gap: a rule the compiler makes unrepresentable cannot be got wrong by one backend on one platform, and a raw-bytes view method would make every backend re-implement the four rules. Ruled under 01KZFXF9N49NHJ7XS3MD0MX3BR. See path_components below."
+    },
+    {
+      "id": "ORD",
+      "what": "enumerate is stable and byte-lexicographic by name, and repeated calls agree."
+    },
+    {
+      "id": "BND",
+      "what": "Durable-boundary observation: replaying one event stream produces the identical candidate sequence, and one close produces one candidate."
+    },
+    {
+      "id": "MNT",
+      "what": "Two actor views coexist, and a released ViewId resolves to UnknownView."
+    },
+    {
+      "id": "VOC",
+      "what": "This file and the Rust enums agree, in both directions."
+    },
+    {
+      "id": "CAT",
+      "what": "Every case cites the published material rather than crates/**."
+    }
+  ],
+  "path_components": {
+    "rule": "A mountpoint or a read-only target holding a path component the portable-name rules refuse is refused with NameRejected, carrying the rule the component broke. A `..` component is NameRejected(Relative).",
+    "why_here": "The only surface at mesh-workspace-adapter/0 where the four name rules are checkable at all. On the view the type is the enforcement and the error variant is unreachable; on a path the caller supplies bytes the backend must judge.",
+    "graded_by": "NAME/relative-names-are-refused and NAME/relative-target-is-refused",
+    "ruled_by": "01KZFXF9N49NHJ7XS3MD0MX3BR — the type is the enforcement on the view, the path surface is where the family grades, and README.md sections 4 and 6 carry the same wording."
+  },
+  "fixture": {
+    "rule": "prepare_fixture() is called once, before anything else, and every mount and every read-only presentation afterwards uses the AdapterFixture it answered. A backend creates a workspace and a head if that is what it takes, or names ones it already holds; a backend that holds no state of its own may answer any pair.",
+    "why_here": "Nothing else on either trait creates a workspace or names a head, so a caller that has not been handed one can only invent an identifier — and a real backend answers NotFound for a workspace it was never given. Without this the MNT and RO families, and everything downstream of a mount, applied only to a backend that accepts an arbitrary identifier, which means an in-memory one. Closes 01KZFXFR4KHDN8EJ8R0750E0T6.",
+    "refusal": "A backend that declares MountActorView or MaterializeReadonlyView and then refuses to prepare is graded `fail` on those families, never `unsupported`: a declaration nothing can check is a silent divergence, and `unsupported` is the word an honest partial backend earns. A backend that declares neither is unaffected.",
+    "graded_by": "MNT/two-actor-views-coexist, MNT/released-view-is-unknown, RO/access-is-read-only, RO/write-is-refused and RO/every-mutating-operation-is-refused, all of which grade against the workspace and head the backend named."
+  },
+  "presentation_paths": {
+    "rule": "A mountpoint or read-only target is a presentation request. A backend-owned root may resolve a relative request below that root and must return the path actually used. An absolute request is literal: serve it there or return a typed refusal, never silently rebase it.",
+    "conformance_fixture": "The suite uses distinct relative requests below mesh-conformance/ so MNT and RO grade adapter semantics without requiring permission to create a host-global /mesh directory.",
+    "refusal": "A backend that declares MountActorView or MaterializeReadonlyView and refuses the suite's portable relative request is graded fail on the corresponding family, never unsupported.",
+    "validation_order": "Validate every component, including a refused .. component, before resolving a relative request below a backend-owned root.",
+    "closes": "01KZG5J7H8X16W56RX9AGWMCRJ"
+  },
+  "ordering": {
+    "enumerate": "ascending byte-lexicographic order of the entry name's UTF-8 bytes — not locale order, and not code-point order after normalization. The same rule protocol/test-vectors/README.md states for a keyed sequence.",
+    "events": "lamport -> event_ulid -> content-hash. FsEvent carries no timestamp and cannot acquire one: crates/mesh-materializer/src/ may not name std::time, SystemTime or Instant, and tests/no_ambient_io.rs enforces it."
+  },
+  "not_reachable": [
+    {
+      "what": "AdapterError::NameRejected through any WorkspaceView method.",
+      "consequence": "NormalizedName cannot represent a refused name, so no view method can be handed one. The NAME family is graded at the path surface instead, and the view surface is enforced by the type rather than by a case. This is the ruling, not an open gap: see path_components.ruled_by and the errors entry for NameRejected, which names the two operations that DO produce it.",
+      "owner": "protocol and correctness",
+      "ruled": "01KZFXF9N49NHJ7XS3MD0MX3BR"
+    },
+    {
+      "what": "AdapterError::OutsideWorkspace.",
+      "consequence": "No method on either trait takes a path relative to a workspace root, so nothing in the catalogue can reach this refusal. It stays in the closed set because a backend's own resolution will produce it.",
+      "owner": "protocol and correctness"
+    },
+    {
+      "what": "More than one workspace, or more than one head, in a single run.",
+      "consequence": "prepare_fixture names one of each and the suite grades against that pair, so two workspaces interfering with one another is not reachable from here. It is a narrower limit than the one it replaced — the suite no longer invents an identifier, so a backend that refuses what it was never given is graded rather than skipped.",
+      "owner": "runtime and platform"
+    }
+  ],
+  "unpinned": [
+    {
+      "what": "The Unicode normalization form for entry names.",
+      "consequence": "The NAME family cannot decide whether a composed and a decomposed name are one entry or two, so it does not ask. Two adapters may legitimately differ here today.",
+      "owner": "protocol and correctness"
+    }
+  ]
+}

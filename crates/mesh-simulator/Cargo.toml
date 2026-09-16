@@ -1,0 +1,14 @@
+[package]
+name = "mesh-simulator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-state = { path = "../mesh-state", version = "=0.0.0" }
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }

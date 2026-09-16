@@ -1,0 +1,46 @@
+# `mesh-keychain` — the platform key-custody backends (plan §8.1, task 01KZC2CDEKQ0BDNVZ96ZMM100P).
+#
+# This crate holds a secret. It is the only crate in the workspace that does, and that
+# is why it is here and not in `mesh-crypto`: `crates/mesh-crypto/src/no_secret_material.rs`
+# fails the BUILD if a secret-key type or an export accessor appears in that crate, and
+# weakening that guard to make room for a software fallback would trade the strongest
+# structural control in the programme for a convenience. The guard stays; the secret
+# lives behind the seam, in a crate whose whole surface is one `sign` method.
+#
+# `Cargo.lock` note, for the reviewer ADR-0014 condition 5 requires: this manifest adds
+# NO new third-party package. `ed25519-dalek` is already locked and already compiled for
+# `mesh-crypto`; the only lockfile change is the workspace's own `mesh-keychain` entry,
+# which ADR-0014 admits without conditions 1-5 ("The workspace's own crate graph is not
+# a dependency question at all").
+
+[package]
+name = "mesh-keychain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-approval = { path = "../../crates/mesh-approval", version = "=0.0.0" }
+mesh-crypto = { path = "../../crates/mesh-crypto", version = "=0.0.0" }
+mesh-types = { path = "../../crates/mesh-types", version = "=0.0.0" }
+
+# The same audited Ed25519 `mesh-crypto` verifies with, pinned identically. Signing and
+# verification MUST come from one implementation: a fallback that signed with a second
+# would be a second definition of what a Mesh signature is.
+#
+# `zeroize` is not optional here the way it is next door. It is what makes
+# `SigningKey: ZeroizeOnDrop`, so the secret scalar is overwritten when custody is
+# dropped rather than left in a freed allocation for the next reader of this heap.
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }
+
+[build-dependencies]
+# Compile the tiny Objective-C Security.framework bridge. This package is already locked through
+# bundled SQLite; making the edge direct adds no second compiler toolchain or runtime library. A
+# build script is compiled for the host, so the dependency must exist even when its target guard
+# skips the bridge for Linux.
+cc = "=1.4.3"

@@ -1,0 +1,120 @@
+{
+  "contract": "mesh-recovery-preservation/0",
+  "task": "01KZM79AZ4XV9CF48GJAPRQZR2",
+  "design": "01M0E48FQ1EXH0KYJHVHNYXAZT",
+  "meaningful_acknowledgement": "PrivateSaved",
+  "ordering": {
+    "fields": ["lamport", "event_ulid", "content_hash"],
+    "winner": "lexicographic-maximum",
+    "wall_clock": "forbidden",
+    "duplicate": "idempotent"
+  },
+  "results": {
+    "boundary_evidence": {
+      "durable_state": "none-by-itself",
+      "window": "remains-open",
+      "meaningful_acknowledgement": "forbidden"
+    },
+    "latest_recovery": {
+      "durable_state": ["immutable-recovery-bytes", "latest_recovery-pointer"],
+      "does_not_advance": ["last_meaningful", "actor-head", "outbox", "PrivateSaved"],
+      "window": "remains-open",
+      "meaningful_acknowledgement": "forbidden"
+    },
+    "last_meaningful": {
+      "durable_state": ["checkpoint-records", "actor-head", "outbox", "last_meaningful-pointer"],
+      "latest_recovery": "retained-separately",
+      "window": "closes-after-durable-commit",
+      "meaningful_acknowledgement": "PrivateSaved-after-commit"
+    }
+  },
+  "triggers": [
+    {
+      "id": "actor-becomes-idle-after-settling",
+      "plan_trigger": "actor becomes idle for a configurable interval",
+      "effect": "meaningful-after-settling"
+    },
+    {
+      "id": "integrated-agent-requests-flush",
+      "plan_trigger": "integrated agent requests a flush",
+      "effect": "recovery-only"
+    },
+    {
+      "id": "actor-process-exits",
+      "plan_trigger": "actor process exits",
+      "effect": "recovery-only"
+    },
+    {
+      "id": "maximum-uncheckpointed-bytes-or-time",
+      "plan_trigger": "maximum uncheckpointed bytes or time is reached",
+      "effect": "recovery-only"
+    },
+    {
+      "id": "user-opens-review",
+      "plan_trigger": "user opens review",
+      "effect": "recovery-only"
+    },
+    {
+      "id": "actor-disconnects",
+      "plan_trigger": "actor disconnects",
+      "effect": "recovery-only"
+    },
+    {
+      "id": "modified-file-handle-closes",
+      "plan_trigger": "modified file handle closes",
+      "effect": "evidence-only"
+    },
+    {
+      "id": "fsync-completes",
+      "plan_trigger": "fsync completes",
+      "effect": "evidence-only"
+    },
+    {
+      "id": "atomic-replacement-completes",
+      "plan_trigger": "atomic replacement completes",
+      "effect": "evidence-only"
+    }
+  ],
+  "situations": [
+    "open-window",
+    "already-preserved-window",
+    "settling-after-preservation",
+    "restart",
+    "duplicate-trigger",
+    "persistence-failure"
+  ],
+  "user_facing": {
+    "statuses": [
+      "Working",
+      "Saved privately",
+      "Available to team",
+      "Ready for review",
+      "Needs attention",
+      "Approved"
+    ],
+    "mapping": {
+      "recovery-only": "Working",
+      "meaningful-saved": "Saved privately",
+      "replicated": "Available to team",
+      "review-frozen": "Ready for review",
+      "human-decision-required": "Needs attention",
+      "publication-succeeded": "Approved"
+    },
+    "copy": {
+      "recovery-only": "Mesh kept the newest recoverable bytes. Work is still in progress.",
+      "meaningful-saved": "This work is saved privately.",
+      "persistence-failed": "Mesh could not preserve the newest work. Your earlier saved work is unchanged and needs attention."
+    }
+  },
+  "banned_user_terms": [
+    "DAG",
+    "frontier",
+    "vector clock",
+    "branch",
+    "commit",
+    "rebase",
+    "staging",
+    "ref",
+    "operation log"
+  ]
+}

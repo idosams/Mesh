@@ -1,0 +1,20 @@
+FROM rust@sha256:14bc9c5966e7b3a385794b3d5389a8765668342025fbcc7b2e3d2866ac4bd8c3
+
+# The snapshot timestamp and package versions are part of the evidence input. A rebuild
+# either resolves these exact packages or fails; it never silently measures newer npm.
+RUN printf '%s\n' \
+      'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20260801T000000Z bookworm main' \
+      'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20260801T000000Z bookworm-security main' \
+      > /etc/apt/sources.list \
+    && rm -f /etc/apt/sources.list.d/* \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends nodejs=18.20.4+dfsg-1~deb12u2 npm=9.2.0~ds1-1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+COPY benchmarks/checkpoint-settling/fixture.mjs /work/fixture.mjs
+COPY benchmarks/checkpoint-settling/semantic.mjs /work/semantic.mjs
+COPY benchmarks/checkpoint-settling/capture.mjs /work/capture.mjs
+
+ENTRYPOINT ["node", "/work/capture.mjs"]

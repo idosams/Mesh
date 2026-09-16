@@ -1,0 +1,522 @@
+{
+  "contract": "mesh-checkpoint-settling-tool-capture/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "repository_commit": "33ffb92c64f685ec10ba8fbd3229555ed72af21f",
+  "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900",
+  "seed": 347002,
+  "platform": {
+    "tag": "linux-overlayfs",
+    "os": "linux",
+    "os_version": "6.10.14-linuxkit",
+    "arch": "arm64",
+    "filesystem": "overlayfs",
+    "filesystem_type": "2035054128",
+    "node": "v18.20.4",
+    "docker_image": "sha256:de6447416ac130d441e8658b90766b338ce765fe1ba69ef88a58aba9a25e0ff3",
+    "hardware": {
+      "cpu_model": "-",
+      "cpu_vendor": "Apple",
+      "logical_cores": 10,
+      "physical_cores": 10,
+      "memory_bytes": 8218034176
+    }
+  },
+  "network_evidence": "docker-network-none",
+  "cache_state": "fresh-private-tool-state-per-sample",
+  "sample_count_per_arm": 5,
+  "invocation": [
+    "/repo/benchmarks/checkpoint-settling/capture-tools.mjs",
+    "--platform",
+    "linux-overlayfs",
+    "--commit",
+    "33ffb92c64f685ec10ba8fbd3229555ed72af21f",
+    "--families",
+    "vim,formatter",
+    "--samples",
+    "5",
+    "--vim",
+    "/usr/bin/vim",
+    "--rustfmt",
+    "/usr/bin/rustfmt",
+    "--network-evidence",
+    "docker-network-none",
+    "--image",
+    "sha256:de6447416ac130d441e8658b90766b338ce765fe1ba69ef88a58aba9a25e0ff3",
+    "--out",
+    "/out/linux-tools-v2.json"
+  ],
+  "arms": [
+    {
+      "id": "vim",
+      "family": "vim or neovim",
+      "pattern": "linux-vim-rename-over-with-backup",
+      "tool_path": "/usr/bin/vim",
+      "tool_version": "VIM - Vi IMproved 9.0 (2022 Jun 28, compiled Feb 16 2025 05:23:41)",
+      "input_digest": "sha256:0ea8f79184b6b437b610fb3cdd70cf3119cd6ff6e3dae338a39d9a1d98117f52",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/usr/bin/vim",
+            "-Nu",
+            "NONE",
+            "-n",
+            "-es",
+            "<temporary-path>",
+            "-c",
+            "call setline(1, 'edited seed=347002 sample=1')",
+            "-c",
+            "wq"
+          ],
+          "initial_tree_digest": "sha256:41818ad2a5e8f2b8a5e9bec3621dc803e2c71e2ef832f63690507ebe4c2d0092",
+          "final_tree_digest": "sha256:752198aca2e355befa253dec1123114888a0ca58c82cd7c9f51b900adfb9d4c9",
+          "polls": 5985,
+          "elapsed_ms": 106.881,
+          "observations": [
+            {
+              "at_ms": 4.091,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 30,
+                  "size": 28,
+                  "bytes_delta": 28
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/usr/bin/vim",
+            "-Nu",
+            "NONE",
+            "-n",
+            "-es",
+            "<temporary-path>",
+            "-c",
+            "call setline(1, 'edited seed=347002 sample=2')",
+            "-c",
+            "wq"
+          ],
+          "initial_tree_digest": "sha256:0823213d666b443e31d4fa09d36f3cc902120f2980839ba1b4f0364c3fa87007",
+          "final_tree_digest": "sha256:b28f74fbbd4fbbfc56b120c8813debaa513d79df8dcb7c5b2bdf1276a98739c3",
+          "polls": 8326,
+          "elapsed_ms": 102.591,
+          "observations": [
+            {
+              "at_ms": 2.155,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 2.196,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 28,
+                  "bytes_delta": 28
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/usr/bin/vim",
+            "-Nu",
+            "NONE",
+            "-n",
+            "-es",
+            "<temporary-path>",
+            "-c",
+            "call setline(1, 'edited seed=347002 sample=3')",
+            "-c",
+            "wq"
+          ],
+          "initial_tree_digest": "sha256:8564006a396d6881d946fd586a7e584782a0e7ba1b33dc46354978999bed489d",
+          "final_tree_digest": "sha256:8620f79bcaa602dfe1ee15ca26d9462dde133f60e09d4d28c8e421188dc227a5",
+          "polls": 9130,
+          "elapsed_ms": 102.16,
+          "observations": [
+            {
+              "at_ms": 1.673,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1.703,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 28,
+                  "bytes_delta": 28
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/usr/bin/vim",
+            "-Nu",
+            "NONE",
+            "-n",
+            "-es",
+            "<temporary-path>",
+            "-c",
+            "call setline(1, 'edited seed=347002 sample=4')",
+            "-c",
+            "wq"
+          ],
+          "initial_tree_digest": "sha256:4eaa62248cf84689f6ec312f479ed95d24ed6b21e33af4cbf674f6c5596ba557",
+          "final_tree_digest": "sha256:b5c487287492d27afa132c3bf433645813b05cda0d001d886a6360d1b888aca8",
+          "polls": 9084,
+          "elapsed_ms": 104.208,
+          "observations": [
+            {
+              "at_ms": 1.662,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1.701,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 28,
+                  "bytes_delta": 28
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/usr/bin/vim",
+            "-Nu",
+            "NONE",
+            "-n",
+            "-es",
+            "<temporary-path>",
+            "-c",
+            "call setline(1, 'edited seed=347002 sample=5')",
+            "-c",
+            "wq"
+          ],
+          "initial_tree_digest": "sha256:66cf8467445eb5cbcf0949e0218d817a3404c6d5a1ad435e4cafaec9b69a09a8",
+          "final_tree_digest": "sha256:e219415ac9841225da7083216cf08e02ba4412f86930aa401c78999cc4687a07",
+          "polls": 9359,
+          "elapsed_ms": 103.223,
+          "observations": [
+            {
+              "at_ms": 1.66,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 30,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 1.675,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "doc.txt",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 28,
+                  "bytes_delta": 28
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "formatter",
+      "family": "a formatter",
+      "pattern": "linux-rustfmt-in-place-truncate",
+      "tool_path": "/usr/bin/rustfmt",
+      "tool_version": "rustfmt 1.5.1-stable ( )",
+      "input_digest": "sha256:0c40d8996b1d0eb62d6deea9cbaba53ac235f02f7a31400be98265e9ac4be531",
+      "sample_count": 5,
+      "samples": [
+        {
+          "sample": 1,
+          "seed": 347003,
+          "invocation": [
+            "/usr/bin/rustfmt",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:14c628183e6fc082e66fc6468b90373e875ff1abd57863caabb6cc706dba7048",
+          "final_tree_digest": "sha256:e0bce4539f4b7732f1f1c43559d978b8938e77261d1edd302e896390bc3732a0",
+          "polls": 4499,
+          "elapsed_ms": 105.239,
+          "observations": [
+            {
+              "at_ms": 5.464,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 5.518,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 22308,
+                  "bytes_delta": 22308
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "check_status": 0
+          }
+        },
+        {
+          "sample": 2,
+          "seed": 347004,
+          "invocation": [
+            "/usr/bin/rustfmt",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:1a48f8aa8a43a335a3c81c8a699d963fb45ce84ea70eca5c75b4601bcd71b29a",
+          "final_tree_digest": "sha256:8680fce078fb92369e0b05924e50f8b0f9d77774c3152576db280e600654ed4e",
+          "polls": 4607,
+          "elapsed_ms": 103.856,
+          "observations": [
+            {
+              "at_ms": 4.345,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 4.378,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 22308,
+                  "bytes_delta": 22308
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "check_status": 0
+          }
+        },
+        {
+          "sample": 3,
+          "seed": 347005,
+          "invocation": [
+            "/usr/bin/rustfmt",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:ad896bb752b2f03917e8df70cfb11bd7b0bf467fb3906c75d9bb2abc6d291799",
+          "final_tree_digest": "sha256:052e9e24af89473b63ae0650629ca4fdeeb7045adaf444ac22358db0ccd56992",
+          "polls": 4576,
+          "elapsed_ms": 103.372,
+          "observations": [
+            {
+              "at_ms": 3.632,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 0,
+                  "bytes_delta": 0
+                }
+              ]
+            },
+            {
+              "at_ms": 3.661,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 0,
+                  "size": 22308,
+                  "bytes_delta": 22308
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "check_status": 0
+          }
+        },
+        {
+          "sample": 4,
+          "seed": 347006,
+          "invocation": [
+            "/usr/bin/rustfmt",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:b311435695930c8822980a9685df8a3804ab10266b8c3ada880a80bb57516ccc",
+          "final_tree_digest": "sha256:f83a27996d028945aaa6e01f6698df14139b6b28f56ec0b63031ceec5f9bc1bb",
+          "polls": 4605,
+          "elapsed_ms": 103.433,
+          "observations": [
+            {
+              "at_ms": 3.839,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 22308,
+                  "bytes_delta": 22308
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "check_status": 0
+          }
+        },
+        {
+          "sample": 5,
+          "seed": 347007,
+          "invocation": [
+            "/usr/bin/rustfmt",
+            "<temporary-path>"
+          ],
+          "initial_tree_digest": "sha256:013703cf0866ffee18605d21b69ae9caac1cb21f8d1a84676602f4540e19ea97",
+          "final_tree_digest": "sha256:6997d0ee76cae1a929d6fdaaa8968208f7d0e9d00af7c07c224f92f22baf2e55",
+          "polls": 4231,
+          "elapsed_ms": 104.238,
+          "observations": [
+            {
+              "at_ms": 3.627,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 18724,
+                  "bytes_delta": 18724
+                }
+              ]
+            },
+            {
+              "at_ms": 3.658,
+              "changes": [
+                {
+                  "change": "written",
+                  "path": "main.rs",
+                  "inode": 773256,
+                  "from": 18724,
+                  "size": 22308,
+                  "bytes_delta": 22308
+                }
+              ]
+            }
+          ],
+          "semantic": {
+            "verified": true,
+            "check_status": 0
+          }
+        }
+      ]
+    }
+  ],
+  "corpus_digest": "sha256:d1161af1a5ed7ead948d2b151ad6ceacb3a3143d6c482385df63870007c7212e"
+}

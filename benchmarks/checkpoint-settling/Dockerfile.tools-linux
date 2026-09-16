@@ -1,0 +1,18 @@
+FROM rust@sha256:14bc9c5966e7b3a385794b3d5389a8765668342025fbcc7b2e3d2866ac4bd8c3
+
+# Acquisition may use the network while building this immutable image. Every measured
+# invocation uses the resulting digest with `--network none`.
+RUN printf '%s\n' \
+      'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20260801T000000Z bookworm main' \
+      'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20260801T000000Z bookworm-security main' \
+      > /etc/apt/sources.list \
+    && rm -f /etc/apt/sources.list.d/* \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+      nodejs=18.20.4+dfsg-1~deb12u2 \
+      npm=9.2.0~ds1-1 \
+      rustfmt=1.63.0+dfsg1-2 \
+      vim=2:9.0.1378-2+deb12u2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo

@@ -1,0 +1,28 @@
+{
+  "schema": "mesh.manifest-scaling-requirements/1",
+  "generator": {
+    "name": "manifest-scaling-stream/1",
+    "seed": "0x000000004d455348",
+    "splitmix64_increment": "0x9e3779b97f4a7c15",
+    "splitmix64_multiplier_1": "0xbf58476d1ce4e5b9",
+    "splitmix64_multiplier_2": "0x94d049bb133111eb"
+  },
+  "samples": [1, 2, 3, 4, 5],
+  "candidates": ["A", "B", "C"],
+  "sizes_bytes": [67108864, 268435456, 1073741824],
+  "patterns": ["overwrite-1k", "insert-1k", "append-1k", "scattered-16x4k"],
+  "versions": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+  "actors": ["primary", "identical-second"],
+  "thresholds": {
+    "c_publication_bytes_max_percent_of_b": 25,
+    "c_point_lookup_decoded_bytes_max_percent_of_a": 25,
+    "c_full_reconstruction_decoded_bytes_max_percent_of_a": 110,
+    "c_novel_storage_bytes_max_percent_of_b": 110
+  },
+  "row_count": 6120,
+  "selection": {
+    "complete_passing_evidence": "C",
+    "missing_invalid_or_failed_evidence": "B",
+    "logical_schema": "mesh.v0.file-manifest"
+  }
+}

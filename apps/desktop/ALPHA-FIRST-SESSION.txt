@@ -1,0 +1,61 @@
+MESH ALPHA — YOUR FIRST 20 MINUTES
+
+Thank you for trying Mesh. This is a small, invite-only Mac alpha. We are testing whether the
+product makes agent work easier to understand and safer to recover—not whether you can tolerate
+unfinished software.
+
+Before you begin
+
+- Read START-HERE.txt and verify the application checksum first.
+- Open VISUAL-GUIDE.html beside the app archive. It shows the complete flow, the Review layout,
+  PDF and text comparisons, and the recovery steps when a file seems missing.
+- Use a small real project that you can safely copy. Do not use Mesh as the only copy of important
+  work.
+- Plan to share your screen with the person who invited you. If anything feels unsafe or unclear,
+  stop and say what you expected to happen.
+
+The first-session mission
+
+1. Open Mesh and choose an ordinary project folder.
+2. Read the preview. Without help, say what you think Mesh will do to the original folder.
+3. Create the private workspace and open its working folder.
+4. Choose Start Codex on this version. Ask the agent to make one small, recognizable change.
+5. Stop the agent and any editor or terminal using that folder. In Mesh, choose Finish agent
+   handoff and confirm.
+6. Open Review work. Review is bound to a recorded exact version, not every live filesystem
+   change. If your new file is missing, use Current → Refresh, then return to Review and choose
+   Record reviewed version. Use the comparison view to explain what changed. If the change
+   includes a PDF, PowerPoint, Word, or Excel file, try both Visual and Content changes when
+   offered.
+7. Record the review if it is still offered. If Mesh offers Approve this version, approve it and
+   use Update original only after reading the exact plan. If Mesh reports Approval unavailable,
+   choose Choose export folder and select a new empty folder—not the original project. Preview the
+   whole saved workspace before confirming it.
+8. Open Workspace versions, open an earlier saved point, and return to the current one. Confirm
+   that the pinned agent folder did not silently move.
+
+Stop immediately if
+
+- the original project changes before you explicitly approve an update;
+- a file disappears, the wrong version opens, or Mesh claims success after an error;
+- the review shows different content from the native file;
+- an agent folder moves to another version without a new explicit action;
+- Mesh asks you to disable Gatekeeper, remove quarantine metadata, or bypass a warning globally.
+
+What to send your Mesh contact
+
+- Mac model and macOS version.
+- The 12-character Build value shown in Mesh's footer.
+- In Current → More workspace actions, choose Copy safe diagnostics and paste the resulting JSON.
+  It is deliberately limited to recovery counts and state; Mesh refuses unexpected fields and
+  excludes file contents, paths, configuration, event history, and keys.
+- Total minutes from opening Mesh to seeing the agent change in Review work.
+- The first step that required explanation.
+- One sentence: "I expected ___, but Mesh ___."
+- Whether you would use this on a real project next week: yes, no, or only if ___ changes.
+- Any stop condition above, marked URGENT. Keep the original folder and the Mesh workspace untouched
+  until the team has helped you preserve evidence.
+
+Please do not include private file contents, credentials, or keys in feedback. A screenshot of the
+Mesh interface is useful only after you have checked that it contains no confidential names or
+paths.

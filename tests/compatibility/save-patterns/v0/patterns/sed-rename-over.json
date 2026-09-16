@@ -1,0 +1,58 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "sed-rename-over",
+  "title": "A stream editor writes a temporary and renames it over the target, with no backup",
+  "category": "cli-tool",
+  "tool": { "name": "BSD sed", "version": "shipped with macOS 14.5", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["sed", "-i", "", "s/alpha/ALPHA/", "doc.txt"],
+    "evidence": "Three readings. `.!84315!doc.txt` appears at inode 190956762 with size 0, is seen again at size 11, and then in ONE reading `doc.txt` changes from inode 190956761 to inode 190956762 and `.!84315!doc.txt` vanishes. The target acquiring the temporary's inode while the temporary's name disappears is a rename over the target, observed rather than assumed.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "the rename and the unbinding of the temporary's name arrive in one reading, which is what makes them one operation rather than two"]
+  },
+  "objects": [
+    { "object": 1, "role": "doc.txt as it was before the edit — displaced by the rename" },
+    { "object": 2, "role": ".!84315!doc.txt, the temporary, which becomes doc.txt" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Closed", "object": 2 },
+        { "sequence": 4, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [
+        { "through": 3, "reason": "Closed" },
+        { "through": 4, "reason": "RenamedIntoPlace" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Renamed", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1], [1, 2]],
+      "omission_note": "A temporary that lives for less than one reading collapses the whole save into a single observed change of doc.txt's identity, which the backend records as MovedInferred / RecoveryDetected and never as exact."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 4, "reason": "RenamedIntoPlace" } ], "boundary_evidence": { "through": 4, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 3, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 4, "folder": 3 },
+    "meaningful_durable_change": "doc.txt holds the substituted text under a new object identity, and no temporary exists.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3], "folder": [1, 2] },
+    "forbidden_note": "Every point before the rename records a durable temporary with a machine-generated name that the person never created and cannot recognise.",
+    "coalescable": "safely"
+  },
+  "notes": [
+    "The document's object identity DOES change here: doc.txt is object 1 before and object 2 after. Nothing in the coalescing rule needs to know that, because a checkpoint is a state at a sequence point and the state at sequence 4 is a real state. Attribution — which the rule does not do — is where identity matters.",
+    "This is the smallest complete instance of the atomic-replace family, and the one to reach for when debugging a coalescer: four events, two candidates, one right answer."
+  ]
+}

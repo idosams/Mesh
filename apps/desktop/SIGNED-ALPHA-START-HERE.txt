@@ -1,0 +1,46 @@
+MESH SIGNED TECHNICAL ALPHA — START HERE
+
+This consented technical-alpha build is signed with an Apple Developer ID, notarized by Apple,
+stapled, and checksum-verifiable. Keep the original project folder as an untouched backup and do
+not use this alpha as the only copy of important work.
+
+1. Keep the ZIP, JSON manifest, and SHA256 file together in one new folder. In Terminal run:
+
+   shasum -a 256 -c ./Mesh-signed-alpha-*.sha256
+
+   Continue only if the result says OK.
+
+2. Quit every running copy of Mesh. Extract into a new folder, never over a running Mesh.app:
+
+   ditto -x -k ./Mesh-signed-alpha-*.zip .
+
+   Open VISUAL-GUIDE.html for the illustrated first-session flow, then keep its
+   alpha-guide/screenshots folder beside it.
+
+3. Open Mesh.app normally in Finder. If macOS says the developer cannot be verified, stop and
+   report it; do not disable Gatekeeper or remove quarantine metadata. Compare the Build value in
+   Mesh's footer with the revision prefix in the three received filenames.
+
+4. Keep the original project untouched while testing:
+   - preview and import the original folder;
+   - work through Open working folder, which follows the saved point opened in Mesh;
+   - use Start Codex on this version or Start another agent copy for independent pinned real folders;
+   - after every process using an agent folder stops, choose Finish agent handoff;
+   - Finish inspects the complete result and privately saves unambiguous file and folder changes;
+   - review any rename, deletion, symbolic link, or unsupported entry that Mesh refuses to guess;
+   - inspect and record the exact review. Review shows a recorded saved version rather than every
+     live filesystem change; if a new file is missing, use Current → Refresh, then return to Review
+     and choose Record reviewed version;
+   - approve only with the explicit macOS user-presence prompt;
+   - preview every destination change before choosing Update original folder.
+
+5. Under Workspace versions, open earlier and current saved points as independent writable native
+   folders. The stable working-folder shortcut follows the point opened in Mesh. Existing agents
+   deliberately remain pinned to their original real folder.
+6. For ordinary editor work, enable Automatically save safe native edits privately and verify that
+   a stable file change becomes Saved privately without another click. Confirm that a deletion,
+   rename, link, special entry, active agent folder, or continually changing file pauses for review.
+
+Approval authority is local and bound to the signed app identity. Never approve a version you did
+not inspect, never share one writable folder between agents, and stop after any unexpected write,
+lost file, wrong-version folder, signature warning, or approval mismatch.

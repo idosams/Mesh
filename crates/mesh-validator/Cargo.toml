@@ -1,0 +1,39 @@
+[package]
+name = "mesh-validator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Digest framing (`DigestWriter`, `DomainTag`, `Blake3`) and `PolicyEpoch`. Every identity in this
+# crate — a command's digest, an environment's digest, a plan's digest, a record's identifier — is
+# derived with the workspace's one digest kit rather than a second one invented here, so a
+# validation record named in a review bundle and a validation record named here are the same name.
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+
+# The capability model. This crate does not invent a parallel one: the right to run a validation is
+# `DelegatedAction::RunValidation`, and `WorkspaceScope` is what a profile is scoped to.
+mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }
+
+# The authority gate. `Grant<Delegated>` has no public constructor — only `DecisionLedger` produces
+# one — so `ValidationAuthority` cannot be built without a policy decision that was recorded. And
+# `Grant<Delegated>` is the delegated tier, which has no canonical-advance action to carry.
+#
+# What is deliberately ABSENT: `mesh-approval`, which carries `canonical-mutation`. Plan §8.3.7 and
+# the `validators-cannot-mutate-canonical-state` restriction in
+# `tools/program/arch-check/architecture.json` forbid that edge, so the review bundle depends on
+# validation evidence and never the other way round.
+mesh-policy = { path = "../mesh-policy", version = "=0.0.0" }
+
+[dev-dependencies]
+# Test-only, and it compiles into no library. `mesh-approval` owns the review bundle's `Verdict`
+# vocabulary; `tests/approval-vocabulary.rs` asserts that this crate's verdict words are exactly
+# the words that bundle absorbs, so the handoff is a checked fact rather than a comment. A
+# `[dev-dependencies]` edge is registered by the architecture check and never closure-checked,
+# which is what keeps the forbidden edge above forbidden.
+mesh-approval = { path = "../mesh-approval", version = "=0.0.0" }

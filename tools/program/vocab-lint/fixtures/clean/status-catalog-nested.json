@@ -1,0 +1,5 @@
+{
+  "working": { "label": "Working", "icon": "spinner", "help": "An actor is changing files." },
+  "savedPrivately": { "label": "Saved privately", "icon": "lock", "help": "It survived; nobody else has it." },
+  "readyForReview": { "label": "Ready for review", "icon": "inbox", "help": "There is an exact change waiting for a person." }
+}

@@ -1,0 +1,161 @@
+{
+  "contract": "mesh-checkpoint-settling-manifest/1",
+  "task": "01KZM78X6WQ0YACD52KBVDPVRJ",
+  "design_revision": 2,
+  "historical_provenance": {
+    "pattern": "npm-install-cold",
+    "changes": 12225,
+    "distinct_paths": 5662,
+    "selection_input": false,
+    "reason": "The exact historical stream and digest are absent; the aggregate is provenance only."
+  },
+  "successor_fixture": {
+    "generator": "benchmarks/checkpoint-settling/fixture.mjs",
+    "generator_version": 1,
+    "seed": 347,
+    "files": 2048,
+    "bytes_per_file": 4096,
+    "directories": 64,
+    "input_digest": "sha256:b3ec3a10d9e2bb3f1b81923388ec73f307ac6f40ffc2c997a2d79ee15ebcf78a",
+    "semantic_outcome": "The consumer names the dependency, both lockfiles exist, and all 2,048 fixture files are installed byte-for-byte."
+  },
+  "acquisition": {
+    "network": "disabled during every measured install",
+    "macos": {
+      "recipe": "node benchmarks/checkpoint-settling/capture.mjs --platform macos-apfs --commit b64a72840b42bcd86620fac8bf03d18972f383e8 --fixture-digest sha256:b3ec3a10d9e2bb3f1b81923388ec73f307ac6f40ffc2c997a2d79ee15ebcf78a --network-evidence npm-offline-native --out benchmarks/checkpoint-settling/captures/macos-exact-v3.json"
+    },
+    "linux": {
+      "dockerfile": "benchmarks/checkpoint-settling/Dockerfile.linux",
+      "base": "rust@sha256:14bc9c5966e7b3a385794b3d5389a8765668342025fbcc7b2e3d2866ac4bd8c3",
+      "debian_snapshot": "20260801T000000Z",
+      "build_recipe": "docker build -f benchmarks/checkpoint-settling/Dockerfile.linux -t mesh-settling-exact:b64a7284 .",
+      "built_image_digest": "sha256:6304efd9869649e952a8fb55c88c80b04d1e827084c2965dfab22b55dc0ffdb8",
+      "recipe": "IMAGE_ID=\"$(docker image inspect --format '{{.Id}}' mesh-settling-exact:b64a7284)\" && docker run --rm --network none -e MESH_SETTLING_IMAGE=\"$IMAGE_ID\" --mount type=bind,src=\"$(pwd)/benchmarks/checkpoint-settling/captures\",dst=/out \"$IMAGE_ID\" --platform linux-overlayfs --commit b64a72840b42bcd86620fac8bf03d18972f383e8 --fixture-digest sha256:b3ec3a10d9e2bb3f1b81923388ec73f307ac6f40ffc2c997a2d79ee15ebcf78a --network-evidence docker-network-none --out /out/linux-exact-v3.json"
+    }
+  },
+  "accepted_captures": {
+    "instrument_commit": "b64a72840b42bcd86620fac8bf03d18972f383e8",
+    "capture_script_digest": "sha256:f5abc33eeb4196eeefef667ace0e1d228ea67e56f7ea03133c30a6719e6f2f1c",
+    "tarball_digest": "sha256:c1b54969703721121522c531b66bc08dd20b35fc9cbc4338fb4c705a88e4725d",
+    "macos": {
+      "path": "captures/macos-exact-v3.json",
+      "digest": "sha256:b7ffd438993db10b325949b22a687c6adde8240374c8c0efd4903afc69c093dd",
+      "polls": 13863,
+      "observations": 33,
+      "changes": 3148,
+      "elapsed_ms": 1139.107
+    },
+    "linux": {
+      "path": "captures/linux-exact-v3.json",
+      "digest": "sha256:177b03d002452c1d34e8800b0df936d2fe53f56e3d35dee6332f1a5947183c4d",
+      "polls": 121529,
+      "observations": 147,
+      "changes": 2159,
+      "elapsed_ms": 1378.29
+    },
+    "superseded_count_only_captures": ["captures/macos.json", "captures/linux.json"],
+    "discarded_calibration_samples_per_platform": 3,
+    "discarded_reason": "Instrumentation-only calibration samples were read to find missing hardware metadata. None is checked in or used by selection; the candidate grid and decision rule were already frozen. The two earlier count-only captures remain checked in as superseded evidence and are not selection inputs."
+  },
+  "tool_acquisition": {
+    "revision": 2,
+    "capture_script": "capture-tools.mjs",
+    "current_capture_script_digest": "sha256:01fc3e3ca239e4d268b9ba63ed91c3f759c3a706a43beeacf3b15b0f383b2d48",
+    "seed": 347002,
+    "samples_per_arm": 5,
+    "macos_recipes": [
+      "node benchmarks/checkpoint-settling/capture-tools.mjs --platform macos-apfs --commit 8dd79cfce842061148ffadc8a56b45c6fbff8e5a --families vim,git,formatter --samples 5 --vim /usr/bin/vim --git /opt/homebrew/bin/git --rustfmt /Users/idoosams/.rustup/toolchains/1.97.1-aarch64-apple-darwin/bin/rustfmt --network-evidence host-network-not-used --out benchmarks/checkpoint-settling/captures/macos-tools-v1.json",
+      "node benchmarks/checkpoint-settling/capture-tools.mjs --platform macos-apfs --commit c83420f6eae060507dae3da676628694710a84cc --families vscode --samples 5 --vscode /opt/homebrew/bin/code --network-evidence host-network-not-used --out benchmarks/checkpoint-settling/captures/macos-vscode-v2.json",
+      "node benchmarks/checkpoint-settling/capture-tools.mjs --platform macos-apfs --commit a8075cd4e8aa45e0f7f0bbb58cba05f9baa331fa --families jetbrains --samples 5 --idea-format '/Volumes/IntelliJ IDEA/IntelliJ IDEA.app/Contents/bin/format.sh' --network-evidence host-network-not-used --out benchmarks/checkpoint-settling/captures/macos-jetbrains-v2.json"
+    ],
+    "macos_jetbrains_artifact": {
+      "url": "https://download.jetbrains.com/idea/idea-2025.3-aarch64.dmg",
+      "sha256": "2146b7f5e33d8eab68d9147a15b6df11b3c07b3e6130f351c0b16069c2e6faed"
+    },
+    "linux_recipes": [
+      "docker run --rm --network none --mount type=bind,src=$(pwd),dst=/repo,readonly --mount type=bind,src=$(pwd)/benchmarks/checkpoint-settling/captures,dst=/out sha256:d7822204014be3d8d263ae9f3ddca7662670cccbb254ab1421d80dd3d4999818 node /repo/benchmarks/checkpoint-settling/capture-tools.mjs --platform linux-overlayfs --commit 8dd79cfce842061148ffadc8a56b45c6fbff8e5a --families git --samples 5 --git /usr/bin/git --network-evidence docker-network-none --image sha256:d7822204014be3d8d263ae9f3ddca7662670cccbb254ab1421d80dd3d4999818 --out /out/linux-git-v1.json",
+      "docker run --rm --network none --mount type=bind,src=$(pwd),dst=/repo,readonly --mount type=bind,src=$(pwd)/benchmarks/checkpoint-settling/captures,dst=/out sha256:8fecaf211ec975dd8c3566703bbe0f1c786033f6322b27444f6425c65bac865b node /repo/benchmarks/checkpoint-settling/capture-tools.mjs --platform linux-overlayfs --commit 8dd79cfce842061148ffadc8a56b45c6fbff8e5a --families jetbrains --samples 5 --idea-format /opt/idea/bin/format.sh --network-evidence docker-network-none --image sha256:8fecaf211ec975dd8c3566703bbe0f1c786033f6322b27444f6425c65bac865b --out /out/linux-jetbrains-v1.json",
+      "docker run --rm --network none --mount type=bind,src=$(pwd),dst=/repo,readonly --mount type=bind,src=$(pwd)/benchmarks/checkpoint-settling/captures,dst=/out sha256:bf6af1850d16b391f3df4a1969afe8c80d2cadaad5ccfb5c95433c6715c48622 node /repo/benchmarks/checkpoint-settling/capture-tools.mjs --platform linux-overlayfs --commit c83420f6eae060507dae3da676628694710a84cc --families vscode --samples 5 --vscode /usr/bin/code --xvfb-run /usr/bin/xvfb-run --network-evidence docker-network-none --image sha256:bf6af1850d16b391f3df4a1969afe8c80d2cadaad5ccfb5c95433c6715c48622 --out /out/linux-vscode-v2.json",
+      "docker run --rm --network none --mount type=bind,src=$(pwd),dst=/repo,readonly --mount type=bind,src=$(pwd)/benchmarks/checkpoint-settling/captures,dst=/out sha256:de6447416ac130d441e8658b90766b338ce765fe1ba69ef88a58aba9a25e0ff3 node /repo/benchmarks/checkpoint-settling/capture-tools.mjs --platform linux-overlayfs --commit 33ffb92c64f685ec10ba8fbd3229555ed72af21f --families vim,formatter --samples 5 --vim /usr/bin/vim --rustfmt /usr/bin/rustfmt --network-evidence docker-network-none --image sha256:de6447416ac130d441e8658b90766b338ce765fe1ba69ef88a58aba9a25e0ff3 --out /out/linux-tools-v2.json"
+    ],
+    "captures": [
+      {
+        "path": "captures/macos-tools-v1.json",
+        "digest": "sha256:629e1b1a313e92133fb6ccf8842b5218eca4213ea2ef418c5b70bccfd5f4b1da",
+        "corpus_digest": "sha256:60d5f45d5e256c53266659f832f5d1ddfc0d6046f5ef806ee66cab61c6ceb46b",
+        "instrument_commit": "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+        "capture_script_digest": "sha256:d459385259930e079fac709255d88cc17c7d72a55c669abe0b574a50cca14010"
+      },
+      {
+        "path": "captures/linux-git-v1.json",
+        "digest": "sha256:6d9559fba0c19d678344e1bc1beaf0299a3325b244988048e3a447070f16cd03",
+        "corpus_digest": "sha256:47cbe19bf850be2f451e476dc874086c7ffe5d8f0c0dd4bd92849de3a4dc3a59",
+        "instrument_commit": "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+        "capture_script_digest": "sha256:d459385259930e079fac709255d88cc17c7d72a55c669abe0b574a50cca14010"
+      },
+      {
+        "path": "captures/linux-jetbrains-v1.json",
+        "digest": "sha256:e5244d2697ef57ef29c3957aed8dbb3e48cf83145b0648626af9a5ad022ca5c5",
+        "corpus_digest": "sha256:a422b6fbeb74911ce72e1661f0059fb31d987cd7268e04c627fdced1bd41cfab",
+        "instrument_commit": "8dd79cfce842061148ffadc8a56b45c6fbff8e5a",
+        "capture_script_digest": "sha256:d459385259930e079fac709255d88cc17c7d72a55c669abe0b574a50cca14010"
+      },
+      {
+        "path": "captures/macos-vscode-v2.json",
+        "digest": "sha256:efb1ae3fed587ecdcaccb1ff5fa124caa60c68d34ef6d944691b688aed302256",
+        "corpus_digest": "sha256:ed7f6efba93609ac7b311804423b04c91cc5a2bcd21f372602702e351319c4d5",
+        "instrument_commit": "c83420f6eae060507dae3da676628694710a84cc",
+        "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900"
+      },
+      {
+        "path": "captures/linux-vscode-v2.json",
+        "digest": "sha256:636618d4844cb3eadc2f1d6ae55d10ae826f9ed19ca40c6c77bf1efe16efe602",
+        "corpus_digest": "sha256:ae16858a1dff710eb7a73e1711081641a215ab8f768be5e4895030dff875561a",
+        "instrument_commit": "c83420f6eae060507dae3da676628694710a84cc",
+        "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900"
+      },
+      {
+        "path": "captures/linux-tools-v2.json",
+        "digest": "sha256:4784c9ff231ab3ec16fb28dc1f972e85d44ab124713538b9fc135f838eecff5a",
+        "corpus_digest": "sha256:d1161af1a5ed7ead948d2b151ad6ceacb3a3143d6c482385df63870007c7212e",
+        "instrument_commit": "33ffb92c64f685ec10ba8fbd3229555ed72af21f",
+        "capture_script_digest": "sha256:bdc2abf013a3c91b42f2618b70f81b207ac7dab26b557b057dab666dcdf8f900"
+      },
+      {
+        "path": "captures/macos-jetbrains-v2.json",
+        "digest": "sha256:7173f2d2f693a267f587e1412928f06060ca7673c8bc3f78cc19df4e2ebebea3",
+        "corpus_digest": "sha256:96a7f035f8ceed16dc1145e1ded313df0411e6ae70dae1c4b846060fc5df1571",
+        "instrument_commit": "a8075cd4e8aa45e0f7f0bbb58cba05f9baa331fa",
+        "capture_script_digest": "sha256:01fc3e3ca239e4d268b9ba63ed91c3f759c3a706a43beeacf3b15b0f383b2d48"
+      }
+    ],
+    "acquired_cells": [
+      "VS Code/macOS",
+      "VS Code/Linux",
+      "a JetBrains IDE/macOS",
+      "a JetBrains IDE/Linux",
+      "vim or neovim/macOS",
+      "vim or neovim/Linux",
+      "Git operations/macOS",
+      "Git operations/Linux",
+      "a formatter/macOS",
+      "a formatter/Linux"
+    ],
+    "unmet_cells": {}
+  },
+  "required_save_pattern_cells": 12,
+  "candidate_grid": {
+    "idle_interval_ms": [25, 50, 100, 250, 500, 1000, 2000, 5000],
+    "maximum_uncheckpointed_bytes": [65536, 262144, 1048576, 4194304, 16777216],
+    "maximum_uncheckpointed_time_ms": [25, 50, 100, 250, 500, 1000, 2000, 5000, 10000, 30000]
+  },
+  "selection_rule": {
+    "precondition": "Every one of the 12 save-pattern cells has a timed normalized stream on both required platforms, and each full-scale successor capture passes its semantic and digest checks. Missing arms produce an explicit unresolved decision.",
+    "idle_interval_ms": "Choose the smallest candidate that produces zero false meaningful-save cuts in every timed stream. Report added settling latency separately.",
+    "maximum_uncheckpointed_bytes": "Recovery-only checkpoints are never meaningful saves. Choose the smallest candidate whose p95 recovery-checkpoint count is at most 32 per operation and which preserves at least one intermediate recovery point in every full-scale successor install.",
+    "maximum_uncheckpointed_time_ms": "Recovery-only checkpoints are never meaningful saves. Choose the smallest candidate whose p95 recovery-checkpoint count is at most 32 per operation and which preserves at least one intermediate recovery point in every full-scale successor install.",
+    "platform_disagreement": "Select explicit per-platform values or leave the parameter unresolved; never average platforms.",
+    "aggregation": "False meaningful-save cuts, recovery-preservation frequency, and time or bytes at risk are reported separately and are never combined into one score."
+  },
+  "selection_rule_digest": "sha256:d58ffdc4abeeb4101c548512bc7c42b4f53a138257a213f7ef506b5132c868b7"
+}

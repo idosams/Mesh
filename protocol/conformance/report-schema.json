@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mesh.dev/protocol/conformance/report-schema.json",
+  "title": "cwp-conformance-report/0",
+  "description": "The report `node protocol/conformance/run.mjs --report <file>` writes. Its shape is versioned separately from the protocol: a change here breaks readers of the report, not implementations of CWP. See protocol/conformance/README.md §7.",
+  "type": "object",
+  "required": [
+    "report_format",
+    "protocol",
+    "client",
+    "duration_ms",
+    "summary",
+    "verdict",
+    "specification_gaps",
+    "cases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "report_format": { "const": "cwp-conformance-report/0" },
+    "protocol": { "type": "string", "description": "The protocol version the catalogue was built from." },
+    "client": {
+      "type": "object",
+      "required": ["name", "command", "declared"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string", "description": "The command line the harness spawned." },
+        "declared": {
+          "type": "object",
+          "description": "The client's own `hello` response, recorded verbatim.",
+          "required": ["ok", "adapter", "capabilities"],
+          "properties": {
+            "ok": { "const": true },
+            "adapter": { "const": "cwp-conformance-adapter/0" },
+            "client": { "type": "string" },
+            "description": { "type": "string" },
+            "capabilities": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total",
+        "pass",
+        "fail",
+        "unsupported",
+        "specification_gaps",
+        "answered_specification_gaps",
+        "by_family"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 },
+        "specification_gaps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unsupported cases NO client could pass from the published material. Never counted as failures and never omitted."
+        },
+        "answered_specification_gaps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Specification-gap cases this client answered correctly — it knows something the published material does not say."
+        },
+        "by_family": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["pass", "fail", "unsupported"],
+            "properties": {
+              "pass": { "type": "integer", "minimum": 0 },
+              "fail": { "type": "integer", "minimum": 0 },
+              "unsupported": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "verdict": {
+      "enum": ["conformant-so-far", "non-conformant"],
+      "description": "`conformant-so-far` means no case failed. It is not a certification: some cases cannot be run by anyone yet."
+    },
+    "specification_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case", "rule", "citation", "tracking", "question"],
+        "additionalProperties": false,
+        "properties": {
+          "case": { "type": "string" },
+          "rule": { "type": "string" },
+          "citation": { "type": "string" },
+          "tracking": {
+            "type": ["string", "null"],
+            "description": "The task tracking the unresolved question, when there is one."
+          },
+          "question": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "family", "title", "rule", "citation", "requires", "spec_gap", "result"],
+        "properties": {
+          "id": { "type": "string" },
+          "family": { "enum": ["ENC", "PROF", "ID", "MSG", "ERR", "HEAD", "DELIV", "PUB"] },
+          "title": { "type": "string" },
+          "rule": { "type": "string", "description": "The normative sentence the case is about." },
+          "citation": { "type": "string", "description": "Where that sentence is written down." },
+          "requires": { "type": "array", "items": { "type": "string" } },
+          "spec_gap": {
+            "type": ["object", "null"],
+            "properties": {
+              "tracking": { "type": ["string", "null"] },
+              "question": { "type": "string" }
+            }
+          },
+          "result": { "enum": ["pass", "fail", "unsupported"] },
+          "unsupported_because": {
+            "enum": ["client", "specification"],
+            "description": "`client` — this client does not implement it. `specification` — nothing could, from the published material."
+          },
+          "tracking": { "type": ["string", "null"] },
+          "detail": {
+            "type": "string",
+            "description": "Present on every fail and on every unsupported: the difference, or the reason."
+          }
+        }
+      }
+    }
+  }
+}

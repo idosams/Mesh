@@ -1,0 +1,85 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "record": "mesh.v0.file-version",
+  "signed_record": true,
+  "summary": "One immutable version of one file object.",
+  "schema": {
+    "domain_tag": "mesh.v0.file-version",
+    "fields": [
+      {
+        "name": "object_id",
+        "type": "bytes",
+        "byte_length": 16
+      },
+      {
+        "name": "parent_versions",
+        "type": "sequence",
+        "element": {
+          "name": "element",
+          "type": "bytes",
+          "byte_length": 32
+        }
+      },
+      {
+        "name": "manifest_id",
+        "type": "bytes",
+        "byte_length": 32
+      },
+      {
+        "name": "portable_metadata",
+        "type": "group",
+        "fields": [
+          {
+            "name": "executable",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "created_by",
+        "type": "bytes",
+        "byte_length": 32
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "name": "first-version",
+      "description": "The first version of an object: no parent versions, not executable.",
+      "record": {
+        "object_id": "0189abcdef0170109010101010101010",
+        "parent_versions": [],
+        "manifest_id": "88f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf",
+        "portable_metadata": {
+          "executable": false
+        },
+        "created_by": "c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5"
+      },
+      "canonical_encoding_hex": "86746d6573682e76302e66696c652d76657273696f6e500189abcdef017010901010101010101080582088f6fd4a25e1db3c4bf966092de6c481c8e5e669668a9bb0a1dde84156d52ecf81f45820c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5",
+      "canonical_encoding_length": 110,
+      "canonical_encoding_digest_hex": "3148ba8ed0758b402cc13bb8fc580700a43a5c9b154f42daa963c0250b119534",
+      "record_id_hex": "b90b60aba43256badbc4a15cf04b020d25256b84c628436d727f78ebbbfab605"
+    },
+    {
+      "name": "merge-of-two-parents",
+      "description": "A version produced by a merge, carrying two parents and the executable bit.",
+      "record": {
+        "object_id": "0189abcdef0170109010101010101010",
+        "parent_versions": [
+          "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+        ],
+        "manifest_id": "2dac974da83d90d57fbed9795c3d8566af7880b61b95f828278a72c97d13d030",
+        "portable_metadata": {
+          "executable": true
+        },
+        "created_by": "c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6"
+      },
+      "canonical_encoding_hex": "86746d6573682e76302e66696c652d76657273696f6e500189abcdef0170109010101010101010825820a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a15820a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a258202dac974da83d90d57fbed9795c3d8566af7880b61b95f828278a72c97d13d03081f55820c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6",
+      "canonical_encoding_length": 178,
+      "canonical_encoding_digest_hex": "295ce42b2c5ac7e935fe38eb13a5318e48f4741b1eca954325cd53ca02e5499f",
+      "record_id_hex": "51eacd633a2c43e683380ce7ed1d49bbe9fb1550dfdffe759b3a1d559abf7999"
+    }
+  ]
+}

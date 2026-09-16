@@ -1,0 +1,15 @@
+FROM rust:1.97-bookworm
+
+ARG CODE_VERSION=1.133.0
+ARG CODE_SHA256=b20bfb21c5b3656e3411391c5c18df1782aedd7cd3bda0b9c08363ea261fca4b
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates dbus-x11 nodejs node-ws wget xauth xvfb \
+    && wget -O /tmp/code.deb "https://update.code.visualstudio.com/${CODE_VERSION}/linux-deb-arm64/stable" \
+    && echo "${CODE_SHA256}  /tmp/code.deb" | sha256sum -c - \
+    && echo "code code/add-microsoft-repo boolean false" | debconf-set-selections \
+    && apt-get install -y --no-install-recommends /tmp/code.deb \
+    && rm -f /tmp/code.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work

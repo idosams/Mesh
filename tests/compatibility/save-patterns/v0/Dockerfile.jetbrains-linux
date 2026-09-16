@@ -1,0 +1,15 @@
+FROM rust:1.97-bookworm
+
+ARG IDEA_VERSION=2026.2.1
+ARG IDEA_SHA256=110bc988fa52a702e25a8d57cc50eb0150e8f64641fa70a633f9f3798bfab6eb
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates dbus-x11 fontconfig fonts-dejavu-core libasound2 libfreetype6 libxi6 libxrender1 libxtst6 nodejs wget xauth xdotool xvfb \
+    && wget -q -O /tmp/idea.tar.gz "https://download.jetbrains.com/idea/idea-${IDEA_VERSION}-aarch64.tar.gz" \
+    && echo "${IDEA_SHA256}  /tmp/idea.tar.gz" | sha256sum -c - \
+    && mkdir -p /opt/idea \
+    && tar -xzf /tmp/idea.tar.gz -C /opt/idea --strip-components=1 \
+    && rm -f /tmp/idea.tar.gz \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work

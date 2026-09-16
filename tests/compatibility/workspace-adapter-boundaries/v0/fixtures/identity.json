@@ -1,0 +1,111 @@
+{
+  "contract": "mesh-workspace-adapter-boundaries/0",
+  "cases": [
+    {
+      "id": "same-object-rename",
+      "operation": "rename",
+      "evidence": {
+        "result": "available",
+        "view": "view-a",
+        "sequence": 10,
+        "source_before": { "parent": "dir-a", "name": "draft.txt", "object": "object-a" },
+        "destination_before": { "state": "unbound", "object": null },
+        "destination_after": { "parent": "dir-a", "name": "final.txt", "object": "object-a" }
+      },
+      "expected": { "moved_object_identity": "preserved", "destination_binding": "created" }
+    },
+    {
+      "id": "replace-with-new-object",
+      "operation": "replace",
+      "evidence": {
+        "result": "available",
+        "view": "view-a",
+        "sequence": 20,
+        "source_before": { "parent": "dir-a", "name": ".draft.tmp", "object": "object-new" },
+        "destination_before": { "state": "bound", "object": "object-old" },
+        "destination_after": { "parent": "dir-a", "name": "draft.txt", "object": "object-new" }
+      },
+      "expected": { "moved_object_identity": "preserved", "destination_binding": "replaced" }
+    },
+    {
+      "id": "move-between-directories",
+      "operation": "move",
+      "evidence": {
+        "result": "available",
+        "view": "view-a",
+        "sequence": 30,
+        "source_before": { "parent": "dir-a", "name": "draft.txt", "object": "object-a" },
+        "destination_before": { "state": "unbound", "object": null },
+        "destination_after": { "parent": "dir-b", "name": "draft.txt", "object": "object-a" }
+      },
+      "expected": { "moved_object_identity": "preserved", "destination_binding": "created" }
+    },
+    {
+      "id": "case-only-rename",
+      "operation": "rename",
+      "evidence": {
+        "result": "available",
+        "view": "view-a",
+        "sequence": 40,
+        "source_before": { "parent": "dir-a", "name": "Readme.md", "object": "object-a" },
+        "destination_before": { "state": "bound", "object": "object-a" },
+        "destination_after": { "parent": "dir-a", "name": "README.md", "object": "object-a" }
+      },
+      "expected": { "moved_object_identity": "preserved", "destination_binding": "preserved" }
+    },
+    {
+      "id": "overwritten-destination",
+      "operation": "replace",
+      "evidence": {
+        "result": "available",
+        "view": "view-b",
+        "sequence": 50,
+        "source_before": { "parent": "dir-a", "name": "new.bin", "object": "object-new" },
+        "destination_before": { "state": "bound", "object": "object-displaced" },
+        "destination_after": { "parent": "dir-b", "name": "current.bin", "object": "object-new" }
+      },
+      "expected": { "moved_object_identity": "preserved", "destination_binding": "replaced" }
+    },
+    {
+      "id": "identity-substitution",
+      "operation": "rename",
+      "evidence": {
+        "result": "available",
+        "view": "view-b",
+        "sequence": 60,
+        "source_before": { "parent": "dir-a", "name": "source", "object": "object-source" },
+        "destination_before": { "state": "unbound", "object": null },
+        "destination_after": { "parent": "dir-a", "name": "target", "object": "object-other" }
+      },
+      "expected": { "moved_object_identity": "changed", "destination_binding": "created" }
+    },
+    {
+      "id": "missing-destination-evidence",
+      "operation": "rename",
+      "evidence": {
+        "result": "unsupported",
+        "code": "rename-binding-evidence-unavailable",
+        "missing": ["destination_before.state", "destination_before.object"]
+      },
+      "expected": { "moved_object_identity": "unsupported", "destination_binding": "unsupported" }
+    },
+    {
+      "id": "directory-rename-with-descendants",
+      "operation": "rename-directory",
+      "evidence": {
+        "result": "available",
+        "view": "view-c",
+        "sequence": 70,
+        "source_before": { "parent": "root", "name": "src", "object": "directory-a" },
+        "destination_before": { "state": "unbound", "object": null },
+        "destination_after": { "parent": "root", "name": "lib", "object": "directory-a" },
+        "descendants": { "relative_bindings": "unchanged", "synthetic_child_events": 0 }
+      },
+      "expected": {
+        "moved_object_identity": "preserved",
+        "destination_binding": "created",
+        "descendants": "preserved-by-ancestor"
+      }
+    }
+  ]
+}

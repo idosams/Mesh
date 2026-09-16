@@ -1,0 +1,83 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "record": "mesh.v0.directory-version",
+  "signed_record": true,
+  "summary": "One immutable version of one directory object: its name-to-child bindings.",
+  "schema": {
+    "domain_tag": "mesh.v0.directory-version",
+    "fields": [
+      {
+        "name": "object_id",
+        "type": "bytes",
+        "byte_length": 16
+      },
+      {
+        "name": "entries",
+        "type": "sequence",
+        "element": {
+          "name": "element",
+          "type": "group",
+          "fields": [
+            {
+              "name": "name",
+              "type": "text"
+            },
+            {
+              "name": "object_id",
+              "type": "bytes",
+              "byte_length": 16
+            },
+            {
+              "name": "version_id",
+              "type": "bytes",
+              "byte_length": 32
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "name": "empty-directory",
+      "description": "A directory version with no entries.",
+      "record": {
+        "object_id": "0189abcdef027020a020202020202020",
+        "entries": []
+      },
+      "canonical_encoding_hex": "8378196d6573682e76302e6469726563746f72792d76657273696f6e500189abcdef027020a02020202020202080",
+      "canonical_encoding_length": 46,
+      "canonical_encoding_digest_hex": "24d49755f5d7b8ac67055254d5a22b2029a92a6bb54e5a58e541ac244da18018",
+      "record_id_hex": "d82f68013413e30213123e3bac05556c597b4e8f133cc5c642ac033ad12d89a8"
+    },
+    {
+      "name": "three-entries-sorted-by-utf8-bytes",
+      "description": "Three entries, two of them non-ASCII, in ascending byte-lexicographic order of the UTF-8 name. The insertion order in the generator is deliberately different.",
+      "record": {
+        "object_id": "0189abcdef027020a020202020202020",
+        "entries": [
+          {
+            "name": "README.md",
+            "object_id": "0000000000317131b131313131313131",
+            "version_id": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"
+          },
+          {
+            "name": "café.txt",
+            "object_id": "0000000000327232b232323232323232",
+            "version_id": "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2"
+          },
+          {
+            "name": "水.txt",
+            "object_id": "0000000000337333b333333333333333",
+            "version_id": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+          }
+        ]
+      },
+      "canonical_encoding_hex": "8378196d6573682e76302e6469726563746f72792d76657273696f6e500189abcdef027020a020202020202020838369524541444d452e6d64500000000000317131b1313131313131315820d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d18369636166c3a92e747874500000000000327232b2323232323232325820d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d28367e6b0b42e747874500000000000337333b3333333333333335820d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3",
+      "canonical_encoding_length": 230,
+      "canonical_encoding_digest_hex": "8373fd580b9436b06b1b497e9d0af7362e5a9996f6a084c47bdf27d4c96c99b2",
+      "record_id_hex": "0f98c46db2ba8f7251e5cc04b608768a82fdbfd6541c86fd203fd4db002f4e4e"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "npm-install-cold",
+  "title": "A package-manager install into an empty project: thousands of changes, no quiescence, and the lockfile last",
+  "category": "package-manager",
+  "tool": { "name": "npm", "version": "11.5.1", "platform": "darwin 14.5 arm64, APFS" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["npm", "install", "--offline", "--no-audit", "--no-fund", "./dep.tgz"],
+    "evidence": "327 readings carrying 12,225 changes over 5,662 distinct paths: 5,661 appearances, 6,545 in-place rewrites and 19 removals. The largest single reading held 108 changes. The install compiled a native module, so the run also contains a whole build tree. `package-lock.json` (73,837 bytes) and `node_modules/.package-lock.json` (74,010 bytes) both appear in the FINAL reading and in no earlier one.",
+    "excerpt": true,
+    "excerpt_note": "The stream below is an EXCERPT, renumbered densely, and it is the only pattern in this corpus that is not complete. It keeps the three facts a coalescer can be wrong about — the opening burst, the removal burst near the end, and the lockfile arriving last — and drops 12,000 middle events that are all the same shape. `observed_totals` carries what was dropped, and the command above re-captures the whole of it.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "with 108 changes in one reading, anything created and removed inside a reading was certainly missed and its count is unknown"]
+  },
+  "observed_totals": { "readings": 327, "changes": 12225, "distinct_paths": 5662, "appeared": 5661, "rewritten_in_place": 6545, "vanished": 19, "largest_reading": 108 },
+  "objects": [
+    { "object": 1, "role": "the node_modules directory" },
+    { "object": 2, "role": "a package directory created early" },
+    { "object": 3, "role": "an unpacked package file" },
+    { "object": 4, "role": "a compiled native artefact" },
+    { "object": 5, "role": "an optional platform package removed near the end" },
+    { "object": 6, "role": "node_modules/.package-lock.json" },
+    { "object": 7, "role": "package-lock.json" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "MetadataChanged", "object": 1 },
+        { "sequence": 2, "kind": "MetadataChanged", "object": 2 },
+        { "sequence": 3, "kind": "Opened", "object": 3 },
+        { "sequence": 4, "kind": "Written", "object": 3 },
+        { "sequence": 5, "kind": "Closed", "object": 3 },
+        { "sequence": 6, "kind": "Opened", "object": 4 },
+        { "sequence": 7, "kind": "Written", "object": 4 },
+        { "sequence": 8, "kind": "Closed", "object": 4 },
+        { "sequence": 9, "kind": "Unlinked", "object": 5 },
+        { "sequence": 10, "kind": "Opened", "object": 6 },
+        { "sequence": 11, "kind": "Written", "object": 6 },
+        { "sequence": 12, "kind": "Closed", "object": 6 },
+        { "sequence": 13, "kind": "Opened", "object": 7 },
+        { "sequence": 14, "kind": "Written", "object": 7 },
+        { "sequence": 15, "kind": "Closed", "object": 7 }
+      ],
+      "candidates": [
+        { "through": 5, "reason": "Closed" },
+        { "through": 8, "reason": "Closed" },
+        { "through": 12, "reason": "Closed" },
+        { "through": 15, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "MetadataChanged", "object": 1 },
+        { "sequence": 2, "kind": "MetadataChanged", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 3 },
+        { "sequence": 4, "kind": "Written", "object": 4 },
+        { "sequence": 5, "kind": "Unlinked", "object": 5 },
+        { "sequence": 6, "kind": "Written", "object": 6 },
+        { "sequence": 7, "kind": "Written", "object": 7 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[3], [4], [3, 4]],
+      "omission_note": "At 108 changes per reading the backend's first declared restriction is doing most of the work: several writes to one file between two readings are one change, and the corpus cannot say how many were folded."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 15, "reason": "Closed" } ], "boundary_evidence": { "through": 15, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 7, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 15, "folder": 7 },
+    "meaningful_durable_change": "The dependency tree and the lockfile that describes it, together. The lockfile is the only artefact of the install a person names, and it is written last, so a checkpoint that ends before it is a tree with no record of what produced it.",
+    "forbidden_sequence_points": { "mount": [1,2,3,4,5,6,7,8,9,10,11,12,13,14], "folder": [1,2,3,4,5,6] },
+    "forbidden_note": "Every point before the lockfile is a half-installed tree. They are all real states and none is a save. This is the pattern that shows the difference between the two: a coalescer that never emits a state that did not exist can still emit thousands of states nobody wanted.",
+    "coalescable": "only-by-quiescence"
+  },
+  "notes": [
+    "12,225 changes with no quiescence is what makes the maximum-uncheckpointed-bytes and maximum-uncheckpointed-time triggers unavoidable: a rule that only emits at quiescence keeps the whole install uncheckpointed, and plan §3.5 ACT-004 requires stable work to survive a daemon failure.",
+    "Every split those triggers force lands on a forbidden sequence point, by construction, because every point except the last one is forbidden. The corpus therefore does NOT assert one checkpoint here under a byte trigger; it asserts one checkpoint under quiescence and records that a byte-triggered split is honest but not meaningful.",
+    "This is the pattern the idle-interval and byte-budget defaults must be chosen against, and this run does not choose them. See ../README.md section 7."
+  ]
+}

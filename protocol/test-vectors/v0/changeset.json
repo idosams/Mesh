@@ -1,0 +1,130 @@
+{
+  "vector_format": "mesh-canonical-vectors/0",
+  "encoding_profile": "mesh-cbor/0",
+  "record": "mesh.v0.changeset",
+  "signed_record": true,
+  "summary": "One authored transition. The encoding binds ten fields and never the signature, because the signature is made over the record.",
+  "schema": {
+    "domain_tag": "mesh.v0.changeset",
+    "fields": [
+      {
+        "name": "workspace_id",
+        "type": "bytes",
+        "byte_length": 16
+      },
+      {
+        "name": "actor_id",
+        "type": "bytes",
+        "byte_length": 32
+      },
+      {
+        "name": "session_id",
+        "type": "bytes",
+        "byte_length": 16
+      },
+      {
+        "name": "actor_sequence",
+        "type": "unsigned"
+      },
+      {
+        "name": "causal_parents",
+        "type": "sequence",
+        "element": {
+          "name": "element",
+          "type": "bytes",
+          "byte_length": 32
+        }
+      },
+      {
+        "name": "base_head",
+        "type": "bytes",
+        "byte_length": 32
+      },
+      {
+        "name": "resulting_head",
+        "type": "bytes",
+        "byte_length": 32
+      },
+      {
+        "name": "operations",
+        "type": "sequence",
+        "element": {
+          "name": "element",
+          "type": "record"
+        }
+      },
+      {
+        "name": "policy_epoch",
+        "type": "unsigned"
+      },
+      {
+        "name": "hybrid_logical_time",
+        "type": "group",
+        "fields": [
+          {
+            "name": "physical_millis",
+            "type": "unsigned"
+          },
+          {
+            "name": "logical",
+            "type": "unsigned"
+          }
+        ]
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "name": "genesis-no-operations",
+      "description": "The first ChangeSet in a workspace: no causal parents, no operations.",
+      "record": {
+        "workspace_id": "0189abcdef0071018101010101010101",
+        "actor_id": "f8c135e3f8d7df03486047fd042a625b05e5be7a008af53efb4881d44020548e",
+        "session_id": "0189abcdef0372028202020202020202",
+        "actor_sequence": 1,
+        "causal_parents": [],
+        "base_head": "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0",
+        "resulting_head": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "operations": [],
+        "policy_epoch": 7,
+        "hybrid_logical_time": {
+          "physical_millis": 1700000000000,
+          "logical": 3
+        }
+      },
+      "canonical_encoding_hex": "8b716d6573682e76302e6368616e6765736574500189abcdef00710181010101010101015820f8c135e3f8d7df03486047fd042a625b05e5be7a008af53efb4881d44020548e500189abcdef037202820202020202020201805820b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b05820b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b18007821b0000018bcfe5680003",
+      "canonical_encoding_length": 170,
+      "canonical_encoding_digest_hex": "6e99aa1855be2fe6f70e705c6f6489e1e263baa52ccf402a0a18fe5f81fe3276",
+      "record_id_hex": "5972f81c958c8e00ba88b2ef8fa9747dac4baeb13ff3197fd526bd990351a553"
+    },
+    {
+      "name": "merge-two-parents-two-operations",
+      "description": "Two causal parents and two operations. The operations are the empty operation, so this vector also pins how a nested operation encoding is spliced in.",
+      "record": {
+        "workspace_id": "0189abcdef0071018101010101010101",
+        "actor_id": "f8c135e3f8d7df03486047fd042a625b05e5be7a008af53efb4881d44020548e",
+        "session_id": "0189abcdef0372028202020202020202",
+        "actor_sequence": 2,
+        "causal_parents": [
+          "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2"
+        ],
+        "base_head": "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0",
+        "resulting_head": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "operations": [
+          "81776d6573682e76302e656d7074792d6f7065726174696f6e",
+          "81776d6573682e76302e656d7074792d6f7065726174696f6e"
+        ],
+        "policy_epoch": 7,
+        "hybrid_logical_time": {
+          "physical_millis": 1700000000000,
+          "logical": 3
+        }
+      },
+      "canonical_encoding_hex": "8b716d6573682e76302e6368616e6765736574500189abcdef00710181010101010101015820f8c135e3f8d7df03486047fd042a625b05e5be7a008af53efb4881d44020548e500189abcdef037202820202020202020202825820c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c15820c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c25820b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b05820b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b18281776d6573682e76302e656d7074792d6f7065726174696f6e81776d6573682e76302e656d7074792d6f7065726174696f6e07821b0000018bcfe5680003",
+      "canonical_encoding_length": 288,
+      "canonical_encoding_digest_hex": "cb7c41ccfa3832298d68eadc47d9a768752abd38d4bbbfdf99f740d80409bd75",
+      "record_id_hex": "30b5d82114301601effd0d664c0e8483e5df04d656dbc777230a2b3ede717f78"
+    }
+  ]
+}

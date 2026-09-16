@@ -1,0 +1,65 @@
+[package]
+name = "mesh-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The reproducible benchmark harness and its result schema."
+build = "build.rs"
+
+[lints]
+workspace = true
+
+# No THIRD-PARTY dependency, ever. The harness is the instrument every published
+# Mesh number passes through: a third party has to be able to audit it without auditing a
+# dependency tree, and a benchmark binary must never pull code that could allocate, log or spawn
+# threads behind the timed section. Both edges below are `path` edges to workspace members that
+# themselves declare an empty `[dependencies]` table, so the audit surface of this binary is still
+# exactly this workspace and nothing runs behind a timed section that was not written here.
+#
+# They are `[dependencies]` rather than `[dev-dependencies]` because the workload that needs them —
+# `storage-amplification`, which promotes a week of edits into a real store and counts the bytes —
+# has to be reachable from the `mesh-bench` binary's registry. `benchmarks/runners/run.sh` is what
+# applies the publishing policy (dirty worktree, sample floor, failed iterations), and a storage row
+# that arrived by any other entry point would be a row measured down a path no other row takes.
+[dependencies]
+mesh-cas = { path = "../mesh-cas", version = "=0.0.0" }
+mesh-chunking = { path = "../mesh-chunking", version = "=0.0.0" }
+
+# A benchmark has to reach the thing it measures, and `[dev-dependencies]` is where that edge
+# belongs: it is not compiled into the library or the `mesh-bench` binary, so the sentence above
+# still holds for the instrument itself. `benches/recovery.rs` measures `mesh-store`'s index
+# reconstruction and cannot do it through a copy, and `benches/counter-overhead.rs` measures
+# `mesh-daemon`'s counter plane for the same reason: a copy of the counters here would measure the
+# copy, which is exactly the external approximation this task's `## Intent` exists to remove.
+#
+# `docs/adr/0014-narrow-the-lockfile-fence-to-admit-an-audited-cryptographic-dependency.md` admits a
+# `path` edge between two members of this workspace without its five conditions: no supply chain, no
+# licence and no advisory surface, and it edits `Cargo.lock` only because Cargo records the edge.
+# `mesh-bench` is plan §8.3's harness layer, which may reach anything and which nothing may reach —
+# so an edge onto `mesh-daemon` (§8.3's service layer) points down the ladder, which is the legal
+# direction. Nothing in `mesh-daemon` reaches back.
+[dev-dependencies]
+mesh-daemon = { path = "../mesh-daemon", version = "=0.0.0" }
+mesh-store = { path = "../mesh-store", version = "=0.0.0" }
+
+[[bin]]
+name = "mesh-bench"
+path = "src/bin/mesh-bench.rs"
+
+[[bench]]
+name = "smoke"
+harness = false
+
+[[bench]]
+name = "recovery"
+harness = false
+
+# Named `counter-overhead` because that is what `## Automated validation` in task
+# 01KZC2SQABSC6CT5Z4JCKHHQKQ says a person types; `path` is explicit because a hyphen in a target
+# name is not Cargo's automatic file-discovery convention.
+[[bench]]
+name = "counter-overhead"
+path = "benches/counter-overhead.rs"
+harness = false

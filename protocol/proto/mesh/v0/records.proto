@@ -1,0 +1,113 @@
+// The protobuf projection of the canonical record types.
+//
+// Plan §8.1 splits the wire in two: "Protobuf for network; canonical CBOR for signed records."
+// This file is the network half for the record types that exist today, and it is deliberately
+// *only* that.
+//
+// WHAT IS HERE. One message per canonical record, with the same fields in the same order as
+// `protocol/schemas/canonical-encoding-v0.json`, and one message per repeated compound element.
+// The agreement is machine-checked: `crates/mesh-types/tests/serialization-compat.rs` parses this
+// file and fails if any record message's field names or order drift from the canonical schema.
+// That check is the reason this file exists — two descriptions of one record that nothing compares
+// are two descriptions that will disagree.
+//
+// WHAT IS NOT HERE, AND WHY. The CWP message set — requests, responses, errors, the
+// metadata-plane/content-plane split, and what each peer tracks about every other peer — is
+// reserved by `docs/protocol.md` §7.3 for task 01KZC2EGC8E02DHP5BD6CQN7QE. Inventing it here would
+// be inventing protocol another task owns, so this file carries no service, no RPC and no envelope.
+//
+// PROTOBUF IS NOT THE SIGNED FORM. Protobuf serialization is not deterministic: field ordering,
+// varint width and unknown-field retention are all encoder choices. A signature is made over the
+// `mesh-cbor/0` encoding and never over these bytes. A peer that receives one of these messages
+// reconstructs the record and re-encodes it canonically before verifying anything.
+//
+// FIELD NUMBERS ARE PROTOCOL. A number here is never reused and never renumbered; a removed field
+// is reserved. Field *order* in this file mirrors the canonical schema so the two can be compared
+// by eye as well as by the test.
+
+syntax = "proto3";
+
+package mesh.v0;
+
+// A chunk reference: a content digest naming a chunk, with its position in the reconstructed file.
+message ChunkRef {
+  bytes content_hash = 1;
+  uint64 offset = 2;
+  uint64 length = 3;
+}
+
+// The ordered chunk references that reconstruct one file version's bytes exactly.
+// Canonical domain tag: mesh.v0.file-manifest
+message FileManifest {
+  uint64 byte_length = 1;
+  bytes content_hash = 2;
+  repeated ChunkRef chunks = 3;
+}
+
+// The portable metadata a file version binds.
+message PortableMetadata {
+  bool executable = 1;
+}
+
+// One immutable version of one file object.
+// Canonical domain tag: mesh.v0.file-version
+message FileVersion {
+  bytes object_id = 1;
+  repeated bytes parent_versions = 2;
+  bytes manifest_id = 3;
+  PortableMetadata portable_metadata = 4;
+  bytes created_by = 5;
+}
+
+// One name-to-child binding inside a directory version.
+//
+// Carried as a repeated message rather than a protobuf `map`, because a map has no defined
+// ordering on the wire and the canonical encoding requires ascending byte-lexicographic order of
+// the UTF-8 name. A receiver sorts before re-encoding regardless; a repeated message lets the
+// sender send them already sorted, and lets a mis-sorted stream be a detectable error rather than
+// an invisible one.
+message DirectoryEntry {
+  string name = 1;
+  bytes object_id = 2;
+  bytes version_id = 3;
+}
+
+// One immutable version of one directory object.
+// Canonical domain tag: mesh.v0.directory-version
+message DirectoryVersion {
+  bytes object_id = 1;
+  repeated DirectoryEntry entries = 2;
+}
+
+// Hybrid logical time: a physical millisecond and a logical counter that breaks ties within it.
+message Hlc {
+  uint64 physical_millis = 1;
+  uint64 logical = 2;
+}
+
+// One authored transition.
+//
+// The ten fields below are the fields the canonical encoding binds. The authoring actor's
+// signature is carried alongside a ChangeSet on the wire and is NOT one of them: the signature is
+// made over the record, so a record that bound its own signature could never be signed.
+// Canonical domain tag: mesh.v0.changeset
+message ChangeSet {
+  bytes workspace_id = 1;
+  bytes actor_id = 2;
+  bytes session_id = 3;
+  uint64 actor_sequence = 4;
+  repeated bytes causal_parents = 5;
+  bytes base_head = 6;
+  bytes resulting_head = 7;
+  repeated bytes operations = 8;
+  uint64 policy_epoch = 9;
+  Hlc hybrid_logical_time = 10;
+}
+
+// The placeholder operation, carrying no field.
+//
+// `ChangeSet.operations` carries each operation as its complete canonical encoding rather than as
+// a typed message, because the operation vocabulary belongs to mesh-operations and this file does
+// not name it. Each element is self-identifying: its first array member is its own domain tag.
+// Canonical domain tag: mesh.v0.empty-operation
+message EmptyOperation {}

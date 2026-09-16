@@ -1,0 +1,16 @@
+[package]
+name = "mesh-git-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mesh-approval = { path = "../mesh-approval", version = "=0.0.0" }
+
+[dev-dependencies]
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }

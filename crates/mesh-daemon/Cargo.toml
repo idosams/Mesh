@@ -1,0 +1,90 @@
+[package]
+name = "mesh-daemon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# `cargo run -p mesh-daemon` has to mean one thing, and the thing a person starts is the service.
+# `meshctl` is the client they check it with, and asking for it by name is the right friction.
+default-run = "meshd"
+
+[lints]
+workspace = true
+
+# Declared rather than left to Cargo's automatic discovery, because these names are user-facing —
+# they are what a person types — and a user-facing name belongs in a file somebody reviews rather
+# than in a filesystem convention. `meshctl` is a client and not a second implementation of the
+# wire: every byte it sends goes through this crate's own `ipc::message`, so a change to the
+# format cannot pass in one and fail in the other. Both are `cfg(unix)` inside and say so on any
+# other platform; the transport is a Unix-domain socket and the named-pipe backend is not written.
+
+[[bin]]
+name = "meshd"
+path = "src/main.rs"
+
+[[bin]]
+name = "meshctl"
+path = "src/bin/meshctl.rs"
+
+[dependencies]
+# Nine production workspace edges. The audited third-party primitive signs in `meshctl` and
+# verifies authenticated local ChangeSet envelopes in the service; secret custody remains outside
+# this crate. The daemon composes the
+# layers below it —
+# plan §8.3 puts this crate at rank 5, `mesh-store` at rank 3 and `mesh-types`, `mesh-state` and
+# `mesh-materializer` at ranks 0 and 1 — so every edge here points downward, which is the whole of
+# the layering rule `tools/program/arch-check/architecture.json` enforces.
+#
+# `docs/adr/0014-narrow-the-lockfile-fence-to-admit-an-audited-cryptographic-dependency.md` admits a
+# `path` edge between two members of this workspace without its five conditions: it adds no supply
+# chain, no licence and no advisory surface, and it edits `Cargo.lock` only because Cargo records
+# the edge. Task 01KZFSF7M3A4348TZQD17H8EBV claims `Cargo.lock` in its own `## Allowed paths`, which
+# the declaration gate decides before it reaches the governance fence.
+
+# Crash recovery, the durable boundary and the record index. This crate's own contribution to
+# recovery is the budget and the diagnostics feed, which are useless without the store's recovery
+# to report on.
+mesh-store = { path = "../mesh-store", version = "=0.0.0" }
+
+# File bytes are cut here at the service composition root, then handed to mesh-cas and mesh-store
+# through their existing durability seams. Neither storage crate imports the boundary policy.
+mesh-chunking = { path = "../mesh-chunking", version = "=0.0.0" }
+
+# The digest the protocol names. `mesh-state` ships no `HeadDigest` implementation on purpose —
+# `crates/mesh-state/src/digest.rs` says a default there "would be a name that looks like a `HeadId`
+# and is not the one any other implementation computes" — and hands the seam to the composition
+# root. This crate is that root, so BLAKE3 arrives here and nowhere else in the daemon.
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+
+# Head advancement and the review axis: how far this replica's own version has advanced, and what a
+# change that is still waiting for a parent is waiting for.
+mesh-state = { path = "../mesh-state", version = "=0.0.0" }
+
+# The canonical order an operation set is applied in. Read as a second opinion on `mesh-state`'s
+# causal order rather than as the source of one: two implementations agreeing is evidence, and one
+# implementation agreeing with itself is not.
+mesh-materializer = { path = "../mesh-materializer", version = "=0.0.0" }
+
+# ChangeSet payloads live in the workspace content-addressed store. The daemon opens that store,
+# verifies each payload by its digest, decodes its nested owner-vocabulary operations and gives the
+# exact values to `mesh-materializer`; no bridge or parallel operation enum sits between them.
+mesh-cas = { path = "../mesh-cas", version = "=0.0.0" }
+mesh-operations = { path = "../mesh-operations", version = "=0.0.0" }
+
+# Canonical approval receipts are decoded and verified here before the protected shared version is
+# derived.  The daemon supplies trust configuration and ordered durable records; mesh-approval owns
+# the signed statement and the only constructor for human-held advance authority.
+mesh-approval = { path = "../mesh-approval", version = "=0.0.0" }
+
+# Authenticated local ChangeSet envelopes are verified at the service composition boundary before
+# their operation payload can materialize. Secret custody remains in the desktop adapter.
+mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }
+
+# Local human-key signing counterpart for `meshctl`. Secret key bytes never enter daemon logic or
+# the IPC surface; the binary reads one exact 0600 file and sends only canonical receipt bytes.
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }
+
+[dev-dependencies]
+mesh-bench = { path = "../mesh-bench", version = "=0.0.0" }
+ring = { version = "=0.17.14", default-features = false, features = ["std"] }

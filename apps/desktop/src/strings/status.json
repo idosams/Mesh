@@ -1,0 +1,79 @@
+{
+  "$comment": "The six words this application shows for the state of a person's work, and the whole mapping from an internal state to the wording a person reads for it. One file, because two files drift. It is a linted surface twice over: the `desktop-status-catalog` entry in `tools/program/vocab-lint/surfaces.json` checks every value at `$.states.*.status` against the six approved words, and `desktop-strings-json` checks every string here for the nine terms a person must never meet. `src/app/status.test.ts` checks this file against sections 4.1 and 4.3 of `docs/product-prd.md`, in both directions, so an internal state that gains a row in the product model and no wording here fails the desktop build rather than reaching a person as a fallback label.",
+
+  "$statesComment": "Section 4.3 of the product requirements: user-facing status is exactly these six words, in this order. `means` is what the status tells a person; `nextStep` is what they can do about it. A concept that needs a seventh word is a question for the product owner, never a local addition — the lint rejects a seventh value here before anyone can ship it.",
+  "states": [
+    {
+      "id": "working",
+      "status": "Working",
+      "means": "An actor is changing files right now.",
+      "nextStep": "Nothing is needed from you. Open it to read along."
+    },
+    {
+      "id": "savedPrivately",
+      "status": "Saved privately",
+      "means": "Their work survived; nobody else has it.",
+      "nextStep": "Nothing is needed from you. It is on this device and it will still be here after a restart."
+    },
+    {
+      "id": "availableToTeam",
+      "status": "Available to team",
+      "means": "Peers can open it, read-only.",
+      "nextStep": "Anyone on the team can open it. It is not in the shared version yet."
+    },
+    {
+      "id": "readyForReview",
+      "status": "Ready for review",
+      "means": "There is an exact change waiting for a person.",
+      "nextStep": "Read it and approve it, or send it back with what you want changed."
+    },
+    {
+      "id": "needsAttention",
+      "status": "Needs attention",
+      "means": "A human decision is required before this can proceed.",
+      "nextStep": "Open it and decide. Nothing was discarded and nothing was guessed."
+    },
+    {
+      "id": "approved",
+      "status": "Approved",
+      "means": "It is in the shared version.",
+      "nextStep": "Nothing is needed from you. Everyone works from it now."
+    }
+  ],
+
+  "$internalStatesComment": "Section 4.1 of the product requirements: every internal state, and the only wording this application may show for it. Four of these wordings are status words and four name a thing rather than a state, which is why this list is longer than the six. The internal names are written here — and nowhere else in the application — precisely so that showing one is impossible without passing through this mapping first: `src/app/status.ts` looks a name up and throws when it cannot find it, and it never puts the name it failed on into a sentence.",
+  "internalStates": [
+    {
+      "internalState": "Actor working head",
+      "wording": "Their work"
+    },
+    {
+      "internalState": "Canonical head",
+      "wording": "Shared version"
+    },
+    {
+      "internalState": "Durable actor checkpoint",
+      "wording": "Saved privately"
+    },
+    {
+      "internalState": "Replicated actor checkpoint",
+      "wording": "Available to team"
+    },
+    {
+      "internalState": "Review bundle",
+      "wording": "Ready for review"
+    },
+    {
+      "internalState": "Publish operation",
+      "wording": "Approve to shared version"
+    },
+    {
+      "internalState": "Conflict",
+      "wording": "Needs attention"
+    },
+    {
+      "internalState": "Historical state",
+      "wording": "Earlier version"
+    }
+  ]
+}

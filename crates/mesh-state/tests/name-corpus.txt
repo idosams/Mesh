@@ -1,0 +1,691 @@
+# mesh cross-platform name corpus
+# Generated from the Unicode Character Database, Unicode 15.0.0, via Python's `unicodedata`.
+#
+# One pair per row: `<folds>;<name a>;<name b>;<note>`, each name a space-separated
+# sequence of uppercase hexadecimal code points so that the file itself is pure ASCII and
+# survives every editor, terminal and diff viewer that will ever be pointed at it.
+#
+# `<folds>` is a comma-separated list of the fold families that make the two names ONE
+# directory entry. It is the ANSWER, computed here by the UCD and not by mesh:
+#
+#   exact      the bytes are equal; every volume holds them as one entry
+#   canonical  one canonical form (NFD); the Apple volumes fold it
+#   upcase     one simple uppercase mapping; NTFS folds it
+#   caseless   one canonical caseless form; the case-insensitive Apple volumes fold it
+#   none       no fold mesh models joins them, on any volume it supports
+#
+# The families are NOT nested. `exact` implies all three, and `canonical` implies
+# `caseless`, but `upcase` implies neither of the other two and neither implies it:
+# U+0131 dotless i uppercases to I and folds to itself, so NTFS holds it with `i` and a
+# macOS volume does not. A model with one `case` answer gets that pair wrong, which is why
+# this column is a set.
+#
+# A row that mesh classifies differently is a defect in mesh, not in this file.
+
+canonical,caseless;0063 0061 0066 0065 0301 002E 006D 0064;0063 0061 0066 00E9 002E 006D 0064;NFD vs NFC, the macOS case
+upcase,caseless;0043 0041 0046 00C9 002E 006D 0064;0063 0061 0066 00E9 002E 006D 0064;case only, precomposed
+caseless;0043 0041 0046 0045 0301 002E 006D 0064;0063 0061 0066 00E9 002E 006D 0064;case and normalization together
+canonical,caseless;D55C AD6D 002E 0074 0078 0074;1112 1161 11AB 1100 116E 11A8 002E 0074 0078 0074;Hangul precomposed vs jamo
+canonical,caseless;212B 002E 0074 0078 0074;00C5 002E 0074 0078 0074;angstrom sign vs A-ring: canonically equivalent
+canonical,caseless;212B 002E 0074 0078 0074;0041 030A 002E 0074 0078 0074;angstrom sign vs A + combining ring
+canonical,caseless;0061 0327 0301 002E 0074 0078 0074;0061 0301 0327 002E 0074 0078 0074;cedilla and acute: reordered by combining class
+none;0061 0301 0300 002E 0074 0078 0074;0061 0300 0301 002E 0074 0078 0074;two marks of one class: order is significant
+none;0073 0074 0072 0061 00DF 0065 002E 0074 0078 0074;0053 0054 0052 0041 0053 0053 0045 002E 0074 0078 0074;sharp s is NOT folded to ss: mesh folds case simply, never fully
+none;0073 0074 0072 0061 00DF 0065 002E 0074 0078 0074;0073 0074 0072 0061 0073 0073 0065 002E 0074 0078 0074;sharp s against the ss spelling: two names, on every volume
+upcase,caseless;03C3 002E 0074 0078 0074;03C2 002E 0074 0078 0074;medial sigma vs final sigma
+upcase,caseless;03A3 002E 0074 0078 0074;03C2 002E 0074 0078 0074;capital sigma vs final sigma
+upcase,caseless;0052 0045 0041 0044 004D 0045 002E 006D 0064;0072 0065 0061 0064 006D 0065 002E 006D 0064;the everyday case-insensitive collision
+exact,canonical,upcase,caseless;0052 0045 0041 0044 004D 0045 002E 006D 0064;0052 0045 0041 0044 004D 0045 002E 006D 0064;identical
+none;0052 0045 0041 0044 004D 0045 002E 006D 0064;0052 0045 0041 0044 005F 004D 0045 002E 006D 0064;genuinely different names
+upcase,caseless;0043 004F 004E;0063 006F 006E;a reserved device name, either case
+none;0072 0065 0070 006F 0072 0074 002E 002E;0072 0065 0070 006F 0072 0074;trailing dots are not a fold
+none;0072 0065 0070 006F 0072 0074 0020;0072 0065 0070 006F 0072 0074;a trailing space is not a fold
+none;0130 002E 0074 0078 0074;0069 002E 0074 0078 0074;Turkish dotted capital I folds to i + combining dot above
+none;0130 002E 0074 0078 0074;0049 002E 0074 0078 0074;dotted capital I is not plain I
+upcase;0131 002E 0074 0078 0074;0069 002E 0074 0078 0074;dotless i is not i
+upcase,caseless;0049 002E 0074 0078 0074;0069 002E 0074 0078 0074;ASCII case
+caseless;1E9E 002E 0074 0078 0074;00DF 002E 0074 0078 0074;capital sharp s vs small sharp s
+none;FB01 006C 0065 002E 0074 0078 0074;0066 0069 006C 0065 002E 0074 0078 0074;ligature fi is a COMPATIBILITY difference, never folded here
+upcase,caseless;006E 0075 006C 002E 0074 0078 0074;004E 0055 004C 002E 0074 0078 0074;reserved stem, either case
+canonical,caseless;0041 0301 0327 002E 0074 0078 0074;00C1 0327 002E 0074 0078 0074;partially precomposed
+canonical,caseless;1EC7 002E 0074 0078 0074;0065 0323 0302 002E 0074 0078 0074;Vietnamese e-circumflex-dot: three ways to spell it
+canonical,caseless;1EC7 002E 0074 0078 0074;00EA 0323 002E 0074 0078 0074;Vietnamese, precomposed circumflex plus dot below
+none;0132 002E 0074 0078 0074;0069 006A 002E 0074 0078 0074;IJ ligature is compatibility, not canonical
+upcase,caseless;01C5 002E 0074 0078 0074;01C6 002E 0074 0078 0074;titlecase Dz vs lowercase dz
+upcase,caseless;01C4 002E 0074 0078 0074;01C6 002E 0074 0078 0074;uppercase DZ vs lowercase dz
+upcase,caseless;0410 002E 0074 0078 0074;0430 002E 0074 0078 0074;Cyrillic A, upper vs lower
+none;0410 002E 0074 0078 0074;0041 002E 0074 0078 0074;Cyrillic A is not Latin A
+canonical,caseless;0439 002E 0074 0078 0074;0438 0306 002E 0074 0078 0074;Cyrillic short i, precomposed vs decomposed
+canonical,caseless;00C7 002E 0074 0078 0074;0043 0327 002E 0074 0078 0074;C-cedilla precomposed vs decomposed
+upcase,caseless;00C7 002E 0074 0078 0074;00E7 002E 0074 0078 0074;C-cedilla, case only
+caseless;0043 0327 002E 0074 0078 0074;00E7 002E 0074 0078 0074;decomposed upper vs precomposed lower
+exact,canonical,upcase,caseless;0301 002E 0074 0078 0074;0301 002E 0074 0078 0074;a leading combining mark, identical
+none;0061 002E 0074 0078 0074;0061 200B 002E 0074 0078 0074;a zero-width space is a real difference
+none;1D400 002E 0074 0078 0074;0041 002E 0074 0078 0074;mathematical bold A is compatibility, never folded
+caseless;1F80 002E 0074 0078 0074;1F88 002E 0074 0078 0074;Greek with ypogegrammeni, lower vs capital
+upcase,caseless;0345 002E 0074 0078 0074;03B9 002E 0074 0078 0074;combining ypogegrammeni folds to iota
+canonical,caseless;006E 00C0 002E 0064 0061 0074;006E 0041 0300 002E 0064 0061 0074;sweep decomposition U+00C0
+canonical,caseless;006E 00C7 002E 0064 0061 0074;006E 0043 0327 002E 0064 0061 0074;sweep decomposition U+00C7
+canonical,caseless;006E 00CD 002E 0064 0061 0074;006E 0049 0301 002E 0064 0061 0074;sweep decomposition U+00CD
+canonical,caseless;006E 00D4 002E 0064 0061 0074;006E 004F 0302 002E 0064 0061 0074;sweep decomposition U+00D4
+canonical,caseless;006E 00DC 002E 0064 0061 0074;006E 0055 0308 002E 0064 0061 0074;sweep decomposition U+00DC
+canonical,caseless;006E 00E4 002E 0064 0061 0074;006E 0061 0308 002E 0064 0061 0074;sweep decomposition U+00E4
+canonical,caseless;006E 00EB 002E 0064 0061 0074;006E 0065 0308 002E 0064 0061 0074;sweep decomposition U+00EB
+canonical,caseless;006E 00F2 002E 0064 0061 0074;006E 006F 0300 002E 0064 0061 0074;sweep decomposition U+00F2
+canonical,caseless;006E 00FA 002E 0064 0061 0074;006E 0075 0301 002E 0064 0061 0074;sweep decomposition U+00FA
+canonical,caseless;006E 0101 002E 0064 0061 0074;006E 0061 0304 002E 0064 0061 0074;sweep decomposition U+0101
+canonical,caseless;006E 0107 002E 0064 0061 0074;006E 0063 0301 002E 0064 0061 0074;sweep decomposition U+0107
+canonical,caseless;006E 010D 002E 0064 0061 0074;006E 0063 030C 002E 0064 0061 0074;sweep decomposition U+010D
+canonical,caseless;006E 0115 002E 0064 0061 0074;006E 0065 0306 002E 0064 0061 0074;sweep decomposition U+0115
+canonical,caseless;006E 011B 002E 0064 0061 0074;006E 0065 030C 002E 0064 0061 0074;sweep decomposition U+011B
+canonical,caseless;006E 0121 002E 0064 0061 0074;006E 0067 0307 002E 0064 0061 0074;sweep decomposition U+0121
+canonical,caseless;006E 0129 002E 0064 0061 0074;006E 0069 0303 002E 0064 0061 0074;sweep decomposition U+0129
+canonical,caseless;006E 012F 002E 0064 0061 0074;006E 0069 0328 002E 0064 0061 0074;sweep decomposition U+012F
+canonical,caseless;006E 0139 002E 0064 0061 0074;006E 004C 0301 002E 0064 0061 0074;sweep decomposition U+0139
+canonical,caseless;006E 0143 002E 0064 0061 0074;006E 004E 0301 002E 0064 0061 0074;sweep decomposition U+0143
+canonical,caseless;006E 014C 002E 0064 0061 0074;006E 004F 0304 002E 0064 0061 0074;sweep decomposition U+014C
+canonical,caseless;006E 0154 002E 0064 0061 0074;006E 0052 0301 002E 0064 0061 0074;sweep decomposition U+0154
+canonical,caseless;006E 015A 002E 0064 0061 0074;006E 0053 0301 002E 0064 0061 0074;sweep decomposition U+015A
+canonical,caseless;006E 0160 002E 0064 0061 0074;006E 0053 030C 002E 0064 0061 0074;sweep decomposition U+0160
+canonical,caseless;006E 0168 002E 0064 0061 0074;006E 0055 0303 002E 0064 0061 0074;sweep decomposition U+0168
+canonical,caseless;006E 016E 002E 0064 0061 0074;006E 0055 030A 002E 0064 0061 0074;sweep decomposition U+016E
+canonical,caseless;006E 0174 002E 0064 0061 0074;006E 0057 0302 002E 0064 0061 0074;sweep decomposition U+0174
+canonical,caseless;006E 017A 002E 0064 0061 0074;006E 007A 0301 002E 0064 0061 0074;sweep decomposition U+017A
+canonical,caseless;006E 01A1 002E 0064 0061 0074;006E 006F 031B 002E 0064 0061 0074;sweep decomposition U+01A1
+canonical,caseless;006E 01D0 002E 0064 0061 0074;006E 0069 030C 002E 0064 0061 0074;sweep decomposition U+01D0
+canonical,caseless;006E 01D6 002E 0064 0061 0074;006E 0075 0308 0304 002E 0064 0061 0074;sweep decomposition U+01D6
+canonical,caseless;006E 01DC 002E 0064 0061 0074;006E 0075 0308 0300 002E 0064 0061 0074;sweep decomposition U+01DC
+canonical,caseless;006E 01E3 002E 0064 0061 0074;006E 00E6 0304 002E 0064 0061 0074;sweep decomposition U+01E3
+canonical,caseless;006E 01EB 002E 0064 0061 0074;006E 006F 0328 002E 0064 0061 0074;sweep decomposition U+01EB
+canonical,caseless;006E 01F4 002E 0064 0061 0074;006E 0047 0301 002E 0064 0061 0074;sweep decomposition U+01F4
+canonical,caseless;006E 01FC 002E 0064 0061 0074;006E 00C6 0301 002E 0064 0061 0074;sweep decomposition U+01FC
+canonical,caseless;006E 0202 002E 0064 0061 0074;006E 0041 0311 002E 0064 0061 0074;sweep decomposition U+0202
+canonical,caseless;006E 0208 002E 0064 0061 0074;006E 0049 030F 002E 0064 0061 0074;sweep decomposition U+0208
+canonical,caseless;006E 020E 002E 0064 0061 0074;006E 004F 0311 002E 0064 0061 0074;sweep decomposition U+020E
+canonical,caseless;006E 0214 002E 0064 0061 0074;006E 0055 030F 002E 0064 0061 0074;sweep decomposition U+0214
+canonical,caseless;006E 021A 002E 0064 0061 0074;006E 0054 0326 002E 0064 0061 0074;sweep decomposition U+021A
+canonical,caseless;006E 0228 002E 0064 0061 0074;006E 0045 0327 002E 0064 0061 0074;sweep decomposition U+0228
+canonical,caseless;006E 022E 002E 0064 0061 0074;006E 004F 0307 002E 0064 0061 0074;sweep decomposition U+022E
+canonical,caseless;006E 0340 002E 0064 0061 0074;006E 0300 002E 0064 0061 0074;sweep decomposition U+0340
+canonical,caseless;006E 0385 002E 0064 0061 0074;006E 00A8 0301 002E 0064 0061 0074;sweep decomposition U+0385
+canonical,caseless;006E 038C 002E 0064 0061 0074;006E 039F 0301 002E 0064 0061 0074;sweep decomposition U+038C
+canonical,caseless;006E 03AC 002E 0064 0061 0074;006E 03B1 0301 002E 0064 0061 0074;sweep decomposition U+03AC
+canonical,caseless;006E 03CB 002E 0064 0061 0074;006E 03C5 0308 002E 0064 0061 0074;sweep decomposition U+03CB
+canonical,caseless;006E 0400 002E 0064 0061 0074;006E 0415 0300 002E 0064 0061 0074;sweep decomposition U+0400
+canonical,caseless;006E 040E 002E 0064 0061 0074;006E 0423 0306 002E 0064 0061 0074;sweep decomposition U+040E
+canonical,caseless;006E 0457 002E 0064 0061 0074;006E 0456 0308 002E 0064 0061 0074;sweep decomposition U+0457
+canonical,caseless;006E 04C1 002E 0064 0061 0074;006E 0416 0306 002E 0064 0061 0074;sweep decomposition U+04C1
+canonical,caseless;006E 04D6 002E 0064 0061 0074;006E 0415 0306 002E 0064 0061 0074;sweep decomposition U+04D6
+canonical,caseless;006E 04DE 002E 0064 0061 0074;006E 0417 0308 002E 0064 0061 0074;sweep decomposition U+04DE
+canonical,caseless;006E 04E6 002E 0064 0061 0074;006E 041E 0308 002E 0064 0061 0074;sweep decomposition U+04E6
+canonical,caseless;006E 04EE 002E 0064 0061 0074;006E 0423 0304 002E 0064 0061 0074;sweep decomposition U+04EE
+canonical,caseless;006E 04F4 002E 0064 0061 0074;006E 0427 0308 002E 0064 0061 0074;sweep decomposition U+04F4
+canonical,caseless;006E 0624 002E 0064 0061 0074;006E 0648 0654 002E 0064 0061 0074;sweep decomposition U+0624
+canonical,caseless;006E 0929 002E 0064 0061 0074;006E 0928 093C 002E 0064 0061 0074;sweep decomposition U+0929
+canonical,caseless;006E 095B 002E 0064 0061 0074;006E 091C 093C 002E 0064 0061 0074;sweep decomposition U+095B
+canonical,caseless;006E 09CC 002E 0064 0061 0074;006E 09C7 09D7 002E 0064 0061 0074;sweep decomposition U+09CC
+canonical,caseless;006E 0A59 002E 0064 0061 0074;006E 0A16 0A3C 002E 0064 0061 0074;sweep decomposition U+0A59
+canonical,caseless;006E 0B4C 002E 0064 0061 0074;006E 0B47 0B57 002E 0064 0061 0074;sweep decomposition U+0B4C
+canonical,caseless;006E 0BCC 002E 0064 0061 0074;006E 0BC6 0BD7 002E 0064 0061 0074;sweep decomposition U+0BCC
+canonical,caseless;006E 0CCB 002E 0064 0061 0074;006E 0CC6 0CC2 0CD5 002E 0064 0061 0074;sweep decomposition U+0CCB
+canonical,caseless;006E 0DDD 002E 0064 0061 0074;006E 0DD9 0DCF 0DCA 002E 0064 0061 0074;sweep decomposition U+0DDD
+canonical,caseless;006E 0F5C 002E 0064 0061 0074;006E 0F5B 0FB7 002E 0064 0061 0074;sweep decomposition U+0F5C
+canonical,caseless;006E 0F81 002E 0064 0061 0074;006E 0F71 0F80 002E 0064 0061 0074;sweep decomposition U+0F81
+canonical,caseless;006E 0FB9 002E 0064 0061 0074;006E 0F90 0FB5 002E 0064 0061 0074;sweep decomposition U+0FB9
+canonical,caseless;006E 1B0E 002E 0064 0061 0074;006E 1B0D 1B35 002E 0064 0061 0074;sweep decomposition U+1B0E
+canonical,caseless;006E 1B43 002E 0064 0061 0074;006E 1B42 1B35 002E 0064 0061 0074;sweep decomposition U+1B43
+canonical,caseless;006E 1E05 002E 0064 0061 0074;006E 0062 0323 002E 0064 0061 0074;sweep decomposition U+1E05
+canonical,caseless;006E 1E0B 002E 0064 0061 0074;006E 0064 0307 002E 0064 0061 0074;sweep decomposition U+1E0B
+canonical,caseless;006E 1E11 002E 0064 0061 0074;006E 0064 0327 002E 0064 0061 0074;sweep decomposition U+1E11
+canonical,caseless;006E 1E17 002E 0064 0061 0074;006E 0065 0304 0301 002E 0064 0061 0074;sweep decomposition U+1E17
+canonical,caseless;006E 1E1D 002E 0064 0061 0074;006E 0065 0327 0306 002E 0064 0061 0074;sweep decomposition U+1E1D
+canonical,caseless;006E 1E23 002E 0064 0061 0074;006E 0068 0307 002E 0064 0061 0074;sweep decomposition U+1E23
+canonical,caseless;006E 1E29 002E 0064 0061 0074;006E 0068 0327 002E 0064 0061 0074;sweep decomposition U+1E29
+canonical,caseless;006E 1E2F 002E 0064 0061 0074;006E 0069 0308 0301 002E 0064 0061 0074;sweep decomposition U+1E2F
+canonical,caseless;006E 1E35 002E 0064 0061 0074;006E 006B 0331 002E 0064 0061 0074;sweep decomposition U+1E35
+canonical,caseless;006E 1E3B 002E 0064 0061 0074;006E 006C 0331 002E 0064 0061 0074;sweep decomposition U+1E3B
+canonical,caseless;006E 1E41 002E 0064 0061 0074;006E 006D 0307 002E 0064 0061 0074;sweep decomposition U+1E41
+canonical,caseless;006E 1E47 002E 0064 0061 0074;006E 006E 0323 002E 0064 0061 0074;sweep decomposition U+1E47
+canonical,caseless;006E 1E4D 002E 0064 0061 0074;006E 006F 0303 0301 002E 0064 0061 0074;sweep decomposition U+1E4D
+canonical,caseless;006E 1E53 002E 0064 0061 0074;006E 006F 0304 0301 002E 0064 0061 0074;sweep decomposition U+1E53
+canonical,caseless;006E 1E59 002E 0064 0061 0074;006E 0072 0307 002E 0064 0061 0074;sweep decomposition U+1E59
+canonical,caseless;006E 1E5F 002E 0064 0061 0074;006E 0072 0331 002E 0064 0061 0074;sweep decomposition U+1E5F
+canonical,caseless;006E 1E65 002E 0064 0061 0074;006E 0073 0301 0307 002E 0064 0061 0074;sweep decomposition U+1E65
+canonical,caseless;006E 1E6B 002E 0064 0061 0074;006E 0074 0307 002E 0064 0061 0074;sweep decomposition U+1E6B
+canonical,caseless;006E 1E71 002E 0064 0061 0074;006E 0074 032D 002E 0064 0061 0074;sweep decomposition U+1E71
+canonical,caseless;006E 1E77 002E 0064 0061 0074;006E 0075 032D 002E 0064 0061 0074;sweep decomposition U+1E77
+canonical,caseless;006E 1E7D 002E 0064 0061 0074;006E 0076 0303 002E 0064 0061 0074;sweep decomposition U+1E7D
+canonical,caseless;006E 1E83 002E 0064 0061 0074;006E 0077 0301 002E 0064 0061 0074;sweep decomposition U+1E83
+canonical,caseless;006E 1E89 002E 0064 0061 0074;006E 0077 0323 002E 0064 0061 0074;sweep decomposition U+1E89
+canonical,caseless;006E 1E8F 002E 0064 0061 0074;006E 0079 0307 002E 0064 0061 0074;sweep decomposition U+1E8F
+canonical,caseless;006E 1E95 002E 0064 0061 0074;006E 007A 0331 002E 0064 0061 0074;sweep decomposition U+1E95
+canonical,caseless;006E 1EA0 002E 0064 0061 0074;006E 0041 0323 002E 0064 0061 0074;sweep decomposition U+1EA0
+canonical,caseless;006E 1EA6 002E 0064 0061 0074;006E 0041 0302 0300 002E 0064 0061 0074;sweep decomposition U+1EA6
+canonical,caseless;006E 1EAC 002E 0064 0061 0074;006E 0041 0323 0302 002E 0064 0061 0074;sweep decomposition U+1EAC
+canonical,caseless;006E 1EB2 002E 0064 0061 0074;006E 0041 0306 0309 002E 0064 0061 0074;sweep decomposition U+1EB2
+canonical,caseless;006E 1EB8 002E 0064 0061 0074;006E 0045 0323 002E 0064 0061 0074;sweep decomposition U+1EB8
+canonical,caseless;006E 1EBE 002E 0064 0061 0074;006E 0045 0302 0301 002E 0064 0061 0074;sweep decomposition U+1EBE
+canonical,caseless;006E 1EC4 002E 0064 0061 0074;006E 0045 0302 0303 002E 0064 0061 0074;sweep decomposition U+1EC4
+canonical,caseless;006E 1ECA 002E 0064 0061 0074;006E 0049 0323 002E 0064 0061 0074;sweep decomposition U+1ECA
+canonical,caseless;006E 1ED0 002E 0064 0061 0074;006E 004F 0302 0301 002E 0064 0061 0074;sweep decomposition U+1ED0
+canonical,caseless;006E 1ED6 002E 0064 0061 0074;006E 004F 0302 0303 002E 0064 0061 0074;sweep decomposition U+1ED6
+canonical,caseless;006E 1EDC 002E 0064 0061 0074;006E 004F 031B 0300 002E 0064 0061 0074;sweep decomposition U+1EDC
+canonical,caseless;006E 1EE2 002E 0064 0061 0074;006E 004F 031B 0323 002E 0064 0061 0074;sweep decomposition U+1EE2
+canonical,caseless;006E 1EE8 002E 0064 0061 0074;006E 0055 031B 0301 002E 0064 0061 0074;sweep decomposition U+1EE8
+canonical,caseless;006E 1EEE 002E 0064 0061 0074;006E 0055 031B 0303 002E 0064 0061 0074;sweep decomposition U+1EEE
+canonical,caseless;006E 1EF4 002E 0064 0061 0074;006E 0059 0323 002E 0064 0061 0074;sweep decomposition U+1EF4
+canonical,caseless;006E 1F00 002E 0064 0061 0074;006E 03B1 0313 002E 0064 0061 0074;sweep decomposition U+1F00
+canonical,caseless;006E 1F06 002E 0064 0061 0074;006E 03B1 0313 0342 002E 0064 0061 0074;sweep decomposition U+1F06
+canonical,caseless;006E 1F0C 002E 0064 0061 0074;006E 0391 0313 0301 002E 0064 0061 0074;sweep decomposition U+1F0C
+canonical,caseless;006E 1F12 002E 0064 0061 0074;006E 03B5 0313 0300 002E 0064 0061 0074;sweep decomposition U+1F12
+canonical,caseless;006E 1F1A 002E 0064 0061 0074;006E 0395 0313 0300 002E 0064 0061 0074;sweep decomposition U+1F1A
+canonical,caseless;006E 1F22 002E 0064 0061 0074;006E 03B7 0313 0300 002E 0064 0061 0074;sweep decomposition U+1F22
+canonical,caseless;006E 1F28 002E 0064 0061 0074;006E 0397 0313 002E 0064 0061 0074;sweep decomposition U+1F28
+canonical,caseless;006E 1F2E 002E 0064 0061 0074;006E 0397 0313 0342 002E 0064 0061 0074;sweep decomposition U+1F2E
+canonical,caseless;006E 1F34 002E 0064 0061 0074;006E 03B9 0313 0301 002E 0064 0061 0074;sweep decomposition U+1F34
+canonical,caseless;006E 1F3A 002E 0064 0061 0074;006E 0399 0313 0300 002E 0064 0061 0074;sweep decomposition U+1F3A
+canonical,caseless;006E 1F40 002E 0064 0061 0074;006E 03BF 0313 002E 0064 0061 0074;sweep decomposition U+1F40
+canonical,caseless;006E 1F48 002E 0064 0061 0074;006E 039F 0313 002E 0064 0061 0074;sweep decomposition U+1F48
+canonical,caseless;006E 1F50 002E 0064 0061 0074;006E 03C5 0313 002E 0064 0061 0074;sweep decomposition U+1F50
+canonical,caseless;006E 1F56 002E 0064 0061 0074;006E 03C5 0313 0342 002E 0064 0061 0074;sweep decomposition U+1F56
+canonical,caseless;006E 1F60 002E 0064 0061 0074;006E 03C9 0313 002E 0064 0061 0074;sweep decomposition U+1F60
+canonical,caseless;006E 1F66 002E 0064 0061 0074;006E 03C9 0313 0342 002E 0064 0061 0074;sweep decomposition U+1F66
+canonical,caseless;006E 1F6C 002E 0064 0061 0074;006E 03A9 0313 0301 002E 0064 0061 0074;sweep decomposition U+1F6C
+canonical,caseless;006E 1F72 002E 0064 0061 0074;006E 03B5 0300 002E 0064 0061 0074;sweep decomposition U+1F72
+canonical,caseless;006E 1F78 002E 0064 0061 0074;006E 03BF 0300 002E 0064 0061 0074;sweep decomposition U+1F78
+canonical,caseless;006E 1F80 002E 0064 0061 0074;006E 03B1 0313 0345 002E 0064 0061 0074;sweep decomposition U+1F80
+canonical,caseless;006E 1F86 002E 0064 0061 0074;006E 03B1 0313 0342 0345 002E 0064 0061 0074;sweep decomposition U+1F86
+canonical,caseless;006E 1F8C 002E 0064 0061 0074;006E 0391 0313 0301 0345 002E 0064 0061 0074;sweep decomposition U+1F8C
+canonical,caseless;006E 1F92 002E 0064 0061 0074;006E 03B7 0313 0300 0345 002E 0064 0061 0074;sweep decomposition U+1F92
+canonical,caseless;006E 1F98 002E 0064 0061 0074;006E 0397 0313 0345 002E 0064 0061 0074;sweep decomposition U+1F98
+canonical,caseless;006E 1F9E 002E 0064 0061 0074;006E 0397 0313 0342 0345 002E 0064 0061 0074;sweep decomposition U+1F9E
+canonical,caseless;006E 1FA4 002E 0064 0061 0074;006E 03C9 0313 0301 0345 002E 0064 0061 0074;sweep decomposition U+1FA4
+canonical,caseless;006E 1FAA 002E 0064 0061 0074;006E 03A9 0313 0300 0345 002E 0064 0061 0074;sweep decomposition U+1FAA
+canonical,caseless;006E 1FB0 002E 0064 0061 0074;006E 03B1 0306 002E 0064 0061 0074;sweep decomposition U+1FB0
+canonical,caseless;006E 1FB7 002E 0064 0061 0074;006E 03B1 0342 0345 002E 0064 0061 0074;sweep decomposition U+1FB7
+canonical,upcase,caseless;006E 1FBE 002E 0064 0061 0074;006E 03B9 002E 0064 0061 0074;sweep decomposition U+1FBE
+canonical,caseless;006E 1FC7 002E 0064 0061 0074;006E 03B7 0342 0345 002E 0064 0061 0074;sweep decomposition U+1FC7
+canonical,caseless;006E 1FCD 002E 0064 0061 0074;006E 1FBF 0300 002E 0064 0061 0074;sweep decomposition U+1FCD
+canonical,caseless;006E 1FD3 002E 0064 0061 0074;006E 03B9 0308 0301 002E 0064 0061 0074;sweep decomposition U+1FD3
+canonical,caseless;006E 1FDB 002E 0064 0061 0074;006E 0399 0301 002E 0064 0061 0074;sweep decomposition U+1FDB
+canonical,caseless;006E 1FE2 002E 0064 0061 0074;006E 03C5 0308 0300 002E 0064 0061 0074;sweep decomposition U+1FE2
+canonical,caseless;006E 1FE8 002E 0064 0061 0074;006E 03A5 0306 002E 0064 0061 0074;sweep decomposition U+1FE8
+canonical,caseless;006E 1FEE 002E 0064 0061 0074;006E 00A8 0301 002E 0064 0061 0074;sweep decomposition U+1FEE
+canonical,caseless;006E 1FF7 002E 0064 0061 0074;006E 03C9 0342 0345 002E 0064 0061 0074;sweep decomposition U+1FF7
+canonical,caseless;006E 1FFD 002E 0064 0061 0074;006E 00B4 002E 0064 0061 0074;sweep decomposition U+1FFD
+canonical,caseless;006E 219A 002E 0064 0061 0074;006E 2190 0338 002E 0064 0061 0074;sweep decomposition U+219A
+canonical,caseless;006E 2204 002E 0064 0061 0074;006E 2203 0338 002E 0064 0061 0074;sweep decomposition U+2204
+canonical,caseless;006E 2244 002E 0064 0061 0074;006E 2243 0338 002E 0064 0061 0074;sweep decomposition U+2244
+canonical,caseless;006E 226E 002E 0064 0061 0074;006E 003C 0338 002E 0064 0061 0074;sweep decomposition U+226E
+canonical,caseless;006E 2278 002E 0064 0061 0074;006E 2276 0338 002E 0064 0061 0074;sweep decomposition U+2278
+canonical,caseless;006E 2288 002E 0064 0061 0074;006E 2286 0338 002E 0064 0061 0074;sweep decomposition U+2288
+canonical,caseless;006E 22E0 002E 0064 0061 0074;006E 227C 0338 002E 0064 0061 0074;sweep decomposition U+22E0
+canonical,caseless;006E 22EC 002E 0064 0061 0074;006E 22B4 0338 002E 0064 0061 0074;sweep decomposition U+22EC
+canonical,caseless;006E 304E 002E 0064 0061 0074;006E 304D 3099 002E 0064 0061 0074;sweep decomposition U+304E
+canonical,caseless;006E 305A 002E 0064 0061 0074;006E 3059 3099 002E 0064 0061 0074;sweep decomposition U+305A
+canonical,caseless;006E 3067 002E 0064 0061 0074;006E 3066 3099 002E 0064 0061 0074;sweep decomposition U+3067
+canonical,caseless;006E 3076 002E 0064 0061 0074;006E 3075 3099 002E 0064 0061 0074;sweep decomposition U+3076
+canonical,caseless;006E 3094 002E 0064 0061 0074;006E 3046 3099 002E 0064 0061 0074;sweep decomposition U+3094
+canonical,caseless;006E 30B4 002E 0064 0061 0074;006E 30B3 3099 002E 0064 0061 0074;sweep decomposition U+30B4
+canonical,caseless;006E 30C0 002E 0064 0061 0074;006E 30BF 3099 002E 0064 0061 0074;sweep decomposition U+30C0
+canonical,caseless;006E 30D1 002E 0064 0061 0074;006E 30CF 309A 002E 0064 0061 0074;sweep decomposition U+30D1
+canonical,caseless;006E 30DA 002E 0064 0061 0074;006E 30D8 309A 002E 0064 0061 0074;sweep decomposition U+30DA
+canonical,caseless;006E 30F9 002E 0064 0061 0074;006E 30F1 3099 002E 0064 0061 0074;sweep decomposition U+30F9
+canonical,caseless;006E AC03 002E 0064 0061 0074;006E 1100 1161 11AA 002E 0064 0061 0074;sweep decomposition U+AC03
+canonical,caseless;006E AC09 002E 0064 0061 0074;006E 1100 1161 11B0 002E 0064 0061 0074;sweep decomposition U+AC09
+canonical,caseless;006E AC0F 002E 0064 0061 0074;006E 1100 1161 11B6 002E 0064 0061 0074;sweep decomposition U+AC0F
+canonical,caseless;006E AC15 002E 0064 0061 0074;006E 1100 1161 11BC 002E 0064 0061 0074;sweep decomposition U+AC15
+canonical,caseless;006E AC1B 002E 0064 0061 0074;006E 1100 1161 11C2 002E 0064 0061 0074;sweep decomposition U+AC1B
+canonical,caseless;006E AC21 002E 0064 0061 0074;006E 1100 1162 11AC 002E 0064 0061 0074;sweep decomposition U+AC21
+canonical,caseless;006E AC27 002E 0064 0061 0074;006E 1100 1162 11B2 002E 0064 0061 0074;sweep decomposition U+AC27
+canonical,caseless;006E AC2D 002E 0064 0061 0074;006E 1100 1162 11B8 002E 0064 0061 0074;sweep decomposition U+AC2D
+canonical,caseless;006E AC33 002E 0064 0061 0074;006E 1100 1162 11BE 002E 0064 0061 0074;sweep decomposition U+AC33
+canonical,caseless;006E AC39 002E 0064 0061 0074;006E 1100 1163 11A8 002E 0064 0061 0074;sweep decomposition U+AC39
+canonical,caseless;006E AC3F 002E 0064 0061 0074;006E 1100 1163 11AE 002E 0064 0061 0074;sweep decomposition U+AC3F
+canonical,caseless;006E AC45 002E 0064 0061 0074;006E 1100 1163 11B4 002E 0064 0061 0074;sweep decomposition U+AC45
+canonical,caseless;006E AC4B 002E 0064 0061 0074;006E 1100 1163 11BA 002E 0064 0061 0074;sweep decomposition U+AC4B
+canonical,caseless;006E AC51 002E 0064 0061 0074;006E 1100 1163 11C0 002E 0064 0061 0074;sweep decomposition U+AC51
+canonical,caseless;006E AC57 002E 0064 0061 0074;006E 1100 1164 11AA 002E 0064 0061 0074;sweep decomposition U+AC57
+canonical,caseless;006E AC5D 002E 0064 0061 0074;006E 1100 1164 11B0 002E 0064 0061 0074;sweep decomposition U+AC5D
+canonical,caseless;006E AC63 002E 0064 0061 0074;006E 1100 1164 11B6 002E 0064 0061 0074;sweep decomposition U+AC63
+canonical,caseless;006E AC69 002E 0064 0061 0074;006E 1100 1164 11BC 002E 0064 0061 0074;sweep decomposition U+AC69
+canonical,caseless;006E AC6F 002E 0064 0061 0074;006E 1100 1164 11C2 002E 0064 0061 0074;sweep decomposition U+AC6F
+canonical,caseless;006E AC75 002E 0064 0061 0074;006E 1100 1165 11AC 002E 0064 0061 0074;sweep decomposition U+AC75
+canonical,caseless;006E AC7B 002E 0064 0061 0074;006E 1100 1165 11B2 002E 0064 0061 0074;sweep decomposition U+AC7B
+canonical,caseless;006E AC81 002E 0064 0061 0074;006E 1100 1165 11B8 002E 0064 0061 0074;sweep decomposition U+AC81
+canonical,caseless;006E AC87 002E 0064 0061 0074;006E 1100 1165 11BE 002E 0064 0061 0074;sweep decomposition U+AC87
+canonical,caseless;006E AC8D 002E 0064 0061 0074;006E 1100 1166 11A8 002E 0064 0061 0074;sweep decomposition U+AC8D
+canonical,caseless;006E AC93 002E 0064 0061 0074;006E 1100 1166 11AE 002E 0064 0061 0074;sweep decomposition U+AC93
+canonical,caseless;006E AC99 002E 0064 0061 0074;006E 1100 1166 11B4 002E 0064 0061 0074;sweep decomposition U+AC99
+canonical,caseless;006E AC9F 002E 0064 0061 0074;006E 1100 1166 11BA 002E 0064 0061 0074;sweep decomposition U+AC9F
+canonical,caseless;006E ACA5 002E 0064 0061 0074;006E 1100 1166 11C0 002E 0064 0061 0074;sweep decomposition U+ACA5
+canonical,caseless;006E ACAB 002E 0064 0061 0074;006E 1100 1167 11AA 002E 0064 0061 0074;sweep decomposition U+ACAB
+canonical,caseless;006E ACB1 002E 0064 0061 0074;006E 1100 1167 11B0 002E 0064 0061 0074;sweep decomposition U+ACB1
+canonical,caseless;006E ACB7 002E 0064 0061 0074;006E 1100 1167 11B6 002E 0064 0061 0074;sweep decomposition U+ACB7
+canonical,caseless;006E ACBD 002E 0064 0061 0074;006E 1100 1167 11BC 002E 0064 0061 0074;sweep decomposition U+ACBD
+canonical,caseless;006E ACC3 002E 0064 0061 0074;006E 1100 1167 11C2 002E 0064 0061 0074;sweep decomposition U+ACC3
+canonical,caseless;006E ACC9 002E 0064 0061 0074;006E 1100 1168 11AC 002E 0064 0061 0074;sweep decomposition U+ACC9
+canonical,caseless;006E ACCF 002E 0064 0061 0074;006E 1100 1168 11B2 002E 0064 0061 0074;sweep decomposition U+ACCF
+canonical,caseless;006E ACD5 002E 0064 0061 0074;006E 1100 1168 11B8 002E 0064 0061 0074;sweep decomposition U+ACD5
+canonical,caseless;006E ACDB 002E 0064 0061 0074;006E 1100 1168 11BE 002E 0064 0061 0074;sweep decomposition U+ACDB
+canonical,caseless;006E ACE1 002E 0064 0061 0074;006E 1100 1169 11A8 002E 0064 0061 0074;sweep decomposition U+ACE1
+canonical,caseless;006E ACE7 002E 0064 0061 0074;006E 1100 1169 11AE 002E 0064 0061 0074;sweep decomposition U+ACE7
+canonical,caseless;006E ACED 002E 0064 0061 0074;006E 1100 1169 11B4 002E 0064 0061 0074;sweep decomposition U+ACED
+canonical,caseless;006E ACF3 002E 0064 0061 0074;006E 1100 1169 11BA 002E 0064 0061 0074;sweep decomposition U+ACF3
+canonical,caseless;006E ACF9 002E 0064 0061 0074;006E 1100 1169 11C0 002E 0064 0061 0074;sweep decomposition U+ACF9
+canonical,caseless;006E ACFF 002E 0064 0061 0074;006E 1100 116A 11AA 002E 0064 0061 0074;sweep decomposition U+ACFF
+canonical,caseless;006E AD05 002E 0064 0061 0074;006E 1100 116A 11B0 002E 0064 0061 0074;sweep decomposition U+AD05
+canonical,caseless;006E AD0B 002E 0064 0061 0074;006E 1100 116A 11B6 002E 0064 0061 0074;sweep decomposition U+AD0B
+canonical,caseless;006E AD11 002E 0064 0061 0074;006E 1100 116A 11BC 002E 0064 0061 0074;sweep decomposition U+AD11
+canonical,caseless;006E AD17 002E 0064 0061 0074;006E 1100 116A 11C2 002E 0064 0061 0074;sweep decomposition U+AD17
+canonical,caseless;006E AD1D 002E 0064 0061 0074;006E 1100 116B 11AC 002E 0064 0061 0074;sweep decomposition U+AD1D
+canonical,caseless;006E AD23 002E 0064 0061 0074;006E 1100 116B 11B2 002E 0064 0061 0074;sweep decomposition U+AD23
+canonical,caseless;006E AD29 002E 0064 0061 0074;006E 1100 116B 11B8 002E 0064 0061 0074;sweep decomposition U+AD29
+canonical,caseless;006E AD2F 002E 0064 0061 0074;006E 1100 116B 11BE 002E 0064 0061 0074;sweep decomposition U+AD2F
+canonical,caseless;006E AD35 002E 0064 0061 0074;006E 1100 116C 11A8 002E 0064 0061 0074;sweep decomposition U+AD35
+canonical,caseless;006E AD3B 002E 0064 0061 0074;006E 1100 116C 11AE 002E 0064 0061 0074;sweep decomposition U+AD3B
+canonical,caseless;006E AD41 002E 0064 0061 0074;006E 1100 116C 11B4 002E 0064 0061 0074;sweep decomposition U+AD41
+canonical,caseless;006E AD47 002E 0064 0061 0074;006E 1100 116C 11BA 002E 0064 0061 0074;sweep decomposition U+AD47
+canonical,caseless;006E AD4D 002E 0064 0061 0074;006E 1100 116C 11C0 002E 0064 0061 0074;sweep decomposition U+AD4D
+canonical,caseless;006E AD53 002E 0064 0061 0074;006E 1100 116D 11AA 002E 0064 0061 0074;sweep decomposition U+AD53
+canonical,caseless;006E AD59 002E 0064 0061 0074;006E 1100 116D 11B0 002E 0064 0061 0074;sweep decomposition U+AD59
+canonical,caseless;006E AD5F 002E 0064 0061 0074;006E 1100 116D 11B6 002E 0064 0061 0074;sweep decomposition U+AD5F
+canonical,caseless;006E AD65 002E 0064 0061 0074;006E 1100 116D 11BC 002E 0064 0061 0074;sweep decomposition U+AD65
+canonical,caseless;006E AD6B 002E 0064 0061 0074;006E 1100 116D 11C2 002E 0064 0061 0074;sweep decomposition U+AD6B
+canonical,caseless;006E AD71 002E 0064 0061 0074;006E 1100 116E 11AC 002E 0064 0061 0074;sweep decomposition U+AD71
+canonical,caseless;006E AD77 002E 0064 0061 0074;006E 1100 116E 11B2 002E 0064 0061 0074;sweep decomposition U+AD77
+canonical,caseless;006E AD7D 002E 0064 0061 0074;006E 1100 116E 11B8 002E 0064 0061 0074;sweep decomposition U+AD7D
+canonical,caseless;006E AD83 002E 0064 0061 0074;006E 1100 116E 11BE 002E 0064 0061 0074;sweep decomposition U+AD83
+canonical,caseless;006E AD89 002E 0064 0061 0074;006E 1100 116F 11A8 002E 0064 0061 0074;sweep decomposition U+AD89
+canonical,caseless;006E AD8F 002E 0064 0061 0074;006E 1100 116F 11AE 002E 0064 0061 0074;sweep decomposition U+AD8F
+canonical,caseless;006E AD95 002E 0064 0061 0074;006E 1100 116F 11B4 002E 0064 0061 0074;sweep decomposition U+AD95
+canonical,caseless;006E AD9B 002E 0064 0061 0074;006E 1100 116F 11BA 002E 0064 0061 0074;sweep decomposition U+AD9B
+canonical,caseless;006E ADA1 002E 0064 0061 0074;006E 1100 116F 11C0 002E 0064 0061 0074;sweep decomposition U+ADA1
+canonical,caseless;006E ADA7 002E 0064 0061 0074;006E 1100 1170 11AA 002E 0064 0061 0074;sweep decomposition U+ADA7
+canonical,caseless;006E ADAD 002E 0064 0061 0074;006E 1100 1170 11B0 002E 0064 0061 0074;sweep decomposition U+ADAD
+canonical,caseless;006E ADB3 002E 0064 0061 0074;006E 1100 1170 11B6 002E 0064 0061 0074;sweep decomposition U+ADB3
+canonical,caseless;006E ADB9 002E 0064 0061 0074;006E 1100 1170 11BC 002E 0064 0061 0074;sweep decomposition U+ADB9
+canonical,caseless;006E ADBF 002E 0064 0061 0074;006E 1100 1170 11C2 002E 0064 0061 0074;sweep decomposition U+ADBF
+canonical,caseless;006E ADC5 002E 0064 0061 0074;006E 1100 1171 11AC 002E 0064 0061 0074;sweep decomposition U+ADC5
+canonical,caseless;006E ADCB 002E 0064 0061 0074;006E 1100 1171 11B2 002E 0064 0061 0074;sweep decomposition U+ADCB
+canonical,caseless;006E ADD1 002E 0064 0061 0074;006E 1100 1171 11B8 002E 0064 0061 0074;sweep decomposition U+ADD1
+canonical,caseless;006E ADD7 002E 0064 0061 0074;006E 1100 1171 11BE 002E 0064 0061 0074;sweep decomposition U+ADD7
+canonical,caseless;006E ADDD 002E 0064 0061 0074;006E 1100 1172 11A8 002E 0064 0061 0074;sweep decomposition U+ADDD
+canonical,caseless;006E ADE3 002E 0064 0061 0074;006E 1100 1172 11AE 002E 0064 0061 0074;sweep decomposition U+ADE3
+canonical,caseless;006E ADE9 002E 0064 0061 0074;006E 1100 1172 11B4 002E 0064 0061 0074;sweep decomposition U+ADE9
+canonical,caseless;006E ADEF 002E 0064 0061 0074;006E 1100 1172 11BA 002E 0064 0061 0074;sweep decomposition U+ADEF
+canonical,caseless;006E ADF5 002E 0064 0061 0074;006E 1100 1172 11C0 002E 0064 0061 0074;sweep decomposition U+ADF5
+canonical,caseless;006E ADFB 002E 0064 0061 0074;006E 1100 1173 11AA 002E 0064 0061 0074;sweep decomposition U+ADFB
+canonical,caseless;006E AE01 002E 0064 0061 0074;006E 1100 1173 11B0 002E 0064 0061 0074;sweep decomposition U+AE01
+canonical,caseless;006E AE07 002E 0064 0061 0074;006E 1100 1173 11B6 002E 0064 0061 0074;sweep decomposition U+AE07
+canonical,caseless;006E AE0D 002E 0064 0061 0074;006E 1100 1173 11BC 002E 0064 0061 0074;sweep decomposition U+AE0D
+canonical,caseless;006E AE13 002E 0064 0061 0074;006E 1100 1173 11C2 002E 0064 0061 0074;sweep decomposition U+AE13
+canonical,caseless;006E AE19 002E 0064 0061 0074;006E 1100 1174 11AC 002E 0064 0061 0074;sweep decomposition U+AE19
+canonical,caseless;006E AE1F 002E 0064 0061 0074;006E 1100 1174 11B2 002E 0064 0061 0074;sweep decomposition U+AE1F
+canonical,caseless;006E AE25 002E 0064 0061 0074;006E 1100 1174 11B8 002E 0064 0061 0074;sweep decomposition U+AE25
+canonical,caseless;006E AE2B 002E 0064 0061 0074;006E 1100 1174 11BE 002E 0064 0061 0074;sweep decomposition U+AE2B
+canonical,caseless;006E AE31 002E 0064 0061 0074;006E 1100 1175 11A8 002E 0064 0061 0074;sweep decomposition U+AE31
+canonical,caseless;006E AE37 002E 0064 0061 0074;006E 1100 1175 11AE 002E 0064 0061 0074;sweep decomposition U+AE37
+canonical,caseless;006E AE3D 002E 0064 0061 0074;006E 1100 1175 11B4 002E 0064 0061 0074;sweep decomposition U+AE3D
+canonical,caseless;006E AE43 002E 0064 0061 0074;006E 1100 1175 11BA 002E 0064 0061 0074;sweep decomposition U+AE43
+canonical,caseless;006E AE49 002E 0064 0061 0074;006E 1100 1175 11C0 002E 0064 0061 0074;sweep decomposition U+AE49
+canonical,caseless;006E AE4F 002E 0064 0061 0074;006E 1101 1161 11AA 002E 0064 0061 0074;sweep decomposition U+AE4F
+canonical,caseless;006E AE55 002E 0064 0061 0074;006E 1101 1161 11B0 002E 0064 0061 0074;sweep decomposition U+AE55
+canonical,caseless;006E AE5B 002E 0064 0061 0074;006E 1101 1161 11B6 002E 0064 0061 0074;sweep decomposition U+AE5B
+canonical,caseless;006E AE61 002E 0064 0061 0074;006E 1101 1161 11BC 002E 0064 0061 0074;sweep decomposition U+AE61
+canonical,caseless;006E AE67 002E 0064 0061 0074;006E 1101 1161 11C2 002E 0064 0061 0074;sweep decomposition U+AE67
+canonical,caseless;006E AE6D 002E 0064 0061 0074;006E 1101 1162 11AC 002E 0064 0061 0074;sweep decomposition U+AE6D
+canonical,caseless;006E AE73 002E 0064 0061 0074;006E 1101 1162 11B2 002E 0064 0061 0074;sweep decomposition U+AE73
+canonical,caseless;006E AE79 002E 0064 0061 0074;006E 1101 1162 11B8 002E 0064 0061 0074;sweep decomposition U+AE79
+canonical,caseless;006E AE7F 002E 0064 0061 0074;006E 1101 1162 11BE 002E 0064 0061 0074;sweep decomposition U+AE7F
+canonical,caseless;006E AE85 002E 0064 0061 0074;006E 1101 1163 11A8 002E 0064 0061 0074;sweep decomposition U+AE85
+canonical,caseless;006E AE8B 002E 0064 0061 0074;006E 1101 1163 11AE 002E 0064 0061 0074;sweep decomposition U+AE8B
+canonical,caseless;006E AE91 002E 0064 0061 0074;006E 1101 1163 11B4 002E 0064 0061 0074;sweep decomposition U+AE91
+canonical,caseless;006E AE97 002E 0064 0061 0074;006E 1101 1163 11BA 002E 0064 0061 0074;sweep decomposition U+AE97
+canonical,caseless;006E AE9D 002E 0064 0061 0074;006E 1101 1163 11C0 002E 0064 0061 0074;sweep decomposition U+AE9D
+canonical,caseless;006E AEA3 002E 0064 0061 0074;006E 1101 1164 11AA 002E 0064 0061 0074;sweep decomposition U+AEA3
+canonical,caseless;006E AEA9 002E 0064 0061 0074;006E 1101 1164 11B0 002E 0064 0061 0074;sweep decomposition U+AEA9
+canonical,caseless;006E AEAF 002E 0064 0061 0074;006E 1101 1164 11B6 002E 0064 0061 0074;sweep decomposition U+AEAF
+canonical,caseless;006E AEB5 002E 0064 0061 0074;006E 1101 1164 11BC 002E 0064 0061 0074;sweep decomposition U+AEB5
+canonical,caseless;006E AEBB 002E 0064 0061 0074;006E 1101 1164 11C2 002E 0064 0061 0074;sweep decomposition U+AEBB
+canonical,caseless;006E AEC1 002E 0064 0061 0074;006E 1101 1165 11AC 002E 0064 0061 0074;sweep decomposition U+AEC1
+canonical,caseless;006E AEC7 002E 0064 0061 0074;006E 1101 1165 11B2 002E 0064 0061 0074;sweep decomposition U+AEC7
+canonical,caseless;006E AECD 002E 0064 0061 0074;006E 1101 1165 11B8 002E 0064 0061 0074;sweep decomposition U+AECD
+canonical,caseless;006E AED3 002E 0064 0061 0074;006E 1101 1165 11BE 002E 0064 0061 0074;sweep decomposition U+AED3
+canonical,caseless;006E AED9 002E 0064 0061 0074;006E 1101 1166 11A8 002E 0064 0061 0074;sweep decomposition U+AED9
+canonical,caseless;006E AEDF 002E 0064 0061 0074;006E 1101 1166 11AE 002E 0064 0061 0074;sweep decomposition U+AEDF
+canonical,caseless;006E AEE5 002E 0064 0061 0074;006E 1101 1166 11B4 002E 0064 0061 0074;sweep decomposition U+AEE5
+canonical,caseless;006E AEEB 002E 0064 0061 0074;006E 1101 1166 11BA 002E 0064 0061 0074;sweep decomposition U+AEEB
+canonical,caseless;006E AEF1 002E 0064 0061 0074;006E 1101 1166 11C0 002E 0064 0061 0074;sweep decomposition U+AEF1
+canonical,caseless;006E AEF7 002E 0064 0061 0074;006E 1101 1167 11AA 002E 0064 0061 0074;sweep decomposition U+AEF7
+canonical,caseless;006E AEFD 002E 0064 0061 0074;006E 1101 1167 11B0 002E 0064 0061 0074;sweep decomposition U+AEFD
+canonical,caseless;006E AF03 002E 0064 0061 0074;006E 1101 1167 11B6 002E 0064 0061 0074;sweep decomposition U+AF03
+canonical,caseless;006E AF09 002E 0064 0061 0074;006E 1101 1167 11BC 002E 0064 0061 0074;sweep decomposition U+AF09
+canonical,caseless;006E AF0F 002E 0064 0061 0074;006E 1101 1167 11C2 002E 0064 0061 0074;sweep decomposition U+AF0F
+canonical,caseless;006E AF15 002E 0064 0061 0074;006E 1101 1168 11AC 002E 0064 0061 0074;sweep decomposition U+AF15
+canonical,caseless;006E AF1B 002E 0064 0061 0074;006E 1101 1168 11B2 002E 0064 0061 0074;sweep decomposition U+AF1B
+upcase,caseless;0066 0041 002E 0064 0061 0074;0066 0061 002E 0064 0061 0074;sweep case fold U+0041
+upcase,caseless;0066 0048 002E 0064 0061 0074;0066 0068 002E 0064 0061 0074;sweep case fold U+0048
+upcase,caseless;0066 004F 002E 0064 0061 0074;0066 006F 002E 0064 0061 0074;sweep case fold U+004F
+upcase,caseless;0066 0056 002E 0064 0061 0074;0066 0076 002E 0064 0061 0074;sweep case fold U+0056
+upcase,caseless;0066 00C1 002E 0064 0061 0074;0066 00E1 002E 0064 0061 0074;sweep case fold U+00C1
+upcase,caseless;0066 00C8 002E 0064 0061 0074;0066 00E8 002E 0064 0061 0074;sweep case fold U+00C8
+upcase,caseless;0066 00CF 002E 0064 0061 0074;0066 00EF 002E 0064 0061 0074;sweep case fold U+00CF
+upcase,caseless;0066 00D6 002E 0064 0061 0074;0066 00F6 002E 0064 0061 0074;sweep case fold U+00D6
+upcase,caseless;0066 00DE 002E 0064 0061 0074;0066 00FE 002E 0064 0061 0074;sweep case fold U+00DE
+upcase,caseless;0066 010C 002E 0064 0061 0074;0066 010D 002E 0064 0061 0074;sweep case fold U+010C
+upcase,caseless;0066 011A 002E 0064 0061 0074;0066 011B 002E 0064 0061 0074;sweep case fold U+011A
+upcase,caseless;0066 0128 002E 0064 0061 0074;0066 0129 002E 0064 0061 0074;sweep case fold U+0128
+upcase,caseless;0066 0139 002E 0064 0061 0074;0066 013A 002E 0064 0061 0074;sweep case fold U+0139
+upcase,caseless;0066 0147 002E 0064 0061 0074;0066 0148 002E 0064 0061 0074;sweep case fold U+0147
+upcase,caseless;0066 0156 002E 0064 0061 0074;0066 0157 002E 0064 0061 0074;sweep case fold U+0156
+upcase,caseless;0066 0164 002E 0064 0061 0074;0066 0165 002E 0064 0061 0074;sweep case fold U+0164
+upcase,caseless;0066 0172 002E 0064 0061 0074;0066 0173 002E 0064 0061 0074;sweep case fold U+0172
+upcase,caseless;0066 017F 002E 0064 0061 0074;0066 0073 002E 0064 0061 0074;sweep case fold U+017F
+upcase,caseless;0066 018A 002E 0064 0061 0074;0066 0257 002E 0064 0061 0074;sweep case fold U+018A
+upcase,caseless;0066 0194 002E 0064 0061 0074;0066 0263 002E 0064 0061 0074;sweep case fold U+0194
+upcase,caseless;0066 01A0 002E 0064 0061 0074;0066 01A1 002E 0064 0061 0074;sweep case fold U+01A0
+upcase,caseless;0066 01AE 002E 0064 0061 0074;0066 0288 002E 0064 0061 0074;sweep case fold U+01AE
+upcase,caseless;0066 01B8 002E 0064 0061 0074;0066 01B9 002E 0064 0061 0074;sweep case fold U+01B8
+upcase,caseless;0066 01CB 002E 0064 0061 0074;0066 01CC 002E 0064 0061 0074;sweep case fold U+01CB
+upcase,caseless;0066 01D9 002E 0064 0061 0074;0066 01DA 002E 0064 0061 0074;sweep case fold U+01D9
+upcase,caseless;0066 01E8 002E 0064 0061 0074;0066 01E9 002E 0064 0061 0074;sweep case fold U+01E8
+upcase,caseless;0066 01F6 002E 0064 0061 0074;0066 0195 002E 0064 0061 0074;sweep case fold U+01F6
+upcase,caseless;0066 0202 002E 0064 0061 0074;0066 0203 002E 0064 0061 0074;sweep case fold U+0202
+upcase,caseless;0066 0210 002E 0064 0061 0074;0066 0211 002E 0064 0061 0074;sweep case fold U+0210
+upcase,caseless;0066 021E 002E 0064 0061 0074;0066 021F 002E 0064 0061 0074;sweep case fold U+021E
+upcase,caseless;0066 022C 002E 0064 0061 0074;0066 022D 002E 0064 0061 0074;sweep case fold U+022C
+upcase,caseless;0066 023E 002E 0064 0061 0074;0066 2C66 002E 0064 0061 0074;sweep case fold U+023E
+upcase,caseless;0066 024A 002E 0064 0061 0074;0066 024B 002E 0064 0061 0074;sweep case fold U+024A
+upcase,caseless;0066 037F 002E 0064 0061 0074;0066 03F3 002E 0064 0061 0074;sweep case fold U+037F
+upcase,caseless;0066 038F 002E 0064 0061 0074;0066 03CE 002E 0064 0061 0074;sweep case fold U+038F
+upcase,caseless;0066 0397 002E 0064 0061 0074;0066 03B7 002E 0064 0061 0074;sweep case fold U+0397
+upcase,caseless;0066 039E 002E 0064 0061 0074;0066 03BE 002E 0064 0061 0074;sweep case fold U+039E
+upcase,caseless;0066 03A6 002E 0064 0061 0074;0066 03C6 002E 0064 0061 0074;sweep case fold U+03A6
+upcase,caseless;0066 03CF 002E 0064 0061 0074;0066 03D7 002E 0064 0061 0074;sweep case fold U+03CF
+upcase,caseless;0066 03DC 002E 0064 0061 0074;0066 03DD 002E 0064 0061 0074;sweep case fold U+03DC
+upcase,caseless;0066 03EA 002E 0064 0061 0074;0066 03EB 002E 0064 0061 0074;sweep case fold U+03EA
+upcase,caseless;0066 03F7 002E 0064 0061 0074;0066 03F8 002E 0064 0061 0074;sweep case fold U+03F7
+upcase,caseless;0066 0401 002E 0064 0061 0074;0066 0451 002E 0064 0061 0074;sweep case fold U+0401
+upcase,caseless;0066 0408 002E 0064 0061 0074;0066 0458 002E 0064 0061 0074;sweep case fold U+0408
+upcase,caseless;0066 040F 002E 0064 0061 0074;0066 045F 002E 0064 0061 0074;sweep case fold U+040F
+upcase,caseless;0066 0416 002E 0064 0061 0074;0066 0436 002E 0064 0061 0074;sweep case fold U+0416
+upcase,caseless;0066 041D 002E 0064 0061 0074;0066 043D 002E 0064 0061 0074;sweep case fold U+041D
+upcase,caseless;0066 0424 002E 0064 0061 0074;0066 0444 002E 0064 0061 0074;sweep case fold U+0424
+upcase,caseless;0066 042B 002E 0064 0061 0074;0066 044B 002E 0064 0061 0074;sweep case fold U+042B
+upcase,caseless;0066 0464 002E 0064 0061 0074;0066 0465 002E 0064 0061 0074;sweep case fold U+0464
+upcase,caseless;0066 0472 002E 0064 0061 0074;0066 0473 002E 0064 0061 0074;sweep case fold U+0472
+upcase,caseless;0066 0480 002E 0064 0061 0074;0066 0481 002E 0064 0061 0074;sweep case fold U+0480
+upcase,caseless;0066 0496 002E 0064 0061 0074;0066 0497 002E 0064 0061 0074;sweep case fold U+0496
+upcase,caseless;0066 04A4 002E 0064 0061 0074;0066 04A5 002E 0064 0061 0074;sweep case fold U+04A4
+upcase,caseless;0066 04B2 002E 0064 0061 0074;0066 04B3 002E 0064 0061 0074;sweep case fold U+04B2
+upcase,caseless;0066 04C0 002E 0064 0061 0074;0066 04CF 002E 0064 0061 0074;sweep case fold U+04C0
+upcase,caseless;0066 04CD 002E 0064 0061 0074;0066 04CE 002E 0064 0061 0074;sweep case fold U+04CD
+upcase,caseless;0066 04DC 002E 0064 0061 0074;0066 04DD 002E 0064 0061 0074;sweep case fold U+04DC
+upcase,caseless;0066 04EA 002E 0064 0061 0074;0066 04EB 002E 0064 0061 0074;sweep case fold U+04EA
+upcase,caseless;0066 04F8 002E 0064 0061 0074;0066 04F9 002E 0064 0061 0074;sweep case fold U+04F8
+upcase,caseless;0066 0506 002E 0064 0061 0074;0066 0507 002E 0064 0061 0074;sweep case fold U+0506
+upcase,caseless;0066 0514 002E 0064 0061 0074;0066 0515 002E 0064 0061 0074;sweep case fold U+0514
+upcase,caseless;0066 0522 002E 0064 0061 0074;0066 0523 002E 0064 0061 0074;sweep case fold U+0522
+upcase,caseless;0066 0531 002E 0064 0061 0074;0066 0561 002E 0064 0061 0074;sweep case fold U+0531
+upcase,caseless;0066 0538 002E 0064 0061 0074;0066 0568 002E 0064 0061 0074;sweep case fold U+0538
+upcase,caseless;0066 053F 002E 0064 0061 0074;0066 056F 002E 0064 0061 0074;sweep case fold U+053F
+upcase,caseless;0066 0546 002E 0064 0061 0074;0066 0576 002E 0064 0061 0074;sweep case fold U+0546
+upcase,caseless;0066 054D 002E 0064 0061 0074;0066 057D 002E 0064 0061 0074;sweep case fold U+054D
+upcase,caseless;0066 0554 002E 0064 0061 0074;0066 0584 002E 0064 0061 0074;sweep case fold U+0554
+upcase,caseless;0066 10A4 002E 0064 0061 0074;0066 2D04 002E 0064 0061 0074;sweep case fold U+10A4
+upcase,caseless;0066 10AB 002E 0064 0061 0074;0066 2D0B 002E 0064 0061 0074;sweep case fold U+10AB
+upcase,caseless;0066 10B2 002E 0064 0061 0074;0066 2D12 002E 0064 0061 0074;sweep case fold U+10B2
+upcase,caseless;0066 10B9 002E 0064 0061 0074;0066 2D19 002E 0064 0061 0074;sweep case fold U+10B9
+upcase,caseless;0066 10C0 002E 0064 0061 0074;0066 2D20 002E 0064 0061 0074;sweep case fold U+10C0
+upcase,caseless;0066 10CD 002E 0064 0061 0074;0066 2D2D 002E 0064 0061 0074;sweep case fold U+10CD
+upcase,caseless;0066 1C80 002E 0064 0061 0074;0066 0432 002E 0064 0061 0074;sweep case fold U+1C80
+upcase,caseless;0066 1C87 002E 0064 0061 0074;0066 0463 002E 0064 0061 0074;sweep case fold U+1C87
+upcase,caseless;0066 1C95 002E 0064 0061 0074;0066 10D5 002E 0064 0061 0074;sweep case fold U+1C95
+upcase,caseless;0066 1C9C 002E 0064 0061 0074;0066 10DC 002E 0064 0061 0074;sweep case fold U+1C9C
+upcase,caseless;0066 1CA3 002E 0064 0061 0074;0066 10E3 002E 0064 0061 0074;sweep case fold U+1CA3
+upcase,caseless;0066 1CAA 002E 0064 0061 0074;0066 10EA 002E 0064 0061 0074;sweep case fold U+1CAA
+upcase,caseless;0066 1CB1 002E 0064 0061 0074;0066 10F1 002E 0064 0061 0074;sweep case fold U+1CB1
+upcase,caseless;0066 1CB8 002E 0064 0061 0074;0066 10F8 002E 0064 0061 0074;sweep case fold U+1CB8
+upcase,caseless;0066 1E02 002E 0064 0061 0074;0066 1E03 002E 0064 0061 0074;sweep case fold U+1E02
+upcase,caseless;0066 1E10 002E 0064 0061 0074;0066 1E11 002E 0064 0061 0074;sweep case fold U+1E10
+upcase,caseless;0066 1E1E 002E 0064 0061 0074;0066 1E1F 002E 0064 0061 0074;sweep case fold U+1E1E
+upcase,caseless;0066 1E2C 002E 0064 0061 0074;0066 1E2D 002E 0064 0061 0074;sweep case fold U+1E2C
+upcase,caseless;0066 1E3A 002E 0064 0061 0074;0066 1E3B 002E 0064 0061 0074;sweep case fold U+1E3A
+upcase,caseless;0066 1E48 002E 0064 0061 0074;0066 1E49 002E 0064 0061 0074;sweep case fold U+1E48
+upcase,caseless;0066 1E56 002E 0064 0061 0074;0066 1E57 002E 0064 0061 0074;sweep case fold U+1E56
+upcase,caseless;0066 1E64 002E 0064 0061 0074;0066 1E65 002E 0064 0061 0074;sweep case fold U+1E64
+upcase,caseless;0066 1E72 002E 0064 0061 0074;0066 1E73 002E 0064 0061 0074;sweep case fold U+1E72
+upcase,caseless;0066 1E80 002E 0064 0061 0074;0066 1E81 002E 0064 0061 0074;sweep case fold U+1E80
+upcase,caseless;0066 1E8E 002E 0064 0061 0074;0066 1E8F 002E 0064 0061 0074;sweep case fold U+1E8E
+upcase,caseless;0066 1EA2 002E 0064 0061 0074;0066 1EA3 002E 0064 0061 0074;sweep case fold U+1EA2
+upcase,caseless;0066 1EB0 002E 0064 0061 0074;0066 1EB1 002E 0064 0061 0074;sweep case fold U+1EB0
+upcase,caseless;0066 1EBE 002E 0064 0061 0074;0066 1EBF 002E 0064 0061 0074;sweep case fold U+1EBE
+upcase,caseless;0066 1ECC 002E 0064 0061 0074;0066 1ECD 002E 0064 0061 0074;sweep case fold U+1ECC
+upcase,caseless;0066 1EDA 002E 0064 0061 0074;0066 1EDB 002E 0064 0061 0074;sweep case fold U+1EDA
+upcase,caseless;0066 1EE8 002E 0064 0061 0074;0066 1EE9 002E 0064 0061 0074;sweep case fold U+1EE8
+upcase,caseless;0066 1EF6 002E 0064 0061 0074;0066 1EF7 002E 0064 0061 0074;sweep case fold U+1EF6
+upcase,caseless;0066 1F0A 002E 0064 0061 0074;0066 1F02 002E 0064 0061 0074;sweep case fold U+1F0A
+upcase,caseless;0066 1F19 002E 0064 0061 0074;0066 1F11 002E 0064 0061 0074;sweep case fold U+1F19
+upcase,caseless;0066 1F2A 002E 0064 0061 0074;0066 1F22 002E 0064 0061 0074;sweep case fold U+1F2A
+upcase,caseless;0066 1F39 002E 0064 0061 0074;0066 1F31 002E 0064 0061 0074;sweep case fold U+1F39
+upcase,caseless;0066 1F48 002E 0064 0061 0074;0066 1F40 002E 0064 0061 0074;sweep case fold U+1F48
+upcase,caseless;0066 1F5B 002E 0064 0061 0074;0066 1F53 002E 0064 0061 0074;sweep case fold U+1F5B
+upcase,caseless;0066 1F6C 002E 0064 0061 0074;0066 1F64 002E 0064 0061 0074;sweep case fold U+1F6C
+caseless;0066 1F8B 002E 0064 0061 0074;0066 1F83 002E 0064 0061 0074;sweep case fold U+1F8B
+caseless;0066 1F9A 002E 0064 0061 0074;0066 1F92 002E 0064 0061 0074;sweep case fold U+1F9A
+caseless;0066 1FA9 002E 0064 0061 0074;0066 1FA1 002E 0064 0061 0074;sweep case fold U+1FA9
+upcase,caseless;0066 1FB8 002E 0064 0061 0074;0066 1FB0 002E 0064 0061 0074;sweep case fold U+1FB8
+upcase,caseless;0066 1FC9 002E 0064 0061 0074;0066 1F73 002E 0064 0061 0074;sweep case fold U+1FC9
+upcase,caseless;0066 1FDB 002E 0064 0061 0074;0066 1F77 002E 0064 0061 0074;sweep case fold U+1FDB
+upcase,caseless;0066 1FF9 002E 0064 0061 0074;0066 1F79 002E 0064 0061 0074;sweep case fold U+1FF9
+upcase,caseless;0066 2132 002E 0064 0061 0074;0066 214E 002E 0064 0061 0074;sweep case fold U+2132
+upcase,caseless;0066 2166 002E 0064 0061 0074;0066 2176 002E 0064 0061 0074;sweep case fold U+2166
+upcase,caseless;0066 216D 002E 0064 0061 0074;0066 217D 002E 0064 0061 0074;sweep case fold U+216D
+upcase,caseless;0066 24B9 002E 0064 0061 0074;0066 24D3 002E 0064 0061 0074;sweep case fold U+24B9
+upcase,caseless;0066 24C0 002E 0064 0061 0074;0066 24DA 002E 0064 0061 0074;sweep case fold U+24C0
+upcase,caseless;0066 24C7 002E 0064 0061 0074;0066 24E1 002E 0064 0061 0074;sweep case fold U+24C7
+upcase,caseless;0066 24CE 002E 0064 0061 0074;0066 24E8 002E 0064 0061 0074;sweep case fold U+24CE
+upcase,caseless;0066 2C05 002E 0064 0061 0074;0066 2C35 002E 0064 0061 0074;sweep case fold U+2C05
+upcase,caseless;0066 2C0C 002E 0064 0061 0074;0066 2C3C 002E 0064 0061 0074;sweep case fold U+2C0C
+upcase,caseless;0066 2C13 002E 0064 0061 0074;0066 2C43 002E 0064 0061 0074;sweep case fold U+2C13
+upcase,caseless;0066 2C1A 002E 0064 0061 0074;0066 2C4A 002E 0064 0061 0074;sweep case fold U+2C1A
+upcase,caseless;0066 2C21 002E 0064 0061 0074;0066 2C51 002E 0064 0061 0074;sweep case fold U+2C21
+upcase,caseless;0066 2C28 002E 0064 0061 0074;0066 2C58 002E 0064 0061 0074;sweep case fold U+2C28
+upcase,caseless;0066 2C2F 002E 0064 0061 0074;0066 2C5F 002E 0064 0061 0074;sweep case fold U+2C2F
+upcase,caseless;0066 2C6B 002E 0064 0061 0074;0066 2C6C 002E 0064 0061 0074;sweep case fold U+2C6B
+upcase,caseless;0066 2C7E 002E 0064 0061 0074;0066 023F 002E 0064 0061 0074;sweep case fold U+2C7E
+upcase,caseless;0066 2C8A 002E 0064 0061 0074;0066 2C8B 002E 0064 0061 0074;sweep case fold U+2C8A
+upcase,caseless;0066 2C98 002E 0064 0061 0074;0066 2C99 002E 0064 0061 0074;sweep case fold U+2C98
+upcase,caseless;0066 2CA6 002E 0064 0061 0074;0066 2CA7 002E 0064 0061 0074;sweep case fold U+2CA6
+upcase,caseless;0066 2CB4 002E 0064 0061 0074;0066 2CB5 002E 0064 0061 0074;sweep case fold U+2CB4
+upcase,caseless;0066 2CC2 002E 0064 0061 0074;0066 2CC3 002E 0064 0061 0074;sweep case fold U+2CC2
+upcase,caseless;0066 2CD0 002E 0064 0061 0074;0066 2CD1 002E 0064 0061 0074;sweep case fold U+2CD0
+upcase,caseless;0066 2CDE 002E 0064 0061 0074;0066 2CDF 002E 0064 0061 0074;sweep case fold U+2CDE
+upcase,caseless;0066 A642 002E 0064 0061 0074;0066 A643 002E 0064 0061 0074;sweep case fold U+A642
+upcase,caseless;0066 A650 002E 0064 0061 0074;0066 A651 002E 0064 0061 0074;sweep case fold U+A650
+upcase,caseless;0066 A65E 002E 0064 0061 0074;0066 A65F 002E 0064 0061 0074;sweep case fold U+A65E
+upcase,caseless;0066 A66C 002E 0064 0061 0074;0066 A66D 002E 0064 0061 0074;sweep case fold U+A66C
+upcase,caseless;0066 A68C 002E 0064 0061 0074;0066 A68D 002E 0064 0061 0074;sweep case fold U+A68C
+upcase,caseless;0066 A69A 002E 0064 0061 0074;0066 A69B 002E 0064 0061 0074;sweep case fold U+A69A
+upcase,caseless;0066 A72E 002E 0064 0061 0074;0066 A72F 002E 0064 0061 0074;sweep case fold U+A72E
+upcase,caseless;0066 A73E 002E 0064 0061 0074;0066 A73F 002E 0064 0061 0074;sweep case fold U+A73E
+upcase,caseless;0066 A74C 002E 0064 0061 0074;0066 A74D 002E 0064 0061 0074;sweep case fold U+A74C
+upcase,caseless;0066 A75A 002E 0064 0061 0074;0066 A75B 002E 0064 0061 0074;sweep case fold U+A75A
+upcase,caseless;0066 A768 002E 0064 0061 0074;0066 A769 002E 0064 0061 0074;sweep case fold U+A768
+upcase,caseless;0066 A77E 002E 0064 0061 0074;0066 A77F 002E 0064 0061 0074;sweep case fold U+A77E
+upcase,caseless;0066 A790 002E 0064 0061 0074;0066 A791 002E 0064 0061 0074;sweep case fold U+A790
+upcase,caseless;0066 A7A0 002E 0064 0061 0074;0066 A7A1 002E 0064 0061 0074;sweep case fold U+A7A0
+upcase,caseless;0066 A7AC 002E 0064 0061 0074;0066 0261 002E 0064 0061 0074;sweep case fold U+A7AC
+upcase,caseless;0066 A7B4 002E 0064 0061 0074;0066 A7B5 002E 0064 0061 0074;sweep case fold U+A7B4
+upcase,caseless;0066 A7C2 002E 0064 0061 0074;0066 A7C3 002E 0064 0061 0074;sweep case fold U+A7C2
+upcase,caseless;0066 A7D6 002E 0064 0061 0074;0066 A7D7 002E 0064 0061 0074;sweep case fold U+A7D6
+upcase,caseless;0066 AB74 002E 0064 0061 0074;0066 13A4 002E 0064 0061 0074;sweep case fold U+AB74
+upcase,caseless;0066 AB7B 002E 0064 0061 0074;0066 13AB 002E 0064 0061 0074;sweep case fold U+AB7B
+upcase,caseless;0066 AB82 002E 0064 0061 0074;0066 13B2 002E 0064 0061 0074;sweep case fold U+AB82
+upcase,caseless;0066 AB89 002E 0064 0061 0074;0066 13B9 002E 0064 0061 0074;sweep case fold U+AB89
+upcase,caseless;0066 AB90 002E 0064 0061 0074;0066 13C0 002E 0064 0061 0074;sweep case fold U+AB90
+upcase,caseless;0066 AB97 002E 0064 0061 0074;0066 13C7 002E 0064 0061 0074;sweep case fold U+AB97
+upcase,caseless;0066 AB9E 002E 0064 0061 0074;0066 13CE 002E 0064 0061 0074;sweep case fold U+AB9E
+upcase,caseless;0066 ABA5 002E 0064 0061 0074;0066 13D5 002E 0064 0061 0074;sweep case fold U+ABA5
+upcase,caseless;0066 ABAC 002E 0064 0061 0074;0066 13DC 002E 0064 0061 0074;sweep case fold U+ABAC
+upcase,caseless;0066 ABB3 002E 0064 0061 0074;0066 13E3 002E 0064 0061 0074;sweep case fold U+ABB3
+upcase,caseless;0066 ABBA 002E 0064 0061 0074;0066 13EA 002E 0064 0061 0074;sweep case fold U+ABBA
+upcase,caseless;0066 FF22 002E 0064 0061 0074;0066 FF42 002E 0064 0061 0074;sweep case fold U+FF22
+upcase,caseless;0066 FF29 002E 0064 0061 0074;0066 FF49 002E 0064 0061 0074;sweep case fold U+FF29
+upcase,caseless;0066 FF30 002E 0064 0061 0074;0066 FF50 002E 0064 0061 0074;sweep case fold U+FF30
+upcase,caseless;0066 FF37 002E 0064 0061 0074;0066 FF57 002E 0064 0061 0074;sweep case fold U+FF37
+upcase,caseless;0066 10403 002E 0064 0061 0074;0066 1042B 002E 0064 0061 0074;sweep case fold U+10403
+upcase,caseless;0066 1040A 002E 0064 0061 0074;0066 10432 002E 0064 0061 0074;sweep case fold U+1040A
+upcase,caseless;0066 10411 002E 0064 0061 0074;0066 10439 002E 0064 0061 0074;sweep case fold U+10411
+upcase,caseless;0066 10418 002E 0064 0061 0074;0066 10440 002E 0064 0061 0074;sweep case fold U+10418
+upcase,caseless;0066 1041F 002E 0064 0061 0074;0066 10447 002E 0064 0061 0074;sweep case fold U+1041F
+upcase,caseless;0066 10426 002E 0064 0061 0074;0066 1044E 002E 0064 0061 0074;sweep case fold U+10426
+upcase,caseless;0066 104B5 002E 0064 0061 0074;0066 104DD 002E 0064 0061 0074;sweep case fold U+104B5
+upcase,caseless;0066 104BC 002E 0064 0061 0074;0066 104E4 002E 0064 0061 0074;sweep case fold U+104BC
+upcase,caseless;0066 104C3 002E 0064 0061 0074;0066 104EB 002E 0064 0061 0074;sweep case fold U+104C3
+upcase,caseless;0066 104CA 002E 0064 0061 0074;0066 104F2 002E 0064 0061 0074;sweep case fold U+104CA
+upcase,caseless;0066 104D1 002E 0064 0061 0074;0066 104F9 002E 0064 0061 0074;sweep case fold U+104D1
+upcase,caseless;0066 10574 002E 0064 0061 0074;0066 1059B 002E 0064 0061 0074;sweep case fold U+10574
+upcase,caseless;0066 1057C 002E 0064 0061 0074;0066 105A3 002E 0064 0061 0074;sweep case fold U+1057C
+upcase,caseless;0066 10583 002E 0064 0061 0074;0066 105AA 002E 0064 0061 0074;sweep case fold U+10583
+upcase,caseless;0066 1058A 002E 0064 0061 0074;0066 105B1 002E 0064 0061 0074;sweep case fold U+1058A
+upcase,caseless;0066 10592 002E 0064 0061 0074;0066 105B9 002E 0064 0061 0074;sweep case fold U+10592
+upcase,caseless;0066 10C84 002E 0064 0061 0074;0066 10CC4 002E 0064 0061 0074;sweep case fold U+10C84
+upcase,caseless;0066 10C8B 002E 0064 0061 0074;0066 10CCB 002E 0064 0061 0074;sweep case fold U+10C8B
+upcase,caseless;0066 10C92 002E 0064 0061 0074;0066 10CD2 002E 0064 0061 0074;sweep case fold U+10C92
+upcase,caseless;0066 10C99 002E 0064 0061 0074;0066 10CD9 002E 0064 0061 0074;sweep case fold U+10C99
+upcase,caseless;0066 10CA0 002E 0064 0061 0074;0066 10CE0 002E 0064 0061 0074;sweep case fold U+10CA0
+upcase,caseless;0066 10CA7 002E 0064 0061 0074;0066 10CE7 002E 0064 0061 0074;sweep case fold U+10CA7
+upcase,caseless;0066 10CAE 002E 0064 0061 0074;0066 10CEE 002E 0064 0061 0074;sweep case fold U+10CAE
+upcase,caseless;0066 118A2 002E 0064 0061 0074;0066 118C2 002E 0064 0061 0074;sweep case fold U+118A2
+upcase,caseless;0066 118A9 002E 0064 0061 0074;0066 118C9 002E 0064 0061 0074;sweep case fold U+118A9
+upcase,caseless;0066 118B0 002E 0064 0061 0074;0066 118D0 002E 0064 0061 0074;sweep case fold U+118B0
+upcase,caseless;0066 118B7 002E 0064 0061 0074;0066 118D7 002E 0064 0061 0074;sweep case fold U+118B7
+upcase,caseless;0066 118BE 002E 0064 0061 0074;0066 118DE 002E 0064 0061 0074;sweep case fold U+118BE
+upcase,caseless;0066 16E45 002E 0064 0061 0074;0066 16E65 002E 0064 0061 0074;sweep case fold U+16E45
+none;0064 00C0 002E 0064 0061 0074;0064 00C1 002E 0064 0061 0074;sweep distinct U+00C0 U+00C1
+none;0064 00CC 002E 0064 0061 0074;0064 00CD 002E 0064 0061 0074;sweep distinct U+00CC U+00CD
+none;0064 00DA 002E 0064 0061 0074;0064 00DB 002E 0064 0061 0074;sweep distinct U+00DA U+00DB
+none;0064 00E8 002E 0064 0061 0074;0064 00E9 002E 0064 0061 0074;sweep distinct U+00E8 U+00E9
+none;0064 00F4 002E 0064 0061 0074;0064 00F5 002E 0064 0061 0074;sweep distinct U+00F4 U+00F5
+upcase,caseless;0064 0102 002E 0064 0061 0074;0064 0103 002E 0064 0061 0074;sweep distinct U+0102 U+0103
+none;0064 010D 002E 0064 0061 0074;0064 010E 002E 0064 0061 0074;sweep distinct U+010D U+010E
+upcase,caseless;0064 011A 002E 0064 0061 0074;0064 011B 002E 0064 0061 0074;sweep distinct U+011A U+011B
+none;0064 0125 002E 0064 0061 0074;0064 0128 002E 0064 0061 0074;sweep distinct U+0125 U+0128
+none;0064 0135 002E 0064 0061 0074;0064 0136 002E 0064 0061 0074;sweep distinct U+0135 U+0136
+upcase,caseless;0064 0145 002E 0064 0061 0074;0064 0146 002E 0064 0061 0074;sweep distinct U+0145 U+0146
+none;0064 0155 002E 0064 0061 0074;0064 0156 002E 0064 0061 0074;sweep distinct U+0155 U+0156
+upcase,caseless;0064 0160 002E 0064 0061 0074;0064 0161 002E 0064 0061 0074;sweep distinct U+0160 U+0161
+none;0064 016D 002E 0064 0061 0074;0064 016E 002E 0064 0061 0074;sweep distinct U+016D U+016E
+none;0064 0178 002E 0064 0061 0074;0064 0179 002E 0064 0061 0074;sweep distinct U+0178 U+0179
+upcase,caseless;0064 01CD 002E 0064 0061 0074;0064 01CE 002E 0064 0061 0074;sweep distinct U+01CD U+01CE
+none;0064 01D8 002E 0064 0061 0074;0064 01D9 002E 0064 0061 0074;sweep distinct U+01D8 U+01D9
+upcase,caseless;0064 01E6 002E 0064 0061 0074;0064 01E7 002E 0064 0061 0074;sweep distinct U+01E6 U+01E7
+upcase,caseless;0064 01F4 002E 0064 0061 0074;0064 01F5 002E 0064 0061 0074;sweep distinct U+01F4 U+01F5
+none;0064 0201 002E 0064 0061 0074;0064 0202 002E 0064 0061 0074;sweep distinct U+0201 U+0202
+upcase,caseless;0064 020C 002E 0064 0061 0074;0064 020D 002E 0064 0061 0074;sweep distinct U+020C U+020D
+none;0064 0217 002E 0064 0061 0074;0064 0218 002E 0064 0061 0074;sweep distinct U+0217 U+0218
+upcase,caseless;0064 022A 002E 0064 0061 0074;0064 022B 002E 0064 0061 0074;sweep distinct U+022A U+022B
+none;0064 0341 002E 0064 0061 0074;0064 0343 002E 0064 0061 0074;sweep distinct U+0341 U+0343
+none;0064 038C 002E 0064 0061 0074;0064 038E 002E 0064 0061 0074;sweep distinct U+038C U+038E
+none;0064 03CA 002E 0064 0061 0074;0064 03CB 002E 0064 0061 0074;sweep distinct U+03CA U+03CB
+none;0064 040C 002E 0064 0061 0074;0064 040D 002E 0064 0061 0074;sweep distinct U+040C U+040D
+none;0064 045E 002E 0064 0061 0074;0064 0476 002E 0064 0061 0074;sweep distinct U+045E U+0476
+upcase,caseless;0064 04DA 002E 0064 0061 0074;0064 04DB 002E 0064 0061 0074;sweep distinct U+04DA U+04DB
+none;0064 04E7 002E 0064 0061 0074;0064 04EA 002E 0064 0061 0074;sweep distinct U+04E7 U+04EA
+upcase,caseless;0064 04F4 002E 0064 0061 0074;0064 04F5 002E 0064 0061 0074;sweep distinct U+04F4 U+04F5
+none;0064 06D3 002E 0064 0061 0074;0064 0929 002E 0064 0061 0074;sweep distinct U+06D3 U+0929
+none;0064 095F 002E 0064 0061 0074;0064 09CB 002E 0064 0061 0074;sweep distinct U+095F U+09CB
+none;0064 0A5E 002E 0064 0061 0074;0064 0B48 002E 0064 0061 0074;sweep distinct U+0A5E U+0B48
+none;0064 0CC0 002E 0064 0061 0074;0064 0CC7 002E 0064 0061 0074;sweep distinct U+0CC0 U+0CC7
+none;0064 0DDE 002E 0064 0061 0074;0064 0F43 002E 0064 0061 0074;sweep distinct U+0DDE U+0F43
+none;0064 0F81 002E 0064 0061 0074;0064 0F93 002E 0064 0061 0074;sweep distinct U+0F81 U+0F93
+none;0064 1B0C 002E 0064 0061 0074;0064 1B0E 002E 0064 0061 0074;sweep distinct U+1B0C U+1B0E
+none;0064 1E03 002E 0064 0061 0074;0064 1E04 002E 0064 0061 0074;sweep distinct U+1E03 U+1E04
+upcase,caseless;0064 1E0E 002E 0064 0061 0074;0064 1E0F 002E 0064 0061 0074;sweep distinct U+1E0E U+1E0F
+none;0064 1E19 002E 0064 0061 0074;0064 1E1A 002E 0064 0061 0074;sweep distinct U+1E19 U+1E1A
+upcase,caseless;0064 1E24 002E 0064 0061 0074;0064 1E25 002E 0064 0061 0074;sweep distinct U+1E24 U+1E25
+none;0064 1E2F 002E 0064 0061 0074;0064 1E30 002E 0064 0061 0074;sweep distinct U+1E2F U+1E30
+upcase,caseless;0064 1E3A 002E 0064 0061 0074;0064 1E3B 002E 0064 0061 0074;sweep distinct U+1E3A U+1E3B
+none;0064 1E45 002E 0064 0061 0074;0064 1E46 002E 0064 0061 0074;sweep distinct U+1E45 U+1E46
+upcase,caseless;0064 1E50 002E 0064 0061 0074;0064 1E51 002E 0064 0061 0074;sweep distinct U+1E50 U+1E51
+none;0064 1E5B 002E 0064 0061 0074;0064 1E5C 002E 0064 0061 0074;sweep distinct U+1E5B U+1E5C
+upcase,caseless;0064 1E66 002E 0064 0061 0074;0064 1E67 002E 0064 0061 0074;sweep distinct U+1E66 U+1E67
+none;0064 1E71 002E 0064 0061 0074;0064 1E72 002E 0064 0061 0074;sweep distinct U+1E71 U+1E72
+upcase,caseless;0064 1E7C 002E 0064 0061 0074;0064 1E7D 002E 0064 0061 0074;sweep distinct U+1E7C U+1E7D
+none;0064 1E87 002E 0064 0061 0074;0064 1E88 002E 0064 0061 0074;sweep distinct U+1E87 U+1E88
+upcase,caseless;0064 1E92 002E 0064 0061 0074;0064 1E93 002E 0064 0061 0074;sweep distinct U+1E92 U+1E93
+upcase,caseless;0064 1EA2 002E 0064 0061 0074;0064 1EA3 002E 0064 0061 0074;sweep distinct U+1EA2 U+1EA3
+none;0064 1EAD 002E 0064 0061 0074;0064 1EAE 002E 0064 0061 0074;sweep distinct U+1EAD U+1EAE
+upcase,caseless;0064 1EB8 002E 0064 0061 0074;0064 1EB9 002E 0064 0061 0074;sweep distinct U+1EB8 U+1EB9
+none;0064 1EC3 002E 0064 0061 0074;0064 1EC4 002E 0064 0061 0074;sweep distinct U+1EC3 U+1EC4
+upcase,caseless;0064 1ECE 002E 0064 0061 0074;0064 1ECF 002E 0064 0061 0074;sweep distinct U+1ECE U+1ECF
+none;0064 1ED9 002E 0064 0061 0074;0064 1EDA 002E 0064 0061 0074;sweep distinct U+1ED9 U+1EDA
+upcase,caseless;0064 1EE4 002E 0064 0061 0074;0064 1EE5 002E 0064 0061 0074;sweep distinct U+1EE4 U+1EE5
+none;0064 1EEF 002E 0064 0061 0074;0064 1EF0 002E 0064 0061 0074;sweep distinct U+1EEF U+1EF0
+none;0064 1F00 002E 0064 0061 0074;0064 1F01 002E 0064 0061 0074;sweep distinct U+1F00 U+1F01
+none;0064 1F0B 002E 0064 0061 0074;0064 1F0C 002E 0064 0061 0074;sweep distinct U+1F0B U+1F0C
+none;0064 1F18 002E 0064 0061 0074;0064 1F19 002E 0064 0061 0074;sweep distinct U+1F18 U+1F19
+none;0064 1F25 002E 0064 0061 0074;0064 1F26 002E 0064 0061 0074;sweep distinct U+1F25 U+1F26
+none;0064 1F30 002E 0064 0061 0074;0064 1F31 002E 0064 0061 0074;sweep distinct U+1F30 U+1F31
+none;0064 1F3B 002E 0064 0061 0074;0064 1F3C 002E 0064 0061 0074;sweep distinct U+1F3B U+1F3C
+none;0064 1F48 002E 0064 0061 0074;0064 1F49 002E 0064 0061 0074;sweep distinct U+1F48 U+1F49
+none;0064 1F55 002E 0064 0061 0074;0064 1F56 002E 0064 0061 0074;sweep distinct U+1F55 U+1F56
+none;0064 1F64 002E 0064 0061 0074;0064 1F65 002E 0064 0061 0074;sweep distinct U+1F64 U+1F65
+none;0064 1F6F 002E 0064 0061 0074;0064 1F70 002E 0064 0061 0074;sweep distinct U+1F6F U+1F70
+none;0064 1F7A 002E 0064 0061 0074;0064 1F7B 002E 0064 0061 0074;sweep distinct U+1F7A U+1F7B
+none;0064 1F87 002E 0064 0061 0074;0064 1F88 002E 0064 0061 0074;sweep distinct U+1F87 U+1F88
+none;0064 1F92 002E 0064 0061 0074;0064 1F93 002E 0064 0061 0074;sweep distinct U+1F92 U+1F93
+none;0064 1F9D 002E 0064 0061 0074;0064 1F9E 002E 0064 0061 0074;sweep distinct U+1F9D U+1F9E
+none;0064 1FA8 002E 0064 0061 0074;0064 1FA9 002E 0064 0061 0074;sweep distinct U+1FA8 U+1FA9
+none;0064 1FB3 002E 0064 0061 0074;0064 1FB4 002E 0064 0061 0074;sweep distinct U+1FB3 U+1FB4
+none;0064 1FC2 002E 0064 0061 0074;0064 1FC3 002E 0064 0061 0074;sweep distinct U+1FC2 U+1FC3
+none;0064 1FCE 002E 0064 0061 0074;0064 1FCF 002E 0064 0061 0074;sweep distinct U+1FCE U+1FCF
+none;0064 1FDB 002E 0064 0061 0074;0064 1FDD 002E 0064 0061 0074;sweep distinct U+1FDB U+1FDD
+none;0064 1FE7 002E 0064 0061 0074;0064 1FE8 002E 0064 0061 0074;sweep distinct U+1FE7 U+1FE8
+none;0064 1FF4 002E 0064 0061 0074;0064 1FF6 002E 0064 0061 0074;sweep distinct U+1FF4 U+1FF6
+none;0064 2126 002E 0064 0061 0074;0064 212A 002E 0064 0061 0074;sweep distinct U+2126 U+212A
+none;0064 220C 002E 0064 0061 0074;0064 2224 002E 0064 0061 0074;sweep distinct U+220C U+2224
+none;0064 226F 002E 0064 0061 0074;0064 2270 002E 0064 0061 0074;sweep distinct U+226F U+2270
+none;0064 2288 002E 0064 0061 0074;0064 2289 002E 0064 0061 0074;sweep distinct U+2288 U+2289
+none;0064 22EB 002E 0064 0061 0074;0064 22EC 002E 0064 0061 0074;sweep distinct U+22EB U+22EC
+none;0064 3056 002E 0064 0061 0074;0064 3058 002E 0064 0061 0074;sweep distinct U+3056 U+3058
+none;0064 3071 002E 0064 0061 0074;0064 3073 002E 0064 0061 0074;sweep distinct U+3071 U+3073
+none;0064 30AC 002E 0064 0061 0074;0064 30AE 002E 0064 0061 0074;sweep distinct U+30AC U+30AE
+none;0064 30C2 002E 0064 0061 0074;0064 30C5 002E 0064 0061 0074;sweep distinct U+30C2 U+30C5
+none;0064 30DA 002E 0064 0061 0074;0064 30DC 002E 0064 0061 0074;sweep distinct U+30DA U+30DC
+none;0064 AC02 002E 0064 0061 0074;0064 AC03 002E 0064 0061 0074;sweep distinct U+AC02 U+AC03
+none;0064 AC0D 002E 0064 0061 0074;0064 AC0E 002E 0064 0061 0074;sweep distinct U+AC0D U+AC0E
+none;0064 AC18 002E 0064 0061 0074;0064 AC19 002E 0064 0061 0074;sweep distinct U+AC18 U+AC19
+none;0064 AC23 002E 0064 0061 0074;0064 AC24 002E 0064 0061 0074;sweep distinct U+AC23 U+AC24
+none;0064 AC2E 002E 0064 0061 0074;0064 AC2F 002E 0064 0061 0074;sweep distinct U+AC2E U+AC2F
+none;0064 AC39 002E 0064 0061 0074;0064 AC3A 002E 0064 0061 0074;sweep distinct U+AC39 U+AC3A
+none;0064 AC44 002E 0064 0061 0074;0064 AC45 002E 0064 0061 0074;sweep distinct U+AC44 U+AC45
+none;0064 AC4F 002E 0064 0061 0074;0064 AC50 002E 0064 0061 0074;sweep distinct U+AC4F U+AC50
+none;0064 AC5A 002E 0064 0061 0074;0064 AC5B 002E 0064 0061 0074;sweep distinct U+AC5A U+AC5B
+none;0064 AC65 002E 0064 0061 0074;0064 AC66 002E 0064 0061 0074;sweep distinct U+AC65 U+AC66
+none;0064 AC70 002E 0064 0061 0074;0064 AC71 002E 0064 0061 0074;sweep distinct U+AC70 U+AC71
+none;0064 AC7B 002E 0064 0061 0074;0064 AC7C 002E 0064 0061 0074;sweep distinct U+AC7B U+AC7C
+none;0064 AC86 002E 0064 0061 0074;0064 AC87 002E 0064 0061 0074;sweep distinct U+AC86 U+AC87
+none;0064 AC91 002E 0064 0061 0074;0064 AC92 002E 0064 0061 0074;sweep distinct U+AC91 U+AC92
+none;0064 AC9C 002E 0064 0061 0074;0064 AC9D 002E 0064 0061 0074;sweep distinct U+AC9C U+AC9D
+none;0064 ACA7 002E 0064 0061 0074;0064 ACA8 002E 0064 0061 0074;sweep distinct U+ACA7 U+ACA8
+none;0064 ACB2 002E 0064 0061 0074;0064 ACB3 002E 0064 0061 0074;sweep distinct U+ACB2 U+ACB3
+none;0064 ACBD 002E 0064 0061 0074;0064 ACBE 002E 0064 0061 0074;sweep distinct U+ACBD U+ACBE
+none;0064 ACC8 002E 0064 0061 0074;0064 ACC9 002E 0064 0061 0074;sweep distinct U+ACC8 U+ACC9
+none;0064 ACD3 002E 0064 0061 0074;0064 ACD4 002E 0064 0061 0074;sweep distinct U+ACD3 U+ACD4
+none;0064 ACDE 002E 0064 0061 0074;0064 ACDF 002E 0064 0061 0074;sweep distinct U+ACDE U+ACDF
+none;0064 ACE9 002E 0064 0061 0074;0064 ACEA 002E 0064 0061 0074;sweep distinct U+ACE9 U+ACEA
+none;0064 ACF4 002E 0064 0061 0074;0064 ACF5 002E 0064 0061 0074;sweep distinct U+ACF4 U+ACF5
+none;0064 ACFF 002E 0064 0061 0074;0064 AD00 002E 0064 0061 0074;sweep distinct U+ACFF U+AD00
+none;0064 AD0A 002E 0064 0061 0074;0064 AD0B 002E 0064 0061 0074;sweep distinct U+AD0A U+AD0B
+none;0064 AD15 002E 0064 0061 0074;0064 AD16 002E 0064 0061 0074;sweep distinct U+AD15 U+AD16
+none;0064 AD20 002E 0064 0061 0074;0064 AD21 002E 0064 0061 0074;sweep distinct U+AD20 U+AD21
+none;0064 AD2B 002E 0064 0061 0074;0064 AD2C 002E 0064 0061 0074;sweep distinct U+AD2B U+AD2C
+none;0064 AD36 002E 0064 0061 0074;0064 AD37 002E 0064 0061 0074;sweep distinct U+AD36 U+AD37
+canonical,upcase,caseless;03B9 002E 0074 0078 0074;1FBE 002E 0074 0078 0074;iota and prosgegrammeni: one canonical form AND one uppercase
+upcase;0131 002E 0074 0078 0074;0069 002E 0074 0078 0074;dotless i uppercases to I but folds to itself
+canonical,caseless;212B 002E 0074 0078 0074;00C5 002E 0074 0078 0074;angstrom sign and A-ring: canonically equal, uppercase apart
+canonical,caseless;212A 002E 0074 0078 0074;004B 002E 0074 0078 0074;kelvin sign and K: uppercase equal, canonically apart
+canonical,caseless;2126 002E 0074 0078 0074;03A9 002E 0074 0078 0074;ohm sign and capital omega

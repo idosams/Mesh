@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Mesh restores only daemon-verified managed workspaces through recent-workspace.json.
+    AppKit's independent window restoration can stop before Tauri setup after an interrupted
+    developer build and therefore prevent the local daemon from binding at all.
+  -->
+  <key>NSQuitAlwaysKeepsWindows</key>
+  <false/>
+</dict>
+</plist>

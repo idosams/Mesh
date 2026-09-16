@@ -1,0 +1,67 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "linux-git-checkout-in-place",
+  "title": "git checkout on Linux rewrites the working file in place — where the same operation on darwin replaced its identity",
+  "category": "vcs",
+  "tool": { "name": "git", "version": "git version 2.39.5", "platform": "linux 6.10.14 aarch64, Debian 12 (bookworm), overlayfs" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["git", "checkout", "other"],
+    "evidence": "Two readings. `a.txt` KEEPS inode 550214 and goes 4 -> 12 bytes: the working file is rewritten in place, not replaced. `.git/HEAD` keeps its name and changes inode 550223 -> 550218, and `.git/index` likewise 550218 -> 550231 — both are rename-into-place. `.git/logs/HEAD` grows in place, 546 -> 693. Captured by tests/compatibility/save-patterns/v0/capture.mjs.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "polling cannot order the four changes within a single reading"]
+  },
+  "objects": [
+    { "object": 1, "role": "a.txt, the working file — one identity, rewritten in place" },
+    { "object": 2, "role": ".git/HEAD — replaced by rename into place" },
+    { "object": 3, "role": ".git/index — replaced by rename into place" },
+    { "object": 4, "role": ".git/logs/HEAD — appended in place" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Renamed", "object": 3 },
+        { "sequence": 2, "kind": "Opened", "object": 1 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Closed", "object": 1 },
+        { "sequence": 5, "kind": "Renamed", "object": 2 },
+        { "sequence": 6, "kind": "Opened", "object": 4 },
+        { "sequence": 7, "kind": "Written", "object": 4 },
+        { "sequence": 8, "kind": "Closed", "object": 4 }
+      ],
+      "candidates": [
+        { "through": 4, "reason": "Closed" },
+        { "through": 5, "reason": "RenamedIntoPlace" },
+        { "through": 8, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Renamed", "object": 2 },
+        { "sequence": 2, "kind": "Renamed", "object": 3 },
+        { "sequence": 3, "kind": "Written", "object": 4 },
+        { "sequence": 4, "kind": "Written", "object": 1 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [],
+      "omission_note": "No omission is declared admissible: each of the four changes belongs to a different object, so dropping a reading loses an object rather than merging two views of one."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 8, "reason": "Closed" } ], "boundary_evidence": { "through": 8, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 4, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 8, "folder": 4 },
+    "meaningful_durable_change": "The working tree is at branch `other`: a.txt holds twelve bytes and the repository's own HEAD and index agree with it. One durable change for one branch switch — and it is only meaningful once BOTH the working file and the repository metadata have settled.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6, 7], "folder": [1, 2, 3] },
+    "forbidden_note": "Mount 4 is the trap. The working file has closed and looks complete, so a Closed-anchored trigger would fire — but `.git/HEAD` has not yet been renamed into place, so the checkpoint would record a workspace whose file contents say `other` and whose repository says `master`. A checkpoint of a self-inconsistent repository is worse than a late one.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "SECOND CROSS-PLATFORM DIVERGENCE. The darwin capture (git-checkout-switch-branch) records a.txt VANISHING at one inode and reappearing at a new one. On Linux the same git operation, one minor version apart, keeps the inode and rewrites in place. Object identity across a checkout is therefore a platform property, not a git property.",
+    "The consequence for coalescing is asymmetric: on darwin the working file's identity change is a rename the coalescer must not span; on Linux there is no such rename and the same save looks like an ordinary in-place write. A rule that keys on identity change would treat the two platforms' identical user action as two different kinds of event.",
+    "Three candidates are offered and only the last is meaningful. This is the clearest case in the corpus for why a candidate is recorded rather than acted on: two of the three would checkpoint a repository mid-switch."
+  ]
+}

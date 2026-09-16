@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mesh — Local workspace</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="app.js"></script>
+    <script type="module" src="review-workbench-next/review-workbench-island.js"></script>
+    <script type="module" src="renderer-proof.js"></script>
+  </head>
+  <body>
+    <div id="mesh-app-next" aria-label="Mesh">
+      <div id="workspace-chrome-next" class="hidden" aria-label="Workspace header" slot="workspace-header"></div>
+      <div id="workspace-entry-next" class="hidden" aria-label="Workspace entry" slot="workspace-entry"></div>
+      <div id="import-workbench-next" class="hidden" aria-label="New folder import" slot="import-workbench"></div>
+      <section id="workspace-overview-next" class="workspace-required hidden" aria-label="New workspace overview" slot="workspace-overview"></section>
+      <div id="workspace-current-next" class="hidden" aria-label="New current workspace details" slot="workspace-current"></div>
+      <div id="workspace-files-next" class="hidden" aria-label="New files workspace" slot="workspace-files"></div>
+      <div id="workspace-changes-next" class="hidden" aria-label="New changes workspace" slot="workspace-changes"></div>
+      <div id="review-workbench-next" class="hidden" aria-label="New review workbench" slot="review-workbench"></div>
+      <div id="workspace-versions-next" class="hidden" aria-label="New workspace version navigator" slot="workspace-versions"></div>
+      <div id="workspace-destination-next" class="hidden" aria-label="New destination update panel" slot="workspace-destination"></div>
+      <div id="workspace-restore-next" class="hidden" aria-label="New restore panel" slot="workspace-restore"></div>
+      <div id="confirmation-dialog-next" slot="confirmation-dialog"></div>
+    </div>
+  </body>
+</html>

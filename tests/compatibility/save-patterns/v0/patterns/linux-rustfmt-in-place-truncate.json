@@ -1,0 +1,53 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "linux-rustfmt-in-place-truncate",
+  "title": "The same formatter, on Linux, rewrites in place and passes through length zero — identically to darwin",
+  "category": "formatter",
+  "tool": { "name": "rustfmt, via cargo fmt", "version": "rustfmt 1.9.0-stable (8bab26f4f6 2026-07-14)", "platform": "linux 6.10.14 aarch64, Debian 12 (bookworm), overlayfs" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["cargo", "fmt"],
+    "evidence": "Two readings. `src/main.rs` at inode 550240 goes 37 -> 0 bytes, then the SAME inode goes 0 -> 52 bytes. No temporary file appears at any reading; the inode never changes. Captured by tests/compatibility/save-patterns/v0/capture.mjs in the image built from Dockerfile.capture, against rustfmt 1.9.0-stable — the SAME build as the darwin capture, which is what makes the two comparable rather than merely similar.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling"]
+  },
+  "objects": [
+    { "object": 1, "role": "src/main.rs, the source file — one identity throughout" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Closed", "object": 1 }
+      ],
+      "candidates": [ { "through": 4, "reason": "Closed" } ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 1 },
+        { "sequence": 2, "kind": "Written", "object": 1 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1]],
+      "omission_note": "A formatter fast enough to finish inside one reading is seen as a single Written — the folder-watching backend's first declared restriction, and here the SAFE outcome, because the empty state is what gets skipped."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 4, "reason": "Closed" } ], "boundary_evidence": { "through": 4, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 2, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 4, "folder": 2 },
+    "meaningful_durable_change": "src/main.rs holds the formatted text. One durable change for one formatter run over one file.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3], "folder": [1] },
+    "forbidden_note": "Mount sequence 2 and folder sequence 1 are the measured zero-length state, on Linux as on darwin.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "This is the CONTROL in the cross-platform pair. rustfmt produces byte-for-byte the same object-identity story on both platforms — one inode, through zero, back up — which is what licenses the corpus to treat in-place truncate-then-rewrite as a property of `File::create` + `write` rather than of a filesystem.",
+    "It matters that this one matches, because its neighbours do not: linux-vim-rename-over-with-backup and linux-git-checkout-in-place both diverge from their darwin counterparts. A corpus where every Linux capture diverged would suggest the capture method differs by platform; one where the formatter matches exactly and the editor does not locates the difference in the tools."
+  ]
+}

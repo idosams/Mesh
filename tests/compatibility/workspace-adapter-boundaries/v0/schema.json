@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mesh-workspace-adapter-boundaries/0/schema",
+  "title": "Workspace adapter boundary contract documents",
+  "oneOf": [
+    { "$ref": "#/$defs/contractDocument" },
+    { "$ref": "#/$defs/identityFixtureDocument" },
+    { "$ref": "#/$defs/producerFixtureDocument" },
+    { "$ref": "#/$defs/compatibilityFixtureDocument" }
+  ],
+  "$defs": {
+    "contractToken": {
+      "const": "mesh-workspace-adapter-boundaries/0"
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parent", "name", "object"],
+      "properties": {
+        "parent": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "object": { "type": "string", "minLength": 1 }
+      }
+    },
+    "destinationBefore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "object"],
+      "properties": {
+        "state": { "enum": ["unbound", "bound"] },
+        "object": { "type": ["string", "null"] }
+      }
+    },
+    "unsupportedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "code", "missing"],
+      "properties": {
+        "result": { "const": "unsupported" },
+        "code": { "const": "rename-binding-evidence-unavailable" },
+        "missing": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "availableEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "view", "sequence", "source_before", "destination_before", "destination_after"],
+      "properties": {
+        "result": { "const": "available" },
+        "view": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "source_before": { "$ref": "#/$defs/binding" },
+        "destination_before": { "$ref": "#/$defs/destinationBefore" },
+        "destination_after": { "$ref": "#/$defs/binding" },
+        "descendants": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["relative_bindings", "synthetic_child_events"],
+          "properties": {
+            "relative_bindings": { "const": "unchanged" },
+            "synthetic_child_events": { "const": 0 }
+          }
+        }
+      }
+    },
+    "identityExpected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["moved_object_identity", "destination_binding"],
+      "properties": {
+        "moved_object_identity": { "enum": ["preserved", "changed", "unsupported"] },
+        "destination_binding": { "enum": ["created", "preserved", "replaced", "unsupported"] },
+        "descendants": { "const": "preserved-by-ancestor" }
+      }
+    },
+    "identityFixtureDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "cases"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contractToken" },
+        "cases": {
+          "type": "array",
+          "minItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "operation", "evidence", "expected"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "operation": { "enum": ["rename", "move", "replace", "rename-directory"] },
+              "evidence": {
+                "oneOf": [
+                  { "$ref": "#/$defs/availableEvidence" },
+                  { "$ref": "#/$defs/unsupportedEvidence" }
+                ]
+              },
+              "expected": { "$ref": "#/$defs/identityExpected" }
+            }
+          }
+        }
+      }
+    },
+    "producerFixtureDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "cases"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contractToken" },
+        "cases": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "backend", "reason", "producer", "result"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "backend": { "enum": ["mount", "folder"] },
+              "reason": { "enum": ["Closed", "Synced", "RenamedIntoPlace"] },
+              "producer": { "type": ["string", "null"] },
+              "result": { "enum": ["produced", "unsupported"] },
+              "evidence": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": { "type": "string" }
+              },
+              "code": { "const": "durable-boundary-evidence-unavailable" }
+            }
+          }
+        }
+      }
+    },
+    "compatibilityFixtureDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "cases"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contractToken" },
+        "cases": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "source_contract", "target_contract", "input", "expected"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "source_contract": { "type": "string", "minLength": 1 },
+              "target_contract": { "const": "mesh-workspace-adapter/1" },
+              "input": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["reason"],
+                "properties": { "reason": { "type": "string", "minLength": 1 } }
+              },
+              "expected": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["result"],
+                "properties": {
+                  "result": { "enum": ["valid", "unsupported", "incompatible", "refused"] },
+                  "reason": { "type": "string" },
+                  "code": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contractDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract", "task", "design", "adapter_transition", "association", "ordering",
+        "normalization", "evidence", "identity_predicate", "boundary_reasons", "producers",
+        "backend_claims", "compatibility", "handoffs"
+      ],
+      "properties": {
+        "contract": { "$ref": "#/$defs/contractToken" },
+        "task": { "const": "01KZM79S1CNB92505KBB9EZPBM" },
+        "design": { "const": "01M0E2ZW2VPM66R1FZXQRR2CV5" },
+        "adapter_transition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to", "negotiation", "composition"],
+          "properties": {
+            "from": { "const": "mesh-workspace-adapter/0" },
+            "to": { "const": "mesh-workspace-adapter/1" },
+            "negotiation": { "const": "exact-contract-string" },
+            "composition": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "type": "string" } }
+          }
+        },
+        "association": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["carrier", "event_key", "cardinality", "absence"],
+          "properties": {
+            "carrier": { "const": "separate-evidence-object" },
+            "event_key": { "const": ["view", "sequence"] },
+            "cardinality": { "const": "zero-or-one" },
+            "absence": { "const": "explicit-unsupported" }
+          }
+        },
+        "ordering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["view_extent", "concurrent_evidence", "winner", "wall_clock"],
+          "properties": {
+            "view_extent": { "const": "EventSequence-ascending-within-one-view" },
+            "concurrent_evidence": { "const": ["lamport", "event_ulid", "content_hash"] },
+            "winner": { "const": "lexicographic-maximum" },
+            "wall_clock": { "const": "forbidden" }
+          }
+        },
+        "normalization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["parent", "name", "unicode_normalization", "case_folding"],
+          "properties": {
+            "parent": { "const": "ObjectId-exact" },
+            "name": { "const": "NormalizedName-utf8-bytes-exact" },
+            "unicode_normalization": { "const": "none" },
+            "case_folding": { "const": "none" }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available_fields", "destination_before_states", "unsupported"],
+          "properties": {
+            "available_fields": { "type": "array", "minItems": 10, "uniqueItems": true, "items": { "type": "string" } },
+            "destination_before_states": { "const": ["unbound", "bound"] },
+            "unsupported": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["result", "code", "missing_members", "guessing"],
+              "properties": {
+                "result": { "const": "unsupported" },
+                "code": { "const": "rename-binding-evidence-unavailable" },
+                "missing_members": { "type": "array", "minItems": 8, "uniqueItems": true, "items": { "type": "string" } },
+                "guessing": { "const": "forbidden" }
+              }
+            }
+          }
+        },
+        "identity_predicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["moved_object_identity", "destination_binding", "directory_descendants"],
+          "properties": {
+            "moved_object_identity": {
+              "type": "object", "additionalProperties": false,
+              "required": ["preserved_when", "changed_when"],
+              "properties": { "preserved_when": { "type": "string" }, "changed_when": { "type": "string" } }
+            },
+            "destination_binding": {
+              "type": "object", "additionalProperties": false,
+              "required": ["created_when", "preserved_when", "replaced_when"],
+              "properties": { "created_when": { "type": "string" }, "preserved_when": { "type": "string" }, "replaced_when": { "type": "string" } }
+            },
+            "directory_descendants": {
+              "type": "object", "additionalProperties": false,
+              "required": ["outcome", "requires", "synthetic_child_events"],
+              "properties": {
+                "outcome": { "const": "preserved-by-ancestor" },
+                "requires": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string" } },
+                "synthetic_child_events": { "const": "forbidden" }
+              }
+            }
+          }
+        },
+        "boundary_reasons": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["retained", "removed"],
+          "properties": {
+            "retained": { "const": ["Closed", "Synced", "RenamedIntoPlace"] },
+            "removed": {
+              "type": "array", "minItems": 1, "maxItems": 1,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["reason", "compatibility", "why"],
+                "properties": {
+                  "reason": { "const": "MetadataSettled" },
+                  "compatibility": { "const": "adapter-0-only-rejected-by-adapter-1" },
+                  "why": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "producers": {
+          "type": "array", "minItems": 3, "maxItems": 3,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["reason", "producer", "backend", "requires"],
+            "properties": {
+              "reason": { "enum": ["Closed", "Synced", "RenamedIntoPlace"] },
+              "producer": { "type": "string", "minLength": 1 },
+              "backend": { "const": "mount" },
+              "requires": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string" } }
+            }
+          }
+        },
+        "backend_claims": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["backend", "rename_binding_evidence", "durable_boundary_evidence"],
+                "properties": {
+                  "backend": { "const": "mount" },
+                  "rename_binding_evidence": { "const": "supported-when-capability-declared" },
+                  "durable_boundary_evidence": { "const": "supported-when-capability-declared" }
+                }
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["backend", "rename_binding_evidence", "durable_boundary_evidence", "rename_code", "boundary_code", "why"],
+                "properties": {
+                  "backend": { "const": "folder" },
+                  "rename_binding_evidence": { "const": "unsupported" },
+                  "durable_boundary_evidence": { "const": "unsupported" },
+                  "rename_code": { "const": "rename-binding-evidence-unavailable" },
+                  "boundary_code": { "const": "durable-boundary-evidence-unavailable" },
+                  "why": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          }
+        },
+        "compatibility": {
+          "type": "object", "additionalProperties": false,
+          "required": ["adapter_0", "adapter_1", "unknown_contract", "silent_translation"],
+          "properties": {
+            "adapter_0": { "const": "frozen-readable" },
+            "adapter_1": { "const": "explicit-opt-in" },
+            "unknown_contract": { "const": "refuse" },
+            "silent_translation": { "const": "forbidden" }
+          }
+        },
+        "handoffs": {
+          "type": "object", "additionalProperties": false,
+          "required": ["task_73", "task_350"],
+          "properties": {
+            "task_73": { "type": "object", "additionalProperties": false, "required": ["task", "rule"], "properties": { "task": { "const": "01KZC2YXH6FG9C67JP9DQX7JH6" }, "rule": { "type": "string", "minLength": 1 } } },
+            "task_350": { "type": "object", "additionalProperties": false, "required": ["task", "rule"], "properties": { "task": { "const": "01KZM96X4Y849Y23CC2SDX212H" }, "rule": { "type": "string", "minLength": 1 } } }
+          }
+        }
+      }
+    }
+  }
+}

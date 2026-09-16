@@ -1,0 +1,5190 @@
+{
+  "schema": "mesh.public-source/v1",
+  "source_revision": "879f3ce5d4a82610835c9701e23601e4be625940",
+  "destination_repository": "idosams/Mesh",
+  "history": "clean-root",
+  "file_count": 1036,
+  "tree_sha256": "0abbd53c6e112b6f77dfb1de6efdff6225110a5d06070d1a04dd90120e8c0a59",
+  "files": [
+    {
+      "path": ".config/nextest.toml",
+      "mode": "100644",
+      "sha256": "2a895563e8b4dfc2233f314f99ec7d2f50d76e39a6806e88f3ea33c3d438b610"
+    },
+    {
+      "path": ".github/CODE_OF_CONDUCT.md",
+      "mode": "100644",
+      "sha256": "b0f41a860f7ba8b3e52da209cba7fdbcc854379b8d6876b9ac6349826f3cdb39"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "mode": "100644",
+      "sha256": "c73b91d3a03f2803b226a53dae0be8d1845986e59e9f25633143d180d20fe02d"
+    },
+    {
+      "path": ".github/SECURITY.md",
+      "mode": "100644",
+      "sha256": "a40bee000a4957fee1ec6d315ba8b0451929b8a7dd009ae88694a4647061969d"
+    },
+    {
+      "path": ".github/workflows/public-alpha-nightly.yml",
+      "mode": "100644",
+      "sha256": "a962b8c42f9b004eecad6ba54d60f580330786905e467069022834448e277009"
+    },
+    {
+      "path": ".github/workflows/rust.yml",
+      "mode": "100644",
+      "sha256": "f2163e1764fc5abc4d83d1e41928a81fa60a27823c673e0f5258b88511b7e951"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "sha256": "862639efbc4891f1814c3593aa588ff6d8c2e152190eebecc398477367ed4807"
+    },
+    {
+      "path": "apps/desktop/.gitignore",
+      "mode": "100644",
+      "sha256": "68df706cc63257f4f2f82a2d9169d8860cf0d16629b94e134381ce227d447ac4"
+    },
+    {
+      "path": "apps/desktop/ALPHA-FIRST-SESSION.txt",
+      "mode": "100644",
+      "sha256": "2fb1c9cd9f87c2a4a2bcfc4022a6426dbd97b70208c1ba4505a8d1e2219da53c"
+    },
+    {
+      "path": "apps/desktop/alpha-guide/screenshots/review-pdf.jpg",
+      "mode": "100644",
+      "sha256": "e2a522626b8e2420bc0f7c688aa8243d15ad02445d10f437f71d58320e636a57"
+    },
+    {
+      "path": "apps/desktop/alpha-guide/screenshots/review-text-diff.jpg",
+      "mode": "100644",
+      "sha256": "cf4c7afb955fa470c1101e134b8ba630bad685b4f481f4d75b202c8e646460dc"
+    },
+    {
+      "path": "apps/desktop/alpha-guide/screenshots/review-workbench.jpg",
+      "mode": "100644",
+      "sha256": "b9a026c7f69d159e485be7be27ba3fbbf452bdfe0cfa91c0127c573e9da56509"
+    },
+    {
+      "path": "apps/desktop/ALPHA-START-HERE.txt",
+      "mode": "100644",
+      "sha256": "8e195715f94263c2947e5ef79976df28f67a9933c07ba77cb75626a400004dc3"
+    },
+    {
+      "path": "apps/desktop/ALPHA-VISUAL-GUIDE.html",
+      "mode": "100644",
+      "sha256": "ebd5cf123c825475132e3fc45cf44fcb23649dc6e546c65d1b89590ef6ad732b"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "mode": "100644",
+      "sha256": "df0635da3cde9f314836796ba9757d52ce5a9326d88f25ef5e5ea9f2ec0550c6"
+    },
+    {
+      "path": "apps/desktop/README.md",
+      "mode": "100644",
+      "sha256": "b4f062f7013f97535a41d8b4eef8520912ac901e6c2114b50af7ff81c85e1e08"
+    },
+    {
+      "path": "apps/desktop/scripts/alpha-checksum.mjs",
+      "mode": "100644",
+      "sha256": "44835a7f6be0c2f9a3828fefe0fff690c7db59fb060b0b473720252ae90aed44"
+    },
+    {
+      "path": "apps/desktop/scripts/alpha-guide-verification.mjs",
+      "mode": "100644",
+      "sha256": "44ec019fd54e99a6daa9181b26bc114bafec554be460e0f2726b1bb3a11d1c38"
+    },
+    {
+      "path": "apps/desktop/scripts/alpha-guide-verification.test.mjs",
+      "mode": "100644",
+      "sha256": "8344d519b6abdb62530e411a78c0a9ab44b58634a5e08d961eb7c014464e90b2"
+    },
+    {
+      "path": "apps/desktop/scripts/alpha-visual-guide.test.mjs",
+      "mode": "100644",
+      "sha256": "7a07a15abe432760995417c26648f002ca73e4fde2be4f14188fe6f444d410e1"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-alpha-app-args.mjs",
+      "mode": "100644",
+      "sha256": "ad4ed004bfe79a055e83898ecee8ea814eef4d8c830a363f8bde135461a1773d"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-alpha-app-args.test.mjs",
+      "mode": "100644",
+      "sha256": "d88dd890270a6e4101ea6ca17cc69fcf7be29893124c5ff2fd2053f7e2aa18e2"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-alpha-app.mjs",
+      "mode": "100644",
+      "sha256": "9f278545cc74780a870e2a773641a438cdf2b6337396b05d1cfb1191b843dc08"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-signed-alpha-app-args.mjs",
+      "mode": "100644",
+      "sha256": "d159da707159947729130abc36ed6238d9c91ac6711ac8ac367d93fad64fb501"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-signed-alpha-app-args.test.mjs",
+      "mode": "100644",
+      "sha256": "946abc50d29c0f7eced2b45f939a92e14301e94c6bc64b5a21a71813a3f241c7"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-signed-alpha-app.mjs",
+      "mode": "100644",
+      "sha256": "1e5e128297d2b6439c8b212367c667d19e6e59a1fe2c70249525cab50a7ec9fe"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-signed-alpha-lib.mjs",
+      "mode": "100644",
+      "sha256": "f927b28d4cdc2c12e753b1f5d1690cfc3e61cab76dcb4574db5e6dba6e8321dd"
+    },
+    {
+      "path": "apps/desktop/scripts/archive-signed-alpha-lib.test.mjs",
+      "mode": "100644",
+      "sha256": "c74b3269088195a7441534a840b2e5977e3326747732b6cc0f24c72f49be515d"
+    },
+    {
+      "path": "apps/desktop/scripts/build-local-app.mjs",
+      "mode": "100644",
+      "sha256": "8cb060868edd0be505ab9b5bcbc23df569b90c66c1bd2402fc70783fa84a1bfe"
+    },
+    {
+      "path": "apps/desktop/scripts/local-app.test.mjs",
+      "mode": "100644",
+      "sha256": "e3bbf6822aa93d5852b2ef53432a25f3ff5d7ee60c49fdfb456a2864cdd1a76a"
+    },
+    {
+      "path": "apps/desktop/scripts/macos-signing-preflight-args.mjs",
+      "mode": "100644",
+      "sha256": "41115d9b7bd1bca3c2241c680f2f8888f58c5accc875d6631a5910b051087370"
+    },
+    {
+      "path": "apps/desktop/scripts/macos-signing-preflight-lib.mjs",
+      "mode": "100644",
+      "sha256": "c12ff31f471670e507e3e68c19e07fa587a46ce1128843f7dea75107688b1481"
+    },
+    {
+      "path": "apps/desktop/scripts/macos-signing-preflight.mjs",
+      "mode": "100644",
+      "sha256": "6c83d2b112baab94ff2acd2cc5b80cf91b274c5e3514bfa437f95815826cb7fe"
+    },
+    {
+      "path": "apps/desktop/scripts/macos-signing-preflight.test.mjs",
+      "mode": "100644",
+      "sha256": "22e2ed35cbda67e1d871e6bc667e49093956c7353ee1a8a4c1fee87268266522"
+    },
+    {
+      "path": "apps/desktop/scripts/prove-rendered-app-args.mjs",
+      "mode": "100644",
+      "sha256": "13915b54e44d5b5e51b6551498525e2e095a09ed1a61634a928a6ee270d1fe92"
+    },
+    {
+      "path": "apps/desktop/scripts/prove-rendered-app-args.test.mjs",
+      "mode": "100644",
+      "sha256": "63d67d70e6d1f231836f7b2209a7c8c8325780917df72ee59cd7cfe94ccceb58"
+    },
+    {
+      "path": "apps/desktop/scripts/prove-rendered-app.mjs",
+      "mode": "100644",
+      "sha256": "af398eea54576c5bd04003976c7f764a0c8be763cfd77fe89a9cb81848cb7e1b"
+    },
+    {
+      "path": "apps/desktop/scripts/publish-alpha-artifacts.mjs",
+      "mode": "100644",
+      "sha256": "9855fe9cf95ee603542508cb3cb22d0f6f52ae41a1b56d03e2345c069cf81645"
+    },
+    {
+      "path": "apps/desktop/scripts/publish-alpha-artifacts.test.mjs",
+      "mode": "100644",
+      "sha256": "ab942161c051b746991e63c9789b4d4c1995b34c849f4ff4a6f81482f2ce7d69"
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-proof-protocol.mjs",
+      "mode": "100644",
+      "sha256": "c62f90a409d2bacb3908ffa7679dadc4866d98b7ec1d990706ee4d83e48e81ce"
+    },
+    {
+      "path": "apps/desktop/scripts/renderer-proof-protocol.test.mjs",
+      "mode": "100644",
+      "sha256": "32dfe4317070a77078685fb993cc7c48bfa83cb8b65ea62165a154b9bf2a3b71"
+    },
+    {
+      "path": "apps/desktop/scripts/signed-alpha-archive.test.mjs",
+      "mode": "100644",
+      "sha256": "3b7aeb8bcbfdaa880ce22ee2b260331a7783655407881f7d70172ae9cf5d5c41"
+    },
+    {
+      "path": "apps/desktop/scripts/verify-alpha-archive-args.test.mjs",
+      "mode": "100644",
+      "sha256": "9ca2f9db8e4ac65cee184dc3ab891f913e92f44d009ea8dfdf2d09994b19993d"
+    },
+    {
+      "path": "apps/desktop/scripts/verify-alpha-archive.mjs",
+      "mode": "100644",
+      "sha256": "b2079b67cf38a2b6a31e0f03f1f6e8c6e0aedc88970effbab878ed5ace73c227"
+    },
+    {
+      "path": "apps/desktop/scripts/verify-local-app.mjs",
+      "mode": "100644",
+      "sha256": "679733f86ee6f1b4f204fba3f0a87e4df10939262e8b9001414500ac038574be"
+    },
+    {
+      "path": "apps/desktop/scripts/verify-signed-alpha-archive.mjs",
+      "mode": "100644",
+      "sha256": "c9a7dba64da10d391bc3a6ef596646327978a8a224a2d69f2e637c09a8a9e00a"
+    },
+    {
+      "path": "apps/desktop/scripts/window-proof.m",
+      "mode": "100644",
+      "sha256": "49dcbadb5cce63a05052417044c67d306c7fb716cb49b2ccc3d4817a0f89441e"
+    },
+    {
+      "path": "apps/desktop/SIGNED-ALPHA-START-HERE.txt",
+      "mode": "100644",
+      "sha256": "7135e2c810566bc3371fa2c6fe1548d087b61c7a68aa1e884aa68fae02a139dc"
+    },
+    {
+      "path": "apps/desktop/src/app/architecture.test.ts",
+      "mode": "100644",
+      "sha256": "976b7b18b1719831d9e3b45ae626a21334a339578e9e2c9929a1ccb9c166f739"
+    },
+    {
+      "path": "apps/desktop/src/app/copy.test.ts",
+      "mode": "100644",
+      "sha256": "8c33552ef3212d04522e2d4d90a18ac700e8ddc2d20af604a4f1df42b194ba96"
+    },
+    {
+      "path": "apps/desktop/src/app/endpoint.test.ts",
+      "mode": "100644",
+      "sha256": "514f299949c37b7a680a677c1b14669d9d8ab1d305bb32ffdafcfe5ab9918a56"
+    },
+    {
+      "path": "apps/desktop/src/app/endpoint.ts",
+      "mode": "100644",
+      "sha256": "1d783c8432e17dcf2f033f667ddaf1baa62954a79fcb7c18838832bc32a42ae6"
+    },
+    {
+      "path": "apps/desktop/src/app/facts.ts",
+      "mode": "100644",
+      "sha256": "2148b08c9315383a4b5fd3cbd1abb8005cd285b1f7a3949d21dd199ec44b3d9e"
+    },
+    {
+      "path": "apps/desktop/src/app/live.test.ts",
+      "mode": "100644",
+      "sha256": "ea147d11fbeccc55293302d4579f816403ca8e3d4542838db157c2ac4e8455a1"
+    },
+    {
+      "path": "apps/desktop/src/app/live.ts",
+      "mode": "100644",
+      "sha256": "f3fc9cbe055533d79e8dfe7eea7a77e218a397a6fd702ba4213b5acf770ce5cb"
+    },
+    {
+      "path": "apps/desktop/src/app/operations.test.ts",
+      "mode": "100644",
+      "sha256": "5e8d65766ae8cf66ee360d60b772bff7fe075485566946c2542fa8f65598c78a"
+    },
+    {
+      "path": "apps/desktop/src/app/operations.ts",
+      "mode": "100644",
+      "sha256": "19c37f3082655ce7ee65a66a93cc8f2ebd9dc4d8ea797bf2c09a1d8075d4087c"
+    },
+    {
+      "path": "apps/desktop/src/app/status.test.ts",
+      "mode": "100644",
+      "sha256": "70c90b3ef6d749eeaac5362716c63820bbf9bbbd878e70d18dd30fbe4dbbb70f"
+    },
+    {
+      "path": "apps/desktop/src/app/status.ts",
+      "mode": "100644",
+      "sha256": "1e9a2919209180f93bd3f39c874beedf638f17dae9fc8db39ecf579418a11fcd"
+    },
+    {
+      "path": "apps/desktop/src/app/window.test.ts",
+      "mode": "100644",
+      "sha256": "766fbfc0f86d929371afede2da227f8da733e393c1ef26d0c5d0ca5801e135f9"
+    },
+    {
+      "path": "apps/desktop/src/app/window.ts",
+      "mode": "100644",
+      "sha256": "c878fddc2f96de82bd7614d39056707606d69190d6adf4c54b333e1af21d0d43"
+    },
+    {
+      "path": "apps/desktop/src/ipc/client.test.ts",
+      "mode": "100644",
+      "sha256": "7a13f1d8a57d468757b51c0a93f1bbaa8c3c1f2b57d7689dbf299b2c71ca497a"
+    },
+    {
+      "path": "apps/desktop/src/ipc/client.ts",
+      "mode": "100644",
+      "sha256": "b07af49238c3c65996bd3834ee9735bff704820a8680a9bcafb7e9df30c4c911"
+    },
+    {
+      "path": "apps/desktop/src/ipc/contract.test.ts",
+      "mode": "100644",
+      "sha256": "c993e0d86e0ca79f9d5fd7fad1f437410114ccb997f4fe0fdba75e38efba0aeb"
+    },
+    {
+      "path": "apps/desktop/src/ipc/counter-result.test.ts",
+      "mode": "100644",
+      "sha256": "72e4b31c5b23c0973d28c1197c27e40a2003aa4172c55f04ef43aa70f77b83c2"
+    },
+    {
+      "path": "apps/desktop/src/ipc/counter-result.ts",
+      "mode": "100644",
+      "sha256": "2bf4643e9a3350ca8d37875a8288fc8d2079f5275d7707cd4b8cda9da36a981b"
+    },
+    {
+      "path": "apps/desktop/src/ipc/methods.ts",
+      "mode": "100644",
+      "sha256": "f61519e35e7c86f9ad059b375c3c0653fb670ddc58e9246449e3e56abf60f097"
+    },
+    {
+      "path": "apps/desktop/src/ipc/no-network.test.ts",
+      "mode": "100644",
+      "sha256": "16a19ccf0da0678b71852bd6e53308ffdbbb2b39c2d517c2ae13329d1c54795b"
+    },
+    {
+      "path": "apps/desktop/src/ipc/protocol.test.ts",
+      "mode": "100644",
+      "sha256": "e9d8605c658ab759936a4062dcaeb827a2f391841296158e1872f1588e1a86f2"
+    },
+    {
+      "path": "apps/desktop/src/ipc/protocol.ts",
+      "mode": "100644",
+      "sha256": "45004ef913e3b7374e89fa725a436475ef27a9457e15065416db1442489b89b9"
+    },
+    {
+      "path": "apps/desktop/src/ipc/transport.test.ts",
+      "mode": "100644",
+      "sha256": "d493bf46ededeeecb6bf352d9def318ede2429fdb4596b3cc268ab964ad52f25"
+    },
+    {
+      "path": "apps/desktop/src/ipc/transport.ts",
+      "mode": "100644",
+      "sha256": "d3945dda14efed26b8ff3ed63a0ed40049ec8f3c9733101a022a06c2574c833d"
+    },
+    {
+      "path": "apps/desktop/src/main.ts",
+      "mode": "100644",
+      "sha256": "4ab221458f8e69bec881ee6a7203ce0e3df8171b4d9d0170111f7525bfbc4160"
+    },
+    {
+      "path": "apps/desktop/src/strings/connection.ts",
+      "mode": "100644",
+      "sha256": "c607d4e29b389952e8cfa1d9bcc2c0d95633fc4ce47517a6dc216bab71348016"
+    },
+    {
+      "path": "apps/desktop/src/strings/errors.ts",
+      "mode": "100644",
+      "sha256": "771069911646e64bff3ac3ccf25f05493dcdcefda5ce148f3159a87c73ec2358"
+    },
+    {
+      "path": "apps/desktop/src/strings/operations.ts",
+      "mode": "100644",
+      "sha256": "8f3eb7452ce495c79baeb109e7f167321c735ce6838ddfeb1e1f3ed8b0b7e705"
+    },
+    {
+      "path": "apps/desktop/src/strings/status.json",
+      "mode": "100644",
+      "sha256": "e74d855d4b9ed5ebf9e6a12475ec7ea90fcc068860b94ee73a12fb428e445f4f"
+    },
+    {
+      "path": "apps/desktop/src/strings/window.ts",
+      "mode": "100644",
+      "sha256": "9a16871f8e523ba3ed9364c112ec29928992b6b5b58dfcb490434a6557923f52"
+    },
+    {
+      "path": "apps/desktop/src-tauri/.gitignore",
+      "mode": "100644",
+      "sha256": "6cc7610294ad1e0c493a8ab8dba345fc36e846acdb44090477257b9bdccfa5e9"
+    },
+    {
+      "path": "apps/desktop/src-tauri/active_workspace.rs",
+      "mode": "100644",
+      "sha256": "2983f1018aefdbbf9d8ee680324d271bca88ce6444fe605cd131a3d1c750cbd4"
+    },
+    {
+      "path": "apps/desktop/src-tauri/artifact_preview.rs",
+      "mode": "100644",
+      "sha256": "80187e4273328fcb7025fc870415761ea358e2a81ac76f90819e1ecc89b2e604"
+    },
+    {
+      "path": "apps/desktop/src-tauri/build.rs",
+      "mode": "100644",
+      "sha256": "c2937937277bae75f6b127fcf04b04e08cfb9d6457be2a199b96d1f4f6de138b"
+    },
+    {
+      "path": "apps/desktop/src-tauri/Cargo.toml",
+      "mode": "100644",
+      "sha256": "2f401b7414f6ff1663a69391d0a9fc9463a7ec8c7b1b304ed13fc710ceefd9ba"
+    },
+    {
+      "path": "apps/desktop/src-tauri/codex_workspace.rs",
+      "mode": "100644",
+      "sha256": "e1efd48810170d918e440d92d769c3998985296412e363a70192591c58a0766b"
+    },
+    {
+      "path": "apps/desktop/src-tauri/desktop_attention.rs",
+      "mode": "100644",
+      "sha256": "b47d263204c7c6ad4a5112d02d9e5980fc0abc919164f1c895f5b80b9a4bb7a4"
+    },
+    {
+      "path": "apps/desktop/src-tauri/Info.plist",
+      "mode": "100644",
+      "sha256": "4b2c9b32cfeb73c9dd8ec405cb0bb935c75d8de80d3dd3b79bd0fdc2ac6dd356"
+    },
+    {
+      "path": "apps/desktop/src-tauri/main.rs",
+      "mode": "100644",
+      "sha256": "c1849b67f1b583e9c4b92d3239fc79955cc8dcbe1dbf173aaf0d5b87122d7e9e"
+    },
+    {
+      "path": "apps/desktop/src-tauri/native_capture_preference.rs",
+      "mode": "100644",
+      "sha256": "28210e511b1f2194583041e139970512e8bd124b6d5de4da877f7165c5b1108c"
+    },
+    {
+      "path": "apps/desktop/src-tauri/recent_workspace.rs",
+      "mode": "100644",
+      "sha256": "d347b23751af746895df3becb4290783485c2b5be6c58b9ea4e4947f85fdb2d9"
+    },
+    {
+      "path": "apps/desktop/src-tauri/renderer_proof.rs",
+      "mode": "100644",
+      "sha256": "210101bfc44d4f8881882161e053cc31ceaa08b6d0624320053f77dcae9d1459"
+    },
+    {
+      "path": "apps/desktop/src-tauri/review_inspection.rs",
+      "mode": "100644",
+      "sha256": "50a10e2b98f40c834564271c9fb15c56cdfac0ed8cda4feae9c0c06da02cef1d"
+    },
+    {
+      "path": "apps/desktop/src-tauri/tauri.conf.json",
+      "mode": "100644",
+      "sha256": "7dfa7b28946415ce19ef8c53c25ea4a7ee8ec91bbdf701f2ed54544793dbba47"
+    },
+    {
+      "path": "apps/desktop/src-tauri/version_workspace.rs",
+      "mode": "100644",
+      "sha256": "d31f95efbdef6a6275b9e3c09920204885f5874c6a1debb14acb96cac5ddefe0"
+    },
+    {
+      "path": "apps/desktop/test-support/endpoint.ts",
+      "mode": "100644",
+      "sha256": "e39e217ef4628253082d0f90691f2dbaa4f463c52b7a0d4e3a7025891123d029"
+    },
+    {
+      "path": "apps/desktop/test-support/fake-daemon.ts",
+      "mode": "100644",
+      "sha256": "d7c17e3058e452f92917aa9574651ac3025aaf8142b95f313854ee637091adc1"
+    },
+    {
+      "path": "apps/desktop/test-support/frame.ts",
+      "mode": "100644",
+      "sha256": "1bc3ff7dc44a5d07fad7d703cc5f79bb6d8b91feceeac88facdea0de190964cf"
+    },
+    {
+      "path": "apps/desktop/ui/app.js",
+      "mode": "100644",
+      "sha256": "3f1634da990cca19ca11ad0730277018d27bc8bb32fddddf00a93f9c05521bb4"
+    },
+    {
+      "path": "apps/desktop/ui/app.test.mjs",
+      "mode": "100644",
+      "sha256": "7d75667def97c2375d350f5620592bba7ed46742b2f909685bcd2a26cde5ff1c"
+    },
+    {
+      "path": "apps/desktop/ui/index.html",
+      "mode": "100644",
+      "sha256": "8c2ddce487f6c8828f6408e65db9ce6a9a5fe17bcee31b58eb38eb8fae72c7c8"
+    },
+    {
+      "path": "apps/desktop/ui/notice-source.js",
+      "mode": "100644",
+      "sha256": "558902e08d2edf808f398d36c253f2b50259ee9e5da7111c6be783e85bd896c5"
+    },
+    {
+      "path": "apps/desktop/ui/notice-source.test.mjs",
+      "mode": "100644",
+      "sha256": "3486b7c414d11829f466642f9252ec9c6f15a3c571c12a0905d4c0e8d38e15a6"
+    },
+    {
+      "path": "apps/desktop/ui/post-mutation-refresh.test.mjs",
+      "mode": "100644",
+      "sha256": "8821c8a6663040c909802d007ce629d9ac599ca7d26c5381908465227d5b2046"
+    },
+    {
+      "path": "apps/desktop/ui/renderer-proof.js",
+      "mode": "100644",
+      "sha256": "72fe1a9d8e1c394e0938b823d486ba148a3f6ab3fe22dfc656f5ba88712c0b3a"
+    },
+    {
+      "path": "apps/desktop/ui/renderer-proof.test.mjs",
+      "mode": "100644",
+      "sha256": "ad46ba0f12728c05ce6e3d936483f3c9bd06596ec3bf8d3a8f18daa3108c49ba"
+    },
+    {
+      "path": "apps/desktop/ui/styles.css",
+      "mode": "100644",
+      "sha256": "c871eedc88800575ec8d67d29c6515408b30f7e3e641d91cfafe8403a0668623"
+    },
+    {
+      "path": "apps/desktop/ui/workspace-versions-interaction-policy.js",
+      "mode": "100644",
+      "sha256": "6702b0a3a9df0dea1742db074a90ca27ee753f7c6ad58c17f98bc1b3904f3cfa"
+    },
+    {
+      "path": "apps/desktop/ui-next/artifact-content-diff.test.mjs",
+      "mode": "100644",
+      "sha256": "703c8397030134887ac71831547a7c98b6b34f4b75a150067e0ee3bb24c3655f"
+    },
+    {
+      "path": "apps/desktop/ui-next/components.json",
+      "mode": "100644",
+      "sha256": "f38976d002164b693aa79e84199cdd5eb3648162abe9ed780759a56d015b231b"
+    },
+    {
+      "path": "apps/desktop/ui-next/index.html",
+      "mode": "100644",
+      "sha256": "9faa9389de1b6636bceb8dece6b5e163cadc027062dde850a3bafcfe89f4fba1"
+    },
+    {
+      "path": "apps/desktop/ui-next/package-lock.json",
+      "mode": "100644",
+      "sha256": "126e3e762bc7c9bdd5b762b39b0d65950900e70ba896c1dd3461034ab659225a"
+    },
+    {
+      "path": "apps/desktop/ui-next/package.json",
+      "mode": "100644",
+      "sha256": "6ab41c05b0dc0ca09de2b2256a287e05fa9e073ae5f6d111c6a5b4eea2a4cfb1"
+    },
+    {
+      "path": "apps/desktop/ui-next/README.md",
+      "mode": "100644",
+      "sha256": "cb98a7cfbe59a0c77d4c898aa4f220012b72393b02aeeb719a9784c46b397cab"
+    },
+    {
+      "path": "apps/desktop/ui-next/review-page-state.test.mjs",
+      "mode": "100644",
+      "sha256": "ba76c6d31965d3d8df5782ef5ce418e95574a383053c8f6070c05ede588a1978"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/atoms/badge.tsx",
+      "mode": "100644",
+      "sha256": "992a12cb0a4a2b05729f7890644ab45b0e6fa1cf3eb729ff32fddd36c93c4ccb"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/atoms/button.tsx",
+      "mode": "100644",
+      "sha256": "b5991b23679dbff48527a55685859b435e75ed5e17bf9df4ffc5b80f884c1f73"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/atoms/card.tsx",
+      "mode": "100644",
+      "sha256": "3c513ea3f1accec876708f4a941459879d383f369ad73e54055c012f857b11cd"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/atoms/segmented-control.tsx",
+      "mode": "100644",
+      "sha256": "45af128c387c0bd0500ab42c87bf171f527df9961ccb0782e65d0abfb5424103"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/island.tsx",
+      "mode": "100644",
+      "sha256": "bfd9a23aac6fd3f35cf4298ba10a2ddf721134eaf04622ba1c4b6abb007b75c7"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/layouts/production-workspace-layout.tsx",
+      "mode": "100644",
+      "sha256": "29342c9f879318d1b08ce6300b160ec0bdd2f8a48b6c5bdcd56772564ec65cf5"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/layouts/workspace-entry-shell.tsx",
+      "mode": "100644",
+      "sha256": "12e4010d2b6d66ba6ae06724405097fc4cc6213958e80d08adf42a64024d1534"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/layouts/workspace-shell.tsx",
+      "mode": "100644",
+      "sha256": "b47906ae3e563700e567b5d9359dbf649375ab19f62ef44c0b73973b5806ae53"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/lib/production-focus.ts",
+      "mode": "100644",
+      "sha256": "1ebd51c4651cbc8ec67d3ef097a80217624e842b6c7d190f006f312c72a7c5c3"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/lib/utils.ts",
+      "mode": "100644",
+      "sha256": "53f3d3d070f0a9082934da25b875f9499855c2b0693868dd28be8c23d8730f68"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/main.tsx",
+      "mode": "100644",
+      "sha256": "781cdb0a7bc571d500aeb0ca946d78286b4872b9fbd94b696fc6f2e352ee3dd7"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/artifact-content-diff.ts",
+      "mode": "100644",
+      "sha256": "841953a26e8a4204ec8f161719241da55a759dfef9dbcc1abaf40873a8016dc1"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/confirmation.ts",
+      "mode": "100644",
+      "sha256": "6257bee1ac42a394889918e43b76406f34dc175e21f5203e97b184143f034962"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/import-focus.ts",
+      "mode": "100644",
+      "sha256": "b178adf68a1b1ddb5499552e8323c47a11197c81467014421936a988fefa3e23"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/import-workbench.ts",
+      "mode": "100644",
+      "sha256": "bf5f5d7689c4387899efadb25cd40bfddf6e7a32b9432ce8d3432c632058bffa"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/island-liveness.ts",
+      "mode": "100644",
+      "sha256": "f816fbbc2c78383d50e278a739e2693da02476726a538bf70b33c6a9c42cef77"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/production-route.ts",
+      "mode": "100644",
+      "sha256": "c469a0681a4bd3f0ac70a11864c9f294b5e456f7b9a24d9c75becede6e17c69f"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/production-shell-store.ts",
+      "mode": "100644",
+      "sha256": "202ecb1a50703b85796c8774fb15f5ac4dbbc3d21e3e2f3c9e540b6e6a152a8f"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/review-artifact-preview.ts",
+      "mode": "100644",
+      "sha256": "e6939134dcbfd2cf28209e9c25760132ffc18b2c65acd69e3c174aa2f5ca5e9e"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/review-page.ts",
+      "mode": "100644",
+      "sha256": "404e29b80644ba6b112c677e78c4a2a0fc253fbd5379fa423abf1464135f5896"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/review-workbench-adapter.ts",
+      "mode": "100644",
+      "sha256": "19c4fd85ef6c4863cc155f8b5263bd6fb5ae310a2902814051eff4c1383939a5"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/review-workbench-envelope.ts",
+      "mode": "100644",
+      "sha256": "eeaa1a0d6e1301a9af4421381457599146630a1921a8d2fc20bee65daa081be9"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/review-workbench.ts",
+      "mode": "100644",
+      "sha256": "f9575130c4561909dcd67d976247dc086243b94631873faacff35b8cc1628f9d"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/roving-selection.ts",
+      "mode": "100644",
+      "sha256": "f236704a01a91447b5fe0acd0ad473854490af3cea7eda69a7e1fee09f610e70"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-chrome.ts",
+      "mode": "100644",
+      "sha256": "8d9eedb586469f4632cd3dd4ace0c985c2c4fc2852a3c9aca93a03df44c1a9c3"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-current.ts",
+      "mode": "100644",
+      "sha256": "d9c9446a6451f8b7f79a4c2741a11d7b7a5e528d30b76b164de715902a131c90"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-destination.ts",
+      "mode": "100644",
+      "sha256": "b085ad863188f1c0b5fe71d0c311ceaa4d32eb6dce5bc0e6c3c7a782246c45a3"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-entry.ts",
+      "mode": "100644",
+      "sha256": "2667b3a013e0ab7e4d36f5e90504500ebcdf0c47fa29ca0176068a86545193f2"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-files-changes.ts",
+      "mode": "100644",
+      "sha256": "fc437cd059058105ce1d3757a08946e833bea6738378af01e272e012b32497f6"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-overview.ts",
+      "mode": "100644",
+      "sha256": "aba9a58705cdd0339bb0316e16c8e8557e25fd046e498a4db54805558e299c0f"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-restore.ts",
+      "mode": "100644",
+      "sha256": "103a751e0d97946bf8de298411de3f82ebfcf8b3955343e9ecc542bfc1c3cae5"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/models/workspace-versions.ts",
+      "mode": "100644",
+      "sha256": "675a845efd6e2429d540ab9f8eafe49e06fc02603061861c01b9c51d7f808fc5"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/change-navigator.tsx",
+      "mode": "100644",
+      "sha256": "40444fb24d8c7d0ba77dd254a876a831f5e2cd9a2b78101980b84a18f32ec9d0"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/change-summary.tsx",
+      "mode": "100644",
+      "sha256": "4779ee9a7678f279813b55cf2ee17ebb51980895a64e7c3edd4f30a972b6b595"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/destination-plan.tsx",
+      "mode": "100644",
+      "sha256": "de637d7a9acea6ed4d50a9dbc66c50395024c8deec0ba06ed87a6032b8a05c0b"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/recent-workspace-picker.tsx",
+      "mode": "100644",
+      "sha256": "16f3a00c4745fbb089787b886c3677b7cf1de063dc74a64e4e3c2fa38f413de7"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/restore-preview-card.tsx",
+      "mode": "100644",
+      "sha256": "de340af8bba1c72907b0435ad458bd587ee2b168ddcb5fcdbe8b94229ce0688b"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/review-page-controls.tsx",
+      "mode": "100644",
+      "sha256": "d7895e1a229ff2912fb32eb4478f742574a6d7ea1106329fdad24f717c0b1052"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/molecules/workspace-command-bar.tsx",
+      "mode": "100644",
+      "sha256": "9f9dac07f4ed06264bda857e28451b09c8c5175c3bccb179c66d1dc1e2cc3121"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/artifact-review.tsx",
+      "mode": "100644",
+      "sha256": "0d837bf427566433e08806c00f98b863e5fb63d8f9039fd7f2e13ced5f9d7461"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/confirmation-dialog.tsx",
+      "mode": "100644",
+      "sha256": "5ea5dd3d2d8b5836cf81b3cf192330901404df6772515de2349eb0e3982dc577"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/import-workbench.tsx",
+      "mode": "100644",
+      "sha256": "fdd4eaa3893d568792873b5f6e2a4ee929815921c9cf0a8a84dbb0b0e5a1dd65"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/production-navigation.tsx",
+      "mode": "100644",
+      "sha256": "304159b80b57a30e348cdefcd7e4d3709be0fad4275c20f7518e42febe722686"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/review-page-status.tsx",
+      "mode": "100644",
+      "sha256": "4761a4900b8140641049e232bf49e69caa896fd5c15bb47145d043fc9c4d43d4"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-chrome.tsx",
+      "mode": "100644",
+      "sha256": "63ff1770ba050595fce633f58026654a6f8bdd0288ac358aaa06084bb4681865"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-current.tsx",
+      "mode": "100644",
+      "sha256": "26229f7432483730877f485542cc0d28736a14370cfe898685fe4edf6d27ade6"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-destination.tsx",
+      "mode": "100644",
+      "sha256": "8ebc89455627b7fd6820bd27d74d1cb7dd1fce4d1639d250a4a44357eee45e1a"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-entry.tsx",
+      "mode": "100644",
+      "sha256": "387871e9d622f785ded5dbb1c4da7ade989cd5dec48751939ac195a63f3c94b1"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-files-changes.tsx",
+      "mode": "100644",
+      "sha256": "d273eb91d575440c5bd837129a1826e2fae2b20b61059b813ac08f41676e8e5b"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-overview.tsx",
+      "mode": "100644",
+      "sha256": "84375114cb1a3f7e249cf39c5d10ef9c4ecd4084c8772a036f171212f84b224d"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-restore.tsx",
+      "mode": "100644",
+      "sha256": "55d408d7049644a5f696934fa0a932ac4c91621cd593b32dcd8c08ddaedfc58b"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/organisms/workspace-version-navigator.tsx",
+      "mode": "100644",
+      "sha256": "fd06a84248dd2cdaf9b48037474533947107e65823a83ae9e77c479526cc36c2"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/changes-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "e8c4f84728cedce9618102a7387f818fbe0c26aac700cbaad9e9b9db1ada8349"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/current-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "1461580b91c784354c81af5ad98e47056f296fd7ab591cdb184deac6165397ed"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/files-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "782334ee4d3ab9cee804fb0f16983ad1af61cd8ee3ff27c5a741b1931ad315a0"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/gallery-page.tsx",
+      "mode": "100644",
+      "sha256": "d0d5a4f5f0ae212b11d7e653eab4c56a3077688a8128635413387740166a4524"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/import-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "4e2ce3437334559bc765031167d9b567ade5869431d3e7edd4e09163a7562851"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/production-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "5e244ac2f8850508f78879278f682a7f3ab5bc6e0d0eaf5a38c5ed90060b4d2a"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/restore-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "e78ac0446413fa210e521f131de7db350c945e3536658549418622405b198ba2"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/review-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "9811458669a944a74b2720622ce27c4650420ab309965b27485eaa0207b60ce2"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/update-destination-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "286e0ae6c77c2513aaa1c4e73ec691a0b835cc3a1606e96ac43bc666821e3e22"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/versions-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "5820c1c1e8bc80a5826a2496c9b8166801be6253ee3394656bba77ce3f96766b"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/workspace-entry-page.tsx",
+      "mode": "100644",
+      "sha256": "c17f7a20bb8d26569fff8b3474bff59e80b324214f657417643b9defcb89e397"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/pages/workspaces-workspace-page.tsx",
+      "mode": "100644",
+      "sha256": "7e191b10cf9237ffe253e1b73ebc704a00ea24f9550a5ffaa619caf61cd9288d"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/styles.css",
+      "mode": "100644",
+      "sha256": "1489569769625ee788e265325d20f122f9acff1ef45caee5aa7ca2ff56e90d03"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/views/workspace-view.tsx",
+      "mode": "100644",
+      "sha256": "8e354d1f81418d983d81d0eb15f2e461f3ce81a20a5b9c9562415dde37392c7d"
+    },
+    {
+      "path": "apps/desktop/ui-next/src/vite-env.d.ts",
+      "mode": "100644",
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "apps/desktop/ui-next/tsconfig.json",
+      "mode": "100644",
+      "sha256": "15a9c5010db099da530c53dd39cd60a86d95b76d1cf1d2b654c2914af86c905f"
+    },
+    {
+      "path": "apps/desktop/ui-next/ui-next.test.mjs",
+      "mode": "100644",
+      "sha256": "cd3dab96e9f340af5b52777f59a88e4538e930778914c9de52539b0190708194"
+    },
+    {
+      "path": "apps/desktop/ui-next/vite.config.ts",
+      "mode": "100644",
+      "sha256": "1ce59c6d902875f7b16b49a55d187341471fcbd9ea7a7a3fd7242398f006d1de"
+    },
+    {
+      "path": "apps/desktop/ui-next/vite.island.config.ts",
+      "mode": "100644",
+      "sha256": "cd10d85032f1961164b5c97fd6c3a72cd28806c059d53479cb10c738de3d2175"
+    },
+    {
+      "path": "apps/desktop/ui-next/workspace-current.test.mjs",
+      "mode": "100644",
+      "sha256": "f3fc9a258c56a366a326db88cb931e7f8149cc21bdc4496ae8674741bb0ec877"
+    },
+    {
+      "path": "apps/desktop/ui-next/workspace-destination.test.mjs",
+      "mode": "100644",
+      "sha256": "30bbaf89b181a530685746fb3fc8654928dc08ba12c843ac0cc0531c2ab53b45"
+    },
+    {
+      "path": "apps/desktop/ui-next/workspace-files-changes.test.mjs",
+      "mode": "100644",
+      "sha256": "84287f66ddb8ecbbb9006bd9e27a6f4d5af2332fd5b337018ed1d6cc2063de5c"
+    },
+    {
+      "path": "apps/desktop/ui-next/workspace-shell.test.mjs",
+      "mode": "100644",
+      "sha256": "27accd5052d01bd094674738c6a121339a3721b7aee3d2114b65a256d07469af"
+    },
+    {
+      "path": "benchmarks/baselines/adapters/git-worktree.mjs",
+      "mode": "100644",
+      "sha256": "f5e267d4fb3740e259e18fe621dfdf061affc587b1ade65078abd2499182d6f8"
+    },
+    {
+      "path": "benchmarks/baselines/adapters/jujutsu.mjs",
+      "mode": "100644",
+      "sha256": "964eaf8ed27ec5aa5cc3f6e676c454ea11f375a3486a824e298976300fb25dfa"
+    },
+    {
+      "path": "benchmarks/baselines/adapters/native-fs.mjs",
+      "mode": "100644",
+      "sha256": "4072776221e48bad878e7084b269fe01b117117897725db297e9c2db5d9cd2ac"
+    },
+    {
+      "path": "benchmarks/baselines/adapters/replication.mjs",
+      "mode": "100644",
+      "sha256": "84672ca294981f5c7be57cb38bc53f2e43d558789b97acd43f2b5ae49d145055"
+    },
+    {
+      "path": "benchmarks/baselines/lib/corpus.mjs",
+      "mode": "100644",
+      "sha256": "2e2eb8acfc5ed00a8d35594a2ae17d4b5322f98b1bcef2fdc2db051738202ffe"
+    },
+    {
+      "path": "benchmarks/baselines/lib/exec.mjs",
+      "mode": "100644",
+      "sha256": "8504d5ff347d08adac1816d75ef2fcd578a2cbd503c3c053dfea5f1e4f4b310f"
+    },
+    {
+      "path": "benchmarks/baselines/lib/probe.mjs",
+      "mode": "100644",
+      "sha256": "6eed6cb987f34f1d3aeb89ed176ad0fb292d359ac725224329a087bd32f856dd"
+    },
+    {
+      "path": "benchmarks/baselines/lib/row.mjs",
+      "mode": "100644",
+      "sha256": "7dd5c325ce17ab65b9c9acdff766c10ec7a7230581f39ba0b995b7a9c33db53f"
+    },
+    {
+      "path": "benchmarks/baselines/lib/stats.mjs",
+      "mode": "100644",
+      "sha256": "d7a1c3c0d3bd9317831dac70675eb9bbec7ec53b77133e229d5c1b306be355f3"
+    },
+    {
+      "path": "benchmarks/baselines/lib/tools.mjs",
+      "mode": "100644",
+      "sha256": "840df06b4b25acca5f651ba3df016ac2cd716b6c84ade5925fef6f9797041b2c"
+    },
+    {
+      "path": "benchmarks/baselines/lib/tree.mjs",
+      "mode": "100644",
+      "sha256": "f0b1f8cdabdd11bf98a827914e8e769dafaa5e60c87feb4e1ab8d3771cd13bca"
+    },
+    {
+      "path": "benchmarks/baselines/lib/workloads.mjs",
+      "mode": "100644",
+      "sha256": "875087d1b2dacd39f0261b90645eea0ce1fa6658e972d189b7c084a5ab26c31a"
+    },
+    {
+      "path": "benchmarks/baselines/README.md",
+      "mode": "100644",
+      "sha256": "89d8f0b15cd6af98d45135dde59c16464926ea03cf151d5980978dbe08dea3a0"
+    },
+    {
+      "path": "benchmarks/baselines/reports/directory-move-support.jsonl",
+      "mode": "100644",
+      "sha256": "422f57c8c3873710eabfa1296e92955a15f0eced2eb8e5cc302420c2a4c4311d"
+    },
+    {
+      "path": "benchmarks/baselines/reports/directory-move.jsonl",
+      "mode": "100644",
+      "sha256": "459f242df7ef9e89764ff18906b7ca24d1caf53ac6a94a09a17bd1f2d36b8a4c"
+    },
+    {
+      "path": "benchmarks/baselines/reports/one-byte-edit-support.jsonl",
+      "mode": "100644",
+      "sha256": "5b06df2e476c6ccedea87a537a866ff98bdead36db5a1a5a07227ca69544a218"
+    },
+    {
+      "path": "benchmarks/baselines/reports/one-byte-edit-W5-support.jsonl",
+      "mode": "100644",
+      "sha256": "f94c3e6afc0045027f2dd1058ee5891a6fc80ebdafc88e1716b940cd2c83c325"
+    },
+    {
+      "path": "benchmarks/baselines/reports/one-byte-edit-W5.jsonl",
+      "mode": "100644",
+      "sha256": "8422acea877185c702966fccb4efd4e52304b33675c244f4f9dd95549a0fbc4d"
+    },
+    {
+      "path": "benchmarks/baselines/reports/one-byte-edit.jsonl",
+      "mode": "100644",
+      "sha256": "c465f840ca95d80fe893629398c419e5106338e4994938ca649da53b870c28d6"
+    },
+    {
+      "path": "benchmarks/baselines/reports/store-tree-support.jsonl",
+      "mode": "100644",
+      "sha256": "87c4ece678cfde025af9a3bdc3801fb61aa3ec01c07a5993400cc125caf1e905"
+    },
+    {
+      "path": "benchmarks/baselines/reports/store-tree.jsonl",
+      "mode": "100644",
+      "sha256": "62d19aac652f58720872579998c141079eaccf15887547555ae5509a1727a399"
+    },
+    {
+      "path": "benchmarks/baselines/run.mjs",
+      "mode": "100755",
+      "sha256": "31b040370f508be1243b0ff675b6d0d8da822bdcfc6753c0256625a4aee1d3b0"
+    },
+    {
+      "path": "benchmarks/baselines/verify.mjs",
+      "mode": "100755",
+      "sha256": "71a89809e2adb00bd35e0694debfb049d847e121a7821e0d171ca86e1d4d2aa5"
+    },
+    {
+      "path": "benchmarks/baselines/versions.json",
+      "mode": "100644",
+      "sha256": "6f86cab87ed318b2ad1055cbd0839a896356fcf6f220bf61ad1b5d846f2250ea"
+    },
+    {
+      "path": "benchmarks/budgets/manifest-scaling/requirements.json",
+      "mode": "100644",
+      "sha256": "544cd44de1061bcc4c70b010d12e1d417ac940793538f27055fdd37429901056"
+    },
+    {
+      "path": "benchmarks/budgets/manifest-scaling/verify.mjs",
+      "mode": "100644",
+      "sha256": "e976df701dc60410f39ef614edcf78607e671c28f65a23426b09c42edede41d8"
+    },
+    {
+      "path": "benchmarks/budgets/recovery.md",
+      "mode": "100644",
+      "sha256": "b5d61c43594e8e713d47240161f1e220dab9d3a8d1932bfdf9236cd6d3960a7a"
+    },
+    {
+      "path": "benchmarks/budgets/storage.md",
+      "mode": "100644",
+      "sha256": "0edff3e2abe9b5463197b227df51eef0e9bf1bb608a04487c85b92f66135751f"
+    },
+    {
+      "path": "benchmarks/checkpoint-delivery/capture.sh",
+      "mode": "100755",
+      "sha256": "1f5cd7bb178b38584b57bb50228a26b761e326df9572938497c97ffd165e7bd2"
+    },
+    {
+      "path": "benchmarks/checkpoint-delivery/profile-2026-08-20.json",
+      "mode": "100644",
+      "sha256": "95b24852a72445c7c58771cc5750f29436060d3e063d912c1fe25a47dbbc85e0"
+    },
+    {
+      "path": "benchmarks/checkpoint-delivery/README.md",
+      "mode": "100644",
+      "sha256": "bbbb933ba2b96c2a7d3a80b094a49e866e161fc69e49ca143b856810c23db1b6"
+    },
+    {
+      "path": "benchmarks/checkpoint-delivery/verify.mjs",
+      "mode": "100755",
+      "sha256": "3acef2e1e6721ca275dc7af7c59e1aeadbc2203b3aa3e6e1e1e1dbd69498849f"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/analyze.mjs",
+      "mode": "100644",
+      "sha256": "8eaa1733d70d2f078d3da70cc01a420aa1070f87f29a061f3f85161e735cff26"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/capture-tools.mjs",
+      "mode": "100644",
+      "sha256": "01fc3e3ca239e4d268b9ba63ed91c3f759c3a706a43beeacf3b15b0f383b2d48"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/capture.mjs",
+      "mode": "100644",
+      "sha256": "f5abc33eeb4196eeefef667ace0e1d228ea67e56f7ea03133c30a6719e6f2f1c"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux-exact-v3.json",
+      "mode": "100644",
+      "sha256": "177b03d002452c1d34e8800b0df936d2fe53f56e3d35dee6332f1a5947183c4d"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux-git-v1.json",
+      "mode": "100644",
+      "sha256": "6d9559fba0c19d678344e1bc1beaf0299a3325b244988048e3a447070f16cd03"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux-jetbrains-v1.json",
+      "mode": "100644",
+      "sha256": "e5244d2697ef57ef29c3957aed8dbb3e48cf83145b0648626af9a5ad022ca5c5"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux-tools-v2.json",
+      "mode": "100644",
+      "sha256": "4784c9ff231ab3ec16fb28dc1f972e85d44ab124713538b9fc135f838eecff5a"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux-vscode-v2.json",
+      "mode": "100644",
+      "sha256": "636618d4844cb3eadc2f1d6ae55d10ae826f9ed19ca40c6c77bf1efe16efe602"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/linux.json",
+      "mode": "100644",
+      "sha256": "54e290bfb4d0ce8c03966f79dfe4599cb27acdd842783f21fdc8014c0e5418f5"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/macos-exact-v3.json",
+      "mode": "100644",
+      "sha256": "b7ffd438993db10b325949b22a687c6adde8240374c8c0efd4903afc69c093dd"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/macos-jetbrains-v2.json",
+      "mode": "100644",
+      "sha256": "7173f2d2f693a267f587e1412928f06060ca7673c8bc3f78cc19df4e2ebebea3"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/macos-tools-v1.json",
+      "mode": "100644",
+      "sha256": "629e1b1a313e92133fb6ccf8842b5218eca4213ea2ef418c5b70bccfd5f4b1da"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/macos-vscode-v2.json",
+      "mode": "100644",
+      "sha256": "efb1ae3fed587ecdcaccb1ff5fa124caa60c68d34ef6d944691b688aed302256"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/captures/macos.json",
+      "mode": "100644",
+      "sha256": "02afb56c184163b468262d52eefe6557861b1d70c2b331cf849c7ebf185092e0"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/Dockerfile.linux",
+      "mode": "100644",
+      "sha256": "90344809a6ed1c9b3be911617cac5696cf3fbe2802af6d3f43614ff699f853e8"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/Dockerfile.tools-linux",
+      "mode": "100644",
+      "sha256": "f5a4bb105f2c1299ba0bcfa2ee749f0a4efdc40995ba6a305158f21237f95a56"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/fixture.mjs",
+      "mode": "100644",
+      "sha256": "f1a824647c908b606cdedfee0e0b22c88c8cdad2f2732b46dcc8e452f55e2b4d"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/manifest.json",
+      "mode": "100644",
+      "sha256": "abe089a42c40a4244c19fa201f46e275d274757f364de2f50b3f691bbb65d83e"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/README.md",
+      "mode": "100644",
+      "sha256": "8ce345594ee322244e9259aa450a8a806a4c72e728fa6c642e1d4ffb9dca9f82"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/report.md",
+      "mode": "100644",
+      "sha256": "6618ff2f30afde9622518492171fbcbd1930f596b224eba5167796ea3e07ad21"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/results.jsonl",
+      "mode": "100644",
+      "sha256": "b15c011ef3b9f4f8f79b5336af760ae3e04dc0730d5c37f1aaf8cb3204cd49e7"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/semantic.mjs",
+      "mode": "100644",
+      "sha256": "0b5b370ce8a92ec05fb2d4d25ec1731c14a962e1648814882726fa494cbe858c"
+    },
+    {
+      "path": "benchmarks/checkpoint-settling/verify.mjs",
+      "mode": "100644",
+      "sha256": "6760a67b93e6c4058bce08fa0220da32e96cc4736813727fe7ff94f8c2458df9"
+    },
+    {
+      "path": "benchmarks/reports/README.md",
+      "mode": "100644",
+      "sha256": "3b8c7fd3c95e68834c680ef277b278eaa8bbb111b0c96e6fe41bf6f8221ecd48"
+    },
+    {
+      "path": "benchmarks/reports/storage-amplification.jsonl",
+      "mode": "100644",
+      "sha256": "d60bac1a87a43e082528946d858f3ec52609b003e549642adaaee85cd9ee8fa5"
+    },
+    {
+      "path": "benchmarks/reports/storage-footprint.jsonl",
+      "mode": "100644",
+      "sha256": "f50c28ba8a0d7bbe3cc5d50944347267cc497c51aab0a1aea6707f49aa41d177"
+    },
+    {
+      "path": "benchmarks/runners/baselines.sh",
+      "mode": "100755",
+      "sha256": "a94309c3bb84e299dc76623dd3bb4b746d829b2f74b19a65cb3085e228f6bbc3"
+    },
+    {
+      "path": "benchmarks/runners/README.md",
+      "mode": "100644",
+      "sha256": "bb2b502fa6cb5a794e30e9dbe07f03de6543d762a2e5f8cadfce91f2f325f6f5"
+    },
+    {
+      "path": "benchmarks/runners/repeatability.sh",
+      "mode": "100755",
+      "sha256": "b9bbe2a537923c1267ebc7f564a5d522930f8b4fd0ae3e71e129520fff8b02c4"
+    },
+    {
+      "path": "benchmarks/runners/run.sh",
+      "mode": "100755",
+      "sha256": "dc85ab72949688a66ef70df031f380368a70dcb04a5f0480bf68fd927d99084e"
+    },
+    {
+      "path": "benchmarks/runners/selftest.sh",
+      "mode": "100755",
+      "sha256": "f02bd9d51b64400979db559e835889b9fcdcc23f123ca7c6347d219bd651484c"
+    },
+    {
+      "path": "benchmarks/runners/verify-schema.sh",
+      "mode": "100755",
+      "sha256": "eae729ed9cab1fbf295a510448eb07e844105eba6e27070b258c115099c70afd"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/git-baseline.jsonl",
+      "mode": "100644",
+      "sha256": "7c2ca71c335060d74d398fba8949c4fe6862d01b68cef508fb2c0a3c402f1051"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/git-baseline.sh",
+      "mode": "100755",
+      "sha256": "ef28054793fbec9e13493ef45e62520f0ff4984a284af06d121cbb94da3fb32b"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/harness.rs",
+      "mode": "100644",
+      "sha256": "e58af22fdabed574f6f2730ee4c42c4e59a86edf8524151cf806a7cdb265eade"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/README.md",
+      "mode": "100644",
+      "sha256": "57e8cc1eb8ad16c9c14a4c80a350f8e9c90cdaa5940cece263d31a5a7dd79581"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/results-w1-smoke-vs-git.jsonl",
+      "mode": "100644",
+      "sha256": "8b9f6fd293182fad3ef1af9c984aeb54e5274049a877548700be6a33041d7eac"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/results-w1-smoke.jsonl",
+      "mode": "100644",
+      "sha256": "fdeddb363d1ec33800a6f114c94a74cdcdf0bb17d30fecff86865ebe7b40cdae"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/results.jsonl",
+      "mode": "100644",
+      "sha256": "aa26b9596c361752bf0931451a359e676d2b0750c357cfda8c96ee5b47525b7a"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/run.sh",
+      "mode": "100755",
+      "sha256": "fb727e476d8c0bee5e411f649f0eb059825c1f79717beb9da234b2fa885d8d21"
+    },
+    {
+      "path": "benchmarks/workloads/chunk-policy/summarize.mjs",
+      "mode": "100644",
+      "sha256": "74f192ccde17f3386438b715942ccd643f637644d66964fa384dc314b6ea9cab"
+    },
+    {
+      "path": "benchmarks/workloads/manifest.json",
+      "mode": "100644",
+      "sha256": "64fc731030c552898071f439dedca1759d8f23f28e8781dda700d838ad32fc30"
+    },
+    {
+      "path": "benchmarks/workloads/README.md",
+      "mode": "100644",
+      "sha256": "afb12bba60b84a9234e6ebed3a1f02d8dc67fb3a5911993898889e0d2253ccdf"
+    },
+    {
+      "path": "benchmarks/workloads/verify.mjs",
+      "mode": "100644",
+      "sha256": "e0b42054992afab97936d77852ea2e9859535a4f668860dbc6d1f1200a4ce8d1"
+    },
+    {
+      "path": "Cargo.lock",
+      "mode": "100644",
+      "sha256": "301979a74f50f278d51c747a1631da6f418f788d5c2852c00b2dffc7e382ff54"
+    },
+    {
+      "path": "Cargo.toml",
+      "mode": "100644",
+      "sha256": "6b07d8d4bb9e18367bd8966ce11cbcf86bd0aa3f04bac718bfb155488521be02"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "mode": "100644",
+      "sha256": "9550095742e0c5269c00614f8ae95b4a279fa3a93270db6f20a1a07bd63a0f4f"
+    },
+    {
+      "path": "crates/mesh-agent-sdk/Cargo.toml",
+      "mode": "100644",
+      "sha256": "eca330617feb190a8e9c3736abaae92c34cde2c54dd737c7afc1bfb14b76fd68"
+    },
+    {
+      "path": "crates/mesh-agent-sdk/src/lib.rs",
+      "mode": "100644",
+      "sha256": "a00fec6ff6160a9ca69d120dac8d7cffcfd7d5af3544033951368646588babc7"
+    },
+    {
+      "path": "crates/mesh-approval/Cargo.toml",
+      "mode": "100644",
+      "sha256": "98278093724462722077bdd5533e3d2ae7017773c3c18aa170eef7b5223afc11"
+    },
+    {
+      "path": "crates/mesh-approval/src/blake3.rs",
+      "mode": "100644",
+      "sha256": "c0b6fc0c01126f3586db474df2d8352a277a10feb3489d29d1c61dc15ed05388"
+    },
+    {
+      "path": "crates/mesh-approval/src/bundle.rs",
+      "mode": "100644",
+      "sha256": "d80a883276061882505d015e8d71332183f47c0f2b5e6709294ade60b302a8ee"
+    },
+    {
+      "path": "crates/mesh-approval/src/conflict.rs",
+      "mode": "100644",
+      "sha256": "76871b6ad0565376df965561a86e25e46bc49b2dc52e45b612d9372ffb633d6a"
+    },
+    {
+      "path": "crates/mesh-approval/src/diff.rs",
+      "mode": "100644",
+      "sha256": "11c923778635bc9b230f6e63584ee3662eeaf00b7e7f9542dd88a90e2a2229ac"
+    },
+    {
+      "path": "crates/mesh-approval/src/digest.rs",
+      "mode": "100644",
+      "sha256": "19de6af1bf82d24f3bf28d89654c7674fb56e2caf7560f5d397cd0b4c28f781e"
+    },
+    {
+      "path": "crates/mesh-approval/src/human_receipt.rs",
+      "mode": "100644",
+      "sha256": "0b4254fe09408af6e5c206f37be8ba5693cf86c501dd97c4bc030050574bb452"
+    },
+    {
+      "path": "crates/mesh-approval/src/ids.rs",
+      "mode": "100644",
+      "sha256": "d4cb07ca9e65d37581a47737bb211a3080848b7c3ddaa5b64a2b5a285b689f54"
+    },
+    {
+      "path": "crates/mesh-approval/src/impact.rs",
+      "mode": "100644",
+      "sha256": "f1e55b0f1a7257ab66a2892129374f9c5b8b9469863a9e522e3237b878d9b11e"
+    },
+    {
+      "path": "crates/mesh-approval/src/lib.rs",
+      "mode": "100644",
+      "sha256": "8aea7ba194ffb002202b38b882f7fc89f221d2db86be221b11064856f6851f42"
+    },
+    {
+      "path": "crates/mesh-approval/src/name.rs",
+      "mode": "100644",
+      "sha256": "1ed00400e9426b55ab200432ad0bb26ad07f10565d4fa237a53a9f50c5db2b9c"
+    },
+    {
+      "path": "crates/mesh-approval/src/presentation.rs",
+      "mode": "100644",
+      "sha256": "190ab94f07a2f31990f93b4244ddfcd5c3ad9b21e3b605d6eb3a4ee8010570b2"
+    },
+    {
+      "path": "crates/mesh-approval/src/receipt.rs",
+      "mode": "100644",
+      "sha256": "3ff644b561832190ea91bb1c6586f86ff6cf77e3270aaea3b071b85d11f713aa"
+    },
+    {
+      "path": "crates/mesh-approval/src/state.rs",
+      "mode": "100644",
+      "sha256": "27ba2d1b7c594945dbb9830124c4459c258d40b01a293cc72d75db98af115d55"
+    },
+    {
+      "path": "crates/mesh-approval/src/text_diff.rs",
+      "mode": "100644",
+      "sha256": "bf6fa678cf8c9f5cac8a349ef46007d7b01ac317d99ae4aed48a6592f887e081"
+    },
+    {
+      "path": "crates/mesh-approval/src/validation.rs",
+      "mode": "100644",
+      "sha256": "b758be0a17fe5c993ff0a5779777727bccb6b93cdfae821d60a8ffdd158be437"
+    },
+    {
+      "path": "crates/mesh-approval/tests/blake3_agrees_with_mesh_types.rs",
+      "mode": "100644",
+      "sha256": "727d93e5e088e342383c4a66f0ceec9b9f9ab161602dae553aa4070be5d3a173"
+    },
+    {
+      "path": "crates/mesh-approval/tests/bundle.rs",
+      "mode": "100644",
+      "sha256": "08e00ee82a69f5522e82919a14fd5d86ca16e345ddc6cb2a153e6e7b0019abcb"
+    },
+    {
+      "path": "crates/mesh-approval/tests/diff.rs",
+      "mode": "100644",
+      "sha256": "0ec453e2d8085a4e723bda1ec7077e34aaa887dcc167940991ccc770c02f5074"
+    },
+    {
+      "path": "crates/mesh-approval/tests/human_receipt.rs",
+      "mode": "100644",
+      "sha256": "0044922fafbe43a5bae6fc50bff45490bc2db6532bd209ff3563f3ea16bb3e24"
+    },
+    {
+      "path": "crates/mesh-approval/tests/mesh_conflicts_drift.rs",
+      "mode": "100644",
+      "sha256": "a90406984b47a8ff8bb2cb84fe68be652c4b63f06736dcf498c38750e5bddef4"
+    },
+    {
+      "path": "crates/mesh-approval/tests/receipt.rs",
+      "mode": "100644",
+      "sha256": "f4550a1fe816adf25d758c76feefcd3d145fee3fdc454b8aa89fa6e875e45e18"
+    },
+    {
+      "path": "crates/mesh-approval/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "6997ac81ebc075eadbbf6a344e948584e0ebc0f9f820bb260825490f87c862c5"
+    },
+    {
+      "path": "crates/mesh-bench/benches/counter-overhead.rs",
+      "mode": "100644",
+      "sha256": "8fb21d48847e004bcebcbc2115494c42a962b3613f57cf9ac388dca86976e5a8"
+    },
+    {
+      "path": "crates/mesh-bench/benches/recovery.rs",
+      "mode": "100644",
+      "sha256": "565348407ce9835ffbc214821594e51a367dcf12fc6e5328dde7aad6081715ad"
+    },
+    {
+      "path": "crates/mesh-bench/benches/smoke.rs",
+      "mode": "100644",
+      "sha256": "6966653cc6712333491d897c012bc825a8ee444565af4b746e5ec41544f11d1b"
+    },
+    {
+      "path": "crates/mesh-bench/build.rs",
+      "mode": "100644",
+      "sha256": "9cb2f0add30405f53f3f9d1efc86f8292b8aa0000398838e28c19bed3b2993a3"
+    },
+    {
+      "path": "crates/mesh-bench/Cargo.toml",
+      "mode": "100644",
+      "sha256": "bfd0552dca4699417d5354960a0272bf445f836c7784dcc1f90074cca21b6c34"
+    },
+    {
+      "path": "crates/mesh-bench/src/bin/mesh-bench.rs",
+      "mode": "100644",
+      "sha256": "402ddebe1046690d2cb3709c44a292330eae9df93f99499d35e29fa31df78cb7"
+    },
+    {
+      "path": "crates/mesh-bench/src/clock.rs",
+      "mode": "100644",
+      "sha256": "c3b82e29dc10515533e4a4eb64aab448964d34c1dfebb97d56632eb91026532b"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/content.rs",
+      "mode": "100644",
+      "sha256": "1bea31ccaf999f0d293520d5c42dcbdd4e6d91787c983d7a314d447f88172c57"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/digest.rs",
+      "mode": "100644",
+      "sha256": "e48862358f1f02c4603a20d93a104891883f5c2dd3e5c3931fd7a500f138186a"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/materialize.rs",
+      "mode": "100644",
+      "sha256": "00d4ec3e67e4956eabeb8e467738823325148216568e70c1c69e14a644fe2c2e"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/mod.rs",
+      "mode": "100644",
+      "sha256": "d4a321da3ab597af8f0c09152b52600365c6c3d1d430e084ccaa790e91c5782e"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/plan.rs",
+      "mode": "100644",
+      "sha256": "58a2a61834e7ce06e6cfecbb9690b9a9528c43323fd008c4904cbf7222857678"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/rng.rs",
+      "mode": "100644",
+      "sha256": "f14ee4854624fca0b5898c9241bdb8f85d6c4b011c8caf8e8077310002d1ac00"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/shape.rs",
+      "mode": "100644",
+      "sha256": "5daa0fee9eb7d48fa9eca26f36809b89f49a4c8fd0e0b09643d8ea833fdbd41f"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/tree.rs",
+      "mode": "100644",
+      "sha256": "de666f4b22ad3e480a186b26b5b42ad82319826eb699b73409a5a0d150247a11"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w1.rs",
+      "mode": "100644",
+      "sha256": "fd2d94e2e73af868aab9a58e28ad7b79002a231917184bbd406b54ef746f148d"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w2.rs",
+      "mode": "100644",
+      "sha256": "caba73a571b7a1c45bab06c85282d17f2ac0e96c56b1a6236612cf0d13e1cd8d"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w3.rs",
+      "mode": "100644",
+      "sha256": "474fc2f747c04846af0ffc68d790b18c7ed60bc3758e949aecf901eead61932a"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w4.rs",
+      "mode": "100644",
+      "sha256": "cd259d2f4fcbafe702406dd289c06857dc6d636945fff5c17d0d4203df444c2f"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w5.rs",
+      "mode": "100644",
+      "sha256": "2aab2ed5b5dfecab79d70c646a92fb27df0091870c45ba7e22081213bcf988af"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w6.rs",
+      "mode": "100644",
+      "sha256": "21563c58d5ff3c7964bffa21627a18c96449d01e693aa6183e977918afdfb548"
+    },
+    {
+      "path": "crates/mesh-bench/src/corpus/w7.rs",
+      "mode": "100644",
+      "sha256": "061adf2b09150716f898ec519b8b10a28f8c2b09f093cf0afd9b7c688cae45a7"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/build_info.rs",
+      "mode": "100644",
+      "sha256": "34791a06cf3a26b262e8d77787966062f29eebe2784dee5a89db4d6670d661a3"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/exec.rs",
+      "mode": "100644",
+      "sha256": "c436b506362d5182872fa6e65521485397cd8a65ce727bb261635c6e84fce35b"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/filesystem.rs",
+      "mode": "100644",
+      "sha256": "a469b0a7ddfbbe45434adf99a09caa7c45fa4bc4cbbd1bde4effa086a237f728"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/git.rs",
+      "mode": "100644",
+      "sha256": "b029395e61783c2c2c85bbb4bc51b4cb090b602597ebf3ca12df0f82b0d84086"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/host.rs",
+      "mode": "100644",
+      "sha256": "14b820b60e07e9d74dd1205884e64e772081e867f033c4b65cea3939ce5698bb"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/mod.rs",
+      "mode": "100644",
+      "sha256": "d6b521e716fe3484bcc375cee9d0f15ea40cb5845efb170192134dab3acc070b"
+    },
+    {
+      "path": "crates/mesh-bench/src/env/system.rs",
+      "mode": "100644",
+      "sha256": "daf6d1fad4e61d9e9f247546a3ec79342d38b0d3b309dec42ba45d3429bd3c3b"
+    },
+    {
+      "path": "crates/mesh-bench/src/harness.rs",
+      "mode": "100644",
+      "sha256": "f09fa9196798df56bd890750fa86b12eefc996d3b892198f1c1819345d2d447c"
+    },
+    {
+      "path": "crates/mesh-bench/src/json/mod.rs",
+      "mode": "100644",
+      "sha256": "d962b8a5deb82b07e52b5058cda7864b3fe783ad1a5fb511899290ec97c4c572"
+    },
+    {
+      "path": "crates/mesh-bench/src/json/parse.rs",
+      "mode": "100644",
+      "sha256": "f666ee5467ba29b76cf65aa160e83b947335b3362b011aab73c2bb53021b9e4c"
+    },
+    {
+      "path": "crates/mesh-bench/src/json/value.rs",
+      "mode": "100644",
+      "sha256": "22a3fe85be1e805a4b44f20f8f4428ef2c4d99ce68a0718253ac0abf531570f9"
+    },
+    {
+      "path": "crates/mesh-bench/src/json/write.rs",
+      "mode": "100644",
+      "sha256": "5e60fd3693138705e1c48c198683357776af49f4d37a49a00a904d7aced3a04e"
+    },
+    {
+      "path": "crates/mesh-bench/src/lib.rs",
+      "mode": "100644",
+      "sha256": "46c983fd636eab2de244f4b599022746339cd9afc15b1e48984bcba7fb8c6841"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/decode.rs",
+      "mode": "100644",
+      "sha256": "60654b7a3eac1c3b3a1dd914616a21bf1c992a824f7c9ce68aa47e87a09afd76"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/encode.rs",
+      "mode": "100644",
+      "sha256": "60153cc295a887ec3c742f1aad416f8975955879571f73bf5d533e7724c05425"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/error.rs",
+      "mode": "100644",
+      "sha256": "d7389e0d476f7a81f851df02c600ed6f9c8bade51adf07310f6c246c1e002f76"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/fields.rs",
+      "mode": "100644",
+      "sha256": "ef637eaea0cbdb7ae48e4c26e284c0b155af088b3f896d377904f547c47c2d8c"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/mod.rs",
+      "mode": "100644",
+      "sha256": "2f2f173999e84bc9523c90f5450511b2640721d5189d69fc06686cceb0ae5e6c"
+    },
+    {
+      "path": "crates/mesh-bench/src/schema/result.rs",
+      "mode": "100644",
+      "sha256": "eaf1dd780a2e8f54bbfce38a7db387b8554a6830bc530b12c24dcbc6debfb0dd"
+    },
+    {
+      "path": "crates/mesh-bench/src/selfcheck.rs",
+      "mode": "100644",
+      "sha256": "e33abdcd9a71c4626f711289ed27b0d6f8071a588dce5eb4ef8e5e82dbd02053"
+    },
+    {
+      "path": "crates/mesh-bench/src/sink.rs",
+      "mode": "100644",
+      "sha256": "48c5a62dd720fda43905a38a9df67486a75de01b0a2ea83f3b3f448f15fcc93a"
+    },
+    {
+      "path": "crates/mesh-bench/src/stats.rs",
+      "mode": "100644",
+      "sha256": "4eaec218aedee8e8bbc0cc678f3b8f308d9ecda085c743bef15ba0628e72c62f"
+    },
+    {
+      "path": "crates/mesh-bench/src/testing.rs",
+      "mode": "100644",
+      "sha256": "6cc1ce65c721042db42b85ad7c72e713b9954973eb38dfdca416eb0721e469e3"
+    },
+    {
+      "path": "crates/mesh-bench/src/variance.rs",
+      "mode": "100644",
+      "sha256": "263a743d07d71fd3d92079ba5c89288d7f2f7694928ec481b71526658d5a02a2"
+    },
+    {
+      "path": "crates/mesh-bench/src/workload.rs",
+      "mode": "100644",
+      "sha256": "a1c8e88d629f47599b7ea3d787e953dc1b7e485c4911a9231e925017c34b33d3"
+    },
+    {
+      "path": "crates/mesh-bench/src/workloads/blob_scan.rs",
+      "mode": "100644",
+      "sha256": "80d3653f4cffe5cb5f9a6fd0cefbe62d27e2c70e00673847c7861a2a67b0cd1b"
+    },
+    {
+      "path": "crates/mesh-bench/src/workloads/digest.rs",
+      "mode": "100644",
+      "sha256": "2eef8dfe4933eb052dc6cd0ff4ebb604667eff6f2c0775a2fd618bd8314686a3"
+    },
+    {
+      "path": "crates/mesh-bench/src/workloads/mod.rs",
+      "mode": "100644",
+      "sha256": "8be37668957790b8c79315560ef87fc5a7b80902c826fbf5ec799ab382675fca"
+    },
+    {
+      "path": "crates/mesh-bench/src/workloads/storage_amplification.rs",
+      "mode": "100644",
+      "sha256": "1b3f754e1f25e9d2b52a7ee27f8079e57ebcd61170c38ee7dff29809f1b1c137"
+    },
+    {
+      "path": "crates/mesh-bench/tests/repeatability.rs",
+      "mode": "100644",
+      "sha256": "dae8843ceee22cbafd002667604e5a8dc0991b056dd7cd8b52aeb792f46ef97f"
+    },
+    {
+      "path": "crates/mesh-bench/tests/schema_rejection.rs",
+      "mode": "100644",
+      "sha256": "e542354e9587b830fa46a8c877f8cdcb7e3fa3ac25aba4734b4a55e2e9a9359b"
+    },
+    {
+      "path": "crates/mesh-bench/tests/verification_gate.rs",
+      "mode": "100644",
+      "sha256": "d78ff13c584b8d09b3750be540f0dafb5ecabe38db38bde01ebf57a16ce970ea"
+    },
+    {
+      "path": "crates/mesh-bench/tests/workload-generators.rs",
+      "mode": "100644",
+      "sha256": "357d2bf515510bc46537853c0f72d22dd5baec013814dfaa9a2f6f1f3cfe8acd"
+    },
+    {
+      "path": "crates/mesh-cas/Cargo.toml",
+      "mode": "100644",
+      "sha256": "3a754fe90563b5bd17a1aa686b34066a7ecb0586f11928fedb08a7b8bd644c25"
+    },
+    {
+      "path": "crates/mesh-cas/DURABILITY.md",
+      "mode": "100644",
+      "sha256": "661edeb92a41e3842311d834829e08162c62eb8cb1291a8e550029cf17638b0c"
+    },
+    {
+      "path": "crates/mesh-cas/src/blake3.rs",
+      "mode": "100644",
+      "sha256": "1e7cb7fda489a60f34258bc4ab731c6af09a32196390e332cd3e047a2fe401ce"
+    },
+    {
+      "path": "crates/mesh-cas/src/collect.rs",
+      "mode": "100644",
+      "sha256": "d8a9f84cd1c7bcd1c08a65d11bb75e10ed1280c5f05f639db57711e35a80d41b"
+    },
+    {
+      "path": "crates/mesh-cas/src/digest.rs",
+      "mode": "100644",
+      "sha256": "c2e8618f5b4531899abdd6414900e35557147c197dcccc1cb679afacce3e3e32"
+    },
+    {
+      "path": "crates/mesh-cas/src/error.rs",
+      "mode": "100644",
+      "sha256": "187d91aa14f5cd6c1146cbc7c217e7ca1a9d43f764132121a7a4b2c062db1347"
+    },
+    {
+      "path": "crates/mesh-cas/src/fs.rs",
+      "mode": "100644",
+      "sha256": "29744be68aab17c250e93a70218ee8e3632a06f280971c8babc6c6a4ab66f3c3"
+    },
+    {
+      "path": "crates/mesh-cas/src/journal.rs",
+      "mode": "100644",
+      "sha256": "95c22321f14afed20ad4182422f18c4aa740aff9bda26b806b8e0cbae78363b6"
+    },
+    {
+      "path": "crates/mesh-cas/src/layout.rs",
+      "mode": "100644",
+      "sha256": "0056cb9430699b306fbc0c355a8b73bbd3a024cac73b62d64994ddd88b6f82c0"
+    },
+    {
+      "path": "crates/mesh-cas/src/lib.rs",
+      "mode": "100644",
+      "sha256": "1a516f9a26585f148e8494f2f28dbb59d1559db000340e14302202a2c48bbdfc"
+    },
+    {
+      "path": "crates/mesh-cas/src/promotion.rs",
+      "mode": "100644",
+      "sha256": "0872d2663495b8166220fccdb98cf2d6af836c12d08c6f835ddb215651042e23"
+    },
+    {
+      "path": "crates/mesh-cas/src/store.rs",
+      "mode": "100644",
+      "sha256": "c9a586dc209f55a7bdd87cf2418102704b5c8154675a873d9a3008837dfd2816"
+    },
+    {
+      "path": "crates/mesh-cas/src/transfer_plan.rs",
+      "mode": "100644",
+      "sha256": "b107aebe90432204575c77f2f4c2e0fbfcab3dd08425112b5cf506fed7d6c2a1"
+    },
+    {
+      "path": "crates/mesh-cas/src/transfer.rs",
+      "mode": "100644",
+      "sha256": "47f1d5b0cfff700654172fbc523253139f86ada210f51ef581db77c04b988b26"
+    },
+    {
+      "path": "crates/mesh-cas/tests/blake3_agrees_with_mesh_types.rs",
+      "mode": "100644",
+      "sha256": "61dc2260e7bfa5bb8f50805541732d5c638fc99c000e3b5c939458a879257912"
+    },
+    {
+      "path": "crates/mesh-cas/tests/collection-concurrency.rs",
+      "mode": "100644",
+      "sha256": "026f04358a9f111cfe6e27b7d336b84df44aa46babdb9a0b51069aa1583fed7e"
+    },
+    {
+      "path": "crates/mesh-cas/tests/collection-footprint.rs",
+      "mode": "100644",
+      "sha256": "4f9c4961c700ee85db339d0985cadba9011b39b34a3ffa4cd0d2305b5105576e"
+    },
+    {
+      "path": "crates/mesh-cas/tests/collection.rs",
+      "mode": "100644",
+      "sha256": "3f9956a1db100aabf6804d75c6ebdd7a0c05b6709451e3326752e4197eec36f0"
+    },
+    {
+      "path": "crates/mesh-cas/tests/compaction-interleaving.rs",
+      "mode": "100644",
+      "sha256": "e890e0f39e5bb2a30972afe87f10e9e8b2c98df5494b89552df8436a90bbdf38"
+    },
+    {
+      "path": "crates/mesh-cas/tests/corruption.rs",
+      "mode": "100644",
+      "sha256": "6d4bbae1b96278b36c3a9df6b8e2b3e18ceee2b44348037f14d52bc1b75b66ac"
+    },
+    {
+      "path": "crates/mesh-cas/tests/crash-promotion.rs",
+      "mode": "100644",
+      "sha256": "6cc8120117eeb9e1b6b0fe81780f700c657a68f7a0ffe7b4682845667c4c7264"
+    },
+    {
+      "path": "crates/mesh-cas/tests/promotion_ordering.rs",
+      "mode": "100644",
+      "sha256": "3b16f06335670899eb0cc12dde62e6813fc60f8ce769d3c041ec602391fbd906"
+    },
+    {
+      "path": "crates/mesh-cas/tests/resumable-transfer.rs",
+      "mode": "100644",
+      "sha256": "0f241e2ca64a5621ae2c442e5cbf38c4db6789ce40534c0c03a689559dde0781"
+    },
+    {
+      "path": "crates/mesh-cas/tests/roundtrip.rs",
+      "mode": "100644",
+      "sha256": "43e3ff90e56a273dd1477e4612540834500d153ad27ae9cff23e55b16161b204"
+    },
+    {
+      "path": "crates/mesh-cas/tests/scratch_discard.rs",
+      "mode": "100644",
+      "sha256": "7cceb513f4ea36ba2eeb7c8ec902dc0974f5c146d5b1601d630cf8408477480e"
+    },
+    {
+      "path": "crates/mesh-cas/tests/sequence_steps_agree_with_mesh_store.rs",
+      "mode": "100644",
+      "sha256": "8732c656aedcd3ab5676ceae127f1bbfa94bdd0710417b56b943365a112a803b"
+    },
+    {
+      "path": "crates/mesh-cas/tests/staging_guard.rs",
+      "mode": "100644",
+      "sha256": "4485fdee0e5a8aa27e52fb5e36cc1c7be4d8c17d1f6eeaf65791d90bfcf454e2"
+    },
+    {
+      "path": "crates/mesh-cas/tests/storage-footprint.rs",
+      "mode": "100644",
+      "sha256": "a9d3dc584c8724e2c85f6eedcdd3e19afdbce2d00a7fbd25cf24c548cc1405ee"
+    },
+    {
+      "path": "crates/mesh-cas/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "2f6a04943d912f98f7557e2519952fa6f6178e3fa343e67ab8a3d59f7838e939"
+    },
+    {
+      "path": "crates/mesh-cas/tests/transfer-planning.rs",
+      "mode": "100644",
+      "sha256": "56277b64d80c156f3660e9e6964ac9acb395724c98e01a127b45fc506a105dab"
+    },
+    {
+      "path": "crates/mesh-cas/tests/unreferenced.rs",
+      "mode": "100644",
+      "sha256": "1bd7d0a5555e320cab2cd2638a6afa5807d76d949dd89e4cff908c14c182eddf"
+    },
+    {
+      "path": "crates/mesh-chunking/benches/chunking.rs",
+      "mode": "100644",
+      "sha256": "19f993cbbfc1717e0a3b6d3426d110041eabe59648f4ea0b5e69fe015cf4bcdc"
+    },
+    {
+      "path": "crates/mesh-chunking/Cargo.toml",
+      "mode": "100644",
+      "sha256": "eb502af63826ef60c44aa7d6a7b5d4cdc174063a5e17266b179929d099144126"
+    },
+    {
+      "path": "crates/mesh-chunking/src/blake3.rs",
+      "mode": "100644",
+      "sha256": "8778af90fa20c60dae2145c3292b1c8a89c94a47d2e5fbe93da98e8ab5cee090"
+    },
+    {
+      "path": "crates/mesh-chunking/src/cdc.rs",
+      "mode": "100644",
+      "sha256": "91637f55624592eba5e1bba9539996a8d6833437956b2f00005325de88e55e8d"
+    },
+    {
+      "path": "crates/mesh-chunking/src/compress.rs",
+      "mode": "100644",
+      "sha256": "0af99ece0ddf0d04dc971ae23bf94cbba2a0f368d4431e51c4f6a0b638713845"
+    },
+    {
+      "path": "crates/mesh-chunking/src/config.rs",
+      "mode": "100644",
+      "sha256": "6c6f516838edeaca4f81b55cc1917d8ed24d487c61565a43bd65ae72946232d5"
+    },
+    {
+      "path": "crates/mesh-chunking/src/digest.rs",
+      "mode": "100644",
+      "sha256": "e15ecdcb25a68edcb47c2e04e002fa9b44716c7ba1c2275a7091db5f660f3782"
+    },
+    {
+      "path": "crates/mesh-chunking/src/gear.rs",
+      "mode": "100644",
+      "sha256": "128dddcb822644c8c1cd4458d4a9b967f3dd47db2ef653628854d7e2438622e5"
+    },
+    {
+      "path": "crates/mesh-chunking/src/lib.rs",
+      "mode": "100644",
+      "sha256": "43c3b01effda62836e2d1a01ea142928ea3012426a7c5c3215588d8a09a59902"
+    },
+    {
+      "path": "crates/mesh-chunking/src/manifest.rs",
+      "mode": "100644",
+      "sha256": "58c2a03e530f8db1ab040846d5ce88b783f6ef3828470d931f6320889ebabec9"
+    },
+    {
+      "path": "crates/mesh-chunking/src/stream.rs",
+      "mode": "100644",
+      "sha256": "2a8c84c807fbb171c5c01406e7de807a8067b6be6b6d4648f02ef6a0eb84c1e4"
+    },
+    {
+      "path": "crates/mesh-chunking/src/testing.rs",
+      "mode": "100644",
+      "sha256": "6ac27c3b3d34284a943987f665cbb0821e68004c11974a9f5e1d494f4ee57961"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/blake3_agrees_with_mesh_types.rs",
+      "mode": "100644",
+      "sha256": "4edc7bdfc5a8daa8e694409bdd6bd81420b2846f21afca5f8f9074be0b9e702c"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/determinism.rs",
+      "mode": "100644",
+      "sha256": "c6afdb6193a0edcd8d0d20ac8940ee5bfcfe1ab57546f2c31470078bbec052a4"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/locality.rs",
+      "mode": "100644",
+      "sha256": "95487d592502d2ddb0abbab225096bd44114659cabd12e3ce0de728ca97bb412"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/manifest_mirrors_mesh_types.rs",
+      "mode": "100644",
+      "sha256": "93f524f49680ed4936b7d1f64f5b4db2f5532d1c93ab3c1edcf6a3fde4aeee15"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/transfer_budget.rs",
+      "mode": "100644",
+      "sha256": "6f8e560c478f1dd29b6c164a25346ce7f6fec8b04558bd78c6c851567c7bc443"
+    },
+    {
+      "path": "crates/mesh-chunking/tests/zstd_interoperates.rs",
+      "mode": "100644",
+      "sha256": "3a1be15575e5adace6a75b24b3c389ab581f745367cf583ea0f130cd572bfc01"
+    },
+    {
+      "path": "crates/mesh-conflicts/Cargo.toml",
+      "mode": "100644",
+      "sha256": "fe2895bdc4e9d413174ae826e00491cecdc8290fffe93fff64f27107fa224e21"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/change.rs",
+      "mode": "100644",
+      "sha256": "ef5a2c498df8de37d13729d55e2e7cdbfdd4720c12f8e4083c8e9faf832b963f"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/context.rs",
+      "mode": "100644",
+      "sha256": "6ea75d4619c49e8d424dc68872ad760dd984a3c8310d6d07f24dbc06c664c198"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/fold.rs",
+      "mode": "100644",
+      "sha256": "e452590a3f8e22488818e97ab139e5dfa04fdd2e5dd36f7162ed83150fefdecb"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/ids.rs",
+      "mode": "100644",
+      "sha256": "a77fac90498aed7e3863400693c0b2636907cf14e3cf0c1436732d66a050be7d"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/lib.rs",
+      "mode": "100644",
+      "sha256": "8fd2ee8660712c17eb25a5066676239d6d045d96ca066d71101b099cb19c0f06"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/name.rs",
+      "mode": "100644",
+      "sha256": "1466224a0c3d4692fd0c9a75a6a584d0ad83425852584e3b035d5c2a02662de3"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/object.rs",
+      "mode": "100644",
+      "sha256": "8771ec15c661dfe87935670f1dbd71ae7db4a36513fc4dbfefd3565bfc11fe14"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/outcome.rs",
+      "mode": "100644",
+      "sha256": "e25141b2c7789bbdf93c2f296aabbbf0f8e0058b306922de1a9b9e70e5624293"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/resolve.rs",
+      "mode": "100644",
+      "sha256": "8cae6c278f35d203b5bbab44123fce8154ff18497fb0e79163f956419280a9f5"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/review.rs",
+      "mode": "100644",
+      "sha256": "81286bbdaa73b9849d9360ce80c1771e959f2b4ac4bf68f9cdd756c930405a65"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/rules.rs",
+      "mode": "100644",
+      "sha256": "8f2f73c7a2378ab14603e35bea598f968629760b7037c66824dd8646f89b8861"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/snapshot.rs",
+      "mode": "100644",
+      "sha256": "8c3744bff70228904eb196c255bfff6ca1a084884e8e4f89a61ab354c9226244"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/stamp.rs",
+      "mode": "100644",
+      "sha256": "97e1dcb62fa6200e5cfaba3fbe04679c4338845cc32ddf34c820b1a77dda7261"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/text.rs",
+      "mode": "100644",
+      "sha256": "55ccc370c38fa02741aacfac5b9b7e981c465b6782d904b5776b2469de71d08a"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/tree.rs",
+      "mode": "100644",
+      "sha256": "c367beaef0fcff1f0f24bbaa561c068d3a0757828a007d4a46002f76a67954a4"
+    },
+    {
+      "path": "crates/mesh-conflicts/src/unicode-fold.txt",
+      "mode": "100644",
+      "sha256": "c775bf332425d10924a86135d404add3f3a5c88f0189582be197f9eec5644bbd"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/compatibility-names.rs",
+      "mode": "100644",
+      "sha256": "3d7790d0370c53dd4dd338b2f330a72f657d6ee9d5b101fea3a28b99c58216b6"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/conflicts.rs",
+      "mode": "100644",
+      "sha256": "efbdf551b7b4e830b23844e558d52ea36783eda247c44eae215cb9caf0481252"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/determinism.rs",
+      "mode": "100644",
+      "sha256": "53d5bee17d043e4ea3dbb2bf13f0a1bbb23dd4374ddb60e3e2e9043f26c75d5f"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/mesh_state_drift.rs",
+      "mode": "100644",
+      "sha256": "7d9811522b42c0eeecfe89355a7a7d50ff748f9370c904f74c44b1adfcceafdc"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/preservation.rs",
+      "mode": "100644",
+      "sha256": "a12224793644c075a7afd0504db8a46de69aed7a9bc965f603d6e2da3496304f"
+    },
+    {
+      "path": "crates/mesh-conflicts/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "21e241c5080ec57aab5bd7fb49ed3381deda09f32e78f9c755dc2a009197f542"
+    },
+    {
+      "path": "crates/mesh-context-compiler/Cargo.toml",
+      "mode": "100644",
+      "sha256": "5024e63cd945a2c11602de9f000c0018958011bc45135e120017176eda436c16"
+    },
+    {
+      "path": "crates/mesh-context-compiler/src/lib.rs",
+      "mode": "100644",
+      "sha256": "6ec31d05ff83920fa30db72ee07f9aa5219569b2e0aa139135c9231d07953be5"
+    },
+    {
+      "path": "crates/mesh-context-ledger/Cargo.toml",
+      "mode": "100644",
+      "sha256": "e636a60cd0c1e4c1e6e4ca99f21a296327b7b53f82a7a34e8127f366eb812a6c"
+    },
+    {
+      "path": "crates/mesh-context-ledger/src/lib.rs",
+      "mode": "100644",
+      "sha256": "17f016c4a5397ae4d088a1c42f9a211b899d3d3f1f3afec4e18adcd945ddacd4"
+    },
+    {
+      "path": "crates/mesh-crypto/Cargo.toml",
+      "mode": "100644",
+      "sha256": "1696d596b4cb5d6b287787664c5578ea9f25af6304815c6143b3c37fa489ccb9"
+    },
+    {
+      "path": "crates/mesh-crypto/src/capability.rs",
+      "mode": "100644",
+      "sha256": "92ddee4b2f59e134886793e7e12912f53e58a1be2527bcb917126b53a7098e06"
+    },
+    {
+      "path": "crates/mesh-crypto/src/conformance_impl.rs",
+      "mode": "100644",
+      "sha256": "0dbe3a6102e64cb74fcc12dc49560d6121402428593c0184ee34d064bbdfab30"
+    },
+    {
+      "path": "crates/mesh-crypto/src/custody.rs",
+      "mode": "100644",
+      "sha256": "39ccac7163fb38db4090f105cd6579a319ca9265f70344f5b1f383aa99058134"
+    },
+    {
+      "path": "crates/mesh-crypto/src/domain.rs",
+      "mode": "100644",
+      "sha256": "f737ce6b9ae0ceaf4c4c7afdc4f2959dbb66e0af463424e6c88bd744416d9934"
+    },
+    {
+      "path": "crates/mesh-crypto/src/ed25519.rs",
+      "mode": "100644",
+      "sha256": "80c4040afa70f83aee5211719523e198824cffd47e28719694ebed8a62c761b7"
+    },
+    {
+      "path": "crates/mesh-crypto/src/keys.rs",
+      "mode": "100644",
+      "sha256": "14512685c72cb1ae7e14eb569ee706740c0d1297334af5dece4b952adfb07182"
+    },
+    {
+      "path": "crates/mesh-crypto/src/lib.rs",
+      "mode": "100644",
+      "sha256": "890968a79acd534a2de148f32bca23c626c778edd7e72ff84257385544747440"
+    },
+    {
+      "path": "crates/mesh-crypto/src/no_secret_material.rs",
+      "mode": "100644",
+      "sha256": "d829671e5c21b8ff31c30da3c8459070b83a49bd456285929ee21557002b3a22"
+    },
+    {
+      "path": "crates/mesh-crypto/src/parts.rs",
+      "mode": "100644",
+      "sha256": "466183b5b9f63c538b3c940fdd85daf85c9fac5b125f230e21bc459d7e8235ac"
+    },
+    {
+      "path": "crates/mesh-crypto/src/rotation.rs",
+      "mode": "100644",
+      "sha256": "e4ddd6c7e234ccc6f0424c58b42b777af34a60da3036b3a49ddd652ceb7129af"
+    },
+    {
+      "path": "crates/mesh-crypto/src/scheme.rs",
+      "mode": "100644",
+      "sha256": "70f7aca567b3960232033dfa5dbcbc405f4b9338e4e5c95c7200f20c71f730e4"
+    },
+    {
+      "path": "crates/mesh-crypto/src/token.rs",
+      "mode": "100644",
+      "sha256": "49f02e0741f095aa0874d4d06237affba1e7af59e2ec0e6343163b907eee2924"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/authority_is_unrepresentable.rs",
+      "mode": "100644",
+      "sha256": "b36629a8c6be7fc3396456decd5d14fabb78a9fc027db2165138d00f08804694"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/canonical_capability_codec.rs",
+      "mode": "100644",
+      "sha256": "03b300c2a6235f40c2b58aff14036e1a9a5c7413b13ba6db80be4a26a4542cde"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/conformance_has_teeth.rs",
+      "mode": "100644",
+      "sha256": "5b7cda7bbc430ebfec068b186249a2c5296b37c4b19c9b152e8b31a39f58ec2c"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/fixtures/capability-payload-v0.json",
+      "mode": "100644",
+      "sha256": "9043f120943506b161301ae7b10321d81a1c75c5e7b00d20d2c0c8f6c050a12a"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/key_isolation.rs",
+      "mode": "100644",
+      "sha256": "1b8ec13e7f35b1c48b8efbfe736f4f3f7ff442408b924458d272b4640e1f9386"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/only_a_checked_signature_mints_a_capability.rs",
+      "mode": "100644",
+      "sha256": "ea29a4c64ae203fe4e66b84e6c3294802b84a11bfa78724157f028ca37a60215"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/real_signatures_verify.rs",
+      "mode": "100644",
+      "sha256": "66aa23a77d87d26223e8d3474338d0cc79fc7e07f03268695859ddff10142bed"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/replay_and_staleness.rs",
+      "mode": "100644",
+      "sha256": "153b4d75a8942e11b6942e5e43254bc3c31b659b9bdbb511c439cab7242ab742"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/self_reported_backend.rs",
+      "mode": "100644",
+      "sha256": "a6517d25cdb43870a4dacb7c369aaa271c80e40ed0744cf3df11b2ecae870af2"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "703c01b82450d95e12b5feb74506ee3d6282f45395e46936970914470aeb2739"
+    },
+    {
+      "path": "crates/mesh-crypto/tests/token_wire_is_total.rs",
+      "mode": "100644",
+      "sha256": "980112829635d3c11636f75c954f78c067b2a44f48d364e20e4f922d98b8e207"
+    },
+    {
+      "path": "crates/mesh-daemon/Cargo.toml",
+      "mode": "100644",
+      "sha256": "ccfdaeb459a0be64d935fdd1d452744574f4440340d32854eb10ba8250ebe658"
+    },
+    {
+      "path": "crates/mesh-daemon/examples/capture-checkpoint.rs",
+      "mode": "100644",
+      "sha256": "233370d33ef9c79e18ae90c17591fab4bc6e5792259895af4e0c79f27c83cfe3"
+    },
+    {
+      "path": "crates/mesh-daemon/examples/checkpoint-delivery.rs",
+      "mode": "100644",
+      "sha256": "76c46e9efe6f65cccadb2eae087f4e1f2339e23d337a448c3f53ce2a0e096a36"
+    },
+    {
+      "path": "crates/mesh-daemon/examples/serve.rs",
+      "mode": "100644",
+      "sha256": "3088398e60c692e5eef1cb08d570cfb8b37ea9251937d3bd82d79c9e9b3dad91"
+    },
+    {
+      "path": "crates/mesh-daemon/ipc-contract.json",
+      "mode": "100644",
+      "sha256": "ee01029ee2699392b1d8fbe4e7e5f93fa98a84349e0ac0b1a08278d6bef17b1c"
+    },
+    {
+      "path": "crates/mesh-daemon/src/authenticated_changeset.rs",
+      "mode": "100644",
+      "sha256": "b37ec265119e09f8d0681dfdb6140b495b342889e9fe90af85aaa4726ce5ec29"
+    },
+    {
+      "path": "crates/mesh-daemon/src/bin/meshctl.rs",
+      "mode": "100644",
+      "sha256": "380e2d83c18dd2907ad46c025705fa16b4874d7e494c04917b809e6f1c783e9b"
+    },
+    {
+      "path": "crates/mesh-daemon/src/checkpoint_runtime.rs",
+      "mode": "100644",
+      "sha256": "36a91ec4e1030692f3677d1a524d01166fc90df8e0606b06b9abff504129cd84"
+    },
+    {
+      "path": "crates/mesh-daemon/src/checkpoint_storage.rs",
+      "mode": "100644",
+      "sha256": "432fe3faad3f34d90750c1bf4ba16ff985e63a9b14da8d1df2b2f13a85699f6d"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/catalogue/context.rs",
+      "mode": "100644",
+      "sha256": "cd26a5c6f327386902ac9b7844ce3e6fe759d1acfbc09fb4a1b5f6deaed93a4c"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/catalogue/local_filesystem.rs",
+      "mode": "100644",
+      "sha256": "7aee4f67ed6c38bc5a3d1ef68c195d7a6d9f7eee125848e9045ceff4e0cae18b"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/catalogue/mod.rs",
+      "mode": "100644",
+      "sha256": "1ce290c8d503ed087a2aa3946b4537302a749dcc7b5998519d716792c126a900"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/catalogue/synchronization.rs",
+      "mode": "100644",
+      "sha256": "be556d40b00dca945ed86e3c1cfa24c798536b83b59e47261f62ae7ef55498a0"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/catalogue/workspace.rs",
+      "mode": "100644",
+      "sha256": "b6b477f19392f4a5bacc0b2677daf59142fb3eca35bb621e515726d101196e08"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/coverage.rs",
+      "mode": "100644",
+      "sha256": "7dcf8422b6eb154d4dd78cfab1c7adc6cf00e865ddbfb63990c71b8e54fbfd42"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/mod.rs",
+      "mode": "100644",
+      "sha256": "02e2f950340844cb019b13b0b3ae4b4a8e440dfa23aa41b3c41d02ddc869c6b2"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/registry.rs",
+      "mode": "100644",
+      "sha256": "e09f30b4ce5521a404ff80f84f4dcdbdf593f4e8c0ff1299fe6becfd9d53a1ea"
+    },
+    {
+      "path": "crates/mesh-daemon/src/counters/snapshot.rs",
+      "mode": "100644",
+      "sha256": "c0eb99dbb5366fb348edce3ccc26f9393e7f2fa07cdc892c9131e9234d42e18f"
+    },
+    {
+      "path": "crates/mesh-daemon/src/crash_report.rs",
+      "mode": "100644",
+      "sha256": "e5807e73acdfbf2c0f2e83faa4ae001e010b5e7b67db4ba3347b76d80e1e9f2a"
+    },
+    {
+      "path": "crates/mesh-daemon/src/exclusions.rs",
+      "mode": "100644",
+      "sha256": "0e80b1edba2896cb66c90d79b9a2dab8a372d0130e8a3c6bbbfdfa732cd2a977"
+    },
+    {
+      "path": "crates/mesh-daemon/src/fallback.rs",
+      "mode": "100644",
+      "sha256": "02c964aa8ff874c7d3b90818fb66cf312d8e10147e642cb435771850472e1fb0"
+    },
+    {
+      "path": "crates/mesh-daemon/src/folder_import.rs",
+      "mode": "100644",
+      "sha256": "6fc17de6c89abc7ea13dae5054cd3599c3115759fc3691fb3f163953ed90096a"
+    },
+    {
+      "path": "crates/mesh-daemon/src/folder_watch/mod.rs",
+      "mode": "100644",
+      "sha256": "fae3607e68a817b154eca14194d673bc8a715d1245e2e9687f2c8a063fe60d07"
+    },
+    {
+      "path": "crates/mesh-daemon/src/folder_watch/view.rs",
+      "mode": "100644",
+      "sha256": "c918ca6dd6ab348dd18875d56349b4ebc353f4e54b9896fe4dd5806975e53c00"
+    },
+    {
+      "path": "crates/mesh-daemon/src/folder_watch/watch.rs",
+      "mode": "100644",
+      "sha256": "8ddd6471840bfabae91d0c5d10414f01f5a55d924ec3ca32a7fb0a3e9f8d9218"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/events.rs",
+      "mode": "100644",
+      "sha256": "98e011b3888463ec0d0b8ec060777764a526069c0b75cfdcfab922d1a890aa41"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/json.rs",
+      "mode": "100644",
+      "sha256": "e16cd2e46ed5c6c52108ece16bd4832077593f94ea86b5d107ae4ebdfe02ebad"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/message.rs",
+      "mode": "100644",
+      "sha256": "16a9c8991c77661939cd76f81c318e0cc95a087439ff108e42d362e266cc84c3"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/mod.rs",
+      "mode": "100644",
+      "sha256": "af46fda143595068478102f64cc136d84584862b09cbd7f430ea2d40e7fc5c6f"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/server.rs",
+      "mode": "100644",
+      "sha256": "4b22cafb10d3c4a60dd6e4fd588c0096e8acdb4d9c561e8af5b6e587ab586d50"
+    },
+    {
+      "path": "crates/mesh-daemon/src/ipc/surface.rs",
+      "mode": "100644",
+      "sha256": "55a6b03eb4da7bd5282d6a315d5624beb932563a6b8a19ea5863573a8358c457"
+    },
+    {
+      "path": "crates/mesh-daemon/src/lib.rs",
+      "mode": "100644",
+      "sha256": "b3a51547bd242560b484c16b02ca8f0970bd2fd2fe149d56f17e8ddbcdaf9e77"
+    },
+    {
+      "path": "crates/mesh-daemon/src/live.rs",
+      "mode": "100644",
+      "sha256": "9bbbdd342e1ffea46dae0e4ba690601d970e1ca9ddc800be92b3bedaa858c145"
+    },
+    {
+      "path": "crates/mesh-daemon/src/main.rs",
+      "mode": "100644",
+      "sha256": "b8dce42a3b1b51a61ce1ce758df0fdbc53efacb2cf2e5230cbab0b41571a6cad"
+    },
+    {
+      "path": "crates/mesh-daemon/src/managed_file.rs",
+      "mode": "100644",
+      "sha256": "8a869712560d4cd2e7ada5987a92acb1a967186fc5915b9333b8c1e626f1432a"
+    },
+    {
+      "path": "crates/mesh-daemon/src/managed_mutation.rs",
+      "mode": "100644",
+      "sha256": "1b326d5cd22694b18ada455ef99263f81a020a71dc3f22f92ff68a42594b1e0c"
+    },
+    {
+      "path": "crates/mesh-daemon/src/manifest_paging.rs",
+      "mode": "100644",
+      "sha256": "e846d4b1f13a669d803afd68089e203babc5cbbf3fa29e40815605c20bb321de"
+    },
+    {
+      "path": "crates/mesh-daemon/src/publication.rs",
+      "mode": "100644",
+      "sha256": "bb2395a9c47b0641a3e744ea110fadc383ea9f287be3b4c344b7592acd7a18f7"
+    },
+    {
+      "path": "crates/mesh-daemon/src/pull_back_receipt.rs",
+      "mode": "100644",
+      "sha256": "51d566633d23c3250bb50945b64161a60a1ab1e0bd646e4fd3e68bdcb04cc4c5"
+    },
+    {
+      "path": "crates/mesh-daemon/src/recovery.rs",
+      "mode": "100644",
+      "sha256": "ca80581d411a7214e84243b338c41c5a186c1abb80bd743fbc04e19c785fb08f"
+    },
+    {
+      "path": "crates/mesh-daemon/src/root_authority.rs",
+      "mode": "100644",
+      "sha256": "e3033e8cf036df74e228f505f5f34386b360038fe7f60f4017e6a64df2a6a830"
+    },
+    {
+      "path": "crates/mesh-daemon/src/support_bundle.rs",
+      "mode": "100644",
+      "sha256": "e540f604ff2051d4511609d74e728a52bbd380e4ab3230efbe29ff464983edfb"
+    },
+    {
+      "path": "crates/mesh-daemon/src/user_messages.rs",
+      "mode": "100644",
+      "sha256": "d29b5522dee1c6292e43686c9f45cdf1573a36ca458a354d4a9d2e7554d921e9"
+    },
+    {
+      "path": "crates/mesh-daemon/src/version_state.rs",
+      "mode": "100644",
+      "sha256": "284535e0aec8c5d524be2ea12e72a5be365e06bbef7b1fff4d9bbfac15c0e0b9"
+    },
+    {
+      "path": "crates/mesh-daemon/src/workspace_custody.rs",
+      "mode": "100644",
+      "sha256": "5eda6479a0b8bdd3054344370e14ab2ca599235393a460113c9d9df1c2722ec6"
+    },
+    {
+      "path": "crates/mesh-daemon/src/workspace.rs",
+      "mode": "100644",
+      "sha256": "ef3e774a1192683a2c55688c5ac4eb9331c9ba0187097b2675da877dce7f67b7"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/binary.rs",
+      "mode": "100644",
+      "sha256": "3b1d6735669d3162bc0b70490d630d63fa199fc5ce0919184a911f89bb8e5ae9"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/checkpoint-runtime-restart.rs",
+      "mode": "100644",
+      "sha256": "b1741e30f100a5ddaf6ca2e8cf2d759a0f5563dcffabcd29f151c1366a6d3816"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/checkpoint-runtime.rs",
+      "mode": "100644",
+      "sha256": "8ba1a4e9bc72e69977fb9867388d23e3e0f4e15a2eb9a27f89b34f6ffc2bf9e2"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/checkpoint-storage.rs",
+      "mode": "100644",
+      "sha256": "2c505eb340084da87fbcc3a300f8dd05ec8f4956ab4780736325223b06c4a065"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/counters.rs",
+      "mode": "100644",
+      "sha256": "e2a4e78006e0041f4e47859b1c85fcad017a702c73c6d5cc330d255bf13a1e72"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/crash-diagnostics.rs",
+      "mode": "100644",
+      "sha256": "740fabb551871fb97709b6740a82598586ec4f4c1cd23844d03e78a1c883a6a2"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/desktop-management.rs",
+      "mode": "100644",
+      "sha256": "6bf93f1053b0428e4f607f387f62dd3b039476425892d96a57232037e6d9f948"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/folder-checkpoint.rs",
+      "mode": "100644",
+      "sha256": "46b2bfdcdcf48790556f1073e3a66984e4313664565786d8a93cda8e1cb6c3e0"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/folder-watch-v1.rs",
+      "mode": "100644",
+      "sha256": "b648d4e8c1d0ae00f8d4fcda6ac9a9b9f21f0e43beed4272d9e3d799a7b5c3c2"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/folder-watch.rs",
+      "mode": "100644",
+      "sha256": "cdbc303f2f2e3a4fa688805dc35b3247640def1467242f4f61b50d2d3803e2b8"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/human-approval.rs",
+      "mode": "100644",
+      "sha256": "96db9b1ae665b72ec9ec9238a4557f7b6e0858b754bb8372fb25ec8f410dc1fe"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/import-cli.rs",
+      "mode": "100644",
+      "sha256": "8b036f81677268fb6d96db55e012688af12fc88c8dea2bb671ef613f9adf7df7"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/import.rs",
+      "mode": "100644",
+      "sha256": "cbacd449e5cb32306c70d400284b74f298a927537c93680af70fb6332390fc8c"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/ipc.rs",
+      "mode": "100644",
+      "sha256": "1c8b239faf72483729954021671d78f020d4b162d045de66d7fac5a281431886"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/live-checkpoint-save.rs",
+      "mode": "100644",
+      "sha256": "73b88d2120eb0a3ab777c4af1d2ec7ce68da773c983df0bbcfc320832bb8e7c8"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/managed-entry-lifecycle.rs",
+      "mode": "100644",
+      "sha256": "d79508f38e9edd4ee50a480dbf3551964d8810f8e71438c055023e1d27f68cd4"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/managed-text-edit.rs",
+      "mode": "100644",
+      "sha256": "a0d90f1da84c499f9f35fd94a5a1a4658ada4c7fd5182bf6655ed53479e44258"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/startup-recovery.rs",
+      "mode": "100644",
+      "sha256": "d64b615e69db7fec06655b7203a206a74889a863b108369b721e8eadb333a7c8"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/support-bundle-cli.rs",
+      "mode": "100644",
+      "sha256": "c78547ac532f87fcd91521dcd3ccda9f98c8a6dee6f0445ecef67233aba028f6"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/support-bundle.rs",
+      "mode": "100644",
+      "sha256": "2c6f159e9be0543299f98125b2f1a3b5d426e07080e807eb88c1d52cc19d42e2"
+    },
+    {
+      "path": "crates/mesh-daemon/tests/workspace-version-fork.rs",
+      "mode": "100644",
+      "sha256": "17a5c8dc15dfb61ff2109d38d5a0ccf49199206079f727814483365df725e573"
+    },
+    {
+      "path": "crates/mesh-derivations/Cargo.toml",
+      "mode": "100644",
+      "sha256": "579ac856034eaecb3c7255b34372547e0185ed4dae52a3c3c2344b0d6a5d89ef"
+    },
+    {
+      "path": "crates/mesh-derivations/src/lib.rs",
+      "mode": "100644",
+      "sha256": "dbba589607327510d5b0af5e0ccbbbf94d966a568ca683357a72a7589837f5dd"
+    },
+    {
+      "path": "crates/mesh-fskit-ffi/Cargo.toml",
+      "mode": "100644",
+      "sha256": "c15e71a66fd5c89a4179ed62dac063c9c585142956dd9e3668cc97b3f2c4f391"
+    },
+    {
+      "path": "crates/mesh-fskit-ffi/src/lib.rs",
+      "mode": "100644",
+      "sha256": "2077c99554a4a6a238139acb6444615a9f6c0f2069a63d89b6f1f72bf526aff8"
+    },
+    {
+      "path": "crates/mesh-fuse/Cargo.toml",
+      "mode": "100644",
+      "sha256": "b74799b1e50a608e00c0ff215157f041c1b4befd8757526d6d46da688b2ad3af"
+    },
+    {
+      "path": "crates/mesh-fuse/src/adapter.rs",
+      "mode": "100644",
+      "sha256": "1b7cfc083e9860c27b1815a9e02e951bbcf665a3def9a62baf16844319507dd8"
+    },
+    {
+      "path": "crates/mesh-fuse/src/errno.rs",
+      "mode": "100644",
+      "sha256": "d51485ee835d2d750122ddadd81450182cec90d8d47001d82ecf9127e96fd45e"
+    },
+    {
+      "path": "crates/mesh-fuse/src/kernel.rs",
+      "mode": "100644",
+      "sha256": "8df97b3fe55a859ce4cbd756735ea26b1f3f77004f6b4bd346a54e9193626f8b"
+    },
+    {
+      "path": "crates/mesh-fuse/src/lib.rs",
+      "mode": "100644",
+      "sha256": "93ef05d5ee9f6898bfa9b281a6f5a1844e925d52a33a03e30e57603eab971b0a"
+    },
+    {
+      "path": "crates/mesh-fuse/src/tree.rs",
+      "mode": "100644",
+      "sha256": "29f429d7847b5822005aaaadce8bba15167e961117b9ad5374688986fb252fec"
+    },
+    {
+      "path": "crates/mesh-fuse/src/view.rs",
+      "mode": "100644",
+      "sha256": "d1f4a97b151b1d44ab075e5c010d9d0017de8e682d1d302e70c55b75bab454c2"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/adapter_v1.rs",
+      "mode": "100644",
+      "sha256": "0016c68aae331f9c24c8b2b5436291cc7cdbf9b0443666ea27da4657feafee0d"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/concurrency.rs",
+      "mode": "100644",
+      "sha256": "b5b453022cb6bee3a77d1d71b75e8a445ffaf2f83ccbd695cf71527928b498ad"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/conformance.rs",
+      "mode": "100644",
+      "sha256": "665966b6af18139084784aed88b3f7c710a3523f8991097062aadb68a7fe2a92"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/editor-workflows.rs",
+      "mode": "100644",
+      "sha256": "8977fd6da16a51d1216d84593b01acb8eb0574ff04f34f6b7cb080f5d589ebc2"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/errno.rs",
+      "mode": "100644",
+      "sha256": "c4a25d0e49c8141b1ea631d435073114cda78c6c79dff74e5dee889d45a9aef1"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/kernel-retry.rs",
+      "mode": "100644",
+      "sha256": "e23d50e44da998fd860b64770fe0bdd302583c51095c0202ec9de93b2df88908"
+    },
+    {
+      "path": "crates/mesh-fuse/tests/no_ambient_io.rs",
+      "mode": "100644",
+      "sha256": "a159d5af4c2ccaaeee2c75bfa85b60cb37d4ac0d4d11af88a98908e99cf1b4e0"
+    },
+    {
+      "path": "crates/mesh-git-bridge/Cargo.toml",
+      "mode": "100644",
+      "sha256": "694350990a5a6c50a66e76b189a056462721147b233c65dd9eb8ca710f74cbe1"
+    },
+    {
+      "path": "crates/mesh-git-bridge/src/export.rs",
+      "mode": "100644",
+      "sha256": "5e1c1066f1c4efcf07d34b8d70a20470aba240740bc49fa6c2775ba98f1eac95"
+    },
+    {
+      "path": "crates/mesh-git-bridge/src/import.rs",
+      "mode": "100644",
+      "sha256": "f5c407ad1d0ead48709b436d488c334969c8f5fff6f1d9c120cc785a1ebf238f"
+    },
+    {
+      "path": "crates/mesh-git-bridge/src/lib.rs",
+      "mode": "100644",
+      "sha256": "f7754613ae4eb69764ae7fdd8e4930a23339d3513a0a0223f4c20a01dfef50bd"
+    },
+    {
+      "path": "crates/mesh-git-bridge/src/workspace.rs",
+      "mode": "100644",
+      "sha256": "a86b4cdb15f32e272afcbb7554b8a66584b705267abae3f914cc8bfd032530c3"
+    },
+    {
+      "path": "crates/mesh-git-bridge/tests/export.rs",
+      "mode": "100644",
+      "sha256": "50752286197470428d7b1c855448765114eebd6f83f1aae3519ea3187011fec3"
+    },
+    {
+      "path": "crates/mesh-git-bridge/tests/import.rs",
+      "mode": "100644",
+      "sha256": "9e3f7f523a1b80b3d34542420eb6aa9426f0c7047110b7c71068f236c846cef6"
+    },
+    {
+      "path": "crates/mesh-materializer/Cargo.toml",
+      "mode": "100644",
+      "sha256": "783cbec46dea9aaa0db3be5be6f374917baa25f7d28f68b00f9b5637184f9014"
+    },
+    {
+      "path": "crates/mesh-materializer/src/adapter.rs",
+      "mode": "100644",
+      "sha256": "2aa7dd9f963c97c9d48374e940e456cff38a129f94f84c7a3d35d48542262689"
+    },
+    {
+      "path": "crates/mesh-materializer/src/apply.rs",
+      "mode": "100644",
+      "sha256": "73fcb54c88441a894222e428f15e6ab767773c3bc96c49c76ff750c30a71d079"
+    },
+    {
+      "path": "crates/mesh-materializer/src/conformance/cases.rs",
+      "mode": "100644",
+      "sha256": "a3158dda7f84619d56060e9d0f316425adb245149e32cfa76938bf7ab65b03e8"
+    },
+    {
+      "path": "crates/mesh-materializer/src/conformance.rs",
+      "mode": "100644",
+      "sha256": "c66d23399c5949d55c8a94b8c96bbaae61b11ca9aa41e0d402146725c90a5da8"
+    },
+    {
+      "path": "crates/mesh-materializer/src/encode.rs",
+      "mode": "100644",
+      "sha256": "3d19dd3d3989a1ed20173249470b0c19e765be0897ecbcfb13a5e011a19d2c92"
+    },
+    {
+      "path": "crates/mesh-materializer/src/ids.rs",
+      "mode": "100644",
+      "sha256": "d851ab231f7b92640b15fc1877229c534635f184d04ee646027436a59b007725"
+    },
+    {
+      "path": "crates/mesh-materializer/src/lib.rs",
+      "mode": "100644",
+      "sha256": "a1d030b33fb0739cfdf6d7e5e373c6be6af58da186cd0ab0a1a14d8d6cfe3135"
+    },
+    {
+      "path": "crates/mesh-materializer/src/name.rs",
+      "mode": "100644",
+      "sha256": "a307e20b3cd4aaff3971a39b6ce8fe64e52ce5c31dde85370fcc528b466b2815"
+    },
+    {
+      "path": "crates/mesh-materializer/src/operation.rs",
+      "mode": "100644",
+      "sha256": "d992999a2f06602a688151022d1ae3bbe0f7c6af6bd6123e9ba4e5c5af2535f6"
+    },
+    {
+      "path": "crates/mesh-materializer/src/order.rs",
+      "mode": "100644",
+      "sha256": "00628b5d728363129cd6fa4c8e8257f7fc9870e55afc39d5d08036623a53bc53"
+    },
+    {
+      "path": "crates/mesh-materializer/src/rejection.rs",
+      "mode": "100644",
+      "sha256": "8f38964fed34b4c9962814e44864054ce6548bbb34f8fb6c037e14afc9921c0d"
+    },
+    {
+      "path": "crates/mesh-materializer/src/restore.rs",
+      "mode": "100644",
+      "sha256": "f17e9d04029c6ac97f7709f5b2a44afb37b05012dbbeaaddc0353043cb7f7b6f"
+    },
+    {
+      "path": "crates/mesh-materializer/src/state.rs",
+      "mode": "100644",
+      "sha256": "8dbf219ba3fcd20af161c0ea3b0cab8e255f3a23fe6d6ffb2f3417767d3a9d5a"
+    },
+    {
+      "path": "crates/mesh-materializer/src/version.rs",
+      "mode": "100644",
+      "sha256": "f5de9f9ff10bc694ab5e2b564850d8efab7808849f6624872b16f6b940c6129c"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/adapter_shape.rs",
+      "mode": "100644",
+      "sha256": "13ff6a7d37553d03764c31cc9c334d9dc0eee5d97fd081d0d057823d4ad2321e"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/adapter_v1.rs",
+      "mode": "100644",
+      "sha256": "e290e7d3181f0c8b10f85e28fb20764507b9e22f9e4c6b50fd031de380fad3d1"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/adapter_vocabulary.rs",
+      "mode": "100644",
+      "sha256": "1df035a17cd90de8bea6b1adfcc4e01e659d29b17429d00acd01b6b23a1de3c7"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/adapter-conformance/reference.rs",
+      "mode": "100644",
+      "sha256": "c2c60909c1ecd91fadfc65e5d6a0fc6690f5ee7128ea4d1dd10f27084fb2f29f"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/adapter-conformance.rs",
+      "mode": "100644",
+      "sha256": "d417b182fe297977442ede9ad3acb4d56ee6ed77dde4054d62227df5c69ac55e"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/canonical_encoding.rs",
+      "mode": "100644",
+      "sha256": "d8b0695b93df12e55e43aa7a4764b20e0c3f20f7dd05546a2bd0d1a108369642"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/corpus.rs",
+      "mode": "100644",
+      "sha256": "5bb59a931018caaded2eb44c5c028a1596cc75c30fbff35bfea7218260725668"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/digest.rs",
+      "mode": "100644",
+      "sha256": "c17332f32ccf8d82eb9875b1f872bbc1f9a5d52401ff4baa4ffbf81ed98ee60a"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/mod.rs",
+      "mode": "100644",
+      "sha256": "7135800f2fa374360f0eb57ee17ffa0a8092b3ff33e1fd9d323dac80c01f9931"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/oracle.rs",
+      "mode": "100644",
+      "sha256": "20ff69cc0955bc23c5282d158693ee70f3240c95c0745b23dce0010fb75703ed"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/rng.rs",
+      "mode": "100644",
+      "sha256": "97c2ddb12ed964b7f9dfee3fe964962c397570c9207640bb6fb3da5f3ca15edd"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/common/snapshot.rs",
+      "mode": "100644",
+      "sha256": "d0a7c14e99bfd28ad598fa705ce5e71427296e83e6eb6be69d484458aa95cba6"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/determinism.rs",
+      "mode": "100644",
+      "sha256": "1640f5bc8cef240a4e64b5c30052242bd97c69a35a4690ec67de11a40ddb2080"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/differential.rs",
+      "mode": "100644",
+      "sha256": "6ffa4dd5b299e8fc58117b3ca4b7c31375d1dc7a4e5918385bd5214b70f5be4c"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/no_ambient_io.rs",
+      "mode": "100644",
+      "sha256": "d030475f044fa66cf58d436de4a8725fef1fba22892abc91200a4a70ebca4fd8"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/operation_ownership.rs",
+      "mode": "100644",
+      "sha256": "4be331efc41be11249965cc46a83615a14b09ef39307379818ba5c4d68f9247f"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/order_insensitivity.rs",
+      "mode": "100644",
+      "sha256": "4ff829cad6a73f57b0ab32b3b14eb7351db38c3f649e93a726c94250f2089878"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/regression_seeds.rs",
+      "mode": "100644",
+      "sha256": "dd98d19675326e2114894477a0a5262769282cd7e7a263b254d3058a3c1ae0f3"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/restore.rs",
+      "mode": "100644",
+      "sha256": "12a2b356ffe4cf1c1bff0136698121d70014f7fbc868b2463d928bda4743179a"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/state_invariants.rs",
+      "mode": "100644",
+      "sha256": "cdda6993f87eaa1b478d6d120f3d0167b92461b89773c9fbd872ccca5f5f106c"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/totality.rs",
+      "mode": "100644",
+      "sha256": "87b1893731a1e5a292a57fcabc19e9b0a98651e310361e88b928eaa243e93090"
+    },
+    {
+      "path": "crates/mesh-materializer/tests/vocabulary_drift.rs",
+      "mode": "100644",
+      "sha256": "003d69e37c8be23a384170a051e5c5559fc84e4393bde598496dd868321a8cdd"
+    },
+    {
+      "path": "crates/mesh-mcp/Cargo.toml",
+      "mode": "100644",
+      "sha256": "af24e6d96b35351516d9b730d176b1cd22c2a0e3308f6c278d54409722e10c44"
+    },
+    {
+      "path": "crates/mesh-mcp/README.md",
+      "mode": "100644",
+      "sha256": "84dea2e576432dca34bdac37bab1f0f63d1025195aa08c4a5ec068cbf8f0931e"
+    },
+    {
+      "path": "crates/mesh-mcp/src/json.rs",
+      "mode": "100644",
+      "sha256": "429d60fa294212af68bd38440d560a064a243c8982853a5c01a9b9e04fdf5bba"
+    },
+    {
+      "path": "crates/mesh-mcp/src/lib.rs",
+      "mode": "100644",
+      "sha256": "42d668fc88ad8d5f34ae672688120c61c4de91df52b64c667ee3ff3775b8a93f"
+    },
+    {
+      "path": "crates/mesh-mcp/src/main.rs",
+      "mode": "100644",
+      "sha256": "ce7b35ca885829578c4dfb5fb0f4bf41dae2c71baad37f1bc21cee11d14c24e7"
+    },
+    {
+      "path": "crates/mesh-mcp/tests/stdio.rs",
+      "mode": "100644",
+      "sha256": "e14f61cd0fa80ea3ac4162451e6e56e72e177076379ea87df06f1702fb411761"
+    },
+    {
+      "path": "crates/mesh-operations/Cargo.toml",
+      "mode": "100644",
+      "sha256": "bebfaf95597881625c96019246e97af8f8cd12ac86ac817e9765f26ca14d1552"
+    },
+    {
+      "path": "crates/mesh-operations/src/canonical.rs",
+      "mode": "100644",
+      "sha256": "66c79371cd94f5a14180c8a9fa3b45e967d305c2a8dff3c44dece298954a30a3"
+    },
+    {
+      "path": "crates/mesh-operations/src/cbor_reader.rs",
+      "mode": "100644",
+      "sha256": "27774674bd51b472f974722965d222dba0ce00ea5f2b1f0e0906419feec97efe"
+    },
+    {
+      "path": "crates/mesh-operations/src/cbor.rs",
+      "mode": "100644",
+      "sha256": "aba807075a72f68ab2068e0c9c5b42c210ab2e408e3342a4a953b7d4d96da4bf"
+    },
+    {
+      "path": "crates/mesh-operations/src/changeset.rs",
+      "mode": "100644",
+      "sha256": "7a9e0557fc9c7469ef9dd381c1364a02959a98da12e50d988503a2c5742ad342"
+    },
+    {
+      "path": "crates/mesh-operations/src/coalesce.rs",
+      "mode": "100644",
+      "sha256": "63d39a6b0885e38ccf8b1f68b50e043b77640e3f22da172caee632dca659267d"
+    },
+    {
+      "path": "crates/mesh-operations/src/context.rs",
+      "mode": "100644",
+      "sha256": "0e07ba89ebe2f89cef7485228946001c2cc5f7710d499d91b7549d573d8449df"
+    },
+    {
+      "path": "crates/mesh-operations/src/corpus.rs",
+      "mode": "100644",
+      "sha256": "5d94ac525dbd6e87d2dc800da00a4a7c8f2726aee914632374ec8bcdc9400f7b"
+    },
+    {
+      "path": "crates/mesh-operations/src/encoding.rs",
+      "mode": "100644",
+      "sha256": "939af33986fae66cee3ba0a1507dbe05bcacd3cb51d188f5d493241d82dd4c35"
+    },
+    {
+      "path": "crates/mesh-operations/src/head.rs",
+      "mode": "100644",
+      "sha256": "0ba0d91c9a1a3ddd896afd791f1236fac78ae31322c83cf0eb88c63783f929f5"
+    },
+    {
+      "path": "crates/mesh-operations/src/ids.rs",
+      "mode": "100644",
+      "sha256": "1e53c8e6a359984aa6c575832e76091946bffdbd6fc85e8477d22d1d9bed2f6d"
+    },
+    {
+      "path": "crates/mesh-operations/src/lib.rs",
+      "mode": "100644",
+      "sha256": "31b5293ba7b60d1868112bcf5c0bfc04bfdbb1148305296fa4fd0d172ab319e5"
+    },
+    {
+      "path": "crates/mesh-operations/src/name.rs",
+      "mode": "100644",
+      "sha256": "a5e7e67d464462014d6309968ca63ba4f4a9f5b33a863543d74e064fbad2769a"
+    },
+    {
+      "path": "crates/mesh-operations/src/no_ambient_io.rs",
+      "mode": "100644",
+      "sha256": "ee10d055b9dcfd65ff5a6fee26ece031fa1bf58e09f83ab9c90220d5cccdc78e"
+    },
+    {
+      "path": "crates/mesh-operations/src/operation.rs",
+      "mode": "100644",
+      "sha256": "78eee377a028438344bc0cf42c64f77619353b4443425b23398ad137c2109f4c"
+    },
+    {
+      "path": "crates/mesh-operations/src/sequence.rs",
+      "mode": "100644",
+      "sha256": "15442403b85081addf2e07a118fc0e22afcfcfa71114505e11b768c7643fce70"
+    },
+    {
+      "path": "crates/mesh-operations/tests/ambient_needles.rs",
+      "mode": "100644",
+      "sha256": "ef24be83648425f3e8311e9f078a90febf6b530a808661365af9bdcc4f5ded6c"
+    },
+    {
+      "path": "crates/mesh-operations/tests/changeset_construction.rs",
+      "mode": "100644",
+      "sha256": "3a3d6236c55ab08c87cc8b04e36334b6c6a014517fc8755d3643467018fa9232"
+    },
+    {
+      "path": "crates/mesh-operations/tests/common/mod.rs",
+      "mode": "100644",
+      "sha256": "a26fd5bcf9c6d30cee706cadadf2451112865b8f6a0c6ed47b5b02a82bf9c6a3"
+    },
+    {
+      "path": "crates/mesh-operations/tests/mesh_types_drift.rs",
+      "mode": "100644",
+      "sha256": "74bba6b621e574cd707c62cb5468cde3209b65bc771294a943ad6d1749347f02"
+    },
+    {
+      "path": "crates/mesh-operations/tests/no_raw_write_is_distributable.rs",
+      "mode": "100644",
+      "sha256": "090e91305825a9044d563ce43b7ca64e8de663fd35c9042c45742d634acfff09"
+    },
+    {
+      "path": "crates/mesh-operations/tests/published_vectors.rs",
+      "mode": "100644",
+      "sha256": "94b1ef5f2a5ea0b62fa9a2c087a2350231acff115a28a2aa124c32f6f6fd8129"
+    },
+    {
+      "path": "crates/mesh-operations/tests/sequence_monotonicity.rs",
+      "mode": "100644",
+      "sha256": "5711af54486cff278343e75a38ecf9d48c103620d57ca47d30e112d8d90263f5"
+    },
+    {
+      "path": "crates/mesh-operations/tests/subtree_move_is_constant_cost.rs",
+      "mode": "100644",
+      "sha256": "a8a49f06c5a1af0f16554194898fa9e6c95bc537242bb2adb9b8b7e94b80c58a"
+    },
+    {
+      "path": "crates/mesh-operations/tests/vocabulary.rs",
+      "mode": "100644",
+      "sha256": "ee3bcc4a02b7c69b8bf012a2719b980be654873303ad9d73eb52fc46cc7d018d"
+    },
+    {
+      "path": "crates/mesh-policy/Cargo.toml",
+      "mode": "100644",
+      "sha256": "4188bb0a75c1ac443e62438ed456c8ebd70358a1a6ee73854401759e22d274a9"
+    },
+    {
+      "path": "crates/mesh-policy/src/decision.rs",
+      "mode": "100644",
+      "sha256": "aaa16e214064e208f2a40a2ad40e194d9e4b89989af86de055de4372a50805ff"
+    },
+    {
+      "path": "crates/mesh-policy/src/epoch.rs",
+      "mode": "100644",
+      "sha256": "6c61efbea99b54ee920648e7b0b0a404c520f8e1cb74f43ec10f5d5feb1ac65d"
+    },
+    {
+      "path": "crates/mesh-policy/src/ledger.rs",
+      "mode": "100644",
+      "sha256": "55f03aa6efd5884c9c87ac423fbdf6f5176c3c3511518463af15bbd97c8123cf"
+    },
+    {
+      "path": "crates/mesh-policy/src/lib.rs",
+      "mode": "100644",
+      "sha256": "d0c78abf28d81b64cad42b5c2995e56b3811c65bd1b7ea047185be11632387ca"
+    },
+    {
+      "path": "crates/mesh-policy/src/principal.rs",
+      "mode": "100644",
+      "sha256": "eff2d4d0dc8ee29fbe1746217c78e8b67c2eec09a126b8e6d3297748019da811"
+    },
+    {
+      "path": "crates/mesh-policy/src/publication.rs",
+      "mode": "100644",
+      "sha256": "65462ab5992acb4d527f5c9f5beead966c3ae0bba14b1990d739263e23c53481"
+    },
+    {
+      "path": "crates/mesh-policy/src/revocation.rs",
+      "mode": "100644",
+      "sha256": "f83ac7cdcb4e18f841924ac4b8766d8732a870044c045641c71dc1aabbbf74eb"
+    },
+    {
+      "path": "crates/mesh-policy/src/session.rs",
+      "mode": "100644",
+      "sha256": "e1daf4d8915402077d634316a9aae5c3896d56f9aa6b741703b154dd1bad932c"
+    },
+    {
+      "path": "crates/mesh-policy/tests/authorization.rs",
+      "mode": "100644",
+      "sha256": "c39e46d1c2a7b3a184cefbeb983879807e5abe85a8a589369a1a41be0e75a26d"
+    },
+    {
+      "path": "crates/mesh-policy/tests/epoch_rotation.rs",
+      "mode": "100644",
+      "sha256": "27ba0562194881be6471b8311d932a65e927edf161685491ebaa48dff8a66ac7"
+    },
+    {
+      "path": "crates/mesh-policy/tests/revocation.rs",
+      "mode": "100644",
+      "sha256": "8478924d29300d66c4c21ce2f2e3f5af8e71672c67e3646f3dae3aefe35a7cbe"
+    },
+    {
+      "path": "crates/mesh-policy/tests/structural_guards.rs",
+      "mode": "100644",
+      "sha256": "aa415d0dc7696e9a7a39bd2a8d7b35f4a6f561a31e9ec97fc4bd027920ebd6a4"
+    },
+    {
+      "path": "crates/mesh-policy/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "b4f4074b15a989eb40ffe4acc124f76cafb0ae9aee4478be8bcee2a0fb43260a"
+    },
+    {
+      "path": "crates/mesh-simulator/Cargo.toml",
+      "mode": "100644",
+      "sha256": "84a240f7cf2ad93745d8202d32d478df3f2cb77b9c3b802948ff596d24c6478e"
+    },
+    {
+      "path": "crates/mesh-simulator/src/bin/mesh-simulator-campaign.rs",
+      "mode": "100644",
+      "sha256": "ae6b3cf71e082a44908b7a4b522f68f9f710597cabf663cb68a66ab5ab25ee2e"
+    },
+    {
+      "path": "crates/mesh-simulator/src/bin/mesh-simulator-transport.rs",
+      "mode": "100644",
+      "sha256": "ec8b999c8db02934ffa5cb85aa3ca851099c84c76ff24a8bd63912078666515e"
+    },
+    {
+      "path": "crates/mesh-simulator/src/bin/r1-convergence.rs",
+      "mode": "100644",
+      "sha256": "32ae7ace019199d55304da94372b67baa7b5a776a28992014896ee23d1e173a4"
+    },
+    {
+      "path": "crates/mesh-simulator/src/campaign.rs",
+      "mode": "100644",
+      "sha256": "6ac010941dea46f9267d3dcbdf4fbe2ffdf4dc93a8433195a5cd2519ed46fe23"
+    },
+    {
+      "path": "crates/mesh-simulator/src/invariant.rs",
+      "mode": "100644",
+      "sha256": "b2459b8a79157a0e66a3a5ae393f0ec4def3b1dfa0fac18bd2243ae1f310302f"
+    },
+    {
+      "path": "crates/mesh-simulator/src/lib.rs",
+      "mode": "100644",
+      "sha256": "d675c1d7c61f015330f7b45ed31fbf4bade98f325ae924da063dc5bc60d8d352"
+    },
+    {
+      "path": "crates/mesh-simulator/src/minimize.rs",
+      "mode": "100644",
+      "sha256": "8fab226d6df141a10b65cf93ac366bc95f751db7744bd9e943849ceb3de56b3c"
+    },
+    {
+      "path": "crates/mesh-simulator/src/schedule.rs",
+      "mode": "100644",
+      "sha256": "c16f16caa15ac407a6def831b9e13d62d1fcaab3be3354c1801cbae8929a0506"
+    },
+    {
+      "path": "crates/mesh-simulator/src/transport.rs",
+      "mode": "100644",
+      "sha256": "8a28f3238f30abc9399b9516693a0ed18bcc0b33aa6b81b54dcf03203f38f969"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/campaign.rs",
+      "mode": "100644",
+      "sha256": "781d2c86c8087446fd0620e970dd1081c59584c85b8ac9a6467ee69f0b9f5a06"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/invariants.rs",
+      "mode": "100644",
+      "sha256": "96face4bd56a606dbd407838ccd409c65a885ff81dc9dd4d3379c81cb7b9a4e5"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/minimize.rs",
+      "mode": "100644",
+      "sha256": "b36b56e2497a93d9984307bd1384884c0e31ff31d4bf399e6ec554fd9902519c"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/r1-convergence.rs",
+      "mode": "100644",
+      "sha256": "2a93c0c4560f151367fa8eddd2d780a82041f43ef1f51745a1b61788e4e6caa6"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/schedule.rs",
+      "mode": "100644",
+      "sha256": "0b3c3b32ed0c62bd228da5c17c751f6ffad73e61dc11b8fa6642807f1c8f4148"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "7004a8efdaf72bd7aed89cb29a4d755e132b4c8811f38e9d81b1d9f82b51e002"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/support/r1.rs",
+      "mode": "100644",
+      "sha256": "8dd1de723dcb7a965091ba1febce6edda5133c0e53b7a08d042adafc3cf1343d"
+    },
+    {
+      "path": "crates/mesh-simulator/tests/transport.rs",
+      "mode": "100644",
+      "sha256": "ad04576946beaf95cb41345d67c39f14dea2aed93f3f690f4df4dc360045aef1"
+    },
+    {
+      "path": "crates/mesh-state/Cargo.toml",
+      "mode": "100644",
+      "sha256": "b34df941741a7fd8cd4fade7b0cfd45b3b604c8600ec440927f38683afad3e8c"
+    },
+    {
+      "path": "crates/mesh-state/src/advance.rs",
+      "mode": "100644",
+      "sha256": "caef0560a2906f4f06888eded843f457abcdc8db17f083095719c4481f5f7a26"
+    },
+    {
+      "path": "crates/mesh-state/src/changeset.rs",
+      "mode": "100644",
+      "sha256": "064f540733ce59872c2539f0ead15b10d7ce5d1d4a8a26fdca5d544ebf8405ee"
+    },
+    {
+      "path": "crates/mesh-state/src/digest.rs",
+      "mode": "100644",
+      "sha256": "590396287e836e4a6fb4e669a27ec1d2c33ab305172c05e5ceebd9563fd4d7ed"
+    },
+    {
+      "path": "crates/mesh-state/src/fold.rs",
+      "mode": "100644",
+      "sha256": "e452590a3f8e22488818e97ab139e5dfa04fdd2e5dd36f7162ed83150fefdecb"
+    },
+    {
+      "path": "crates/mesh-state/src/head.rs",
+      "mode": "100644",
+      "sha256": "5e5f02ba43cb76f2d169a516e383ee0ef1153684458da1c2f7d631705a655f91"
+    },
+    {
+      "path": "crates/mesh-state/src/identity.rs",
+      "mode": "100644",
+      "sha256": "7aae5e38fa45814d96ec8b5e307ee35c67fd3ac14c291fd6bf64442a80cea852"
+    },
+    {
+      "path": "crates/mesh-state/src/ids.rs",
+      "mode": "100644",
+      "sha256": "057f39b868e5e3d8558eec4da34a938b2580004504ec27eb58901a5ef91b2919"
+    },
+    {
+      "path": "crates/mesh-state/src/lib.rs",
+      "mode": "100644",
+      "sha256": "31620a5b2ca375a249c0174fdf95bca99f11f3b3d04be305e1c64f97fae32496"
+    },
+    {
+      "path": "crates/mesh-state/src/metadata.rs",
+      "mode": "100644",
+      "sha256": "2141910456f3d27228d05f098e682b3a9457b41d99a1e88fbba695e0278b1591"
+    },
+    {
+      "path": "crates/mesh-state/src/name.rs",
+      "mode": "100644",
+      "sha256": "4e4a9530861cd484dca4b3fdc3aaa05213a060f1b6aefb695ae3c46848524e3a"
+    },
+    {
+      "path": "crates/mesh-state/src/no_ambient_input.rs",
+      "mode": "100644",
+      "sha256": "d33c18da3f6ec1736aaf207a0581279016ef58a08bf42e88a69af106750e7fd7"
+    },
+    {
+      "path": "crates/mesh-state/src/object.rs",
+      "mode": "100644",
+      "sha256": "640a82473633dccd5470e1b403920de03413bb0db41b55f844c1d7c4ce24facc"
+    },
+    {
+      "path": "crates/mesh-state/src/parents.rs",
+      "mode": "100644",
+      "sha256": "c916d6b0d3a14265664750c95d6d1d830fb79023bc96de472bd3e4a4a0f2dc48"
+    },
+    {
+      "path": "crates/mesh-state/src/placement.rs",
+      "mode": "100644",
+      "sha256": "53ceb96cb59a5fe407eae50f6cc82b7395d8baaf0a2a7e33ff5102e671b38fe2"
+    },
+    {
+      "path": "crates/mesh-state/src/portable.rs",
+      "mode": "100644",
+      "sha256": "366a4663bee13924c12cf67101359171f8de7c5d98aea92a477af6dba3e8be1d"
+    },
+    {
+      "path": "crates/mesh-state/src/preflight.rs",
+      "mode": "100644",
+      "sha256": "1296cabcaa46c65e135bb3ddc81b9632ce9164b38e3dd1d395e00beb512d5ac1"
+    },
+    {
+      "path": "crates/mesh-state/src/reception.rs",
+      "mode": "100644",
+      "sha256": "2d15d545bfd58e4f5402f6140b89efa0a479e6fb4f87ca195f4a085e1f8d18ad"
+    },
+    {
+      "path": "crates/mesh-state/src/stamp.rs",
+      "mode": "100644",
+      "sha256": "098fe618087d9a5f85a84462a69dd4cbabb96b698288972f7cf715807fe6e8a6"
+    },
+    {
+      "path": "crates/mesh-state/src/unicode-fold.txt",
+      "mode": "100644",
+      "sha256": "c775bf332425d10924a86135d404add3f3a5c88f0189582be197f9eec5644bbd"
+    },
+    {
+      "path": "crates/mesh-state/tests/common/mod.rs",
+      "mode": "100644",
+      "sha256": "1bc74ffbabcd8b04fd3851fef0cfdb5a506def8a5b3ca3646b3d9cb4cedffa09"
+    },
+    {
+      "path": "crates/mesh-state/tests/delivery.rs",
+      "mode": "100644",
+      "sha256": "c76e32cc08628308a1ae88168d1590c7e2d78a16c5b14ab69d9dce677f40a920"
+    },
+    {
+      "path": "crates/mesh-state/tests/heads.rs",
+      "mode": "100644",
+      "sha256": "d6cc791de09c1a6f584a6ff44cb57fadcbbe6ae0c464d162b81cc5608f6f9711"
+    },
+    {
+      "path": "crates/mesh-state/tests/identity.rs",
+      "mode": "100644",
+      "sha256": "6d1303a857e4d50a625b91c8d8f581dd72fecc556e1fb86ad07823bb8a7695f6"
+    },
+    {
+      "path": "crates/mesh-state/tests/mesh_types_drift.rs",
+      "mode": "100644",
+      "sha256": "3fab52baa188fb90ddbe9effd21126fc2e320778f49b909f6758b96a54c9e525"
+    },
+    {
+      "path": "crates/mesh-state/tests/name-corpus.txt",
+      "mode": "100644",
+      "sha256": "9af16f429f874d6e4c235674682c1d88f37fba8e68da72d0398b4c5a8de34b1e"
+    },
+    {
+      "path": "crates/mesh-state/tests/names.rs",
+      "mode": "100644",
+      "sha256": "97bd3f61f20987fc12975135e9d659ed191bc46615f7c7186611ff4b897d5608"
+    },
+    {
+      "path": "crates/mesh-state/tests/operations_drift.rs",
+      "mode": "100644",
+      "sha256": "b7ee72f0c9bbca30de2ef96398a3498375192ccb303268e27e58c6126b5b2693"
+    },
+    {
+      "path": "crates/mesh-store/Cargo.toml",
+      "mode": "100644",
+      "sha256": "02ae70603abbf2704184ef370ea68ab3a03d935e076f50284ead6d16dd35f238"
+    },
+    {
+      "path": "crates/mesh-store/migrations/0001_local_index.sql",
+      "mode": "100644",
+      "sha256": "6c9c77e4614d7503c8993ec1f53819b95337f3e5cefb1f71f85d10722e0b2c96"
+    },
+    {
+      "path": "crates/mesh-store/migrations/0002_review_and_context.sql",
+      "mode": "100644",
+      "sha256": "c7313c227b9e086d2864266fc28932e8ce6a0e247108515b889ec670735bbd93"
+    },
+    {
+      "path": "crates/mesh-store/RETENTION.md",
+      "mode": "100644",
+      "sha256": "37ed9388f1fa511c29d98ba8d2a9d1cde40288d68894783fbbc70c4836aa4e5f"
+    },
+    {
+      "path": "crates/mesh-store/src/checkpoint_runtime.rs",
+      "mode": "100644",
+      "sha256": "36deed429c1a6484a091376cc7647f24440525bb468ed37df521a9a007750678"
+    },
+    {
+      "path": "crates/mesh-store/src/collect.rs",
+      "mode": "100644",
+      "sha256": "413b5d18da2ffd4c7f95a906ebbaa2e770571db00e8651362caa83c191c6587c"
+    },
+    {
+      "path": "crates/mesh-store/src/commit.rs",
+      "mode": "100644",
+      "sha256": "125aa862cfde9806b7381a4c40b579364a9740245a87dd322dd1fd33d637c2ac"
+    },
+    {
+      "path": "crates/mesh-store/src/digest.rs",
+      "mode": "100644",
+      "sha256": "9fe7114c0e4027946305354911f64f5ebf28e180fd362fa5db1327b770e4348e"
+    },
+    {
+      "path": "crates/mesh-store/src/exclusion.rs",
+      "mode": "100644",
+      "sha256": "069f276e40a1fb8c32daff684bbecdf3dc85a9622f725db6baab3de0fc71201d"
+    },
+    {
+      "path": "crates/mesh-store/src/ids.rs",
+      "mode": "100644",
+      "sha256": "9afb9f5ad24fd03afe4edd4c40637e959b22ff6b4469ea67c368d12482474ead"
+    },
+    {
+      "path": "crates/mesh-store/src/index.rs",
+      "mode": "100644",
+      "sha256": "8d59665738e1915e6f7f2e5075845e820f68afee52664800018606289a782206"
+    },
+    {
+      "path": "crates/mesh-store/src/lib.rs",
+      "mode": "100644",
+      "sha256": "85b7ffcfe8fe0b99d2b7c4ca1af87ea6105d5f7eef4616e45f9d6ca8ce2ec769"
+    },
+    {
+      "path": "crates/mesh-store/src/migration.rs",
+      "mode": "100644",
+      "sha256": "6ac12600f4891cfe1824e9a4605b09e3bde523c90677adf0825929b1913bb619"
+    },
+    {
+      "path": "crates/mesh-store/src/paths.rs",
+      "mode": "100644",
+      "sha256": "6863454cfdcee4fc771d7488887526badc79a577317286ca06316a3cd3196a6e"
+    },
+    {
+      "path": "crates/mesh-store/src/rebuild.rs",
+      "mode": "100644",
+      "sha256": "9f7c04a3ed5f6ec1d414242411890f0cb08be844012aef58f73478d577a482cc"
+    },
+    {
+      "path": "crates/mesh-store/src/record.rs",
+      "mode": "100644",
+      "sha256": "a22ce7b2175a2c022b9e4735e64d639dbbcfdd176ea17c3b3ea4bb84b81b5831"
+    },
+    {
+      "path": "crates/mesh-store/src/recovery_state.rs",
+      "mode": "100644",
+      "sha256": "19e80a19de3be7cadbaead11fa1525030660bf6b69849712d6b249eec26004be"
+    },
+    {
+      "path": "crates/mesh-store/src/recovery.rs",
+      "mode": "100644",
+      "sha256": "c43b857fb87cc08dfd7d5bb3968d35be0f0e65765b04387bfbd926fced532cf9"
+    },
+    {
+      "path": "crates/mesh-store/src/retention.rs",
+      "mode": "100644",
+      "sha256": "f92d0c1b616c9454464ec0ff5ac6541faef665ab2f733bd0445d00b5cd0c8413"
+    },
+    {
+      "path": "crates/mesh-store/src/row.rs",
+      "mode": "100644",
+      "sha256": "750c53776dc468b6f00682ef0268ffb31a3a2ea6980195432f6f301434d8dfe3"
+    },
+    {
+      "path": "crates/mesh-store/src/schema.rs",
+      "mode": "100644",
+      "sha256": "125023cd4de87c338ac7c5e3a2fc4fec246fd5fca507a2f6ae30048058aaf038"
+    },
+    {
+      "path": "crates/mesh-store/src/sequence.rs",
+      "mode": "100644",
+      "sha256": "bb9145ad0eec8d799febcc3ba31b562a330fc88881fef88ce3eaded40862f010"
+    },
+    {
+      "path": "crates/mesh-store/src/sql.rs",
+      "mode": "100644",
+      "sha256": "68a06630ba8f20ea3d4c22b40f1f8169320ed788202aa0dc6c0c0050b7548e25"
+    },
+    {
+      "path": "crates/mesh-store/src/sqlite_driver.rs",
+      "mode": "100644",
+      "sha256": "e88c5147afe3007b2631a1a24174fc9a1d5d24a286988da70e939f17d853866f"
+    },
+    {
+      "path": "crates/mesh-store/tests/checkpoint-runtime-sqlite.rs",
+      "mode": "100644",
+      "sha256": "15efdc3b98a7360f55d70a6b2ad12771c7c738bc27078c91ed7285a171d8cfc6"
+    },
+    {
+      "path": "crates/mesh-store/tests/checkpoint-triggers.rs",
+      "mode": "100644",
+      "sha256": "bb5569c5b9e504192ba3f206c42df38e3c93bd34b846b4deb49993a8f321b550"
+    },
+    {
+      "path": "crates/mesh-store/tests/commit_sequence.rs",
+      "mode": "100644",
+      "sha256": "fb4fd41af1c3ae15a32b5ca0c1586690537d9ab84f10a4d636ef370f1b9e5154"
+    },
+    {
+      "path": "crates/mesh-store/tests/common/mod.rs",
+      "mode": "100644",
+      "sha256": "7da3c4408e046aff9620f18cc22248ed27b879ccf1ce154f597d9c7280793531"
+    },
+    {
+      "path": "crates/mesh-store/tests/crash-commit-sequence.rs",
+      "mode": "100644",
+      "sha256": "2063a4d3fd0577f6f02371fc3ca5b4bea331c7ebd0685c07459262b5ebe570d1"
+    },
+    {
+      "path": "crates/mesh-store/tests/exclusion.rs",
+      "mode": "100644",
+      "sha256": "b81e0e4e156cd41be760ca7f583a08f8107927f172852f97207aacce802b7751"
+    },
+    {
+      "path": "crates/mesh-store/tests/gc.rs",
+      "mode": "100644",
+      "sha256": "4130c8c945cddcc33478ea9208b19d0148e497015765c311c10a18c5e9b83d65"
+    },
+    {
+      "path": "crates/mesh-store/tests/index-footprint.rs",
+      "mode": "100644",
+      "sha256": "e7d78fa748d73642dbb47314b5ec1a409e44890cccd689894229ddbaada504b8"
+    },
+    {
+      "path": "crates/mesh-store/tests/materialization_exclusion.rs",
+      "mode": "100644",
+      "sha256": "d22150a8a0b7eb38be34fca9b0a95d8e75e12035cc63140c73a6536b2a39c15f"
+    },
+    {
+      "path": "crates/mesh-store/tests/mesh_types_drift.rs",
+      "mode": "100644",
+      "sha256": "d8539c760f4748a597cd1c8020b50cfa6f7015668ebdbdf028da201deeaa0780"
+    },
+    {
+      "path": "crates/mesh-store/tests/migrations.rs",
+      "mode": "100644",
+      "sha256": "c72447da3f9fef51f8321d9cefb4fe67f2c65cb8cd2c10aa6c15d11542b1cbae"
+    },
+    {
+      "path": "crates/mesh-store/tests/reconstruction.rs",
+      "mode": "100644",
+      "sha256": "8093ddcd816e8cbd0a4af423c1b5b61bb169b710acb7baa56a583bdaaaae8bfd"
+    },
+    {
+      "path": "crates/mesh-store/tests/recovery_preservation.rs",
+      "mode": "100644",
+      "sha256": "e6db133d22c598fc17c992791e2c8ea477e053dba4728f49e0732f39081afb25"
+    },
+    {
+      "path": "crates/mesh-store/tests/recovery.rs",
+      "mode": "100644",
+      "sha256": "0a697dfdbdf410f2c3caafadba5b422af7c7b773d35ae97f36bbbb163b946697"
+    },
+    {
+      "path": "crates/mesh-store/tests/save-patterns.rs",
+      "mode": "100644",
+      "sha256": "4f85d3ef8ea808f2454a76ea2e650331b6d69e6d6abba623ae677c2805574fcb"
+    },
+    {
+      "path": "crates/mesh-store/tests/support/checkpoint_runtime.rs",
+      "mode": "100644",
+      "sha256": "c4fe152b241f1caf887f1576e7a2e3f8fedbc0994bd4bbfa9711d48de5b29702"
+    },
+    {
+      "path": "crates/mesh-store/tests/support/crash.rs",
+      "mode": "100644",
+      "sha256": "aea48125b4fbd78f4cf0590d9827fe30104d16e6b69944630642a4cc3a820385"
+    },
+    {
+      "path": "crates/mesh-store/tests/support/journal.rs",
+      "mode": "100644",
+      "sha256": "a33c637b11f553e033684b799c761b04207c5855543f6df3669d86c911984ec2"
+    },
+    {
+      "path": "crates/mesh-store/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "ab83a540e739cb013b03fd4dc349beec8afc614db5c04c64c0a843c22bf92993"
+    },
+    {
+      "path": "crates/mesh-store/tests/support/promoter.rs",
+      "mode": "100644",
+      "sha256": "2f866d88789589401291e30036aacf21f2f730fadc99b06ff64dff080ec4f461"
+    },
+    {
+      "path": "crates/mesh-store/tests/wal_concurrency.rs",
+      "mode": "100644",
+      "sha256": "1c1860c2902aabc4cec8f9f89a6b89601f401c1c1df9790b2d51d3675cbcce8a"
+    },
+    {
+      "path": "crates/mesh-sync-engine/Cargo.toml",
+      "mode": "100644",
+      "sha256": "a8ca1c42ef025ba2460d9d402a93f622f33b94af3e6523500f1c50bdcb0fd9c7"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/decode.rs",
+      "mode": "100644",
+      "sha256": "488e2e28a9641b646fc997df26d4ceb0b104833d1c006aea5fbcaea83c324bf8"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/delivery.rs",
+      "mode": "100644",
+      "sha256": "4b3ef20e4df3427d92cb44dd841d1602cf1bd27b0a32e22d89de738a92c66342"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/inbound.rs",
+      "mode": "100644",
+      "sha256": "fe17a2264635ebb2fd85431cd5faa5369c89e11298887aacd61cfea164a1f87a"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/lib.rs",
+      "mode": "100644",
+      "sha256": "ad035676195a7ee383fea5dae3fdbbe590c3ddb51357c9da1a8c841a4bd2c024"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/operation.rs",
+      "mode": "100644",
+      "sha256": "ad3b307fa1f364cf53f9f5323a91bea6ee30ba1658a1bfe93ce3ee75126e0dd8"
+    },
+    {
+      "path": "crates/mesh-sync-engine/src/receipt.rs",
+      "mode": "100644",
+      "sha256": "ddaf52d79585351cc22fa2f75b1fe651f43d52dbdecf93744fe0dcde13051197"
+    },
+    {
+      "path": "crates/mesh-sync-engine/tests/delivery.rs",
+      "mode": "100644",
+      "sha256": "6f0b32570f8cab6f9ff15e53c21fce65493ac1c528ec95aecbc18a029d87bcfd"
+    },
+    {
+      "path": "crates/mesh-sync-engine/tests/identifier_receipt.rs",
+      "mode": "100644",
+      "sha256": "d5c856afce36b01456b6d9a736adf3d46e202d1a9ad96512dab0635f7cfa8718"
+    },
+    {
+      "path": "crates/mesh-sync-engine/tests/receipt_cost.rs",
+      "mode": "100644",
+      "sha256": "56fc61d57da4c7b8c29422b185375c470077ed202c1184e7bcb55c961dfd9ad3"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/Cargo.toml",
+      "mode": "100644",
+      "sha256": "4b73c3a7a531d6d535673d18ae7934e0c8a4d10dafe92c801a5e43b61a23e0d0"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/error.rs",
+      "mode": "100644",
+      "sha256": "2e0cab95ccfb49b26a6ef47d185ad5f6fbd0dfea156bc9cce5e1e6ac58cda254"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/gap.rs",
+      "mode": "100644",
+      "sha256": "8c536effb6a17651e5768fd72136d1d1448a8f5c6e085242e8cb39b73db89ba3"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/ids.rs",
+      "mode": "100644",
+      "sha256": "755376bcc0df4b5bb0e79028de0329edbd87ba6a53d0e99e975b0024c7a32c2c"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/knowledge.rs",
+      "mode": "100644",
+      "sha256": "bdd7c6c6e6f9da061e555eb312476fe825d86267cfe5c5cdd0ad7500d04153ca"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/lib.rs",
+      "mode": "100644",
+      "sha256": "c6ea646ac0f0f6f4cabf13f94aa0d8e1ae53da0d8082305b1e2d120de8bec861"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/message.rs",
+      "mode": "100644",
+      "sha256": "66167e0c2d0752cb364d81483896df5bcbae47c9463774babaf1bddfc669ddae"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/plane.rs",
+      "mode": "100644",
+      "sha256": "3f47c663e98fb9f87da0b43182eaca7a1949013826162733c62b5ef3d55a909f"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/session.rs",
+      "mode": "100644",
+      "sha256": "8a4c91564b8d3a784de3900e3f03125b3b0c9e275b2c929c3f8014b0daeb259b"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/summary.rs",
+      "mode": "100644",
+      "sha256": "eab90ad14dcf7000a8d0421ce3a4af176d6ef6ac8ca66d010703be7f3826f930"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/src/wire.rs",
+      "mode": "100644",
+      "sha256": "1d3451ebbfc6f3cee12d7707dee6ff602a3a939e715616c190be69f9417a411f"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/tests/common/mod.rs",
+      "mode": "100644",
+      "sha256": "55f73cc6f66ba85bd1f36a35900bdd1c2e5db3bebf878bc48a73a0536a146df1"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/tests/mesh_types_drift.rs",
+      "mode": "100644",
+      "sha256": "2d01457571b225d43ae23c7a551df87d47bb937fb27e99d0a004ce95d1cad898"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/tests/proto_projection.rs",
+      "mode": "100644",
+      "sha256": "7c6b0ee49fede1a84f6fbfc2a0e05c504dc09e036eb677068c4fe4064f774a1e"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/tests/protocol-vectors.rs",
+      "mode": "100644",
+      "sha256": "f679d4482356347daecc1dc206a1d50c6eb0d6087f8e77ae03d61459b4fe3ed4"
+    },
+    {
+      "path": "crates/mesh-sync-protocol/tests/two_actor_exchange.rs",
+      "mode": "100644",
+      "sha256": "07cf40f77000e890c5ef00631e3def3d9115b78d26f5de6b1c47b54cb31a60f2"
+    },
+    {
+      "path": "crates/mesh-types/Cargo.toml",
+      "mode": "100644",
+      "sha256": "ad3206aed8014c63e69940b633820334e47dca960a45ab34dfe846954e598ff4"
+    },
+    {
+      "path": "crates/mesh-types/src/actor.rs",
+      "mode": "100644",
+      "sha256": "e66e7bda10910c304451cfe45b089de9da8d32d4cbcb305c4cd162a0435228ef"
+    },
+    {
+      "path": "crates/mesh-types/src/blake3.rs",
+      "mode": "100644",
+      "sha256": "3ca1c1362477556329285e812a1d6d3ef2aad0379ef40ce16df418f172433365"
+    },
+    {
+      "path": "crates/mesh-types/src/canonical.rs",
+      "mode": "100644",
+      "sha256": "98479f286163ae51fa74849da5886c0b7fc97876b7a5da0cd7045bb684114b74"
+    },
+    {
+      "path": "crates/mesh-types/src/cbor_reader.rs",
+      "mode": "100644",
+      "sha256": "a22fe243504f134835a8ac2d6e8eee47f7157409f0201eb1ede5732b4ead289d"
+    },
+    {
+      "path": "crates/mesh-types/src/cbor.rs",
+      "mode": "100644",
+      "sha256": "32205e5b47c0464e34be7a96333de7af119558a482942761a9cc11cee0c83350"
+    },
+    {
+      "path": "crates/mesh-types/src/changeset.rs",
+      "mode": "100644",
+      "sha256": "6cd6d60d109030e65e1e47da25b80341cc1d53cc30ab447ddcb1ae8757375792"
+    },
+    {
+      "path": "crates/mesh-types/src/digest.rs",
+      "mode": "100644",
+      "sha256": "890a88656c895311736bb278c0d8e65e685ea1a3abc512d004ffb31191024af9"
+    },
+    {
+      "path": "crates/mesh-types/src/entity_id.rs",
+      "mode": "100644",
+      "sha256": "e5b7c9df97c7ece109e0e762612480cf25e23914cdaa6d26973ac5c9cdcb920c"
+    },
+    {
+      "path": "crates/mesh-types/src/json.rs",
+      "mode": "100644",
+      "sha256": "9dd7cc866187912cc4b68ec5cb9d69b963c7aa406e7b209e99fbd515e32c1cfc"
+    },
+    {
+      "path": "crates/mesh-types/src/lib.rs",
+      "mode": "100644",
+      "sha256": "8034aba6abec6c1b94ac4209564f6cc60ad4a082ff61b44c5071c94e7d1ee14b"
+    },
+    {
+      "path": "crates/mesh-types/src/manifest.rs",
+      "mode": "100644",
+      "sha256": "875d6c890f95d9c69fc60f584d731896a730a3acebda7a1582c19ff0f699f62a"
+    },
+    {
+      "path": "crates/mesh-types/src/no_ambient_io.rs",
+      "mode": "100644",
+      "sha256": "920b35552f48dbef939d3f3e10dcea24f448d074e4a1d7ac7a414cac838954d6"
+    },
+    {
+      "path": "crates/mesh-types/src/object.rs",
+      "mode": "100644",
+      "sha256": "0dc6ae764c699ed2b8f0caff9c61b9b6e43e4b61c7b84c7e62a47e3fe9ff221d"
+    },
+    {
+      "path": "crates/mesh-types/src/record_id.rs",
+      "mode": "100644",
+      "sha256": "7d0ffe41ad1bb12919b2a33d91c250aeb26fc3312d33586a9a4e07437c329815"
+    },
+    {
+      "path": "crates/mesh-types/src/session.rs",
+      "mode": "100644",
+      "sha256": "71a6a4f14d9221eb4185eeb5d8abfc4c093062a31d10f87352ca287c6d8efda6"
+    },
+    {
+      "path": "crates/mesh-types/src/uuid.rs",
+      "mode": "100644",
+      "sha256": "5e37b19da5dc6d33fdb05f445d365150cdfc829ac1d39443632f91e798b31648"
+    },
+    {
+      "path": "crates/mesh-types/src/vectors.rs",
+      "mode": "100644",
+      "sha256": "78b53d6bab626a581690ef3e479a18b8ab1b3fdad5be30327cbeb990ee463707"
+    },
+    {
+      "path": "crates/mesh-types/tests/actor_identity_family.rs",
+      "mode": "100644",
+      "sha256": "650294c03e3036c47d9fe4d65d41299fbcfb15506adc5f284be86bba1911f980"
+    },
+    {
+      "path": "crates/mesh-types/tests/blake3_reference_vectors.rs",
+      "mode": "100644",
+      "sha256": "8cbb9bd6f93b275f597e84436c68484379b2b7a9591a319e4948b9131aedd0d5"
+    },
+    {
+      "path": "crates/mesh-types/tests/canonical_encoding.rs",
+      "mode": "100644",
+      "sha256": "cb60adcfe2aacceeadf4faede6a90147d9822237507ad79abc4f59afc20eb90e"
+    },
+    {
+      "path": "crates/mesh-types/tests/entity_model.rs",
+      "mode": "100644",
+      "sha256": "e69ee74358f6ea1a55ab3a00c0094cbd01c87ed8c225224f8fe6f2fda7dea3db"
+    },
+    {
+      "path": "crates/mesh-types/tests/identity_properties.rs",
+      "mode": "100644",
+      "sha256": "ec4df63eb73b68cdd10f80dfa0589483a37d75a688e617056aa2944d00131952"
+    },
+    {
+      "path": "crates/mesh-types/tests/serialization-compat.rs",
+      "mode": "100644",
+      "sha256": "2767dfced3a55151629de026efabfba8a7ae96d52f529d5395347222213cda39"
+    },
+    {
+      "path": "crates/mesh-types/tests/uuid_parse_is_total.rs",
+      "mode": "100644",
+      "sha256": "78ec2a857146eb62ac414f67168234eb5300b8d0c45c7ac1082ed232d7179912"
+    },
+    {
+      "path": "crates/mesh-validator/Cargo.toml",
+      "mode": "100644",
+      "sha256": "cbecbb91b9306c7ce12f6c8f3217694406e16771c5147dbe21220a69fdef7888"
+    },
+    {
+      "path": "crates/mesh-validator/examples/propose-validation.rs",
+      "mode": "100644",
+      "sha256": "958f8de2598f1bf649601f6bdcd2817f4ab1555088d5b54a77be326de373bf27"
+    },
+    {
+      "path": "crates/mesh-validator/src/change.rs",
+      "mode": "100644",
+      "sha256": "2dc20ca4a63b78e282648212b4a071d7d8bd51fdabda988ba09289240e6a5ed4"
+    },
+    {
+      "path": "crates/mesh-validator/src/command.rs",
+      "mode": "100644",
+      "sha256": "d499a241b97368e359b8072e5873ecf8131e00d808c9eeaa90342714aa446fa6"
+    },
+    {
+      "path": "crates/mesh-validator/src/lib.rs",
+      "mode": "100644",
+      "sha256": "7a4fa9a5a01d0530f0be5a2901ce8195a7a415ed0a1f049f7a7d78aa281ba480"
+    },
+    {
+      "path": "crates/mesh-validator/src/no_ambient_io.rs",
+      "mode": "100644",
+      "sha256": "18352f939b6de28bcaa1e172405568fe563eae87357cba9a03dc3560fda9fb5a"
+    },
+    {
+      "path": "crates/mesh-validator/src/profile.rs",
+      "mode": "100644",
+      "sha256": "07b8fcf5bed97f07c63359dfc46316f90da236ffb8f3d6d57cb748d15c8eac2a"
+    },
+    {
+      "path": "crates/mesh-validator/src/record.rs",
+      "mode": "100644",
+      "sha256": "703292a072c8321f24536dab9a4b7c871d9e7a9846bde573637bf672a5634f2a"
+    },
+    {
+      "path": "crates/mesh-validator/src/registry.rs",
+      "mode": "100644",
+      "sha256": "c20c176c2ee035f1d170f63577ff84653497b4d038632431a239147b7c2974cb"
+    },
+    {
+      "path": "crates/mesh-validator/src/run.rs",
+      "mode": "100644",
+      "sha256": "47a0682099d7a6ecdb7296eecf602bb84bd0835accbf54ef4b45507b0987feb9"
+    },
+    {
+      "path": "crates/mesh-validator/src/selection.rs",
+      "mode": "100644",
+      "sha256": "948d9a2fcb9b731afadaad5944803e16dca280ca8617e88aa5cd4af646742dcb"
+    },
+    {
+      "path": "crates/mesh-validator/src/tooling.rs",
+      "mode": "100644",
+      "sha256": "f7ab5d2c7b8a9c9306ac2084db66012d3f9e34243ec4f9da36ab940affde1517"
+    },
+    {
+      "path": "crates/mesh-validator/src/trigger.rs",
+      "mode": "100644",
+      "sha256": "f90b170dfc213b45a1e66a9276987bd167e34bf412dd92bc11737effe252aeb1"
+    },
+    {
+      "path": "crates/mesh-validator/src/workspace.rs",
+      "mode": "100644",
+      "sha256": "98416c7f8e99576948e35cac931153d5606367af552979202bbf72731c0f491d"
+    },
+    {
+      "path": "crates/mesh-validator/tests/approval-vocabulary.rs",
+      "mode": "100644",
+      "sha256": "423820af5ffb6ab2986eb14752c10278607727d5e4c761df8b9ba585fd2e8aca"
+    },
+    {
+      "path": "crates/mesh-validator/tests/evidence-replay.rs",
+      "mode": "100644",
+      "sha256": "61a58a49599d51a7ea129886092b62473d531d466d9ec030c16c93b3401f5da7"
+    },
+    {
+      "path": "crates/mesh-validator/tests/profile-approval.rs",
+      "mode": "100644",
+      "sha256": "8b6c2baa0fd44d288f923e6cee51bad01fa26294e1a9c47f7e1c76cb15e03f4a"
+    },
+    {
+      "path": "crates/mesh-validator/tests/support/mod.rs",
+      "mode": "100644",
+      "sha256": "32f83dbb875381ddd39b4968c97a459567467df3a1d921c99c592e153b00935b"
+    },
+    {
+      "path": "crates/mesh-validator/tests/validator-selection.rs",
+      "mode": "100644",
+      "sha256": "cce54fe24efa5f55086f221d0ca0189689db7311c37afc0c2ab3bed324f7e069"
+    },
+    {
+      "path": "crates/mesh-validator/tests/workspace-isolation.rs",
+      "mode": "100644",
+      "sha256": "420ec89ed855b2d5352a743919eac3bbc246ad9312d4265b97237796098e1475"
+    },
+    {
+      "path": "deny.toml",
+      "mode": "100644",
+      "sha256": "2fde402acdbd438893d666bdd535267265e562a95cb7d2be5762114983e7af35"
+    },
+    {
+      "path": "docs/architecture.md",
+      "mode": "100644",
+      "sha256": "56c3a0ad4735ab34ca0d6be587b1d054107a0db4be2c3eddf6d0899e44889c2d"
+    },
+    {
+      "path": "docs/benchmarks.md",
+      "mode": "100644",
+      "sha256": "e82a744efc06d2f8f0cebf5704376cfb0ffa879a7aa119ffffa118ed700afcba"
+    },
+    {
+      "path": "docs/CHANGELOG.md",
+      "mode": "100644",
+      "sha256": "99c71116d3f943590ddb7dc606b4be4ca4eb5886b315cfdb66fa33b99f8afe60"
+    },
+    {
+      "path": "docs/charter.md",
+      "mode": "100644",
+      "sha256": "860baf476108d71cce4d003b9708d097e9b4b5dc7cb05a82055f8cf4a2870ba7"
+    },
+    {
+      "path": "docs/consistency.md",
+      "mode": "100644",
+      "sha256": "eedfe67fa7c3e7d2efdecaa2052015610a7f8faefbbe58e6f8046f7747f0a4c7"
+    },
+    {
+      "path": "docs/demo.md",
+      "mode": "100644",
+      "sha256": "c8dea38a2e8c35878754161aa5d1349dc098157a0a569e2898623d7f42989851"
+    },
+    {
+      "path": "docs/developer-guide.md",
+      "mode": "100644",
+      "sha256": "48d605bc56f377e533e68254a3d81672b1c193f31bb8aecbbad98b8602fc5eb9"
+    },
+    {
+      "path": "docs/launch/public-alpha-contract.json",
+      "mode": "100644",
+      "sha256": "6b08917359e705f7145e80ccd9057a361159994590defd667c52a897f830c542"
+    },
+    {
+      "path": "docs/launch/public-alpha.md",
+      "mode": "100644",
+      "sha256": "5817bd36fe7a1cb0315e986af9d5c0110bfe4b5f5a27e4e8a4fad95a8b54e437"
+    },
+    {
+      "path": "docs/launch/v0.1.0-alpha.1.md",
+      "mode": "100644",
+      "sha256": "10cd178830617ec2b19a01cfd1bfc913cfcadd5bc52da260f6c9d9a2ab0852cc"
+    },
+    {
+      "path": "docs/local-mounted-demo.md",
+      "mode": "100644",
+      "sha256": "cc58763ba7ab60c15cd622aed60af61686612c3d67cf75cd6bdc26e7c9c34ddd"
+    },
+    {
+      "path": "docs/plan/execution-plan.md",
+      "mode": "100644",
+      "sha256": "d41ad9ab795dcc8648b14a0995790f3957c0ed39a430752e1d78d99ab410ae1f"
+    },
+    {
+      "path": "docs/product-prd.md",
+      "mode": "100644",
+      "sha256": "c2d9936d0bdb0a601092bc598c9a15d4e1d73b086cd88a63865ef57f07db82f0"
+    },
+    {
+      "path": "docs/project-status.md",
+      "mode": "100644",
+      "sha256": "6a1205c7a87d8e1d35a4aa92c5d8918a3d81331593837532ab451706f3881a13"
+    },
+    {
+      "path": "docs/protocol.md",
+      "mode": "100644",
+      "sha256": "955fe737254604e292b94eb4295fc89ef42e369009a1a451e175d3870871ba29"
+    },
+    {
+      "path": "docs/README.md",
+      "mode": "100644",
+      "sha256": "c599720023cde9c691854639ce03ae56aeeb0267fdde7ad5e98d4d8402799a0f"
+    },
+    {
+      "path": "docs/threat-model.md",
+      "mode": "100644",
+      "sha256": "d0f725c8c8dd2c64f5e3f79c598cd548c9666c12ec6382c9575c73049a620853"
+    },
+    {
+      "path": "docs/user-guide.md",
+      "mode": "100644",
+      "sha256": "07e71495ca0c369f6d07cac18ab52631a29c06c331a7c14a339a1fbe411a001e"
+    },
+    {
+      "path": "examples/local-daemon-demo.mjs",
+      "mode": "100644",
+      "sha256": "e0965a58d7a327194af5ab6d61cb1ae4300ebdc463fb379fda29da3dac7970c2"
+    },
+    {
+      "path": "examples/local-mounted-demo-inner.sh",
+      "mode": "100755",
+      "sha256": "9a1abd80e2bd0043cc42bdb92226457ff6cfc4d8e81ff871662e266fde11f30c"
+    },
+    {
+      "path": "examples/offline-demo-Cargo.toml",
+      "mode": "100644",
+      "sha256": "19cfe147f3e71df79162aa82c6beae54ad436f3a4132e3253e886f3e5dffc8fe"
+    },
+    {
+      "path": "examples/raw-fuse-helper.c",
+      "mode": "100644",
+      "sha256": "8d5644fe9bc26c6a3aef40522261513389c9da75df4c2cef67f7c744cb66fead"
+    },
+    {
+      "path": "examples/raw-fuse-smoke.sh",
+      "mode": "100755",
+      "sha256": "cc67114725e102242bc462f13090a5942cef1dc691a6785867cfff79ba50d00d"
+    },
+    {
+      "path": "examples/run-local-mounted-demo.sh",
+      "mode": "100755",
+      "sha256": "931df5ac5a347f17d4b4a90cc6fccbb412c721f6892941cf9ccc5d0f9a8f4554"
+    },
+    {
+      "path": "integrations/claude-code/README.md",
+      "mode": "100644",
+      "sha256": "eb7abeaed5943016effe345e313b0f1b10084f3f75d6fa9307fff6c7314aee47"
+    },
+    {
+      "path": "integrations/codex/README.md",
+      "mode": "100644",
+      "sha256": "77b4dd64fca53b0823b946732e0c8ff7a5c34d96c085a459b7817424305757d9"
+    },
+    {
+      "path": "integrations/generic-cli/README.md",
+      "mode": "100644",
+      "sha256": "1d2103607ddefd157716c9275ee1aed2db6549eee7ab5ece6341cad0668177a2"
+    },
+    {
+      "path": "integrations/git/README.md",
+      "mode": "100644",
+      "sha256": "35b0bd34a0222d63ad76ed6666bacbfe92fe201804c6f0bfec15933c3364a52b"
+    },
+    {
+      "path": "integrations/opencode/README.md",
+      "mode": "100644",
+      "sha256": "d45551adf119dea821417f0e915cb03b3a2f2ea09682d1e991469a7e9645881f"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "path": "models/check.sh",
+      "mode": "100755",
+      "sha256": "2c7975953c931920a4e78189eed6cef790a2922cf29cdc9c837dd6a4759be180"
+    },
+    {
+      "path": "models/mesh_tree.tla",
+      "mode": "100644",
+      "sha256": "14d59eab7315fa914db4060cfb832c40133b192a506fe24ea2962b5429e1c841"
+    },
+    {
+      "path": "models/mesh-divergence-conditional.cfg",
+      "mode": "100644",
+      "sha256": "bde455e15a56bb9fa0159099304b45f5f7f65c6c6273e823be06eabc19290b6f"
+    },
+    {
+      "path": "models/mesh-divergence.cfg",
+      "mode": "100644",
+      "sha256": "255c2cb1cbd91e48560064cef772235f1083083f52b3e0f28906bc0c136e4a47"
+    },
+    {
+      "path": "models/mesh-history.cfg",
+      "mode": "100644",
+      "sha256": "f0acebda466dc1607887c181cc9dcfbf221ffcf776fc018698e89e394aac082d"
+    },
+    {
+      "path": "models/mesh-idempotence.cfg",
+      "mode": "100644",
+      "sha256": "91984931aec47ee7ba4ea997f129563f9862574f721041d93ba627ebd1752196"
+    },
+    {
+      "path": "models/mesh-liveness-mut-collect.cfg",
+      "mode": "100644",
+      "sha256": "0e41c6d7dfd6c12ede2b5fe1026a621ef2572ed97e4be2bfea51f1378be81533"
+    },
+    {
+      "path": "models/mesh-liveness.cfg",
+      "mode": "100644",
+      "sha256": "d0ea7e6bcd2cdca5ce3e89b73da2ce7afa0a7cd932b958a2385aef1d110c9463"
+    },
+    {
+      "path": "models/mesh-mut-agent-may-approve.cfg",
+      "mode": "100644",
+      "sha256": "e498dac1bf977f59433bde77855f5a08c26fd7b68f7032ef190311047061aa08"
+    },
+    {
+      "path": "models/mesh-mut-apply-without-parents.cfg",
+      "mode": "100644",
+      "sha256": "3b7345f239c4ddaf1cf109b2095d8ac4026e75cea9ebed0252050c0a2150cf85"
+    },
+    {
+      "path": "models/mesh-mut-collect-unpublished.cfg",
+      "mode": "100644",
+      "sha256": "96fe649c13b975a9df9dbc2e2f61ba1d48b834a22e038c0feee603c068a1bac8"
+    },
+    {
+      "path": "models/mesh-mut-drop-orphan.cfg",
+      "mode": "100644",
+      "sha256": "24b9100509f418eb9b7b1cde5a080f1bfea1d889c41d919a0124749f8d718105"
+    },
+    {
+      "path": "models/mesh-mut-epoch-ignored.cfg",
+      "mode": "100644",
+      "sha256": "89225a650a3a9a85abfbc89e9ecda4baff58ae6eb67fdb3c9fc299461d3b6b4d"
+    },
+    {
+      "path": "models/mesh-mut-no-compare-and-swap.cfg",
+      "mode": "100644",
+      "sha256": "c42bf6419854190886aa79833ae651d560a3bea7a3c2781d342343012208e4eb"
+    },
+    {
+      "path": "models/mesh-mut-order-by-arrival.cfg",
+      "mode": "100644",
+      "sha256": "48fb0263ea202d27e91ac09516c854e6e7036c896a249870c08711600169b874"
+    },
+    {
+      "path": "models/mesh-mut-order-by-clock.cfg",
+      "mode": "100644",
+      "sha256": "d210df38a859549aec1f85f85e33b309222963f8608f810dc03e8a048fc6c1ca"
+    },
+    {
+      "path": "models/mesh-mut-publish-without-content.cfg",
+      "mode": "100644",
+      "sha256": "867bebed72eb1d0caa04c69dc031e9226ee50afe9f1f98990e6f9a7452d4b077"
+    },
+    {
+      "path": "models/mesh-mut-redeliver-reorders.cfg",
+      "mode": "100644",
+      "sha256": "e13eecfeb2969cfa8b6ce4d2d9128f5e2f5d6ce302ec0765e2320c4fb5fe5e97"
+    },
+    {
+      "path": "models/mesh-mut-refuses-honest-work.cfg",
+      "mode": "100644",
+      "sha256": "c2779c5a1d8139978319a60df2a2703e76b0c03a641a7cdb7e3edd29a544a392"
+    },
+    {
+      "path": "models/mesh-mut-replay-approval.cfg",
+      "mode": "100644",
+      "sha256": "4e447a2520f8b94f3e80e4fef00327bc62f19569395622ffd35b0ae0aa9c9f12"
+    },
+    {
+      "path": "models/mesh-mut-silent-rebase.cfg",
+      "mode": "100644",
+      "sha256": "799debca504d472d09249454d62c9845bc7375effec9c937cc56ed3932f22db0"
+    },
+    {
+      "path": "models/mesh-publication.cfg",
+      "mode": "100644",
+      "sha256": "b793f94179a4114ffaf14a068bd7db34935b8f21ef35fb01360631adcb4a41e5"
+    },
+    {
+      "path": "models/mesh-tree-mut-arrival-order.cfg",
+      "mode": "100644",
+      "sha256": "f45fd4300626c4966a205c7a8dcef21ee93700d751d2a436a25f37d9439a2a39"
+    },
+    {
+      "path": "models/mesh-tree-mut-no-cycle-check.cfg",
+      "mode": "100644",
+      "sha256": "76ae25c1ab11470e60fe59abca1cbff9ce322831203d2e4fb91eebc1c5118297"
+    },
+    {
+      "path": "models/mesh-tree.cfg",
+      "mode": "100644",
+      "sha256": "8381947a5e8b7ddbd70d3ba26fc7547464f2934635d13e2e7a88e45b29fe66b9"
+    },
+    {
+      "path": "models/mesh.cfg",
+      "mode": "100644",
+      "sha256": "22f3213744db29637ca5dbbe83a331fa21e7b9bc97fd0760a7660f5fa69119a2"
+    },
+    {
+      "path": "models/mesh.tla",
+      "mode": "100644",
+      "sha256": "5338b01ea669415272d81b6e6ea6f1074e89aaccd602f1c8085aeca3a718b1af"
+    },
+    {
+      "path": "models/README.md",
+      "mode": "100644",
+      "sha256": "0957100a1dc0507f4e48f4be7d860443575b9d8340499ec4973f2d563badd2b1"
+    },
+    {
+      "path": "models/results/campaign.jsonl",
+      "mode": "100644",
+      "sha256": "5288ffa36222f9a5dc3c09ec90c4902e852f42981715f988a9a6cac22052bf5f"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-divergence.txt",
+      "mode": "100644",
+      "sha256": "6da35e4f848263f7224a037702a6379a88200f9a15428797946b6afe2a24266f"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-liveness-mut-collect.txt",
+      "mode": "100644",
+      "sha256": "931d08d9cbe2a706d7a56097009378520399acb3de7f82a59f1ce1298b2b50fb"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-agent-may-approve.txt",
+      "mode": "100644",
+      "sha256": "7eabc6303a343477cd82534db549b6dec3249a8f50944625ecb3f2edc204cf38"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-apply-without-parents.txt",
+      "mode": "100644",
+      "sha256": "17a00e5c410cbc1e7c877a8b51ca96e4ec65a6b4ecbe8be21fbc11d884853fec"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-collect-unpublished.txt",
+      "mode": "100644",
+      "sha256": "f17bc8f3b1a76fe76764dd1c8ec92d36eb23902ba847e564ee87f31e309d6c58"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-drop-orphan.txt",
+      "mode": "100644",
+      "sha256": "0876da5d1279dcd4b275c5670e8cab7039a8f1f98bc432673541db0afda7f280"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-epoch-ignored.txt",
+      "mode": "100644",
+      "sha256": "0b458eecc59c0fc554769454f8de120fa74c8361f941d8a8b6a76e16ccf15dc7"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-no-compare-and-swap.txt",
+      "mode": "100644",
+      "sha256": "f8f9878724ce7ef261515aaadb4378b4c50ead31d3d290523da253b1e6ac8cd4"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-order-by-arrival.txt",
+      "mode": "100644",
+      "sha256": "7e1e7f4509bc0b1b2634c1580856275230e8d0f166807c61897533c308605975"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-order-by-clock.txt",
+      "mode": "100644",
+      "sha256": "aacae343ed45e4d3a14d42f5e733763deff082e9121c853b36b3f863112e011a"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-publish-without-content.txt",
+      "mode": "100644",
+      "sha256": "86292dfcfb2e45b4e6946d31579080cd6003c92e1e89727a3f4f0b877760f793"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-redeliver-reorders.txt",
+      "mode": "100644",
+      "sha256": "c1731c17b1697685c111228cec2f7b9f631fff7030edc1dd07b16637caa984e9"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-refuses-honest-work.txt",
+      "mode": "100644",
+      "sha256": "2845f1d9af1f60bf4826b9e8cf76b71f48d1191f1f657f2514e19a541fea902b"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-replay-approval.txt",
+      "mode": "100644",
+      "sha256": "7c1ede33305c0ec43914927bb410ad1dd99ed7ed1eaebcd33f70af3653178215"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-mut-silent-rebase.txt",
+      "mode": "100644",
+      "sha256": "1013b67605fb61fc1082109cbbcaeb74307dc1e1a493e7a2cec569570d61309e"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-tree-mut-arrival-order.txt",
+      "mode": "100644",
+      "sha256": "4180feacf98605e67d93f7e052ac599e7da5c206f18d32fa49c97f729eac5bb6"
+    },
+    {
+      "path": "models/results/counterexamples/mesh-tree-mut-no-cycle-check.txt",
+      "mode": "100644",
+      "sha256": "e38647f7eefd260ae3ff2f8cfaf60946dc35e5070156dd64cd821252e8a54fb0"
+    },
+    {
+      "path": "models/results/README.md",
+      "mode": "100644",
+      "sha256": "9b8ac924755195764b06be4814a70da67232efa14d3f7714ccdcd0ff7619faec"
+    },
+    {
+      "path": "models/results/run.json",
+      "mode": "100644",
+      "sha256": "a7b82583e379b4c230931c96eaec212835f115557759d9116aedb299c3026369"
+    },
+    {
+      "path": "package-lock.json",
+      "mode": "100644",
+      "sha256": "e6d653af187417186d6954cbb27a5119d0b6418754bdd4beeea4f127ad44e7ca"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "sha256": "85052aa8810056bdd71ceb98e9ed6bf50ef7afd0f6e07c8a0c8465580dcb6096"
+    },
+    {
+      "path": "platform/macos-fskit/README.md",
+      "mode": "100644",
+      "sha256": "8f033bef8e4c2034101225b451b34ce10b75315294297250b696830b4255d11a"
+    },
+    {
+      "path": "platform/mesh-keychain/build.rs",
+      "mode": "100644",
+      "sha256": "dc3a555d1288b8f9e5906872519baea64c9f3da55743f45969e63c18c5ee864d"
+    },
+    {
+      "path": "platform/mesh-keychain/Cargo.toml",
+      "mode": "100644",
+      "sha256": "4823e5b1488db8b8bc9c6bf40c5874017948c662c3179fea0654c2559f42161a"
+    },
+    {
+      "path": "platform/mesh-keychain/GUARANTEES.md",
+      "mode": "100644",
+      "sha256": "0cad005095e8a6f5e14c685174e69b10d295559bd24db748af68aec90dc2a88b"
+    },
+    {
+      "path": "platform/mesh-keychain/src/entropy.rs",
+      "mode": "100644",
+      "sha256": "e0ce92e35a48f3050a6ed9c2d42efc2c86cb46e96f89848563f5ce3c22379323"
+    },
+    {
+      "path": "platform/mesh-keychain/src/lib.rs",
+      "mode": "100644",
+      "sha256": "21f7d421ec6ebd6d498d33d7f7619f35ce0a0c3958bfc6f263d779205cfa872b"
+    },
+    {
+      "path": "platform/mesh-keychain/src/no_export.rs",
+      "mode": "100644",
+      "sha256": "824dcba0660379660227897a1fa34ffadb199f65cfa0a8ba2bddb99c5d825678"
+    },
+    {
+      "path": "platform/mesh-keychain/src/secure_enclave.m",
+      "mode": "100644",
+      "sha256": "e2713b0922573605d892c6ce3fc49c69b8ebcea3341f860d51015a4bf87602ac"
+    },
+    {
+      "path": "platform/mesh-keychain/src/secure_enclave.rs",
+      "mode": "100644",
+      "sha256": "2a933971c46d0468c358f1940f96503e42d78613124a83917d3cfcaa7635df35"
+    },
+    {
+      "path": "platform/mesh-keychain/src/software.rs",
+      "mode": "100644",
+      "sha256": "161fb7991e44d9b2398d0d87d6f2ff574e87bce7089bbff1c6bffa7c889ddb2e"
+    },
+    {
+      "path": "platform/mesh-keychain/src/support.rs",
+      "mode": "100644",
+      "sha256": "c67a111315d2efd2e88d893ba5bb7af7937a14d7686453b244a98dac9d789abd"
+    },
+    {
+      "path": "platform/mesh-keychain/tests/key_isolation.rs",
+      "mode": "100644",
+      "sha256": "709ba751127fe8acd231b3f8b2f39c6d700b70534c3987f1b525f716c5d50f53"
+    },
+    {
+      "path": "platform/mesh-keychain/tests/secure_enclave_ffi.rs",
+      "mode": "100644",
+      "sha256": "237cf03feaddf11f19e55641a9db52d998c9e9be3adf2abc895df768f4a86765"
+    },
+    {
+      "path": "platform/windows-spike/README.md",
+      "mode": "100644",
+      "sha256": "7d0b1707cce49457ebc36928bb6725396372dd8c7abeebb0b9d3790841b00390"
+    },
+    {
+      "path": "protocol/conformance/clients/broken/client-mutations.mjs",
+      "mode": "100644",
+      "sha256": "f54c5477ee1c61dbfe42d426481fbb92228a1b1d47b8b4c65634409e235b4195"
+    },
+    {
+      "path": "protocol/conformance/clients/broken/client.mjs",
+      "mode": "100644",
+      "sha256": "141c026d32f745a7a3950518611a25830e68f532527674903b083e7829d21bf5"
+    },
+    {
+      "path": "protocol/conformance/clients/published/blake3.mjs",
+      "mode": "100644",
+      "sha256": "58a55db05af9a3176d983ef84a69fece44bbea6e7e4ab079a3c2a547747d118e"
+    },
+    {
+      "path": "protocol/conformance/clients/published/cbor.mjs",
+      "mode": "100644",
+      "sha256": "7e4f872fc3d4f2c249dfd86b1024c5b81b741f320e00c5551d10b36ca4e326e7"
+    },
+    {
+      "path": "protocol/conformance/clients/published/client.mjs",
+      "mode": "100644",
+      "sha256": "2a07ebe7bf66095ccafdf81b607d9fa81baf74377c3c9957a29ab1eb5802af7e"
+    },
+    {
+      "path": "protocol/conformance/clients/published/preconditions.mjs",
+      "mode": "100644",
+      "sha256": "f906e0e2753512a28bbb1a8b68d45994fd0309a6bd7187d84ca8072e97dc97f8"
+    },
+    {
+      "path": "protocol/conformance/clients/second/.gitignore",
+      "mode": "100644",
+      "sha256": "8020bd263249216219b152aa71b9beb0ab7b8ef50908d3b544662f57e23a1ec0"
+    },
+    {
+      "path": "protocol/conformance/clients/second/admit.py",
+      "mode": "100644",
+      "sha256": "95d4b9a594af11311e399f6de50a3ec4efb5a0a13067f40ae1bc0212e480ae38"
+    },
+    {
+      "path": "protocol/conformance/clients/second/blake3.py",
+      "mode": "100644",
+      "sha256": "74212296bf3d33469b558d193f059e76a9db48386664d66e39ca311009aa5703"
+    },
+    {
+      "path": "protocol/conformance/clients/second/client.py",
+      "mode": "100644",
+      "sha256": "434c905b81adc7432dd0b1d3d68b09b9bb1a52a7972e266c925f5e18271b2a04"
+    },
+    {
+      "path": "protocol/conformance/clients/second/meshcbor.py",
+      "mode": "100644",
+      "sha256": "6357e0b53fc47cc63a5ea8f9e338668ab4eb46358792135fcd6dae63c6b5f1af"
+    },
+    {
+      "path": "protocol/conformance/clients/second/README.md",
+      "mode": "100644",
+      "sha256": "9b64d39198aebdf45e0ba4332724b8a6bbf25cb3d740bbf054da3014db8486e1"
+    },
+    {
+      "path": "protocol/conformance/clients/second/sandbox.py",
+      "mode": "100644",
+      "sha256": "1dccfd840c159a5aae6a9d58fabca6b57a39bc57444a9f2765f6789dfc0053f7"
+    },
+    {
+      "path": "protocol/conformance/lib/adapter.mjs",
+      "mode": "100644",
+      "sha256": "8cc551ee4067304fecfe1a21875c0fe086aac514b95d83fe3f455d5162671c9b"
+    },
+    {
+      "path": "protocol/conformance/lib/case.mjs",
+      "mode": "100644",
+      "sha256": "d9cdccf0bd14615a5633a929c9200986a04f76da0b06ba7ccd39eea26e93fe41"
+    },
+    {
+      "path": "protocol/conformance/lib/cases-messages.mjs",
+      "mode": "100644",
+      "sha256": "cc785725d3822951de578775fd4cb0a082e6677c74439fbf3d32e73c488e5081"
+    },
+    {
+      "path": "protocol/conformance/lib/cases-records.mjs",
+      "mode": "100644",
+      "sha256": "8a9eb32b450bd7d8b73d4785610b9ae6a678d4ed48a0b802c7c134678f26525b"
+    },
+    {
+      "path": "protocol/conformance/lib/catalogue.mjs",
+      "mode": "100644",
+      "sha256": "9ef4ba58fbc8959adf73387c0963de7684a0243da9c8a8ada1f157feb92c5096"
+    },
+    {
+      "path": "protocol/conformance/lib/expect.mjs",
+      "mode": "100644",
+      "sha256": "6b4fc1853a321b5d7792884c949429c3d7863200dc9bb2b920ba9fd7c99f7c50"
+    },
+    {
+      "path": "protocol/conformance/lib/report.mjs",
+      "mode": "100644",
+      "sha256": "53225280248812b64f2b4cf68e2c34d62c117f44a2e923af00c7f295714399d4"
+    },
+    {
+      "path": "protocol/conformance/lib/run-cases.mjs",
+      "mode": "100644",
+      "sha256": "ba9b0ab9dce0ec517fdfae656df9622e7b9ca6dbe1d0987ab2974fa20de7e675"
+    },
+    {
+      "path": "protocol/conformance/README.md",
+      "mode": "100644",
+      "sha256": "d87603776427f759d33f24f9f6de09fb340ea50b806a40f11b9f25a5b05989f7"
+    },
+    {
+      "path": "protocol/conformance/report-schema.json",
+      "mode": "100644",
+      "sha256": "e6ccc0ba525a080e063546463d687384f07b74a2125c10b063af246482697720"
+    },
+    {
+      "path": "protocol/conformance/reports/second-client-r14.md",
+      "mode": "100644",
+      "sha256": "82e653482dc05ba1b691bbf99ca0e05d41536e7414b08f35c183a9d7e7125df4"
+    },
+    {
+      "path": "protocol/conformance/run.mjs",
+      "mode": "100644",
+      "sha256": "a758cfaaec520a28ddc736cea507f9ef906eafd4fb5ac19b25f51bd9ad2b62ce"
+    },
+    {
+      "path": "protocol/proto/mesh/v0/records.proto",
+      "mode": "100644",
+      "sha256": "11da5dd0caf1fd46475b30412173c7d9f83ca418477e50476a846433fe780cb4"
+    },
+    {
+      "path": "protocol/proto/mesh/v0/sync.proto",
+      "mode": "100644",
+      "sha256": "5578ff6898f09c57c1804d15428635f448b609b00201885c54732e8263e23ae6"
+    },
+    {
+      "path": "protocol/proto/README.md",
+      "mode": "100644",
+      "sha256": "eb59a532008ca042bccaafbb0187c5b47465d1754806fc07a925eeee0eb2e993"
+    },
+    {
+      "path": "protocol/README.md",
+      "mode": "100644",
+      "sha256": "d83e040fdeb5e5b843e9c8f325c784f848e73a7d9bda990a3d818e2cb152e758"
+    },
+    {
+      "path": "protocol/schemas/canonical-encoding-v0.json",
+      "mode": "100644",
+      "sha256": "417cff48f25bc77e71415b8fa9ec3f68c0bab1ab659b44b436903dc3bf07df65"
+    },
+    {
+      "path": "protocol/schemas/README.md",
+      "mode": "100644",
+      "sha256": "06ac25694b14d8d518108b0993123d631e91a512945f00119118f1412244cfdf"
+    },
+    {
+      "path": "protocol/test-vectors/README.md",
+      "mode": "100644",
+      "sha256": "b53fd9112c56fab8538526cfa126b2bf38da8fcbfb096e4409ba849cc341f1a6"
+    },
+    {
+      "path": "protocol/test-vectors/v0/changeset.json",
+      "mode": "100644",
+      "sha256": "31001b6636503fd79fd4ecd06556255e657bf55e695cee09ea71b4e7597bd665"
+    },
+    {
+      "path": "protocol/test-vectors/v0/directory-version.json",
+      "mode": "100644",
+      "sha256": "b74f5abc24f98a62acb949ad77cd931da3c787ec7c7992cc70cbeece6abddc9b"
+    },
+    {
+      "path": "protocol/test-vectors/v0/empty-operation.json",
+      "mode": "100644",
+      "sha256": "9cbf552c811958a8f9430356b915bdec8d6bb684e1768fbcbfdca7ce3d75d997"
+    },
+    {
+      "path": "protocol/test-vectors/v0/file-manifest.json",
+      "mode": "100644",
+      "sha256": "8400cef18712594f90322ce2a7d7836f7e6a9f1febe35ba4bbcbcc95d4a17de3"
+    },
+    {
+      "path": "protocol/test-vectors/v0/file-version.json",
+      "mode": "100644",
+      "sha256": "6172a5f02e73263ff86b96375985e35c5bc8c57d390fefe027312d0e28cc9119"
+    },
+    {
+      "path": "protocol/test-vectors/v0/index.json",
+      "mode": "100644",
+      "sha256": "cae2c74810f783965721a848cbd4349c0d37a8c9b51ef5d806ee1173cffdafc9"
+    },
+    {
+      "path": "protocol/verify-published.mjs",
+      "mode": "100644",
+      "sha256": "90fae4d8581750d4be814fd19f3c8cd8bf3c15c829e2fac676c670a4382331e9"
+    },
+    {
+      "path": "protocol/VERSIONING.md",
+      "mode": "100644",
+      "sha256": "a90baf745a9e6f08ebe9601bb93e81f8e4d10c4717b838f7fddc1336127e356a"
+    },
+    {
+      "path": "protocol/wire/README.md",
+      "mode": "100644",
+      "sha256": "df19553082bca7be21f0ecfb24c720b00fa1d447e882b612dedc56f8933e72cf"
+    },
+    {
+      "path": "protocol/wire/v0/messages.json",
+      "mode": "100644",
+      "sha256": "e823d766c492f504dddb07f16273da687e4d162d1a7973a070db6e96394f7070"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "sha256": "2a6085f2528493514c65fef6c9b26974cd61cf98543a59e0d96db0f3f19d2a04"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "mode": "100644",
+      "sha256": "21ef45e6869ce85240821f43d5600c119734fb4a091b6af2c294dce65389a562"
+    },
+    {
+      "path": "rustfmt.toml",
+      "mode": "100644",
+      "sha256": "ef31f9c1abd703f253588f46bd86f902464b176c052b13cdbe82f0c3843faa9b"
+    },
+    {
+      "path": "tests/authorization/README.md",
+      "mode": "100644",
+      "sha256": "fcb128eddb12894642dfc60866e10e9c4eadef771d8c24814e2745c7f8f137cd"
+    },
+    {
+      "path": "tests/compatibility/adapter/v0/README.md",
+      "mode": "100644",
+      "sha256": "91d5864cdc1af18e164f5695555814eec2a5669878d291616c8081b6731da581"
+    },
+    {
+      "path": "tests/compatibility/adapter/v0/vocabulary.json",
+      "mode": "100644",
+      "sha256": "df5ff9b7d56d3992fdc9b77c8aedceb3fc693d1224e0a1ec6de34252df73ca03"
+    },
+    {
+      "path": "tests/compatibility/adapter/v1/compatibility.json",
+      "mode": "100644",
+      "sha256": "f166158b7e98c305597c5030281dd41f76ca27b5b4a39ad7f35c530dc27871e0"
+    },
+    {
+      "path": "tests/compatibility/adapter/v1/README.md",
+      "mode": "100644",
+      "sha256": "ebbedb0731cb172a9db4696b731a4a14d9b57d3e947b7c038b1c2dbd6a9957ba"
+    },
+    {
+      "path": "tests/compatibility/adapter/v1/verify.mjs",
+      "mode": "100755",
+      "sha256": "522b102360150887ec764e5a611de294e5f0e85ff5e90687fe0f6b16bd25d5a7"
+    },
+    {
+      "path": "tests/compatibility/adapter/v1/vocabulary.json",
+      "mode": "100644",
+      "sha256": "79fb162bbb3c55e5414f348ebefe1887889e6db982f1728f108ddb687ec349aa"
+    },
+    {
+      "path": "tests/compatibility/manifest-scaling/verify.mjs",
+      "mode": "100644",
+      "sha256": "817b01aa4268adf258c2b8e107cb56f47d109d65755411fd116b76cf667cfb81"
+    },
+    {
+      "path": "tests/compatibility/README.md",
+      "mode": "100644",
+      "sha256": "f21e8be482f4f68b91e880d6246474ed35c2f4a27fcb149a0213cf41ea5bec5b"
+    },
+    {
+      "path": "tests/compatibility/recovery-preservation/v0/contract.json",
+      "mode": "100644",
+      "sha256": "309d3c1901a8f9e92b695a18ed8c7e607ca499898086fd3d41a0c14a1b9e68a4"
+    },
+    {
+      "path": "tests/compatibility/recovery-preservation/v0/fixtures.json",
+      "mode": "100644",
+      "sha256": "afbd0f3490de232a4c409abc84540895956de212658bb66082c53abe6a41e4cc"
+    },
+    {
+      "path": "tests/compatibility/recovery-preservation/v0/README.md",
+      "mode": "100644",
+      "sha256": "51feaaa0048d7d44530cfd5714078d6264fada48fbd4b926b8a345cdf35d43fe"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/capture.mjs",
+      "mode": "100644",
+      "sha256": "30d595220ef7c141fab0246e419e423b2a1ef52ce1586d3e7bc731214fdd7c3c"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/catalogue.json",
+      "mode": "100644",
+      "sha256": "cbd932c642aef5c737d673d7bdea0f7432cb575fa4453a82f72c8926b4d091c7"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/Dockerfile.jetbrains-linux",
+      "mode": "100644",
+      "sha256": "18f2161b2d8be105bc185600bc72c9afb87c01f51fb425589fd43640c41ceb69"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/Dockerfile.vscode-linux",
+      "mode": "100644",
+      "sha256": "b8cd6cb7a200890144057a6dc2a2418ea9ab73463ee29b54927fd69e2501540d"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/jetbrains-linux-xdotool.mjs",
+      "mode": "100644",
+      "sha256": "1775304d7735701f288d8247f472f2ac0111b95a506d478d794d3a7480baa64a"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/jetbrains-linux-xdotool.selftest.mjs",
+      "mode": "100644",
+      "sha256": "0d13fb862b9185c5a382e4a96bab3d61e8c4e53f5f704603b5e230f111f7dcc8"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/vscode-linux-cdp-selftest.mjs",
+      "mode": "100644",
+      "sha256": "38828569c16d6ec548a6be3e92f3906fe58c4aa05b3d6fd0fa38984cc4865a5b"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/vscode-linux-cdp.mjs",
+      "mode": "100644",
+      "sha256": "8b087f23f13cf9a631e72418528be1d2e6fd0b1c13c6a363a1dfc8d64ebf184e"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/vscode-macos-cdp-selftest.mjs",
+      "mode": "100644",
+      "sha256": "cd70c4e20807c40c732bd3872c08c4b5401adaa08ce267f25a9c89e409f1637b"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/drivers/vscode-macos-cdp.mjs",
+      "mode": "100644",
+      "sha256": "68cdf5d951d2fc7582e264363f73c869f571eba5396be36b59384a377e09ec93"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/git-checkout-switch-branch.json",
+      "mode": "100644",
+      "sha256": "a5d548fac751914539538d7a7badde51dd84368be6aa65ae83c50db4e3ea3a85"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/jetbrains-linux-backup-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "43b4a2eb334ab5c5324eb657dfcc91ad83e6da34157e46d9b2c59959fac6132e"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/jetbrains-macos-command-line-format-backup-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "8b5c271d5b9074f487af93d6508ed650d1f48c6fad41b309685acf7598898484"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/jetbrains-safe-write.json",
+      "mode": "100644",
+      "sha256": "736478a462d15c502c1b41670f07bc7dbc991bd2a82ef8b8702da2955f303675"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/linux-git-checkout-in-place.json",
+      "mode": "100644",
+      "sha256": "79f4b10ab9197526d881b79d898267dce0637b56993a4fcbd0906767cb850318"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/linux-npm-install-cold.json",
+      "mode": "100644",
+      "sha256": "4565425e39118e1abe4c6c04f888c39e3d3281f311ffe1a924cd6fcc525b681b"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/linux-rustfmt-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "b7c7e4197b060d874d83164dc73b91db89cef667fd01b59f346a7acd83b70ea9"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/linux-vim-rename-over-with-backup.json",
+      "mode": "100644",
+      "sha256": "c9e2870ee0d26c380fabfbde11f972628ae6ba3cf69f908119efcd30abd1b690"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/npm-install-cold.json",
+      "mode": "100644",
+      "sha256": "d3dc701a9303f58acd84d966bc573320fcb7379d1622e16bc9369d9ce338ac3c"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/rustfmt-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "b5bb443cb83e346e5bfd203109017eb959115fd6642dc46844429a09e091e3df"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/sed-rename-over-with-backup.json",
+      "mode": "100644",
+      "sha256": "5417c979bb8c8a7f434d3acb50e0508e913f0f2897a46cb63d30cc9281b65752"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/sed-rename-over.json",
+      "mode": "100644",
+      "sha256": "2301067e909f9b4b80f1754b7955f1bc0ef1526f30dc7efecb4153b87de9e7c2"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/vim-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "41f7ce94b5ab80a8e366f1a98ae119d178f6fe5447b85195d159d8e75b01d6f5"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/vscode-atomic-replace.json",
+      "mode": "100644",
+      "sha256": "a731840b0eb5a3e0f850180743e2e3a8fc315cf8f9069fe1e15ffa88e9471392"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/vscode-linux-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "908ff096598b6531741a570c22c05e6b98e4c6466e0a56641bf67f0a2ec987b5"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/patterns/vscode-macos-in-place-truncate.json",
+      "mode": "100644",
+      "sha256": "02795a2a6a5e5bae8f78977dc07922aeee94b486fcea573c77ab22a284808425"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/README.md",
+      "mode": "100644",
+      "sha256": "aa6f4eaa391469a3944c0479025740e8d5efb1bbf8136bb53e64768493c32d60"
+    },
+    {
+      "path": "tests/compatibility/save-patterns/v0/replay.mjs",
+      "mode": "100644",
+      "sha256": "e47ff0ff48066333f20808d10c2e3599ccce1d5a68d96625e8947e0be2d9830b"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/contract.json",
+      "mode": "100644",
+      "sha256": "21c2ffe059a1af12173629ea3b9488f8ae84e14d90b7ce4901e19fd06c6ebdb0"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/fixtures/compatibility.json",
+      "mode": "100644",
+      "sha256": "3a2027bc9d3f29530d16e284dce61069c1612161f2a60dad1c6cb4c768b11f6d"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/fixtures/identity.json",
+      "mode": "100644",
+      "sha256": "4c0865ad4f7be01ff62f31542bf833a2266d80a2ce6b949ca231c2a5e1b1ca43"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/fixtures/producers.json",
+      "mode": "100644",
+      "sha256": "08836690b0e5d950d1e89c15ee4d173716c9f086df7db350cabeaa2145b0b9ce"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/README.md",
+      "mode": "100644",
+      "sha256": "9ed3c047ad023d2c080d18dc124eac87c42f7e37bbaa1907d6e951b2335b2bfb"
+    },
+    {
+      "path": "tests/compatibility/workspace-adapter-boundaries/v0/schema.json",
+      "mode": "100644",
+      "sha256": "d131d88358a9335171d3e11896cd2e91c1a303ef875f4580074d513712d6bc21"
+    },
+    {
+      "path": "tests/convergence/README.md",
+      "mode": "100644",
+      "sha256": "2b9546479a66c6329a199a6bed5885cddf1bceaabad931f2fc6e34c28020a6fb"
+    },
+    {
+      "path": "tests/corruption/README.md",
+      "mode": "100644",
+      "sha256": "72dc4e39329eba2ea3c7c1ffb7b9e36e79cb46691a7e0cc8e8560cb05b0fbe87"
+    },
+    {
+      "path": "tests/crash/README.md",
+      "mode": "100644",
+      "sha256": "76908e98ea580616d306ce8575892b537986f833f1dbd9f3a41feeac8758281c"
+    },
+    {
+      "path": "tests/interop/README.md",
+      "mode": "100644",
+      "sha256": "d16fca719ee99f1e98be8e0871e139b93aa716a51e9c345143cbce82665ee951"
+    },
+    {
+      "path": "tools/program/arch-check/lib/ambient.mjs",
+      "mode": "100644",
+      "sha256": "3fdc8a5c3689f3fb61cd7124fafaaa599671430edecc0cc575168e84a89bfd34"
+    },
+    {
+      "path": "tools/program/license-check.mjs",
+      "mode": "100644",
+      "sha256": "396c9908755bdcf9f62ae877f50d260c2a1ea9dcacc6f595d4a12ed681fc4f29"
+    },
+    {
+      "path": "tools/program/npm-wiring.mjs",
+      "mode": "100644",
+      "sha256": "9c91d1f1994750947b3573f3a7feb151e3214fb7b0eb0305ddf0cd100d915b62"
+    },
+    {
+      "path": "tools/program/storage-budget/check.mjs",
+      "mode": "100644",
+      "sha256": "5c0bc7e8905a25f8858f2ad4571c9c5ac43f69b448959872d426cd5bf5e4ff7e"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/allow/over-budget.md",
+      "mode": "100644",
+      "sha256": "6509e71e298f0b35e595afc5b8c8150f0871ab11e0102228acc499b775a50074"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/allow/reasoned.md",
+      "mode": "100644",
+      "sha256": "fcf9ad4db1e10a65e58cbaa5f2372c0cf1ad13701dd355b231fdd8ed8f938a5a"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/allow/unreasoned.md",
+      "mode": "100644",
+      "sha256": "42f1f441ea40815dee38c353ee33ac03835c3cbc8b9fb7f3ed1bfc22dd6f85ea"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/clean/near-misses.md",
+      "mode": "100644",
+      "sha256": "f90b2c7369ef758b58e636e25e0a209e7594cc23a02d03cc0d30c88538db88bb"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/clean/status-catalog-nested.json",
+      "mode": "100644",
+      "sha256": "0b2f9bec29d4942ee731d6d3b8756b34d44dbe478839eaa795d341d1104d6ff2"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/clean/status-catalog.json",
+      "mode": "100644",
+      "sha256": "50f4809331ec5fa33fc63cb97b6c6c9ee4bbe43ad5a163968584508dca9b8ec4"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/clean/ui-strings.ts",
+      "mode": "100644",
+      "sha256": "9d7e4a5a8ff4018138acdc91fbe6c691b367afccc561306781cd0d2e8530f1d8"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/expectations.json",
+      "mode": "100644",
+      "sha256": "62841991ddebb363d7c80f63256aabe63bee7b44d816accfdfd9ab5854a5aee4"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/branch.ts",
+      "mode": "100644",
+      "sha256": "dd61c5822afbf3eb2a7cf9bee91f6d174e4a0dca6fb64af9cdcfe9d3578e2866"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/commit.ts",
+      "mode": "100644",
+      "sha256": "c9774ad0c5cb711f73da1ca3e29bc2826e278e8bef21f1f10a3a5a625e7d0ee5"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/dag.md",
+      "mode": "100644",
+      "sha256": "6ae4bd7bbac4cd223c53e65d3197134d3db3296b9b550ffbfb2ea984402e4b71"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/frontier.md",
+      "mode": "100644",
+      "sha256": "5d32b5e47f2545000eaf3fc7b80e431c7bdfa4ff70afeb1a8042a1fd6051b124"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/operation-log.md",
+      "mode": "100644",
+      "sha256": "ff20c619b490a904d07d6dfbc4314573e84238414b727d5bb757e5b917126cf5"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/rebase.json",
+      "mode": "100644",
+      "sha256": "a5181329effa0cabb2a279dcdb885c39134cf09f4783c5cdf9a280f1f3885e3b"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/ref.rs",
+      "mode": "100644",
+      "sha256": "04eda0713c69ac6eda7976bc7641ec1ad6971b9bd4160307b6f99841527a0a24"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/shipped-suppression.json",
+      "mode": "100644",
+      "sha256": "5910fc801dce4c45ff2da438359bb9cc96387b80fe29f4600a56c1685e799fff"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/staging.md",
+      "mode": "100644",
+      "sha256": "d41ede349d32755d0e3c18d74ba772cceaae27e1ff990cccc6d78d0e11d515b2"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/forbidden/vector-clock.md",
+      "mode": "100644",
+      "sha256": "568f5e15a0c34dcf8d7d8e48861cd98025ac1bd4fdce664b900931a9644c0f50"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/journey/ceremony-free.md",
+      "mode": "100644",
+      "sha256": "a86d19645f32db9e9098806b060bf428a437c56ab5b42139c837b7eef8b40f7f"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/journey/ceremony-step.md",
+      "mode": "100644",
+      "sha256": "5b0f126102449e840c3b5d3e4078345d2aa7491ac62b3c0e5c94c29872c5a6cc"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/mapping/asymmetric.md",
+      "mode": "100644",
+      "sha256": "ee5171b6a38b1f23a6db13cbf594265b8bc8e59f31852d3c3f7fa36d5db52322"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/mapping/symmetric.md",
+      "mode": "100644",
+      "sha256": "670bd09d6c1bf7d91bc89668dc597b8a8f2263f566bdcb8e7dd30860a3dc74c6"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/mapping/unapproved-wording.md",
+      "mode": "100644",
+      "sha256": "0031cd59ccdb9d89fc4b054827ab1805db5f2c661d45689124eaa1986b5d0caa"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/requirements/duplicate-and-missing.md",
+      "mode": "100644",
+      "sha256": "60246acf484a4122eb252740ee110493c282c5c3452f8c61284d2ab201f94047"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/six-state/full-order.md",
+      "mode": "100644",
+      "sha256": "be499532b5348ae0eabc7cf8a5a97c64895040965962a8c5a77f9cae5c935b9b"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/six-state/nested-seventh-word.json",
+      "mode": "100644",
+      "sha256": "2c8141d3544b640ddccd14cf5aa37cbfe677421b79fead4a991d554bd9b1913e"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/six-state/path-selects-nothing.json",
+      "mode": "100644",
+      "sha256": "716488c7fb2c4baf09e9b381b74137ad0a674ef7766f5a3355c7db4fffadd062"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/six-state/seventh-word.json",
+      "mode": "100644",
+      "sha256": "e6c037f7e236ebe47be7e392753007fed012c89c1a73723aa6e8940a437b53b5"
+    },
+    {
+      "path": "tools/program/vocab-lint/fixtures/six-state/wrong-order.md",
+      "mode": "100644",
+      "sha256": "5fd294ebef2ce7970c75900c124b0918deb21d705058eaa96abcfd8cdb4ada31"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/engine.mjs",
+      "mode": "100644",
+      "sha256": "45845463eb2ee2d2a84386bbeaf45bb34d33c5ebf68c2de1c9471ff91ba625a4"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/extract.mjs",
+      "mode": "100644",
+      "sha256": "95b6f4658a6609cf779c9ad44984eec3b939f7a04cc49c42bc27a616c37d25b5"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/globs.mjs",
+      "mode": "100644",
+      "sha256": "168c78a953b451f9a3b1a7549113f3b9739c12eaad00f96c36b59f812f14ad95"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/markdown.mjs",
+      "mode": "100644",
+      "sha256": "b35ed6a97e0fccbb35bf627c9758421a8af4d42860d6688508160f91588224ec"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/positions.mjs",
+      "mode": "100644",
+      "sha256": "35542a0b3a05c9485c178e1caed45b6a463dead4ea67274a2915331f6ae1b34a"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/report.mjs",
+      "mode": "100644",
+      "sha256": "3e457470d2fa4f98b9cd2e1951c497e8abf041a394a930f18895f2cc65bfef39"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/forbidden-words.mjs",
+      "mode": "100644",
+      "sha256": "66f54da5f7c625d479c464b6b7cb53bb673dd0da6de374b4dbb6463645b507c4"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/index.mjs",
+      "mode": "100644",
+      "sha256": "e7cf0e067262543b8b37d09a7922468737e4e0ef7d80309f663cac132125bd4c"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/journey.mjs",
+      "mode": "100644",
+      "sha256": "192770b778caa16e52599c3e7740906b24265927ec49ba64096ca4d6e6e9cf64"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/mapping.mjs",
+      "mode": "100644",
+      "sha256": "190a5045bdde7e34873ba94bb4225dbdd4ea32033ee9c1fc3df8bf8579fbcf2a"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/requirements.mjs",
+      "mode": "100644",
+      "sha256": "434d9d63ca55dafdf7b5453a48104f6ec69adf7999d6c6fa3904f9973abca833"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/rules/six-state.mjs",
+      "mode": "100644",
+      "sha256": "ad86f250d0fefaf3eb5167c98f7b004833518f232d5d1cc3a6726bf1ef729cfb"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/selftest.mjs",
+      "mode": "100644",
+      "sha256": "b31dcd9f1c4adcfa5ac306cbb30de838995f5c924851f5586771f4b4ca838e10"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/surfaces.mjs",
+      "mode": "100644",
+      "sha256": "2f3bc50f378a66b5434acefcc9fba757e562fbf4fea792835157424d0df95017"
+    },
+    {
+      "path": "tools/program/vocab-lint/lib/vocabulary.mjs",
+      "mode": "100644",
+      "sha256": "b34672ee4190d666854b92d2c3ef7f61aad94b7beb3270c2e7ed5bf074f77d67"
+    },
+    {
+      "path": "tools/program/vocab-lint/lint.mjs",
+      "mode": "100644",
+      "sha256": "b8ae10238f1ab15e1e9866b79dbba09e4339cf4377ab6651b466f687b3098a5b"
+    },
+    {
+      "path": "tools/program/vocab-lint/README.md",
+      "mode": "100644",
+      "sha256": "814d823df35bb645d7c27f5f1c0642e9e87588fcf0a1255a22998bd19b70d504"
+    },
+    {
+      "path": "tools/program/vocab-lint/requirements.expected.json",
+      "mode": "100644",
+      "sha256": "60154be869f7ebaaab28ce255470e140d5c5efef0c9631564abe91ae7179deac"
+    },
+    {
+      "path": "tools/program/vocab-lint/surfaces.json",
+      "mode": "100644",
+      "sha256": "40c5ca03c54c9cbcd47c5a19a2d79e0daa6f8fb086b020fed319b49b6f47e225"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/checks.mjs",
+      "mode": "100644",
+      "sha256": "74ab19312b10ae5285285973bd19935e95134ef1270f33e5c0a53ded9941644d"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/crates.mjs",
+      "mode": "100644",
+      "sha256": "1fa98cc25cd94eb3fa36f72502f00b4e84da72f3d01736afbeb07433aace7687"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/model.mjs",
+      "mode": "100644",
+      "sha256": "a81e51b03ad374bcd5addf54364905c2c217feacf05a1b1c60c2c06c24c22cc1"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/parse.mjs",
+      "mode": "100644",
+      "sha256": "fac36d6a3705bee1646fe2f6683e4dfe68fcc7bcb044f53cddb2cd34ea416f91"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/README.md",
+      "mode": "100644",
+      "sha256": "f3b0ea9eb8af141b2a58d19f7adf45bc184ce503d1544aa3536a400647587b15"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/report.mjs",
+      "mode": "100644",
+      "sha256": "8cf01d69017762939b5ffd50a90b7c766d9f4dc54b5e13cc3b663184256d1c99"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/rust.mjs",
+      "mode": "100644",
+      "sha256": "82eda09f1600d1597775a0bfc946de0cf119ab1c7881eedef3ea8afa25d32393"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology/selftest.mjs",
+      "mode": "100644",
+      "sha256": "1e8c82556333218d9d8422e2141d3e48cb52be23f8cf7c9636cef8aad0369c0b"
+    },
+    {
+      "path": "tools/program/vocab-lint/terminology.mjs",
+      "mode": "100644",
+      "sha256": "a464f978892b1623d713124fb1637310ae459788cd5c51a171d8c487d96332fb"
+    },
+    {
+      "path": "tools/support-bundle/scan.mjs",
+      "mode": "100644",
+      "sha256": "5e574bba4378473acef70cdcbd249509d702ad09f6f7f1b9227588c607292535"
+    },
+    {
+      "path": "tools/support-bundle/scan.test.mjs",
+      "mode": "100644",
+      "sha256": "ac593a0fcaad220f4f077d9a2c196ae0552b438a3604d505df80ab27c199a781"
+    }
+  ]
+}

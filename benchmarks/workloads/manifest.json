@@ -1,0 +1,504 @@
+{
+  "schema_version": "1",
+  "generator_family": "mesh-bench/corpus",
+  "canonical_seed": 42,
+  "measured_on": [
+    {
+      "role": "published",
+      "host_kind": "physical machine",
+      "note": "the host the eighteen plan digests and eighteen content digests below were first computed on",
+      "repository_commit": "018bbaf6709f6c555f3e2ea2c0027792535ae4c2",
+      "cpu_model": "Apple M2 Pro",
+      "logical_cores": 10,
+      "memory_bytes": 17179869184,
+      "os": "macos",
+      "os_version": "14.5",
+      "arch": "arm64",
+      "filesystem": "apfs",
+      "build_profile": "release",
+      "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "cache_state": "not applicable - generation is CPU-bound and writes nothing",
+      "revalidated_at_commit": "bae732205c6185459910b2798a97d6c6f725eccd",
+      "revalidated_on": "2026-08-08",
+      "commands": [
+        {
+          "command": "cargo nextest run -p mesh-bench --test workload-generators",
+          "exit_code": 0,
+          "detail": "10 tests run: 10 passed, 0 skipped"
+        },
+        {
+          "command": "node benchmarks/workloads/verify.mjs --all --content",
+          "exit_code": 0,
+          "detail": "verify OK - 18 workload/scale pair(s) match the published manifest"
+        }
+      ],
+      "plan_digests_matched": 18,
+      "content_digests_matched": 18
+    },
+    {
+      "role": "reproduced",
+      "host_kind": "Linux virtual machine (Docker Desktop 28.3.2, linuxkit) on the same physical Apple M2 Pro as the published host - a different operating system, kernel, C library, filesystem and (on x86_64) instruction set, but not a second computer. What it rules out is Darwin, APFS and AArch64 code generation; what it does not rule out is anything shared by both hosts below the hypervisor.",
+      "repository_commit": "bae732205c6185459910b2798a97d6c6f725eccd",
+      "cpu_model": "Apple M2 Pro (10 vCPU exposed to the VM; lscpu reports vendor Apple, no model name)",
+      "logical_cores": 10,
+      "memory_bytes": 8218034176,
+      "os": "linux",
+      "os_version": "Debian GNU/Linux 12 (bookworm), kernel 6.10.14-linuxkit",
+      "arch": "aarch64",
+      "target_triple": "aarch64-unknown-linux-gnu",
+      "filesystem": "overlayfs",
+      "build_profile": "release",
+      "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "node_version": "v18.20.4",
+      "nextest_version": "cargo-nextest 0.9.143 (60fa45f63 2026-08-04)",
+      "cache_state": "not applicable - generation is CPU-bound and writes nothing",
+      "measured_on_date": "2026-08-08",
+      "conditions": "release build, then 60 s idle before the first measurement so that no number is taken immediately after a --release compile (benchmarks/runners/README.md, \"a quiet machine\"). the publishing host was running its own verify pass concurrently, so the per-row generation times of this entry are contended; the digests are not, and no threshold is derived from either.",
+      "build_seconds": 10,
+      "commands": [
+        {
+          "command": "cargo nextest run -p mesh-bench --test workload-generators",
+          "exit_code": 0,
+          "detail": "10 tests run: 10 passed, 0 skipped"
+        },
+        {
+          "command": "node benchmarks/workloads/verify.mjs --all --content",
+          "exit_code": 0,
+          "detail": "verify OK - 18 workload/scale pair(s) match the published manifest",
+          "wall_seconds": 250
+        }
+      ],
+      "plan_digests_matched": 18,
+      "content_digests_matched": 18
+    },
+    {
+      "role": "reproduced",
+      "host_kind": "Linux virtual machine (Docker Desktop 28.3.2, linuxkit) on the same physical Apple M2 Pro as the published host - a different operating system, kernel, C library, filesystem and (on x86_64) instruction set, but not a second computer. What it rules out is Darwin, APFS and AArch64 code generation; what it does not rule out is anything shared by both hosts below the hypervisor.",
+      "repository_commit": "bae732205c6185459910b2798a97d6c6f725eccd",
+      "cpu_model": "Apple M2 Pro (10 vCPU exposed to the VM; lscpu reports vendor Apple, no model name)",
+      "logical_cores": 10,
+      "memory_bytes": 8218034176,
+      "os": "linux",
+      "os_version": "Debian GNU/Linux 12 (bookworm), kernel 6.10.14-linuxkit",
+      "arch": "x86_64",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "filesystem": "overlayfs",
+      "build_profile": "release",
+      "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "node_version": "v18.20.4",
+      "nextest_version": "cargo-nextest 0.9.143 (60fa45f63 2026-08-04)",
+      "cache_state": "not applicable - generation is CPU-bound and writes nothing",
+      "measured_on_date": "2026-08-08",
+      "conditions": "release build, then 60 s idle before the first measurement so that no number is taken immediately after a --release compile (benchmarks/runners/README.md, \"a quiet machine\"). run alone. Executed under Rosetta 2 translation, but compiled by the LLVM x86-64 backend - the emitted object is ELF e_machine 0x3E (EM_X86_64), so the integer and floating-point code that computes the digests is x86-64 code, not AArch64 code.",
+      "build_seconds": 19,
+      "commands": [
+        {
+          "command": "cargo nextest run -p mesh-bench --test workload-generators",
+          "exit_code": 0,
+          "detail": "10 tests run: 10 passed, 0 skipped"
+        },
+        {
+          "command": "node benchmarks/workloads/verify.mjs --all --content",
+          "exit_code": 0,
+          "detail": "verify OK - 18 workload/scale pair(s) match the published manifest",
+          "wall_seconds": 252
+        }
+      ],
+      "plan_digests_matched": 18,
+      "content_digests_matched": 18
+    }
+  ],
+  "note": "Digests are a function of the generator, the seed, the scale and the generator version - not of this machine. measured_on records every host the eighteen plan digests and eighteen content digests have been computed on: the first entry is where they were published from, and each later entry is a host that reproduced all thirty-six by running the two commands it quotes and reading their exit codes. generation_seconds on a row is provenance from the publishing host, never a threshold. A digest mismatch on another machine is a real defect in the generator determinism, which is the entire point of publishing them.",
+  "rows": [
+    {
+      "workload": "W1",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:34146525988e803f",
+      "content_digest": "fnv1a64:bf22880b0fc55bbc",
+      "facts": {
+        "file_count": 20000,
+        "logical_bytes": 1500000000,
+        "text_file_ratio": 0.98,
+        "activity_count": 3
+      },
+      "generation_seconds": 4.225
+    },
+    {
+      "workload": "W1",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:1c397cb17be36c59",
+      "content_digest": "fnv1a64:28e712d71c98a56b",
+      "facts": {
+        "file_count": 2000,
+        "logical_bytes": 150000000,
+        "text_file_ratio": 0.98,
+        "activity_count": 3
+      },
+      "generation_seconds": 0.42
+    },
+    {
+      "workload": "W1",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:dc65933788ca3f10",
+      "content_digest": "fnv1a64:814c0617d5c07faa",
+      "facts": {
+        "file_count": 64,
+        "logical_bytes": 1000000,
+        "text_file_ratio": 0.984375,
+        "activity_count": 3
+      },
+      "generation_seconds": 0.004
+    },
+    {
+      "workload": "W2",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:3342de9c7fca4d47",
+      "content_digest": "fnv1a64:bfde123d77f9cb73",
+      "facts": {
+        "file_count": 1000000,
+        "logical_bytes": 100000000000,
+        "accessed_files": 50000,
+        "accessed_ratio": 0.05
+      },
+      "generation_seconds": 143.697
+    },
+    {
+      "workload": "W2",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:0e0c78ea1d5774e2",
+      "content_digest": "fnv1a64:307574b9375e5e9f",
+      "facts": {
+        "file_count": 20000,
+        "logical_bytes": 2000000000,
+        "accessed_files": 1000,
+        "accessed_ratio": 0.05
+      },
+      "generation_seconds": 3.055
+    },
+    {
+      "workload": "W2",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:d1ecd6192473ee04",
+      "content_digest": "fnv1a64:478648d7d8fa3e19",
+      "facts": {
+        "file_count": 500,
+        "logical_bytes": 4000000,
+        "accessed_files": 25,
+        "accessed_ratio": 0.05
+      },
+      "generation_seconds": 0.008
+    },
+    {
+      "workload": "W3",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:b6d0b12cbddff36a",
+      "content_digest": "fnv1a64:f4968dd0802b15ba",
+      "facts": {
+        "actor_count": 100,
+        "changes_per_actor": 10,
+        "changes_per_actor_max": 10,
+        "total_changes": 1000,
+        "overlap_ratio": 0.218,
+        "checkpoints_per_actor": 5,
+        "corpus_files": 2050,
+        "has_contended_paths": 1
+      },
+      "generation_seconds": 0.186
+    },
+    {
+      "workload": "W3",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:86ba6692377fc4e9",
+      "content_digest": "fnv1a64:eeb1cc6a4cd6c254",
+      "facts": {
+        "actor_count": 20,
+        "changes_per_actor": 10,
+        "changes_per_actor_max": 10,
+        "total_changes": 200,
+        "overlap_ratio": 0.215,
+        "checkpoints_per_actor": 5,
+        "corpus_files": 410,
+        "has_contended_paths": 1
+      },
+      "generation_seconds": 0.038
+    },
+    {
+      "workload": "W3",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:80ab696c7af1a70f",
+      "content_digest": "fnv1a64:6289bddef91019b7",
+      "facts": {
+        "actor_count": 4,
+        "changes_per_actor": 5,
+        "changes_per_actor_max": 5,
+        "total_changes": 20,
+        "overlap_ratio": 0.2,
+        "checkpoints_per_actor": 3,
+        "corpus_files": 43,
+        "has_contended_paths": 1
+      },
+      "generation_seconds": 0.007
+    },
+    {
+      "workload": "W4",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:c7e4014e5f330bc2",
+      "content_digest": "fnv1a64:6a03957a7b6b4653",
+      "facts": {
+        "file_count": 5000,
+        "logical_bytes": 20000000000,
+        "has_docx": 1,
+        "has_xlsx": 1,
+        "has_pptx": 1,
+        "has_pdf": 1,
+        "has_images": 1,
+        "has_csv": 1,
+        "has_text": 1
+      },
+      "generation_seconds": 34.324
+    },
+    {
+      "workload": "W4",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:fcdaeea556526686",
+      "content_digest": "fnv1a64:67d83186eecff905",
+      "facts": {
+        "file_count": 1000,
+        "logical_bytes": 2000000000,
+        "has_docx": 1,
+        "has_xlsx": 1,
+        "has_pptx": 1,
+        "has_pdf": 1,
+        "has_images": 1,
+        "has_csv": 1,
+        "has_text": 1
+      },
+      "generation_seconds": 3.413
+    },
+    {
+      "workload": "W4",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:40fcd5cf424035d3",
+      "content_digest": "fnv1a64:5723aa24cd19c61f",
+      "facts": {
+        "file_count": 80,
+        "logical_bytes": 4000000,
+        "has_docx": 1,
+        "has_xlsx": 1,
+        "has_pptx": 1,
+        "has_pdf": 1,
+        "has_images": 1,
+        "has_csv": 1,
+        "has_text": 1
+      },
+      "generation_seconds": 0.008
+    },
+    {
+      "workload": "W5",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:40b58ef151308f8d",
+      "content_digest": "fnv1a64:ec618692f334074d",
+      "facts": {
+        "base_bytes": 1073741824,
+        "has_modification_of_stated_size": 1,
+        "has_middle_insertion": 1,
+        "has_append": 1,
+        "random_rewrite_count": 64,
+        "random_rewrite_bytes": 4096,
+        "every_edit_lands_inside_the_file": 1
+      },
+      "generation_seconds": 1.57
+    },
+    {
+      "workload": "W5",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:61ef492e1c669eda",
+      "content_digest": "fnv1a64:59cda9f67e5113b4",
+      "facts": {
+        "base_bytes": 67108864,
+        "has_modification_of_stated_size": 1,
+        "has_middle_insertion": 1,
+        "has_append": 1,
+        "random_rewrite_count": 16,
+        "random_rewrite_bytes": 4096,
+        "every_edit_lands_inside_the_file": 1
+      },
+      "generation_seconds": 0.091
+    },
+    {
+      "workload": "W5",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:cb478fbfc9ebe081",
+      "content_digest": "fnv1a64:696552df3cd94a24",
+      "facts": {
+        "base_bytes": 1048576,
+        "has_modification_of_stated_size": 1,
+        "has_middle_insertion": 1,
+        "has_append": 1,
+        "random_rewrite_count": 4,
+        "random_rewrite_bytes": 4096,
+        "every_edit_lands_inside_the_file": 1
+      },
+      "generation_seconds": 0.003
+    },
+    {
+      "workload": "W6",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:47ef85fd9b33aaaa",
+      "content_digest": "fnv1a64:5cceb431adeb3669",
+      "facts": {
+        "base_file_count": 1024,
+        "base_bytes": 16000000,
+        "fault_count": 512,
+        "distinct_fault_kinds": 7,
+        "steps_are_monotonic": 1,
+        "injects_network_partition": 1,
+        "injects_duplicate_message": 1,
+        "injects_message_reorder": 1,
+        "injects_process_crash": 1,
+        "injects_disk_full": 1,
+        "injects_corrupt_chunk": 1,
+        "injects_stale_peer_reconnect": 1
+      },
+      "generation_seconds": 0.046
+    },
+    {
+      "workload": "W6",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:d47922847c59f67d",
+      "content_digest": "fnv1a64:3998e44da85eb193",
+      "facts": {
+        "base_file_count": 256,
+        "base_bytes": 4000000,
+        "fault_count": 128,
+        "distinct_fault_kinds": 7,
+        "steps_are_monotonic": 1,
+        "injects_network_partition": 1,
+        "injects_duplicate_message": 1,
+        "injects_message_reorder": 1,
+        "injects_process_crash": 1,
+        "injects_disk_full": 1,
+        "injects_corrupt_chunk": 1,
+        "injects_stale_peer_reconnect": 1
+      },
+      "generation_seconds": 0.012
+    },
+    {
+      "workload": "W6",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:d0cdbf29d865f6b3",
+      "content_digest": "fnv1a64:6f88a4b363ce265f",
+      "facts": {
+        "base_file_count": 32,
+        "base_bytes": 200000,
+        "fault_count": 21,
+        "distinct_fault_kinds": 7,
+        "steps_are_monotonic": 1,
+        "injects_network_partition": 1,
+        "injects_duplicate_message": 1,
+        "injects_message_reorder": 1,
+        "injects_process_crash": 1,
+        "injects_disk_full": 1,
+        "injects_corrupt_chunk": 1,
+        "injects_stale_peer_reconnect": 1
+      },
+      "generation_seconds": 0.002
+    },
+    {
+      "workload": "W7",
+      "scale": "full",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:94b19dd223e01535",
+      "content_digest": "fnv1a64:49277e5971fd0ad0",
+      "facts": {
+        "file_count": 2056,
+        "base_bytes": 85748732,
+        "edit_count": 1344,
+        "checkpoint_count": 56,
+        "near_threshold_file_count": 4,
+        "above_threshold_file_count": 4,
+        "near_threshold_files_edited": 4,
+        "every_edit_lands_inside_its_file": 1,
+        "the_week_edits_more_than_one_file": 1
+      },
+      "generation_seconds": 0.243
+    },
+    {
+      "workload": "W7",
+      "scale": "reduced",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:d02c6642b7eda21e",
+      "content_digest": "fnv1a64:8359a016d77eb467",
+      "facts": {
+        "file_count": 260,
+        "base_bytes": 16485758,
+        "edit_count": 224,
+        "checkpoint_count": 28,
+        "near_threshold_file_count": 2,
+        "above_threshold_file_count": 2,
+        "near_threshold_files_edited": 2,
+        "every_edit_lands_inside_its_file": 1,
+        "the_week_edits_more_than_one_file": 1
+      },
+      "generation_seconds": 0.037
+    },
+    {
+      "workload": "W7",
+      "scale": "smoke",
+      "seed": 42,
+      "generator_version": "1",
+      "plan_digest": "fnv1a64:1a75355c82ca6f5a",
+      "content_digest": "fnv1a64:91e34f60afd1ba49",
+      "facts": {
+        "file_count": 32,
+        "base_bytes": 3595727,
+        "edit_count": 28,
+        "checkpoint_count": 14,
+        "near_threshold_file_count": 1,
+        "above_threshold_file_count": 1,
+        "near_threshold_files_edited": 1,
+        "every_edit_lands_inside_its_file": 1,
+        "the_week_edits_more_than_one_file": 1
+      },
+      "generation_seconds": 0.009
+    }
+  ]
+}

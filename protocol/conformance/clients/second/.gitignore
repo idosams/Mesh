@@ -1,0 +1,3 @@
+# Python leaves these beside the source; the tree stays clean.
+__pycache__/
+*.pyc

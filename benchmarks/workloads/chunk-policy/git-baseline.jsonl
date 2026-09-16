@@ -1,0 +1,2 @@
+{"baseline":"git","tool_version":"git version 2.51.0","arm":"storage.md-6.3/one-byte-edit","content_bytes":8895,"git_bytes_v1":31774,"git_bytes_v2":32268,"git_delta_bytes":494,"files":1,"gc":"aggressive, before both readings"}
+{"baseline":"git","tool_version":"git version 2.51.0","arm":"W1/smoke/one-byte-edit-every-file","content_bytes":1000000,"git_bytes_v1":565541,"git_bytes_v2":571839,"git_delta_bytes":6298,"files":64,"gc":"aggressive, before both readings"}

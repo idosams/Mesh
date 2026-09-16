@@ -1,0 +1,67 @@
+{
+  "contract": "mesh-save-patterns/0",
+  "pattern": "jetbrains-macos-command-line-format-backup-in-place-truncate",
+  "title": "IntelliJ IDEA's command-line formatter on macOS creates a short-lived backup, truncates and rewrites the document in place, then removes the backup",
+  "category": "editor",
+  "tool": { "name": "IntelliJ IDEA Ultimate command-line formatter", "version": "2026.2.1 (IU-262.9437.185)", "platform": "darwin 25.6.0 arm64, APFS (macOS 26.6.1)" },
+  "provenance": {
+    "method": "observed-by-polling",
+    "command": ["node", "<repo>/tests/compatibility/save-patterns/v0/capture.mjs", "--root", "<root>", "--out", "<capture.json>", "--", "env", "IDEA_PROPERTIES=<isolated-properties>", "<verified-dmg>/IntelliJ IDEA.app/Contents/bin/format.sh", "-allowDefaults", "<root>/Example.java"],
+    "fixture": "Before each repetition, <root>/Example.java contained exactly `class Example{int x=1;void f(){System.out.println(x);}}\\n` (56 bytes). The official arm64 IntelliJ IDEA disk image had SHA-256 b9c521ba766f7e5372e9d05f6d68442ada13f34ce758af318ca21f017c0bb19f, was mounted read-only, and used one isolated set of config, system, log and plugin directories for both repetitions. The formatter ran with factory defaults and exited 0. The retained file after the second repetition contained exactly the 86-byte IDEA-formatted Java source and retained inode 227809857; Example.java~ no longer existed.",
+    "evidence": "Two formatter repetitions sharing one isolated IDEA profile exited 0 in 63.261 s and 27.996 s. Both polling captures kept Example.java at inode 227809857 and recorded its size changing from 56 to 86 bytes. The first polling run saw only that final resize. The second saw Example.java~ appear at inode 227837712 with 0 bytes, grow to 56 bytes, saw Example.java at the original inode shrink from 56 to 0 and grow to 86 bytes, then saw Example.java~ vanish. The retained post-second-repetition file was read and was the exact 86-byte IDEA-formatted output. The polling captures did not hash document content, so equality of output bytes across repetitions is not claimed. The poller did not read Example.java~, so its 56-byte content is unknown. This is observed execution of IntelliJ IDEA's documented command-line formatter, not a GUI LightEdit save and not evidence about every editor mode.",
+    "surprise": "The measured macOS formatter save has the same backup-plus-in-place-truncate family as the measured Linux LightEdit save, not the older documentation-derived two-rename `___jb_tmp___`/`___jb_old___` shape. One of two polling runs missed the entire short-lived backup and the empty-document state, showing why folder observation cannot treat their absence as proof that they did not occur.",
+    "blind_spots": ["open, flush, fsync and close are invisible to polling", "one of two runs completed backup creation, document truncation/rewrite and backup deletion between readings", "the backup's bytes were not read, so only its name, inode and sizes are evidence", "the mount stream is derived from object transitions and does not claim a syscall trace", "the command-line formatter exercises IntelliJ IDEA's formatter/save path, not its GUI LightEdit input path"]
+  },
+  "objects": [
+    { "object": 1, "role": "Example.java, the document — one identity throughout" },
+    { "object": 2, "role": "Example.java~, a short-lived 56-byte path whose content was not observed" }
+  ],
+  "streams": {
+    "mount": {
+      "fidelity": "a backend that declares ObserveDurableBoundary",
+      "derived": true,
+      "events": [
+        { "sequence": 1, "kind": "Opened", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Closed", "object": 2 },
+        { "sequence": 4, "kind": "Opened", "object": 1 },
+        { "sequence": 5, "kind": "Written", "object": 1 },
+        { "sequence": 6, "kind": "Written", "object": 1 },
+        { "sequence": 7, "kind": "Closed", "object": 1 },
+        { "sequence": 8, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [
+        { "through": 3, "reason": "Closed" },
+        { "through": 7, "reason": "Closed" }
+      ]
+    },
+    "folder": {
+      "fidelity": "a backend that does not declare ObserveDurableBoundary",
+      "observed": true,
+      "events": [
+        { "sequence": 1, "kind": "Written", "object": 2 },
+        { "sequence": 2, "kind": "Written", "object": 2 },
+        { "sequence": 3, "kind": "Written", "object": 1 },
+        { "sequence": 4, "kind": "Written", "object": 1 },
+        { "sequence": 5, "kind": "Unlinked", "object": 2 }
+      ],
+      "candidates": [],
+      "admissible_omissions": [[1, 2, 3, 5]],
+      "omission_note": "The detailed run saw every listed transition. The other run missed the entire backup lifetime and the zero-length document, leaving only the final same-inode resize; replay must still close exactly once at the last surviving event."
+    }
+  },
+  "expected": {
+    "mount": { "checkpoints": [ { "from": 1, "through": 8, "reason": "Closed" } ], "boundary_evidence": { "through": 7, "confidence": "ExactFilesystemRange" } },
+    "folder": { "checkpoints": [ { "from": 1, "through": 5, "reason": null } ], "boundary_evidence": { "through": null, "confidence": "RecoveryDetected" } },
+    "meaningful_sequence_point": { "mount": 8, "folder": 5 },
+    "meaningful_durable_change": "Example.java holds the exact formatted source in the original object identity and the short-lived Example.java~ path no longer exists.",
+    "forbidden_sequence_points": { "mount": [1, 2, 3, 4, 5, 6, 7], "folder": [1, 2, 3, 4] },
+    "forbidden_note": "Mount 5 and folder 3 are the zero-length document observed in the detailed repetition. Mount 7 and folder 4 have the final document bytes but still retain Example.java~ as durable workspace state. A backup close or document close is boundary evidence, not proof that this save settled.",
+    "coalescable": "not-on-a-folder-backend"
+  },
+  "notes": [
+    "The disk image checksum came from JetBrains' adjacent .sha256 publication and matched the downloaded bytes before the image was mounted read-only.",
+    "This fills the JetBrains IDE × macOS execution cell with a real IDEA command-line formatter save. It does not relabel that run as GUI input and does not erase the separate documentation-derived safe-write supplement.",
+    "On a mount, document close supplies exact boundary evidence but settling after backup deletion closes the meaningful window. On a folder backend, only established settling can do so."
+  ]
+}

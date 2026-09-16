@@ -1,0 +1,27 @@
+{
+  "name": "@mesh/desktop-ui-next",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.ts",
+    "build": "vite build --config vite.config.ts",
+    "build:island": "vite build --config vite.island.config.ts",
+    "check": "tsc --project tsconfig.json --noEmit && npm run build && node --test *.test.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "https://registry.npmjs.org/@tailwindcss/vite/-/vite-4.2.1.tgz",
+    "@types/react": "https://registry.npmjs.org/@types/react/-/react-19.2.14.tgz",
+    "@types/react-dom": "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz",
+    "class-variance-authority": "https://registry.npmjs.org/class-variance-authority/-/class-variance-authority-0.7.1.tgz",
+    "clsx": "https://registry.npmjs.org/clsx/-/clsx-2.1.1.tgz",
+    "esbuild": "https://registry.npmjs.org/esbuild/-/esbuild-0.28.1.tgz",
+    "jiti": "https://registry.npmjs.org/jiti/-/jiti-2.6.1.tgz",
+    "react": "https://registry.npmjs.org/react/-/react-19.2.4.tgz",
+    "react-dom": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.4.tgz",
+    "tailwind-merge": "https://registry.npmjs.org/tailwind-merge/-/tailwind-merge-3.5.0.tgz",
+    "tailwindcss": "https://registry.npmjs.org/tailwindcss/-/tailwindcss-4.2.1.tgz",
+    "typescript": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+    "vite": "https://registry.npmjs.org/vite/-/vite-7.3.6.tgz"
+  }
+}

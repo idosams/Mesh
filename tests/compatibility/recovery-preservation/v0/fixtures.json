@@ -1,0 +1,55 @@
+{
+  "contract": "mesh-recovery-preservation/0",
+  "matrix": {
+    "open-window": {
+      "evidence-only": { "result": "boundary-evidence-recorded", "window": "open", "latest_recovery": "no-change", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "recovery-preserved", "window": "open", "latest_recovery": "advance", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "meaningful-after-settling": { "result": "meaningful-saved", "window": "closed", "latest_recovery": "no-change", "last_meaningful": "advance", "private_saved_ack": true, "status": "Saved privately" }
+    },
+    "already-preserved-window": {
+      "evidence-only": { "result": "boundary-evidence-recorded", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "recovery-preserved", "window": "open", "latest_recovery": "advance-if-newer", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "meaningful-after-settling": { "result": "meaningful-saved", "window": "closed", "latest_recovery": "preserve", "last_meaningful": "advance", "private_saved_ack": true, "status": "Saved privately" }
+    },
+    "settling-after-preservation": {
+      "evidence-only": { "result": "boundary-evidence-recorded", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "recovery-preserved", "window": "open", "latest_recovery": "advance-if-newer", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "meaningful-after-settling": { "result": "meaningful-saved", "window": "closed", "latest_recovery": "preserve", "last_meaningful": "advance", "private_saved_ack": true, "status": "Saved privately" }
+    },
+    "restart": {
+      "evidence-only": { "result": "restart-restored", "window": "open", "latest_recovery": "restore-prior", "last_meaningful": "restore-prior", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "restart-restored", "window": "open", "latest_recovery": "restore-newest", "last_meaningful": "restore-prior", "private_saved_ack": false, "status": "Working" },
+      "meaningful-after-settling": { "result": "restart-restored", "window": "closed", "latest_recovery": "restore-prior", "last_meaningful": "restore-newest", "private_saved_ack": false, "status": "Saved privately" }
+    },
+    "duplicate-trigger": {
+      "evidence-only": { "result": "duplicate-ignored", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "duplicate-ignored", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "meaningful-after-settling": { "result": "duplicate-ignored", "window": "closed", "latest_recovery": "preserve", "last_meaningful": "preserve", "private_saved_ack": false, "status": "Saved privately" }
+    },
+    "persistence-failure": {
+      "evidence-only": { "result": "evidence-only-no-persistence", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Working" },
+      "recovery-only": { "result": "persistence-failed", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Needs attention" },
+      "meaningful-after-settling": { "result": "persistence-failed", "window": "open", "latest_recovery": "preserve", "last_meaningful": "unchanged", "private_saved_ack": false, "status": "Needs attention" }
+    }
+  },
+  "ordering_cases": [
+    { "id": "higher-lamport-wins", "current": { "lamport": 7, "event_ulid": "01M00000000000000000000001", "content_hash": "1111111111111111111111111111111111111111111111111111111111111111" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000000", "content_hash": "0000000000000000000000000000000000000000000000000000000000000000" }, "expected": "candidate" },
+    { "id": "lower-lamport-loses", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000000", "content_hash": "0000000000000000000000000000000000000000000000000000000000000000" }, "candidate": { "lamport": 7, "event_ulid": "01M00000000000000000000001", "content_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }, "expected": "current" },
+    { "id": "higher-event-ulid-wins", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000001", "content_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "0000000000000000000000000000000000000000000000000000000000000000" }, "expected": "candidate" },
+    { "id": "lower-event-ulid-loses", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "0000000000000000000000000000000000000000000000000000000000000000" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000001", "content_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" }, "expected": "current" },
+    { "id": "higher-content-hash-wins", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "1111111111111111111111111111111111111111111111111111111111111111" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "2222222222222222222222222222222222222222222222222222222222222222" }, "expected": "candidate" },
+    { "id": "lower-content-hash-loses", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "2222222222222222222222222222222222222222222222222222222222222222" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "1111111111111111111111111111111111111111111111111111111111111111" }, "expected": "current" },
+    { "id": "exact-duplicate-is-idempotent", "current": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "2222222222222222222222222222222222222222222222222222222222222222" }, "candidate": { "lamport": 8, "event_ulid": "01M00000000000000000000002", "content_hash": "2222222222222222222222222222222222222222222222222222222222222222" }, "expected": "duplicate" }
+  ],
+  "restart_cases": [
+    { "trigger": "integrated-agent-requests-flush", "through": 3, "bytes_base64": "Zmx1c2ggYnl0ZXM=", "bytes_digest": "8a55450b64ab7fec069f391ad483165bcc40c120fafaef6e4f4f49192dfccfa9", "order": { "lamport": 11, "event_ulid": "01M00000000000000000000011", "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "trigger": "actor-process-exits", "through": 4, "bytes_base64": "cHJvY2VzcyBleGl0IGJ5dGVz", "bytes_digest": "4b81a31cce5dc295af32111d605473b69b9ad87c3d3a1893b10b0316b793548a", "order": { "lamport": 12, "event_ulid": "01M00000000000000000000012", "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } },
+    { "trigger": "maximum-uncheckpointed-bytes-or-time", "through": 5, "bytes_base64": "YnVkZ2V0IGJ5dGVz", "bytes_digest": "76e1b60302dedc173d8788d75333815e218bd1484620712fd56f7a74297bca67", "order": { "lamport": 13, "event_ulid": "01M00000000000000000000013", "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" } },
+    { "trigger": "user-opens-review", "through": 6, "bytes_base64": "cmV2aWV3IGJ5dGVz", "bytes_digest": "1fe50e6e2fb4dfe55bd2348712faee10ce21f8dd8f52b9afb577eef52cdac92f", "order": { "lamport": 14, "event_ulid": "01M00000000000000000000014", "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" } },
+    { "trigger": "actor-disconnects", "through": 7, "bytes_base64": "ZGlzY29ubmVjdCBieXRlcw==", "bytes_digest": "f040b979719e0a2d86ca60c2267ef5a4a16993e4b9fb1e75286d7d22fabdf984", "order": { "lamport": 15, "event_ulid": "01M00000000000000000000015", "content_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" } }
+  ],
+  "pattern_cases": [
+    { "id": "multi-object-install", "source": "tests/compatibility/save-patterns/v0/patterns/npm-install-cold.json", "stream": "mount", "trigger": "maximum-uncheckpointed-bytes-or-time", "preserve_at": 9 },
+    { "id": "single-file-atomic-replacement", "source": "tests/compatibility/save-patterns/v0/patterns/vscode-atomic-replace.json", "stream": "mount", "trigger": "integrated-agent-requests-flush", "preserve_at": 4 }
+  ]
+}
