@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import stylesheet from "./styles.css?inline";
 import { ProductionWorkspacePage } from "./pages/production-workspace-page";
 import { ArtifactReview } from "./organisms/artifact-review";
+import { LiveAgentReview } from "./organisms/live-agent-review";
+import { SegmentedControl } from "./atoms/segmented-control";
 import { ReviewPageStatus } from "./organisms/review-page-status";
 import { ImportWorkbench } from "./organisms/import-workbench";
 import { WorkspaceOverview } from "./organisms/workspace-overview";
@@ -15,7 +17,14 @@ import { ConfirmationDialog } from "./organisms/confirmation-dialog";
 import { WorkspaceEntryPage } from "./pages/workspace-entry-page";
 import { WorkspaceRestore } from "./organisms/workspace-restore";
 import { WorkspaceDestination } from "./organisms/workspace-destination";
-import { reviewPageEnvelope, type ReviewPageControls } from "./models/review-page";
+import {
+  liveReviewFileEnvelope,
+  reviewPageEnvelope,
+  type LiveReviewFilePreview,
+  type LiveReviewModel,
+  type ReviewPageControls,
+  type ReviewPageStatusModel,
+} from "./models/review-page";
 import { reviewArtifactPreviewEnvelope } from "./models/review-artifact-preview";
 import {
   reconcileReviewWorkbenchProjection,
@@ -49,6 +58,7 @@ const REJECTED_EVENT = "mesh:review-workbench-rejected";
 const AVAILABLE_EVENT = "mesh:review-workbench-available";
 const INTENT_EVENT = "mesh:review-workbench-intent";
 const ARTIFACT_PREVIEW_EVENT = "mesh:review-workbench-artifact-preview";
+const LIVE_PREVIEW_EVENT = "mesh:review-workbench-live-preview";
 const OVERVIEW_PROJECTION_EVENT = "mesh:workspace-overview-projection";
 const OVERVIEW_MOUNTED_EVENT = "mesh:workspace-overview-mounted";
 const OVERVIEW_REJECTED_EVENT = "mesh:workspace-overview-rejected";
@@ -196,16 +206,37 @@ function projectionLiveness(rejectedEvent: string) {
   });
 }
 
-function IslandReview({ source, generation, bundle, controls }: {
+function ReviewModeChooser({ mode, onChange }: {
+  mode: "Saved review" | "Live agent work";
+  onChange: (mode: "Saved review" | "Live agent work") => void;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Review mode</p>
+        <p className="mt-1 text-sm text-muted-foreground">Saved review is immutable. Live agent work is mutable and unrecorded.</p>
+      </div>
+      <SegmentedControl label="Review mode" options={["Saved review", "Live agent work"]} value={mode} onChange={(value) => onChange(value as typeof mode)} />
+    </div>
+  );
+}
+
+function IslandReview({ source, generation, bundle, controls, live }: {
   source: ReviewWorkbenchModel;
   generation: number;
   bundle: string;
   controls: ReviewPageControls;
+  live: LiveReviewModel;
 }) {
   const [model, setModel] = useState(source);
+  const [reviewMode, setReviewMode] = useState<"Saved review" | "Live agent work">(live.available ? "Live agent work" : "Saved review");
   const [artifactPreview, setArtifactPreview] = useState<ReviewArtifactPreview | null>(null);
   const [artifactPreviewLoading, setArtifactPreviewLoading] = useState(false);
   const [artifactPreviewError, setArtifactPreviewError] = useState<string | null>(null);
+  const [livePreview, setLivePreview] = useState<LiveReviewFilePreview | null>(null);
+  const [livePreviewLoading, setLivePreviewLoading] = useState(false);
+  const [livePreviewError, setLivePreviewError] = useState<string | null>(null);
+  const [livePreviewErrorPath, setLivePreviewErrorPath] = useState<string | null>(null);
   useEffect(() => {
     setModel((current) => reconcileReviewWorkbenchProjection(current, source));
     // Native requests are generation-bound. A refreshed authority projection cancels any older
@@ -234,6 +265,24 @@ function IslandReview({ source, generation, bundle, controls }: {
     document.addEventListener(ARTIFACT_PREVIEW_EVENT, receivePreview);
     return () => document.removeEventListener(ARTIFACT_PREVIEW_EVENT, receivePreview);
   }, [bundle, generation, source]);
+  useEffect(() => {
+    const receivePreview = (event: Event) => {
+      try {
+        const result = liveReviewFileEnvelope((event as CustomEvent<unknown>).detail, generation, live);
+        setLivePreview(result.preview);
+        setLivePreviewError(result.error);
+        setLivePreviewErrorPath(result.error ? result.path : null);
+      } catch (error) {
+        setLivePreview(null);
+        setLivePreviewError(error instanceof Error ? error.message : "The live snapshot was refused.");
+        setLivePreviewErrorPath(null);
+      } finally {
+        setLivePreviewLoading(false);
+      }
+    };
+    document.addEventListener(LIVE_PREVIEW_EVENT, receivePreview);
+    return () => document.removeEventListener(LIVE_PREVIEW_EVENT, receivePreview);
+  }, [generation, live]);
   const handleIntent = (intent: ReviewWorkbenchIntent) => {
     if (intent.type === "select-change") {
       setModel((current) => reduceReviewWorkbench(current, intent));
@@ -251,18 +300,80 @@ function IslandReview({ source, generation, bundle, controls }: {
       setArtifactPreviewLoading(true);
       setArtifactPreviewError(null);
     }
+    if (intent.type === "load-live-file") {
+      setLivePreviewLoading(true);
+      setLivePreviewError(null);
+      setLivePreviewErrorPath(null);
+    }
     document.dispatchEvent(new CustomEvent(INTENT_EVENT, {
       detail: Object.freeze({ generation, bundle, intent: Object.freeze({ ...intent }) }),
     }));
   };
-  return <ArtifactReview
-    model={model}
-    controls={controls}
-    onIntent={handleIntent}
-    artifactPreview={artifactPreview}
-    artifactPreviewLoading={artifactPreviewLoading}
-    artifactPreviewError={artifactPreviewError}
-  />;
+  return <div>
+    <ReviewModeChooser mode={reviewMode} onChange={setReviewMode} />
+    {reviewMode === "Saved review" ? <ArtifactReview
+      model={model}
+      controls={controls}
+      onIntent={handleIntent}
+      artifactPreview={artifactPreview}
+      artifactPreviewLoading={artifactPreviewLoading}
+      artifactPreviewError={artifactPreviewError}
+    /> : <LiveAgentReview
+      model={live}
+      preview={livePreview}
+      loading={livePreviewLoading}
+      error={livePreviewError}
+      errorPath={livePreviewErrorPath}
+      onIntent={handleIntent}
+    />}
+  </div>;
+}
+
+function IslandReviewStatus({ model, controls, live, generation }: {
+  model: ReviewPageStatusModel;
+  controls: ReviewPageControls;
+  live: LiveReviewModel;
+  generation: number;
+}) {
+  const [reviewMode, setReviewMode] = useState<"Saved review" | "Live agent work">(live.available ? "Live agent work" : "Saved review");
+  const [preview, setPreview] = useState<LiveReviewFilePreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [errorPath, setErrorPath] = useState<string | null>(null);
+  useEffect(() => {
+    const receivePreview = (event: Event) => {
+      try {
+        const result = liveReviewFileEnvelope((event as CustomEvent<unknown>).detail, generation, live);
+        setPreview(result.preview);
+        setError(result.error);
+        setErrorPath(result.error ? result.path : null);
+      } catch (caught) {
+        setPreview(null);
+        setError(caught instanceof Error ? caught.message : "The live snapshot was refused.");
+        setErrorPath(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    document.addEventListener(LIVE_PREVIEW_EVENT, receivePreview);
+    return () => document.removeEventListener(LIVE_PREVIEW_EVENT, receivePreview);
+  }, [generation, live]);
+  const onIntent = (intent: ReviewWorkbenchIntent) => {
+    if (intent.type === "load-live-file") {
+      setLoading(true);
+      setError(null);
+      setErrorPath(null);
+    }
+    document.dispatchEvent(new CustomEvent(INTENT_EVENT, {
+      detail: Object.freeze({ generation, bundle: null, intent: Object.freeze({ ...intent }) }),
+    }));
+  };
+  return <div>
+    <ReviewModeChooser mode={reviewMode} onChange={setReviewMode} />
+    {reviewMode === "Saved review"
+      ? <ReviewPageStatus model={model} controls={controls} onIntent={onIntent} />
+      : <LiveAgentReview model={live} preview={preview} loading={loading} error={error} errorPath={errorPath} onIntent={onIntent} />}
+  </div>;
 }
 
 const host = document.getElementById("review-workbench-next");
@@ -298,17 +409,13 @@ if (host) {
               generation={candidate.generation}
               bundle={candidate.bundle}
               controls={candidate.controls}
+              live={candidate.live}
             />
-          ) : <ReviewPageStatus
+          ) : <IslandReviewStatus
             model={candidate.model}
             controls={candidate.controls}
-            onIntent={(intent) => document.dispatchEvent(new CustomEvent(INTENT_EVENT, {
-              detail: Object.freeze({
-                generation: candidate.generation,
-                bundle: candidate.bundle,
-                intent: Object.freeze({ ...intent }),
-              }),
-            }))}
+            live={candidate.live}
+            generation={candidate.generation}
           />}
         </Committed>,
       ));

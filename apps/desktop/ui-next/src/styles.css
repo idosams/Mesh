@@ -22,15 +22,15 @@
   color-scheme: dark;
   --background: #090d12;
   --foreground: #eef2f5;
-  --card: #10161e;
+  --card: #0f151c;
   --card-foreground: #eef2f5;
   --primary: #7de2bd;
   --primary-foreground: #07110e;
-  --secondary: #1a2530;
+  --secondary: #18222c;
   --secondary-foreground: #eef2f5;
-  --muted: #18212a;
-  --muted-foreground: #9aa8b5;
-  --border: #5b7185;
+  --muted: #171f27;
+  --muted-foreground: #98a6b3;
+  --border: #576f85;
   --ring: #72d8fa;
   --destructive: #c94c55;
 }
@@ -48,9 +48,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 15% -20%, rgb(35 104 84 / 24%), transparent 35rem),
-    var(--background);
+  background: var(--background);
 }
 
 button {

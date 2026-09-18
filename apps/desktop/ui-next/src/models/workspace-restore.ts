@@ -1,3 +1,5 @@
+import { BOUNDED_CHOICE_LIMIT, boundedChoiceProjection, type BoundedChoiceProjection } from "./choice-projection";
+
 export type RestoreFileFormat = "Text" | "PDF" | "Word" | "PowerPoint" | "Excel" | "File";
 
 export type RestoreFileChoice = Readonly<{
@@ -11,6 +13,41 @@ export type RestoreVersionChoice = Readonly<{
   id: string;
   label: string;
 }>;
+
+export type RestoreFileProjection = BoundedChoiceProjection<RestoreFileChoice>;
+export type RestoreVersionProjection = BoundedChoiceProjection<RestoreVersionChoice>;
+
+export function workspaceRestoreFileProjection(
+  choices: readonly RestoreFileChoice[],
+  filterText: string,
+  selectedId: string,
+  maximum = BOUNDED_CHOICE_LIMIT,
+): RestoreFileProjection {
+  return boundedChoiceProjection(
+    choices,
+    filterText,
+    selectedId,
+    (choice) => choice.id,
+    (choice) => [choice.path, choice.label, choice.format],
+    maximum,
+  );
+}
+
+export function workspaceRestoreVersionProjection(
+  choices: readonly RestoreVersionChoice[],
+  filterText: string,
+  selectedId: string,
+  maximum = BOUNDED_CHOICE_LIMIT,
+): RestoreVersionProjection {
+  return boundedChoiceProjection(
+    choices,
+    filterText,
+    selectedId,
+    (choice) => choice.id,
+    (choice) => [choice.id, choice.label],
+    maximum,
+  );
+}
 
 export type RestorePreview = Readonly<{
   filePath: string;

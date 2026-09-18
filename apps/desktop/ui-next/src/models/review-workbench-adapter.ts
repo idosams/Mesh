@@ -24,6 +24,11 @@ const artifactKinds = Object.freeze<Record<string, Exclude<ArtifactKind, "text">
   pptx: "presentation",
   docx: "document",
   xlsx: "spreadsheet",
+  png: "image",
+  jpg: "image",
+  jpeg: "image",
+  gif: "image",
+  webp: "image",
 });
 
 const artifactLabels: Readonly<Record<ArtifactKind, string>> = Object.freeze({
@@ -32,6 +37,7 @@ const artifactLabels: Readonly<Record<ArtifactKind, string>> = Object.freeze({
   presentation: "PowerPoint",
   document: "Word",
   spreadsheet: "Excel",
+  image: "Image",
   file: "File",
 });
 
@@ -260,9 +266,21 @@ function reviewChange(value: unknown): ReviewChange {
   const values = kind === "text"
     ? changedTextValues(change.verified_text, beforeFallback, afterFallback, change.before, change.after)
     : Object.freeze({ before: beforeFallback, after: afterFallback, hunks: Object.freeze([]) });
+  const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "Workspace root";
+  const status = kind === "file"
+    ? "unsupported"
+    : beforePath === null
+      ? "added"
+      : afterPath === null
+        ? "deleted"
+        : beforePath !== afterPath
+          ? "moved"
+          : "modified";
   return Object.freeze({
     id: object,
     path: beforePath && afterPath && beforePath !== afterPath ? `${beforePath} → ${afterPath}` : path,
+    folder,
+    status,
     kind,
     kindLabel: limitation === null ? artifactLabels[kind] : "File",
     summary: readableEffect(effect),

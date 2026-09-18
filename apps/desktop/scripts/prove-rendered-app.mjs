@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { chmod, lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises';
 import { createConnection } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
@@ -16,6 +16,7 @@ import {
   RENDERER_PROOF_PREFIX,
   rendererProofReportsFromText,
 } from './renderer-proof-protocol.mjs';
+import { writeNewPrivateScreenshot } from './proof-screenshot-output.mjs';
 
 const options = parseProofArguments(process.argv.slice(2));
 if (options.help) {
@@ -44,7 +45,14 @@ const probe = join(scratch, 'window-proof');
 const IPC_VERSION = 7;
 const MAX_DAEMON_MESSAGE_BYTES = 16 * 1024 * 1024;
 const CHUNK_DATA_BYTES = 30_000;
+const AGENT_PROOF_RESULT_PATH = 'agent-proof-result.txt';
 const AGENT_PROOF_RESULT = 'packaged agent handoff result\n';
+const AGENT_PROOF_IMAGE_PATH = 'agent-proof-result.png';
+const FILES_PROOF_IMAGE_PATH = 'assets/mesh-proof.png';
+// Keep a real, decodable raster beside the text result so the review proof can exercise both the
+// exact text diff and a native-open type backed by the system image viewer. Text-file default
+// associations are user-configurable and may be absent on an otherwise valid clean Mac.
+const AGENT_PROOF_IMAGE = await readFile(join(repository, 'apps/desktop/src-tauri/icons/icon.png'));
 const proofEnvironment = {
   ...process.env,
   HOME: home,
@@ -58,11 +66,18 @@ delete proofEnvironment.MESH_RENDERER_PROOF_NONCE;
 delete proofEnvironment.MESH_RENDERER_PROOF_SURFACE;
 delete proofEnvironment.MESH_RENDERER_PROOF_SOURCE;
 delete proofEnvironment.MESH_RENDERER_PROOF_DESTINATION;
+delete proofEnvironment.MESH_RENDERER_PROOF_SCREENSHOT;
 
 await mkdir(source);
 await mkdir(privateExport, { recursive: true, mode: 0o700 });
+// The native export flow intentionally separates missing-folder creation from file updates, and
+// the proof authority permits exactly one confirmation. Seed only the empty parent directory so
+// this journey still proves a single bounded file-update confirmation for a nested saved file.
+await mkdir(join(privateExport, 'assets'), { mode: 0o700 });
+await mkdir(join(source, 'assets'));
 await writeFile(join(source, 'notes.txt'), 'first saved version\n');
 await writeFile(join(source, 'run.sh'), "#!/bin/sh\nprintf 'native mesh\\n'\n");
+await writeFile(join(source, FILES_PROOF_IMAGE_PATH), AGENT_PROOF_IMAGE);
 await chmod(join(source, 'run.sh'), 0o755);
 // macOS exposes /tmp through a symlink to /private/tmp. The daemon returns canonical roots, so
 // compare filesystem identities instead of requiring temporary path spellings to survive.
@@ -131,6 +146,9 @@ function rendererProofSession(surface, expectedWorkspace = null) {
       ...(surface === 'private-export'
         ? { MESH_RENDERER_PROOF_DESTINATION: privateExport }
         : {}),
+      ...(surface === 'files' && screenshot
+        ? { MESH_RENDERER_PROOF_SCREENSHOT: '1' }
+        : {}),
     },
   };
 }
@@ -150,8 +168,12 @@ async function waitForRendererProof(child, stderr, session) {
       && !agentResultWritten
       && complete.includes('mesh-renderer-proof-checkpoint:agent-handoff-launched')
     ) {
-      await writeFile(join(session.source, 'agent-proof-result.txt'), AGENT_PROOF_RESULT, {
+      await writeFile(join(session.source, AGENT_PROOF_RESULT_PATH), AGENT_PROOF_RESULT, {
         encoding: 'utf8',
+        flag: 'wx',
+        mode: 0o600,
+      });
+      await writeFile(join(session.source, AGENT_PROOF_IMAGE_PATH), AGENT_PROOF_IMAGE, {
         flag: 'wx',
         mode: 0o600,
       });
@@ -490,11 +512,63 @@ async function launch(
     );
     await verifyStableFolder(expectedWorkspace);
     const result = whileRunning ? await whileRunning(state) : null;
+    let screenshotProof = null;
     if (takeScreenshot && screenshot) {
-      execFileSync('/usr/sbin/screencapture', ['-x', '-l', String(window.window_number), screenshot]);
-      window.screenshot = screenshot;
+      const internalScreenshot = join(
+        appData,
+        'renderer-proof',
+        `files-${rendererSession.nonce}.png`,
+      );
+      const screenshotBytes = await readFile(internalScreenshot);
+      assert.ok(
+        screenshotBytes.length >= 1_024 && screenshotBytes.length <= 16 * 1_024 * 1_024,
+        'the app-owned Files screenshot was not bounded',
+      );
+      assert.deepEqual(
+        screenshotBytes.subarray(0, 8),
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        'the app-owned Files screenshot was not PNG',
+      );
+      assert.equal(
+        screenshotBytes.subarray(12, 16).toString('ascii'),
+        'IHDR',
+        'the app-owned Files screenshot had no PNG dimensions',
+      );
+      const screenshotWidth = screenshotBytes.readUInt32BE(16);
+      const screenshotHeight = screenshotBytes.readUInt32BE(20);
+      assert.ok(
+        screenshotWidth >= 320 && screenshotWidth <= 8_192
+          && screenshotHeight >= 240 && screenshotHeight <= 8_192,
+        'the app-owned Files screenshot dimensions were invalid',
+      );
+      const screenshotSha256 = createHash('sha256').update(screenshotBytes).digest('hex');
+      const screenshotMarkers = stderr
+        .split(/\r?\n/u)
+        .filter((line) => line.startsWith(
+          `mesh-renderer-proof-screenshot:${rendererSession.nonce}:`,
+        ));
+      assert.equal(
+        screenshotMarkers.length,
+        1,
+        'the app-owned Files screenshot did not emit one nonce-bound native receipt',
+      );
+      assert.equal(
+        screenshotMarkers[0],
+        `mesh-renderer-proof-screenshot:${rendererSession.nonce}:${screenshotSha256}:${screenshotBytes.length}:${screenshotWidth}:${screenshotHeight}`,
+        'the app-owned Files screenshot did not match its native descriptor-bound receipt',
+      );
+      await writeNewPrivateScreenshot(screenshot, screenshotBytes);
+      screenshotProof = {
+        schema: 'mesh-rendered-screenshot-proof/v1',
+        path: screenshot,
+        nonce: rendererSession.nonce,
+        sha256: screenshotSha256,
+        bytes: screenshotBytes.length,
+        width: screenshotWidth,
+        height: screenshotHeight,
+      };
     }
-    return { window, state, result, rendererProof };
+    return { window, state, result, rendererProof, screenshotProof };
   } finally {
     await stop(child);
   }
@@ -606,6 +680,11 @@ try {
     join(privateExport, 'run.sh'),
     'the packaged private export lost the executable bit',
   );
+  assert.deepEqual(
+    await readFile(join(privateExport, FILES_PROOF_IMAGE_PATH)),
+    AGENT_PROOF_IMAGE,
+    'the packaged private export changed the nested saved image bytes',
+  );
   assert.equal(
     await readFile(join(source, 'notes.txt'), 'utf8'),
     'first saved version\n',
@@ -626,14 +705,23 @@ try {
     false,
     async () => {
       assert.equal(
-        await readFile(join(canonicalWorkspace, 'agent-proof-result.txt'), 'utf8'),
+        await readFile(join(canonicalWorkspace, AGENT_PROOF_RESULT_PATH), 'utf8'),
         AGENT_PROOF_RESULT,
         'the packaged agent handoff did not retain the verifier-owned result',
       );
+      assert.deepEqual(
+        await readFile(join(canonicalWorkspace, AGENT_PROOF_IMAGE_PATH)),
+        AGENT_PROOF_IMAGE,
+        'the packaged agent handoff did not retain the verifier-owned image',
+      );
       const saved = await requestWorkspaceState();
       assert.ok(
-        saved.file_histories.some((history) => history.path === 'agent-proof-result.txt'),
+        saved.file_histories.some((history) => history.path === AGENT_PROOF_RESULT_PATH),
         'the packaged agent handoff did not authenticate its result into private history',
+      );
+      assert.ok(
+        saved.file_histories.some((history) => history.path === AGENT_PROOF_IMAGE_PATH),
+        'the packaged agent handoff did not authenticate its image into private history',
       );
       const reviewed = await requestDaemon('review.open-current', {
         opened_by: '09'.repeat(32),
@@ -686,6 +774,17 @@ try {
     'native mesh\n',
     'the executable restored into the selected native folder did not run',
   );
+  // Finder and default applications are outside Mesh custody and may add ordinary metadata to a
+  // folder they display. Exercise those native Files actions only after every proof that requires
+  // the canonical workspace to remain byte-for-byte unchanged; the independent fork below is the
+  // sole workspace used by the remaining native-edit journey.
+  const files = await launch(
+    'files',
+    canonicalWorkspace,
+    true,
+    null,
+    'files',
+  );
   await writeFile(
     join(appData, 'recent-workspace.json'),
     JSON.stringify({
@@ -711,7 +810,7 @@ try {
     }),
     { encoding: 'utf8', mode: 0o600 },
   );
-  const restarted = await launch('restarted', forkWorkspace, true, async (state) => {
+  const restarted = await launch('restarted', forkWorkspace, false, async (state) => {
     const selectedAgentContext = await proveCodexContextBridge(state);
     assert.equal(
       await realpath(selectedAgentContext.root),
@@ -784,10 +883,11 @@ try {
     ...restarted.window,
     // The window probe has its own v1 schema. Write the composed envelope identity after that
     // trusted subrecord so object spread cannot silently relabel the final renderer proof.
-    schema: 'mesh-rendered-app-proof/v4',
+    schema: 'mesh-rendered-app-proof/v6',
+    screenshot: files.screenshotProof,
     app,
     executable,
-    processes: 7,
+    processes: 8,
     first_launch: empty.state,
     explicit_first_open: {
       workspace: canonicalWorkspace,
@@ -831,7 +931,7 @@ try {
     component_interface_mounted: true,
     renderer_controls_driven: true,
     renderer: {
-      schema: 'mesh-packaged-renderer-proof/v4',
+      schema: 'mesh-packaged-renderer-proof/v5',
       nonce_bound: true,
       onboarding: {
         surface: empty.rendererProof.surface,
@@ -839,6 +939,13 @@ try {
         visible: empty.rendererProof.visible,
         interaction: empty.rendererProof.interaction,
         outcome: empty.rendererProof.outcome,
+      },
+      files: {
+        surface: files.rendererProof.surface,
+        mounted: files.rendererProof.mounted,
+        visible: files.rendererProof.visible,
+        interaction: files.rendererProof.interaction,
+        outcome: files.rendererProof.outcome,
       },
       review: {
         surface: first.rendererProof.surface,

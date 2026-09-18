@@ -3,6 +3,25 @@
 Mesh is not yet a stable product. This changelog records public, installable releases; internal
 development commits and private test builds are deliberately omitted.
 
+## [0.1.0-alpha.3] — 2026-09-18
+
+Explorer and review candidate for the macOS technical alpha.
+
+### Improved
+
+- Files is now a content-first workspace explorer with persistent folders, search, keyboard
+  navigation, breadcrumbs, recognizable file types, and collapsible explorer and details panes.
+- Changes keeps the selected file visible across bounded large-workspace windows and shows actual
+  text changes directly in the workbench.
+- Saved Review groups changed files, preserves the selected viewer, previews supported text,
+  images, PDF, and Office content, and treats unsupported binaries as exact metadata.
+- Live agent work can be inspected before handoff through bounded, read-only snapshots without
+  exposing save, approval, export, or update-original authority.
+- Workspace-open failures now distinguish a missing managed workspace from an ordinary folder and
+  provide clear retry, import, or forget actions without replacing the current safe workspace.
+
+The signing, notarization, approval, platform, and backup limitations below are unchanged.
+
 ## [0.1.0-alpha.2] — 2026-09-16
 
 Tester-feedback hotfix for the first macOS technical alpha.
@@ -51,5 +70,6 @@ First public macOS technical alpha.
 - Filesystem changes made while Mesh is not running are inspected when the workspace is reopened;
   continuous background capture is not claimed.
 
+[0.1.0-alpha.3]: launch/v0.1.0-alpha.3.md
 [0.1.0-alpha.2]: launch/v0.1.0-alpha.2.md
 [0.1.0-alpha.1]: launch/v0.1.0-alpha.1.md

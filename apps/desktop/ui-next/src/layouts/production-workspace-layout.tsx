@@ -28,14 +28,14 @@ export function ProductionWorkspaceLayout({ header, navigation, notice, children
         Skip to workspace
       </a>
       <header className="border-b border-border bg-background/95">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{header}</div>
+        <div className="mx-auto max-w-[100rem] px-4 sm:px-6 lg:px-8">{header}</div>
       </header>
-      <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">{navigation}</div>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{notice}</div>
-      <main ref={mainRef} id="mesh-react-main" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[100rem] px-4 pt-3 sm:px-6 lg:px-8">{navigation}</div>
+      <div className="mx-auto max-w-[100rem] px-4 sm:px-6 lg:px-8">{notice}</div>
+      <main ref={mainRef} id="mesh-react-main" tabIndex={-1} className="mx-auto max-w-[100rem] px-4 py-4 sm:px-6 lg:px-8">
         {children}
       </main>
-      <footer className="mx-auto max-w-7xl px-4 py-8 text-xs text-muted-foreground sm:px-6 lg:px-8">
+      <footer className="mx-auto max-w-[100rem] px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-8">
         <span title={buildIdentity.title}>{buildIdentity.label}</span> · Local only · No network listener
       </footer>
     </div>

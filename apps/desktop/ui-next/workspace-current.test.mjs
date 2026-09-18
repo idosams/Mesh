@@ -10,6 +10,7 @@ async function loadModule(path) {
     format: "cjs",
     platform: "node",
     write: false,
+    external: ["react", "react-dom", "react/jsx-runtime"],
   });
   const require = createRequire(import.meta.url);
   const module = { exports: {} };
@@ -107,6 +108,35 @@ test("the detailed current projection is bounded, complete, and generation-bound
   );
 });
 
+test("Current bounds large monitor and workspace projections while search reaches later matches", async () => {
+  const module = await loadModule("./src/models/workspace-current.ts");
+  const list = module.workspaceCurrentListProjection(
+    Array.from({ length: 10_000 }, (_, index) => `entry-${index}`),
+    module.CURRENT_MONITOR_ROW_LIMIT,
+  );
+  assert.equal(list.items.length, 500);
+  assert.equal(list.matched, 10_000);
+  assert.equal(list.truncated, true);
+  assert.equal(Object.isFrozen(list.items), true);
+
+  const workspaces = Array.from({ length: 1_000 }, (_, index) => ({
+    path: `/private/mesh/workspace-${index}`,
+    label: `Workspace ${String(index).padStart(4, "0")}`,
+    state: index === 998 ? "current" : index === 997 ? "agent-assigned" : "available",
+    canOpen: index !== 998,
+  }));
+  const bounded = module.workspaceCurrentWorkspaceProjection(workspaces, "");
+  assert.equal(bounded.items.length, 100);
+  assert.equal(bounded.matched, 1_000);
+  assert.equal(bounded.items[0].state, "current");
+  assert.equal(bounded.items[1].state, "agent-assigned");
+
+  const searched = module.workspaceCurrentWorkspaceProjection(workspaces, "workspace 0999");
+  assert.equal(searched.matched, 1);
+  assert.equal(searched.items[0].path, "/private/mesh/workspace-999");
+  assert.throws(() => module.workspaceCurrentListProjection(workspaces, 0), /bound was invalid/);
+});
+
 test("the detailed current view exposes custody, conditions, destination, diagnostics, and rollback without native authority", async () => {
   const React = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");
@@ -134,9 +164,14 @@ test("the detailed current view exposes custody, conditions, destination, diagno
 });
 
 test("the Current organism emits exact action intents without a legacy control proxy", async () => {
-  const { WorkspaceCurrent } = await loadModule("./src/organisms/workspace-current.tsx");
+  const { WorkspaceCurrentView } = await loadModule("./src/organisms/workspace-current.tsx");
   const intents = [];
-  const tree = WorkspaceCurrent({ model: projection, onIntent: (intent) => intents.push(intent) });
+  const tree = WorkspaceCurrentView({
+    model: projection,
+    onIntent: (intent) => intents.push(intent),
+    workspaceQuery: "",
+    onWorkspaceQueryChange: () => {},
+  });
   const buttons = [];
   const visit = (node) => {
     if (!node || typeof node !== "object") return;
@@ -162,4 +197,43 @@ test("the Current organism emits exact action intents without a legacy control p
     { type: "activate", action: "finish-agent" },
     { type: "switch-workspace", path: "/private/mesh/agent-two" },
   ]);
+});
+
+test("the Current organism does not render every accepted large-workspace row", async () => {
+  const React = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { WorkspaceCurrent } = await loadModule("./src/organisms/workspace-current.tsx");
+  const largeProjection = {
+    ...projection,
+    entries: Array.from({ length: 10_000 }, (_, index) => `path-${index}.txt · file`),
+    conditions: Array.from({ length: 2_048 }, (_, index) => `Condition ${index}.`),
+    agentActivity: {
+      ...projection.agentActivity,
+      summary: "10,000 live changes detected.",
+      changes: Array.from({ length: 10_000 }, (_, index) => ({
+        path: `changed-${index}.txt`,
+        kind: "modified-file",
+      })),
+    },
+    workspaces: Array.from({ length: 1_000 }, (_, index) => ({
+      path: `/private/mesh/workspace-${index}`,
+      label: `Workspace ${String(index).padStart(4, "0")}`,
+      state: index === 999 ? "current" : index === 998 ? "agent-assigned" : "available",
+      canOpen: index !== 999,
+    })),
+  };
+  const html = renderToStaticMarkup(React.createElement(WorkspaceCurrent, {
+    model: largeProjection,
+    onIntent: () => {},
+  }));
+
+  assert.equal((html.match(/data-mesh-current-workspace=/g) ?? []).length, 100);
+  assert.equal((html.match(/data-mesh-live-change=/g) ?? []).length, 500);
+  assert.equal((html.match(/data-mesh-materialized-entry=/g) ?? []).length, 500);
+  assert.equal((html.match(/data-mesh-current-condition=/g) ?? []).length, 200);
+  assert.match(html, /100 of 1,000 matching workspaces shown/);
+  assert.match(html, /first 500 of 10,000 live changes/);
+  assert.match(html, /first 500 of 10,000 paths/);
+  assert.match(html, /first 200 of 2,048 conditions/);
+  assert.doesNotMatch(html, /changed-9999\.txt|path-9999\.txt|Condition 2047/);
 });

@@ -372,9 +372,9 @@ function fakeDocument() {
           const queue = this.getElementById('folder-change-queue');
           queue.classList.toggle('hidden', changes.queue.length === 0);
           this.getElementById('folder-change-count').textContent = changes.queueSummary;
-          this.getElementById('folder-change-items').replaceChildren(...changes.queue.map((line) => {
+          this.getElementById('folder-change-items').replaceChildren(...changes.queue.map((change) => {
             const row = new FakeElement();
-            row.textContent = line;
+            row.textContent = [change.path, change.description, change.detail].filter(Boolean).join(' · ');
             return row;
           }));
           const saveAll = this.getElementById('save-all-private');
@@ -512,6 +512,8 @@ function fakeDocument() {
             option.value = candidate.path;
             option.textContent = candidate.state === 'current'
               ? `Current · ${candidate.label}`
+              : candidate.state === 'unavailable'
+                ? `Unavailable · ${candidate.label}`
               : candidate.state === 'agent-assigned'
                 ? `${candidate.label} · Agent assigned`
                 : candidate.label;
@@ -2153,6 +2155,9 @@ test('opening the working folder uses the exact verified workspace binding', asy
     },
   };
   let revealParameters = null;
+  const workspaceEntryOpenParameters = [];
+  let workspaceEntryOpenFailure = false;
+  let workspaceEntryOpenGate = null;
   let codexParameters = null;
   let codexCalls = 0;
   let terminalParameters = null;
@@ -2239,6 +2244,17 @@ test('opening the working folder uses the exact verified workspace binding', asy
         workspace_root: workspace.root,
         stable: true,
         native_folder: true,
+      });
+    }
+    if (command === 'open_managed_workspace_entry') {
+      workspaceEntryOpenParameters.push(parameters);
+      if (workspaceEntryOpenGate) await workspaceEntryOpenGate;
+      if (workspaceEntryOpenFailure) throw new Error('Finder refused the exact workspace entry');
+      return JSON.stringify({
+        schema: 'mesh.workspace-entry-open/v1',
+        action: parameters.action,
+        entry_kind: parameters.entryKind,
+        opened: true,
       });
     }
     if (command === 'open_managed_workspace_in_codex') {
@@ -2507,6 +2523,45 @@ test('opening the working folder uses the exact verified workspace binding', asy
     expectedWorkspaceInstallation: workspace.installation,
   });
   assert.match(document.getElementById('notice').textContent, /Work there normally/);
+  revealParameters = null;
+  await document.emitWorkspaceWorkIntent({ type: 'activate', action: 'open-workspace-folder' });
+  await waitFor(() => revealParameters !== null);
+  assert.match(document.getElementById('notice').textContent, /Opened the current workspace folder in Finder/);
+  await document.emitWorkspaceWorkIntent({
+    type: 'set-field', field: 'selectedEntry', value: 'agent-result.txt',
+  });
+  let releaseWorkspaceEntryOpen;
+  workspaceEntryOpenGate = new Promise((resolve) => { releaseWorkspaceEntryOpen = resolve; });
+  const openingWorkspaceEntry = document.emitWorkspaceWorkIntent({ type: 'activate', action: 'open-entry' });
+  await waitFor(() => workspaceEntryOpenParameters.length === 1);
+  assert.equal(
+    document.workspaceWork.workbench.actions.find((action) => action.id === 'open-entry')?.enabled,
+    false,
+    'Files kept exact-entry launch authority enabled while the native handoff was unresolved',
+  );
+  releaseWorkspaceEntryOpen();
+  workspaceEntryOpenGate = null;
+  await openingWorkspaceEntry;
+  await waitFor(() => /Opened agent-result\.txt with its default application/.test(document.getElementById('notice').textContent));
+  assert.deepEqual(workspaceEntryOpenParameters.at(-1), {
+    expectedWorkspaceRoot: workspace.root,
+    expectedWorkspaceDigest: workspace.digest,
+    expectedWorkspaceInstallation: workspace.installation,
+    expectedAgentHandoffGeneration: null,
+    relativePath: 'agent-result.txt',
+    entryKind: 'file',
+    action: 'open-entry',
+  });
+  assert.match(document.getElementById('notice').textContent, /Opened agent-result\.txt with its default application/);
+  assert.equal(
+    document.workspaceWork.workbench.actions.find((action) => action.id === 'open-entry')?.enabled,
+    true,
+    'Files did not restore exact-entry launch authority after native completion',
+  );
+  workspaceEntryOpenFailure = true;
+  await document.emitWorkspaceWorkIntent({ type: 'activate', action: 'reveal-entry' });
+  assert.match(document.getElementById('notice').textContent, /File action unavailable: Finder refused the exact workspace entry/);
+  workspaceEntryOpenFailure = false;
   assert.equal(!document.workspaceCurrentAction('start-codex')?.enabled, false);
   assert.equal(!document.workspaceCurrentAction('open-terminal')?.enabled, false);
   assert.equal(!document.workspaceCurrentAction('copy-agent-path')?.enabled, false);
@@ -8161,6 +8216,10 @@ test('a recent-workspace opener failure keeps the verified switch and offers one
 
 test('an unavailable recent folder leaves the current verified workspace usable', async () => {
   const document = fakeDocument();
+  let pageRequest = null;
+  document.addEventListener('mesh:workspace-page-request', (event) => {
+    pageRequest = event.detail;
+  });
   const workspace = {
     root: '/managed/current/mounts',
     digest: 'workspace-current-stable',
@@ -8204,13 +8263,14 @@ test('an unavailable recent folder leaves the current verified workspace usable'
         working: false,
       });
     }
+    if (command === 'discover_native_directories' || command === 'discover_native_missing_files') return '[]';
     if (command === 'daemon_call' && parameters.method === 'workspace.state') {
       stateReads += 1;
       return JSON.stringify(workspace);
     }
     if (command === 'daemon_call' && parameters.method === 'workspace.open') {
       assert.equal(JSON.parse(parameters.paramsJson).path, unavailable);
-      throw new Error('The selected recent workspace is unavailable');
+      throw daemonRefusal('workspace-unreachable', 'The selected recent workspace is unavailable');
     }
     throw new Error(`unexpected native command: ${command}`);
   };
@@ -8228,11 +8288,21 @@ test('an unavailable recent folder leaves the current verified workspace usable'
   assert.match(document.getElementById('recent-workspace-hint').textContent, /navigation shortcut/);
   assert.match(document.getElementById('recent-workspace-hint').textContent, /saved history are not changed/);
   await document.getElementById('open-recent-workspace').emit('click');
-  await waitFor(() => /current workspace remains open/.test(document.getElementById('notice').textContent));
+  assert.match(document.getElementById('notice').textContent, /Saved workspace unavailable/);
   assert.equal((document.workspaceCurrent?.current?.agentFolder ?? ''), workspace.root);
   assert.equal(document.getElementById('manage-path').disabled, false);
   assert.ok(stateReads >= 2, 'the current workspace was not reverified after the refusal');
-  assert.match(document.getElementById('notice').textContent, /current workspace remains open/);
+  assert.match(document.getElementById('notice').textContent, /current workspace is still open and unchanged/);
+  assert.match(document.getElementById('notice').textContent, /Forget from list/);
+  assert.doesNotMatch(document.getElementById('notice').textContent, /Error:|Application Support|could not confirm the requested open/);
+  assert.equal(
+    document.getElementById('recent-workspace').children
+      .find((option) => option.value === unavailable).textContent.startsWith('Unavailable ·'),
+    true,
+  );
+  assert.equal(document.getElementById('open-recent-workspace').textContent, 'Try again');
+  assert.match(document.getElementById('recent-workspace-hint').textContent, /Restore its saved folder/);
+  assert.deepEqual(pageRequest, { page: 'workspaces', selector: '#workspace-entry-recent' });
 
   await document.getElementById('forget-recent-workspace').emit('click');
   await waitFor(() => recentPaths.length === 1);
@@ -8340,7 +8410,7 @@ test('a lost manual managed-workspace open reply recovers the workspace native a
   assert.ok(stateReads >= 4, 'the native workspace selected after the lost reply was not reverified after navigation repair');
   assert.match(document.getElementById('notice').textContent, /could not confirm the requested open/i);
   assert.match(document.getElementById('notice').textContent, /recovered and verified/i);
-  assert.match(document.getElementById('notice').textContent, new RegExp(second.root));
+  assert.doesNotMatch(document.getElementById('notice').textContent, new RegExp(second.root));
 
   await document.emitWorkspaceCurrentIntent('refresh');
   assert.equal(openAttempts, 1, 'Refresh replayed the source-owned managed-path open');
@@ -8349,6 +8419,78 @@ test('a lost manual managed-workspace open reply recovers the workspace native a
     second.root,
     'Refresh discarded the exact source-owned managed-path draft',
   );
+});
+
+test('a refused manual managed-workspace path explains Import without exposing private storage', async () => {
+  const document = fakeDocument();
+  const workspace = {
+    root: '/managed/current/mounts',
+    digest: 'workspace-current-manual-refusal',
+    installation: 'installation-current-manual-refusal',
+    records: 1,
+    reviews: 0,
+    review_items: [],
+    review_items_not_listed: 0,
+    private_version: { version: 'version-current-manual-refusal' },
+    shared_version: null,
+    entries: [],
+    conditions: [],
+    not_yet: [],
+    file_histories: [],
+    workspace_versions: [],
+  };
+  const ordinaryFolder = '/Users/person/Documents/ordinary-project';
+  let stateReads = 0;
+  const invoke = async (command, parameters = {}) => {
+    if (command === 'recent_workspace_status') {
+      return JSON.stringify({
+        remembered: workspace.root,
+        workspaces: [workspace.root],
+        auto_opened: false,
+      });
+    }
+    if (command === 'managed_checkpoint_state') {
+      return JSON.stringify({
+        root: workspace.root,
+        workspace_digest: workspace.digest,
+        workspace_installation: workspace.installation,
+        working: false,
+      });
+    }
+    if (command === 'discover_native_directories' || command === 'discover_native_missing_files') return '[]';
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') {
+      stateReads += 1;
+      return JSON.stringify(workspace);
+    }
+    if (command === 'daemon_call' && parameters.method === 'workspace.open') {
+      assert.equal(JSON.parse(parameters.paramsJson).path, ordinaryFolder);
+      throw daemonRefusal('workspace-unreachable', 'internal native path detail');
+    }
+    throw new Error(`unexpected manual refusal command: ${command}`);
+  };
+
+  globalThis.document = document;
+  globalThis.window = { __TAURI__: { core: { invoke } } };
+  globalThis.confirm = () => true;
+  await import(`./app.js?manual-open-refused=${Date.now()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+
+  await document.emitWorkspaceEntryIntent(
+    { type: 'update-managed-path', path: ordinaryFolder },
+    document.workspaceEntry.generation,
+  );
+  await document.emitWorkspaceEntryIntent(
+    { type: 'open-managed-path', path: ordinaryFolder },
+    document.workspaceEntry.generation,
+  );
+  assert.match(document.getElementById('notice').textContent, /not an available saved Mesh workspace/);
+
+  const notice = document.getElementById('notice').textContent;
+  assert.match(notice, /choose Import for an ordinary project folder/);
+  assert.match(notice, /current workspace is still open and unchanged/);
+  assert.doesNotMatch(notice, /Error:|internal native path detail|\/Users\/person/);
+  assert.equal((document.workspaceCurrent?.current?.agentFolder ?? ''), workspace.root);
+  assert.ok(stateReads >= 3, 'the current workspace was not reverified after the deterministic refusal');
 });
 
 test('an agent-assigned recent workspace switches directly to its verified finish control', async () => {
@@ -8806,7 +8948,7 @@ test('an unavailable sole recent folder does not claim a current workspace remai
       throw daemonRefusal('no-workspace-open', 'No managed workspace is open');
     }
     if (command === 'daemon_call' && parameters.method === 'workspace.open') {
-      throw new Error('The selected recent workspace is unavailable');
+      throw daemonRefusal('workspace-unreachable', 'The selected recent workspace is unavailable');
     }
     throw new Error(`unexpected native command: ${command}`);
   };
@@ -8821,9 +8963,10 @@ test('an unavailable sole recent folder does not claim a current workspace remai
   assert.equal(document.getElementById('workspace-entry-summary').textContent, 'Return to a recent Mesh workspace');
 
   await document.getElementById('open-recent-workspace').emit('click');
-  await waitFor(() => /No managed workspace is open/.test(document.getElementById('notice').textContent));
-  assert.match(document.getElementById('notice').textContent, /No managed workspace is open/);
+  await waitFor(() => /Saved workspace unavailable/.test(document.getElementById('notice').textContent));
+  assert.match(document.getElementById('notice').textContent, /No workspace was opened, and nothing changed/);
   assert.doesNotMatch(document.getElementById('notice').textContent, /current workspace remains open/);
+  assert.doesNotMatch(document.getElementById('notice').textContent, /Error:|\/managed\/missing/);
 });
 
 test('a durable review approves only through the native user-presence command', async () => {
@@ -8915,6 +9058,8 @@ test('a durable review approves only through the native user-presence command', 
   const recentForgetPaths = [];
   const singleExportPreviewParameters = [];
   const batchExportPreviewParameters = [];
+  let savedSideOpenParameters = null;
+  let releaseSavedSideOpen = null;
   const invoke = async (command, parameters = {}) => {
     if (command === 'recent_workspace_status') return JSON.stringify({
       auto_opened: false,
@@ -9170,6 +9315,19 @@ test('a durable review approves only through the native user-presence command', 
             already_present: false,
             message: null,
           },
+      });
+    }
+    if (command === 'open_review_artifact_inspection') {
+      savedSideOpenParameters = parameters;
+      await new Promise((resolve) => { releaseSavedSideOpen = resolve; });
+      return JSON.stringify({
+        schema: 'mesh.review-side-open/v1',
+        side: parameters.side,
+        action: parameters.action,
+        version_id: parameters.expectedVersionId,
+        content_digest: parameters.expectedContentDigest,
+        opened: true,
+        working_folder_unchanged: true,
       });
     }
     throw new Error(`unexpected native command: ${command}`);
@@ -9442,6 +9600,28 @@ test('a durable review approves only through the native user-presence command', 
     'selecting a recent workspace hid the still-mounted entry surface before its replacement committed',
   );
   assert.equal(entryHost.shadowRoot.activeElement, recentOwner, 'selecting a recent workspace dropped keyboard focus');
+
+  await document.emitReviewIntent({
+    type: 'open-review-side',
+    changeId: 'ee'.repeat(16),
+    side: 'after',
+    action: 'reveal-entry',
+  });
+  await waitFor(() => savedSideOpenParameters !== null);
+  assert.equal(savedSideOpenParameters.expectedVersionId, '44'.repeat(32));
+  assert.equal(savedSideOpenParameters.expectedContentDigest, '55'.repeat(32));
+  const pendingOpenGeneration = entryProjection.generation;
+  await document.emitWorkspaceEntryIntent(
+    { type: 'open-recent', path: selectedRecentPath },
+    pendingOpenGeneration,
+  );
+  assert.deepEqual(
+    recentOpenPaths,
+    [],
+    'a workspace switch crossed the production coordinator while an exact native side launch was pending',
+  );
+  releaseSavedSideOpen();
+  await waitFor(() => /Revealed the exact after saved copy/.test(document.getElementById('notice').textContent));
 
   for (const [generation, path] of [
     [initialEntryGeneration - 1, selectedRecentPath],
@@ -10351,19 +10531,21 @@ test('office and PDF review cards load exact side-by-side visual previews on dem
     if (command === 'pick_folder') return '/review-output';
     if (command === 'export_review_artifact_inspection') {
       exportedInspection = parameters;
+      const beforeExtension = activeArtifactKind === 'image' ? 'png' : 'pdf';
+      const afterExtension = activeArtifactKind === 'image' ? 'jpg' : 'pdf';
       return JSON.stringify({
         schema: 'mesh-review-inspection-export/v1',
         directory: '/review-output/Mesh review 777777777777',
         files: [
           {
             side: 'before',
-            path: '/review-output/Mesh review 777777777777/Before.pdf',
+            path: `/review-output/Mesh review 777777777777/Before.${beforeExtension}`,
             version_id: beforeVersion,
             content_digest: beforeDigest,
           },
           {
             side: 'after',
-            path: '/review-output/Mesh review 777777777777/After.pdf',
+            path: `/review-output/Mesh review 777777777777/After.${afterExtension}`,
             version_id: afterVersion,
             content_digest: afterDigest,
           },
@@ -10376,6 +10558,26 @@ test('office and PDF review cards load exact side-by-side visual previews on dem
     }
     if (command === 'render_review_artifact') {
       renderedSides.push(parameters.side);
+      if (activeArtifactKind === 'image') {
+        assert.equal(Object.hasOwn(parameters, 'pageNumber'), false);
+        const before = parameters.side === 'before';
+        return JSON.stringify({
+          renderer: 'macos-imageio-thumbnail-v1',
+          scope: 'representative-preview',
+          kind: 'image',
+          side: parameters.side,
+          version_id: before ? beforeVersion : afterVersion,
+          content_digest: before ? beforeDigest : afterDigest,
+          image_data_url: `data:image/png;base64,${before ? 'YmVmb3Jl' : 'YWZ0ZXI='}`,
+          text_source: null,
+          text_lines: null,
+          text_sections: null,
+          text_truncated: false,
+          page_number: null,
+          page_count: null,
+          rendering_authorizes_approval: false,
+        });
+      }
       if (activeArtifactKind === 'presentation') {
         assert.equal(Object.hasOwn(parameters, 'pageNumber'), false);
         const before = parameters.side === 'before';
@@ -10514,10 +10716,31 @@ test('office and PDF review cards load exact side-by-side visual previews on dem
   islandArtifactPreview = null;
   renderedSides.length = 0;
 
+  const generationBeforeReadOnlyRefresh = islandProjection.generation;
+  document.dispatchEvent(new FakeCustomEvent('mesh:review-workbench-intent', {
+    detail: {
+      generation: generationBeforeReadOnlyRefresh,
+      bundle: islandProjection.projection.bundle,
+      intent: { type: 'load-artifact-preview', changeId: objectId, pageNumber: 1 },
+    },
+  }));
+  // Advance and mount an unchanged projection before the listener's action microtask runs. The
+  // exact read-only request must rebind to this generation instead of leaving React permanently
+  // stuck in its loading state.
+  document.dispatchEvent(new FakeCustomEvent('mesh:review-workbench-available'));
+  await waitFor(() => islandArtifactPreview !== null);
+  assert.ok(islandProjection.generation > generationBeforeReadOnlyRefresh);
+  assert.equal(islandArtifactPreview.generation, islandProjection.generation);
+  assert.deepEqual(renderedSides.sort(), ['after', 'before']);
+  islandArtifactPreview = null;
+  renderedSides.length = 0;
+
   assert.equal(reviewArtifactKind(review.bundle_changes[0]), 'pdf');
   assert.equal(reviewArtifactKind({ path_after: 'people/plan.pptx' }), 'presentation');
   assert.equal(reviewArtifactKind({ path_after: 'people/policy.docx' }), 'document');
   assert.equal(reviewArtifactKind({ path_after: 'finance/budget.xlsx' }), 'spreadsheet');
+  assert.equal(reviewArtifactKind({ path_after: 'assets/hero.PNG' }), 'image');
+  assert.equal(reviewArtifactKind({ path_before: 'assets/photo.jpg', path_after: 'assets/photo.jpeg' }), 'image');
   assert.equal(reviewArtifactKind({ path_before: 'slides.pptx', path_after: 'slides.pdf' }), null);
   assert.equal(reviewArtifactKind({ path_before: 'report.pdf', path_after: 'report.txt' }), null);
   assert.equal(reviewArtifactKind({ path_before: 'notes.txt', path_after: 'notes.docx' }), null);
@@ -10685,6 +10908,32 @@ test('office and PDF review cards load exact side-by-side visual previews on dem
   assert.deepEqual(renderedSides.sort(), ['after', 'before']);
   assert.equal(islandArtifactPreview.kind, 'presentation');
   assert.equal(islandArtifactPreview.after.textSource, 'mesh-pptx-slide-text-v1');
+  activeArtifactKind = 'image';
+  review.bundle_changes[0].path_before = 'assets/hero.png';
+  review.bundle_changes[0].path_after = 'assets/hero.jpg';
+  renderedSides.length = 0;
+  await document.emitWorkspaceCurrentIntent('refresh');
+  islandArtifactPreview = null;
+  document.dispatchEvent(new FakeCustomEvent('mesh:review-workbench-intent', {
+    detail: {
+      generation: islandProjection.generation,
+      bundle: islandProjection.projection.bundle,
+      intent: { type: 'load-artifact-preview', changeId: objectId, pageNumber: 1 },
+    },
+  }));
+  await waitFor(() => islandArtifactPreview !== null);
+  assert.equal(islandArtifactPreview.kind, 'image');
+  assert.deepEqual(renderedSides.sort(), ['after', 'before']);
+  exportedInspection = null;
+  document.dispatchEvent(new FakeCustomEvent('mesh:review-workbench-intent', {
+    detail: {
+      generation: islandProjection.generation,
+      bundle: islandProjection.projection.bundle,
+      intent: { type: 'inspect-exact-copies', changeId: objectId },
+    },
+  }));
+  await waitFor(() => exportedInspection !== null);
+  assert.deepEqual(exportedInspection.sides, ['before', 'after']);
   review.bundle_changes[0].path_before = 'finance/board-pack.pdf';
   review.bundle_changes[0].path_after = 'finance/board-pack.pdf';
 
@@ -10975,6 +11224,33 @@ test('office and PDF review cards load exact side-by-side visual previews on dem
       { label: 'Budget', line_start: 1, line_count: 1 },
     ],
   }, spreadsheetChange, 'after', 'spreadsheet'), /extracted artifact text was malformed/);
+  const imageChange = {
+    ...review.bundle_changes[0],
+    path_before: 'assets/hero.png',
+    path_after: 'assets/hero.png',
+  };
+  const imagePreview = {
+    ...semanticPreview,
+    renderer: 'macos-imageio-thumbnail-v1',
+    kind: 'image',
+    text_source: null,
+    text_lines: null,
+    text_sections: null,
+    text_truncated: false,
+  };
+  assert.equal(
+    validatedReviewArtifactPreview(
+      imagePreview,
+      imageChange,
+      'after',
+      'image',
+    ).content_digest,
+    afterDigest,
+  );
+  assert.throws(() => validatedReviewArtifactPreview({
+    ...imagePreview,
+    renderer: 'macos-quick-look-thumbnail',
+  }, imageChange, 'after', 'image'), /did not match the exact reviewed artifact/);
   assert.throws(() => validatedReviewArtifactPreview({
     ...semanticPreview,
     kind: 'pdf',
@@ -15557,6 +15833,10 @@ test('an agent-created native file is inspected and adopted into private history
   assert.equal(inspected, true);
   assert.equal(document.getElementById('edit-file').value, 'agent-notes.md');
   assert.equal(document.getElementById('file-editor').disabled, true);
+  assert.equal(document.workspaceWork.workbench.changes.editorKind, 'text');
+  assert.equal(document.workspaceWork.workbench.changes.editorText, '# agent result\n');
+  assert.equal(document.workspaceWork.workbench.changes.baselineText, '');
+  assert.equal(document.workspaceWork.workbench.changes.canEditText, false);
   assert.equal(document.getElementById('save-private').disabled, false);
   assert.match(document.getElementById('notice').textContent, /1 native change was found/);
 
@@ -16568,7 +16848,12 @@ test('a managed mutation is bound to the exact workspace the person verified', a
     entries: [{ path: 'kept.txt', type: 'file' }],
     conditions: [],
     not_yet: [],
-    file_histories: [],
+    file_histories: [{
+      path: 'kept.txt',
+      object_id: '01MANAGEDMUTATIONOBJECT000000',
+      current: { version_id: 'version-1', manifest_id: 'manifest-1' },
+      retained_versions: [{ version_id: 'version-1', manifest_id: 'manifest-1' }],
+    }],
   });
   const verified = workspace('/managed/verified', 'digest-verified');
   const replacement = workspace('/managed/replacement', 'digest-replacement');
@@ -16588,7 +16873,17 @@ test('a managed mutation is bound to the exact workspace the person verified', a
       assert.equal(parameters.expectedWorkspaceRoot, verified.root);
       assert.equal(parameters.expectedWorkspaceDigest, verified.digest);
       assert.equal(parameters.expectedWorkspaceInstallation, verified.installation);
-      return JSON.stringify({ path: 'kept.txt', content_digest: inspectedDigest });
+      return JSON.stringify({
+        path: 'kept.txt',
+        text: 'kept content\n',
+        text_editable: true,
+        native_untracked: false,
+        modified_from_current_version: false,
+        current_version: 'version-1',
+        byte_count: 13,
+        content_digest: inspectedDigest,
+        executable: false,
+      });
     }
     if (command === 'delete_managed_entry') {
       submitted = parameters;
@@ -16610,6 +16905,19 @@ test('a managed mutation is bound to the exact workspace the person verified', a
   globalThis.confirm = () => true;
   await import(`./app.js?external-workspace-switch=${Date.now()}`);
   await waitFor(() => document.serviceState.state === 'ready');
+
+  const filesGeneration = document.workspaceWork.generation;
+  await document.emitWorkspaceWorkIntent(
+    { type: 'set-field', field: 'selectedEntry', value: 'kept.txt' },
+    filesGeneration,
+  );
+  await waitFor(() => document.workspaceWork.workbench.changes.editorKind === 'text');
+  assert.equal(document.workspaceWork.workbench.files.selectedEntry, 'kept.txt');
+  assert.equal(
+    document.workspaceWork.workbench.changes.editorText,
+    'kept content\n',
+    'selecting a file in Explorer did not load its exact content into the Files preview',
+  );
 
   const selected = document.getElementById('manage-entry');
   selected.value = 'kept.txt';

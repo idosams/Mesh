@@ -3072,6 +3072,40 @@ impl OpenWorkspace {
         ))
     }
 
+    /// Reconstruct bounded UTF-8 text from the current durable file version.
+    ///
+    /// The mutable native file is intentionally not consulted. This gives a caller an exact
+    /// saved baseline for a working-copy comparison while refusing to allocate an unbounded
+    /// retained body. Binary or over-limit durable content returns `None` after its manifest has
+    /// been resolved, without reconstructing the payload.
+    pub(crate) fn current_durable_text(
+        &self,
+        relative_path: &str,
+        byte_limit: usize,
+    ) -> Result<Option<String>, WorkspaceVersionFailure> {
+        self.ensure_physical_root()
+            .map_err(|error| WorkspaceVersionFailure::RetainedContent(error.to_string()))?;
+        let history = self
+            .file_histories
+            .iter()
+            .find(|history| history.path == relative_path)
+            .ok_or_else(|| {
+                WorkspaceVersionFailure::IncompleteHistory(vec!["managed-file-not-materialized"])
+            })?;
+        let current = history.current.ok_or_else(|| {
+            WorkspaceVersionFailure::IncompleteHistory(vec!["managed-file-version-missing"])
+        })?;
+        let manifest_id = RecordDigest::from_bytes(*current.manifest.as_bytes());
+        let manifest = self
+            .record_index
+            .manifest(&manifest_id)
+            .ok_or_else(|| WorkspaceVersionFailure::MissingManifest(manifest_id.to_string()))?;
+        if manifest.byte_length > u64::try_from(byte_limit).unwrap_or(u64::MAX) {
+            return Ok(None);
+        }
+        Ok(String::from_utf8(reconstruct_manifest(&self.payload_store, manifest)?).ok())
+    }
+
     /// Identify retained versions whose exact bytes and portable executable bit still occupy an
     /// ordinary destination.
     ///

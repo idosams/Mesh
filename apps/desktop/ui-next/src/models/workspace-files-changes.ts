@@ -3,6 +3,9 @@ export type WorkspaceWorkActionId =
   | "create-folder"
   | "move-entry"
   | "delete-entry"
+  | "open-entry"
+  | "reveal-entry"
+  | "open-workspace-folder"
   | "scan-files"
   | "load-file"
   | "preserve-edit"
@@ -27,8 +30,19 @@ export type WorkspaceEntryChoice = Readonly<{
   kind: "file" | "folder";
 }>;
 
+export type WorkspaceNativeChange = Readonly<{
+  path: string;
+  description: string;
+  detail: string;
+  code: "A" | "D" | "M" | "?";
+  status: "Added" | "Deleted or moved" | "Modified" | "Unsupported";
+}>;
+
 export type WorkspaceFilesChangesModel = Readonly<{
   files: Readonly<{
+    workspaceLabel: string;
+    workspaceRoot: string;
+    workspaceState: "current" | "agent-assigned";
     entries: readonly WorkspaceEntryChoice[];
     newPath: string;
     selectedEntry: string;
@@ -45,11 +59,13 @@ export type WorkspaceFilesChangesModel = Readonly<{
     editorKind: "none" | "text" | "binary";
     editorText: string;
     baselineText: string;
+    baselineAvailable: boolean;
     canEditText: boolean;
     editState: string;
     editVersion: string;
+    scanState: "idle" | "scanning" | "clean" | "changes" | "error";
     queueSummary: string;
-    queue: readonly string[];
+    queue: readonly WorkspaceNativeChange[];
     autoSaveChecked: boolean;
     autoSaveEnabled: boolean;
     autoSaveHint: string;
@@ -88,7 +104,8 @@ export type WorkspaceFilesChangesIntent =
 type JsonRecord = Record<string, unknown>;
 
 const ACTION_IDS: readonly WorkspaceWorkActionId[] = Object.freeze([
-  "create-text", "create-folder", "move-entry", "delete-entry", "scan-files",
+  "create-text", "create-folder", "move-entry", "delete-entry", "open-entry", "reveal-entry",
+  "open-workspace-folder", "scan-files",
   "load-file", "preserve-edit", "save-private", "save-all-private", "record-structural-change",
 ]);
 const FIELD_IDS: readonly WorkspaceWorkField[] = Object.freeze([
@@ -159,9 +176,35 @@ function entries(value: unknown): readonly WorkspaceEntryChoice[] {
   }));
 }
 
-function lines(value: unknown, label: string): readonly string[] {
-  if (!Array.isArray(value) || value.length > 10_000) throw new Error(`${label} was invalid or unbounded.`);
-  return Object.freeze(value.map((item, index) => text(item, `${label} ${index + 1}`, 4_096)));
+const CHANGE_STATUS = Object.freeze({
+  A: "Added",
+  D: "Deleted or moved",
+  M: "Modified",
+  "?": "Unsupported",
+} as const);
+
+function nativeChanges(value: unknown): readonly WorkspaceNativeChange[] {
+  if (!Array.isArray(value) || value.length > 10_000) throw new Error("change queue was invalid or unbounded.");
+  const seen = new Set<string>();
+  return Object.freeze(value.map((candidate, index) => {
+    const item = record(candidate, `change queue ${index + 1}`);
+    exactKeys(item, ["code", "description", "detail", "path", "status"], `change queue ${index + 1}`);
+    if (!(typeof item.code === "string" && Object.hasOwn(CHANGE_STATUS, item.code))) {
+      throw new Error(`change queue ${index + 1} status code was unknown.`);
+    }
+    const code = item.code as WorkspaceNativeChange["code"];
+    if (item.status !== CHANGE_STATUS[code]) throw new Error(`change queue ${index + 1} status did not match its code.`);
+    const path = text(item.path, `change queue ${index + 1} path`, 4_096);
+    if (seen.has(path)) throw new Error("change queue repeated a path.");
+    seen.add(path);
+    return Object.freeze({
+      path,
+      description: text(item.description, `change queue ${index + 1} description`, 512),
+      detail: text(item.detail, `change queue ${index + 1} detail`, 4_096, true),
+      code,
+      status: CHANGE_STATUS[code],
+    });
+  }));
 }
 
 function actions(value: unknown): readonly WorkspaceWorkAction[] {
@@ -211,17 +254,27 @@ export function workspaceFilesChangesEnvelope(value: unknown, previousGeneration
   const workbench = record(envelope.workbench, "workspace files and changes workbench");
   exactKeys(workbench, ["actions", "changes", "files"], "workspace files and changes workbench");
   const files = record(workbench.files, "workspace files");
-  exactKeys(files, ["canEditMovePath", "canEditNewPath", "canSelectEntry", "entries", "movePath", "newPath", "selectedEntry", "status"], "workspace files");
+  exactKeys(files, [
+    "canEditMovePath", "canEditNewPath", "canSelectEntry", "entries", "movePath", "newPath",
+    "selectedEntry", "status", "workspaceLabel", "workspaceRoot", "workspaceState",
+  ], "workspace files");
   const changes = record(workbench.changes, "workspace changes");
   exactKeys(changes, [
-    "autoSaveChecked", "autoSaveEnabled", "autoSaveHint", "baselineText", "canEditText", "canSelectFile",
-    "editState", "editVersion", "editorKind", "editorText", "files", "queue", "queueSummary", "selectedFile", "structural",
+    "autoSaveChecked", "autoSaveEnabled", "autoSaveHint", "baselineAvailable", "baselineText", "canEditText", "canSelectFile",
+    "editState", "editVersion", "editorKind", "editorText", "files", "queue", "queueSummary", "scanState", "selectedFile", "structural",
   ], "workspace changes");
   if (!['none', 'text', 'binary'].includes(changes.editorKind as string)) throw new Error("The workspace editor kind was unknown.");
+  if (!['idle', 'scanning', 'clean', 'changes', 'error'].includes(changes.scanState as string)) throw new Error("The workspace scan state was unknown.");
+  if (files.workspaceState !== "current" && files.workspaceState !== "agent-assigned") {
+    throw new Error("The workspace explorer state was unknown.");
+  }
   return Object.freeze({
     generation: envelope.generation as number,
     model: Object.freeze({
       files: Object.freeze({
+        workspaceLabel: text(files.workspaceLabel, "workspace label", 512),
+        workspaceRoot: text(files.workspaceRoot, "workspace root", 4_096),
+        workspaceState: files.workspaceState,
         entries: entries(files.entries),
         newPath: text(files.newPath, "new path", 4_096, true),
         selectedEntry: text(files.selectedEntry, "selected entry", 4_096, true),
@@ -238,11 +291,13 @@ export function workspaceFilesChangesEnvelope(value: unknown, previousGeneration
         editorKind: changes.editorKind as WorkspaceFilesChangesModel["changes"]["editorKind"],
         editorText: text(changes.editorText, "editor text", 1_048_576, true),
         baselineText: text(changes.baselineText, "editor baseline", 1_048_576, true),
+        baselineAvailable: bool(changes.baselineAvailable, "editor baseline availability"),
         canEditText: bool(changes.canEditText, "editor authority"),
         editState: text(changes.editState, "editor state", 512),
         editVersion: text(changes.editVersion, "editor version", 512, true),
+        scanState: changes.scanState as WorkspaceFilesChangesModel["changes"]["scanState"],
         queueSummary: text(changes.queueSummary, "change queue summary", 512),
-        queue: lines(changes.queue, "change queue"),
+        queue: nativeChanges(changes.queue),
         autoSaveChecked: bool(changes.autoSaveChecked, "automatic save choice"),
         autoSaveEnabled: bool(changes.autoSaveEnabled, "automatic save authority"),
         autoSaveHint: text(changes.autoSaveHint, "automatic save hint", 2_048),

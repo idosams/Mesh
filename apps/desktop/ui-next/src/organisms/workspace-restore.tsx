@@ -1,13 +1,23 @@
+import { useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import { RestorePreviewCard } from "../molecules/restore-preview-card";
-import type { WorkspaceRestoreIntent, WorkspaceRestoreModel } from "../models/workspace-restore";
+import {
+  workspaceRestoreFileProjection,
+  workspaceRestoreVersionProjection,
+  type WorkspaceRestoreIntent,
+  type WorkspaceRestoreModel,
+} from "../models/workspace-restore";
 
 export function WorkspaceRestore({ model, onIntent }: Readonly<{
   model: WorkspaceRestoreModel;
   onIntent: (intent: WorkspaceRestoreIntent) => void;
 }>) {
+  const [fileQuery, setFileQuery] = useState("");
+  const [versionQuery, setVersionQuery] = useState("");
   const selectedFile = model.files.find((choice) => choice.id === model.selectedFileId) || null;
+  const fileProjection = workspaceRestoreFileProjection(model.files, fileQuery, model.selectedFileId);
+  const versionProjection = workspaceRestoreVersionProjection(model.versions, versionQuery, model.selectedVersionId);
   return (
     <div aria-label="Restore an earlier file version" className="grid gap-5 p-5 lg:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -23,8 +33,10 @@ export function WorkspaceRestore({ model, onIntent }: Readonly<{
       </header>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2 text-sm font-semibold" htmlFor="restore-next-file">
-          File
+        <div className="grid gap-2 text-sm font-semibold">
+          <label htmlFor="restore-file-filter">Find a retained file</label>
+          <input id="restore-file-filter" type="search" value={fileQuery} onChange={(event) => setFileQuery(event.currentTarget.value)} placeholder="Filter retained files…" className="min-h-11 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+          <label htmlFor="restore-next-file">File</label>
           <select
             id="restore-next-file"
             value={model.selectedFileId}
@@ -33,11 +45,14 @@ export function WorkspaceRestore({ model, onIntent }: Readonly<{
             onChange={(event) => onIntent({ type: "select-file", id: event.currentTarget.value })}
           >
             <option value="" disabled={model.files.length > 0}>{model.files.length ? "Choose a file" : "No retained file history"}</option>
-            {model.files.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+            {fileProjection.items.map((choice) => <option data-mesh-restore-file="true" key={choice.id} value={choice.id}>{choice.label}</option>)}
           </select>
-        </label>
-        <label className="grid gap-2 text-sm font-semibold" htmlFor="restore-next-version">
-          Earlier saved version
+          <span className="text-xs font-normal text-muted-foreground">{restoreProjectionCopy(fileProjection, "retained files")}</span>
+        </div>
+        <div className="grid gap-2 text-sm font-semibold">
+          <label htmlFor="restore-version-filter">Find an earlier saved version</label>
+          <input id="restore-version-filter" type="search" value={versionQuery} onChange={(event) => setVersionQuery(event.currentTarget.value)} placeholder="Filter saved versions…" className="min-h-11 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+          <label htmlFor="restore-next-version">Earlier saved version</label>
           <select
             id="restore-next-version"
             value={model.selectedVersionId}
@@ -47,9 +62,10 @@ export function WorkspaceRestore({ model, onIntent }: Readonly<{
             onChange={(event) => onIntent({ type: "select-version", id: event.currentTarget.value })}
           >
             <option value="" disabled={model.versions.length > 0}>{selectedFile ? (model.versions.length ? "Choose a saved version" : "No earlier version retained") : "Choose a file first"}</option>
-            {model.versions.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
+            {versionProjection.items.map((choice) => <option data-mesh-restore-version="true" key={choice.id} value={choice.id}>{choice.label}</option>)}
           </select>
-        </label>
+          <span className="text-xs font-normal text-muted-foreground">{restoreProjectionCopy(versionProjection, "saved versions")}</span>
+        </div>
       </div>
 
       {selectedFile ? (
@@ -72,4 +88,22 @@ export function WorkspaceRestore({ model, onIntent }: Readonly<{
       </footer>
     </div>
   );
+}
+
+function restoreProjectionCopy(
+  projection: Readonly<{
+    items: readonly unknown[];
+    matched: number;
+    retainedSelected: boolean;
+    truncated: boolean;
+  }>,
+  label: string,
+): string {
+  if (projection.retainedSelected) {
+    return `${projection.matched.toLocaleString()} matching ${label}; the current choice remains available.`;
+  }
+  if (projection.truncated) {
+    return `${projection.items.length.toLocaleString()} of ${projection.matched.toLocaleString()} matching ${label} shown.`;
+  }
+  return `${projection.matched.toLocaleString()} matching ${label}.`;
 }

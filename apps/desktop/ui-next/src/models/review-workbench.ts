@@ -1,4 +1,4 @@
-export type ArtifactKind = "text" | "pdf" | "presentation" | "document" | "spreadsheet" | "file";
+export type ArtifactKind = "text" | "pdf" | "presentation" | "document" | "spreadsheet" | "image" | "file";
 
 export type ReviewMode = "visual" | "content";
 
@@ -23,6 +23,8 @@ export type ReviewDiffHunk = Readonly<{
 export type ReviewChange = {
   id: string;
   path: string;
+  folder: string;
+  status: "added" | "modified" | "moved" | "deleted" | "unsupported";
   kind: ArtifactKind;
   kindLabel: string;
   summary: string;
@@ -100,6 +102,14 @@ export type ReviewWorkbenchIntent =
   | { type: "change-diff-layout"; layout: DiffLayout }
   | { type: "load-artifact-preview"; changeId: string; pageNumber: number }
   | { type: "inspect-exact-copies"; changeId: string }
+  | { type: "load-live-file"; path: string }
+  | { type: "switch-live-workspace"; path: string }
+  | {
+      type: "open-review-side";
+      changeId: string;
+      side: "before" | "after";
+      action: "open-entry" | "reveal-entry" | "open-folder";
+    }
   | { type: "record-review" }
   | { type: "setup-approval" }
   | { type: "approve-version" }
@@ -129,8 +139,14 @@ export function reduceReviewWorkbench(
       ...model,
       selectedChangeId: intent.changeId,
       // A text/code change with exact hunks must never land on the summary-only visual fallback
-      // merely because the previously selected Office/PDF artifact preferred Visual view.
-      mode: selected.kind === "text" ? "content" : model.mode,
+      // merely because the previously selected Office/PDF artifact preferred Visual view. A
+      // raster image has no useful extracted-content surface, so selecting it must likewise land
+      // on the exact visual comparison instead of preserving an unavailable Content view.
+      mode: selected.kind === "text"
+        ? "content"
+        : selected.kind === "image"
+          ? "visual"
+          : model.mode,
     });
   }
   if (intent.type === "change-mode") {
@@ -155,7 +171,11 @@ export function reconcileReviewWorkbenchProjection(
     // Selection and presentation are local review choices, not native authority. Keep them while
     // the exact bundle is unchanged, but take every action bit and every content row from source.
     selectedChangeId: selected.id,
-    mode: selected.kind === "text" ? "content" : current.mode,
+    mode: selected.kind === "text"
+      ? "content"
+      : selected.kind === "image"
+        ? "visual"
+        : current.mode,
     diffLayout: current.diffLayout,
   });
 }

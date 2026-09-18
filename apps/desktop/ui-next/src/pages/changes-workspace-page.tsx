@@ -16,6 +16,7 @@ export function ChangesWorkspacePage({ active, route, surfaceFailures }: Readonl
         name={slot.name}
         label={slot.loadingLabel}
         failed={surfaceFailures[slot.name]}
+        chrome="workbench"
       />
     </WorkspaceView>
   );

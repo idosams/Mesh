@@ -17,10 +17,11 @@ export function WorkspaceView({ active, label, children }: Readonly<{
   );
 }
 
-export function IslandSlot({ name, label, failed = false }: Readonly<{
+export function IslandSlot({ name, label, failed = false, chrome = "card" }: Readonly<{
   name: string;
   label: string;
   failed?: boolean;
+  chrome?: "card" | "workbench";
 }>) {
   const slotRef = useRef<HTMLSlotElement>(null);
   const [ready, setReady] = useState(false);
@@ -44,11 +45,14 @@ export function IslandSlot({ name, label, failed = false }: Readonly<{
       observer?.disconnect();
     };
   }, [name]);
+  const frame = chrome === "workbench"
+    ? "min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/15"
+    : "min-w-0 rounded-2xl border border-border bg-card p-4 shadow-2xl sm:p-6";
   return (
-    <div className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-2xl sm:p-6">
+    <div className={frame} data-mesh-slot-chrome={chrome}>
       <slot ref={slotRef} name={name} />
       {failed && !ready ? (
-        <div className="space-y-3" data-mesh-slot-failure={name} role="alert">
+        <div className="space-y-3 p-4 sm:p-6" data-mesh-slot-failure={name} role="alert">
           <p className="m-0 text-sm text-foreground">This page could not finish rendering safely.</p>
           <button
             type="button"
@@ -57,7 +61,7 @@ export function IslandSlot({ name, label, failed = false }: Readonly<{
           >Reload Mesh</button>
         </div>
       ) : (
-        <p className="m-0 text-sm text-muted-foreground" data-mesh-slot-status={name} hidden={ready}>
+        <p className="m-0 p-4 text-sm text-muted-foreground sm:p-6" data-mesh-slot-status={name} hidden={ready}>
           {label}
         </p>
       )}

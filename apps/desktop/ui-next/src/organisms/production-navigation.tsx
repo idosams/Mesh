@@ -18,7 +18,7 @@ export function ProductionNavigation({ activePage, workspaceReady, nativeChangeC
           <button
             key={page.id}
             type="button"
-            className={`min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-secondary text-foreground" : "text-muted-foreground"}`}
+            className={`relative min-h-11 shrink-0 border-b-2 px-3 text-xs font-semibold hover:bg-secondary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${active ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
             aria-current={active ? "page" : undefined}
             data-state={active ? "active" : "inactive"}
             onClick={() => onNavigate(page.id)}

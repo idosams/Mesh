@@ -151,6 +151,10 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(renderedProof, /spawn\(executable/);
   assert.match(renderedProof, /mkdtemp\('\/tmp\/mesh-app-'\)/);
   assert.match(renderedProof, /CFFIXED_USER_HOME: home/);
+  assert.match(renderedProof, /MESH_RENDERER_PROOF_SCREENSHOT: '1'/);
+  assert.match(renderedProof, /the app-owned Files screenshot was not PNG/);
+  assert.match(renderedProof, /writeNewPrivateScreenshot\(screenshot, screenshotBytes\)/);
+  assert.doesNotMatch(renderedProof, /\/usr\/sbin\/screencapture/);
   assert.doesNotMatch(renderedProof, /env: \{ \.\.\.process\.env, HOME: home/);
   assert.match(renderedProof, /const canonicalWorkspace = await realpath\(empty\.initialized\.root\)/);
   assert.match(renderedProof, /await realpath\(state\.root\)/);
@@ -179,6 +183,14 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(renderedProof, /execFileSync\(join\(forkWorkspace, 'run\.sh'\)/);
   assert.match(renderedProof, /executable_version_ran_natively: true/);
   assert.match(renderedProof, /const pinnedAgentContext = await proveCodexContextBridge\(state\)/);
+  assert.match(renderedProof, /const AGENT_PROOF_RESULT_PATH = 'agent-proof-result\.txt'/);
+  assert.match(renderedProof, /const AGENT_PROOF_IMAGE_PATH = 'agent-proof-result\.png'/);
+  assert.match(
+    renderedProof,
+    /readFile\(join\(repository, 'apps\/desktop\/src-tauri\/icons\/icon\.png'\)\)/,
+    'the native-open package proof must use a real supported image instead of a host-specific text association',
+  );
+  assert.match(renderedProof, /assert\.deepEqual\([\s\S]*AGENT_PROOF_IMAGE/);
   assert.match(renderedProof, /join\(pinnedAgentContext\.root, 'agent-pinned\.txt'\)/);
   assert.match(renderedProof, /pinned_agent_context: pinnedAgentContext/);
   assert.match(renderedProof, /selected_agent_context: restarted\.result\.selectedAgentContext/);
@@ -315,8 +327,15 @@ test('the alpha archive remains checksum-verifiable without claiming Apple trust
   assert.match(renderedProof, /rendererProofSession\('onboarding'\)/);
   assert.match(renderedProof, /'versions'/);
   assert.match(renderedProof, /'private-export'/);
+  assert.match(renderedProof, /mkdir\(join\(privateExport, 'assets'\), \{ mode: 0o700 \}\)/);
   assert.match(renderedProof, /the packaged private export lost the executable bit/);
+  assert.match(renderedProof, /the packaged private export changed the nested saved image bytes/);
   assert.match(renderedProof, /the private-export proof changed the unmanaged original/);
+  assert.ok(
+    renderedProof.indexOf("const exported = await launch(\n    'private-export'")
+      < renderedProof.indexOf("const files = await launch(\n    'files'"),
+    'native Files launches must follow the canonical workspace export proof',
+  );
   assert.match(renderedProof, /rendererSurface = null/);
   assert.match(renderedProof, /}, 'review'\)/);
   assert.match(renderedProof, /mesh_desktop_build_revision/);

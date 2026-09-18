@@ -43,10 +43,10 @@ test('the document workbench keeps before and after visible at alpha window widt
   const desktop = tauri.app.windows[0];
   assert.ok(desktop.width < 1_280 && desktop.minWidth < 1_280);
   assert.ok(desktop.width >= 768 && desktop.minWidth >= 768);
-  assert.match(organism, /xl:grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
+  assert.match(organism, /xl:grid-cols-\[20rem_minmax\(0,1fr\)\]/);
   assert.equal((organism.match(/md:grid-cols-2/g) || []).length, 4);
-  assert.doesNotMatch(organism, /lg:grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
-  assert.match(navigator, /max-h-64[^"\n]*overflow-y-auto[^"\n]*xl:max-h-\[40rem\]/);
+  assert.doesNotMatch(organism, /grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
+  assert.match(navigator, /max-h-72[^"\n]*overflow-y-auto[^"\n]*xl:max-h-\[44rem\]/);
   assert.match(navigator, /xl:border-b-0 xl:border-r/);
   assert.match(organism, /aria-label="Document section comparison"/);
   assert.match(organism, />\s*Previous section\s*</);
@@ -193,6 +193,23 @@ test('the production review projection crosses one fail-closed typed adapter', a
     `Digest ${'77'.repeat(6)}…`,
     `Version ${'66'.repeat(6)}…`,
   ]);
+  const imageProjection = structuredClone(projection);
+  imageProjection.bundle_changes[0] = {
+    ...projection.bundle_changes[0],
+    path_before: null,
+    path_after: 'assets/hero.PNG',
+    before: null,
+    body: 'binary',
+    verified_text: null,
+  };
+  const image = adapter.reviewWorkbenchFromProjection(
+    'Alpha workspace',
+    'Saved version',
+    imageProjection,
+    authority,
+  );
+  assert.equal(image.changes[0].kind, 'image');
+  assert.equal(image.changes[0].kindLabel, 'Image');
   const crossFormatRenames = [
     ['finance/plan.docx', 'finance/plan.pptx'],
     ['finance/plan.pdf', 'finance/plan.txt'],
@@ -757,6 +774,19 @@ test('opaque native text changes remain explicit inside mixed React review bundl
   assert.equal(opaque.impact, 'Metadata only');
   assert.equal(opaque.comparisonLimitation, 'above-line-ceiling');
   assert.deepEqual(opaque.diffHunks, []);
+  const unknownBinaryProjection = structuredClone(projection);
+  unknownBinaryProjection.bundle_changes = [{
+    ...projection.bundle_changes[0],
+    path_before: '.DS_Store',
+    path_after: '.DS_Store',
+  }];
+  const unknownBinary = adapter.reviewWorkbenchFromProjection(
+    'People',
+    'Saved version',
+    unknownBinaryProjection,
+    authority,
+  ).changes[0];
+  assert.equal(unknownBinary.kind, 'file');
 
   const unknownReason = structuredClone(projection);
   unknownReason.bundle_changes[1].opaque_reason = 'future-opaque-reason';
@@ -923,8 +953,9 @@ test('the review reducer reveals exact text hunks across mixed bundles and never
   const modelModule = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text).toString('base64')}`);
   const change = Object.freeze({ id: 'change', kind: 'text', diffHunks: Object.freeze([]) });
   const artifact = Object.freeze({ id: 'artifact', kind: 'spreadsheet', diffHunks: Object.freeze([]) });
+  const image = Object.freeze({ id: 'image', kind: 'image', diffHunks: Object.freeze([]) });
   const model = Object.freeze({
-    changes: Object.freeze([artifact, change]),
+    changes: Object.freeze([artifact, change, image]),
     selectedChangeId: 'artifact',
     mode: 'visual',
     diffLayout: 'split',
@@ -935,6 +966,8 @@ test('the review reducer reveals exact text hunks across mixed bundles and never
   assert.equal(textSelected.mode, 'content', 'an XLSX-first bundle hid the selected exact text diff');
   const artifactSelected = modelModule.reduceReviewWorkbench(textSelected, { type: 'select-change', changeId: 'artifact' });
   assert.equal(artifactSelected.mode, 'content', 'artifact navigation discarded the person\'s content-view choice');
+  const imageSelected = modelModule.reduceReviewWorkbench(textSelected, { type: 'select-change', changeId: 'image' });
+  assert.equal(imageSelected.mode, 'visual', 'a raster image remained on its unavailable content surface');
   const inline = modelModule.reduceReviewWorkbench(textSelected, { type: 'change-diff-layout', layout: 'inline' });
   assert.equal(inline.diffLayout, 'inline');
   assert.equal(Object.isFrozen(inline), true);
@@ -2226,18 +2259,19 @@ test('the production notice primes stable empty live regions before retained rep
     module.exports.activateProductionNoticeReplay();
     const populated = module.exports.renderPage();
     assert.equal(snapshotRequests, 1);
+    assert.match(populated, /whitespace-pre-line/);
     assert.match(populated, /role="status" aria-live="polite" aria-atomic="true">Retained before the shell loaded\.<\/div>/);
     assert.match(populated, /role="alert" aria-live="assertive" aria-atomic="true"><\/div>/);
 
     documentRoot.dispatchEvent(new TestCustomEvent('mesh:notice-projection', {
       detail: {
         schema: 'mesh.notice/v1', generation: 2,
-        message: 'Retained operation failed.', error: true, proof: null,
+        message: 'Saved workspace unavailable\nTry again or forget this shortcut.', error: true, proof: null,
       },
     }));
     const failed = module.exports.renderPage();
     assert.match(failed, /role="status" aria-live="polite" aria-atomic="true"><\/div>/);
-    assert.match(failed, /role="alert" aria-live="assertive" aria-atomic="true">Retained operation failed\.<\/div>/);
+    assert.match(failed, /role="alert" aria-live="assertive" aria-atomic="true">Saved workspace unavailable\nTry again or forget this shortcut\.<\/div>/);
     module.exports.activateProductionNoticeReplay();
     assert.equal(snapshotRequests, 1, 'remount activation requested a duplicate retained announcement');
   } finally {
@@ -2422,7 +2456,7 @@ test('the production workspace entry page accepts only fresh bounded state and c
     openPath: '',
     canEditPath: true,
     canOpenPath: false,
-    recents: [{ path: '/private/one.mesh', label: 'Payroll · Managed workspace', state: 'available' }],
+    recents: [{ path: '/private/one.mesh', label: 'Payroll · Managed workspace', state: 'unavailable' }],
     selectedRecentPath: '/private/one.mesh',
     canSelectRecent: true,
     recentHint: 'Forgetting removes only this navigation shortcut.',
@@ -2433,6 +2467,7 @@ test('the production workspace entry page accepts only fresh bounded state and c
   };
   const accepted = module.workspaceEntryEnvelope({ generation: 8, entry }, 7);
   assert.equal(accepted.model.recents[0].label, 'Payroll · Managed workspace');
+  assert.equal(accepted.model.recents[0].state, 'unavailable');
   assert.equal(Object.isFrozen(accepted.model.recents), true);
   assert.deepEqual(module.workspaceEntryIntent({ type: 'choose-folder' }), { type: 'choose-folder' });
   assert.deepEqual(module.workspaceEntryIntent({ type: 'retry' }), { type: 'retry' });
@@ -2457,6 +2492,13 @@ test('the production workspace entry page accepts only fresh bounded state and c
     /not in the projected list/,
   );
   assert.throws(
+    () => module.workspaceEntryEnvelope({
+      generation: 9,
+      entry: { ...entry, recents: [{ ...entry.recents[0], state: 'missing' }] },
+    }, 8),
+    /recent workspace state was invalid/,
+  );
+  assert.throws(
     () => module.workspaceEntryIntent({ type: 'open-recent', path: '/private/one.mesh', invoke: true }),
     /unrecognized or missing fields/,
   );
@@ -2472,6 +2514,45 @@ test('the production workspace entry page accepts only fresh bounded state and c
     () => module.workspaceEntryIntent({ type: 'set-disclosure', open: 'true' }),
     /not boolean/,
   );
+
+  const pickerBuild = await build({
+    stdin: {
+      contents: `
+        import React from "react";
+        import { renderToStaticMarkup } from "react-dom/server";
+        import { RecentWorkspacePicker } from "./src/molecules/recent-workspace-picker.tsx";
+        module.exports.render = (props) => renderToStaticMarkup(
+          React.createElement(RecentWorkspacePicker, { ...props, onIntent: () => {} }),
+        );
+      `,
+      resolveDir: root,
+      loader: 'js',
+    },
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    packages: 'external',
+    write: false,
+  });
+  const picker = { exports: {} };
+  Function('require', 'module', 'exports', pickerBuild.outputFiles[0].text)(
+    createRequire(import.meta.url),
+    picker,
+    picker.exports,
+  );
+  const markup = picker.exports.render({
+    recents: accepted.model.recents,
+    selectedPath: '/private/one.mesh',
+    canSelect: true,
+    hint: 'Restore its saved folder and try again, or choose Forget from list.',
+    openLabel: 'Try again',
+    canOpen: true,
+    canForget: true,
+    forgetTitle: '',
+  });
+  assert.match(markup, /Unavailable · Payroll · Managed workspace/);
+  assert.match(markup, />Try again</);
+  assert.match(markup, /Restore its saved folder and try again/);
 });
 
 test('the production Restore panel accepts only fresh bounded choices, readable previews, and closed intents', async () => {
@@ -3057,7 +3138,11 @@ test('the alpha workbench exposes keyboard focus, audible diff meaning, and AA c
   const review = readFileSync(join(root, 'src/organisms/artifact-review.tsx'), 'utf8');
   const styles = readFileSync(join(root, 'src/styles.css'), 'utf8');
   assert.match(navigator, /aria-pressed=\{selected\}/);
-  assert.match(navigator, /tabIndex=\{selected \? 0 : -1\}/);
+  assert.match(navigator, /const roving = selected \|\| \(selectedIndex < 0 && index === 0\)/);
+  assert.match(navigator, /tabIndex=\{roving \? 0 : -1\}/);
+  assert.match(navigator, /placeholder="Search changed files"/);
+  assert.match(navigator, />All statuses<\/option>/);
+  assert.match(navigator, />All types<\/option>/);
   assert.match(navigator, /focus-visible:ring-2/);
   assert.match(review, /aria-busy=\{artifactPreviewLoading\}/);
   assert.match(review, /role=\{failed \? "alert" : "status"\}/);
@@ -3153,6 +3238,104 @@ test('artifact renderer failures produce one atomic alert and keep retry availab
     ...overrides,
   });
   const alertCount = (html) => (html.match(/role="alert"/gu) || []).length;
+
+  const opaque = render({
+    model: {
+      ...model,
+      changes: [{
+        ...change,
+        path: '.DS_Store',
+        kind: 'file',
+        kindLabel: 'File',
+      }],
+    },
+  });
+  const opaqueOpen = opaque.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  const opaqueReveal = opaque.match(/<button[^>]*>Reveal in Finder<\/button>/u)?.[0];
+  assert.match(opaqueOpen, /disabled=""/u);
+  assert.match(opaqueOpen, /aria-describedby="before-default-app-unavailable"/u);
+  assert.doesNotMatch(opaqueReveal, /disabled=""/u);
+  assert.match(opaque, /Default-app opening stays unavailable until native inspection admits this exact content type/u);
+  const unadmittedPdfOpen = render().match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  assert.match(unadmittedPdfOpen, /disabled=""/u);
+  const beforePreview = {
+    side: 'before',
+    versionId: change.beforeVersionId,
+    contentDigest: change.beforeContentDigest,
+    imageDataUrl: 'data:image/png;base64,AA==',
+    pageNumber: 1,
+    pageCount: 1,
+  };
+  const afterPreview = {
+    side: 'after',
+    versionId: change.afterVersionId,
+    contentDigest: change.afterContentDigest,
+    imageDataUrl: 'data:image/png;base64,AA==',
+    pageNumber: 1,
+    pageCount: 1,
+  };
+  const pdfPreview = {
+    changeId: change.id,
+    requestedPage: 1,
+    before: beforePreview,
+    after: afterPreview,
+    beforeAbsentPage: null,
+    afterAbsentPage: null,
+    beforeError: null,
+    afterError: null,
+  };
+  const admittedPdf = render({ artifactPreview: pdfPreview });
+  const admittedPdfOpen = admittedPdf.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  assert.doesNotMatch(admittedPdfOpen, /disabled=""/u);
+  const absentPdf = render({
+    artifactPreview: {
+      ...pdfPreview,
+      changeId: change.id,
+      requestedPage: 2,
+      before: null,
+      after: { ...afterPreview, pageNumber: 2, pageCount: 2 },
+      beforeAbsentPage: {
+        side: 'before',
+        versionId: change.beforeVersionId,
+        contentDigest: change.beforeContentDigest,
+        pageCount: 1,
+      },
+      afterAbsentPage: null,
+      beforeError: null,
+      afterError: null,
+    },
+  });
+  const absentPdfOpen = absentPdf.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  assert.doesNotMatch(absentPdfOpen, /disabled=""/u);
+
+  const imageChange = {
+    ...change,
+    id: 'saved-image',
+    path: 'assets/hero.png',
+    kind: 'image',
+    kindLabel: 'Image',
+  };
+  const imageModel = { ...model, changes: [imageChange], selectedChangeId: imageChange.id };
+  const imageWithoutEvidence = render({ model: imageModel });
+  const imageOpenWithoutEvidence = imageWithoutEvidence.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  const imageRevealWithoutEvidence = imageWithoutEvidence.match(/<button[^>]*>Reveal in Finder<\/button>/u)?.[0];
+  assert.match(imageOpenWithoutEvidence, /disabled=""/u);
+  assert.doesNotMatch(imageRevealWithoutEvidence, /disabled=""/u);
+  const imagePreview = {
+    ...pdfPreview,
+    changeId: imageChange.id,
+    before: { ...beforePreview, pageNumber: null, pageCount: null },
+    after: { ...afterPreview, pageNumber: null, pageCount: null },
+  };
+  const admittedImage = render({ model: imageModel, artifactPreview: imagePreview });
+  const admittedImageOpen = admittedImage.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  assert.doesNotMatch(admittedImageOpen, /disabled=""/u);
+  const crossChangeImage = render({
+    model: imageModel,
+    artifactPreview: { ...imagePreview, changeId: 'different-change' },
+  });
+  const crossChangeOpen = crossChangeImage.match(/<button[^>]*>Open in default app<\/button>/u)?.[0];
+  assert.match(crossChangeOpen, /disabled=""/u);
 
   const rejected = render({ artifactPreviewError: 'Native renderer failed.' });
   assert.equal(alertCount(rejected), 1);

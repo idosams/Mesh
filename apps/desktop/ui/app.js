@@ -1,5 +1,9 @@
 import { workspaceVersionsRetainedInteraction } from './workspace-versions-interaction-policy.js';
 import { createNoticeSource } from './notice-source.js';
+import {
+  workspaceEditorBaselineAvailable,
+  workspaceEditorBaselineText,
+} from './workspace-editor-baseline.js';
 
 // Capture the webview objects once. This is equivalent in the packaged app and keeps each
 // independently loaded UI instance bound to its own window during concurrent regression tests.
@@ -119,6 +123,7 @@ let workspaceChangesEditorState = {
 const WORKSPACE_STRUCTURAL_CHANGE_HINT = 'Mesh never guesses file identity from a similar path. Choose deletion, or explicitly pair the missing tracked file with a new file. Exact-byte moves can finish immediately; a move whose content also changed stays Working until you scan and save those bytes.';
 let workspaceChangesQueueState = {
   scanLabel: 'Find folder changes',
+  scanState: 'idle',
   canScan: false,
   saveAllLabel: 'Save all privately',
   savingAll: false,
@@ -160,6 +165,7 @@ let workspaceEntryNextActions = new Map();
 let workspaceEntryManagedPathDraft = '';
 let workspaceEntryDisclosureOpen = false;
 let selectedRecentWorkspacePath = '';
+const unavailableRecentWorkspacePaths = new Set();
 let workspaceEntrySelectionInFlight = 0;
 let workspaceEntryRefreshInFlight = false;
 let workspaceRestoreNextAvailable = false;
@@ -207,6 +213,18 @@ function reviewWorkbenchActionKey(intent) {
       ? `${intent.type}:${intent.changeId}`
       : null;
   }
+  if (intent.type === 'open-review-side') {
+    return keys.length === 4
+      && keys[0] === 'action'
+      && keys[1] === 'changeId'
+      && keys[2] === 'side'
+      && keys[3] === 'type'
+      && typeof intent.changeId === 'string'
+      && ['before', 'after'].includes(intent.side)
+      && ['open-entry', 'reveal-entry', 'open-folder'].includes(intent.action)
+      ? `${intent.type}:${intent.changeId}:${intent.side}:${intent.action}`
+      : null;
+  }
   if (intent.type === 'load-artifact-preview') {
     return keys.length === 3
       && keys[0] === 'changeId'
@@ -217,6 +235,17 @@ function reviewWorkbenchActionKey(intent) {
       && intent.pageNumber > 0
       && intent.pageNumber <= PDF_PREVIEW_PAGE_LIMIT
       ? `${intent.type}:${intent.changeId}`
+      : null;
+  }
+  if (intent.type === 'load-live-file' || intent.type === 'switch-live-workspace') {
+    return keys.length === 2
+      && keys[0] === 'path'
+      && keys[1] === 'type'
+      && typeof intent.path === 'string'
+      && intent.path.length > 0
+      && intent.path.length <= 4_096
+      && !/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(intent.path)
+      ? `${intent.type}:${intent.path}`
       : null;
   }
   if (intent.type === 'open-earlier-review') {
@@ -377,7 +406,8 @@ const WORKSPACE_WORK_FIELDS = Object.freeze([
   'newPath', 'selectedEntry', 'movePath', 'selectedFile', 'editorText', 'missingSource', 'moveTarget',
 ]);
 const WORKSPACE_WORK_ACTION_IDS = Object.freeze([
-  'create-text', 'create-folder', 'move-entry', 'delete-entry', 'scan-files',
+  'create-text', 'create-folder', 'move-entry', 'delete-entry', 'open-entry', 'reveal-entry',
+  'open-workspace-folder', 'scan-files',
   'load-file', 'preserve-edit', 'save-private', 'save-all-private', 'record-structural-change',
 ]);
 const WORKSPACE_WORK_ACTION_ECHO_FIELDS = Object.freeze({
@@ -500,6 +530,9 @@ function applyWorkspaceWorkField(field, value, interactionGeneration) {
       workspaceWorkFieldEchoGeneration = null;
     }
     renderWorkspaceFilesChangesNext(fieldEchoGeneration, field);
+    if (field === 'selectedEntry') {
+      void inspectManagedWorkspaceEntryFromFiles(value);
+    }
     return;
   }
   if (field !== 'missingSource' && field !== 'moveTarget') return;
@@ -1259,7 +1292,11 @@ if (typeof appDocument.addEventListener === 'function') {
         return;
       }
       const action = workspaceWorkNextActions.get(kind);
-      if (typeof action === 'function') action();
+      if (typeof action === 'function') {
+        Promise.resolve()
+          .then(action)
+          .catch((error) => showNotice(`File action unavailable: ${decodeDaemonRefusal(error).message || error}`, true));
+      }
       return;
     }
     if (kind === 'set-auto-save') {
@@ -1314,11 +1351,28 @@ if (typeof appDocument.addEventListener === 'function') {
     const bundle = detail.bundle;
     Promise.resolve()
       .then(() => {
-        if (!projectionAcceptsVisibleGeneration(
+        const exactGeneration = projectionAcceptsVisibleGeneration(
           generation,
           reviewWorkbenchNextPending,
           reviewWorkbenchNextMounted,
-        )
+        );
+        // Artifact rendering is a read-only request bound to an exact bundle, change, and page.
+        // A periodic refresh may commit an identical action set after the click event is accepted
+        // but before this microtask executes. Rebase only that read-only request onto the current
+        // committed projection; mutating, exporting, and native-launch actions remain exact-
+        // generation only.
+        const sameReviewPreview = intent.type === 'load-artifact-preview'
+          && reviewWorkbenchNextPending?.bundle === bundle
+          && reviewWorkbenchNextMounted?.bundle === bundle
+          && projectionHasVisibleContinuity(
+            reviewWorkbenchNextPending,
+            reviewWorkbenchNextMounted,
+          )
+          && projectionHasInteractionContinuity(
+            reviewWorkbenchNextPending,
+            reviewWorkbenchNextMounted,
+          );
+        if ((!exactGeneration && !sameReviewPreview)
           || reviewWorkbenchNextPending?.bundle !== bundle
           || reviewWorkbenchNextMounted?.bundle !== bundle) return undefined;
         const currentAction = reviewWorkbenchNextActions.get(actionKey);
@@ -1354,6 +1408,43 @@ class DaemonRefusal extends Error {
     super(message);
     this.code = code;
   }
+}
+
+class ManagedWorkspaceOpenFailure extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'ManagedWorkspaceOpenFailure';
+    this.code = code;
+  }
+}
+
+const MANAGED_WORKSPACE_REFUSAL_CODES = new Set([
+  'workspace-unreachable',
+  'workspace-payload-store-unreachable',
+  'workspace-index-unavailable',
+  'workspace-damaged',
+  'workspace-nothing-readable',
+  'workspace-contradictory',
+]);
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function managedWorkspaceOpenMessage(code, source, currentWorkspaceVerified) {
+  const safety = currentWorkspaceVerified
+    ? 'Your current workspace is still open and unchanged.'
+    : 'No workspace was opened, and nothing changed.';
+  if (source === 'recent') {
+    if (code === 'workspace-unreachable') {
+      return `Saved workspace unavailable\nMesh can’t open this recent workspace because its saved folder is no longer reachable.\n${safety}\nNext: restore the folder and choose Try again, or choose Forget from list to remove only this shortcut.`;
+    }
+    return `Saved workspace needs attention\nMesh found this recent workspace, but could not verify its private history.\n${safety}\nNext: leave the folder unchanged and choose Try again. If it still fails, copy diagnostics before repairing or removing anything.`;
+  }
+  if (code === 'workspace-unreachable') {
+    return `This is not an available saved Mesh workspace\nMesh couldn’t find usable private history in the selected folder.\n${safety}\nNext: choose Import for an ordinary project folder, or select a saved workspace from Recent workspaces.`;
+  }
+  return `Saved workspace needs attention\nMesh found the selected workspace, but could not verify its private history.\n${safety}\nNext: leave the folder unchanged and try again. If it still fails, copy diagnostics before repairing or removing anything.`;
 }
 
 function decodeDaemonRefusal(error) {
@@ -1595,6 +1686,10 @@ function installBuildIdentity(recent) {
 function installNavigationStatus(recent, workspaceRoot = model.workspace?.root ?? null) {
   installBuildIdentity(recent);
   model.recent = recent;
+  const rememberedPaths = new Set(Array.isArray(recent?.workspaces) ? recent.workspaces : []);
+  for (const path of unavailableRecentWorkspacePaths) {
+    if (!rememberedPaths.has(path)) unavailableRecentWorkspacePaths.delete(path);
+  }
   model.activeFolder = recent.active_folder
     ? { path: recent.active_folder, workspace_root: workspaceRoot, stable: true }
     : null;
@@ -1974,6 +2069,11 @@ const REVIEW_ARTIFACT_KINDS = Object.freeze({
   pptx: 'presentation',
   docx: 'document',
   xlsx: 'spreadsheet',
+  png: 'image',
+  jpg: 'image',
+  jpeg: 'image',
+  gif: 'image',
+  webp: 'image',
 });
 
 export function reviewArtifactKind(change) {
@@ -2015,7 +2115,9 @@ export function validatedReviewArtifactPreview(answer, change, side, kind) {
     && answer.page_count >= answer.page_number
     && answer.page_count <= PDF_DOCUMENT_PAGE_LIMIT;
   const representative = kind !== 'pdf'
-    && answer?.renderer === 'macos-quick-look-thumbnail'
+    && answer?.renderer === (kind === 'image'
+      ? 'macos-imageio-thumbnail-v1'
+      : 'macos-quick-look-thumbnail')
     && answer?.scope === 'representative-preview'
     && answer?.page_number === null
     && answer?.page_count === null;
@@ -2704,6 +2806,72 @@ function installCurrentReviewArtifactActions(item) {
   if (item.subject_operation !== currentWorkspaceVersion()?.operation) return;
   for (const change of item.bundle_changes || []) {
     const kind = reviewArtifactKind(change);
+    for (const side of ['before', 'after']) {
+      if (change[side] === null) continue;
+      for (const action of ['open-entry', 'reveal-entry', 'open-folder']) {
+        reviewWorkbenchNextActions.set(`open-review-side:${change.object_id}:${side}:${action}`, async () => {
+          if (!beginNativeWorkspaceLaunch()) return;
+          const expectedVersion = change[side]?.version_id;
+          const expectedDigest = change[side]?.content_digest
+            || change.verified_text?.[side]?.content_digest
+            || null;
+          let completion;
+          try {
+            const binding = captureVerifiedWorkspace();
+            if (!/^[0-9a-f]{64}$/u.test(expectedVersion || '')
+              || !/^[0-9a-f]{64}$/u.test(expectedDigest || '')) {
+              throw new Error('The selected saved side has no complete immutable identity. Refresh Review before opening it.');
+            }
+            const answer = JSON.parse(await invoke('open_review_artifact_inspection', {
+              expectedWorkspaceRoot: binding.root,
+              expectedWorkspaceDigest: binding.digest,
+              expectedWorkspaceInstallation: binding.installation,
+              bundle: item.bundle,
+              target: item.subject_operation,
+              objectId: change.object_id,
+              side,
+              expectedVersionId: expectedVersion,
+              expectedContentDigest: expectedDigest,
+              action,
+            }));
+            assertVerifiedWorkspace(binding);
+            const keys = answer && typeof answer === 'object' && !Array.isArray(answer)
+              ? Object.keys(answer).sort()
+              : [];
+            if (keys.join(',') !== 'action,content_digest,opened,schema,side,version_id,working_folder_unchanged'
+              || answer.schema !== 'mesh.review-side-open/v1'
+              || answer.side !== side
+              || answer.action !== action
+              || answer.version_id !== expectedVersion
+              || (expectedDigest !== null && answer.content_digest !== expectedDigest)
+              || !/^[0-9a-f]{64}$/u.test(answer.content_digest)
+              || answer.opened !== true
+              || answer.working_folder_unchanged !== true) {
+              throw new Error('The native saved-side launcher returned a stale or malformed result.');
+            }
+            const sideLabel = side === 'before' ? 'Before' : 'After';
+            completion = {
+              message: action === 'open-entry'
+                ? `Opened the exact ${sideLabel.toLowerCase()} saved copy in its default application.`
+                : action === 'reveal-entry'
+                  ? `Revealed the exact ${sideLabel.toLowerCase()} saved copy in Finder.`
+                  : `Opened the folder containing the exact ${sideLabel.toLowerCase()} saved copy.`,
+              error: false,
+            };
+          } catch (error) {
+            completion = {
+              message: `Exact ${side} copy unavailable: ${decodeDaemonRefusal(error).message || error}`,
+              error: true,
+            };
+          } finally {
+            finishNativeWorkspaceLaunch();
+          }
+          // Publish completion only after the global native-launch freeze has been released and
+          // the fresh controls are mounted. A person may act on this success notice immediately.
+          showNotice(completion.message, completion.error);
+        });
+      }
+    }
     if (!kind) continue;
     const formatName = {
       pdf: 'PDF',
@@ -2835,8 +3003,127 @@ function installCurrentReviewArtifactActions(item) {
   }
 }
 
+function liveReviewPresentation() {
+  const current = currentWorkspacePresentation();
+  const assigned = workspaceInstallationMatchesHandoff();
+  const state = assigned ? model.agentLive?.state || 'scanning' : 'idle';
+  const changes = assigned ? model.agentLive?.changes || [] : [];
+  return Object.freeze({
+    available: assigned,
+    state,
+    summary: current?.agentActivity.summary || 'No agent currently owns this workspace.',
+    workspaceRoot: model.workspace?.root || '',
+    changes: Object.freeze(changes.map((change) => Object.freeze({ path: change.path, kind: change.kind }))),
+    workspaces: Object.freeze(current?.workspaces || []),
+  });
+}
+
+function installLiveReviewActions(live) {
+  for (const workspace of live.workspaces) {
+    if (!workspace.canOpen) continue;
+    reviewWorkbenchNextActions.set(`switch-live-workspace:${workspace.path}`, async () => {
+      const continuity = workspaceProjectionContinuityKey();
+      const selected = recentWorkspaceEntries().find((entry) => entry.path === workspace.path);
+      if (!selected || workspaceInteractionInFlight()) {
+        throw new Error('That assigned workspace is no longer available. Refresh and choose it again.');
+      }
+      const opened = await openRecentWorkspacePath(
+        workspace.path,
+        () => recentWorkspaceEntries().some((entry) => entry.path === workspace.path)
+          && workspaceProjectionContinuityKey() === continuity,
+        'The workspace list changed while Mesh was switching Live review. Review the current workspace and choose again.',
+      );
+      if (opened && workspaceInstallationMatchesHandoff()) void inspectLiveAgentWork();
+      return opened;
+    });
+  }
+  if (!live.available) return;
+  for (const change of live.changes) {
+    if (!['modified-file', 'new-file'].includes(change.kind)) continue;
+    reviewWorkbenchNextActions.set(`load-live-file:${change.path}`, async () => {
+      const delivery = reviewWorkbenchNextMounted;
+      const generation = delivery?.generation;
+      const binding = captureVerifiedWorkspace();
+      const agentGeneration = canonicalAgentHandoffGeneration(model.agentHandoff?.generation);
+      if (!delivery || !agentGeneration || !workspaceInstallationMatchesHandoff()) {
+        throw new Error('This workspace is no longer assigned to the same agent.');
+      }
+      try {
+        const answer = JSON.parse(await invoke('inspect_agent_live_file', {
+          expectedWorkspaceRoot: binding.root,
+          expectedWorkspaceDigest: binding.digest,
+          expectedWorkspaceInstallation: binding.installation,
+          expectedAgentHandoffGeneration: agentGeneration,
+          relativePath: change.path,
+        }));
+        assertVerifiedWorkspace(binding);
+        const keys = answer && typeof answer === 'object' && !Array.isArray(answer)
+          ? Object.keys(answer).sort()
+          : [];
+        if (keys.join(',') !== 'agent_handoff_generation,byte_count,content_digest,executable,image_data_url,kind,mutable,path,preview_error,preview_kind,recorded,schema,text,workspace_digest,workspace_installation,workspace_root'
+          || answer.schema !== 'mesh.agent-live-file/v1'
+          || answer.workspace_root !== binding.root
+          || answer.workspace_digest !== binding.digest
+          || answer.workspace_installation !== binding.installation
+          || answer.agent_handoff_generation !== agentGeneration
+          || answer.path !== change.path
+          || answer.kind !== change.kind
+          || !Number.isSafeInteger(answer.byte_count)
+          || answer.byte_count < 0
+          || typeof answer.content_digest !== 'string'
+          || !/^[0-9a-f]{64}$/u.test(answer.content_digest)
+          || typeof answer.executable !== 'boolean'
+          || !['text', 'image', 'artifact', 'metadata'].includes(answer.preview_kind)
+          || (answer.image_data_url !== null && (typeof answer.image_data_url !== 'string'
+            || !answer.image_data_url.startsWith('data:image/')
+            || answer.image_data_url.length > 12 * 1024 * 1024))
+          || (answer.preview_error !== null && (typeof answer.preview_error !== 'string' || answer.preview_error.length > 1_024))
+          || (answer.text !== null && (typeof answer.text !== 'string' || answer.text.length > 1_048_576))
+          || answer.mutable !== true
+          || answer.recorded !== false) {
+          throw new Error('The live file snapshot was stale or malformed.');
+        }
+        if (!projectionAcceptsVisibleGeneration(generation, reviewWorkbenchNextPending, reviewWorkbenchNextMounted)
+          || reviewWorkbenchNextMounted !== delivery
+          || !agentLiveInspectionStillCurrent({ ...binding, generation: agentGeneration })) return;
+        appDocument.dispatchEvent(new appWindow.CustomEvent('mesh:review-workbench-live-preview', {
+          detail: Object.freeze({
+            generation,
+            path: change.path,
+            error: null,
+            snapshot: Object.freeze({
+              path: answer.path,
+              kind: answer.kind,
+              byteCount: answer.byte_count,
+              contentDigest: answer.content_digest,
+              executable: answer.executable,
+              text: answer.text,
+              previewKind: answer.preview_kind,
+              imageDataUrl: answer.image_data_url,
+              previewError: answer.preview_error,
+            }),
+          }),
+        }));
+      } catch (error) {
+        if (!projectionAcceptsVisibleGeneration(generation, reviewWorkbenchNextPending, reviewWorkbenchNextMounted)
+          || reviewWorkbenchNextMounted !== delivery) return;
+        appDocument.dispatchEvent(new appWindow.CustomEvent('mesh:review-workbench-live-preview', {
+          detail: Object.freeze({
+            generation,
+            path: change.path,
+            snapshot: null,
+            error: (decodeDaemonRefusal(error).message || String(error)).slice(0, 1_024),
+          }),
+        }));
+      }
+    });
+  }
+}
+
 function renderReviews() {
   reviewWorkbenchNextActions = new Map();
+  const live = liveReviewPresentation();
+  installLiveReviewActions(live);
   const items = model.workspace?.review_items || [];
   const total = model.workspace?.reviews || 0;
   const current = currentWorkspaceVersion();
@@ -3023,6 +3310,7 @@ function renderReviews() {
         versionLabel: `Saved ${shortIdentity(currentItem.reviewed_head || currentItem.subject_operation)}`,
         projection: currentItem,
         controls,
+        live,
         authority: Object.freeze({
           canRenderArtifactPreview,
           canInspectExactCopies,
@@ -3080,7 +3368,11 @@ function renderReviews() {
           });
     const generation = ++reviewWorkbenchNextGeneration;
     const continuityKey = reviewProjectionContinuityKey(`status:${state}`);
-    const interactionKey = projectionSurfaceContinuityKey(continuityKey, 'review-status', status, controls);
+    const interactionKey = projectionSurfaceContinuityKey(continuityKey, 'review-status', {
+      status,
+      controls,
+      liveActions: [...reviewWorkbenchNextActions.keys()].sort(),
+    });
     reviewWorkbenchNextPending = Object.freeze({
       generation,
       bundle: null,
@@ -3091,7 +3383,7 @@ function renderReviews() {
     if (reviewWorkbenchNextMounted?.continuityKey !== continuityKey) reviewWorkbenchNextMounted = null;
     installReviewWorkbenchNextVisibility();
     appDocument.dispatchEvent(new appWindow.CustomEvent('mesh:review-workbench-projection', {
-      detail: Object.freeze({ generation, state, status, controls }),
+      detail: Object.freeze({ generation, state, status, controls, live }),
     }));
   } else {
     reviewWorkbenchNextPending = null;
@@ -3273,6 +3565,7 @@ function clearWorkspaceScopedState() {
   };
   workspaceChangesQueueState = {
     scanLabel: 'Find folder changes',
+    scanState: 'idle',
     canScan: false,
     saveAllLabel: 'Save all privately',
     savingAll: false,
@@ -3310,17 +3603,25 @@ function unsupportedNativeKind(kind) {
 }
 
 function folderChangePresentation(change) {
-  return change.native_unsupported
-    ? `${change.path} · ${unsupportedNativeKind(change.unsupported_kind)} · ${change.unsupported_kind === 'excluded-ancestor' ? 'include its parent too or keep this path excluded' : 'convert or remove before saving or review'}`
+  const projection = change.native_unsupported
+    ? { code: '?', status: 'Unsupported', description: unsupportedNativeKind(change.unsupported_kind), detail: change.unsupported_kind === 'excluded-ancestor' ? 'include its parent too or keep this path excluded' : 'convert or remove before saving or review' }
     : change.native_directory
-    ? `${change.path} · new native folder · saved parent-first with this reviewed queue`
+    ? { code: 'A', status: 'Added', description: 'new native folder', detail: 'saved parent-first with this reviewed queue' }
     : change.native_missing
-    ? `${change.path} · missing tracked file · choose rename or deletion below`
-    : `${change.path} · ${change.native_untracked ? 'new native file' : 'changed tracked file'} · ${formatBytes(change.byte_count)} bytes`;
+    ? { code: 'D', status: 'Deleted or moved', description: 'missing tracked file', detail: 'choose rename or deletion below' }
+    : change.native_untracked
+    ? { code: 'A', status: 'Added', description: 'new native file', detail: `${formatBytes(change.byte_count)} bytes` }
+    : { code: 'M', status: 'Modified', description: 'changed tracked file', detail: `${formatBytes(change.byte_count)} bytes` };
+  return Object.freeze({ path: change.path, ...projection });
 }
 
 function reconcileWorkspaceChangesQueueState() {
   const changes = model.folderChanges;
+  const scanState = changes.length
+    ? 'changes'
+    : workspaceChangesQueueState.scanState === 'changes'
+      ? 'idle'
+      : workspaceChangesQueueState.scanState;
   const missing = changes.filter((change) => change.native_missing);
   const unsupported = changes.filter((change) => change.native_unsupported);
   workspaceChangesQueueState.canSaveAllPrivate = changes.length > 0
@@ -3357,9 +3658,16 @@ function reconcileWorkspaceChangesQueueState() {
     missing,
     selected,
     candidates,
+    scanState,
     queueSummary: changes.length
-    ? `${changes.length} native ${changes.length === 1 ? 'change' : 'changes'} ready`
-    : 'No folder scan is active.',
+      ? `${changes.length} native ${changes.length === 1 ? 'change' : 'changes'} ready`
+      : scanState === 'scanning'
+        ? 'Checking native folder…'
+        : scanState === 'clean'
+          ? 'Folder matches private history'
+          : scanState === 'error'
+            ? 'Folder check incomplete'
+            : 'Folder not checked yet',
   });
 }
 
@@ -4314,6 +4622,7 @@ async function inspectLiveAgentWork() {
   if (!model.agentLive) {
     model.agentLive = Object.freeze({ state: 'scanning', changes: Object.freeze([]) });
     renderWorkspaceCurrentNext();
+    renderReviews();
   }
   try {
     const result = JSON.parse(await invoke('inspect_agent_live_work', {
@@ -4328,6 +4637,7 @@ async function inspectLiveAgentWork() {
     if (JSON.stringify(model.agentLive) !== JSON.stringify(next)) {
       model.agentLive = next;
       renderWorkspaceCurrentNext();
+      renderReviews();
     }
     return true;
   } catch (error) {
@@ -4336,6 +4646,7 @@ async function inspectLiveAgentWork() {
     if (JSON.stringify(model.agentLive) !== JSON.stringify(next)) {
       model.agentLive = next;
       renderWorkspaceCurrentNext();
+      renderReviews();
     }
     return false;
   } finally {
@@ -4457,6 +4768,9 @@ const WORKSPACE_WORK_ACTION_CONTROLS = Object.freeze([
   Object.freeze({ id: 'create-folder', label: 'Create folder', source: true }),
   Object.freeze({ id: 'move-entry', label: 'Move or rename', source: true }),
   Object.freeze({ id: 'delete-entry', label: 'Delete entry', source: true }),
+  Object.freeze({ id: 'open-entry', label: 'Open with default app', source: true }),
+  Object.freeze({ id: 'reveal-entry', label: 'Reveal in Finder', source: true }),
+  Object.freeze({ id: 'open-workspace-folder', label: 'Open workspace folder', source: true }),
   Object.freeze({ id: 'scan-files', label: 'Find folder changes', source: true }),
   Object.freeze({ id: 'load-file', label: 'Open file', source: true }),
   Object.freeze({ id: 'preserve-edit', label: 'Preserve edit', source: true }),
@@ -4495,6 +4809,18 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
       'create-folder': createManagedFolderEntry,
       'move-entry': moveManagedEntry,
       'delete-entry': deleteManagedEntry,
+      'open-entry': () => openManagedWorkspaceEntry('open-entry'),
+      'reveal-entry': () => openManagedWorkspaceEntry('reveal-entry'),
+      'open-workspace-folder': async () => {
+        if (!beginNativeWorkspaceLaunch()) return false;
+        try {
+          await revealCurrentWorkspaceFolder();
+          showNotice('Opened the current workspace folder in Finder.');
+          return true;
+        } finally {
+          finishNativeWorkspaceLaunch();
+        }
+      },
       'load-file': inspectSelectedManagedFile,
       'preserve-edit': preserveManagedEditorText,
       'save-private': saveInspectedFilePrivately,
@@ -4505,7 +4831,11 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
     if (enabled) actionClosures.set(`activate:${spec.id}`, sourceAction);
     return Object.freeze({
       id: spec.id,
-      label: spec.id === 'scan-files'
+      label: spec.id === 'open-entry'
+        ? model.workspace?.entries.find((entry) => entry.path === workspaceFilesState.selectedEntry)?.type === 'folder'
+          ? 'Open in Finder'
+          : 'Open with default app'
+        : spec.id === 'scan-files'
         ? workspaceChangesQueueState.scanLabel
         : spec.id === 'save-all-private'
           ? workspaceChangesQueueState.saveAllLabel
@@ -4535,7 +4865,7 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
   workspaceWorkNextActions = actionClosures;
   const editorKind = !model.editor
     ? 'none'
-    : model.editor.text_editable && typeof model.editor.text === 'string'
+    : typeof model.editor.text === 'string'
       ? 'text'
       : 'binary';
   const structural = missing.length
@@ -4560,6 +4890,9 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
       generation,
       workbench: Object.freeze({
         files: Object.freeze({
+          workspaceLabel: currentWorkspaceDisplayName() || workspaceDisplayName(data.root),
+          workspaceRoot: data.root,
+          workspaceState: workspaceInstallationMatchesHandoff() ? 'agent-assigned' : 'current',
           entries: Object.freeze((data.entries || []).map((entry) => Object.freeze({
             value: entry.path,
             label: entry.path,
@@ -4579,10 +4912,12 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
           canSelectFile: workspaceChangesEditorState.canSelectFile,
           editorKind,
           editorText: editorKind === 'text' ? workspaceChangesEditorState.editorText : '',
-          baselineText: editorKind === 'text' ? model.editor.text : '',
+          baselineText: editorKind === 'text' ? workspaceEditorBaselineText(model.editor) : '',
+          baselineAvailable: editorKind === 'text' && workspaceEditorBaselineAvailable(model.editor),
           canEditText: editorKind === 'text' && workspaceChangesEditorState.canEditText,
           editState: workspaceChangesEditorState.editState,
           editVersion: workspaceChangesEditorState.editVersion,
+          scanState: queue.scanState,
           queueSummary: queue.queueSummary,
           queue: Object.freeze(model.folderChanges.map(folderChangePresentation)),
           autoSaveChecked: model.nativeCaptureEnabled,
@@ -4747,6 +5082,8 @@ function renderWorkspaceEntryNext(interactionGeneration = null, interactionKind 
             label: entry.projectRoot ? name : `${name} — ${entry.path}`,
             state: entry.path === workspace?.root
               ? 'current'
+              : unavailableRecentWorkspacePaths.has(entry.path)
+                ? 'unavailable'
               : entry.agentHandoffInstallation
                 ? 'agent-assigned'
                 : 'available',
@@ -5032,6 +5369,55 @@ async function revealCurrentWorkspaceFolder() {
   return opened;
 }
 
+async function openManagedWorkspaceEntry(action) {
+  const selectedPath = workspaceFilesState.selectedEntry;
+  const selected = model.workspace?.entries.find((entry) => entry.path === selectedPath) || null;
+  if (!selected || !['file', 'folder'].includes(selected.type)) {
+    showNotice('Choose a current file or folder before opening it outside Mesh.', true);
+    return false;
+  }
+  if (selected.type === 'folder' && action !== 'open-entry') {
+    showNotice('Folders open directly in Finder. Choose Open in Finder.', true);
+    return false;
+  }
+  if (!beginNativeWorkspaceLaunch()) return false;
+  try {
+    const binding = captureVerifiedWorkspace();
+    const generation = workspaceInstallationMatchesHandoff()
+      ? canonicalAgentHandoffGeneration(model.agentHandoff?.generation)
+      : null;
+    const result = JSON.parse(await invoke('open_managed_workspace_entry', {
+      expectedWorkspaceRoot: binding.root,
+      expectedWorkspaceDigest: binding.digest,
+      expectedWorkspaceInstallation: binding.installation,
+      expectedAgentHandoffGeneration: generation,
+      relativePath: selected.path,
+      entryKind: selected.type,
+      action,
+    }));
+    assertVerifiedWorkspace(binding);
+    const keys = result && typeof result === 'object' && !Array.isArray(result)
+      ? Object.keys(result).sort()
+      : [];
+    if (keys.join(',') !== 'action,entry_kind,opened,schema'
+      || result.schema !== 'mesh.workspace-entry-open/v1'
+      || result.action !== action
+      || result.entry_kind !== selected.type
+      || result.opened !== true
+      || workspaceFilesState.selectedEntry !== selected.path) {
+      throw new Error('The native workspace-entry launcher returned a stale or malformed result.');
+    }
+    showNotice(selected.type === 'folder'
+      ? `Opened ${selected.path} in Finder.`
+      : action === 'reveal-entry'
+        ? `Revealed ${selected.path} in Finder.`
+        : `Opened ${selected.path} with its default application.`);
+    return true;
+  } finally {
+    finishNativeWorkspaceLaunch();
+  }
+}
+
 function legacyRecentWorkspacePaths() {
   if (Array.isArray(model.recent?.workspaces)) {
     return model.recent.workspaces.filter((path) => typeof path === 'string' && path);
@@ -5261,13 +5647,22 @@ function recentWorkspacePresentation(entries = recentWorkspaceEntries()) {
   const selected = entries.find((entry) => entry.path === selectedPath) || null;
   const selectedHasAgent = Boolean(selected?.agentHandoffInstallation);
   const selectedIsCurrent = Boolean(selectedPath && selectedPath === model.workspace?.root);
+  const selectedIsUnavailable = Boolean(
+    selectedPath
+    && !selectedIsCurrent
+    && unavailableRecentWorkspacePaths.has(selectedPath)
+  );
   const interactionBlocked = workspaceInteractionInFlight();
   return Object.freeze({
     selectedPath,
     canSelect: !interactionBlocked && entries.length > 0,
     canOpen: !interactionBlocked && Boolean(selected) && !selectedIsCurrent,
     canForget: !interactionBlocked && Boolean(selected) && !selectedHasAgent && !selectedIsCurrent,
-    openLabel: selectedHasAgent ? 'Switch to finish agent' : 'Switch workspace',
+    openLabel: selectedIsUnavailable
+      ? 'Try again'
+      : selectedHasAgent
+        ? 'Switch to finish agent'
+        : 'Switch workspace',
     forgetTitle: selectedHasAgent
     ? 'Choose Finish agent handoff after every process using this folder has stopped before removing it from Recent workspaces.'
     : selectedIsCurrent
@@ -5275,7 +5670,9 @@ function recentWorkspacePresentation(entries = recentWorkspaceEntries()) {
       : '',
     hint: !selected
     ? 'Validated native workspaces appear here and remain available across restarts.'
-    : selectedHasAgent
+    : selectedIsUnavailable
+      ? 'Mesh could not reopen this shortcut. Restore its saved folder and try again, or choose Forget from list. Forgetting removes only the shortcut.'
+      : selectedHasAgent
       ? 'This folder is assigned to an agent. Return to it and choose Finish agent handoff after every process using it has stopped.'
       : selectedIsCurrent
         ? 'This is the open workspace. It stays remembered so Mesh can reopen it after restart. Switch to another workspace first, or use Roll back managed copy when removal is intended.'
@@ -7333,7 +7730,10 @@ function renderManagementChoices() {
     workspaceFilesState.movePath = '';
   }
   workspaceFilesState.canEditNewPath = available;
-  workspaceFilesState.canSelectEntry = available && entries.length > 0;
+  workspaceFilesState.canSelectEntry = Boolean(model.workspace)
+    && model.workspaceVerified
+    && !awaitingImport
+    && entries.length > 0;
   workspaceFilesState.canEditMovePath = available && Boolean(workspaceFilesState.selectedEntry);
   workspaceFilesState.status = stateBlocked && model.workspace
     ? 'Management is paused because the current workspace state could not be verified. Refresh before continuing.'
@@ -7353,6 +7753,23 @@ function renderManagementChoices() {
 }
 
 function workspaceFileActionEnabled(id) {
+  if (id === 'open-workspace-folder') {
+    return Boolean(
+      !workspaceInteractionInFlight()
+      && model.workspace
+      && model.workspaceVerified
+      && !rememberedWorkspaceNeedsImport(model.workspace),
+    );
+  }
+  if (id === 'open-entry' || id === 'reveal-entry') {
+    const entry = model.workspace?.entries.find((candidate) => candidate.path === workspaceFilesState.selectedEntry);
+    return Boolean(
+      !workspaceInteractionInFlight()
+      && model.workspaceVerified
+      && entry
+      && (id === 'open-entry' || entry.type === 'file'),
+    );
+  }
   if (id === 'create-text' || id === 'create-folder') {
     return workspaceFilesState.canEditNewPath && Boolean(workspaceFilesState.newPath);
   }
@@ -9538,6 +9955,7 @@ async function openManagedWorkspace(
   {
     choiceStillCurrent = null,
     choiceChangedMessage = 'The workspace choice changed while Mesh was checking the current folder. Review the visible choice and open it again.',
+    openSource = 'manual',
   } = {},
 ) {
   if (selection !== workspaceSelectionSequence) return false;
@@ -9558,7 +9976,7 @@ async function openManagedWorkspace(
     try {
       workspace = await call('workspace.open', { path: root });
     } catch (error) {
-      await recoverAmbiguousManagedWorkspaceOpen(sequence, error);
+      await recoverAmbiguousManagedWorkspaceOpen(sequence, error, openSource);
     }
     await installVerifiedWorkspace(async () => workspace, sequence, true);
     const rememberWarning = await rememberWorkspace(model.workspace.root);
@@ -9589,27 +10007,54 @@ async function openManagedWorkspace(
   return true;
 }
 
-async function recoverAmbiguousManagedWorkspaceOpen(sequence, cause) {
+async function recoverAmbiguousManagedWorkspaceOpen(sequence, cause, openSource) {
   // workspace.open is a local process boundary. The daemon can durably select the requested
   // workspace even when the webview never receives its reply, so the snapshot that preceded the
   // attempt is no longer safe to present as current. Keep the shared mutation guard held while
   // reading native truth and repairing recency/navigation; otherwise the recovered snapshot can
   // briefly enable another workspace action before the restart route is durable.
+  const deterministicRefusal = cause instanceof DaemonRefusal
+    && MANAGED_WORKSPACE_REFUSAL_CODES.has(cause.code);
   let recovered;
   try {
-    recovered = await installVerifiedWorkspace(
-      () => call('workspace.state'),
-      sequence,
-      true,
-    );
+    if (deterministicRefusal) {
+      const verified = await readVerifiedWorkspace(() => call('workspace.state'), sequence);
+      installWorkspaceSnapshot(verified.workspace, verified.checkpoint);
+      recovered = verified.workspace;
+    } else {
+      recovered = await installVerifiedWorkspace(
+        () => call('workspace.state'),
+        sequence,
+        true,
+      );
+    }
   } catch (recoveryError) {
+    if (
+      deterministicRefusal
+      && recoveryError instanceof DaemonRefusal
+      && recoveryError.code === 'no-workspace-open'
+    ) {
+      model.workspace = null;
+      model.checkpoint = null;
+      clearWorkspaceScopedState();
+      model.workspaceVerified = true;
+      setLocalService('ready');
+      renderWorkspace();
+      throw new ManagedWorkspaceOpenFailure(
+        cause.code,
+        managedWorkspaceOpenMessage(cause.code, openSource, false),
+      );
+    }
     throw new Error(
-      `Mesh could not confirm the requested open: ${cause} Mesh also could not verify which workspace is now open. Managed actions remain paused; choose Refresh before using either folder.`,
+      `Mesh could not confirm the requested open: ${errorMessage(cause)} Mesh also could not verify which workspace is now open. Managed actions remain paused; choose Refresh before using either folder.`,
       { cause: recoveryError },
     );
   }
 
-  const navigationWarning = await rememberWorkspace(recovered.root);
+  // A typed workspace.open refusal is guaranteed not to select or initialize anything. Reverify
+  // the current daemon workspace, but do not rewrite its already-correct native navigation as if
+  // an ambiguous open might have committed.
+  const navigationWarning = deterministicRefusal ? '' : await rememberWorkspace(recovered.root);
   assertCurrentWorkspaceVerification(sequence);
   if (
     !model.workspaceVerified
@@ -9619,7 +10064,7 @@ async function recoverAmbiguousManagedWorkspaceOpen(sequence, cause) {
   ) {
     markWorkspaceUnverified();
     throw new Error(
-      `Mesh could not confirm the requested open: ${cause} Mesh found the local service's current workspace, but could not keep its native navigation verified. Managed actions remain paused; choose Refresh before using either folder.`,
+      `Mesh could not confirm the requested open: ${errorMessage(cause)} Mesh found the local service's current workspace, but could not keep its native navigation verified. Managed actions remain paused; choose Refresh before using either folder.`,
       { cause },
     );
   }
@@ -9637,13 +10082,19 @@ async function recoverAmbiguousManagedWorkspaceOpen(sequence, cause) {
     await reconcileNavigationFromDaemon();
     markWorkspaceUnverified();
     throw new Error(
-      `Mesh could not confirm the requested open: ${cause} The workspace changed again while Mesh was repairing its navigation. Managed actions remain paused; choose Refresh before using either folder.`,
+      `Mesh could not confirm the requested open: ${errorMessage(cause)} The workspace changed again while Mesh was repairing its navigation. Managed actions remain paused; choose Refresh before using either folder.`,
       { cause: recoveryError },
     );
   }
   renderWorkspace();
+  if (deterministicRefusal) {
+    throw new ManagedWorkspaceOpenFailure(
+      cause.code,
+      managedWorkspaceOpenMessage(cause.code, openSource, true),
+    );
+  }
   throw new Error(
-    `Mesh could not confirm the requested open: ${cause} Mesh recovered and verified the workspace the local service actually has open at ${recovered.root}. Review it before continuing.${navigationWarning ? ` ${navigationWarning}` : ''}`,
+    `Mesh could not confirm the requested open: ${errorMessage(cause)} Mesh recovered and verified the workspace the local service actually has open. Review it before continuing.${navigationWarning ? ` ${navigationWarning}` : ''}`,
     { cause },
   );
 }
@@ -9680,7 +10131,7 @@ async function chooseManagedWorkspaceFromEntry(expectedContinuityKey) {
   } catch (error) {
     if (mutationStarted || selection === workspaceSelectionSequence) {
       if (!mutationStarted) renderPreview();
-      showNotice(String(error), true);
+      showNotice(errorMessage(error), true);
     }
     return false;
   } finally {
@@ -9712,7 +10163,7 @@ async function openManagedWorkspaceFromEntry(path, expectedContinuityKey) {
   } catch (error) {
     if (mutationStarted || selection === workspaceSelectionSequence) {
       renderPreview();
-      showNotice(String(error), true);
+      showNotice(errorMessage(error), true);
     }
     return false;
   } finally {
@@ -9727,13 +10178,25 @@ async function openRecentWorkspacePath(path, choiceStillCurrent, choiceChangedMe
     await openManagedWorkspace(path, selection, {
       choiceStillCurrent,
       choiceChangedMessage,
+      openSource: 'recent',
     });
+    unavailableRecentWorkspacePaths.delete(path);
+    renderWorkspace();
     return true;
   } catch (error) {
+    if (error instanceof ManagedWorkspaceOpenFailure) {
+      unavailableRecentWorkspacePaths.add(path);
+      selectedRecentWorkspacePath = path;
+      workspaceEntryDisclosureOpen = true;
+      renderWorkspace();
+      focusReactWorkspacePage('workspaces', '#workspace-entry-recent');
+      showNotice(error.message, true);
+      return false;
+    }
     const refreshSucceeded = await refresh();
     const currentReverified = refreshSucceeded && Boolean(model.workspace) && model.workspaceVerified;
     showNotice(
-      `${error} ${currentReverified
+      `${errorMessage(error)} ${currentReverified
         ? 'The current workspace remains open; remove or repair the unavailable folder before trying it again.'
         : refreshSucceeded
           ? 'No managed workspace is open; remove or repair the unavailable folder before trying it again.'
@@ -9802,6 +10265,9 @@ async function forgetSelectedRecentWorkspace(path) {
   if (!recent.canForget || !beginWorkspaceTransition()) return false;
   try {
     const warning = await forgetWorkspace(path);
+    if (!recentWorkspaceEntries().some((entry) => entry.path === path)) {
+      unavailableRecentWorkspacePaths.delete(path);
+    }
     showNotice(
       warning || `Removed ${path} from the recent-workspace list. Its folder and saved history were not changed.`,
       Boolean(warning),
@@ -10526,6 +10992,7 @@ async function scanNativeFolder({
   if (rememberedWorkspaceNeedsImport(model.workspace)) {
     model.folderChanges = [];
     model.nativeInspectionFailed = false;
+    workspaceChangesQueueState.scanState = 'idle';
     renderEditorChoices();
     if (!automatic) {
       showNotice('This folder is not saved in Mesh yet. Use Preview this folder to review its exact content before creating the private workspace.');
@@ -10541,6 +11008,7 @@ async function scanNativeFolder({
   folderScanInFlight = true;
   workspaceChangesQueueState.canScan = false;
   workspaceChangesQueueState.scanLabel = 'Finding changes…';
+  if (!periodic) workspaceChangesQueueState.scanState = 'scanning';
   if (!periodic) renderWorkspaceFilesChangesNext();
   const inspectionFailedBefore = model.nativeInspectionFailed;
   folderScanSettled = new Promise((resolve) => {
@@ -10586,6 +11054,8 @@ async function scanNativeFolder({
     queuePresentationChanged = JSON.stringify(model.folderChanges) !== JSON.stringify(nextFolderChanges);
     model.folderChanges = nextFolderChanges;
     model.nativeInspectionFailed = false;
+    if (changes.length > 0) workspaceChangesQueueState.scanState = 'changes';
+    else if (!periodic) workspaceChangesQueueState.scanState = 'clean';
     if (!changes.length) {
       if (!automatic) {
         showNotice('No supported native changes were found. The native folder matches private history.');
@@ -10655,6 +11125,7 @@ async function scanNativeFolder({
     // during inspection. That is still an incomplete view of native work. Preserve the failure
     // across Refresh and pause every write/new-agent action until a complete scan succeeds.
     model.nativeInspectionFailed = true;
+    workspaceChangesQueueState.scanState = 'error';
     showNotice(String(error), true);
     return false;
   } finally {
@@ -11106,6 +11577,19 @@ async function inspectSelectedManagedFile() {
     if (workspaceChangesEditorState.selectedFile !== relativePath) throw new WorkspaceVerificationSuperseded();
     installEditorInspection(editor);
   } catch (error) { showNotice(String(error), true); }
+}
+
+async function inspectManagedWorkspaceEntryFromFiles(relativePath) {
+  const entry = model.workspace?.entries.find((candidate) => candidate.path === relativePath) || null;
+  if (!entry || entry.type !== 'file' || !model.workspaceVerified || workspaceInstallationMatchesHandoff()) return false;
+  if (refuseEditorDraftFileDeparture(relativePath)) return false;
+  const knownFile = (model.workspace?.file_histories || []).some((history) => history.path === relativePath)
+    || (model.workspace?.native_untracked_files || []).includes(relativePath);
+  if (!knownFile) return false;
+  workspaceChangesEditorState.selectedFile = relativePath;
+  renderEditorChoices();
+  if (!workspaceChangesEditorState.canLoadFile) return false;
+  return inspectSelectedManagedFile();
 }
 
 function updateEditorDraftPresentation() {

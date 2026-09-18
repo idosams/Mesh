@@ -12,6 +12,7 @@ async function loadModule(path) {
     format: "cjs",
     platform: "node",
     write: false,
+    external: ["react", "react-dom", "react/jsx-runtime"],
   });
   const require = createRequire(import.meta.url);
   const module = { exports: {} };
@@ -98,7 +99,7 @@ test("the production navigation renders keyboard page controls only for an open 
   assert.match(navigation, /<nav aria-label="Primary pages"/);
   assert.equal((navigation.match(/<button/g) || []).length, 9);
   assert.match(navigation, /aria-current="page"[^>]*>Current/);
-  assert.match(navigation, /<button[^>]*class="[^"]* bg-secondary text-foreground[^"]*"[^>]*aria-current="page"[^>]*data-state="active"/);
+  assert.match(navigation, /<button[^>]*class="[^"]* border-primary text-foreground[^"]*"[^>]*aria-current="page"[^>]*data-state="active"/);
   assert.match(navigation, />Review</);
   assert.match(navigation, /aria-label="3 folder changes"/);
   const emptyNavigation = renderToStaticMarkup(React.createElement(ProductionNavigation, {
@@ -261,6 +262,52 @@ test("the Restore panel explains document changes with responsive keyboard-nativ
   assert.match(html, /flex flex-col gap-3[^>]*sm:flex-row/);
   assert.match(html, /Restore in working copy/);
   assert.match(html, /Undo last restore/);
+});
+
+test("Restore keeps large retained-file and version choices bounded and selected", async () => {
+  const React = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const restoreModule = await loadModule("./src/models/workspace-restore.ts");
+  const { WorkspaceRestore } = await loadModule("./src/organisms/workspace-restore.tsx");
+  const files = Array.from({ length: 4_096 }, (_, index) => ({
+    id: `object-${String(index).padStart(4, "0")}`,
+    path: `archive/file-${String(index).padStart(4, "0")}.txt`,
+    label: `archive/file-${String(index).padStart(4, "0")}.txt`,
+    format: "Text",
+  }));
+  const versions = Array.from({ length: 4_096 }, (_, index) => ({
+    id: `version-${String(index).padStart(4, "0")}`,
+    label: `Saved version ${String(index).padStart(4, "0")}`,
+  }));
+  const selectedFileId = files.at(-1).id;
+  const selectedVersionId = versions.at(-1).id;
+  assert.equal(restoreModule.workspaceRestoreFileProjection(files, "", selectedFileId).items.length, 500);
+  assert.equal(restoreModule.workspaceRestoreVersionProjection(versions, "", selectedVersionId).items.length, 500);
+
+  const html = renderToStaticMarkup(React.createElement(WorkspaceRestore, {
+    model: {
+      files,
+      selectedFileId,
+      versions,
+      selectedVersionId,
+      canSelectFile: true,
+      canSelectVersion: true,
+      canPreview: true,
+      canApply: false,
+      canUndo: false,
+      hint: "Choose an earlier version.",
+      preview: null,
+      undoLabel: "Undo last restore",
+    },
+    onIntent: () => assert.fail("SSR must not emit an intent"),
+  }));
+  assert.equal((html.match(/data-mesh-restore-file=/g) || []).length, 500);
+  assert.equal((html.match(/data-mesh-restore-version=/g) || []).length, 500);
+  assert.match(html, /500 of 4,096 matching retained files shown/);
+  assert.match(html, /500 of 4,096 matching saved versions shown/);
+  assert.match(html, /file-4095\.txt/);
+  assert.match(html, /version-4095/);
+  assert.doesNotMatch(html, /file-0000\.txt|version-0000/);
 });
 
 test("a verified Restore preview never claims it is ready while applying is blocked", async () => {

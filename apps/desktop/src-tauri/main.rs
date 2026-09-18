@@ -33,14 +33,19 @@ mod version_workspace;
 
 #[cfg(unix)]
 mod desktop {
+    use std::ffi::{CStr, CString};
     use std::fs;
-    use std::io::{self, BufRead as _, BufReader, Write as _};
+    use std::io::{self, BufRead as _, BufReader, Read as _, Seek as _, Write as _};
+    use std::os::fd::{AsRawFd as _, FromRawFd as _, RawFd};
+    use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
     use std::os::unix::net::UnixStream;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
+    #[cfg(target_os = "macos")]
+    use core_foundation::{base::TCFType as _, url::CFURL};
     use mesh_approval::{
         ApprovalDecision, Blake3 as ApprovalBlake3, ContentDigest as _, ExpectedHumanApproval,
         HumanApprovalReceiptDraft, APPROVAL_ALGORITHM, APPROVAL_APPLICATION_SCOPE,
@@ -54,7 +59,7 @@ mod desktop {
     use mesh_daemon::{
         CheckpointRuntimeParameters, LiveDaemon, ManagedContentDigest, ManagedDirectoryExport,
         ManagedEntryChange, ManagedFileExportPreview, ManagedTextFileError, ProtectedWorkspaceRoot,
-        VerifiedManagedWorkspacePath, WorkspaceVersionForkRequest, MAX_MANAGED_TEXT_BYTES,
+        VerifiedManagedWorkspacePath, WorkspaceVersionForkRequest,
     };
     use mesh_keychain::{
         fresh_approval_challenge, SecureEnclaveApprovalCredential, SecureEnclaveApprovalError,
@@ -75,13 +80,18 @@ mod desktop {
     use crate::native_capture_preference::NativeCapturePreference;
     use crate::recent_workspace::{RecentWorkspace, RecentWorkspaceEntry};
     use crate::renderer_proof::RendererProofRuntime;
-    use crate::review_inspection::{export_review_inspection, ReviewInspectionCopy};
+    use crate::review_inspection::{
+        export_review_inspection, prune_app_owned_review_inspections, ReviewInspectionCopy,
+    };
     use crate::version_workspace::VersionWorkspaceDirectory;
 
     const DESKTOP_SESSION: &str = "mesh-desktop";
     const DAEMON_REFUSAL_KIND: &str = "mesh-daemon-refusal";
     const DAEMON_REPLY_TIMEOUT: Duration = Duration::from_secs(10);
     const MAX_LOCAL_ENDPOINT_BYTES: usize = 100;
+    const MAX_RETAINED_REVIEW_INSPECTIONS: usize = 32;
+    const MAX_WORKSPACE_EDITOR_TEXT_BYTES: usize = 1_048_576;
+    const MAX_RENDERER_SCREENSHOT_BYTES: u64 = 16 * 1_024 * 1_024;
     const DAEMON_SOCKET_NAME: &str = "daemon.sock";
 
     #[cfg(feature = "git-integration")]
@@ -755,6 +765,361 @@ mod desktop {
         runtime.renderer_proof.configuration()
     }
 
+    #[cfg(target_os = "macos")]
+    const RENDERER_SCREENSHOT_OPEN_DIRECTORY_FLAGS: i32 = 0x0010_0000 | 0x0000_0100;
+    #[cfg(target_os = "macos")]
+    const RENDERER_SCREENSHOT_CREATE_FILE_FLAGS: i32 =
+        0x0000_0002 | 0x0000_0200 | 0x0000_0800 | 0x0000_0100;
+
+    #[cfg(target_os = "macos")]
+    #[allow(unsafe_code)]
+    fn renderer_screenshot_mkdirat(directory: RawFd, name: &CStr, mode: u32) -> io::Result<()> {
+        unsafe extern "C" {
+            fn mkdirat(directory: i32, path: *const std::ffi::c_char, mode: u32) -> i32;
+        }
+        // SAFETY: `name` is a live C string and `directory` is a retained directory descriptor.
+        if unsafe { mkdirat(directory, name.as_ptr(), mode) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[allow(unsafe_code, clashing_extern_declarations)]
+    fn renderer_screenshot_openat(
+        directory: RawFd,
+        name: &CStr,
+        flags: i32,
+        mode: i32,
+    ) -> io::Result<fs::File> {
+        unsafe extern "C" {
+            #[link_name = "openat"]
+            fn openat_with_mode(
+                directory: i32,
+                path: *const std::ffi::c_char,
+                flags: i32,
+                ...
+            ) -> i32;
+        }
+        // SAFETY: `name` is a live C string and a successful call transfers one descriptor.
+        let descriptor = unsafe { openat_with_mode(directory, name.as_ptr(), flags, mode) };
+        if descriptor < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: successful `openat` returned a fresh owned descriptor.
+        Ok(unsafe { fs::File::from_raw_fd(descriptor) })
+    }
+
+    #[cfg(target_os = "macos")]
+    #[allow(unsafe_code)]
+    fn renderer_screenshot_unlinkat(directory: RawFd, name: &CStr) -> io::Result<()> {
+        unsafe extern "C" {
+            fn unlinkat(directory: i32, path: *const std::ffi::c_char, flags: i32) -> i32;
+        }
+        // SAFETY: `name` is a live C string and flags=0 removes only the named non-directory entry.
+        if unsafe { unlinkat(directory, name.as_ptr(), 0) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn renderer_screenshot_dimensions(png: &[u8]) -> Result<(u32, u32), String> {
+        if png.len() < 256
+            || png.len() as u64 > MAX_RENDERER_SCREENSHOT_BYTES
+            || !png.starts_with(b"\x89PNG\r\n\x1a\n")
+            || png.get(12..16) != Some(b"IHDR")
+        {
+            return Err("packaged Files screenshot was not a bounded PNG".to_owned());
+        }
+        let width = u32::from_be_bytes(
+            png.get(16..20)
+                .and_then(|bytes| bytes.try_into().ok())
+                .ok_or_else(|| "packaged Files screenshot width was missing".to_owned())?,
+        );
+        let height = u32::from_be_bytes(
+            png.get(20..24)
+                .and_then(|bytes| bytes.try_into().ok())
+                .ok_or_else(|| "packaged Files screenshot height was missing".to_owned())?,
+        );
+        if !(64..=8_192).contains(&width) || !(64..=8_192).contains(&height) {
+            return Err("packaged Files screenshot dimensions were invalid".to_owned());
+        }
+        Ok((width, height))
+    }
+
+    #[cfg(target_os = "macos")]
+    fn persist_renderer_files_screenshot(
+        application_data: &Path,
+        filename: &str,
+        png: &[u8],
+    ) -> Result<(PathBuf, u32, u32, u64, String), String> {
+        let (width, height) = renderer_screenshot_dimensions(png)?;
+        let expected_application_data = fs::symlink_metadata(application_data)
+            .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        if !expected_application_data.is_dir()
+            || expected_application_data.file_type().is_symlink()
+            || expected_application_data.permissions().mode() & 0o077 != 0
+        {
+            return Err("packaged Files screenshot storage was not private".to_owned());
+        }
+        let application_data_directory = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(RENDERER_SCREENSHOT_OPEN_DIRECTORY_FLAGS)
+            .open(application_data)
+            .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        let actual_application_data = application_data_directory
+            .metadata()
+            .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        if actual_application_data.dev() != expected_application_data.dev()
+            || actual_application_data.ino() != expected_application_data.ino()
+            || !actual_application_data.is_dir()
+        {
+            return Err("packaged Files screenshot storage changed during capture".to_owned());
+        }
+
+        let root_name = CString::new("renderer-proof").expect("fixed screenshot directory name");
+        match renderer_screenshot_mkdirat(application_data_directory.as_raw_fd(), &root_name, 0o700)
+        {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(_) => {
+                return Err("packaged Files screenshot storage could not be created".to_owned())
+            }
+        }
+        let root_directory = renderer_screenshot_openat(
+            application_data_directory.as_raw_fd(),
+            &root_name,
+            RENDERER_SCREENSHOT_OPEN_DIRECTORY_FLAGS,
+            0,
+        )
+        .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        root_directory
+            .set_permissions(fs::Permissions::from_mode(0o700))
+            .map_err(|_| "packaged Files screenshot storage was not private".to_owned())?;
+        let root_metadata = root_directory
+            .metadata()
+            .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        if !root_metadata.is_dir() || root_metadata.permissions().mode() & 0o077 != 0 {
+            return Err("packaged Files screenshot storage was not private".to_owned());
+        }
+
+        let output_name = CString::new(filename)
+            .map_err(|_| "packaged Files screenshot name was invalid".to_owned())?;
+        if filename.is_empty()
+            || filename.as_bytes().contains(&b'/')
+            || !filename.starts_with("files-")
+            || !filename.ends_with(".png")
+        {
+            return Err("packaged Files screenshot name was invalid".to_owned());
+        }
+        let mut output_file = renderer_screenshot_openat(
+            root_directory.as_raw_fd(),
+            &output_name,
+            RENDERER_SCREENSHOT_CREATE_FILE_FLAGS,
+            0o600,
+        )
+        .map_err(|_| "packaged Files screenshot output could not be created".to_owned())?;
+        let written = (|| {
+            output_file
+                .write_all(png)
+                .map_err(|_| "packaged Files screenshot output could not be written".to_owned())?;
+            output_file
+                .sync_all()
+                .map_err(|_| "packaged Files screenshot output was not durable".to_owned())?;
+            output_file
+                .set_permissions(fs::Permissions::from_mode(0o600))
+                .map_err(|_| "packaged Files screenshot output was not private".to_owned())?;
+            let metadata = output_file
+                .metadata()
+                .map_err(|_| "packaged Files screenshot output was unreadable".to_owned())?;
+            if !metadata.is_file()
+                || metadata.permissions().mode() & 0o177 != 0
+                || metadata.nlink() != 1
+                || metadata.len() != png.len() as u64
+            {
+                return Err(
+                    "packaged Files screenshot output was not an exact private file".to_owned(),
+                );
+            }
+            output_file
+                .rewind()
+                .map_err(|_| "packaged Files screenshot output was unreadable".to_owned())?;
+            let mut stored = Vec::with_capacity(png.len());
+            (&mut output_file)
+                .take(MAX_RENDERER_SCREENSHOT_BYTES + 1)
+                .read_to_end(&mut stored)
+                .map_err(|_| "packaged Files screenshot output was unreadable".to_owned())?;
+            let stable = output_file
+                .metadata()
+                .map_err(|_| "packaged Files screenshot output was unreadable".to_owned())?;
+            if stored != png
+                || stable.dev() != metadata.dev()
+                || stable.ino() != metadata.ino()
+                || stable.len() != metadata.len()
+            {
+                return Err("packaged Files screenshot output changed during capture".to_owned());
+            }
+            Ok(metadata.len())
+        })();
+        let bytes = match written {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                let _ = renderer_screenshot_unlinkat(root_directory.as_raw_fd(), &output_name);
+                return Err(error);
+            }
+        };
+        let sha256 = encode_hex(ring::digest::digest(&ring::digest::SHA256, png).as_ref());
+        Ok((
+            application_data.join("renderer-proof").join(filename),
+            width,
+            height,
+            bytes,
+            sha256,
+        ))
+    }
+
+    #[cfg(target_os = "macos")]
+    #[allow(unsafe_code)]
+    #[tauri::command(async)]
+    async fn renderer_proof_capture_files_screenshot(
+        window: tauri::WebviewWindow,
+        runtime: State<'_, DesktopRuntime>,
+    ) -> Result<String, String> {
+        let Some(filename) = runtime.renderer_proof.files_screenshot_name()? else {
+            return Ok(Json::object([
+                ("schema", Json::text("mesh.renderer-proof-screenshot/v1")),
+                ("captured", Json::Bool(false)),
+                ("path", Json::Null),
+                ("width", Json::Null),
+                ("height", Json::Null),
+                ("bytes", Json::Null),
+                ("sha256", Json::Null),
+            ])
+            .encode());
+        };
+        let application_data = window
+            .app_handle()
+            .path()
+            .app_data_dir()
+            .map_err(|_| "packaged Files screenshot storage was unavailable".to_owned())?;
+        let (sender, receiver) = std::sync::mpsc::sync_channel::<Result<Vec<u8>, String>>(1);
+        window
+            .with_webview(move |webview| {
+                use block2::RcBlock;
+                use objc2::{runtime::AnyObject, MainThreadMarker};
+                use objc2_app_kit::{
+                    NSBitmapImageFileType, NSBitmapImageRep, NSBitmapImageRepPropertyKey, NSImage,
+                };
+                use objc2_foundation::{NSDictionary, NSError, NSNumber};
+                use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
+
+                let Some(marker) = MainThreadMarker::new() else {
+                    let _ = sender.send(Err(
+                        "packaged Files WebKit snapshot was not on the UI thread".to_owned(),
+                    ));
+                    return;
+                };
+                let completion: RcBlock<dyn Fn(*mut NSImage, *mut NSError)> =
+                    RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
+                        let snapshot = if !error.is_null() || image.is_null() {
+                            Err("packaged Files WebKit snapshot failed".to_owned())
+                        } else {
+                            // SAFETY: WebKit owns the callback image for the duration of this
+                            // completion block. AppKit returns retained immutable data at each
+                            // conversion step, and the bounded PNG is copied before callback return.
+                            unsafe { &*image }
+                                .TIFFRepresentation()
+                                .filter(|data| data.len() <= 64 * 1_024 * 1_024)
+                                .and_then(|data| NSBitmapImageRep::imageRepWithData(&data))
+                                .and_then(|bitmap| {
+                                    let properties = NSDictionary::<
+                                        NSBitmapImageRepPropertyKey,
+                                        AnyObject,
+                                    >::new();
+                                    // SAFETY: the empty properties dictionary has the exact key
+                                    // and value types AppKit requires for PNG representation.
+                                    unsafe {
+                                        bitmap.representationUsingType_properties(
+                                            NSBitmapImageFileType::PNG,
+                                            &properties,
+                                        )
+                                    }
+                                })
+                                .filter(|data| data.len() as u64 <= MAX_RENDERER_SCREENSHOT_BYTES)
+                                .map(|data| data.to_vec())
+                                .ok_or_else(|| {
+                                    "packaged Files WebKit snapshot had no pixels".to_owned()
+                                })
+                        };
+                        let _ = sender.send(snapshot);
+                    });
+                // SAFETY: Tauri supplies the live WKWebView on its owning UI thread. WebKit copies
+                // the heap block and invokes it with the snapshot image or an error.
+                unsafe {
+                    let view: &WKWebView = &*webview.inner().cast();
+                    let configuration = WKSnapshotConfiguration::new(marker);
+                    let width = NSNumber::new_f64(1_200.0);
+                    configuration.setSnapshotWidth(Some(&width));
+                    view.takeSnapshotWithConfiguration_completionHandler(
+                        Some(&configuration),
+                        &completion,
+                    );
+                }
+            })
+            .map_err(|_| "packaged Files WebKit snapshot could not start".to_owned())?;
+        let png = tauri::async_runtime::spawn_blocking(move || {
+            receiver.recv_timeout(Duration::from_secs(12))
+        })
+        .await
+        .map_err(|_| "packaged Files WebKit snapshot stopped unexpectedly".to_owned())?
+        .map_err(|_| "packaged Files WebKit snapshot timed out".to_owned())??;
+        let screenshot_nonce = filename
+            .strip_prefix("files-")
+            .and_then(|value| value.strip_suffix(".png"))
+            .ok_or_else(|| "packaged Files screenshot name was invalid".to_owned())?
+            .to_owned();
+        let (path, width, height, bytes, sha256) =
+            tauri::async_runtime::spawn_blocking(move || {
+                persist_renderer_files_screenshot(&application_data, &filename, &png)
+            })
+            .await
+            .map_err(|_| "packaged Files screenshot storage stopped unexpectedly".to_owned())??;
+        eprintln!(
+            "mesh-renderer-proof-screenshot:{screenshot_nonce}:{sha256}:{bytes}:{width}:{height}"
+        );
+        Ok(Json::object([
+            ("schema", Json::text("mesh.renderer-proof-screenshot/v1")),
+            ("captured", Json::Bool(true)),
+            ("path", Json::text(path.display().to_string())),
+            ("width", Json::Number(width as u64)),
+            ("height", Json::Number(height as u64)),
+            ("bytes", Json::Number(bytes)),
+            ("sha256", Json::text(sha256)),
+        ])
+        .encode())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[tauri::command(async)]
+    async fn renderer_proof_capture_files_screenshot(
+        runtime: State<'_, DesktopRuntime>,
+    ) -> Result<String, String> {
+        if runtime.renderer_proof.files_screenshot_name()?.is_some() {
+            return Err("packaged Files screenshots require macOS".to_owned());
+        }
+        Ok(Json::object([
+            ("schema", Json::text("mesh.renderer-proof-screenshot/v1")),
+            ("captured", Json::Bool(false)),
+            ("path", Json::Null),
+            ("width", Json::Null),
+            ("height", Json::Null),
+            ("bytes", Json::Null),
+            ("sha256", Json::Null),
+        ])
+        .encode())
+    }
+
     #[tauri::command]
     fn renderer_proof_report(
         runtime: State<'_, DesktopRuntime>,
@@ -928,6 +1293,25 @@ mod desktop {
         .encode())
     }
 
+    fn review_inspection_family(extension: &str) -> Option<&'static str> {
+        match extension {
+            "pdf" => Some("pdf"),
+            "pptx" => Some("presentation"),
+            "docx" => Some("document"),
+            "xlsx" => Some("spreadsheet"),
+            "png" | "jpg" | "gif" | "webp" => Some("image"),
+            _ => None,
+        }
+    }
+
+    fn review_inspection_families_match<'a>(extensions: impl IntoIterator<Item = &'a str>) -> bool {
+        let mut extensions = extensions.into_iter();
+        let Some(family) = extensions.next().and_then(review_inspection_family) else {
+            return false;
+        };
+        extensions.all(|extension| review_inspection_family(extension) == Some(family))
+    }
+
     fn review_inspection_destination(
         runtime: &DesktopRuntime,
         value: &str,
@@ -1019,20 +1403,16 @@ mod desktop {
                 .map_err(|error| daemon_refusal(&error.code, &error.message))?;
             let extension =
                 inspection_extension(artifact.path(), artifact.bytes()).ok_or_else(|| {
-                    "The saved bytes did not match a supported PDF or Office document.".to_owned()
+                    "The saved bytes did not match a supported document or image.".to_owned()
                 })?;
             let version = artifact.version().to_string();
             let digest = artifact.digest().to_string();
             artifacts.push((side, artifact, extension, version, digest));
         }
-        if artifacts
-            .iter()
-            .map(|(_, _, extension, _, _)| *extension)
-            .collect::<std::collections::HashSet<_>>()
-            .len()
-            != 1
-        {
-            return Err("The two saved sides were not the same document type.".to_owned());
+        if !review_inspection_families_match(
+            artifacts.iter().map(|(_, _, extension, _, _)| *extension),
+        ) {
+            return Err("The two saved sides were not the same artifact family.".to_owned());
         }
         let export = tauri::async_runtime::spawn_blocking(move || {
             let copies = artifacts
@@ -1081,6 +1461,150 @@ mod desktop {
             ("document_content_opened", Json::Bool(false)),
             ("finder_opened", Json::Bool(finder.is_ok())),
             ("warning", finder.err().map_or(Json::Null, Json::text)),
+        ])
+        .encode())
+    }
+
+    /// Materialize one immutable saved side into Mesh-owned private storage, then perform only the
+    /// exact native action named by the renderer. The response deliberately carries no path: the
+    /// renderer can request a closed action but never gains ambient filesystem authority.
+    #[tauri::command(async)]
+    #[allow(clippy::too_many_arguments)]
+    async fn open_review_artifact_inspection(
+        runtime: State<'_, DesktopRuntime>,
+        expected_workspace_root: String,
+        expected_workspace_digest: String,
+        expected_workspace_installation: String,
+        bundle: String,
+        target: String,
+        object_id: String,
+        side: String,
+        expected_version_id: String,
+        expected_content_digest: String,
+        action: String,
+    ) -> Result<String, String> {
+        let side = match side.as_str() {
+            "before" => "before",
+            "after" => "after",
+            _ => return Err("The requested saved side was not recognized.".to_owned()),
+        };
+        if !matches!(
+            action.as_str(),
+            "open-entry" | "reveal-entry" | "open-folder"
+        ) {
+            return Err("The saved-side action was not recognized.".to_owned());
+        }
+        let artifact = runtime
+            .daemon
+            .review_artifact_for_workspace(
+                &expected_workspace_root,
+                &expected_workspace_digest,
+                &expected_workspace_installation,
+                &bundle,
+                &target,
+                &object_id,
+                side,
+            )
+            .map_err(|error| daemon_refusal(&error.code, &error.message))?;
+        let version = artifact.version().to_string();
+        let digest = artifact.digest().to_string();
+        let extension = admitted_review_inspection_extension(
+            artifact.path(),
+            artifact.bytes(),
+            &version,
+            &digest,
+            &expected_version_id,
+            &expected_content_digest,
+            &action,
+        )?;
+        let inspection_root = runtime.recent.directory().join("review-inspection");
+        if let Err(error) = fs::create_dir(&inspection_root) {
+            if error.kind() != std::io::ErrorKind::AlreadyExists {
+                return Err(format!(
+                    "Mesh could not create its private review-copy folder: {error}"
+                ));
+            }
+        }
+        let root_metadata = fs::symlink_metadata(&inspection_root).map_err(|error| {
+            format!("Mesh could not inspect its private review-copy folder: {error}")
+        })?;
+        if !root_metadata.file_type().is_dir() || root_metadata.file_type().is_symlink() {
+            return Err("Mesh's private review-copy folder is not a real directory.".to_owned());
+        }
+        let mut root_permissions = root_metadata.permissions();
+        root_permissions.set_mode(0o700);
+        fs::set_permissions(&inspection_root, root_permissions).map_err(|error| {
+            format!("Mesh could not protect its private review-copy folder: {error}")
+        })?;
+        prune_app_owned_review_inspections(
+            &inspection_root,
+            MAX_RETAINED_REVIEW_INSPECTIONS.saturating_sub(1),
+        )
+        .map_err(|error| error.to_string())?;
+        let export = tauri::async_runtime::spawn_blocking({
+            let inspection_root = inspection_root.clone();
+            let bundle = bundle.clone();
+            let target = target.clone();
+            let object_id = object_id.clone();
+            move || {
+                export_review_inspection(
+                    &inspection_root,
+                    &bundle,
+                    &target,
+                    &object_id,
+                    &[ReviewInspectionCopy {
+                        side,
+                        reviewed_path: artifact.path(),
+                        extension,
+                        version: &version,
+                        digest: &digest,
+                        bytes: artifact.bytes(),
+                    }],
+                )
+                .map(|export| (export, version, digest))
+            }
+        })
+        .await
+        .map_err(|_| "The exact review-copy preparation stopped unexpectedly.".to_owned())?
+        .map_err(|error| error.to_string())?;
+        let (export, version, digest) = export;
+        let file = export
+            .files
+            .first()
+            .ok_or_else(|| "The exact saved-side copy was not created.".to_owned())?;
+        let (reference, launcher_action) = if action == "open-folder" {
+            (
+                stable_native_reference(&export.directory, true)?,
+                "open-entry",
+            )
+        } else {
+            (stable_native_reference(&file.path, false)?, action.as_str())
+        };
+        #[cfg(target_os = "macos")]
+        let default_application = if action == "open-entry" {
+            Some(default_native_application(&file.path)?)
+        } else if action == "open-folder" {
+            Some(PathBuf::from(FINDER_APPLICATION_PATH))
+        } else {
+            None
+        };
+        #[cfg(not(target_os = "macos"))]
+        let default_application: Option<PathBuf> = None;
+        open_native_entry_with(
+            Path::new(NATIVE_FOLDER_OPENER),
+            &reference,
+            launcher_action,
+            default_application.as_deref(),
+            NATIVE_FOLDER_OPEN_TIMEOUT,
+        )?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.review-side-open/v1")),
+            ("side", Json::text(side)),
+            ("action", Json::text(action)),
+            ("version_id", Json::text(version)),
+            ("content_digest", Json::text(digest)),
+            ("opened", Json::Bool(true)),
+            ("working_folder_unchanged", Json::Bool(true)),
         ])
         .encode())
     }
@@ -1723,6 +2247,8 @@ mod desktop {
 
     #[cfg(target_os = "macos")]
     const NATIVE_FOLDER_OPENER: &str = "/usr/bin/open";
+    #[cfg(target_os = "macos")]
+    const FINDER_APPLICATION_PATH: &str = "/System/Library/CoreServices/Finder.app";
     #[cfg(target_os = "linux")]
     const NATIVE_FOLDER_OPENER: &str = "/usr/bin/xdg-open";
     #[cfg(target_os = "windows")]
@@ -1732,6 +2258,17 @@ mod desktop {
     const CODEX_BUNDLE_IDENTIFIER: &str = "com.openai.codex";
     #[cfg(any(target_os = "macos", test))]
     const TERMINAL_BUNDLE_IDENTIFIER: &str = "com.apple.Terminal";
+
+    #[cfg(target_os = "macos")]
+    #[link(name = "CoreServices", kind = "framework")]
+    #[allow(unsafe_code)]
+    unsafe extern "C" {
+        fn LSCopyDefaultApplicationURLForURL(
+            url: core_foundation::url::CFURLRef,
+            roles: u32,
+            error: *mut *const std::ffi::c_void,
+        ) -> core_foundation::url::CFURLRef;
+    }
 
     fn wait_for_launcher(
         mut child: std::process::Child,
@@ -1784,6 +2321,229 @@ mod desktop {
             path,
             NATIVE_FOLDER_OPEN_TIMEOUT,
         )
+    }
+
+    fn stable_native_reference(path: &Path, directory: bool) -> Result<PathBuf, String> {
+        let metadata = fs::symlink_metadata(path)
+            .map_err(|error| format!("Mesh could not inspect the exact review copy: {error}"))?;
+        let expected_kind = if directory {
+            metadata.file_type().is_dir()
+        } else {
+            metadata.file_type().is_file()
+        };
+        if !expected_kind || metadata.file_type().is_symlink() {
+            return Err("The exact review copy changed before it could be opened.".to_owned());
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let reference = PathBuf::from(format!("/.vol/{}/{}", metadata.dev(), metadata.ino()));
+            let stable = fs::symlink_metadata(&reference).map_err(|error| {
+                format!("Mesh could not bind the exact review copy to a stable reference: {error}")
+            })?;
+            let stable_kind = if directory {
+                stable.file_type().is_dir()
+            } else {
+                stable.file_type().is_file()
+            };
+            if stable_kind
+                && !stable.file_type().is_symlink()
+                && stable.dev() == metadata.dev()
+                && stable.ino() == metadata.ino()
+            {
+                Ok(reference)
+            } else {
+                Err(
+                    "The stable review-copy reference did not match the exact saved bytes."
+                        .to_owned(),
+                )
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Ok(path.to_path_buf())
+        }
+    }
+
+    fn safe_review_text_extension(path: &str, bytes: &[u8]) -> Option<&'static str> {
+        if std::str::from_utf8(bytes).is_err() {
+            return None;
+        }
+        match Path::new(path)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("md") => Some("md"),
+            Some("json") => Some("json"),
+            Some("yaml") => Some("yaml"),
+            Some("yml") => Some("yml"),
+            Some("toml") => Some("toml"),
+            Some("csv") => Some("csv"),
+            Some("log") => Some("log"),
+            Some("rs") => Some("rs"),
+            Some("js") => Some("js"),
+            Some("jsx") => Some("jsx"),
+            Some("ts") => Some("ts"),
+            Some("tsx") => Some("tsx"),
+            Some("css") => Some("css"),
+            Some("c") => Some("c"),
+            Some("cc") => Some("cc"),
+            Some("cpp") => Some("cpp"),
+            Some("h") => Some("h"),
+            Some("hpp") => Some("hpp"),
+            Some("py") => Some("py"),
+            Some("rb") => Some("rb"),
+            Some("go") => Some("go"),
+            Some("java") => Some("java"),
+            Some("swift") => Some("swift"),
+            Some("kt") => Some("kt"),
+            _ => Some("txt"),
+        }
+    }
+
+    fn safe_review_image_extension(path: &str, bytes: &[u8]) -> Option<&'static str> {
+        match Path::new(path)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("png") if bytes.starts_with(b"\x89PNG\r\n\x1a\n") => Some("png"),
+            Some("jpg" | "jpeg") if bytes.starts_with(&[0xff, 0xd8, 0xff]) => Some("jpg"),
+            Some("gif") if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") => {
+                Some("gif")
+            }
+            Some("webp")
+                if bytes.len() >= 12
+                    && bytes.starts_with(b"RIFF")
+                    && bytes.get(8..12) == Some(b"WEBP") =>
+            {
+                Some("webp")
+            }
+            _ => None,
+        }
+    }
+
+    fn admitted_review_inspection_extension(
+        path: &str,
+        bytes: &[u8],
+        version: &str,
+        digest: &str,
+        expected_version: &str,
+        expected_digest: &str,
+        action: &str,
+    ) -> Result<&'static str, String> {
+        if version != expected_version || digest != expected_digest {
+            return Err(
+                "The saved side changed before the native action began. Refresh Review and choose the exact side again."
+                    .to_owned(),
+            );
+        }
+        let safe_open_extension = inspection_extension(path, bytes)
+            .or_else(|| safe_review_image_extension(path, bytes))
+            .or_else(|| safe_review_text_extension(path, bytes));
+        if action == "open-entry" && safe_open_extension.is_none() {
+            return Err(
+                "This exact binary copy cannot be opened safely by default. Use Reveal in Finder or Open copy folder instead."
+                    .to_owned(),
+            );
+        }
+        Ok(safe_open_extension.unwrap_or("bin"))
+    }
+
+    fn live_raster_data_url(path: &str, bytes: &[u8]) -> Option<String> {
+        if bytes.len() > 8 * 1024 * 1024 {
+            return None;
+        }
+        let extension = Path::new(path)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)?
+            .to_ascii_lowercase();
+        let mime = match extension.as_str() {
+            "png" if bytes.starts_with(b"\x89PNG\r\n\x1a\n") => "image/png",
+            "jpg" | "jpeg" if bytes.starts_with(&[0xff, 0xd8, 0xff]) => "image/jpeg",
+            "gif" if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") => "image/gif",
+            "webp"
+                if bytes.len() >= 12
+                    && bytes.starts_with(b"RIFF")
+                    && bytes.get(8..12) == Some(b"WEBP") =>
+            {
+                "image/webp"
+            }
+            _ => return None,
+        };
+        Some(format!("data:{mime};base64,{}", encode_base64(bytes)))
+    }
+
+    fn open_native_entry_with(
+        program: &std::path::Path,
+        reference: &std::path::Path,
+        action: &str,
+        default_application: Option<&std::path::Path>,
+        timeout: Duration,
+    ) -> Result<(), String> {
+        let mut command = Command::new(program);
+        match action {
+            "open-entry" => {
+                if let Some(application) = default_application {
+                    command.arg("-a").arg(application);
+                }
+            }
+            "reveal-entry" => {
+                if default_application.is_some() {
+                    return Err("Finder reveal cannot name a document application".to_owned());
+                }
+                #[cfg(target_os = "macos")]
+                command.arg("-R");
+            }
+            _ => return Err("The workspace-entry action was not recognized".to_owned()),
+        }
+        let child = command
+            .arg(reference)
+            .spawn()
+            .map_err(|error| format!("The workspace-entry launcher could not start: {error}"))?;
+        wait_for_launcher(
+            child,
+            timeout,
+            "The operating system could not open this workspace entry. Try again or open the workspace folder.",
+            "The workspace-entry launcher did not finish. Try again or open the workspace folder.",
+            "The workspace-entry launcher result was unavailable",
+        )
+    }
+
+    #[cfg(target_os = "macos")]
+    #[allow(unsafe_code)]
+    fn default_native_application(path: &Path) -> Result<PathBuf, String> {
+        let url = CFURL::from_path(path, false).ok_or_else(|| {
+            "The exact saved copy could not be represented as a file URL.".to_owned()
+        })?;
+        // SAFETY: LaunchServices borrows the valid CFURL for this call. Passing no error output
+        // avoids an additional owned CF object. A non-null result follows the Create rule and is
+        // immediately wrapped so it is released after its filesystem path is copied.
+        let application = unsafe {
+            LSCopyDefaultApplicationURLForURL(
+                url.as_concrete_TypeRef(),
+                u32::MAX,
+                std::ptr::null_mut(),
+            )
+        };
+        if application.is_null() {
+            return Err(
+                "No default application is registered for this exact saved file type.".to_owned(),
+            );
+        }
+        // SAFETY: the non-null result is owned under LaunchServices' documented Create rule.
+        let application = unsafe { CFURL::wrap_under_create_rule(application) };
+        let path = application.to_path().ok_or_else(|| {
+            "The default application did not resolve to a local application bundle.".to_owned()
+        })?;
+        if !path.is_absolute() || !path.is_dir() {
+            return Err(
+                "The default application did not resolve to a local application bundle.".to_owned(),
+            );
+        }
+        Ok(path)
     }
 
     #[cfg(any(target_os = "macos", test))]
@@ -1974,6 +2734,82 @@ mod desktop {
             ),
             ("stable", Json::Bool(true)),
             ("native_folder", Json::Bool(true)),
+        ])
+        .encode())
+    }
+
+    #[tauri::command(async)]
+    #[allow(clippy::too_many_arguments)]
+    fn open_managed_workspace_entry(
+        runtime: State<'_, DesktopRuntime>,
+        expected_workspace_root: String,
+        expected_workspace_digest: String,
+        expected_workspace_installation: String,
+        expected_agent_handoff_generation: Option<String>,
+        relative_path: String,
+        entry_kind: String,
+        action: String,
+    ) -> Result<String, String> {
+        if let Some(generation) = expected_agent_handoff_generation.as_deref() {
+            parse_agent_handoff_generation(generation)?;
+        }
+        let is_directory = match entry_kind.as_str() {
+            "file" => false,
+            "folder" => true,
+            _ => return Err("The selected workspace entry kind was not recognized".to_owned()),
+        };
+        if action != "open-entry" && action != "reveal-entry" {
+            return Err("The workspace-entry action was not recognized".to_owned());
+        }
+        if is_directory && action == "reveal-entry" {
+            return Err("Folders are opened in Finder rather than revealed as files".to_owned());
+        }
+        let entry = runtime
+            .daemon
+            .verified_managed_workspace_entry(
+                &expected_workspace_root,
+                &expected_workspace_digest,
+                &expected_workspace_installation,
+                expected_agent_handoff_generation.as_deref(),
+                &relative_path,
+                is_directory,
+            )
+            .map_err(|error| error.to_string())?;
+        entry.ensure_current().map_err(|error| {
+            format!("The selected workspace entry changed before it could be opened: {error}")
+        })?;
+        #[cfg(target_os = "macos")]
+        let launch_reference = entry.stable_reference().map_err(|error| {
+            format!(
+                "The selected workspace entry could not be bound to a stable reference: {error}"
+            )
+        })?;
+        #[cfg(not(target_os = "macos"))]
+        let launch_reference = entry.path().to_path_buf();
+        #[cfg(target_os = "macos")]
+        let default_application = if action == "open-entry" {
+            if is_directory {
+                Some(PathBuf::from(FINDER_APPLICATION_PATH))
+            } else {
+                Some(default_native_application(entry.path())?)
+            }
+        } else {
+            None
+        };
+        #[cfg(not(target_os = "macos"))]
+        let default_application: Option<PathBuf> = None;
+        open_native_entry_with(
+            std::path::Path::new(NATIVE_FOLDER_OPENER),
+            &launch_reference,
+            &action,
+            default_application.as_deref(),
+            NATIVE_FOLDER_OPEN_TIMEOUT,
+        )?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.workspace-entry-open/v1")),
+            ("action", Json::text(action)),
+            ("entry_kind", Json::text(entry_kind)),
+            ("opened", Json::Bool(true)),
         ])
         .encode())
     }
@@ -3732,9 +4568,16 @@ mod desktop {
             .reopen_existing_workspace(std::path::Path::new(path))
             .map(|workspace| workspace.to_json().encode())
             .map_err(|error| {
+                let message = match error.code.as_str() {
+                    "workspace-unreachable" => "Mesh could not reach an initialized saved workspace in this folder. Choose Import if it is an ordinary project folder; nothing was opened, initialized, or changed.",
+                    "workspace-payload-store-unreachable" => "Mesh found the saved workspace, but its private file history is unavailable. Leave the folder unchanged and try again; nothing was opened or changed.",
+                    "workspace-index-unavailable" => "Mesh found the saved workspace, but its private history index is unavailable. Leave the folder unchanged and try again; nothing was opened or changed.",
+                    "workspace-damaged" | "workspace-nothing-readable" | "workspace-contradictory" => "Mesh found the saved workspace, but could not verify its private history. Leave the folder unchanged and copy diagnostics before repairing or removing anything; nothing was opened or changed.",
+                    _ => "Mesh could not verify this saved workspace. Nothing was opened, initialized, or changed.",
+                };
                 daemon_refusal(
                     &error.code,
-                    "This folder is not an initialized managed workspace, or its durable history is unavailable. Choose Import for an ordinary project folder; nothing was initialized or changed.",
+                    message,
                 )
             })
     }
@@ -4052,6 +4895,87 @@ mod desktop {
         .encode())
     }
 
+    #[tauri::command]
+    async fn inspect_agent_live_file(
+        runtime: State<'_, DesktopRuntime>,
+        expected_workspace_root: String,
+        expected_workspace_digest: String,
+        expected_workspace_installation: String,
+        expected_agent_handoff_generation: String,
+        relative_path: String,
+    ) -> Result<String, String> {
+        parse_agent_handoff_generation(&expected_agent_handoff_generation)?;
+        let snapshot = runtime
+            .daemon
+            .inspect_agent_live_file(
+                &expected_workspace_root,
+                &expected_workspace_digest,
+                &expected_workspace_installation,
+                &expected_agent_handoff_generation,
+                &relative_path,
+            )
+            .map_err(|error| error.to_string())?;
+        let mut preview_kind = "metadata";
+        let mut image_data_url = None;
+        let mut preview_error = None;
+        if snapshot.text().is_some() {
+            preview_kind = "text";
+        } else if let Some(image) = live_raster_data_url(snapshot.path(), snapshot.bytes()) {
+            preview_kind = "image";
+            image_data_url = Some(image);
+        } else if !snapshot.bytes().is_empty()
+            && inspection_extension(snapshot.path(), snapshot.bytes()).is_some()
+        {
+            let path = snapshot.path().to_owned();
+            let bytes = snapshot.bytes().to_vec();
+            let page = path.to_ascii_lowercase().ends_with(".pdf").then_some(1);
+            match tauri::async_runtime::spawn_blocking(move || render_artifact(&path, &bytes, page))
+                .await
+                .map_err(|_| "The live artifact preview stopped unexpectedly".to_owned())?
+            {
+                Ok(rendered) => {
+                    preview_kind = "artifact";
+                    image_data_url = Some(format!(
+                        "data:image/png;base64,{}",
+                        encode_base64(&rendered.png)
+                    ));
+                }
+                Err(error) => preview_error = Some(error.to_string()),
+            }
+        }
+        Ok(Json::object([
+            ("schema", Json::text("mesh.agent-live-file/v1")),
+            ("workspace_root", Json::text(snapshot.root())),
+            ("workspace_digest", Json::text(snapshot.digest())),
+            (
+                "workspace_installation",
+                Json::text(snapshot.installation()),
+            ),
+            (
+                "agent_handoff_generation",
+                Json::text(snapshot.generation()),
+            ),
+            ("path", Json::text(snapshot.path())),
+            ("kind", Json::text(snapshot.kind())),
+            ("byte_count", Json::Number(snapshot.byte_count())),
+            ("content_digest", Json::text(snapshot.content_digest())),
+            ("executable", Json::Bool(snapshot.executable())),
+            ("text", snapshot.text().map_or(Json::Null, Json::text)),
+            ("preview_kind", Json::text(preview_kind)),
+            (
+                "image_data_url",
+                image_data_url.map_or(Json::Null, Json::text),
+            ),
+            (
+                "preview_error",
+                preview_error.map_or(Json::Null, Json::text),
+            ),
+            ("mutable", Json::Bool(true)),
+            ("recorded", Json::Bool(false)),
+        ])
+        .encode())
+    }
+
     #[tauri::command(async)]
     fn inspect_managed_file(
         runtime: State<'_, DesktopRuntime>,
@@ -4060,15 +4984,24 @@ mod desktop {
         expected_workspace_digest: String,
         expected_workspace_installation: String,
     ) -> Result<String, String> {
-        let file = runtime
+        let (file, baseline_text) = runtime
             .daemon
             .with_verified_managed_workspace(
                 &expected_workspace_root,
                 &expected_workspace_digest,
                 &expected_workspace_installation,
-                || runtime.daemon.inspect_managed_file(&relative_path),
+                || {
+                    runtime.daemon.inspect_managed_file_with_durable_text(
+                        &relative_path,
+                        MAX_WORKSPACE_EDITOR_TEXT_BYTES,
+                    )
+                },
             )
             .map_err(|error| error.to_string())?;
+        let editor_text = (file.byte_count()
+            <= u64::try_from(MAX_WORKSPACE_EDITOR_TEXT_BYTES).unwrap_or(u64::MAX))
+        .then(|| file.text())
+        .flatten();
         Ok(Json::object([
             ("path", Json::text(file.path())),
             ("current_version", Json::text(file.current_version())),
@@ -4078,15 +5011,19 @@ mod desktop {
                 Json::text(file.content_digest().to_string()),
             ),
             ("executable", Json::Bool(file.executable())),
-            ("text", file.text().map_or(Json::Null, Json::text)),
-            ("text_editable", Json::Bool(file.text().is_some())),
+            ("text", editor_text.map_or(Json::Null, Json::text)),
+            (
+                "baseline_text",
+                baseline_text.as_deref().map_or(Json::Null, Json::text),
+            ),
+            ("text_editable", Json::Bool(editor_text.is_some())),
             (
                 "modified_from_current_version",
                 Json::Bool(file.modified_from_current_version()),
             ),
             (
                 "max_text_bytes",
-                Json::Number(MAX_MANAGED_TEXT_BYTES as u64),
+                Json::Number(MAX_WORKSPACE_EDITOR_TEXT_BYTES as u64),
             ),
         ])
         .encode())
@@ -4109,6 +5046,10 @@ mod desktop {
                 || runtime.daemon.inspect_native_untracked_file(&relative_path),
             )
             .map_err(|error| error.to_string())?;
+        let preview_text = (file.byte_count()
+            <= u64::try_from(MAX_WORKSPACE_EDITOR_TEXT_BYTES).unwrap_or(u64::MAX))
+        .then(|| file.text())
+        .flatten();
         Ok(Json::object([
             ("path", Json::text(file.path())),
             ("byte_count", Json::Number(file.byte_count())),
@@ -4117,7 +5058,7 @@ mod desktop {
                 Json::text(file.content_digest().to_string()),
             ),
             ("executable", Json::Bool(file.executable())),
-            ("text", file.text().map_or(Json::Null, Json::text)),
+            ("text", preview_text.map_or(Json::Null, Json::text)),
             ("text_editable", Json::Bool(false)),
             ("native_untracked", Json::Bool(true)),
         ])
@@ -5611,6 +6552,7 @@ mod desktop {
                 pick_folder,
                 recent_workspace_status,
                 renderer_proof_configuration,
+                renderer_proof_capture_files_screenshot,
                 renderer_proof_report,
                 renderer_proof_accept_private_export_confirmation,
                 renderer_proof_failure,
@@ -5619,6 +6561,7 @@ mod desktop {
                 open_current_review,
                 render_review_artifact,
                 export_review_artifact_inspection,
+                open_review_artifact_inspection,
                 approval_credential_status,
                 enroll_approval_credential,
                 approve_current_review,
@@ -5627,6 +6570,7 @@ mod desktop {
                 remember_managed_workspace,
                 forget_managed_workspace,
                 reveal_managed_workspace,
+                open_managed_workspace_entry,
                 reconcile_managed_workspace_navigation,
                 reconcile_current_workspace_navigation,
                 prepare_managed_workspace_agent_path,
@@ -5643,6 +6587,7 @@ mod desktop {
                 set_native_capture_preference,
                 inspect_agent_finish_preflight,
                 inspect_agent_live_work,
+                inspect_agent_live_file,
                 inspect_managed_file,
                 inspect_native_file,
                 inspect_managed_directory_installation,
@@ -5782,9 +6727,107 @@ mod desktop {
         use super::*;
         use ring::rand::SystemRandom;
         use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
-        use std::os::unix::fs::PermissionsExt as _;
         use std::os::unix::net::UnixListener;
         use std::thread;
+
+        #[cfg(target_os = "macos")]
+        #[test]
+        fn renderer_files_screenshot_is_private_bounded_png() {
+            let root = std::env::temp_dir().join(format!(
+                "mesh-renderer-screenshot-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("current time")
+                    .as_nanos()
+            ));
+            let application_data = root.join("application-data");
+            fs::create_dir_all(&application_data).expect("private application data");
+            fs::set_permissions(&application_data, fs::Permissions::from_mode(0o700))
+                .expect("private application data permissions");
+            let (path, width, height, bytes, sha256) = persist_renderer_files_screenshot(
+                &application_data,
+                "files-abababababababababababababababababababababababababababababababab.png",
+                include_bytes!("icons/icon.png"),
+            )
+            .expect("app-owned screenshot conversion");
+            let metadata = fs::metadata(&path).expect("screenshot metadata");
+            assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+            assert!((64..=8_192).contains(&width));
+            assert!((64..=8_192).contains(&height));
+            assert_eq!(metadata.len(), bytes);
+            assert_eq!(sha256.len(), 64);
+            assert!(fs::read(&path)
+                .expect("screenshot bytes")
+                .starts_with(b"\x89PNG\r\n\x1a\n"));
+            assert!(!path.with_extension("tiff").exists());
+            fs::remove_dir_all(&root).expect("screenshot cleanup");
+        }
+
+        #[cfg(target_os = "macos")]
+        #[test]
+        fn renderer_files_screenshot_never_follows_replaced_paths() {
+            use std::os::unix::fs::symlink;
+
+            let root = std::env::temp_dir().join(format!(
+                "mesh-renderer-screenshot-race-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("current time")
+                    .as_nanos()
+            ));
+            let application_data = root.join("application-data");
+            let outside = root.join("outside");
+            fs::create_dir_all(&application_data).expect("private application data");
+            fs::create_dir_all(&outside).expect("outside directory");
+            fs::set_permissions(&application_data, fs::Permissions::from_mode(0o700))
+                .expect("private application data permissions");
+            let proof = application_data.join("renderer-proof");
+            let screenshot_name =
+                "files-cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd.png";
+            let victim = outside.join("victim.png");
+
+            symlink(&outside, &proof).expect("replacement proof root");
+            assert!(persist_renderer_files_screenshot(
+                &application_data,
+                screenshot_name,
+                include_bytes!("icons/icon.png"),
+            )
+            .is_err());
+            assert!(fs::read_dir(&outside)
+                .expect("outside listing")
+                .next()
+                .is_none());
+            fs::remove_file(&proof).expect("remove replacement proof root");
+
+            fs::create_dir(&proof).expect("real proof root");
+            fs::set_permissions(&proof, fs::Permissions::from_mode(0o700))
+                .expect("proof root permissions");
+            symlink(&victim, proof.join(screenshot_name)).expect("dangling output symlink");
+            assert!(persist_renderer_files_screenshot(
+                &application_data,
+                screenshot_name,
+                include_bytes!("icons/icon.png"),
+            )
+            .is_err());
+            assert!(!victim.exists());
+            fs::remove_file(proof.join(screenshot_name)).expect("remove dangling output symlink");
+
+            fs::write(proof.join(screenshot_name), b"preexisting user bytes")
+                .expect("preexisting output");
+            assert!(persist_renderer_files_screenshot(
+                &application_data,
+                screenshot_name,
+                include_bytes!("icons/icon.png"),
+            )
+            .is_err());
+            assert_eq!(
+                fs::read(proof.join(screenshot_name)).expect("preserved output"),
+                b"preexisting user bytes"
+            );
+            fs::remove_dir_all(&root).expect("screenshot race cleanup");
+        }
 
         struct TestApprovalSigner {
             key: EcdsaKeyPair,
@@ -6986,6 +8029,10 @@ mod desktop {
                 refusal.get("kind").and_then(Json::as_text),
                 Some(DAEMON_REFUSAL_KIND)
             );
+            assert_eq!(
+                refusal.get("code").and_then(Json::as_text),
+                Some("workspace-unreachable")
+            );
             assert!(refusal
                 .get("message")
                 .and_then(Json::as_text)
@@ -7419,6 +8466,102 @@ mod desktop {
         }
 
         #[test]
+        fn exact_copy_command_compares_closed_artifact_families_not_raster_suffixes() {
+            assert!(review_inspection_families_match(["png", "jpg"]));
+            assert!(review_inspection_families_match(["gif", "webp"]));
+            assert!(review_inspection_families_match(["pdf", "pdf"]));
+            assert!(!review_inspection_families_match(["pdf", "png"]));
+            assert!(!review_inspection_families_match(["docx", "pptx"]));
+            assert!(!review_inspection_families_match(["bin"]));
+        }
+
+        #[test]
+        fn saved_side_identity_and_content_type_are_admitted_before_materialization() {
+            let version = "11".repeat(32);
+            let digest = "22".repeat(32);
+            assert_eq!(
+                admitted_review_inspection_extension(
+                    "empty.txt",
+                    b"",
+                    &version,
+                    &digest,
+                    &version,
+                    &digest,
+                    "open-entry",
+                )
+                .unwrap(),
+                "txt"
+            );
+            assert_eq!(
+                admitted_review_inspection_extension(
+                    ".DS_Store",
+                    b"\0opaque\xffbytes",
+                    &version,
+                    &digest,
+                    &version,
+                    &digest,
+                    "reveal-entry",
+                )
+                .unwrap(),
+                "bin"
+            );
+            assert!(admitted_review_inspection_extension(
+                ".DS_Store",
+                b"\0opaque\xffbytes",
+                &version,
+                &digest,
+                &version,
+                &digest,
+                "open-entry",
+            )
+            .unwrap_err()
+            .contains("Reveal in Finder"));
+            assert_eq!(
+                admitted_review_inspection_extension(
+                    "assets/hero.png",
+                    b"\x89PNG\r\n\x1a\nexact saved bytes",
+                    &version,
+                    &digest,
+                    &version,
+                    &digest,
+                    "open-entry",
+                )
+                .unwrap(),
+                "png"
+            );
+            assert!(admitted_review_inspection_extension(
+                "assets/spoofed.png",
+                b"not an image\xff",
+                &version,
+                &digest,
+                &version,
+                &digest,
+                "open-entry",
+            )
+            .is_err());
+            assert!(admitted_review_inspection_extension(
+                "empty.txt",
+                b"",
+                &version,
+                &digest,
+                &"33".repeat(32),
+                &digest,
+                "reveal-entry",
+            )
+            .is_err());
+            assert!(admitted_review_inspection_extension(
+                "empty.txt",
+                b"",
+                &version,
+                &digest,
+                &version,
+                &"44".repeat(32),
+                "open-folder",
+            )
+            .is_err());
+        }
+
+        #[test]
         fn native_folder_opening_reports_the_opener_process_result() {
             let folder = std::path::Path::new("/folder handed to the opener as one argument");
             open_native_folder_with(
@@ -7451,6 +8594,93 @@ mod desktop {
             )
             .expect_err("a stuck opener must not block the desktop indefinitely");
             assert!(timeout.contains("did not finish"));
+        }
+
+        #[test]
+        fn workspace_entry_launcher_uses_only_closed_argument_shapes() {
+            let scratch = std::env::temp_dir()
+                .join(format!("mesh-desktop-entry-argv-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&scratch);
+            fs::create_dir_all(&scratch).expect("scratch directory");
+            let launcher = scratch.join("capture-entry-argv.sh");
+            let captured = scratch.join("argv.txt");
+            fs::write(
+                &launcher,
+                format!(
+                    "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n",
+                    captured.display()
+                ),
+            )
+            .expect("capture launcher");
+            fs::set_permissions(&launcher, fs::Permissions::from_mode(0o700))
+                .expect("executable capture launcher");
+            let entry = scratch.join("report with spaces.txt");
+            fs::write(&entry, b"report\n").expect("entry");
+
+            open_native_entry_with(
+                &launcher,
+                &entry,
+                "open-entry",
+                None,
+                Duration::from_secs(1),
+            )
+            .expect("default application launch");
+            assert_eq!(
+                fs::read_to_string(&captured).expect("captured open arguments"),
+                format!("{}\n", entry.display()),
+            );
+            #[cfg(target_os = "macos")]
+            {
+                let application = Path::new("/System/Applications/Preview.app");
+                open_native_entry_with(
+                    &launcher,
+                    &entry,
+                    "open-entry",
+                    Some(application),
+                    Duration::from_secs(1),
+                )
+                .expect("resolved default application launch");
+                assert_eq!(
+                    fs::read_to_string(&captured).expect("captured application arguments"),
+                    format!("-a\n{}\n{}\n", application.display(), entry.display()),
+                );
+                let directory = scratch.join("folder with spaces");
+                fs::create_dir(&directory).expect("directory entry");
+                open_native_entry_with(
+                    &launcher,
+                    &directory,
+                    "open-entry",
+                    Some(Path::new(FINDER_APPLICATION_PATH)),
+                    Duration::from_secs(1),
+                )
+                .expect("explicit Finder directory launch");
+                assert_eq!(
+                    fs::read_to_string(&captured).expect("captured Finder arguments"),
+                    format!("-a\n{}\n{}\n", FINDER_APPLICATION_PATH, directory.display()),
+                );
+            }
+            open_native_entry_with(
+                &launcher,
+                &entry,
+                "reveal-entry",
+                None,
+                Duration::from_secs(1),
+            )
+            .expect("Finder reveal launch");
+            #[cfg(target_os = "macos")]
+            assert_eq!(
+                fs::read_to_string(&captured).expect("captured reveal arguments"),
+                format!("-R\n{}\n", entry.display()),
+            );
+            assert!(open_native_entry_with(
+                &launcher,
+                &entry,
+                "arbitrary-action",
+                None,
+                Duration::from_secs(1),
+            )
+            .is_err());
+            fs::remove_dir_all(scratch).unwrap();
         }
 
         #[test]

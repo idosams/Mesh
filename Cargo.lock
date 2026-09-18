@@ -1867,12 +1867,18 @@ version = "0.0.0"
 name = "mesh-desktop"
 version = "0.0.0"
 dependencies = [
+ "block2",
+ "core-foundation",
  "mesh-approval",
  "mesh-crypto",
  "mesh-daemon",
  "mesh-git-bridge",
  "mesh-keychain",
  "mesh-mcp",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
  "ring",
  "tauri",
  "tauri-build",

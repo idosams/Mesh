@@ -28,6 +28,22 @@ const views = ["Visual", "Content changes"] as const;
 const diffLayouts = ["Split", "Inline"] as const;
 const PDF_PREVIEW_PAGE_LIMIT = 64;
 
+function nativeAdmittedDefaultOpen(
+  change: ReviewChange,
+  preview: ReviewArtifactPreview | null,
+  side: "before" | "after",
+): boolean {
+  const versionId = side === "before" ? change.beforeVersionId : change.afterVersionId;
+  const contentDigest = side === "before" ? change.beforeContentDigest : change.afterContentDigest;
+  if (versionId === null) return false;
+  if (change.kind === "text" && change.comparisonLimitation === null) return true;
+  if (preview?.changeId !== change.id || contentDigest === null) return false;
+  const admitted = preview[side] ?? preview[side === "before" ? "beforeAbsentPage" : "afterAbsentPage"];
+  return admitted !== null
+    && admitted.versionId === versionId
+    && admitted.contentDigest === contentDigest;
+}
+
 type ArtifactReviewProps = {
   model: ReviewWorkbenchModel;
   controls?: ReviewPageControlsModel;
@@ -84,23 +100,48 @@ export function ArtifactReview({
         <ReviewPageControls controls={controls} onIntent={onIntent} />
       </div>
 
-      <div className="grid min-h-[32rem] xl:grid-cols-[17rem_minmax(0,1fr)_18rem]">
+      <div className="grid min-h-[36rem] xl:grid-cols-[20rem_minmax(0,1fr)]">
         <ChangeNavigator
           changes={model.changes}
           selectedChangeId={model.selectedChangeId}
           onSelect={(changeId) => onIntent({ type: "select-change", changeId })}
         />
 
-        <section className="min-w-0 p-5" aria-label="Selected change comparison" aria-busy={artifactPreviewLoading}>
+        <div className="min-w-0">
+        <section
+          className="min-w-0 p-5"
+          aria-label="Selected change comparison"
+          aria-busy={artifactPreviewLoading}
+          data-mesh-proof="selected-change-comparison"
+          data-mesh-change-id={change.id}
+          data-mesh-change-path={change.path}
+          data-mesh-change-kind={change.kind}
+        >
           <p className="sr-only" role="status" aria-live="polite">
             Selected {change.path}. {change.summary}
           </p>
-          <div className="mb-5">
+          <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-5 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold">{change.path}</h3>
               <Badge tone="changed">{change.kindLabel}</Badge>
+              <Badge tone="neutral">Saved review</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Before and after are exact immutable saved sides. They are not the writable workspace.</p>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <SavedSideActions
+                label="Before"
+                present={change.beforeVersionId !== null}
+                canOpenInDefaultApp={nativeAdmittedDefaultOpen(change, artifactPreview, "before")}
+                onAction={(action) => onIntent({ type: "open-review-side", changeId: change.id, side: "before", action })}
+              />
+              <SavedSideActions
+                label="After"
+                present={change.afterVersionId !== null}
+                canOpenInDefaultApp={nativeAdmittedDefaultOpen(change, artifactPreview, "after")}
+                onAction={(action) => onIntent({ type: "open-review-side", changeId: change.id, side: "after", action })}
+              />
+            </div>
           </div>
 
           {change.comparisonLimitation ? (
@@ -162,7 +203,7 @@ export function ArtifactReview({
           )}
         </section>
 
-        <aside className="border-t border-border bg-muted/20 p-5 xl:border-l xl:border-t-0" aria-label="Review decision">
+        <aside className="border-t border-border bg-muted/20 p-5" aria-label="Review decision">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Decision</p>
           <h3 className="mt-2 text-base font-semibold">Review this exact saved version</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{model.approvalReason}</p>
@@ -214,8 +255,48 @@ export function ArtifactReview({
             Agents and web content cannot skip the native user-presence approval ceremony.
           </p>
         </aside>
+        </div>
       </div>
     </Card>
+  );
+}
+
+type SavedSideAction = "open-entry" | "reveal-entry" | "open-folder";
+
+function SavedSideActions({
+  label,
+  present,
+  canOpenInDefaultApp,
+  onAction,
+}: {
+  label: "Before" | "After";
+  present: boolean;
+  canOpenInDefaultApp: boolean;
+  onAction: (action: SavedSideAction) => void;
+}) {
+  const unavailableId = `${label.toLowerCase()}-default-app-unavailable`;
+  return (
+    <div className="rounded-lg border border-border bg-background/70 p-3" role="group" aria-label={`${label} exact saved side actions`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em]">{label}</span>
+        <Badge tone={present ? "neutral" : "changed"}>{present ? "Exact copy" : "Not present"}</Badge>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button
+          variant="quiet"
+          disabled={!present || !canOpenInDefaultApp}
+          aria-describedby={present && !canOpenInDefaultApp ? unavailableId : undefined}
+          onClick={() => onAction("open-entry")}
+        >Open in default app</Button>
+        <Button variant="quiet" disabled={!present} onClick={() => onAction("reveal-entry")}>Reveal in Finder</Button>
+        <Button variant="quiet" disabled={!present} onClick={() => onAction("open-folder")}>Open copy folder</Button>
+      </div>
+      {present && !canOpenInDefaultApp ? (
+        <p id={unavailableId} className="mt-2 text-xs leading-5 text-muted-foreground">
+          Default-app opening stays unavailable until native inspection admits this exact content type. Reveal preserves the exact read-only copy in Finder.
+        </p>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
+import { isAbsolute } from 'node:path';
 
 export const RENDERER_PROOF_PREFIX = 'mesh-renderer-proof:';
 const MAX_RENDERER_PROOF_BYTES = 4_096;
 const CLAIMS = Object.freeze({
   onboarding: Object.freeze({ interaction: 'preview-path', outcome: 'verified-preview' }),
-  review: Object.freeze({ interaction: 'content-inline', outcome: 'content-inline-selected' }),
+  files: Object.freeze({
+    interaction: 'expand-select-open-reveal-folders',
+    outcome: 'native-file-and-folder-actions-completed',
+  }),
+  review: Object.freeze({
+    interaction: 'content-inline-native-open-reveal',
+    outcome: 'saved-side-native-launches-completed',
+  }),
   versions: Object.freeze({ interaction: 'select-saved-point', outcome: 'verified-preview-ready' }),
   'private-export': Object.freeze({
     interaction: 'refuse-original-then-confirm-private',
@@ -69,6 +77,38 @@ function assertSurfaceClaim(value, expected) {
   assert.equal(value.outcome, expected.outcome, 'rendered surface proof did not establish the expected outcome');
 }
 
+function assertScreenshotProof(value) {
+  if (value === null) return;
+  assert.ok(
+    value && typeof value === 'object' && !Array.isArray(value),
+    'rendered screenshot proof was malformed',
+  );
+  assert.deepEqual(
+    Object.keys(value),
+    ['schema', 'path', 'nonce', 'sha256', 'bytes', 'width', 'height'],
+    'rendered screenshot proof had unrecognized or missing fields',
+  );
+  assert.equal(value.schema, 'mesh-rendered-screenshot-proof/v1');
+  assert.ok(
+    typeof value.path === 'string' && value.path.length <= 4_096 && isAbsolute(value.path),
+    'rendered screenshot proof path was invalid',
+  );
+  assert.match(value.nonce, /^[0-9a-f]{64}$/u, 'rendered screenshot proof nonce was invalid');
+  assert.match(value.sha256, /^[0-9a-f]{64}$/u, 'rendered screenshot proof digest was invalid');
+  assert.ok(
+    Number.isSafeInteger(value.bytes) && value.bytes >= 1_024 && value.bytes <= 16 * 1_024 * 1_024,
+    'rendered screenshot proof byte count was invalid',
+  );
+  assert.ok(
+    Number.isSafeInteger(value.width) && value.width >= 320 && value.width <= 8_192,
+    'rendered screenshot proof width was invalid',
+  );
+  assert.ok(
+    Number.isSafeInteger(value.height) && value.height >= 240 && value.height <= 8_192,
+    'rendered screenshot proof height was invalid',
+  );
+}
+
 export function parseRenderedAppProofOutput(output) {
   const lines = String(output).trim().split('\n').filter(Boolean);
   assert.equal(lines.length, 1, 'rendered app must emit exactly one final proof object');
@@ -80,21 +120,30 @@ export function parseRenderedAppProofOutput(output) {
     throw new Error('rendered app proof was not valid JSON');
   }
   assert.ok(value && typeof value === 'object' && !Array.isArray(value), 'rendered app proof was missing');
-  assert.equal(value.schema, 'mesh-rendered-app-proof/v4');
+  assert.equal(value.schema, 'mesh-rendered-app-proof/v6');
+  assert.ok(Object.hasOwn(value, 'screenshot'), 'rendered screenshot proof was missing');
+  assertScreenshotProof(value.screenshot);
   assert.equal(value.component_interface_mounted, true, 'rendered app did not prove the component interface mounted');
   assert.equal(value.renderer_controls_driven, true, 'rendered app did not prove renderer controls were driven');
   assert.ok(value.renderer && typeof value.renderer === 'object' && !Array.isArray(value.renderer), 'renderer proof was missing');
   assert.deepEqual(
     Object.keys(value.renderer),
-    ['schema', 'nonce_bound', 'onboarding', 'review', 'versions', 'private_export', 'agent_handoff'],
+    ['schema', 'nonce_bound', 'onboarding', 'files', 'review', 'versions', 'private_export', 'agent_handoff'],
   );
-  assert.equal(value.renderer.schema, 'mesh-packaged-renderer-proof/v4');
+  assert.equal(value.renderer.schema, 'mesh-packaged-renderer-proof/v5');
   assert.equal(value.renderer.nonce_bound, true, 'renderer proof was not nonce bound');
   assertSurfaceClaim(value.renderer.onboarding, {
     surface: 'onboarding', interaction: 'preview-path', outcome: 'verified-preview',
   });
+  assertSurfaceClaim(value.renderer.files, {
+    surface: 'files',
+    interaction: 'expand-select-open-reveal-folders',
+    outcome: 'native-file-and-folder-actions-completed',
+  });
   assertSurfaceClaim(value.renderer.review, {
-    surface: 'review', interaction: 'content-inline', outcome: 'content-inline-selected',
+    surface: 'review',
+    interaction: 'content-inline-native-open-reveal',
+    outcome: 'saved-side-native-launches-completed',
   });
   assertSurfaceClaim(value.renderer.versions, {
     surface: 'versions', interaction: 'select-saved-point', outcome: 'verified-preview-ready',

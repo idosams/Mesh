@@ -400,6 +400,41 @@ fn an_external_editor_change_is_detected_and_can_be_saved_directly() {
 }
 
 #[test]
+fn desktop_edit_inspection_pairs_working_text_with_its_exact_saved_baseline() {
+    let (parent, _source, managed) = imported("desktop-working-diff-baseline");
+    let daemon = LiveDaemon::with_checkpoint_runtime(startup(), parameters()).expect("config");
+    daemon.open_at_start(&managed).expect("open");
+    fs::write(managed.join("docs/note.txt"), "changed outside Mesh\n").expect("external edit");
+
+    let (working, baseline) = daemon
+        .inspect_managed_file_with_durable_text("docs/note.txt", MAX_MANAGED_TEXT_BYTES)
+        .expect("desktop comparison inspection");
+
+    assert_eq!(working.text(), Some("changed outside Mesh\n"));
+    assert!(working.modified_from_current_version());
+    assert_eq!(baseline.as_deref(), Some("first\n"));
+    fs::remove_dir_all(parent).expect("cleanup");
+}
+
+#[test]
+fn desktop_edit_inspection_never_reconstructs_an_over_limit_saved_baseline() {
+    let retained = vec![b'x'; MAX_MANAGED_TEXT_BYTES + 1];
+    let (parent, _source, managed) =
+        imported_with_bytes("desktop-working-diff-bounded-baseline", &retained);
+    let daemon = LiveDaemon::with_checkpoint_runtime(startup(), parameters()).expect("config");
+    daemon.open_at_start(&managed).expect("open");
+    fs::write(managed.join("docs/note.txt"), "small working text\n").expect("external edit");
+
+    let (working, baseline) = daemon
+        .inspect_managed_file_with_durable_text("docs/note.txt", MAX_MANAGED_TEXT_BYTES)
+        .expect("bounded desktop comparison inspection");
+
+    assert_eq!(working.text(), Some("small working text\n"));
+    assert_eq!(baseline, None);
+    fs::remove_dir_all(parent).expect("cleanup");
+}
+
+#[test]
 fn an_agent_created_native_file_is_discovered_adopted_and_restart_exact() {
     let (parent, source, managed) = imported("agent-created-file");
     let path = managed.join("agent-note.txt");

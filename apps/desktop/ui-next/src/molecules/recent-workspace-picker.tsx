@@ -3,6 +3,7 @@ import type { RecentWorkspace, WorkspaceEntryIntent } from "../models/workspace-
 
 function optionLabel(workspace: RecentWorkspace): string {
   if (workspace.state === "current") return `Current · ${workspace.label}`;
+  if (workspace.state === "unavailable") return `Unavailable · ${workspace.label}`;
   if (workspace.state === "agent-assigned") return `${workspace.label} · Agent assigned`;
   return workspace.label;
 }

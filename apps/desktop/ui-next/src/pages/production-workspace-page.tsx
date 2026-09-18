@@ -85,7 +85,7 @@ export function ProductionWorkspacePage() {
       <ProductionWorkspaceLayout
       header={<slot name="workspace-header" />}
       navigation={(
-        <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-border bg-card p-2">
+        <div className="flex gap-1 overflow-x-auto border-b border-border bg-background/80 px-1">
           <ProductionNavigation
             activePage={activePage}
             workspaceReady={workspaceReady}
@@ -95,7 +95,7 @@ export function ProductionWorkspacePage() {
         </div>
       )}
       notice={(
-        <div data-mesh-proof="production-notice" data-mesh-notice-generation={notice?.generation} data-mesh-agent-proof={notice?.proof ?? undefined} className={notice ? `mt-4 rounded-xl border p-3 text-sm ${notice.error ? "border-destructive text-red-200" : "border-primary/40 text-foreground"}` : undefined}>
+        <div data-mesh-proof="production-notice" data-mesh-notice-generation={notice?.generation} data-mesh-agent-proof={notice?.proof ?? undefined} className={notice ? `mt-4 whitespace-pre-line rounded-xl border p-3 text-sm leading-6 ${notice.error ? "border-destructive text-red-200" : "border-primary/40 text-foreground"}` : undefined}>
           <div role="status" aria-live="polite" aria-atomic="true">
             {notice && !notice.error ? notice.message : null}
           </div>

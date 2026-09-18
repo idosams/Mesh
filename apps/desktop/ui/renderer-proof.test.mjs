@@ -82,9 +82,20 @@ function documentWith(host) {
   };
 }
 
-function invokeFor(configuration, reports, checkpoints = []) {
+function invokeFor(configuration, reports, checkpoints = [], screenshot = null) {
   return async (command, parameters = {}) => {
     if (command === 'renderer_proof_configuration') return JSON.stringify(configuration);
+    if (command === 'renderer_proof_capture_files_screenshot') {
+      return JSON.stringify(screenshot || {
+        schema: 'mesh.renderer-proof-screenshot/v1',
+        captured: false,
+        path: null,
+        width: null,
+        height: null,
+        bytes: null,
+        sha256: null,
+      });
+    }
     if (command === 'renderer_proof_report') {
       reports.push(JSON.parse(parameters.report));
       return null;
@@ -225,6 +236,136 @@ test('packaged proof waits for the React shell commit without timer polling', as
   assert.equal(reports[0].outcome, 'verified-preview');
 });
 
+test('Files proof expands a nested file and completes exact native file and folder actions', async () => {
+  const reports = [];
+  const checkpoints = [];
+  let notice = new Node({ proof: 'production-notice' });
+  const productionHost = productionNoticeShell(notice, 'Files');
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  const explorer = new Node({ proof: 'files-explorer' });
+  const tree = new Node({ proof: 'files-tree' });
+  const filter = new Node({ proof: 'files-filter' });
+  const selected = new Node({ proof: 'files-selected-entry' });
+  selected.setAttribute('data-mesh-entry-path', '');
+  const openWorkspace = button('Open workspace folder', () => {
+    notice.textContent = 'Opened the current workspace folder in Finder.';
+  });
+  const folder = button('assets');
+  let expanded = false;
+  let openAttempts = 0;
+  const installBase = (...extra) => {
+    shadow.children = [explorer, tree, filter, selected, folder, openWorkspace, ...extra];
+  };
+  folder.onClick = () => {
+    if (!expanded) {
+      expanded = true;
+      const file = button('mesh-proof.png', () => {
+        selected.setAttribute('data-mesh-entry-path', 'assets/mesh-proof.png');
+        const installFileActions = () => {
+          const open = button('Open with default app', () => {
+            openAttempts += 1;
+            if (openAttempts === 1) {
+              notice = new Node({ proof: 'production-notice' });
+              productionHost.shadowRoot.children[0] = notice;
+              installFileActions();
+              return;
+            }
+            notice.textContent = 'Opened assets/mesh-proof.png with its default application.';
+          });
+          const reveal = button('Reveal in Finder', () => {
+            notice.textContent = 'Revealed assets/mesh-proof.png in Finder.';
+          });
+          installBase(file, open, reveal);
+        };
+        installFileActions();
+      });
+      installBase(file);
+      return;
+    }
+    selected.setAttribute('data-mesh-entry-path', 'assets');
+    const openFolder = button('Open in Finder', () => {
+      notice.textContent = 'Opened assets in Finder.';
+    });
+    installBase(openFolder);
+  };
+  installBase();
+  const elements = new Map([
+    ['mesh-app-next', productionHost],
+    ['workspace-files-next', host],
+  ]);
+
+  await runRendererProof({
+    document: {
+      getElementById: (id) => elements.get(id) || null,
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'files',
+      source: null, destination: null,
+    }, reports, checkpoints, {
+      schema: 'mesh.renderer-proof-screenshot/v1',
+      captured: true,
+      path: `/tmp/files-${nonce}.png`,
+      width: 1062,
+      height: 703,
+      bytes: 128_000,
+      sha256: 'cd'.repeat(32),
+    }),
+    getComputedStyle: visible,
+    delay: async () => {},
+    now: (() => {
+      let timestamp = 0;
+      return () => { timestamp += 1_000; return timestamp; };
+    })(),
+  });
+
+  assert.equal(openAttempts, 2, 'Files proof did not reacquire a replaced native Open control and notice');
+
+  assert.deepEqual(checkpoints, [
+    'files-mounted',
+    'files-folder-expanded',
+    'files-file-selected',
+    'files-file-opened',
+    'files-file-revealed',
+    'files-folder-opened',
+    'files-workspace-opened',
+  ]);
+  assert.deepEqual(reports, [{
+    schema: 'mesh-renderer-proof/v1', nonce, surface: 'files', mounted: true,
+    visible: true, interaction: 'expand-select-open-reveal-folders',
+    outcome: 'native-file-and-folder-actions-completed',
+  }]);
+});
+
+test('Files proof failures remain stage-specific and secret-free', () => {
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React Files explorer did not mount visibly')),
+    'files-mount',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React Files explorer did not select /secret/path')),
+    'files-navigation',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React Files explorer did not open its exact selected file')),
+    'files-native-open',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React Files explorer did not reveal its exact selected file')),
+    'files-native-reveal',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React Files explorer did not open the current workspace folder')),
+    'files-folder-open',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged Files WebKit snapshot timed out')),
+    'files-screenshot',
+  );
+});
+
 test('a bounded cold WKWebView start may take longer than the former ten-second proof window', async () => {
   const reports = [];
   const host = new Node();
@@ -258,7 +399,7 @@ test('a bounded cold WKWebView start may take longer than the former ten-second 
   assert.equal(reports[0].outcome, 'verified-preview');
 });
 
-test('review proof drives Content changes and Inline before reporting', async () => {
+test('review proof uses text for Inline and an admitted image for native Open and Reveal', async () => {
   const reports = [];
   const checkpoints = [];
   const host = new Node();
@@ -267,16 +408,116 @@ test('review proof drives Content changes and Inline before reporting', async ()
   const mounted = new Node({ proof: 'review-mounted' });
   const comparison = new Node({ proof: 'comparison-view' });
   const interactions = [];
-  const visual = button('Visual', () => {
-    interactions.push('Visual');
+  let selectedKind = 'text';
+  let notice = new Node({ proof: 'production-notice' });
+  let appHost = null;
+  const replaceNotice = (text) => {
+    notice = new Node({ text, proof: 'production-notice' });
+    notice.setAttribute('data-mesh-notice-generation', interactions.length);
+    if (appHost) appHost.shadowRoot.children[0] = notice;
+  };
+  let openAttempts = 0;
+  const openSaved = button('Open in default app', () => {
+    interactions.push('Open in default app');
+    openAttempts += 1;
+    if (openAttempts === 1) return;
+    replaceNotice(openAttempts === 2
+      ? 'The default application was briefly unavailable.'
+      : 'Opened the exact after saved copy in its default application.');
+  });
+  openSaved.disabled = true;
+  let revealAttempts = 0;
+  const revealSaved = button('Reveal in Finder', () => {
+    interactions.push('Reveal in Finder');
+    revealAttempts += 1;
+    if (revealAttempts === 1) return;
+    replaceNotice(revealAttempts === 2
+      ? 'Finder was briefly unavailable.'
+      : 'Revealed the exact after saved copy in Finder.');
+  });
+  const textChange = button('agent-proof-result.txt Added Text', () => {
+    interactions.push('Select text change');
+    selectedKind = 'text';
+    textChange.pressed = true;
+    imageChange.pressed = false;
+    content.pressed = true;
+    visual.pressed = false;
+  });
+  textChange.pressed = true;
+  let imageSelectionAttempts = 0;
+  const selectedComparison = new Node({ proof: 'selected-change-comparison' });
+  selectedComparison.setAttribute('data-mesh-change-id', 'text-change');
+  selectedComparison.setAttribute('data-mesh-change-path', 'agent-proof-result.txt');
+  selectedComparison.setAttribute('data-mesh-change-kind', 'text');
+  let previewSelectionLostOnce = false;
+  const imageChange = button('agent-proof-result.png Added Image', () => {
+    interactions.push('Select image change');
+    imageSelectionAttempts += 1;
+    selectedKind = 'image';
+    textChange.pressed = false;
+    imageChange.pressed = true;
+    if (imageSelectionAttempts === 1) return;
+    selectedComparison.setAttribute('data-mesh-change-id', 'image-change');
+    selectedComparison.setAttribute('data-mesh-change-path', 'agent-proof-result.png');
+    selectedComparison.setAttribute('data-mesh-change-kind', 'image');
     visual.pressed = true;
     content.pressed = false;
+    let loadAttempts = 0;
+    const loadImage = button('Load visual comparison', () => {
+      interactions.push('Load visual comparison');
+      if (!previewSelectionLostOnce) {
+        previewSelectionLostOnce = true;
+        selectedKind = 'text';
+        textChange.pressed = true;
+        imageChange.pressed = false;
+        selectedComparison.setAttribute('data-mesh-change-id', 'text-change');
+        selectedComparison.setAttribute('data-mesh-change-path', 'agent-proof-result.txt');
+        selectedComparison.setAttribute('data-mesh-change-kind', 'text');
+        visual.pressed = false;
+        content.pressed = true;
+        shadow.children = shadow.children.filter((child) => child !== loadImage);
+        return;
+      }
+      loadAttempts += 1;
+      if (loadAttempts === 2) {
+        loadImage.textContent = 'Try visual comparison again';
+      } else if (loadAttempts === 3) {
+        openSaved.disabled = false;
+      }
+    });
+    shadow.children.push(loadImage);
+  });
+  imageChange.setAttribute('data-change-option', 'image-change');
+  imageChange.pressed = false;
+  let imageVisualAttempts = 0;
+  const visual = button('Visual', () => {
+    interactions.push('Visual');
+    if (selectedKind === 'image') {
+      imageVisualAttempts += 1;
+      if (imageVisualAttempts < 5) return;
+    }
+    visual.pressed = true;
+    content.pressed = false;
+    if (selectedKind === 'image') {
+      let loadAttempts = 0;
+      const loadImage = button('Load visual comparison', () => {
+        interactions.push('Load visual comparison');
+        loadAttempts += 1;
+        if (loadAttempts === 2) {
+          loadImage.textContent = 'Try visual comparison again';
+        } else if (loadAttempts === 3) {
+          openSaved.disabled = false;
+        }
+      });
+      shadow.children.push(loadImage);
+    }
   });
   visual.pressed = false;
   const content = button('Content changes', () => {
     interactions.push('Content changes');
     visual.pressed = false;
     content.pressed = true;
+    if (selectedKind !== 'text') return;
     const layout = new Node({ proof: 'content-diff-layout' });
     const inline = button('Inline', () => {
       interactions.push('Inline');
@@ -288,28 +529,65 @@ test('review proof drives Content changes and Inline before reporting', async ()
   });
   content.pressed = true;
   comparison.children = [visual, content];
-  shadow.children = [mounted, comparison];
+  shadow.children = [mounted, comparison, selectedComparison, textChange, imageChange, openSaved, revealSaved];
+  appHost = productionNoticeShell(notice, 'Review');
+  const document = {
+    getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+    defaultView: { Event: globalThis.Event, confirm: () => false },
+  };
+  let currentTime = 0;
 
   await runRendererProof({
-    document: documentWith(host),
+    document,
     invoke: invokeFor({
       schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'review',
       source: null, destination: null,
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {},
+    now: () => {
+      currentTime += 1_001;
+      return currentTime;
+    },
   });
 
   assert.deepEqual(reports[0], {
     schema: 'mesh-renderer-proof/v1', nonce, surface: 'review', mounted: true,
-    visible: true, interaction: 'content-inline', outcome: 'content-inline-selected',
+    visible: true,
+    interaction: 'content-inline-native-open-reveal',
+    outcome: 'saved-side-native-launches-completed',
   });
-  assert.deepEqual(interactions, ['Visual', 'Content changes', 'Inline']);
+  assert.deepEqual(interactions, [
+    'Select text change',
+    'Visual',
+    'Content changes',
+    'Inline',
+    'Select image change',
+    'Select image change',
+    'Visual',
+    'Load visual comparison',
+    'Select image change',
+    'Load visual comparison',
+    'Load visual comparison',
+    'Load visual comparison',
+    'Open in default app',
+    'Open in default app',
+    'Open in default app',
+    'Reveal in Finder',
+    'Reveal in Finder',
+    'Reveal in Finder',
+  ]);
   assert.deepEqual(checkpoints, [
     'review-mounted',
+    'review-text-selected',
     'review-visual',
     'review-content',
     'review-inline',
+    'review-image-selected',
+    'review-image-visual',
+    'review-image-preview',
+    'review-saved-open',
+    'review-saved-reveal',
   ]);
 });
 
@@ -317,6 +595,42 @@ test('review proof classifies a failed Visual transition as review interaction, 
   assert.equal(
     rendererProofFailureCode(new Error('the packaged React review workbench did not leave content changes')),
     'review-content',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench did not switch the image change to Visual')),
+    'review-image-visual',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench did not expose exact image preview loading')),
+    'review-image-preview',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench native image renderer refused the exact saved side')),
+    'review-image-preview-native',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench rejected the exact image preview envelope')),
+    'review-image-preview-envelope',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench left the exact image preview pending')),
+    'review-image-preview-pending',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench lost the exact image selection while previewing')),
+    'review-image-selection-lost',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench loaded the image preview without native open evidence')),
+    'review-image-preview-evidence',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench returned an unclassified image preview refusal')),
+    'review-image-preview-refused',
+  );
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React review workbench returned the image preview to its idle state')),
+    'review-image-preview-idle',
   );
 });
 

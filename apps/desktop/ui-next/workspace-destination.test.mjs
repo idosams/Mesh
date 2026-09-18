@@ -141,6 +141,33 @@ test("the destination projection is closed, bounded, and generation-bound", asyn
   );
 });
 
+test("Update destination keeps large saved-file choices searchable and selected", async () => {
+  const React = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const destinationModule = await loadModule("./src/models/workspace-destination.ts");
+  const { WorkspaceDestination } = await loadModule("./src/organisms/workspace-destination.tsx");
+  const files = Array.from({ length: 4_096 }, (_, index) => ({
+    value: `reports/file-${String(index).padStart(4, "0")}.txt`,
+    label: `reports/file-${String(index).padStart(4, "0")}.txt`,
+  }));
+  const selectedFile = files.at(-1).value;
+  const projection = destinationModule.workspaceDestinationChoiceProjection(files, "", selectedFile);
+  assert.equal(projection.items.length, 500);
+  assert.equal(projection.items.some((choice) => choice.value === selectedFile), true);
+  assert.equal(projection.matched, 4_096);
+  assert.equal(projection.truncated, true);
+
+  const html = renderToStaticMarkup(React.createElement(WorkspaceDestination, {
+    model: { ...destination, files, selectedFile },
+    generation: 20,
+    onIntent: () => assert.fail("SSR must not emit an intent"),
+  }));
+  assert.equal((html.match(/data-mesh-destination-file=/g) || []).length, 500);
+  assert.match(html, /500 of 4,096 matching saved files shown/);
+  assert.match(html, /file-4095\.txt/);
+  assert.doesNotMatch(html, /file-0000\.txt/);
+});
+
 test("the destination organism keeps every staged update control and readable plan visible", async () => {
   const React = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");

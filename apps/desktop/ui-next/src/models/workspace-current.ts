@@ -56,6 +56,53 @@ export type WorkspaceCurrentModel = Readonly<{
   actions: readonly WorkspaceCurrentAction[];
 }>;
 
+export const CURRENT_WORKSPACE_ROW_LIMIT = 100;
+export const CURRENT_MONITOR_ROW_LIMIT = 500;
+export const CURRENT_DETAIL_ROW_LIMIT = 500;
+export const CURRENT_CONDITION_ROW_LIMIT = 200;
+
+export type WorkspaceCurrentListProjection<T> = Readonly<{
+  items: readonly T[];
+  matched: number;
+  truncated: boolean;
+}>;
+
+export function workspaceCurrentListProjection<T>(
+  items: readonly T[],
+  maximum: number,
+): WorkspaceCurrentListProjection<T> {
+  if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error("The current-page row bound was invalid.");
+  const visible = items.slice(0, maximum);
+  return Object.freeze({
+    items: Object.freeze(visible),
+    matched: items.length,
+    truncated: items.length > visible.length,
+  });
+}
+
+export function workspaceCurrentWorkspaceProjection(
+  workspaces: readonly WorkspaceCurrentWorkspace[],
+  filterText: string,
+  maximum = CURRENT_WORKSPACE_ROW_LIMIT,
+): WorkspaceCurrentListProjection<WorkspaceCurrentWorkspace> {
+  if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error("The current workspace-row bound was invalid.");
+  const query = filterText.trim().toLocaleLowerCase();
+  const stateOrder: Readonly<Record<WorkspaceCurrentWorkspace["state"], number>> = Object.freeze({
+    current: 0,
+    "agent-assigned": 1,
+    available: 2,
+  });
+  const matches = workspaces
+    .filter((workspace) => !query || [workspace.label, workspace.path, workspace.state]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .map((workspace, index) => ({ workspace, index }))
+    .sort((left, right) => stateOrder[left.workspace.state] - stateOrder[right.workspace.state]
+      || left.workspace.label.localeCompare(right.workspace.label, undefined, { sensitivity: "base" })
+      || left.index - right.index)
+    .map(({ workspace }) => workspace);
+  return workspaceCurrentListProjection(matches, maximum);
+}
+
 export type WorkspaceCurrentIntent =
   | Readonly<{ type: "activate"; action: WorkspaceCurrentActionId }>
   | Readonly<{ type: "switch-workspace"; path: string }>;

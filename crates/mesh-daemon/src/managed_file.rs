@@ -259,6 +259,7 @@ pub struct ManagedFileInspection {
     content_digest: RecordDigest,
     executable: bool,
     text: Option<String>,
+    bytes: Vec<u8>,
     modified_from_current_version: bool,
 }
 
@@ -273,6 +274,7 @@ pub struct NativeFileInspection {
     content_digest: RecordDigest,
     executable: bool,
     text: Option<String>,
+    bytes: Vec<u8>,
 }
 
 /// One native directory absent from durable history and ready for explicit adoption.
@@ -915,17 +917,18 @@ fn bounded_text(bytes: &[u8]) -> Option<String> {
 }
 
 impl NativeFileInspection {
-    pub(crate) fn from_bytes(path: String, bytes: &[u8], executable: bool) -> Self {
+    pub(crate) fn from_owned_bytes(path: String, bytes: Vec<u8>, executable: bool) -> Self {
+        let byte_count = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        let content_digest =
+            RecordDigest::from_bytes(*mesh_types::Blake3::digest_bytes(&bytes).as_bytes());
+        let text = bounded_text(&bytes);
         Self {
             path,
-            byte_count: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-            content_digest: RecordDigest::from_bytes(
-                *mesh_types::Blake3::digest_bytes(bytes).as_bytes(),
-            ),
+            byte_count,
+            content_digest,
             executable,
-            text: (bytes.len() <= MAX_MANAGED_TEXT_BYTES)
-                .then(|| std::str::from_utf8(bytes).ok().map(str::to_owned))
-                .flatten(),
+            text,
+            bytes,
         }
     }
 
@@ -959,9 +962,21 @@ impl NativeFileInspection {
         self.text.as_deref()
     }
 
+    /// Exact confined bytes retained for a native-host-only inert preview.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
     pub(crate) fn without_text(mut self) -> Self {
         self.text = None;
+        self.bytes = Vec::new();
         self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retained_preview_capacity(&self) -> usize {
+        self.bytes.capacity()
     }
 }
 
@@ -1002,6 +1017,12 @@ impl ManagedFileInspection {
         self.text.as_deref()
     }
 
+    /// Exact confined bytes retained for a native-host-only inert preview.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
     /// Whether the operating-system bytes or portable executable metadata differ from the current
     /// durable version.
     #[must_use]
@@ -1011,7 +1032,13 @@ impl ManagedFileInspection {
 
     pub(crate) fn without_text(mut self) -> Self {
         self.text = None;
+        self.bytes = Vec::new();
         self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retained_preview_capacity(&self) -> usize {
+        self.bytes.capacity()
     }
 }
 
@@ -1326,6 +1353,13 @@ pub enum ManagedTextFileError {
         /// Exact byte count that exceeded the bound.
         bytes: usize,
     },
+    /// The file exceeded the native inert-preview byte ceiling before an unbounded allocation.
+    PreviewTooLarge {
+        /// Observed byte count, or the first byte count beyond the ceiling during a racing write.
+        bytes: usize,
+        /// Exact native-preview byte ceiling applied to the confined read.
+        limit: usize,
+    },
     /// The selected file was not UTF-8 text.
     NotUtf8,
     /// The replacement bytes equal the file already on disk.
@@ -1394,6 +1428,10 @@ impl fmt::Display for ManagedTextFileError {
             Self::UnknownRetainedVersion => formatter.write_str("the selected retained file version is not in complete durable history"),
             Self::RetainedContent(error) => write!(formatter, "the retained file version could not be reconstructed exactly: {error}"),
             Self::TooLarge { bytes } => write!(formatter, "the selected text file is {bytes} bytes; the desktop limit is {MAX_MANAGED_TEXT_BYTES}"),
+            Self::PreviewTooLarge { bytes, limit } => write!(
+                formatter,
+                "the selected live file is {bytes} bytes; the inert-preview limit is {limit} bytes"
+            ),
             Self::NotUtf8 => formatter.write_str("the selected file is not UTF-8 text"),
             Self::Unchanged => formatter.write_str("the file already contains these exact bytes"),
             Self::StaleInspection => formatter.write_str(
@@ -2515,7 +2553,7 @@ pub(crate) fn inspect_managed_file(
     let content_digest =
         RecordDigest::from_bytes(*mesh_types::Blake3::digest_bytes(&bytes).as_bytes());
     let text = (bytes.len() <= MAX_MANAGED_TEXT_BYTES)
-        .then(|| String::from_utf8(bytes).ok())
+        .then(|| String::from_utf8(bytes.clone()).ok())
         .flatten();
     let executable = metadata.permissions().mode() & 0o111 != 0;
     Ok(ManagedFileInspection {
@@ -2525,9 +2563,58 @@ pub(crate) fn inspect_managed_file(
         content_digest,
         executable,
         text,
+        bytes,
         modified_from_current_version: content_digest != current_content_digest
             || PortableMetadata::new(executable) != current_metadata,
     })
+}
+
+pub(crate) fn inspect_managed_file_bounded(
+    root: &Path,
+    relative: &str,
+    current_version: String,
+    current_content_digest: RecordDigest,
+    current_metadata: PortableMetadata,
+    byte_limit: usize,
+) -> Result<ManagedFileInspection, ManagedTextFileError> {
+    let (_path, _, _, metadata, _, bytes) =
+        read_confined_regular_file_bounded(root, relative, byte_limit)?;
+    let byte_count = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    let content_digest =
+        RecordDigest::from_bytes(*mesh_types::Blake3::digest_bytes(&bytes).as_bytes());
+    let text = bounded_text(&bytes);
+    let executable = metadata.permissions().mode() & 0o111 != 0;
+    Ok(ManagedFileInspection {
+        path: relative.to_owned(),
+        current_version,
+        byte_count,
+        content_digest,
+        executable,
+        text,
+        bytes,
+        modified_from_current_version: content_digest != current_content_digest
+            || PortableMetadata::new(executable) != current_metadata,
+    })
+}
+
+pub(crate) fn inspect_native_file_bounded(
+    root: &Path,
+    relative: &str,
+    byte_limit: usize,
+) -> Result<NativeFileInspection, ManagedTextFileError> {
+    let reserve_private_top_level = crate::workspace::presented_workspace_storage_root(root)
+        .map_or(true, |root| root.is_none());
+    let (_path, _, _, metadata, _, bytes) = read_confined_regular_file_in_layout_bounded(
+        root,
+        relative,
+        reserve_private_top_level,
+        byte_limit,
+    )?;
+    Ok(NativeFileInspection::from_owned_bytes(
+        relative.to_owned(),
+        bytes,
+        metadata.permissions().mode() & 0o111 != 0,
+    ))
 }
 
 pub(crate) fn read_managed_bytes(
@@ -3264,6 +3351,22 @@ fn read_confined_regular_file(
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+fn read_confined_regular_file_bounded(
+    root: &Path,
+    relative: &str,
+    byte_limit: usize,
+) -> Result<ConfinedRegularFileRead, ManagedTextFileError> {
+    let reserve_private_top_level = crate::workspace::presented_workspace_storage_root(root)
+        .map_or(true, |root| root.is_none());
+    read_confined_regular_file_in_layout_bounded(
+        root,
+        relative,
+        reserve_private_top_level,
+        byte_limit,
+    )
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn read_confined_regular_file_in_layout(
     root: &Path,
     relative: &str,
@@ -3311,6 +3414,74 @@ fn read_confined_regular_file_in_layout(
     Err(ManagedTextFileError::InvalidPath)
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn read_confined_regular_file_in_layout_bounded(
+    root: &Path,
+    relative: &str,
+    reserve_private_top_level: bool,
+    byte_limit: usize,
+) -> Result<ConfinedRegularFileRead, ManagedTextFileError> {
+    let components = managed_components(relative, reserve_private_top_level)?;
+    let mut path = root.to_path_buf();
+    let mut directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(OPEN_DIRECTORY_FLAGS)
+        .open(root)
+        .map_err(|error| confined_open_error(root, error))?;
+    for (index, component) in components.iter().enumerate() {
+        let Component::Normal(name) = component else {
+            return Err(ManagedTextFileError::InvalidPath);
+        };
+        path.push(name);
+        if index + 1 == components.len() {
+            let mut file = open_read_at(&directory, name)
+                .map_err(|error| confined_open_error(&path, error))?;
+            let metadata = file
+                .metadata()
+                .map_err(|error| ManagedTextFileError::io("metadata", &path, error))?;
+            if !metadata.is_file() {
+                return Err(ManagedTextFileError::NotRegularFile);
+            }
+            let identity = managed_file_identity(&file, &metadata)
+                .map_err(|error| ManagedTextFileError::io("metadata", &path, error))?;
+            let metadata_bytes = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+            if metadata_bytes > byte_limit {
+                return Err(ManagedTextFileError::PreviewTooLarge {
+                    bytes: metadata_bytes,
+                    limit: byte_limit,
+                });
+            }
+            run_before_read_hook();
+            let mut bytes = Vec::with_capacity(metadata_bytes);
+            std::io::Read::by_ref(&mut file)
+                .take(
+                    u64::try_from(byte_limit)
+                        .unwrap_or(u64::MAX)
+                        .saturating_add(1),
+                )
+                .read_to_end(&mut bytes)
+                .map_err(|error| ManagedTextFileError::io("read", &path, error))?;
+            if bytes.len() > byte_limit {
+                return Err(ManagedTextFileError::PreviewTooLarge {
+                    bytes: bytes.len(),
+                    limit: byte_limit,
+                });
+            }
+            return Ok((
+                path,
+                directory,
+                name.to_os_string(),
+                metadata,
+                identity,
+                bytes,
+            ));
+        }
+        directory = open_directory_at(&directory, name)
+            .map_err(|error| confined_open_error(&path, error))?;
+    }
+    Err(ManagedTextFileError::InvalidPath)
+}
+
 #[cfg(target_os = "macos")]
 const CONFINED_LOOP_ERROR: i32 = 62;
 #[cfg(target_os = "linux")]
@@ -3333,6 +3504,32 @@ fn read_confined_regular_file(
     relative: &str,
 ) -> Result<ConfinedRegularFileRead, ManagedTextFileError> {
     read_confined_regular_file_in_layout(root, relative, true)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn read_confined_regular_file_bounded(
+    root: &Path,
+    _relative: &str,
+    _byte_limit: usize,
+) -> Result<ConfinedRegularFileRead, ManagedTextFileError> {
+    Err(ManagedTextFileError::io(
+        "open",
+        root,
+        io::Error::new(
+            io::ErrorKind::Unsupported,
+            "descriptor-relative managed reads require macOS or Linux",
+        ),
+    ))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn read_confined_regular_file_in_layout_bounded(
+    root: &Path,
+    _relative: &str,
+    _reserve_private_top_level: bool,
+    _byte_limit: usize,
+) -> Result<ConfinedRegularFileRead, ManagedTextFileError> {
+    read_confined_regular_file_bounded(root, "", 0)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]

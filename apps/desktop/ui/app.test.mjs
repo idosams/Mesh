@@ -27,6 +27,7 @@ const recentWorkspacePicker = readFileSync(new URL('../ui-next/src/molecules/rec
 const workspaceRestore = readFileSync(new URL('../ui-next/src/organisms/workspace-restore.tsx', import.meta.url), 'utf8');
 const workspaceVersions = readFileSync(new URL('../ui-next/src/organisms/workspace-version-navigator.tsx', import.meta.url), 'utf8');
 const artifactReview = readFileSync(new URL('../ui-next/src/organisms/artifact-review.tsx', import.meta.url), 'utf8');
+const liveAgentReview = readFileSync(new URL('../ui-next/src/organisms/live-agent-review.tsx', import.meta.url), 'utf8');
 const workspaceFilesChanges = readFileSync(new URL('../ui-next/src/organisms/workspace-files-changes.tsx', import.meta.url), 'utf8');
 const workspaceCurrent = readFileSync(new URL('../ui-next/src/organisms/workspace-current.tsx', import.meta.url), 'utf8');
 const workspaceDestination = readFileSync(new URL('../ui-next/src/organisms/workspace-destination.tsx', import.meta.url), 'utf8');
@@ -347,6 +348,12 @@ test('the React Changes editor has no hidden legacy text controller', () => {
   assert.match(script, /async function inspectSelectedManagedFile\(/);
   assert.match(script, /async function preserveManagedEditorText\(/);
   assert.match(script, /async function saveInspectedFilePrivately\(/);
+  assert.match(script, /baselineText: editorKind === 'text' \? workspaceEditorBaselineText\(model\.editor\) : ''/);
+  assert.match(script, /baselineAvailable: editorKind === 'text' && workspaceEditorBaselineAvailable\(model\.editor\)/);
+  assert.match(script, /const editorKind = !model\.editor[\s\S]*typeof model\.editor\.text === 'string'/);
+  assert.match(nativeHost, /inspect_managed_file_with_durable_text\([\s\S]*&relative_path,[\s\S]*MAX_WORKSPACE_EDITOR_TEXT_BYTES/);
+  assert.match(nativeHost, /"baseline_text"/);
+  assert.match(nativeHost, /MAX_WORKSPACE_EDITOR_TEXT_BYTES: usize = 1_048_576/);
   assert.doesNotMatch(styles, /\.file-editor(?:\W|$)/);
   assert.doesNotMatch(styles, /\.edit-status(?:\W|$)/);
 });
@@ -915,6 +922,58 @@ test('native managed-file reads require the verified workspace identity', () => 
     /fn read_managed_text\(/,
     'an obsolete relative-path-only Tauri command can read from a replacement workspace',
   );
+});
+
+test('workspace entries open only through exact closed native authority', () => {
+  assert.match(script, /invoke\('open_managed_workspace_entry', \{[\s\S]*expectedWorkspaceRoot: binding\.root,[\s\S]*expectedWorkspaceDigest: binding\.digest,[\s\S]*expectedWorkspaceInstallation: binding\.installation,[\s\S]*expectedAgentHandoffGeneration: generation,[\s\S]*relativePath: selected\.path,[\s\S]*entryKind: selected\.type,[\s\S]*action,/);
+  assert.match(nativeHost, /fn open_managed_workspace_entry\([\s\S]*expected_workspace_root: String,[\s\S]*expected_workspace_digest: String,[\s\S]*expected_workspace_installation: String,[\s\S]*expected_agent_handoff_generation: Option<String>,[\s\S]*relative_path: String,[\s\S]*entry_kind: String,[\s\S]*action: String,/);
+  assert.match(nativeHost, /FINDER_APPLICATION_PATH: &str = "\/System\/Library\/CoreServices\/Finder\.app"/);
+  assert.match(nativeHost, /let default_application = if action == "open-entry" \{[\s\S]*if is_directory \{[\s\S]*FINDER_APPLICATION_PATH[\s\S]*default_native_application\(entry\.path\(\)\)/);
+  assert.match(nativeHost, /verified_managed_workspace_entry\([\s\S]*&relative_path,[\s\S]*is_directory,/);
+  assert.match(nativeHost, /action != "open-entry" && action != "reveal-entry"/);
+  assert.match(nativeHost, /Command::new\(program\)/);
+  assert.match(script, /if \(!beginNativeWorkspaceLaunch\(\)\) return false;[\s\S]*invoke\('open_managed_workspace_entry',[\s\S]*finally \{[\s\S]*finishNativeWorkspaceLaunch\(\)/);
+  assert.match(script, /'open-workspace-folder': async \(\) => \{[\s\S]*beginNativeWorkspaceLaunch\(\)[\s\S]*revealCurrentWorkspaceFolder\(\)[\s\S]*Opened the current workspace folder in Finder\.[\s\S]*finishNativeWorkspaceLaunch\(\)/);
+  assert.match(script, /workspaceWorkNextActions\.get\(kind\);[\s\S]*Promise\.resolve\(\)[\s\S]*\.then\(action\)[\s\S]*File action unavailable:/);
+  assert.match(script, /function workspaceFileActionEnabled\(id\)[\s\S]*id === 'open-workspace-folder'[\s\S]*!workspaceInteractionInFlight\(\)[\s\S]*id === 'open-entry' \|\| id === 'reveal-entry'[\s\S]*!workspaceInteractionInFlight\(\)/);
+  assert.doesNotMatch(nativeHost, /shell\.open|Command::new\([^)]*relative_path/);
+});
+
+test('saved review sides open only through exact closed native authority', () => {
+  assert.match(artifactReview, /Before and after are exact immutable saved sides/);
+  assert.match(artifactReview, /Open in default app/);
+  assert.match(artifactReview, /Reveal in Finder/);
+  assert.match(artifactReview, /Open copy folder/);
+  assert.match(script, /invoke\('open_review_artifact_inspection', \{[\s\S]*expectedWorkspaceRoot: binding\.root,[\s\S]*expectedWorkspaceDigest: binding\.digest,[\s\S]*expectedWorkspaceInstallation: binding\.installation,[\s\S]*bundle: item\.bundle,[\s\S]*target: item\.subject_operation,[\s\S]*objectId: change\.object_id,[\s\S]*side,[\s\S]*expectedVersionId: expectedVersion,[\s\S]*expectedContentDigest: expectedDigest,[\s\S]*action,/);
+  assert.match(nativeHost, /fn open_review_artifact_inspection\([\s\S]*expected_workspace_root: String,[\s\S]*expected_workspace_digest: String,[\s\S]*expected_workspace_installation: String,[\s\S]*bundle: String,[\s\S]*target: String,[\s\S]*object_id: String,[\s\S]*side: String,[\s\S]*expected_version_id: String,[\s\S]*expected_content_digest: String,[\s\S]*action: String,/);
+  assert.match(nativeHost, /review_artifact_for_workspace\([\s\S]*&object_id,[\s\S]*side,/);
+  assert.match(nativeHost, /stable_native_reference\(&file\.path, false\)/);
+  assert.match(nativeHost, /else if action == "open-folder" \{[\s\S]*FINDER_APPLICATION_PATH/);
+  assert.match(nativeHost, /"mesh\.review-side-open\/v1"/);
+  assert.match(script, /if \(!beginNativeWorkspaceLaunch\(\)\) return;[\s\S]*invoke\('open_review_artifact_inspection',[\s\S]*finally \{[\s\S]*finishNativeWorkspaceLaunch\(\)/);
+  const savedSideLaunch = script.slice(
+    script.indexOf('function installCurrentReviewArtifactActions'),
+    script.indexOf('async function loadReviewArtifactPreview'),
+  );
+  assert.ok(
+    savedSideLaunch.indexOf('finishNativeWorkspaceLaunch()')
+      < savedSideLaunch.indexOf('showNotice(completion.message, completion.error)'),
+    'a saved-side success notice must never become actionable before the native-launch freeze is released',
+  );
+  assert.match(nativeHost, /admitted_review_inspection_extension\([\s\S]*&expected_version_id,[\s\S]*&expected_content_digest,[\s\S]*&action,/);
+  assert.doesNotMatch(nativeHost, /Command::new\([^)]*(artifact\.path|file\.path|object_id)/);
+});
+
+test('live Review stays read only, generation bound, stable across unchanged polls, and switch safe', () => {
+  assert.match(liveAgentReview, /Mutable/);
+  assert.match(liveAgentReview, /Unrecorded/);
+  assert.match(liveAgentReview, /cannot record, approve, export, save, or update the original folder/);
+  assert.doesNotMatch(liveAgentReview, /Approve exact version|Save privately|Create Git branch/);
+  assert.match(script, /invoke\('inspect_agent_live_file', \{[\s\S]*expectedWorkspaceRoot: binding\.root,[\s\S]*expectedWorkspaceDigest: binding\.digest,[\s\S]*expectedWorkspaceInstallation: binding\.installation,[\s\S]*expectedAgentHandoffGeneration: agentGeneration,[\s\S]*relativePath: change\.path,/);
+  assert.match(script, /if \(JSON\.stringify\(model\.agentLive\) !== JSON\.stringify\(next\)\) \{[\s\S]*renderReviews\(\)/);
+  assert.match(script, /switch-live-workspace:[^`]*\$\{workspace\.path\}[\s\S]*workspaceProjectionContinuityKey\(\)[\s\S]*openRecentWorkspacePath/);
+  assert.match(nativeHost, /fn inspect_agent_live_file\([\s\S]*expected_agent_handoff_generation: String,[\s\S]*relative_path: String,/);
+  assert.match(nativeHost, /\.inspect_agent_live_file\([\s\S]*&expected_agent_handoff_generation,[\s\S]*&relative_path,/);
 });
 
 test('agent handoff scans exact native files before an automatic safe save or structural review', () => {

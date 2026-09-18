@@ -17,17 +17,35 @@ const NONCE_ENV: &str = "MESH_RENDERER_PROOF_NONCE";
 const SURFACE_ENV: &str = "MESH_RENDERER_PROOF_SURFACE";
 const SOURCE_ENV: &str = "MESH_RENDERER_PROOF_SOURCE";
 const DESTINATION_ENV: &str = "MESH_RENDERER_PROOF_DESTINATION";
+const SCREENSHOT_ENV: &str = "MESH_RENDERER_PROOF_SCREENSHOT";
 const AGENT_RESULT_NAME: &str = "agent-proof-result.txt";
 const AGENT_RESULT_BYTES: &[u8] = b"packaged agent handoff result\n";
 const MAX_REPORT_BYTES: usize = 4_096;
-const FAILURE_CODES: [&str; 15] = [
+const FAILURE_CODES: [&str; 32] = [
     "configuration",
     "onboarding-mount",
     "onboarding-path",
     "onboarding-preview",
+    "files-mount",
+    "files-navigation",
+    "files-native-open",
+    "files-native-reveal",
+    "files-folder-open",
+    "files-screenshot",
     "review-mount",
     "review-content",
     "review-inline",
+    "review-image-visual",
+    "review-image-preview",
+    "review-image-preview-native",
+    "review-image-preview-envelope",
+    "review-image-preview-pending",
+    "review-image-selection-lost",
+    "review-image-preview-evidence",
+    "review-image-preview-refused",
+    "review-image-preview-idle",
+    "review-native-open",
+    "review-native-reveal",
     "versions-mount",
     "versions-preview",
     "private-export-mount",
@@ -37,11 +55,24 @@ const FAILURE_CODES: [&str; 15] = [
     "agent-handoff-start",
     "agent-handoff-finish",
 ];
-const CHECKPOINT_CODES: [&str; 39] = [
+const CHECKPOINT_CODES: [&str; 52] = [
+    "files-mounted",
+    "files-folder-expanded",
+    "files-file-selected",
+    "files-file-opened",
+    "files-file-revealed",
+    "files-folder-opened",
+    "files-workspace-opened",
     "review-mounted",
+    "review-text-selected",
     "review-visual",
     "review-content",
     "review-inline",
+    "review-image-selected",
+    "review-image-visual",
+    "review-image-preview",
+    "review-saved-open",
+    "review-saved-reveal",
     "versions-start",
     "versions-mounted",
     "versions-clicked",
@@ -85,6 +116,7 @@ struct RendererProofConfiguration {
     surface: &'static str,
     source: Option<String>,
     destination: Option<String>,
+    capture_screenshot: bool,
 }
 
 impl RendererProofConfiguration {
@@ -105,6 +137,7 @@ impl RendererProofConfiguration {
         }
         let surface = match surface.as_str() {
             "onboarding" => "onboarding",
+            "files" => "files",
             "review" => "review",
             "versions" => "versions",
             "private-export" => "private-export",
@@ -115,6 +148,7 @@ impl RendererProofConfiguration {
             ("onboarding", Some(source), None) if !source.is_empty() && source.len() <= 4_096 => {
                 (Some(source), None)
             }
+            ("files", None, None) => (None, None),
             ("review", None, None) => (None, None),
             ("versions", None, None) => (None, None),
             ("agent-handoff", Some(source), None)
@@ -138,16 +172,27 @@ impl RendererProofConfiguration {
             surface,
             source,
             destination,
+            capture_screenshot: false,
         })
     }
 
     fn from_environment() -> Option<Self> {
-        let configuration = Self::from_values(
+        let mut configuration = Self::from_values(
             std::env::var(NONCE_ENV).ok(),
             std::env::var(SURFACE_ENV).ok(),
             std::env::var(SOURCE_ENV).ok(),
             std::env::var(DESTINATION_ENV).ok(),
         )?;
+        match std::env::var(SCREENSHOT_ENV) {
+            Err(std::env::VarError::NotPresent) => {}
+            Ok(value) if value == "1" && configuration.surface == "files" => {
+                configuration.capture_screenshot = true;
+            }
+            _ => {
+                eprintln!("mesh-renderer-proof-configuration-refused:screenshot");
+                return None;
+            }
+        }
         if configuration.surface == "private-export"
             && !private_export_paths_are_confined(&configuration)
         {
@@ -355,6 +400,21 @@ impl RendererProofRuntime {
         Ok(configuration.json())
     }
 
+    pub(crate) fn files_screenshot_name(&self) -> Result<Option<String>, String> {
+        let configuration = self
+            .configuration
+            .as_ref()
+            .ok_or_else(|| "packaged renderer proof is not enabled".to_owned())?;
+        if configuration.surface != "files" {
+            return Err(
+                "packaged renderer screenshot is available only for Files proof".to_owned(),
+            );
+        }
+        Ok(configuration
+            .capture_screenshot
+            .then(|| format!("files-{}.png", configuration.nonce)))
+    }
+
     pub(crate) fn accept(&self, report: &str) -> Result<String, String> {
         let configuration = self
             .configuration
@@ -390,7 +450,14 @@ impl RendererProofRuntime {
         }
         let expected_claim = match configuration.surface {
             "onboarding" => ("preview-path", "verified-preview"),
-            "review" => ("content-inline", "content-inline-selected"),
+            "files" => (
+                "expand-select-open-reveal-folders",
+                "native-file-and-folder-actions-completed",
+            ),
+            "review" => (
+                "content-inline-native-open-reveal",
+                "saved-side-native-launches-completed",
+            ),
             "versions" => ("select-saved-point", "verified-preview-ready"),
             "private-export" => (
                 "refuse-original-then-confirm-private",
@@ -680,6 +747,7 @@ impl RendererProofRuntime {
             .as_ref()
             .ok_or_else(|| "packaged renderer proof is not enabled".to_owned())?;
         let surface_matches = match configuration.surface {
+            "files" => code.starts_with("files-"),
             "review" => code.starts_with("review-"),
             "versions" => code.starts_with("versions-"),
             "private-export" => code.starts_with("private-export-"),
@@ -771,6 +839,21 @@ mod tests {
         )
         .expect("exact versions proof configuration");
         assert_eq!(versions.surface, "versions");
+        let files = RendererProofConfiguration::from_values(
+            Some("ab".repeat(32)),
+            Some("files".to_owned()),
+            None,
+            None,
+        )
+        .expect("exact Files proof configuration");
+        assert_eq!(files.surface, "files");
+        assert!(RendererProofConfiguration::from_values(
+            Some("ab".repeat(32)),
+            Some("files".to_owned()),
+            Some("/tmp/source".to_owned()),
+            None,
+        )
+        .is_none());
         assert!(RendererProofConfiguration::from_values(
             Some("ab".repeat(32)),
             Some("versions".to_owned()),
@@ -801,6 +884,25 @@ mod tests {
         )
         .expect("complete agent handoff proof");
         assert_eq!(agent_handoff.surface, "agent-handoff");
+    }
+
+    #[test]
+    fn files_screenshot_name_is_nonce_bound_and_dormant_by_default() {
+        let mut files_runtime = runtime("files");
+        assert_eq!(files_runtime.files_screenshot_name().unwrap(), None);
+        files_runtime
+            .configuration
+            .as_mut()
+            .expect("Files proof configuration")
+            .capture_screenshot = true;
+        assert_eq!(
+            files_runtime.files_screenshot_name().unwrap().as_deref(),
+            Some("files-abababababababababababababababababababababababababababababababab.png")
+        );
+        assert!(runtime("review").files_screenshot_name().is_err());
+        assert!(RendererProofRuntime::disabled()
+            .files_screenshot_name()
+            .is_err());
     }
 
     #[test]
@@ -920,7 +1022,11 @@ mod tests {
     #[test]
     fn report_is_nonce_bound_closed_and_single_use() {
         let proof_runtime = runtime("review");
-        let accepted = report("review", "content-inline", "content-inline-selected");
+        let accepted = report(
+            "review",
+            "content-inline-native-open-reveal",
+            "saved-side-native-launches-completed",
+        );
         assert_eq!(
             proof_runtime.accept(&accepted).expect("accepted report"),
             accepted
@@ -1007,6 +1113,12 @@ mod tests {
             "private-export-preview-ready",
         );
         assert_eq!(
+            runtime("files")
+                .report_checkpoint("files-file-selected")
+                .expect("closed Files checkpoint"),
+            "files-file-selected",
+        );
+        assert_eq!(
             runtime("versions")
                 .report_checkpoint("versions-clicked")
                 .expect("closed versions checkpoint"),
@@ -1014,6 +1126,9 @@ mod tests {
         );
         assert!(runtime("versions")
             .report_checkpoint("private-export-clicked")
+            .is_err());
+        assert!(runtime("files")
+            .report_checkpoint("review-mounted")
             .is_err());
     }
 
@@ -1027,6 +1142,19 @@ mod tests {
             onboarding
         );
         assert!(runtime("review").accept(&onboarding).is_err());
+        let files = report(
+            "files",
+            "expand-select-open-reveal-folders",
+            "native-file-and-folder-actions-completed",
+        );
+        assert_eq!(runtime("files").accept(&files).expect("Files"), files);
+        assert!(runtime("files")
+            .accept(&report(
+                "files",
+                "expand-select-open-reveal-folders",
+                "native-file-opened"
+            ))
+            .is_err());
         assert!(runtime("review")
             .accept(&report("review", "content-inline", "verified-preview"))
             .is_err());
@@ -1110,6 +1238,12 @@ mod tests {
         assert!(RendererProofRuntime::disabled()
             .report_failure("configuration")
             .is_err());
+        assert_eq!(
+            runtime("files")
+                .report_failure("files-navigation")
+                .expect("known Files diagnostic"),
+            "files-navigation",
+        );
         assert_eq!(
             runtime("review")
                 .report_checkpoint("review-content")

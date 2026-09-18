@@ -19,6 +19,10 @@ pub(crate) enum ArtifactKind {
     Presentation,
     Document,
     Spreadsheet,
+    Png,
+    Jpeg,
+    Gif,
+    Webp,
 }
 
 impl ArtifactKind {
@@ -32,6 +36,10 @@ impl ArtifactKind {
             "pptx" => Some(Self::Presentation),
             "docx" => Some(Self::Document),
             "xlsx" => Some(Self::Spreadsheet),
+            "png" => Some(Self::Png),
+            "jpg" | "jpeg" => Some(Self::Jpeg),
+            "gif" => Some(Self::Gif),
+            "webp" => Some(Self::Webp),
             _ => None,
         }
     }
@@ -42,6 +50,7 @@ impl ArtifactKind {
             Self::Presentation => "presentation",
             Self::Document => "document",
             Self::Spreadsheet => "spreadsheet",
+            Self::Png | Self::Jpeg | Self::Gif | Self::Webp => "image",
         }
     }
 
@@ -51,7 +60,15 @@ impl ArtifactKind {
             Self::Presentation => "pptx",
             Self::Document => "docx",
             Self::Spreadsheet => "xlsx",
+            Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Gif => "gif",
+            Self::Webp => "webp",
         }
+    }
+
+    const fn is_image(self) -> bool {
+        matches!(self, Self::Png | Self::Jpeg | Self::Gif | Self::Webp)
     }
 
     fn accepts(self, bytes: &[u8]) -> bool {
@@ -60,6 +77,12 @@ impl ArtifactKind {
             Self::Presentation => ooxml_container_has(bytes, b"ppt/presentation.xml"),
             Self::Document => ooxml_container_has(bytes, b"word/document.xml"),
             Self::Spreadsheet => ooxml_container_has(bytes, b"xl/workbook.xml"),
+            Self::Png => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+            Self::Jpeg => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+            Self::Gif => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+            Self::Webp => {
+                bytes.len() >= 12 && bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP")
+            }
         }
     }
 }
@@ -193,6 +216,7 @@ pub(crate) struct ArtifactPreview {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ArtifactRenderer {
     QuickLookThumbnail,
+    ImageIoThumbnail,
     PdfKitPage,
 }
 
@@ -200,13 +224,14 @@ impl ArtifactRenderer {
     pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::QuickLookThumbnail => "macos-quick-look-thumbnail",
+            Self::ImageIoThumbnail => "macos-imageio-thumbnail-v1",
             Self::PdfKitPage => "macos-pdfkit-page-v1",
         }
     }
 
     pub(crate) const fn scope(self) -> &'static str {
         match self {
-            Self::QuickLookThumbnail => "representative-preview",
+            Self::QuickLookThumbnail | Self::ImageIoThumbnail => "representative-preview",
             Self::PdfKitPage => "exact-page-preview",
         }
     }
@@ -425,6 +450,7 @@ fn artifact_section_label(kind: ArtifactKind, number: usize) -> String {
         ArtifactKind::Presentation => "Slide",
         ArtifactKind::Document => "Document",
         ArtifactKind::Spreadsheet => "Sheet",
+        ArtifactKind::Png | ArtifactKind::Jpeg | ArtifactKind::Gif | ArtifactKind::Webp => "Image",
     };
     if kind == ArtifactKind::Document {
         family.to_owned()
@@ -514,7 +540,12 @@ fn extract_quick_look_text(kind: ArtifactKind, html: &[u8]) -> Option<ArtifactTe
                     ArtifactKind::Spreadsheet => {
                         name == "table" && tag_has_class(&tag, "worksheet")
                     }
-                    ArtifactKind::Document | ArtifactKind::Pdf => false,
+                    ArtifactKind::Document
+                    | ArtifactKind::Pdf
+                    | ArtifactKind::Png
+                    | ArtifactKind::Jpeg
+                    | ArtifactKind::Gif
+                    | ArtifactKind::Webp => false,
                 };
             if begins_section {
                 if !push_artifact_line(&mut lines, &mut characters, &mut current) {
@@ -2457,6 +2488,52 @@ fn quick_look_succeeds(input: &std::path::Path, root: &std::path::Path, thumbnai
 }
 
 #[cfg(target_os = "macos")]
+fn render_image_io_thumbnail(input: &std::path::Path, output: &std::path::Path) -> Option<Vec<u8>> {
+    use std::fs;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    // `sips` is the fixed macOS ImageIO front end. Unlike Quick Look it decodes raster bytes
+    // directly, does not depend on a Finder/Quick Look service being available, and `-Z` bounds
+    // the representative image to 1,200 pixels on its longest edge.
+    let mut child = Command::new("/usr/bin/sips")
+        .args(["-s", "format", "png", "-Z", "1200"])
+        .arg(input)
+        .arg("--out")
+        .arg(output)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+            Err(_) => return None,
+        }
+    };
+    if !status.success() {
+        return None;
+    }
+    let metadata = fs::symlink_metadata(output).ok()?;
+    if !metadata.is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() > MAX_PREVIEW_BYTES
+    {
+        return None;
+    }
+    let png = fs::read(output).ok()?;
+    png.starts_with(b"\x89PNG\r\n\x1a\n").then_some(png)
+}
+
+#[cfg(target_os = "macos")]
 const PDF_PAGE_RENDERER: &str = r#"ObjC.import('Foundation');
 ObjC.import('AppKit');
 ObjC.import('PDFKit');
@@ -2707,6 +2784,21 @@ fn render_platform(
         return Err(ArtifactPreviewError::InvalidPage);
     }
 
+    if kind.is_image() {
+        let output = root.join("image-preview.png");
+        let rendered = render_image_io_thumbnail(&input, &output);
+        cleanup();
+        return rendered
+            .map(|png| PlatformPreview {
+                png,
+                text: None,
+                renderer: ArtifactRenderer::ImageIoThumbnail,
+                page_number: None,
+                page_count: None,
+            })
+            .ok_or(ArtifactPreviewError::Unavailable);
+    }
+
     if !quick_look_succeeds(&input, &root, true) {
         cleanup();
         return Err(ArtifactPreviewError::Unavailable);
@@ -2732,30 +2824,38 @@ fn render_platform(
         ArtifactKind::Presentation => extract_presentation_text(&input, bytes),
         ArtifactKind::Document => extract_document_text(&input, bytes),
         ArtifactKind::Spreadsheet => extract_spreadsheet_text(&input, bytes),
-        ArtifactKind::Pdf => None,
+        ArtifactKind::Pdf
+        | ArtifactKind::Png
+        | ArtifactKind::Jpeg
+        | ArtifactKind::Gif
+        | ArtifactKind::Webp => None,
     };
-    let text = semantic_text.or_else(|| {
-        if quick_look_succeeds(&input, &root, false) {
-            let preview = root.join(format!(
-                "review.{}.qlpreview/Preview.html",
-                kind.extension()
-            ));
-            match fs::symlink_metadata(&preview) {
-                Ok(metadata)
-                    if metadata.is_file()
-                        && !metadata.file_type().is_symlink()
-                        && metadata.len() <= 4 * 1024 * 1024 =>
-                {
-                    fs::read(preview)
-                        .ok()
-                        .and_then(|html| extract_quick_look_text(kind, &html))
+    let text = if kind.is_image() {
+        None
+    } else {
+        semantic_text.or_else(|| {
+            if quick_look_succeeds(&input, &root, false) {
+                let preview = root.join(format!(
+                    "review.{}.qlpreview/Preview.html",
+                    kind.extension()
+                ));
+                match fs::symlink_metadata(&preview) {
+                    Ok(metadata)
+                        if metadata.is_file()
+                            && !metadata.file_type().is_symlink()
+                            && metadata.len() <= 4 * 1024 * 1024 =>
+                    {
+                        fs::read(preview)
+                            .ok()
+                            .and_then(|html| extract_quick_look_text(kind, &html))
+                    }
+                    _ => None,
                 }
-                _ => None,
+            } else {
+                None
             }
-        } else {
-            None
-        }
-    });
+        })
+    };
     cleanup();
     let png = png?;
     if !png.starts_with(b"\x89PNG\r\n\x1a\n") {
@@ -3164,9 +3264,22 @@ mod tests {
             ArtifactKind::from_path("people/policy.docx"),
             Some(ArtifactKind::Document)
         );
+        assert_eq!(
+            ArtifactKind::from_path("assets/hero.PNG"),
+            Some(ArtifactKind::Png)
+        );
+        assert_eq!(
+            ArtifactKind::from_path("assets/photo.jpeg"),
+            Some(ArtifactKind::Jpeg)
+        );
         assert_eq!(ArtifactKind::from_path("people/policy.doc"), None);
         assert!(ArtifactKind::Pdf.accepts(b"%PDF-1.7\n"));
         assert!(!ArtifactKind::Pdf.accepts(b"PK\x03\x04"));
+        assert!(ArtifactKind::Png.accepts(b"\x89PNG\r\n\x1a\nexact saved bytes"));
+        assert!(!ArtifactKind::Png.accepts(b"spoofed image bytes"));
+        assert!(ArtifactKind::Jpeg.accepts(b"\xff\xd8\xffexact saved bytes"));
+        assert!(ArtifactKind::Gif.accepts(b"GIF89aexact saved bytes"));
+        assert!(ArtifactKind::Webp.accepts(b"RIFF0000WEBPexact saved bytes"));
         let presentation =
             empty_zip(&["[Content_Types].xml", "_rels/.rels", "ppt/presentation.xml"]);
         assert!(ArtifactKind::Presentation.accepts(&presentation));
@@ -3188,6 +3301,24 @@ mod tests {
         assert_eq!(encode_base64(b"f"), "Zg==");
         assert_eq!(encode_base64(b"fo"), "Zm8=");
         assert_eq!(encode_base64(b"foo"), "Zm9v");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_imageio_renders_a_bounded_real_png_without_quick_look() {
+        let rendered = render(
+            "assets/mesh-proof.png",
+            include_bytes!("icons/icon.png"),
+            None,
+        )
+        .expect("macOS ImageIO renders the exact PNG bytes");
+        assert_eq!(rendered.kind, ArtifactKind::Png);
+        assert_eq!(rendered.renderer, ArtifactRenderer::ImageIoThumbnail);
+        assert_eq!(rendered.page_number, None);
+        assert_eq!(rendered.page_count, None);
+        assert_eq!(rendered.text, None);
+        assert!(rendered.png.starts_with(b"\x89PNG\r\n\x1a\n"));
+        assert!(rendered.png.len() as u64 <= MAX_PREVIEW_BYTES);
     }
 
     #[test]

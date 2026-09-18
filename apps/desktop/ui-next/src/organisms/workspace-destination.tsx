@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import { DestinationPlan } from "../molecules/destination-plan";
-import type { WorkspaceDestinationActionId, WorkspaceDestinationIntent, WorkspaceDestinationModel } from "../models/workspace-destination";
+import {
+  workspaceDestinationChoiceProjection,
+  type WorkspaceDestinationActionId,
+  type WorkspaceDestinationIntent,
+  type WorkspaceDestinationModel,
+} from "../models/workspace-destination";
 
 export function destinationDraftWasAccepted(
   submittedDestination: string | null,
@@ -23,6 +28,8 @@ export function WorkspaceDestination({ model, generation, onIntent }: Readonly<{
   const submittedDestinationRef = useRef<string | null>(null);
   const chooserRevisionAtStartRef = useRef<number | null>(null);
   const [draftPresent, setDraftPresent] = useState(false);
+  const [fileQuery, setFileQuery] = useState("");
+  const fileProjection = workspaceDestinationChoiceProjection(model.files, fileQuery, model.selectedFile);
   const actions = new Map(model.actions.map((action) => [action.id, action]));
   const action = (id: WorkspaceDestinationActionId) => actions.get(id)!;
   const button = (id: WorkspaceDestinationActionId, variant: "primary" | "secondary", proof?: string) => {
@@ -86,13 +93,16 @@ export function WorkspaceDestination({ model, generation, onIntent }: Readonly<{
       </header>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <label className="grid gap-2 text-sm font-semibold" htmlFor="destination-next-file">
-          Saved file
+        <div className="grid gap-2 text-sm font-semibold">
+          <label htmlFor="destination-file-filter">Find a saved file</label>
+          <input id="destination-file-filter" type="search" value={fileQuery} onChange={(event) => setFileQuery(event.currentTarget.value)} placeholder="Filter saved files…" className="min-h-11 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+          <label htmlFor="destination-next-file">Saved file</label>
           <select ref={selectedFileRef} id="destination-next-file" value={model.selectedFile} disabled={!model.canSelectFile} className="min-h-11 min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-normal text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" onChange={(event) => onIntent({ type: "set-field", field: "selectedFile", value: event.currentTarget.value })}>
             <option value="" disabled={model.files.length > 0}>{model.files.length ? "Choose a saved file" : "No saved files available"}</option>
-            {model.files.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            {fileProjection.items.map((item) => <option data-mesh-destination-file="true" key={item.value} value={item.value}>{item.label}</option>)}
           </select>
-        </label>
+          <span className="text-xs font-normal text-muted-foreground">{choiceProjectionCopy(fileProjection, "saved files")}</span>
+        </div>
         <div className="grid gap-2">
           <p className="text-sm font-semibold">Selected destination</p>
           <output data-mesh-proof="destination-selected" aria-label={model.destination ? `Selected destination: ${model.destination}` : "No destination selected"} aria-live="polite" tabIndex={0} className="min-h-11 min-w-0 select-text overflow-x-auto rounded-lg border border-border bg-muted/40 px-3 py-2.5 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">{model.destination}</output>
@@ -138,4 +148,17 @@ export function WorkspaceDestination({ model, generation, onIntent }: Readonly<{
       <p className="border-t border-border pt-4 text-xs leading-5 text-muted-foreground">Mesh creates folders and updates current files first. After current paths are installed, Mesh derives former saved paths for a separate reviewed removal step. Only paths proven to come from the original import or an exact durable update receipt are eligible; recursive deletion is unavailable. Private-only, changed, replaced, or unrelated destination entries are preserved, and Mesh never removes a destination entry silently. A batch never rolls back an earlier completed prefix.</p>
     </div>
   );
+}
+
+function choiceProjectionCopy(
+  projection: ReturnType<typeof workspaceDestinationChoiceProjection>,
+  label: string,
+): string {
+  if (projection.retainedSelected) {
+    return `${projection.matched.toLocaleString()} matching ${label}; the current choice remains available.`;
+  }
+  if (projection.truncated) {
+    return `${projection.items.length.toLocaleString()} of ${projection.matched.toLocaleString()} matching ${label} shown.`;
+  }
+  return `${projection.matched.toLocaleString()} matching ${label}.`;
 }

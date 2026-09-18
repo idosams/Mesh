@@ -1,9 +1,17 @@
+import { useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import type {
   WorkspaceCurrentActionId,
   WorkspaceCurrentIntent,
   WorkspaceCurrentModel,
+} from "../models/workspace-current";
+import {
+  CURRENT_CONDITION_ROW_LIMIT,
+  CURRENT_DETAIL_ROW_LIMIT,
+  CURRENT_MONITOR_ROW_LIMIT,
+  workspaceCurrentListProjection,
+  workspaceCurrentWorkspaceProjection,
 } from "../models/workspace-current";
 
 type IntentHandler = (intent: WorkspaceCurrentIntent) => void;
@@ -12,6 +20,27 @@ export function WorkspaceCurrent({ model, onIntent }: {
   model: WorkspaceCurrentModel;
   onIntent: IntentHandler;
 }) {
+  const [workspaceQuery, setWorkspaceQuery] = useState("");
+  return (
+    <WorkspaceCurrentView
+      model={model}
+      onIntent={onIntent}
+      workspaceQuery={workspaceQuery}
+      onWorkspaceQueryChange={setWorkspaceQuery}
+    />
+  );
+}
+
+export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorkspaceQueryChange }: {
+  model: WorkspaceCurrentModel;
+  onIntent: IntentHandler;
+  workspaceQuery: string;
+  onWorkspaceQueryChange: (query: string) => void;
+}) {
+  const workspaceProjection = workspaceCurrentWorkspaceProjection(model.workspaces, workspaceQuery);
+  const agentChangeProjection = workspaceCurrentListProjection(model.agentActivity.changes, CURRENT_MONITOR_ROW_LIMIT);
+  const entryProjection = workspaceCurrentListProjection(model.entries, CURRENT_DETAIL_ROW_LIMIT);
+  const conditionProjection = workspaceCurrentListProjection(model.conditions, CURRENT_CONDITION_ROW_LIMIT);
   const byId = new Map(model.actions.map((action) => [action.id, action]));
   const proofByAction: Partial<Record<WorkspaceCurrentActionId, string>> = {
     "start-codex": "current-start-codex",
@@ -61,10 +90,25 @@ export function WorkspaceCurrent({ model, onIntent }: {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspaces and agents</p>
             <h3 id="workspace-switcher-heading" className="mt-1 font-semibold">Switch without losing agent context</h3>
           </div>
-          <span className="text-xs text-muted-foreground">{model.workspaces.length} recent</span>
+          <span className="text-xs text-muted-foreground">{model.workspaces.length.toLocaleString()} recent</span>
         </div>
+        <label className="mt-3 grid max-w-xl gap-1.5 text-xs font-medium text-muted-foreground">
+          <span>Find a workspace or agent</span>
+          <input
+            type="search"
+            value={workspaceQuery}
+            onChange={(event) => onWorkspaceQueryChange(event.currentTarget.value)}
+            placeholder="Search by name, state, or path…"
+            className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </label>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {workspaceProjection.truncated
+            ? `${workspaceProjection.items.length.toLocaleString()} of ${workspaceProjection.matched.toLocaleString()} matching workspaces shown`
+            : `${workspaceProjection.matched.toLocaleString()} matching workspaces`}
+        </p>
         <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {model.workspaces.map((workspace) => (
+          {workspaceProjection.items.map((workspace) => (
             <button
               key={workspace.path}
               type="button"
@@ -82,6 +126,12 @@ export function WorkspaceCurrent({ model, onIntent }: {
             </button>
           ))}
         </div>
+        {workspaceProjection.truncated ? (
+          <p className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
+            Showing the first {workspaceProjection.items.length.toLocaleString()} matching workspaces. Refine the search to reach a narrower result set.
+          </p>
+        ) : null}
+        {workspaceProjection.matched === 0 ? <p className="mt-3 text-sm text-muted-foreground">No workspace or agent matches this search.</p> : null}
       </section>
 
       <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="live-agent-heading">
@@ -99,12 +149,17 @@ export function WorkspaceCurrent({ model, onIntent }: {
         </p>
         {model.agentActivity.changes.length ? (
           <ul className="mt-3 max-h-56 space-y-2 overflow-auto" data-mesh-live-agent-work="true">
-            {model.agentActivity.changes.map((change) => (
-              <li key={`${change.kind}:${change.path}`} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm">
+            {agentChangeProjection.items.map((change) => (
+              <li data-mesh-live-change="true" key={`${change.kind}:${change.path}`} className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm">
                 <span className="min-w-0 break-all font-mono">{change.path}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{change.kind.replaceAll("-", " ")}</span>
               </li>
             ))}
+            {agentChangeProjection.truncated ? (
+              <li className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
+                Showing the first {agentChangeProjection.items.length.toLocaleString()} of {agentChangeProjection.matched.toLocaleString()} live changes. Open Live agent work in Review and filter to inspect a narrower result set.
+              </li>
+            ) : null}
           </ul>
         ) : null}
         {model.agentAssigned ? (
@@ -158,14 +213,16 @@ export function WorkspaceCurrent({ model, onIntent }: {
         <details className="rounded-xl border border-border bg-background/40 p-4">
           <summary className="min-h-11 cursor-pointer font-semibold">Materialized paths ({model.entries.length})</summary>
           <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm">
-            {model.entries.map((entry, index) => <li className="break-all font-mono" key={`${index}:${entry}`}>{entry}</li>)}
+            {entryProjection.items.map((entry, index) => <li data-mesh-materialized-entry="true" className="break-all font-mono" key={`${index}:${entry}`}>{entry}</li>)}
+            {entryProjection.truncated ? <li className="text-xs text-muted-foreground">Showing the first {entryProjection.items.length.toLocaleString()} of {entryProjection.matched.toLocaleString()} paths. Use Files to search the complete workspace.</li> : null}
           </ul>
         </details>
         <details className="rounded-xl border border-border bg-background/40 p-4" open={model.conditions.length > 0}>
           <summary className="min-h-11 cursor-pointer font-semibold">Conditions and unavailable controls ({model.conditions.length})</summary>
           {model.conditions.length ? (
             <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm text-muted-foreground">
-              {model.conditions.map((condition, index) => <li key={`${index}:${condition}`}>{condition}</li>)}
+              {conditionProjection.items.map((condition, index) => <li data-mesh-current-condition="true" key={`${index}:${condition}`}>{condition}</li>)}
+              {conditionProjection.truncated ? <li>Showing the first {conditionProjection.items.length.toLocaleString()} of {conditionProjection.matched.toLocaleString()} conditions.</li> : null}
             </ul>
           ) : <p className="mt-3 text-sm text-muted-foreground">No reported conditions.</p>}
         </details>

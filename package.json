@@ -1,6 +1,6 @@
 {
   "name": "mesh",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Mesh local-first workspace protocol and desktop client",
   "type": "module",
   "private": true,

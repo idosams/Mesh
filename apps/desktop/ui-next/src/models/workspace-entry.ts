@@ -3,7 +3,7 @@ export type WorkspaceEntryMode = "empty" | "needs-import" | "ready";
 export type RecentWorkspace = Readonly<{
   path: string;
   label: string;
-  state: "available" | "current" | "agent-assigned";
+  state: "available" | "current" | "agent-assigned" | "unavailable";
 }>;
 
 export type WorkspaceEntryModel = Readonly<{
@@ -76,7 +76,7 @@ function boolean(value: unknown, label: string): boolean {
 function recentWorkspace(value: unknown): RecentWorkspace {
   const item = record(value, "recent workspace");
   exactKeys(item, ["label", "path", "state"], "recent workspace");
-  if (!["available", "current", "agent-assigned"].includes(item.state as string)) {
+  if (!["available", "current", "agent-assigned", "unavailable"].includes(item.state as string)) {
     throw new Error("The recent workspace state was invalid.");
   }
   return Object.freeze({

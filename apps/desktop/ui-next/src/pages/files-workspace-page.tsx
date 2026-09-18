@@ -16,6 +16,7 @@ export function FilesWorkspacePage({ active, route, surfaceFailures }: Readonly<
         name={slot.name}
         label={slot.loadingLabel}
         failed={surfaceFailures[slot.name]}
+        chrome="workbench"
       />
     </WorkspaceView>
   );

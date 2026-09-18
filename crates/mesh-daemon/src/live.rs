@@ -66,8 +66,9 @@ use crate::managed_file::{
     confined_existing_entry, confined_free_path, create_export_directory_in_exact_parent_prepared,
     create_export_file_in_exact_parent_prepared, inspect_managed_directory,
     inspect_managed_directory_export_target, inspect_managed_export_target, inspect_managed_file,
-    managed_directory_identity, read_export_replacement, read_managed_bytes,
-    read_managed_replacement, read_managed_text, recover_prepared_export_directory_in_exact_parent,
+    inspect_managed_file_bounded, inspect_native_file_bounded, managed_directory_identity,
+    read_export_replacement, read_managed_bytes, read_managed_replacement, read_managed_text,
+    recover_prepared_export_directory_in_exact_parent,
     recover_prepared_export_file_in_exact_parent, remove_exact_export_directory,
     remove_exact_export_file, ManagedDirectoryExport, ManagedDirectoryExportBatchPreview,
     ManagedDirectoryExportPreview, ManagedDirectoryExportTarget, ManagedDirectoryIdentity,
@@ -87,6 +88,8 @@ use crate::pull_back_receipt::{
 };
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::user_messages;
+
+const MAX_AGENT_LIVE_PREVIEW_BYTES: usize = 32 * 1024 * 1024;
 #[cfg(test)]
 use crate::workspace::HistoricalWorkspaceSnapshot;
 use crate::workspace::{
@@ -107,6 +110,18 @@ pub struct VerifiedManagedWorkspacePath {
     inode: u64,
 }
 
+/// One exact regular file or directory reopened beneath a verified managed workspace.
+///
+/// The renderer never receives this path. Desktop-only launchers use the recorded kernel identity
+/// to avoid handing a mutable caller-supplied spelling to Finder or LaunchServices.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedManagedWorkspaceEntry {
+    path: PathBuf,
+    directory: bool,
+    device: u64,
+    inode: u64,
+}
+
 /// Complete read-only inspection performed while one exact agent generation remains assigned.
 ///
 /// Bodies are deliberately omitted. The result proves that every currently discovered regular
@@ -123,6 +138,80 @@ pub struct AgentFinishPreflight {
     native_directories: Vec<NativeDirectoryInspection>,
     missing_files: Vec<NativeMissingFile>,
     unsupported_entries: Vec<NativeUnsupportedEntry>,
+}
+
+/// One stable, read-only live-agent file snapshot admitted under exact custody.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentLiveFileSnapshot {
+    root: String,
+    digest: String,
+    installation: String,
+    generation: String,
+    path: String,
+    kind: &'static str,
+    byte_count: u64,
+    content_digest: String,
+    executable: bool,
+    text: Option<String>,
+    bytes: Vec<u8>,
+}
+
+impl AgentLiveFileSnapshot {
+    /// Canonical managed workspace root held during both reads.
+    #[must_use]
+    pub fn root(&self) -> &str {
+        &self.root
+    }
+    /// Exact folded workspace digest held during both reads.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+    /// Opaque physical workspace installation held during both reads.
+    #[must_use]
+    pub fn installation(&self) -> &str {
+        &self.installation
+    }
+    /// Exact active agent-custody generation held during both reads.
+    #[must_use]
+    pub fn generation(&self) -> &str {
+        &self.generation
+    }
+    /// Normalized root-relative file path admitted by native inventory.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+    /// Whether the file is tracked-and-modified or newly native.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        self.kind
+    }
+    /// Exact byte count shared by the two stable reads.
+    #[must_use]
+    pub const fn byte_count(&self) -> u64 {
+        self.byte_count
+    }
+    /// BLAKE3 digest shared by the two stable reads.
+    #[must_use]
+    pub fn content_digest(&self) -> &str {
+        &self.content_digest
+    }
+    /// Whether any executable bit was present during both reads.
+    #[must_use]
+    pub const fn executable(&self) -> bool {
+        self.executable
+    }
+    /// Bounded UTF-8 text when safe for an inert renderer preview.
+    #[must_use]
+    pub fn text(&self) -> Option<&str> {
+        self.text.as_deref()
+    }
+    /// Exact confined bytes available only to native inert preview code.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 impl AgentFinishPreflight {
@@ -369,6 +458,73 @@ impl VerifiedManagedWorkspacePath {
     }
 }
 
+impl VerifiedManagedWorkspaceEntry {
+    /// Canonical display path resolved by the daemon beneath the verified workspace.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Whether the exact reopened entry is a directory rather than a regular file.
+    #[must_use]
+    pub const fn is_directory(&self) -> bool {
+        self.directory
+    }
+
+    /// Recheck the mutable display spelling immediately before a native launch.
+    pub fn ensure_current(&self) -> std::io::Result<()> {
+        let metadata = fs::symlink_metadata(&self.path)?;
+        let expected_kind = if self.directory {
+            metadata.file_type().is_dir()
+        } else {
+            metadata.file_type().is_file()
+        };
+        if expected_kind
+            && !metadata.file_type().is_symlink()
+            && metadata.dev() == self.device
+            && metadata.ino() == self.inode
+        {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(
+                "the verified workspace entry was replaced",
+            ))
+        }
+    }
+
+    /// Stable macOS filesystem reference for the exact admitted file or directory.
+    pub fn stable_reference(&self) -> std::io::Result<PathBuf> {
+        #[cfg(target_os = "macos")]
+        let reference = PathBuf::from(format!("/.vol/{}/{}", self.device, self.inode));
+        #[cfg(not(target_os = "macos"))]
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "this platform has no supported persistent entry reference",
+        ));
+
+        #[cfg(target_os = "macos")]
+        {
+            let metadata = fs::symlink_metadata(&reference)?;
+            let expected_kind = if self.directory {
+                metadata.file_type().is_dir()
+            } else {
+                metadata.file_type().is_file()
+            };
+            if expected_kind
+                && !metadata.file_type().is_symlink()
+                && metadata.dev() == self.device
+                && metadata.ino() == self.inode
+            {
+                Ok(reference)
+            } else {
+                Err(std::io::Error::other(
+                    "the stable workspace-entry reference does not name the admitted entry",
+                ))
+            }
+        }
+    }
+}
+
 static HISTORICAL_EXPORT_SERIAL: AtomicU64 = AtomicU64::new(1);
 const MAX_WORKSPACE_VERSION_PREVIEW_ENTRIES: usize = 24;
 const MAX_WORKSPACE_VERSION_PREVIEW_CHANGES: usize = 24;
@@ -483,6 +639,7 @@ thread_local! {
     static BEFORE_HISTORICAL_EXPORT_REMOVE: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_REOPEN_DIRECTORY_LOCK: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_VERSION_FORK_CONFIRM: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
+    static BETWEEN_AGENT_LIVE_FILE_READS: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
 }
 
 #[cfg(test)]
@@ -497,6 +654,15 @@ fn run_before_historical_export_remove() {
 #[cfg(test)]
 fn run_after_reopen_directory_lock() {
     AFTER_REOPEN_DIRECTORY_LOCK.with(|hook| {
+        if let Some(hook) = hook.borrow_mut().take() {
+            hook();
+        }
+    });
+}
+
+#[cfg(test)]
+fn run_between_agent_live_file_reads() {
+    BETWEEN_AGENT_LIVE_FILE_READS.with(|hook| {
         if let Some(hook) = hook.borrow_mut().take() {
             hook();
         }
@@ -1546,6 +1712,14 @@ struct PendingCheckpointIntervals {
 
 impl IdleCheckpointSchedulerState {
     fn publish(&mut self, scheduled: IdleCheckpointSchedule) -> IdleScheduleUpdate {
+        self.publish_at(scheduled, Instant::now())
+    }
+
+    fn publish_at(
+        &mut self,
+        scheduled: IdleCheckpointSchedule,
+        published_at: Instant,
+    ) -> IdleScheduleUpdate {
         if self.worker_running {
             if let Some(current) = &self.scheduled {
                 if scheduled.installation < current.installation {
@@ -1564,7 +1738,7 @@ impl IdleCheckpointSchedulerState {
         self.generation = self.generation.saturating_add(1);
         self.scheduled = Some(scheduled);
         if self.maximum_started_at.is_none() {
-            self.maximum_started_at = Some(Instant::now());
+            self.maximum_started_at = Some(published_at);
         }
         if self.worker_running {
             IdleScheduleUpdate::WakeWorker
@@ -1586,6 +1760,12 @@ impl IdleCheckpointSchedulerState {
         self.scheduled = None;
         self.maximum_started_at = None;
         true
+    }
+
+    fn maximum_remaining_at(&self, maximum: Duration, now: Instant) -> Duration {
+        self.maximum_started_at.map_or(maximum, |started| {
+            maximum.saturating_sub(now.saturating_duration_since(started))
+        })
     }
 }
 
@@ -2186,6 +2366,90 @@ impl LiveDaemon {
         })
     }
 
+    /// Resolve one renderer-selected relative path beneath the exact managed workspace.
+    ///
+    /// Custody is acquired before the workspace-open serial. An unassigned caller must still be
+    /// unassigned; a live-review caller must name the exact active handoff generation. The path is
+    /// then reopened component-by-component without following links and its physical identity is
+    /// retained for the desktop launcher.
+    pub fn verified_managed_workspace_entry(
+        &self,
+        expected_root: &str,
+        expected_digest: &str,
+        expected_installation: &str,
+        expected_agent_generation: Option<&str>,
+        relative_path: &str,
+        is_directory: bool,
+    ) -> Result<VerifiedManagedWorkspaceEntry, ManagedTextFileError> {
+        let custody = crate::workspace_custody::lock_for_workspace_path(
+            Path::new(expected_root),
+            expected_installation,
+        )
+        .map_err(|error| {
+            if error.is_stale_workspace() {
+                ManagedTextFileError::StaleWorkspace
+            } else {
+                ManagedTextFileError::Recovery(error.to_string())
+            }
+        })?;
+        let resolve = || {
+            let _open_serial = self
+                .workspace_open
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let held = self.held();
+            let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+            if open.root().as_path() != Path::new(expected_root)
+                || open.digest().to_string() != expected_digest
+                || open.installation() != expected_installation
+            {
+                return Err(ManagedTextFileError::StaleWorkspace);
+            }
+            open.ensure_physical_root()
+                .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
+            let path = confined_existing_entry(
+                open.physical_root().as_path(),
+                relative_path,
+                is_directory,
+            )?;
+            let metadata = fs::symlink_metadata(&path)
+                .map_err(|error| ManagedTextFileError::io("verify managed entry", &path, error))?;
+            let expected_kind = if is_directory {
+                metadata.file_type().is_dir()
+            } else {
+                metadata.file_type().is_file()
+            };
+            if !expected_kind || metadata.file_type().is_symlink() {
+                return Err(ManagedTextFileError::NotRegularFile);
+            }
+            Ok(VerifiedManagedWorkspaceEntry {
+                path,
+                directory: is_directory,
+                device: metadata.dev(),
+                inode: metadata.ino(),
+            })
+        };
+        let map_custody = |error: crate::WorkspaceAgentCustodyError| {
+            if error.is_stale_workspace() {
+                ManagedTextFileError::StaleWorkspace
+            } else {
+                ManagedTextFileError::Recovery(error.to_string())
+            }
+        };
+        match expected_agent_generation {
+            Some(generation) => {
+                let _custody = custody
+                    .require_generation(generation)
+                    .map_err(map_custody)?;
+                resolve()
+            }
+            None => {
+                let _custody = custody.require_unassigned().map_err(map_custody)?;
+                resolve()
+            }
+        }
+    }
+
     /// Read the workspace-native agent custody for the exact displayed installation.
     pub fn workspace_agent_custody_for_workspace(
         &self,
@@ -2305,6 +2569,130 @@ impl LiveDaemon {
             native_directories,
             missing_files,
             unsupported_entries,
+        })
+    }
+
+    /// Read one changing file twice while exact agent custody and workspace identity remain held.
+    /// Only an identical pair is returned, so the desktop never labels a concurrently changing
+    /// read as a stable live snapshot.
+    pub fn inspect_agent_live_file(
+        &self,
+        expected_root: &str,
+        expected_digest: &str,
+        expected_installation: &str,
+        expected_generation: &str,
+        relative_path: &str,
+    ) -> Result<AgentLiveFileSnapshot, ManagedTextFileError> {
+        let _custody = crate::workspace_custody::lock_for_workspace_path(
+            Path::new(expected_root),
+            expected_installation,
+        )
+        .and_then(|authority| authority.require_generation(expected_generation))
+        .map_err(|error| {
+            if error.is_stale_workspace() {
+                ManagedTextFileError::StaleWorkspace
+            } else {
+                ManagedTextFileError::Recovery(error.to_string())
+            }
+        })?;
+        let _open_serial = self
+            .workspace_open
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let (managed, native) = {
+            let held = self.held();
+            let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+            if open.root().as_path() != Path::new(expected_root)
+                || open.digest().to_string() != expected_digest
+                || open.installation() != expected_installation
+            {
+                return Err(ManagedTextFileError::StaleWorkspace);
+            }
+            open.ensure_physical_root()
+                .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
+            let summary = summarise(open, None);
+            if !summary.native_inventory_complete {
+                return Err(ManagedTextFileError::Recovery(
+                    "the complete native inventory could not be inspected".to_owned(),
+                ));
+            }
+            (
+                summary
+                    .file_histories
+                    .iter()
+                    .any(|history| history.path() == relative_path),
+                summary
+                    .native_untracked_files
+                    .iter()
+                    .any(|path| path == relative_path),
+            )
+        };
+        let (kind, byte_count, content_digest, executable, text, bytes) = if managed {
+            let first =
+                self.inspect_managed_file_bounded(relative_path, MAX_AGENT_LIVE_PREVIEW_BYTES)?;
+            #[cfg(test)]
+            run_between_agent_live_file_reads();
+            let second =
+                self.inspect_managed_file_bounded(relative_path, MAX_AGENT_LIVE_PREVIEW_BYTES)?;
+            if first != second {
+                return Err(ManagedTextFileError::Recovery(
+                    "the live file changed while Mesh was reading it; retry when the write finishes"
+                        .to_owned(),
+                ));
+            }
+            if !first.modified_from_current_version() {
+                return Err(ManagedTextFileError::Recovery(
+                    "the selected live file no longer differs from its saved version".to_owned(),
+                ));
+            }
+            (
+                "modified-file",
+                first.byte_count(),
+                first.content_digest().to_string(),
+                first.executable(),
+                first.text().map(str::to_owned),
+                first.bytes().to_vec(),
+            )
+        } else if native {
+            let first = self.inspect_native_untracked_file_bounded(
+                relative_path,
+                MAX_AGENT_LIVE_PREVIEW_BYTES,
+            )?;
+            #[cfg(test)]
+            run_between_agent_live_file_reads();
+            let second = self.inspect_native_untracked_file_bounded(
+                relative_path,
+                MAX_AGENT_LIVE_PREVIEW_BYTES,
+            )?;
+            if first != second {
+                return Err(ManagedTextFileError::Recovery(
+                    "the live file changed while Mesh was reading it; retry when the write finishes"
+                        .to_owned(),
+                ));
+            }
+            (
+                "new-file",
+                first.byte_count(),
+                first.content_digest().to_string(),
+                first.executable(),
+                first.text().map(str::to_owned),
+                first.bytes().to_vec(),
+            )
+        } else {
+            return Err(ManagedTextFileError::NotRegularFile);
+        };
+        Ok(AgentLiveFileSnapshot {
+            root: expected_root.to_owned(),
+            digest: expected_digest.to_owned(),
+            installation: expected_installation.to_owned(),
+            generation: expected_generation.to_owned(),
+            path: relative_path.to_owned(),
+            kind,
+            byte_count,
+            content_digest,
+            executable,
+            text,
+            bytes,
         })
     }
 
@@ -4044,11 +4432,7 @@ impl LiveDaemon {
                 // replacement can then start a fresh one with its exact installation identity.
                 return Ok(None);
             }
-            let maximum_remaining = idle
-                .maximum_started_at
-                .map_or(intervals.maximum, |started| {
-                    intervals.maximum.saturating_sub(started.elapsed())
-                });
+            let maximum_remaining = idle.maximum_remaining_at(intervals.maximum, Instant::now());
             let first_interval = intervals.idle.min(maximum_remaining);
             let (idle, waited) = checkpoint_idle
                 .wake
@@ -4474,6 +4858,86 @@ impl LiveDaemon {
         )
     }
 
+    /// Inspect mutable working bytes together with the exact bounded text of their saved basis.
+    ///
+    /// This is the desktop editor comparison seam. General scans intentionally use
+    /// [`Self::inspect_managed_file`] so a multi-file scan never reconstructs retained bodies it
+    /// does not display.
+    pub fn inspect_managed_file_with_durable_text(
+        &self,
+        relative_path: &str,
+        text_byte_limit: usize,
+    ) -> Result<(ManagedFileInspection, Option<String>), ManagedTextFileError> {
+        let held = self.held();
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        open.ensure_physical_root()
+            .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
+        let history = open
+            .file_histories()
+            .iter()
+            .find(|history| history.path() == relative_path)
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let current = history
+            .current()
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let manifest = open
+            .manifest_record(current.manifest())
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let metadata = open
+            .file_version_metadata(current.version())
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let file = inspect_managed_file(
+            open.physical_root().as_path(),
+            relative_path,
+            current.version().to_string(),
+            manifest.content_digest,
+            metadata,
+        )?;
+        let bounded_byte_limit = text_byte_limit.min(MAX_MANAGED_TEXT_BYTES);
+        let durable_text = if file.text().is_some()
+            && file.byte_count() <= u64::try_from(bounded_byte_limit).unwrap_or(u64::MAX)
+        {
+            open.current_durable_text(relative_path, bounded_byte_limit)
+                .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?
+        } else {
+            None
+        };
+        Ok((file, durable_text))
+    }
+
+    fn inspect_managed_file_bounded(
+        &self,
+        relative_path: &str,
+        byte_limit: usize,
+    ) -> Result<ManagedFileInspection, ManagedTextFileError> {
+        let held = self.held();
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        open.ensure_physical_root()
+            .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
+        let history = open
+            .file_histories()
+            .iter()
+            .find(|history| history.path() == relative_path)
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let current = history
+            .current()
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let manifest = open
+            .manifest_record(current.manifest())
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        let metadata = open
+            .file_version_metadata(current.version())
+            .ok_or(ManagedTextFileError::NotRegularFile)?;
+        inspect_managed_file_bounded(
+            open.physical_root().as_path(),
+            relative_path,
+            current.version().to_string(),
+            manifest.content_digest,
+            metadata,
+            byte_limit,
+        )
+    }
+
     /// Inspect one native regular file that is not yet present in durable workspace history.
     ///
     /// Discovery is deliberately nonauthoritative: a folder rescan cannot prove when the file was
@@ -4492,11 +4956,25 @@ impl LiveDaemon {
             .map_err(|_| ManagedTextFileError::TargetExists)?;
         let root = open.physical_root().as_path();
         let (target, bytes) = read_managed_replacement(root, relative_path)?;
-        Ok(NativeFileInspection::from_bytes(
+        Ok(NativeFileInspection::from_owned_bytes(
             relative_path.to_owned(),
-            &bytes,
+            bytes,
             target.executable(),
         ))
+    }
+
+    fn inspect_native_untracked_file_bounded(
+        &self,
+        relative_path: &str,
+        byte_limit: usize,
+    ) -> Result<NativeFileInspection, ManagedTextFileError> {
+        let held = self.held();
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        open.ensure_physical_root()
+            .map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
+        open.managed_discovery_target(relative_path)
+            .map_err(|_| ManagedTextFileError::TargetExists)?;
+        inspect_native_file_bounded(open.physical_root().as_path(), relative_path, byte_limit)
     }
 
     /// Reopen one durable managed directory and report the exact current operating-system object.
@@ -9112,6 +9590,38 @@ mod tests {
     }
 
     #[test]
+    fn later_activity_resets_idle_generation_without_postponing_the_maximum_deadline() {
+        let first = IdleCheckpointSchedule {
+            through: RecoverySequence::new(1).expect("sequence"),
+            installation: CheckpointInstallation(1),
+            root: PathBuf::from("/workspace"),
+        };
+        let second = IdleCheckpointSchedule {
+            through: RecoverySequence::new(2).expect("sequence"),
+            installation: CheckpointInstallation(1),
+            root: PathBuf::from("/workspace"),
+        };
+        let started = Instant::now();
+        let later = started + Duration::from_millis(500);
+        let observed = started + Duration::from_millis(800);
+        let mut scheduler = IdleCheckpointSchedulerState::default();
+
+        assert_eq!(
+            scheduler.publish_at(first, started),
+            IdleScheduleUpdate::StartWorker
+        );
+        assert_eq!(
+            scheduler.publish_at(second, later),
+            IdleScheduleUpdate::WakeWorker
+        );
+        assert_eq!(scheduler.maximum_started_at, Some(started));
+        assert_eq!(
+            scheduler.maximum_remaining_at(Duration::from_secs(1), observed),
+            Duration::from_millis(200)
+        );
+    }
+
+    #[test]
     fn same_workspace_open_waits_before_workspace_open_instead_of_inverting_custody() {
         let root = scratch("open-custody-order");
         std::fs::create_dir_all(&root).expect("workspace");
@@ -9489,6 +9999,83 @@ mod tests {
     }
 
     #[test]
+    fn verified_workspace_entry_refuses_traversal_links_and_kind_mismatches() {
+        use std::os::unix::fs::symlink;
+
+        let root = scratch("verified-workspace-entry");
+        let outside = scratch("verified-workspace-entry-outside");
+        std::fs::create_dir_all(root.join("nested")).expect("workspace tree");
+        std::fs::create_dir_all(&outside).expect("outside tree");
+        std::fs::write(root.join("nested/report.txt"), b"report\n").expect("workspace file");
+        std::fs::write(outside.join("secret.txt"), b"secret\n").expect("outside file");
+        symlink(outside.join("secret.txt"), root.join("linked.txt")).expect("linked entry");
+        let daemon = LiveDaemon::new(started());
+        let summary = daemon.open_at_start(&root).expect("open workspace");
+
+        let file = daemon
+            .verified_managed_workspace_entry(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                None,
+                "nested/report.txt",
+                false,
+            )
+            .expect("regular file");
+        assert_eq!(
+            file.path(),
+            std::fs::canonicalize(&root)
+                .expect("canonical workspace")
+                .join("nested/report.txt")
+        );
+        assert!(!file.is_directory());
+        let folder = daemon
+            .verified_managed_workspace_entry(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                None,
+                "nested",
+                true,
+            )
+            .expect("regular folder");
+        assert!(folder.is_directory());
+        assert!(daemon
+            .verified_managed_workspace_entry(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                None,
+                "../verified-workspace-entry-outside/secret.txt",
+                false,
+            )
+            .is_err());
+        assert!(daemon
+            .verified_managed_workspace_entry(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                None,
+                "linked.txt",
+                false,
+            )
+            .is_err());
+        assert!(daemon
+            .verified_managed_workspace_entry(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                None,
+                "nested/report.txt",
+                true,
+            )
+            .is_err());
+
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
     fn exact_agent_setup_blocks_release_and_refuses_stale_generation() {
         let root = scratch("exact-agent-setup");
         std::fs::create_dir_all(&root).expect("workspace");
@@ -9568,6 +10155,139 @@ mod tests {
                 .is_err(),
             "released generation must not regain setup authority"
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn live_agent_file_snapshot_tracks_appearance_change_disappearance_and_refuses_mid_read_write()
+    {
+        let root = scratch("live-agent-file");
+        std::fs::create_dir_all(&root).expect("workspace");
+        let source = root.join("source");
+        let managed = root.join("managed");
+        std::fs::create_dir(&source).expect("source");
+        std::fs::write(source.join("base.txt"), "saved\n").expect("saved source file");
+        crate::PreparedFolderImport::prepare(&source, &managed)
+            .expect("prepare workspace")
+            .confirm_into_workspace()
+            .expect("confirm workspace");
+        let daemon = LiveDaemon::new(started());
+        let summary = daemon.open_at_start(&managed).expect("open workspace");
+        let physical_root = daemon
+            .verified_managed_workspace_path(&summary.root, &summary.digest, &summary.installation)
+            .expect("verified physical workspace")
+            .path()
+            .to_path_buf();
+        let generation = daemon
+            .acquire_workspace_agent_custody(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                false,
+                None,
+            )
+            .expect("assign agent");
+        let live_path = physical_root.join("live.txt");
+        std::fs::write(&live_path, "appeared\n").expect("new live file");
+        let appeared = daemon
+            .inspect_agent_live_file(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+                "live.txt",
+            )
+            .expect("stable appearance");
+        assert_eq!(appeared.kind(), "new-file");
+        assert_eq!(appeared.text(), Some("appeared\n"));
+
+        std::fs::write(&live_path, "changed again\n").expect("change live file");
+        let changed = daemon
+            .inspect_agent_live_file(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+                "live.txt",
+            )
+            .expect("stable change");
+        assert_eq!(changed.text(), Some("changed again\n"));
+        assert_ne!(appeared.content_digest(), changed.content_digest());
+
+        let changing_path = live_path.clone();
+        BETWEEN_AGENT_LIVE_FILE_READS.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                std::fs::write(changing_path, "changed during read\n").expect("mid-read write");
+            }));
+        });
+        let changing = daemon.inspect_agent_live_file(
+            &summary.root,
+            &summary.digest,
+            &summary.installation,
+            &generation,
+            "live.txt",
+        );
+        assert!(
+            matches!(changing, Err(ManagedTextFileError::Recovery(message)) if message.contains("changed while Mesh was reading"))
+        );
+
+        let oversized = vec![0_u8; MAX_AGENT_LIVE_PREVIEW_BYTES + 1];
+        std::fs::write(&live_path, oversized).expect("write oversized live file");
+        assert!(matches!(
+            daemon.inspect_agent_live_file(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+                "live.txt",
+            ),
+            Err(ManagedTextFileError::PreviewTooLarge { bytes, limit })
+                if bytes == MAX_AGENT_LIVE_PREVIEW_BYTES + 1
+                    && limit == MAX_AGENT_LIVE_PREVIEW_BYTES
+        ));
+
+        for index in 0..3 {
+            std::fs::write(
+                physical_root.join(format!("large-{index}.bin")),
+                vec![u8::try_from(index).unwrap(); 4 * 1024 * 1024],
+            )
+            .expect("write large finish-preflight file");
+        }
+        let finish = daemon
+            .inspect_agent_finish_preflight(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+            )
+            .expect("bounded finish preflight");
+        assert!(finish
+            .managed_files()
+            .iter()
+            .all(|file| file.retained_preview_capacity() == 0));
+        assert!(finish
+            .native_files()
+            .iter()
+            .all(|file| file.retained_preview_capacity() == 0));
+
+        std::fs::remove_file(&live_path).expect("remove live file");
+        assert!(daemon
+            .inspect_agent_live_file(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+                "live.txt",
+            )
+            .is_err());
+        assert!(daemon
+            .release_workspace_agent_custody(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+            )
+            .expect("release agent"));
         std::fs::remove_dir_all(root).unwrap();
     }
 

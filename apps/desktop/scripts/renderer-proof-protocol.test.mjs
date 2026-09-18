@@ -28,16 +28,28 @@ test('renderer proof accepts one exact nonce-bound surface result', () => {
     surface: 'onboarding',
   }), report());
   assert.deepEqual(parseRendererProofReport(report({
+    surface: 'files',
+    interaction: 'expand-select-open-reveal-folders',
+    outcome: 'native-file-and-folder-actions-completed',
+  }), {
+    nonce,
+    surface: 'files',
+  }), report({
+    surface: 'files',
+    interaction: 'expand-select-open-reveal-folders',
+    outcome: 'native-file-and-folder-actions-completed',
+  }));
+  assert.deepEqual(parseRendererProofReport(report({
     surface: 'review',
-    interaction: 'content-inline',
-    outcome: 'content-inline-selected',
+    interaction: 'content-inline-native-open-reveal',
+    outcome: 'saved-side-native-launches-completed',
   }), {
     nonce,
     surface: 'review',
   }), report({
     surface: 'review',
-    interaction: 'content-inline',
-    outcome: 'content-inline-selected',
+    interaction: 'content-inline-native-open-reveal',
+    outcome: 'saved-side-native-launches-completed',
   }));
   assert.deepEqual(parseRendererProofReport(report({
     surface: 'versions',
@@ -114,19 +126,26 @@ test('stderr extraction is prefix-scoped, bounded, and refuses duplicate reports
 
 function renderedProof(overrides = {}) {
   return {
-    schema: 'mesh-rendered-app-proof/v4',
+    schema: 'mesh-rendered-app-proof/v6',
+    screenshot: null,
     component_interface_mounted: true,
     renderer_controls_driven: true,
     renderer: {
-      schema: 'mesh-packaged-renderer-proof/v4',
+      schema: 'mesh-packaged-renderer-proof/v5',
       nonce_bound: true,
       onboarding: {
         surface: 'onboarding', mounted: true, visible: true,
         interaction: 'preview-path', outcome: 'verified-preview',
       },
+      files: {
+        surface: 'files', mounted: true, visible: true,
+        interaction: 'expand-select-open-reveal-folders',
+        outcome: 'native-file-and-folder-actions-completed',
+      },
       review: {
         surface: 'review', mounted: true, visible: true,
-        interaction: 'content-inline', outcome: 'content-inline-selected',
+        interaction: 'content-inline-native-open-reveal',
+        outcome: 'saved-side-native-launches-completed',
       },
       versions: {
         surface: 'versions', mounted: true, visible: true,
@@ -145,7 +164,7 @@ function renderedProof(overrides = {}) {
   };
 }
 
-test('the final rendered-app claim is derived only from all five exact surface proofs', () => {
+test('the final rendered-app claim is derived only from all six exact surface proofs', () => {
   const proof = renderedProof();
   assert.deepEqual(parseRenderedAppProofOutput(`${JSON.stringify(proof)}\n`), proof);
   for (const candidate of [
@@ -161,6 +180,12 @@ test('the final rendered-app claim is derived only from all five exact surface p
     () => parseRenderedAppProofOutput(`${JSON.stringify(renderedProof({ renderer: withoutPrivateExport }))}\n`),
     /deep-equal/,
     'the archive claim must fail closed when private-export proof is absent',
+  );
+  const { files: _files, ...withoutFiles } = proof.renderer;
+  assert.throws(
+    () => parseRenderedAppProofOutput(`${JSON.stringify(renderedProof({ renderer: withoutFiles }))}\n`),
+    /deep-equal/,
+    'the archive claim must fail closed when Files proof is absent',
   );
   const { versions: _versions, ...withoutVersions } = proof.renderer;
   assert.throws(
@@ -178,4 +203,35 @@ test('the final rendered-app claim is derived only from all five exact surface p
     () => parseRenderedAppProofOutput(`${JSON.stringify(proof)}\n${JSON.stringify(proof)}\n`),
     /exactly one/,
   );
+});
+
+test('the final rendered-app claim closes screenshot evidence over its native receipt fields', () => {
+  const screenshot = {
+    schema: 'mesh-rendered-screenshot-proof/v1',
+    path: '/tmp/mesh-files.png',
+    nonce: 'ab'.repeat(32),
+    sha256: 'cd'.repeat(32),
+    bytes: 128_000,
+    width: 1_200,
+    height: 800,
+  };
+  const proof = renderedProof({ screenshot });
+  assert.deepEqual(parseRenderedAppProofOutput(`${JSON.stringify(proof)}\n`), proof);
+
+  const { screenshot: _missing, ...withoutScreenshot } = proof;
+  for (const candidate of [
+    withoutScreenshot,
+    renderedProof({ screenshot: { ...screenshot, sha256: 'not-a-digest' } }),
+    renderedProof({ screenshot: { ...screenshot, nonce: 'ab' } }),
+    renderedProof({ screenshot: { ...screenshot, path: 'relative.png' } }),
+    renderedProof({ screenshot: { ...screenshot, bytes: 0 } }),
+    renderedProof({ screenshot: { ...screenshot, width: 20 } }),
+    renderedProof({ screenshot: { ...screenshot, height: 20 } }),
+    renderedProof({ screenshot: { ...screenshot, invented: true } }),
+  ]) {
+    assert.throws(
+      () => parseRenderedAppProofOutput(`${JSON.stringify(candidate)}\n`),
+      /screenshot|deep-equal/,
+    );
+  }
 });

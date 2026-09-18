@@ -1,3 +1,5 @@
+import { BOUNDED_CHOICE_LIMIT, boundedChoiceProjection, type BoundedChoiceProjection } from "./choice-projection";
+
 export const WORKSPACE_DESTINATION_ACTION_IDS = Object.freeze([
   "choose-destination",
   "preview-single",
@@ -10,6 +12,23 @@ export type WorkspaceDestinationActionId = typeof WORKSPACE_DESTINATION_ACTION_I
 export type WorkspaceDestinationPlanState = "ready" | "information" | "blocked" | "complete";
 
 export type WorkspaceDestinationChoice = Readonly<{ value: string; label: string }>;
+export type WorkspaceDestinationChoiceProjection = BoundedChoiceProjection<WorkspaceDestinationChoice>;
+
+export function workspaceDestinationChoiceProjection(
+  choices: readonly WorkspaceDestinationChoice[],
+  filterText: string,
+  selectedValue: string,
+  maximum = BOUNDED_CHOICE_LIMIT,
+): WorkspaceDestinationChoiceProjection {
+  return boundedChoiceProjection(
+    choices,
+    filterText,
+    selectedValue,
+    (choice) => choice.value,
+    (choice) => [choice.value, choice.label],
+    maximum,
+  );
+}
 export type WorkspaceDestinationAction = Readonly<{
   id: WorkspaceDestinationActionId;
   label: string;
