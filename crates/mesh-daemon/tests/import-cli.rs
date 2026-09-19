@@ -194,7 +194,7 @@ fn endpoint_import_uses_the_daemon_authenticated_same_folder_scope() {
         Some(1),
         "the imported workspace has one content operation"
     );
-    let working = managed.join(mesh_store::MOUNT_DIRECTORY_NAME);
+    let working = managed.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME);
     assert!(working.join("README.md").is_file());
     assert!(working.join("src/main.rs").is_file());
     assert!(!working.join("records.mesh").exists());
@@ -277,7 +277,7 @@ fn offline_preview_confirms_through_the_live_daemon_without_a_false_drift() {
         "live confirmation changed the source"
     );
     assert!(managed
-        .join(mesh_store::MOUNT_DIRECTORY_NAME)
+        .join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
         .join("README.md")
         .is_file());
 
@@ -341,7 +341,10 @@ fn separate_processes_preview_confirm_restart_and_rollback_without_touching_sour
             .and_then(Json::as_text)
             .expect("presented working folder"),
     );
-    assert_eq!(working, managed.join(mesh_store::MOUNT_DIRECTORY_NAME));
+    assert_eq!(
+        working,
+        managed.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+    );
     assert_imported_tree(&working, &before);
     assert!(managed.join("records.mesh").is_file());
     assert!(managed.join("metadata.sqlite").is_file());

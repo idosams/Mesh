@@ -21,7 +21,7 @@ The shipping local-folder journey is now a Tauri 2 window. It starts the existin
 daemon inside the app lifetime, accepts a native folder choice where that control is reliable or
 an absolute typed path on macOS, previews an exact folder summary,
 creates durable private history in a verified managed copy, reopens that state after restart,
-keeps that private history outside the ordinary `mounts` working folder, reveals that folder to
+keeps that private history outside the ordinary `Mesh Version - Working Folder`, reveals that folder to
 Finder, editors, terminals and agents, reconstructs any durable workspace point as an independent
 native folder without rewinding the current workspace,
 creates text files and folders, renames or moves entries without changing file identity, deletes
@@ -55,7 +55,7 @@ preview lists missing folders first. One create-only confirmation installs those
 order through exact parent identities, then Mesh automatically re-previews the files. A second
 confirmation atomically installs only changed files. A later race stops either stage and reports
 the confirmed prefix; it never claims tree-wide atomicity. Continue real work in
-the opened `mounts` folder. To compare or experiment with older state,
+the opened `Mesh Version - Working Folder`. To compare or experiment with older state,
 choose a durable point under **Workspace versions** and open it. The native host allocates an
 owner-only app-managed checkout by default, retargets the same stable folder, and keeps a custom
 private location as an optional advanced choice. The result has independent private history, so an

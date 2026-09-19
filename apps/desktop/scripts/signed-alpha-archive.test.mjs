@@ -65,7 +65,7 @@ test('the verifier independently proves Apple identity and the exact application
   assert.match(verifier, /spctl.*--assess/s);
   assert.match(verifier, /executable\.includes\(Buffer\.from\(record\.source_revision\)\)/);
   assert.match(verifier, /prove-rendered-app\.mjs/);
-  assert.match(verifier, /parseRenderedAppProofOutput\(renderedOutput\)/);
+  assert.match(verifier, /assertCompleteArchiveFixtureProof\([\s\S]*parseRenderedAppProofOutput\(renderedOutput\)/);
   assert.match(verifier, /extracted_journey_driver: renderedAppProof \? 'renderer\+daemon-ipc' : null/);
   assert.match(verifier, /extracted_renderer_controls_driven: renderedAppProof\?\.renderer_controls_driven === true/);
   assert.match(verifier, /extracted_workspace_versions_proved:/);

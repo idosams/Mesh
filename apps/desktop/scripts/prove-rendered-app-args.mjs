@@ -5,10 +5,14 @@ rendered alpha journey.
 
 Options:
   --screenshot <path>  Save a screenshot of the verified window.
+  --seed-repository <path>
+                       Restore a clean Git HEAD into the disposable source before
+                       adding proof fixtures. The original repository stays read-only.
   -h, --help           Show this help without launching Mesh.`;
 
 export function parseProofArguments(argv) {
   let screenshot = null;
+  let seedRepository = null;
   let help = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -29,8 +33,18 @@ export function parseProofArguments(argv) {
       index += 1;
       continue;
     }
+    if (argument === '--seed-repository') {
+      if (seedRepository !== null) throw new Error('--seed-repository may be provided only once');
+      const value = argv[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error('--seed-repository requires an absolute or relative Git worktree path');
+      }
+      seedRepository = value;
+      index += 1;
+      continue;
+    }
     throw new Error(`unknown argument: ${argument}`);
   }
 
-  return { help, screenshot };
+  return { help, screenshot, seedRepository };
 }

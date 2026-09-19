@@ -144,7 +144,10 @@ fn desktop_ipc_imports_reopens_and_rolls_back_without_touching_the_original() {
     );
     assert!(managed.join(mesh_daemon::RECORD_FILE_NAME).is_file());
     assert!(!presented.join(mesh_daemon::RECORD_FILE_NAME).exists());
-    assert_eq!(presented, managed.join("mounts"));
+    assert_eq!(
+        presented,
+        managed.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+    );
     assert_eq!(fs::read(source.join("README.md")).unwrap(), original_before);
 
     drop(client);

@@ -106,7 +106,7 @@ fn a_presented_import_keeps_private_state_outside_the_native_working_folder() {
 
     let prepared =
         PreparedFolderImport::prepare_presented(&source, &store).expect("prepare presented");
-    let working = store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+    let working = store.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME);
     assert_eq!(prepared.destination(), working);
     assert!(store.join(".mesh-presented-workspace").is_file());
     assert!(!working.join(".mesh").exists());
@@ -159,7 +159,7 @@ fn restart_recovery_removes_the_exact_presented_store_and_nothing_else() {
         .status()
         .expect("start presented import child");
     assert!(status.success(), "child failed: {status}");
-    let working = store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+    let working = store.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME);
     assert!(working.exists());
 
     assert!(recover_pending_import(&working).expect("recover presented"));

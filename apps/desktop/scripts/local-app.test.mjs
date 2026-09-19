@@ -37,6 +37,10 @@ const renderedProofArguments = await readFile(
   new URL('./prove-rendered-app-args.mjs', import.meta.url),
   'utf8',
 );
+const renderedProofImage = await readFile(
+  new URL('./rendered-proof-image.mjs', import.meta.url),
+  'utf8',
+);
 const windowProbe = await readFile(new URL('./window-proof.m', import.meta.url), 'utf8');
 const buildScript = await readFile(new URL('../src-tauri/build.rs', import.meta.url), 'utf8');
 
@@ -159,14 +163,30 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(renderedProof, /const canonicalWorkspace = await realpath\(empty\.initialized\.root\)/);
   assert.match(renderedProof, /await realpath\(state\.root\)/);
   assert.match(renderedProof, /restart did not upgrade the remembered workspace to its canonical path/);
+  assert.match(renderedProof, /rememberedImport\.document\.schema,[\s\S]*mesh-desktop-recent-workspaces\/v9/);
   assert.match(renderedProof, /mesh-desktop-recent-workspaces\/v7/);
   assert.doesNotMatch(renderedProof, /mesh-desktop-recent-workspaces\/v[1-6]/);
   assert.match(renderedProof, /original_update_version: null/);
   assert.match(renderedProof, /project_root: canonicalSource/);
-  assert.match(renderedProof, /requestDaemon\('workspace\.state'\)/);
-  assert.match(renderedProof, /requestDaemon\('folder\.import\.preview', \{ source \}\)/);
-  assert.match(renderedProof, /requestDaemon\('folder\.import\.confirm'/);
-  assert.match(renderedProof, /join\(versionStores, `workspace-\$\{preview\.summary\.slice\(0, 12\)\}\.mesh`\)/);
+  assert.match(renderedProof, /requestDaemon\('workspace\.state', \{\}, totalTimeoutMs\)/);
+  assert.match(renderedProof, /const deadline = Date\.now\(\) \+ proofDaemonIdleTimeoutMs\('workspace\.state'\)/);
+  assert.match(renderedProof, /globalThis\.setTimeout\([\s\S]*overall deadline/);
+  assert.doesNotMatch(renderedProof, /requestDaemon\('folder\.import\.(?:preview|confirm)'/);
+  assert.match(renderedProof, /const importedWorkspace = await waitForWorkspace/);
+  assert.match(renderedProof, /const privateStore = dirname\(importedWorkspace\.root\)/);
+  assert.match(renderedProof, /the visible import did not remember its exact managed workspace/);
+  assert.match(renderedProof, /the seeded large-workspace review did not exercise its bounded state/);
+  assert.match(renderedProof, /mirrorOrdinaryDirectories\(canonicalWorkspace, privateExport/);
+  assert.match(renderedProof, /async function waitForPrivateExportReceipt\(\)/);
+  assert.match(renderedProof, /Promise\.all\(expected\.map\(\(relative\) => lstat\(join\(privateExport, relative\)\)\)\)/);
+  assert.match(renderedProof, /waitForPrivateExportReceipt,[\s\S]*'private-export'/);
+  assert.match(renderedProof, /the packaged private export omitted the current post-agent text result/);
+  assert.match(renderedProof, /the packaged private export omitted the current post-agent image result/);
+  assert.ok(
+    renderedProof.indexOf('const agentHandoff = await launch(')
+      < renderedProof.indexOf('const exported = await launch('),
+    'the real-workspace proof must create one complete post-handoff review before private export',
+  );
   assert.doesNotMatch(renderedProof, /const privateStore = join\(scratch, 'workspace\.mesh'\)/);
   assert.match(renderedProof, /app_managed_storage: true/);
   assert.match(renderedProof, /requestDaemon\('workspace\.version\.fork'/);
@@ -185,11 +205,11 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(renderedProof, /const pinnedAgentContext = await proveCodexContextBridge\(state\)/);
   assert.match(renderedProof, /const AGENT_PROOF_RESULT_PATH = 'agent-proof-result\.txt'/);
   assert.match(renderedProof, /const AGENT_PROOF_IMAGE_PATH = 'agent-proof-result\.png'/);
-  assert.match(
-    renderedProof,
-    /readFile\(join\(repository, 'apps\/desktop\/src-tauri\/icons\/icon\.png'\)\)/,
-    'the native-open package proof must use a real supported image instead of a host-specific text association',
-  );
+  assert.match(renderedProof, /readRenderedProofImage\(\)/);
+  assert.doesNotMatch(renderedProof, /src-tauri\/icons\/icon\.png/);
+  assert.match(renderedProofImage, /new URL\('\.\.\/src-tauri\/build\.rs', import\.meta\.url\)/);
+  assert.match(renderedProofImage, /DEVELOPMENT_ICON_BASE64/);
+  assert.match(renderedProofImage, /89504e470d0a1a0a/);
   assert.match(renderedProof, /assert\.deepEqual\([\s\S]*AGENT_PROOF_IMAGE/);
   assert.match(renderedProof, /join\(pinnedAgentContext\.root, 'agent-pinned\.txt'\)/);
   assert.match(renderedProof, /pinned_agent_context: pinnedAgentContext/);
@@ -202,6 +222,9 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(renderedProof, /'--mesh-mcp'/);
   assert.match(renderedProof, /method: 'tools\/call'/);
   assert.match(renderedProof, /name: 'mesh_workspace_state'/);
+  assert.match(renderedProof, /setTimeout\(\(\) => resolveDeadline\(null\), 6 \* 60_000\)/);
+  assert.match(renderedProof, /clearTimeout\(deadline\)/);
+  assert.match(renderedProof, /maxRetries: 10,[\s\S]*retryDelay: 100/);
   assert.match(renderedProof, /the agent bridge returned the wrong native root/);
   assert.match(renderedProof, /read_only: listed\.tools\[0\]\.annotations\?\.readOnlyHint === true/);
   assert.match(renderedProof, /original_preserved: true/);
@@ -311,7 +334,7 @@ test('the alpha archive remains checksum-verifiable without claiming Apple trust
   assert.match(alphaVerifier, /desktop_control_suite: proveRendered/);
   assert.match(alphaVerifier, /extracted_windowed_app_proof: proveRendered/);
   assert.match(alphaVerifier, /extracted_journey_driver: renderedAppProof \? 'renderer\+daemon-ipc' : null/);
-  assert.match(alphaVerifier, /parseRenderedAppProofOutput\(renderedOutput\)/);
+  assert.match(alphaVerifier, /assertCompleteArchiveFixtureProof\([\s\S]*parseRenderedAppProofOutput\(renderedOutput\)/);
   assert.match(alphaVerifier, /extracted_renderer_controls_driven: renderedAppProof\?\.renderer_controls_driven === true/);
   assert.match(alphaVerifier, /extracted_workspace_versions_proved:/);
   assert.match(alphaVerifier, /versions\?\.outcome === 'verified-preview-ready'/);
@@ -327,7 +350,7 @@ test('the alpha archive remains checksum-verifiable without claiming Apple trust
   assert.match(renderedProof, /rendererProofSession\('onboarding'\)/);
   assert.match(renderedProof, /'versions'/);
   assert.match(renderedProof, /'private-export'/);
-  assert.match(renderedProof, /mkdir\(join\(privateExport, 'assets'\), \{ mode: 0o700 \}\)/);
+  assert.match(renderedProof, /excludedRootNames: \['\.git'\]/);
   assert.match(renderedProof, /the packaged private export lost the executable bit/);
   assert.match(renderedProof, /the packaged private export changed the nested saved image bytes/);
   assert.match(renderedProof, /the private-export proof changed the unmanaged original/);

@@ -1761,7 +1761,7 @@ fn export_refuses_private_storage_siblings_of_a_presented_working_folder() {
         .expect("verified presented import")
         .confirm_into_workspace()
         .expect("presented workspace");
-    let managed = storage.join(mesh_store::MOUNT_DIRECTORY_NAME);
+    let managed = storage.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME);
     let private_target = storage.join("chunks");
     assert!(private_target.is_dir(), "the private CAS target exists");
 

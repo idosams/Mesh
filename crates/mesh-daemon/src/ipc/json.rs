@@ -411,13 +411,22 @@ impl Reader<'_> {
                     return Err(self.fail("a raw control character is not allowed in a string"))
                 }
                 _ => {
-                    // Copy one whole UTF-8 code point. The input is `&str`, so the boundary is
-                    // known good and the slice below cannot split a character.
-                    let rest = core::str::from_utf8(&self.bytes[self.at..])
+                    // Structural and control bytes are ASCII and therefore cannot occur inside a
+                    // multi-byte UTF-8 code point. Copy the whole ordinary run in one validation
+                    // instead of validating the complete remaining message once per character.
+                    // The latter made a large but bounded workspace reply quadratic in its wire
+                    // size and could keep the desktop command busy for minutes after the daemon
+                    // had already completed the import.
+                    let start = self.at;
+                    while let Some(byte) = self.peek() {
+                        if byte == b'"' || byte == b'\\' || byte < 0x20 {
+                            break;
+                        }
+                        self.at += 1;
+                    }
+                    let ordinary = core::str::from_utf8(&self.bytes[start..self.at])
                         .map_err(|_| self.fail("invalid UTF-8"))?;
-                    let character = rest.chars().next().ok_or_else(|| self.fail("truncated"))?;
-                    self.at += character.len_utf8();
-                    out.push(character);
+                    out.push_str(ordinary);
                 }
             }
         }
@@ -524,6 +533,13 @@ mod tests {
     #[test]
     fn reads_the_escapes_it_writes() {
         let value = Json::text("\u{1f600} \u{e9} \\ \" \n");
+        assert_eq!(Json::parse(&value.encode()), Ok(value));
+    }
+
+    #[test]
+    fn reads_a_large_workspace_string_in_linear_runs() {
+        let ordinary = "a".repeat(2 * 1024 * 1024);
+        let value = Json::text(format!("{ordinary}\u{1f600}\nfinished"));
         assert_eq!(Json::parse(&value.encode()), Ok(value));
     }
 

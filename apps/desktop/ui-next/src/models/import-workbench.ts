@@ -9,6 +9,7 @@ export type ImportWorkbenchModel = Readonly<{
   files: readonly string[];
   destinationPath: string;
   confirmLabel: string;
+  busy: boolean;
   canChoose: boolean;
   canPreviewPath: boolean;
   canEditDestination: boolean;
@@ -68,6 +69,7 @@ export function importWorkbenchEnvelope(
   const candidate = record(envelope.import, "import workbench");
   exactKeys(candidate, [
     "byteCount",
+    "busy",
     "canChoose",
     "canChooseDestination",
     "canConfirm",
@@ -96,10 +98,20 @@ export function importWorkbenchEnvelope(
     candidate.summary !== ""
     || files.length !== 0
     || candidate.destinationPath !== ""
+    || candidate.busy !== false
     || candidate.canEditDestination !== false
     || candidate.canChooseDestination !== false
   ))
-    || (candidate.phase === "review" && candidate.sourcePath === "")) {
+    || (candidate.phase === "review" && (
+      candidate.sourcePath === ""
+      || (candidate.busy === true && (
+        candidate.canChoose !== false
+        || candidate.canPreviewPath !== false
+        || candidate.canEditDestination !== false
+        || candidate.canChooseDestination !== false
+        || candidate.canConfirm !== false
+      ))
+    ))) {
     throw new Error("The import workbench phase contradicted its preview facts.");
   }
   return Object.freeze({
@@ -115,6 +127,7 @@ export function importWorkbenchEnvelope(
       files,
       destinationPath: safeText(candidate.destinationPath, "import destination path", 4_096, true),
       confirmLabel: safeText(candidate.confirmLabel, "import confirmation label", 96),
+      busy: boolean(candidate.busy, "import busy state"),
       canChoose: boolean(candidate.canChoose, "choose-folder authority"),
       canPreviewPath: boolean(candidate.canPreviewPath, "typed-path authority"),
       canEditDestination: boolean(candidate.canEditDestination, "destination-draft authority"),

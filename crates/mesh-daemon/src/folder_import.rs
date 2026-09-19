@@ -23,9 +23,12 @@ use mesh_operations::{
 };
 use mesh_store::{
     journal_records, Checkpoint, DurableCommit, EntityUuid, OperationRecord, RecordDigest,
-    DATABASE_FILE_NAME, MOUNT_DIRECTORY_NAME,
+    DATABASE_FILE_NAME,
 };
 use mesh_types::{Blake3, ContentDigest as _, Digest32, DigestHasher as _};
+
+#[cfg(test)]
+use mesh_store::MOUNT_DIRECTORY_NAME;
 
 use crate::checkpoint_storage::{CasChunkPromoter, PreparedCheckpointFile};
 use crate::exclusions::{EffectiveExclusions, REPOSITORY_IGNORE_FILE_NAME};
@@ -504,7 +507,7 @@ impl PreparedFolderImport {
             root: storage_root.clone(),
             identity,
         };
-        let destination = storage_root.join(MOUNT_DIRECTORY_NAME);
+        let destination = storage_root.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
         match Self::prepare_inner(
             &source,
             &destination,

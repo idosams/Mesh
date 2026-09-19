@@ -22,11 +22,18 @@ export function ImportWorkbench({ model, onIntent, reviewFocusAuthorization = nu
   }, [reviewFocusAuthorization, model.phase]);
   if (model.phase === "review") {
     return (
-      <section className="grid gap-5" aria-label="Verified folder preview" data-mesh-proof="import-verified-preview">
+      <section
+        className="grid gap-5"
+        aria-label="Verified folder preview"
+        aria-busy={model.busy}
+        data-mesh-proof="import-verified-preview"
+      >
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Verified copy</p>
-            <Badge tone="positive">Ready to create</Badge>
+            <Badge tone={model.busy ? "neutral" : "positive"}>
+              {model.busy ? "Creating private workspace" : "Ready to create"}
+            </Badge>
           </div>
           <h3
             ref={reviewHeading}
@@ -45,6 +52,16 @@ export function ImportWorkbench({ model, onIntent, reviewFocusAuthorization = nu
         </dl>
         <div className="rounded-lg border border-border bg-muted/20 p-4">
           <p className="text-sm leading-6 text-muted-foreground">{model.scopeNote}</p>
+          {model.busy ? (
+            <p
+              className="mt-3 text-sm font-medium"
+              role="status"
+              aria-live="polite"
+              data-mesh-proof="import-confirmation-progress"
+            >
+              Keep Mesh open. Large projects can take several minutes; the original folder remains unchanged.
+            </p>
+          ) : null}
           {model.files.length > 0 ? (
             <details className="mt-3">
               <summary className="min-h-11 cursor-pointer text-sm font-medium">Review included files</summary>

@@ -15,7 +15,10 @@ import {
   assertUniqueArchiveEntries,
 } from './alpha-guide-verification.mjs';
 import { evaluateProvisioningProfile } from './macos-signing-preflight-lib.mjs';
-import { parseRenderedAppProofOutput } from './renderer-proof-protocol.mjs';
+import {
+  assertCompleteArchiveFixtureProof,
+  parseRenderedAppProofOutput,
+} from './renderer-proof-protocol.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktop = resolve(here, '..');
@@ -254,7 +257,9 @@ try {
         MESH_EXPECTED_BUILD_REVISION: record.source_revision,
       },
     });
-    renderedAppProof = parseRenderedAppProofOutput(renderedOutput);
+    renderedAppProof = assertCompleteArchiveFixtureProof(
+      parseRenderedAppProofOutput(renderedOutput),
+    );
   }
 } finally {
   await rm(extraction, { recursive: true, force: true });

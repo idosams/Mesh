@@ -308,7 +308,7 @@ Then follow this exact journey:
    entries remain in place; recursive deletion is unavailable.
 
 Mesh deliberately does not silently synchronize changes into the imported folder. The opened
-`mounts` directory is the native working project after import. **Update original** is an explicit
+`Mesh Version - Working Folder` is the native working project after import. **Update original** is an explicit
 approved-version operation whose files and folders are previewed before writing. Current folders and files are confirmed first; former paths have a
 second, independently confirmed cleanup plan. This remains a reviewed update flow, not an
 ambient bidirectional synchronization engine.

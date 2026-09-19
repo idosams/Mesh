@@ -4,7 +4,9 @@ import { isAbsolute } from 'node:path';
 export const RENDERER_PROOF_PREFIX = 'mesh-renderer-proof:';
 const MAX_RENDERER_PROOF_BYTES = 4_096;
 const CLAIMS = Object.freeze({
-  onboarding: Object.freeze({ interaction: 'preview-path', outcome: 'verified-preview' }),
+  onboarding: Object.freeze({
+    interaction: 'preview-path-confirm-import', outcome: 'import-completed-after-busy',
+  }),
   files: Object.freeze({
     interaction: 'expand-select-open-reveal-folders',
     outcome: 'native-file-and-folder-actions-completed',
@@ -23,8 +25,32 @@ const CLAIMS = Object.freeze({
     outcome: 'agent-handoff-completed',
   }),
 });
+const BOUNDED_REVIEW_CLAIM = Object.freeze({
+  interaction: 'bounded-incomplete-review-inspection',
+  outcome: 'incomplete-review-disclosed-without-authority',
+});
+const BOUNDED_PRIVATE_EXPORT_CLAIM = Object.freeze({
+  interaction: 'bounded-review-private-export-refusal',
+  outcome: 'private-export-blocked-without-complete-review',
+});
 
-export function parseRendererProofReport(value, { nonce, surface }) {
+function claimMatches(surface, interaction, outcome) {
+  const primary = CLAIMS[surface];
+  return (interaction === primary.interaction && outcome === primary.outcome)
+    || (surface === 'review'
+      && interaction === BOUNDED_REVIEW_CLAIM.interaction
+      && outcome === BOUNDED_REVIEW_CLAIM.outcome)
+    || (surface === 'private-export'
+      && interaction === BOUNDED_PRIVATE_EXPORT_CLAIM.interaction
+      && outcome === BOUNDED_PRIVATE_EXPORT_CLAIM.outcome);
+}
+
+export function parseRendererProofReport(value, {
+  nonce,
+  surface,
+  interaction: expectedInteraction = null,
+  outcome: expectedOutcome = null,
+}) {
   assert.ok(value && typeof value === 'object' && !Array.isArray(value), 'renderer proof must be one object');
   assert.deepEqual(Object.keys(value), [
     'schema',
@@ -46,8 +72,24 @@ export function parseRendererProofReport(value, { nonce, surface }) {
   assert.equal(value.surface, surface, 'renderer proof described the wrong surface');
   assert.equal(value.mounted, true, 'renderer proof did not establish a mounted React surface');
   assert.equal(value.visible, true, 'renderer proof did not establish a visible React surface');
-  assert.equal(value.interaction, CLAIMS[surface].interaction, 'renderer proof used the wrong interaction');
-  assert.equal(value.outcome, CLAIMS[surface].outcome, 'renderer proof did not observe the expected outcome');
+  assert.ok(
+    claimMatches(surface, value.interaction, value.outcome),
+    'renderer proof interaction and outcome did not match one exact allowed claim',
+  );
+  if (expectedInteraction !== null) {
+    assert.equal(
+      value.interaction,
+      expectedInteraction,
+      'renderer proof interaction did not match the required claim',
+    );
+  }
+  if (expectedOutcome !== null) {
+    assert.equal(
+      value.outcome,
+      expectedOutcome,
+      'renderer proof outcome did not match the required claim',
+    );
+  }
   return value;
 }
 
@@ -73,8 +115,10 @@ function assertSurfaceClaim(value, expected) {
   assert.equal(value.surface, expected.surface, 'rendered surface proof named the wrong surface');
   assert.equal(value.mounted, true, 'rendered surface proof did not establish mount');
   assert.equal(value.visible, true, 'rendered surface proof did not establish visibility');
-  assert.equal(value.interaction, expected.interaction, 'rendered surface proof used the wrong interaction');
-  assert.equal(value.outcome, expected.outcome, 'rendered surface proof did not establish the expected outcome');
+  assert.ok(
+    claimMatches(expected.surface, value.interaction, value.outcome),
+    'rendered surface proof interaction and outcome did not establish one exact allowed claim',
+  );
 }
 
 function assertScreenshotProof(value) {
@@ -133,7 +177,9 @@ export function parseRenderedAppProofOutput(output) {
   assert.equal(value.renderer.schema, 'mesh-packaged-renderer-proof/v5');
   assert.equal(value.renderer.nonce_bound, true, 'renderer proof was not nonce bound');
   assertSurfaceClaim(value.renderer.onboarding, {
-    surface: 'onboarding', interaction: 'preview-path', outcome: 'verified-preview',
+    surface: 'onboarding',
+    interaction: 'preview-path-confirm-import',
+    outcome: 'import-completed-after-busy',
   });
   assertSurfaceClaim(value.renderer.files, {
     surface: 'files',
@@ -158,5 +204,29 @@ export function parseRenderedAppProofOutput(output) {
     interaction: 'start-finish-rescan',
     outcome: 'agent-handoff-completed',
   });
+  return value;
+}
+
+export function assertCompleteArchiveFixtureProof(value) {
+  assert.equal(
+    value.renderer.review.interaction,
+    'content-inline-native-open-reveal',
+    'the archive fixture did not exercise the complete Review interaction',
+  );
+  assert.equal(
+    value.renderer.review.outcome,
+    'saved-side-native-launches-completed',
+    'the archive fixture did not prove complete Review native actions',
+  );
+  assert.equal(
+    value.renderer.private_export.interaction,
+    'refuse-original-then-confirm-private',
+    'the archive fixture did not exercise confirmed private export',
+  );
+  assert.equal(
+    value.renderer.private_export.outcome,
+    'private-export-completed',
+    'the archive fixture did not prove a completed private export',
+  );
   return value;
 }

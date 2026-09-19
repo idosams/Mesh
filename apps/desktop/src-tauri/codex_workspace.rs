@@ -10,7 +10,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const CONFIG_DIRECTORY: &str = ".codex";
 const CONFIG_FILE: &str = "config.toml";
 const PRIVATE_INTEGRATION_DIRECTORY: &str = "integrations/codex";
-const PRESENTED_WORKSPACE_DIRECTORY: &str = "mounts";
 const LEGACY_PROJECT_LINK_TARGET: &str = "../integrations/codex";
 
 /// Result of ensuring that Codex can start the bundled read-only Mesh bridge.
@@ -100,8 +99,9 @@ pub fn ensure_codex_project_config_at_references(
         ));
     }
     validate_real_directory(workspace, "workspace")?;
-    if workspace_display.file_name().and_then(|name| name.to_str())
-        != Some(PRESENTED_WORKSPACE_DIRECTORY)
+    if !workspace_display
+        .file_name()
+        .is_some_and(mesh_daemon::workspace::is_presented_directory_name)
     {
         return Err(CodexProjectConfigError::Invalid(
             "workspace is not an isolated native Mesh presentation",

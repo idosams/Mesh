@@ -88,6 +88,18 @@ mod desktop {
     const DESKTOP_SESSION: &str = "mesh-desktop";
     const DAEMON_REFUSAL_KIND: &str = "mesh-daemon-refusal";
     const DAEMON_REPLY_TIMEOUT: Duration = Duration::from_secs(10);
+    // Opening or refreshing a workspace re-verifies its complete native inventory and projects a
+    // bounded but potentially multi-megabyte state reply. These calls are read-only and safe to
+    // leave in flight; a short interactive socket deadline only converts healthy large folders
+    // into false recovery failures during Refresh and Finish agent handoff.
+    const DAEMON_WORKSPACE_READ_REPLY_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+    // A confirmed import hashes, copies, re-verifies and durably ingests every included file.
+    // Reusing the ordinary interactive deadline here turns a healthy large import into an
+    // ambiguous timeout, and the renderer's one permitted recovery replay can then allocate and
+    // ingest a duplicate workspace while the first request is still running. Keep this bound
+    // beyond the UI's explicit 15-minute progress wait so the UI, rather than the socket, owns the
+    // visible timeout without launching a second native transaction.
+    const DAEMON_IMPORT_REPLY_TIMEOUT: Duration = Duration::from_secs(20 * 60);
     const MAX_LOCAL_ENDPOINT_BYTES: usize = 100;
     const MAX_RETAINED_REVIEW_INSPECTIONS: usize = 32;
     const MAX_WORKSPACE_EDITOR_TEXT_BYTES: usize = 1_048_576;
@@ -1679,6 +1691,9 @@ mod desktop {
 
     #[tauri::command(async)]
     fn approval_credential_status(runtime: State<'_, DesktopRuntime>) -> Result<String, String> {
+        if let Err(error) = SecureEnclaveApprovalCredential::availability() {
+            return Ok(approval_status_json(None, Some(&error.to_string())));
+        }
         match SecureEnclaveApprovalCredential::load() {
             Ok(credential) => {
                 runtime
@@ -3927,7 +3942,9 @@ mod desktop {
                         .reuse_candidates_for(operation)
                         .map_err(|error| error.to_string())?
                     {
-                        let presented = fs::canonicalize(existing.join("mounts")).ok();
+                        let presented = mesh_daemon::workspace::presented_workspace_path(&existing)
+                            .and_then(fs::canonicalize)
+                            .ok();
                         let may_be_handed_off = match (&handed_off, presented.as_deref()) {
                             (Some(entries), Some(presented)) => entries.iter().any(|entry| {
                                 entry.path() == presented
@@ -4372,7 +4389,10 @@ mod desktop {
                 // Matching bytes at another path can therefore never adopt the live workspace.
                 if let Ok(open) = runtime.daemon.workspace_state() {
                     let presented = std::path::Path::new(&open.root);
-                    if presented.file_name() == Some(std::ffi::OsStr::new("mounts")) {
+                    if presented
+                        .file_name()
+                        .is_some_and(mesh_daemon::workspace::is_presented_directory_name)
+                    {
                         if let Some(candidate_store) = presented.parent() {
                             if let Some(answer) = runtime
                                 .daemon
@@ -4587,7 +4607,18 @@ mod desktop {
         method: String,
         params_json: String,
     ) -> Result<String, String> {
-        call_daemon_with_timeout(endpoint, method, params_json, DAEMON_REPLY_TIMEOUT)
+        let reply_timeout = daemon_reply_timeout(&method);
+        call_daemon_with_timeout(endpoint, method, params_json, reply_timeout)
+    }
+
+    fn daemon_reply_timeout(method: &str) -> Duration {
+        if method == "folder.import.confirm" {
+            DAEMON_IMPORT_REPLY_TIMEOUT
+        } else if matches!(method, "workspace.open" | "workspace.state") {
+            DAEMON_WORKSPACE_READ_REPLY_TIMEOUT
+        } else {
+            DAEMON_REPLY_TIMEOUT
+        }
     }
 
     fn call_daemon_with_timeout(
@@ -4694,6 +4725,9 @@ mod desktop {
         expected_agent_handoff_generation: String,
     ) -> Result<String, String> {
         parse_agent_handoff_generation(&expected_agent_handoff_generation)?;
+        let _ = runtime
+            .renderer_proof
+            .report_checkpoint("agent-handoff-preflight-command-entered");
         let daemon = Arc::clone(&runtime.daemon);
         let preflight = tauri::async_runtime::spawn_blocking(move || {
             daemon.inspect_agent_finish_preflight(
@@ -4711,6 +4745,9 @@ mod desktop {
             preflight.installation(),
             preflight.generation(),
         )?;
+        let _ = runtime
+            .renderer_proof
+            .report_checkpoint("agent-handoff-preflight-command-returned");
         Ok(Json::object([
             ("schema", Json::text("mesh.agent-finish-preflight/v1")),
             ("workspace_root", Json::text(preflight.root())),
@@ -8374,7 +8411,10 @@ mod desktop {
                     .and_then(Json::as_text)
                     .expect("live CLI workspace root"),
             );
-            assert_eq!(cli_root, cli_managed.join("mounts"));
+            assert_eq!(
+                cli_root,
+                cli_managed.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+            );
             let checkpoint = Json::parse(
                 &managed_checkpoint_state_for(&daemon).expect("current checkpoint state"),
             )
@@ -9063,7 +9103,10 @@ mod desktop {
                     .and_then(Json::as_text)
                     .expect("native agent folder"),
             );
-            assert_eq!(presented, private_store.join("mounts"));
+            assert_eq!(
+                presented,
+                private_store.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+            );
             assert_eq!(
                 private_store.parent(),
                 Some(application.join("workspace-versions").as_path())
@@ -9279,6 +9322,30 @@ mod desktop {
                 Some(4_000)
             );
             let _ = fs::remove_dir_all(scratch);
+        }
+
+        #[test]
+        fn filesystem_bound_calls_own_longer_deadlines_without_unbounding_other_calls() {
+            assert_eq!(
+                daemon_reply_timeout("folder.import.confirm"),
+                DAEMON_IMPORT_REPLY_TIMEOUT,
+            );
+            assert!(DAEMON_IMPORT_REPLY_TIMEOUT > Duration::from_secs(15 * 60));
+            for method in ["workspace.state", "workspace.open"] {
+                assert_eq!(
+                    daemon_reply_timeout(method),
+                    DAEMON_WORKSPACE_READ_REPLY_TIMEOUT,
+                    "{method}"
+                );
+            }
+            assert!(DAEMON_WORKSPACE_READ_REPLY_TIMEOUT >= Duration::from_secs(5 * 60));
+            for method in ["folder.import.preview", "unknown.method"] {
+                assert_eq!(
+                    daemon_reply_timeout(method),
+                    DAEMON_REPLY_TIMEOUT,
+                    "{method}"
+                );
+            }
         }
 
         #[test]
@@ -10413,7 +10480,10 @@ mod desktop {
             );
             let earlier_state = daemon.workspace_state().expect("earlier state");
             assert_eq!(PathBuf::from(&earlier_state.root), earlier_presented);
-            assert_eq!(earlier_presented, earlier_workspace.join("mounts"));
+            assert_eq!(
+                earlier_presented,
+                earlier_workspace.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+            );
             let earlier_canonical = fs::canonicalize(&earlier_presented).unwrap();
             assert_eq!(fs::read_link(&stable).unwrap(), earlier_canonical);
 
@@ -10652,7 +10722,9 @@ mod desktop {
             );
             assert_ne!(second_agent_store, earlier_workspace);
             fs::write(
-                second_agent_store.join("mounts/agent-two.txt"),
+                second_agent_store
+                    .join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+                    .join("agent-two.txt"),
                 "second agent remains here\n",
             )
             .expect("second-agent work");
@@ -10711,7 +10783,9 @@ mod desktop {
                 "the contaminated checkout was not preserved for inspection"
             );
             fs::write(
-                clean_after_codex_store.join("mounts/preserved-after-codex.txt"),
+                clean_after_codex_store
+                    .join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+                    .join("preserved-after-codex.txt"),
                 "keep this fallback distinct\n",
             )
             .expect("make the fallback independently dirty for the remaining reuse cases");
@@ -10760,7 +10834,8 @@ mod desktop {
                 fs::canonicalize(&outside_codex).unwrap(),
                 "replaced Codex link was altered during fallback"
             );
-            let after_impostor_presented = after_impostor_store.join("mounts");
+            let after_impostor_presented =
+                after_impostor_store.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME);
 
             daemon
                 .open_workspace(&current.display().to_string())
@@ -10805,7 +10880,12 @@ mod desktop {
                 "dirty historical work was overwritten"
             );
             assert_eq!(
-                fs::read_to_string(second_agent_store.join("mounts/agent-two.txt")).unwrap(),
+                fs::read_to_string(
+                    second_agent_store
+                        .join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+                        .join("agent-two.txt")
+                )
+                .unwrap(),
                 "second agent remains here\n",
                 "a later version switch reused or rewrote the second agent's folder"
             );

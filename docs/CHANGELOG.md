@@ -3,6 +3,25 @@
 Mesh is not yet a stable product. This changelog records public, installable releases; internal
 development commits and private test builds are deliberately omitted.
 
+## [0.1.0-alpha.4] — 2026-09-19
+
+Preview and workspace-identity fixes for the macOS technical alpha.
+
+### Fixed
+
+- Text and JSON files in managed and agent-assigned workspaces now open in the inline preview
+  instead of incorrectly reporting that inspection is unavailable.
+- Workspace refreshes preserve the selected file and reuse stable projections, reducing visible
+  flicker while a workspace is being monitored.
+- Version folders exposed to Finder, terminals, editors, and software pickers now use the human
+  name `Mesh Version - Working Folder` instead of the internal name `mounts`.
+- Approval setup in an ad-hoc build now stops immediately with the real Apple-identity requirement
+  instead of beginning a flow that cannot complete.
+- The packaged export journey waits for the filesystem receipt before declaring success.
+
+Human approval itself remains unavailable in this ad-hoc, unnotarized build. It requires a
+Developer-ID-signed Mesh application with a validated stable Apple identity.
+
 ## [0.1.0-alpha.3] — 2026-09-18
 
 Explorer and review candidate for the macOS technical alpha.
@@ -70,6 +89,7 @@ First public macOS technical alpha.
 - Filesystem changes made while Mesh is not running are inspected when the workspace is reopened;
   continuous background capture is not claimed.
 
+[0.1.0-alpha.4]: launch/v0.1.0-alpha.4.md
 [0.1.0-alpha.3]: launch/v0.1.0-alpha.3.md
 [0.1.0-alpha.2]: launch/v0.1.0-alpha.2.md
 [0.1.0-alpha.1]: launch/v0.1.0-alpha.1.md

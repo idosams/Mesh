@@ -23,7 +23,6 @@ import {
   workspaceChangeRovingPath,
   workspaceExplorerAncestorPaths,
   workspaceFilePresentation,
-  workspaceExplorerLocateFilter,
   workspaceExplorerNavigation,
   workspaceExplorerProjection,
   workspaceExplorerSummary,
@@ -215,7 +214,8 @@ function WorkspaceFilePreview({ selected, selectedChange, changes }: {
   }
   const matchesInspection = changes.selectedFile === selected.value && changes.editorKind !== "none";
   if (!matchesInspection) {
-    const canInspect = changes.canSelectFile && changes.files.some((choice) => choice.value === selected.value);
+    const canInspect = changes.selectedFile === selected.value
+      || (changes.canSelectFile && changes.files.some((choice) => choice.value === selected.value));
     return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-live="polite"><div className="max-w-lg"><h4 className="font-semibold">{canInspect ? "Loading exact file preview…" : "Inline preview unavailable"}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{canInspect ? "Mesh is verifying the current working bytes before showing content." : "Mesh cannot safely inspect this file in the current workspace state. The external Open and Finder actions remain available."}</p></div></div>;
   }
   if (changes.editorKind === "binary") {
@@ -251,8 +251,6 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
   const actions = useMemo(() => actionMap(model), [model]);
   const tree = useMemo(() => workspaceExplorerTree(model.files.entries), [model.files.entries]);
   const [filter, setFilter] = useState("");
-  const [explorerOpen, setExplorerOpen] = useState(true);
-  const [fileView, setFileView] = useState<"Preview" | "Details">("Preview");
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(
     workspaceExplorerAncestorPaths(model.files.selectedEntry),
   ));
@@ -326,17 +324,17 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
                 {model.files.workspaceState === "agent-assigned" ? "Agent assigned" : "Current workspace"}
               </Badge>
             </div>
-            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={model.files.workspaceRoot}>{model.files.workspaceRoot}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Browse and open the exact working files.</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <p className="text-xs text-muted-foreground"><strong className="text-foreground">{summary.files}</strong> files · <strong className="text-foreground">{summary.folders}</strong> folders · <strong className={model.changes.queue.length ? "text-amber-300" : "text-foreground"}>{model.changes.queue.length}</strong> changes</p>
-          <WorkAction id="open-workspace-folder" actions={actions} onIntent={onIntent} />
+          <WorkAction id="open-workspace-folder" actions={actions} onIntent={onIntent} variant="quiet" />
         </div>
       </header>
 
-      <div className={`grid min-h-[42rem] overflow-hidden bg-card ${explorerOpen ? "lg:grid-cols-[20rem_minmax(0,1fr)]" : "lg:grid-cols-[3.25rem_minmax(0,1fr)]"}`}>
-        {explorerOpen ? <section id="workspace-files-explorer-panel" className="min-w-0 border-b border-border bg-background/55 lg:border-b-0 lg:border-r" aria-labelledby="workspace-tree-heading">
+      <div className="grid min-h-[42rem] overflow-hidden bg-card lg:grid-cols-[19rem_minmax(0,1fr)]">
+        <section id="workspace-files-explorer-panel" className="min-w-0 border-b border-border bg-background/55 lg:border-b-0 lg:border-r" aria-labelledby="workspace-tree-heading">
           <div className="flex min-h-12 items-center justify-between gap-2 border-b border-border px-3">
             <div>
               <h3 id="workspace-tree-heading" className="text-xs font-semibold uppercase tracking-[0.14em]">Explorer</h3>
@@ -346,23 +344,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
                   : `${rows.length} of ${summary.total} visible`}
               </p>
             </div>
-            <div className="flex items-center gap-1">
-              <Button className="px-2" size="compact" variant="quiet" aria-controls="workspace-files-explorer-panel" aria-expanded="true" onClick={() => setExplorerOpen(false)}>Hide</Button>
-              <Button className="px-2" size="compact" variant="quiet" onClick={() => setExpanded(new Set())}>Collapse</Button>
-              <Button
-                className="px-2"
-                size="compact"
-                variant="quiet"
-                disabled={!model.files.selectedEntry}
-                onClick={() => {
-                  setFilter(workspaceExplorerLocateFilter(tree, model.files.selectedEntry));
-                  setExpanded(new Set(workspaceExplorerAncestorPaths(model.files.selectedEntry)));
-                  focusRow(model.files.selectedEntry);
-                }}
-              >
-                Locate
-              </Button>
-            </div>
+            <Button className="px-2" size="compact" variant="quiet" onClick={() => setExpanded(new Set())}>Collapse all</Button>
           </div>
           <label className="relative m-3 block">
             <span className="sr-only">Filter workspace files</span>
@@ -409,9 +391,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
               </p>
             )}
           </div>
-        </section> : <aside id="workspace-files-explorer-panel" className="flex min-h-12 items-start justify-center border-b border-border bg-background/55 p-2 lg:border-b-0 lg:border-r" aria-label="Explorer collapsed">
-          <Button className="px-2 lg:[writing-mode:vertical-rl]" size="compact" variant="quiet" aria-controls="workspace-files-explorer-panel" aria-expanded="false" onClick={() => setExplorerOpen(true)}>Show Explorer</Button>
-        </aside>}
+        </section>
 
         <section className="grid min-w-0 grid-rows-[auto_auto_1fr_auto] bg-[#0b1016]" aria-labelledby="workspace-details-heading">
           <nav aria-label="Selected path" className="flex min-h-12 min-w-0 items-center gap-1 overflow-x-auto border-b border-border bg-background/30 px-4 text-xs text-muted-foreground">
@@ -437,17 +417,25 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {selected ? <SegmentedControl label="File information view" value={fileView} onChange={(value) => setFileView(value as "Preview" | "Details")} options={["Preview", "Details"]} /> : null}
-              {selected ? <WorkAction id="open-entry" actions={actions} onIntent={onIntent} variant="primary" /> : null}
-              {selected?.kind === "file" ? <WorkAction id="reveal-entry" actions={actions} onIntent={onIntent} /> : null}
+              {selected ? <WorkAction id="open-entry" actions={actions} onIntent={onIntent} /> : null}
+              {selected?.kind === "file" ? <WorkAction id="reveal-entry" actions={actions} onIntent={onIntent} variant="quiet" /> : null}
             </div>
           </div>
 
-          <div className="min-w-0 p-4">
+          <div className="min-w-0 space-y-3 p-4">
             {selected ? (
-              fileView === "Preview"
-                ? <WorkspaceFilePreview selected={selected} selectedChange={selectedChange} changes={model.changes} />
-                : <WorkspaceFileDetails selected={selected} selectedChange={selectedChange} />
+              <>
+                {model.files.workspaceState === "agent-assigned" ? (
+                  <p className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs leading-5 text-amber-100" role="status">
+                    Read-only snapshot from the assigned agent folder. Selecting the file again refreshes it; Mesh never saves from this preview.
+                  </p>
+                ) : null}
+                <WorkspaceFilePreview selected={selected} selectedChange={selectedChange} changes={model.changes} />
+                <details className="rounded-md border border-border bg-background/35">
+                  <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">File details</summary>
+                  <WorkspaceFileDetails selected={selected} selectedChange={selectedChange} />
+                </details>
+              </>
             ) : (
               <div className="grid min-h-52 place-items-center rounded-lg border border-dashed border-border p-8 text-center">
                 <div><p className="font-semibold">Choose a file or folder</p><p className="mt-2 text-sm text-muted-foreground">Use Files to inspect an exact workspace entry.</p></div>

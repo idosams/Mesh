@@ -321,7 +321,10 @@ fn an_earlier_workspace_opens_as_an_independent_native_folder() {
             .and_then(mesh_daemon::ipc::Json::as_text)
             .expect("fork working folder"),
     );
-    assert_eq!(fork, fork_private.join("mounts"));
+    assert_eq!(
+        fork,
+        fork_private.join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+    );
     assert_eq!(
         fs::read(fork.join("original.txt")).unwrap(),
         b"first version\n"
@@ -662,7 +665,10 @@ fn a_workspace_version_preview_is_bounded_without_hiding_the_total() {
             .and_then(mesh_daemon::ipc::Json::as_bool),
         Some(false)
     );
-    let expected_destination = private.join("mounts").to_string_lossy().into_owned();
+    let expected_destination = private
+        .join(mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
+        .to_string_lossy()
+        .into_owned();
     assert_eq!(
         imported
             .get("destination")

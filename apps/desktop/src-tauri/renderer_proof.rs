@@ -21,11 +21,12 @@ const SCREENSHOT_ENV: &str = "MESH_RENDERER_PROOF_SCREENSHOT";
 const AGENT_RESULT_NAME: &str = "agent-proof-result.txt";
 const AGENT_RESULT_BYTES: &[u8] = b"packaged agent handoff result\n";
 const MAX_REPORT_BYTES: usize = 4_096;
-const FAILURE_CODES: [&str; 32] = [
+const FAILURE_CODES: [&str; 33] = [
     "configuration",
     "onboarding-mount",
     "onboarding-path",
     "onboarding-preview",
+    "onboarding-confirm",
     "files-mount",
     "files-navigation",
     "files-native-open",
@@ -55,7 +56,7 @@ const FAILURE_CODES: [&str; 32] = [
     "agent-handoff-start",
     "agent-handoff-finish",
 ];
-const CHECKPOINT_CODES: [&str; 52] = [
+const CHECKPOINT_CODES: [&str; 56] = [
     "files-mounted",
     "files-folder-expanded",
     "files-file-selected",
@@ -73,6 +74,7 @@ const CHECKPOINT_CODES: [&str; 52] = [
     "review-image-preview",
     "review-saved-open",
     "review-saved-reveal",
+    "review-bounded-unavailable",
     "versions-start",
     "versions-mounted",
     "versions-clicked",
@@ -89,10 +91,13 @@ const CHECKPOINT_CODES: [&str; 52] = [
     "private-export-target-accepted",
     "private-export-preview-enabled",
     "private-export-preview-ready",
+    "private-export-bounded-blocked",
     "agent-handoff-start-clicked",
     "agent-handoff-assigned",
     "agent-handoff-finish-clicked",
     "agent-handoff-confirmed",
+    "agent-handoff-preflight-command-entered",
+    "agent-handoff-preflight-command-returned",
     "agent-handoff-complete",
     "agent-handoff-native-preflight",
     "agent-handoff-native-release",
@@ -336,7 +341,9 @@ fn agent_handoff_path_is_confined_to(
         && private_permissions
         && home == fixed_home
         && home == proof_root.join("home")
-        && source.file_name().is_some_and(|name| name == "mounts")
+        && source
+            .file_name()
+            .is_some_and(|name| name == mesh_daemon::workspace::PRESENTED_DIRECTORY_NAME)
         && source
             .parent()
             .is_some_and(|parent| parent.starts_with(versions))
@@ -449,30 +456,48 @@ impl RendererProofRuntime {
             return Err("packaged renderer proof had unrecognized or missing fields".to_owned());
         }
         let expected_claim = match configuration.surface {
-            "onboarding" => ("preview-path", "verified-preview"),
+            "onboarding" => ("preview-path-confirm-import", "import-completed-after-busy"),
             "files" => (
                 "expand-select-open-reveal-folders",
                 "native-file-and-folder-actions-completed",
             ),
-            "review" => (
-                "content-inline-native-open-reveal",
-                "saved-side-native-launches-completed",
-            ),
+            "review" => ("", ""),
             "versions" => ("select-saved-point", "verified-preview-ready"),
-            "private-export" => (
-                "refuse-original-then-confirm-private",
-                "private-export-completed",
-            ),
+            "private-export" => ("", ""),
             "agent-handoff" => ("start-finish-rescan", "agent-handoff-completed"),
             _ => unreachable!("configuration construction closes the surface vocabulary"),
+        };
+        let interaction = parsed.get("interaction").and_then(Json::as_text);
+        let outcome = parsed.get("outcome").and_then(Json::as_text);
+        let claim_matches = match configuration.surface {
+            "review" => matches!(
+                (interaction, outcome),
+                (
+                    Some("content-inline-native-open-reveal"),
+                    Some("saved-side-native-launches-completed")
+                ) | (
+                    Some("bounded-incomplete-review-inspection"),
+                    Some("incomplete-review-disclosed-without-authority")
+                )
+            ),
+            "private-export" => matches!(
+                (interaction, outcome),
+                (
+                    Some("refuse-original-then-confirm-private"),
+                    Some("private-export-completed")
+                ) | (
+                    Some("bounded-review-private-export-refusal"),
+                    Some("private-export-blocked-without-complete-review")
+                )
+            ),
+            _ => interaction == Some(expected_claim.0) && outcome == Some(expected_claim.1),
         };
         if parsed.get("schema").and_then(Json::as_text) != Some("mesh-renderer-proof/v1")
             || parsed.get("nonce").and_then(Json::as_text) != Some(configuration.nonce.as_str())
             || parsed.get("surface").and_then(Json::as_text) != Some(configuration.surface)
             || parsed.get("mounted").and_then(Json::as_bool) != Some(true)
             || parsed.get("visible").and_then(Json::as_bool) != Some(true)
-            || parsed.get("interaction").and_then(Json::as_text) != Some(expected_claim.0)
-            || parsed.get("outcome").and_then(Json::as_text) != Some(expected_claim.1)
+            || !claim_matches
         {
             return Err(
                 "packaged renderer proof did not match the configured interaction".to_owned(),
@@ -595,11 +620,15 @@ impl RendererProofRuntime {
         let current = state
             .as_mut()
             .ok_or_else(|| "packaged agent proof launcher was not accepted".to_owned())?;
-        if current.root != canonical.display().to_string()
-            || current.installation != installation
-            || current.generation != generation
-            || current.phase != expected
-        {
+        let root_matches = current.root == canonical.display().to_string();
+        let installation_matches = current.installation == installation;
+        let generation_matches = current.generation == generation;
+        let phase_matches = current.phase == expected;
+        if !root_matches || !installation_matches || !generation_matches || !phase_matches {
+            eprintln!(
+                "mesh-renderer-proof-agent-lifecycle-mismatch:root={root_matches}:installation={installation_matches}:generation={generation_matches}:phase={phase_matches}:actual_phase={:?}:expected_phase={expected:?}",
+                current.phase,
+            );
             return Err("packaged agent proof lifecycle changed identity or order".to_owned());
         }
         current.phase = next;
@@ -973,7 +1002,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&proof_root);
         let home = proof_root.join("home");
         let source = home.join(
-            "Library/Application Support/dev.mesh.desktop/workspace-versions/proof.mesh/mounts",
+            "Library/Application Support/dev.mesh.desktop/workspace-versions/proof.mesh/Mesh Version - Working Folder",
         );
         let outside = proof_root.join("outside/mounts");
         for directory in [&source, &outside] {
@@ -1043,6 +1072,21 @@ mod tests {
         let invented =
             accepted.replacen("\"outcome\":", "\"native_authority\":true,\"outcome\":", 1);
         assert!(runtime("review").accept(&invented).is_err());
+        let bounded = report(
+            "review",
+            "bounded-incomplete-review-inspection",
+            "incomplete-review-disclosed-without-authority",
+        );
+        assert_eq!(
+            runtime("review").accept(&bounded).expect("bounded review"),
+            bounded,
+        );
+        let crossed_claim = report(
+            "review",
+            "bounded-incomplete-review-inspection",
+            "saved-side-native-launches-completed",
+        );
+        assert!(runtime("review").accept(&crossed_claim).is_err());
     }
 
     #[test]
@@ -1063,6 +1107,27 @@ mod tests {
         assert!(runtime
             .accept_private_export_confirmation("/tmp/destination")
             .is_err());
+    }
+
+    #[test]
+    fn incomplete_review_private_export_refusal_is_one_closed_claim() {
+        let bounded = report(
+            "private-export",
+            "bounded-review-private-export-refusal",
+            "private-export-blocked-without-complete-review",
+        );
+        assert_eq!(
+            runtime("private-export")
+                .accept(&bounded)
+                .expect("bounded refusal"),
+            bounded,
+        );
+        let crossed_claim = report(
+            "private-export",
+            "bounded-review-private-export-refusal",
+            "private-export-completed",
+        );
+        assert!(runtime("private-export").accept(&crossed_claim).is_err());
     }
 
     #[test]
@@ -1134,7 +1199,11 @@ mod tests {
 
     #[test]
     fn report_accepts_only_the_configured_surface_outcome() {
-        let onboarding = report("onboarding", "preview-path", "verified-preview");
+        let onboarding = report(
+            "onboarding",
+            "preview-path-confirm-import",
+            "import-completed-after-busy",
+        );
         assert_eq!(
             runtime("onboarding")
                 .accept(&onboarding)

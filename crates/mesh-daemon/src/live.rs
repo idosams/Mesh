@@ -2358,8 +2358,11 @@ impl LiveDaemon {
         let (device, inode) = open.physical_directory_identity();
         Ok(VerifiedManagedWorkspacePath {
             path: open.physical_root().as_path().to_path_buf(),
-            presented: open.physical_root().as_path().file_name()
-                == Some(std::ffi::OsStr::new(mesh_store::MOUNT_DIRECTORY_NAME))
+            presented: open
+                .physical_root()
+                .as_path()
+                .file_name()
+                .is_some_and(crate::workspace::is_presented_directory_name)
                 && open.physical_root().as_path().parent() == Some(open.storage_root().as_path()),
             device,
             inode,
@@ -2572,9 +2575,10 @@ impl LiveDaemon {
         })
     }
 
-    /// Read one changing file twice while exact agent custody and workspace identity remain held.
+    /// Read one current file twice while exact agent custody and workspace identity remain held.
     /// Only an identical pair is returned, so the desktop never labels a concurrently changing
-    /// read as a stable live snapshot.
+    /// read as a stable live snapshot. Unchanged tracked files remain previewable under custody;
+    /// the returned kind keeps that read distinct from unrecorded agent work.
     pub fn inspect_agent_live_file(
         &self,
         expected_root: &str,
@@ -2640,13 +2644,12 @@ impl LiveDaemon {
                         .to_owned(),
                 ));
             }
-            if !first.modified_from_current_version() {
-                return Err(ManagedTextFileError::Recovery(
-                    "the selected live file no longer differs from its saved version".to_owned(),
-                ));
-            }
             (
-                "modified-file",
+                if first.modified_from_current_version() {
+                    "modified-file"
+                } else {
+                    "current-file"
+                },
                 first.byte_count(),
                 first.content_digest().to_string(),
                 first.executable(),
@@ -8442,7 +8445,10 @@ impl LiveDaemon {
     ) -> Result<Option<crate::ipc::Json>, Unavailable> {
         let operation = RecordDigest::parse_hex(operation)
             .map_err(|_| workspace_version_refusal("workspace-version-invalid"))?;
-        let presented = candidate_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = match crate::workspace::presented_workspace_path(candidate_store) {
+            Ok(presented) => presented,
+            Err(_) => return Ok(None),
+        };
         // Match ordinary navigation's global order. Open and retain the descriptor-pinned
         // candidate under its exact device/inode guard before entering `workspace_open`; the
         // candidate is then revalidated against the still-current source before installation.
@@ -8577,7 +8583,10 @@ impl LiveDaemon {
         candidate_store: &Path,
         expected_summary: &str,
     ) -> Result<Option<crate::ipc::Json>, Unavailable> {
-        let presented = candidate_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = match crate::workspace::presented_workspace_path(candidate_store) {
+            Ok(presented) => presented,
+            Err(_) => return Ok(None),
+        };
         let confirmed = match crate::ConfirmedFolderImport::open(&presented) {
             Ok(confirmed) => confirmed,
             Err(_) => return Ok(None),
@@ -9706,7 +9715,7 @@ mod tests {
             .reopen_existing_workspace(Path::new(&source_state.root))
             .expect("return to source");
         let source_state = daemon.workspace_state().expect("reopened source state");
-        let presented = candidate_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = candidate_store.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
 
         let (candidate_locked_tx, candidate_locked_rx) = std::sync::mpsc::channel();
         let (release_candidate_tx, release_candidate_rx) = std::sync::mpsc::channel();
@@ -9769,7 +9778,7 @@ mod tests {
             .expect("return to source for create-only race");
         let source_state = daemon.workspace_state().expect("source state for fork");
         let racing_store = root.join("racing-candidate.mesh");
-        let racing_presented = racing_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let racing_presented = racing_store.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
         let (confirmed_tx, confirmed_rx) = std::sync::mpsc::channel();
         let (release_fork_tx, release_fork_rx) = std::sync::mpsc::channel();
         let fork_daemon = Arc::clone(&daemon);
@@ -9849,7 +9858,7 @@ mod tests {
         let source = root.join("source");
         let managed = root.join("managed.mesh");
         let candidate_store = root.join("candidate.mesh");
-        let presented = candidate_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = candidate_store.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
         std::fs::create_dir_all(&source).expect("source folder");
         std::fs::write(source.join("note.txt"), b"saved version\n").expect("source file");
         let daemon = Arc::new(
@@ -10187,6 +10196,17 @@ mod tests {
                 None,
             )
             .expect("assign agent");
+        let unchanged = daemon
+            .inspect_agent_live_file(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                &generation,
+                "base.txt",
+            )
+            .expect("stable unchanged file");
+        assert_eq!(unchanged.kind(), "current-file");
+        assert_eq!(unchanged.text(), Some("saved\n"));
         let live_path = physical_root.join("live.txt");
         std::fs::write(&live_path, "appeared\n").expect("new live file");
         let appeared = daemon
@@ -10543,7 +10563,7 @@ mod tests {
         let source = root.join("source");
         let managed = root.join("managed.mesh");
         let candidate_store = root.join("candidate.mesh");
-        let presented = candidate_store.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = candidate_store.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
         fs::create_dir_all(&source).expect("source folder");
         fs::write(source.join("note.txt"), b"saved version\n").expect("source file");
         let daemon = LiveDaemon::with_checkpoint_runtime(started(), checkpoint_parameters())

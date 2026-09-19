@@ -927,7 +927,7 @@ if (currentHost) {
             detail: Object.freeze({ generation: exactGeneration }),
           }));
         }}>
-          <WorkspaceCurrent model={candidate.model} onIntent={onIntent} />
+          <WorkspaceCurrent model={candidate.model} generation={exactGeneration} onIntent={onIntent} />
         </Committed>,
       ));
     } catch (error) {
@@ -1053,5 +1053,6 @@ if (confirmationHost) {
     mountedGeneration = null;
     root.render(null);
   });
+  confirmationHost.setAttribute("data-mesh-confirmation-ready", "true");
   document.dispatchEvent(new CustomEvent(CONFIRMATION_AVAILABLE_EVENT));
 }

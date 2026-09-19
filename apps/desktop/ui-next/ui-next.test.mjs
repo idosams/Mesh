@@ -2848,6 +2848,7 @@ test('the production import workbench keeps preview and confirmation authority o
     files: [],
     destinationPath: '',
     confirmLabel: 'Create workspace and open folder',
+    busy: false,
     canChoose: true,
     canPreviewPath: true,
     canEditDestination: false,
@@ -2856,6 +2857,7 @@ test('the production import workbench keeps preview and confirmation authority o
   };
   const accepted = module.importWorkbenchEnvelope({ generation: 2, import: select }, 1);
   assert.equal(accepted.model.phase, 'select');
+  assert.equal(accepted.model.busy, false);
   assert.equal(Object.isFrozen(accepted.model.files), true);
   assert.deepEqual(module.importWorkbenchIntent({ type: 'preview-path', path: '/Users/finance/Plan ' }), {
     type: 'preview-path',
@@ -2891,6 +2893,16 @@ test('the production import workbench keeps preview and confirmation authority o
     () => module.importWorkbenchEnvelope({ generation: 3, import: { ...select, summary: 'invented' } }, 2),
     /contradicted/,
   );
+  assert.throws(
+    () => module.importWorkbenchEnvelope({ generation: 3, import: { ...select, busy: 'yes' } }, 2),
+    /phase contradicted its preview facts/,
+  );
+  assert.throws(
+    () => module.importWorkbenchEnvelope({ generation: 3, import: { ...select, busy: true } }, 2),
+    /phase contradicted its preview facts/,
+  );
+  assert.match(organism, /aria-busy=\{model\.busy\}/);
+  assert.match(organism, /Large projects can take several minutes/);
   assert.throws(
     () => module.importWorkbenchIntent({ type: 'confirm-import', summary: 'forged' }),
     /unrecognized or missing fields/,

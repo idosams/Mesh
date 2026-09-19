@@ -19,6 +19,9 @@ pub const MAX_RESPONSE_BYTES: usize = 17 * 1024 * 1024;
 
 const MAX_DAEMON_MESSAGE_BYTES: usize = 16 * 1024 * 1024;
 const DAEMON_CHUNK_DATA_BYTES: usize = 30_000;
+#[cfg(unix)]
+const DAEMON_WORKSPACE_STATE_REPLY_TIMEOUT: std::time::Duration =
+    std::time::Duration::from_secs(5 * 60);
 
 /// The only tool this bounded server publishes.
 pub const WORKSPACE_STATE_TOOL: &str = "mesh_workspace_state";
@@ -522,7 +525,7 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
             )
         })?;
         stream
-            .set_read_timeout(Some(Duration::from_secs(2)))
+            .set_read_timeout(Some(DAEMON_WORKSPACE_STATE_REPLY_TIMEOUT))
             .map_err(|error| format!("could not bound the Mesh daemon reply: {error}"))?;
         stream
             .set_write_timeout(Some(Duration::from_secs(2)))

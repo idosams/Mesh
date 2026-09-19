@@ -39,13 +39,13 @@ function interactableHost(element) {
     && element.getAttribute?.('aria-busy') !== 'true';
 }
 
-async function waitFor(read, delay, message) {
+async function waitFor(read, delay, message, { deadlineMs = 40_000, maximumAttempts = 800 } = {}) {
   // A clean archive starts the freshly linked WKWebView immediately after the native build and
   // full desktop suite. WebKit may clamp a background window's 50 ms timers toward one second, so
   // bind the wait to elapsed wall time as well as attempts instead of silently stretching it to
   // several minutes.
-  const deadline = Date.now() + 40_000;
-  for (let attempt = 0; attempt < 800 && Date.now() < deadline; attempt += 1) {
+  const deadline = Date.now() + deadlineMs;
+  for (let attempt = 0; attempt < maximumAttempts && Date.now() < deadline; attempt += 1) {
     const value = read();
     if (value) return value;
     await delay(50);
@@ -70,6 +70,12 @@ function enabledButtonNamed(root, label) {
 function buttonContaining(root, label) {
   return [...(root?.querySelectorAll('button') || [])]
     .find((button) => button.textContent?.includes(label)) || null;
+}
+
+function closedReviewUnavailableReason(status) {
+  return /could not verify a complete bounded review/u.test(status)
+    || /has not verified the current workspace/u.test(status)
+    || /has concurrent saved heads/u.test(status);
 }
 
 async function openReactPage(page, dependencies) {
@@ -170,14 +176,40 @@ async function proveOnboarding(configuration, dependencies) {
     delay,
     'the packaged React onboarding did not render the verified preview with keyboard focus',
   );
+  const confirm = await waitFor(
+    () => enabledButtonNamed(controls.shadow, 'Create workspace and open folder'),
+    delay,
+    'the packaged React onboarding did not expose exact import confirmation',
+  );
+  confirm.click();
+  await waitFor(
+    () => {
+      const verified = proofElement(controls.shadow, 'import-verified-preview');
+      const progress = proofElement(controls.shadow, 'import-confirmation-progress');
+      const creating = buttonNamed(controls.shadow, 'Creating private workspace…');
+      return verified?.getAttribute('aria-busy') === 'true'
+        && visible(progress, getComputedStyle)
+        && creating?.disabled === true
+        ? progress
+        : null;
+    },
+    delay,
+    'the packaged React onboarding did not expose its bounded import progress state',
+  );
+  await waitFor(
+    () => !proofElement(controls.shadow, 'import-verified-preview'),
+    delay,
+    'the packaged React onboarding did not finish the confirmed import',
+    { deadlineMs: 900_000, maximumAttempts: 18_000 },
+  );
   return {
     schema: 'mesh-renderer-proof/v1',
     nonce: configuration.nonce,
     surface: 'onboarding',
     mounted: true,
     visible: true,
-    interaction: 'preview-path',
-    outcome: 'verified-preview',
+    interaction: 'preview-path-confirm-import',
+    outcome: 'import-completed-after-busy',
   };
 }
 
@@ -288,7 +320,7 @@ async function proveFiles(configuration, dependencies) {
     );
   };
   await completeSelectedAction({
-    label: 'Open with default app',
+    label: 'Open',
     path: 'assets/mesh-proof.png',
     noticeText: 'Opened assets/mesh-proof.png with its default application.',
     exposureFailure: 'the packaged React Files explorer did not expose native file opening',
@@ -297,7 +329,7 @@ async function proveFiles(configuration, dependencies) {
   await invoke('renderer_proof_checkpoint', { code: 'files-file-opened' });
 
   await completeSelectedAction({
-    label: 'Reveal in Finder',
+    label: 'Reveal',
     path: 'assets/mesh-proof.png',
     noticeText: 'Revealed assets/mesh-proof.png in Finder.',
     exposureFailure: 'the packaged React Files explorer did not expose native file reveal',
@@ -329,37 +361,34 @@ async function proveFiles(configuration, dependencies) {
     delay,
     'the packaged React Files explorer did not select its proof folder',
   );
-  const openFolder = await waitFor(
-    () => {
-      const selected = proofElement(host.shadowRoot, 'files-selected-entry');
-      const candidate = enabledButtonNamed(host.shadowRoot, 'Open in Finder');
-      return selected?.getAttribute('data-mesh-entry-path') === 'assets' ? candidate : null;
-    },
-    delay,
-    'the packaged React Files explorer did not expose selected-folder opening',
-  );
-  openFolder.click();
-  await waitFor(
-    () => {
-      const notice = readNotice();
-      return visible(notice, getComputedStyle) && notice.textContent === 'Opened assets in Finder.';
-    },
-    delay,
-    'the packaged React Files explorer did not open its exact selected folder',
-  );
+  await completeSelectedAction({
+    label: 'Open in Finder',
+    path: 'assets',
+    noticeText: 'Opened assets in Finder.',
+    exposureFailure: 'the packaged React Files explorer did not expose selected-folder opening',
+    completionFailure: 'the packaged React Files explorer did not open its exact selected folder',
+  });
   await invoke('renderer_proof_checkpoint', { code: 'files-folder-opened' });
 
-  const openWorkspace = await waitFor(
-    () => enabledButtonNamed(host.shadowRoot, 'Open workspace folder'),
+  await waitFor(
+    () => enabledButtonNamed(host.shadowRoot, 'Open folder'),
     delay,
     'the packaged React Files explorer did not expose workspace-folder opening',
   );
-  openWorkspace.click();
+  let workspaceOpenAttempts = 0;
+  let workspaceRetryAfter = 0;
   await waitFor(
     () => {
       const notice = readNotice();
-      return visible(notice, getComputedStyle)
-        && notice.textContent === 'Opened the current workspace folder in Finder.';
+      if (visible(notice, getComputedStyle)
+        && notice.textContent === 'Opened the current workspace folder in Finder.') return true;
+      const action = enabledButtonNamed(host.shadowRoot, 'Open folder');
+      if (action && workspaceOpenAttempts < 3 && now() >= workspaceRetryAfter) {
+        workspaceOpenAttempts += 1;
+        workspaceRetryAfter = now() + 1_000;
+        action.click();
+      }
+      return false;
     },
     delay,
     'the packaged React Files explorer did not open the current workspace folder',
@@ -394,7 +423,48 @@ async function proveReview(configuration, dependencies) {
       ? { shadow, visual, content }
       : null;
   };
-  await waitFor(readReview, delay, 'the packaged React review workbench did not mount visibly');
+  const initialReview = await waitFor(() => {
+    const ready = readReview();
+    if (ready) return { state: 'ready', ...ready };
+    const shadow = host?.shadowRoot;
+    const unavailable = proofElement(shadow, 'review-unavailable');
+    return visible(host, getComputedStyle) && visible(unavailable, getComputedStyle)
+      ? { state: 'unavailable', shadow, unavailable }
+      : null;
+  }, delay, 'the packaged React review workbench did not mount visibly');
+  if (initialReview.state === 'unavailable') {
+    const status = initialReview.unavailable.textContent || '';
+    if (!/Review details are unavailable/u.test(status)
+      || !closedReviewUnavailableReason(status)) {
+      throw new Error('the packaged bounded review did not disclose its incomplete state');
+    }
+    const decisionLabels = new Set([
+      'Set up approval',
+      'Record reviewed version',
+      'Confirm review complete',
+      'Choose export folder',
+      'Approve exact version',
+      'Approve and create Git branch',
+      'Create Git branch',
+    ]);
+    const enabledDecision = [...(initialReview.shadow?.querySelectorAll('button') || [])]
+      .some((button) => visible(button, getComputedStyle)
+        && !button.disabled
+        && decisionLabels.has(button.textContent?.trim()));
+    if (enabledDecision) {
+      throw new Error('the packaged bounded review exposed an action without complete review authority');
+    }
+    await invoke('renderer_proof_checkpoint', { code: 'review-bounded-unavailable' });
+    return {
+      schema: 'mesh-renderer-proof/v1',
+      nonce: configuration.nonce,
+      surface: 'review',
+      mounted: true,
+      visible: true,
+      interaction: 'bounded-incomplete-review-inspection',
+      outcome: 'incomplete-review-disclosed-without-authority',
+    };
+  }
   await invoke('renderer_proof_checkpoint', { code: 'review-mounted' });
   const textChange = await waitFor(
     () => buttonContaining(readReview()?.shadow, 'agent-proof-result.txt'),
@@ -658,6 +728,9 @@ async function proveAgentHandoff(configuration, dependencies) {
   }, delay, 'the packaged agent handoff did not become assigned after launch');
   await invoke('renderer_proof_checkpoint', { code: 'agent-handoff-assigned' });
   controls.finish.focus({ preventScroll: true });
+  let clickedGeneration = Number(
+    proofElement(controls.shadow, 'current-mounted')?.getAttribute('data-mesh-generation'),
+  );
   controls.finish.click();
   await invoke('renderer_proof_checkpoint', { code: 'agent-handoff-finish-clicked' });
   const confirmationHost = document.getElementById('confirmation-dialog-next');
@@ -665,12 +738,30 @@ async function proveAgentHandoff(configuration, dependencies) {
     const shadow = confirmationHost?.shadowRoot;
     const backdrop = proofElement(shadow, 'confirmation-backdrop');
     const button = proofElement(shadow, 'confirmation-accept');
-    return visible(confirmationHost, getComputedStyle)
+    const accepted = visible(confirmationHost, getComputedStyle)
       && visible(backdrop, getComputedStyle)
       && visible(button, getComputedStyle)
       && !button.disabled
       ? button
       : null;
+    if (accepted) return accepted;
+    // Live-agent inspection may commit a newer Current projection after this proof read its
+    // Finish control but before the coordinator accepts that generation's intent. React normally
+    // retains the same keyed button node, so retry only after the mounted projection advances.
+    const currentShadow = currentHost?.shadowRoot;
+    const mounted = proofElement(currentShadow, 'current-mounted');
+    const committedGeneration = Number(mounted?.getAttribute('data-mesh-generation'));
+    const replacement = proofElement(currentShadow, 'current-finish-agent');
+    if (visible(currentHost, getComputedStyle)
+      && Number.isSafeInteger(committedGeneration)
+      && committedGeneration > clickedGeneration
+      && visible(replacement, getComputedStyle)
+      && !replacement.disabled) {
+      clickedGeneration = committedGeneration;
+      replacement.focus({ preventScroll: true });
+      replacement.click();
+    }
+    return null;
   }, delay, 'the packaged agent handoff did not render its Finish confirmation');
   accept.click();
   await invoke('renderer_proof_checkpoint', { code: 'agent-handoff-confirmed' });
@@ -691,7 +782,13 @@ async function proveAgentHandoff(configuration, dependencies) {
       && /Agent folder released.*authenticated and saved privately/u.test(notice.textContent || '')
       ? available
       : null;
-  }, delay, 'the packaged agent handoff did not finish, rescan, and save its result');
+  }, delay, 'the packaged agent handoff did not finish, rescan, and save its result', {
+    // Finish performs one complete post-release native scan and may authenticate every stable
+    // changed file before it can publish success. Keep only this final large-workspace stage on
+    // the same bounded fifteen-minute deadline as the user-visible operation.
+    deadlineMs: 900_000,
+    maximumAttempts: 18_000,
+  });
   await invoke('renderer_proof_checkpoint', { code: 'agent-handoff-complete' });
   return {
     schema: 'mesh-renderer-proof/v1',
@@ -779,17 +876,38 @@ async function provePrivateExport(configuration, dependencies) {
   });
   await invoke('renderer_proof_checkpoint', { code: 'private-export-start' });
   const host = document.getElementById('review-workbench-next');
-  const choose = await waitFor(() => {
+  const entry = await waitFor(() => {
     const shadow = host?.shadowRoot;
     const mounted = proofElement(shadow, 'review-mounted');
     const candidate = buttonNamed(shadow, 'Choose export folder');
-    return visible(host, getComputedStyle)
+    if (visible(host, getComputedStyle)
       && visible(mounted, getComputedStyle)
       && visible(candidate, getComputedStyle)
-      && !candidate.disabled
-      ? candidate
+      && !candidate.disabled) return { state: 'ready', choose: candidate };
+    const unavailable = proofElement(shadow, 'review-unavailable');
+    return visible(host, getComputedStyle) && visible(unavailable, getComputedStyle)
+      ? { state: 'unavailable', shadow, unavailable }
       : null;
   }, delay, 'the packaged private export controls did not mount visibly');
+  if (entry.state === 'unavailable') {
+    const status = entry.unavailable.textContent || '';
+    if (!/Review details are unavailable/u.test(status)
+      || !closedReviewUnavailableReason(status)
+      || buttonNamed(entry.shadow, 'Choose export folder')) {
+      throw new Error('the packaged private export did not remain blocked by its incomplete review');
+    }
+    await invoke('renderer_proof_checkpoint', { code: 'private-export-bounded-blocked' });
+    return {
+      schema: 'mesh-renderer-proof/v1',
+      nonce: configuration.nonce,
+      surface: 'private-export',
+      mounted: true,
+      visible: true,
+      interaction: 'bounded-review-private-export-refusal',
+      outcome: 'private-export-blocked-without-complete-review',
+    };
+  }
+  const choose = entry.choose;
   await invoke('renderer_proof_checkpoint', { code: 'private-export-mounted' });
   const destinationHost = document.getElementById('workspace-destination-next');
   const priorDestinationGeneration = proofElement(
@@ -975,6 +1093,9 @@ export function rendererProofFailureCode(error) {
   if (message.includes('onboarding did not mount')) return 'onboarding-mount';
   if (message.includes('did not accept the proof path')) return 'onboarding-path';
   if (message.includes('did not render the verified preview')) return 'onboarding-preview';
+  if (message.includes('did not expose exact import confirmation')
+    || message.includes('did not expose its bounded import progress state')
+    || message.includes('did not finish the confirmed import')) return 'onboarding-confirm';
   if (message.includes('Files explorer did not mount')) return 'files-mount';
   if (message.includes('Files explorer did not expand')
     || message.includes('Files explorer did not select')

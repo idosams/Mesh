@@ -16,14 +16,16 @@ import {
 
 type IntentHandler = (intent: WorkspaceCurrentIntent) => void;
 
-export function WorkspaceCurrent({ model, onIntent }: {
+export function WorkspaceCurrent({ model, generation, onIntent }: {
   model: WorkspaceCurrentModel;
+  generation: number;
   onIntent: IntentHandler;
 }) {
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   return (
     <WorkspaceCurrentView
       model={model}
+      generation={generation}
       onIntent={onIntent}
       workspaceQuery={workspaceQuery}
       onWorkspaceQueryChange={setWorkspaceQuery}
@@ -31,8 +33,9 @@ export function WorkspaceCurrent({ model, onIntent }: {
   );
 }
 
-export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorkspaceQueryChange }: {
+export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQuery, onWorkspaceQueryChange }: {
   model: WorkspaceCurrentModel;
+  generation: number;
   onIntent: IntentHandler;
   workspaceQuery: string;
   onWorkspaceQueryChange: (query: string) => void;
@@ -63,7 +66,7 @@ export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorksp
   };
 
   return (
-    <div data-mesh-proof="current-mounted" aria-label="Current workspace details" className="grid gap-5 p-5 lg:p-6">
+    <div data-mesh-proof="current-mounted" data-mesh-generation={generation} aria-label="Current workspace details" className="grid gap-5 p-5 lg:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -84,14 +87,18 @@ export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorksp
         </div>
       </header>
 
-      <section className="rounded-xl border border-border bg-background/40 p-4" aria-labelledby="workspace-switcher-heading">
-        <div className="flex flex-wrap items-end justify-between gap-2">
+      <details className="rounded-xl border border-border bg-background/40" aria-labelledby="workspace-switcher-heading">
+        <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 py-3 font-semibold">
+          <span>Switch workspace</span>
+          <span className="text-xs font-normal text-muted-foreground">{model.workspaces.length.toLocaleString()} recent</span>
+        </summary>
+        <div className="border-t border-border p-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspaces and agents</p>
             <h3 id="workspace-switcher-heading" className="mt-1 font-semibold">Switch without losing agent context</h3>
           </div>
-          <span className="text-xs text-muted-foreground">{model.workspaces.length.toLocaleString()} recent</span>
-        </div>
+          </div>
         <label className="mt-3 grid max-w-xl gap-1.5 text-xs font-medium text-muted-foreground">
           <span>Find a workspace or agent</span>
           <input
@@ -132,7 +139,8 @@ export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorksp
           </p>
         ) : null}
         {workspaceProjection.matched === 0 ? <p className="mt-3 text-sm text-muted-foreground">No workspace or agent matches this search.</p> : null}
-      </section>
+        </div>
+      </details>
 
       <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="live-agent-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -196,28 +204,31 @@ export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorksp
         </section>
       </div>
 
-      <section className="min-w-0 rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="destination-heading">
-        <p id="destination-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Original or destination folder</p>
-        <p className="mt-2 break-all font-mono text-sm" title={model.destination}>{model.destination}</p>
-        <p className="mt-2 text-sm text-muted-foreground">Mesh previews and rechecks saved content before any destination write.</p>
-        <div className="mt-4">{action("update-destination", "secondary")}</div>
-      </section>
+      <details className="rounded-xl border border-border bg-background/30">
+        <summary className="min-h-12 cursor-pointer px-4 py-3 font-semibold">Workspace details and recovery</summary>
+        <div className="grid gap-4 border-t border-border p-4">
+          <section className="min-w-0 rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="destination-heading">
+            <p id="destination-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Original or destination folder</p>
+            <p className="mt-2 break-all font-mono text-sm" title={model.destination}>{model.destination}</p>
+            <p className="mt-2 text-sm text-muted-foreground">Mesh previews and rechecks saved content before any destination write.</p>
+            <div className="mt-4">{action("update-destination", "secondary")}</div>
+          </section>
 
-      <dl className="grid gap-3 text-sm sm:grid-cols-3">
-        <Fact label="Private version" value={model.privateVersion} title={model.privateVersionTitle} />
-        <Fact label="Shared version" value={model.sharedVersion} title={model.sharedVersionTitle} />
-        <Fact label="Files and folders" value={String(model.entryCount)} />
-      </dl>
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <Fact label="Private version" value={model.privateVersion} title={model.privateVersionTitle} />
+            <Fact label="Shared version" value={model.sharedVersion} title={model.sharedVersionTitle} />
+            <Fact label="Files and folders" value={String(model.entryCount)} />
+          </dl>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <details className="rounded-xl border border-border bg-background/40 p-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <details className="rounded-xl border border-border bg-background/40 p-4">
           <summary className="min-h-11 cursor-pointer font-semibold">Materialized paths ({model.entries.length})</summary>
           <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm">
             {entryProjection.items.map((entry, index) => <li data-mesh-materialized-entry="true" className="break-all font-mono" key={`${index}:${entry}`}>{entry}</li>)}
             {entryProjection.truncated ? <li className="text-xs text-muted-foreground">Showing the first {entryProjection.items.length.toLocaleString()} of {entryProjection.matched.toLocaleString()} paths. Use Files to search the complete workspace.</li> : null}
           </ul>
-        </details>
-        <details className="rounded-xl border border-border bg-background/40 p-4" open={model.conditions.length > 0}>
+            </details>
+            <details className="rounded-xl border border-border bg-background/40 p-4" open={model.conditions.length > 0}>
           <summary className="min-h-11 cursor-pointer font-semibold">Conditions and unavailable controls ({model.conditions.length})</summary>
           {model.conditions.length ? (
             <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm text-muted-foreground">
@@ -225,19 +236,21 @@ export function WorkspaceCurrentView({ model, onIntent, workspaceQuery, onWorksp
               {conditionProjection.truncated ? <li>Showing the first {conditionProjection.items.length.toLocaleString()} of {conditionProjection.matched.toLocaleString()} conditions.</li> : null}
             </ul>
           ) : <p className="mt-3 text-sm text-muted-foreground">No reported conditions.</p>}
-        </details>
-      </div>
+            </details>
+          </div>
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <div>
-          <p className="font-semibold">Support and recovery</p>
-          <p className="text-sm text-muted-foreground">Diagnostics exclude file contents and paths. Rollback succeeds only while the managed copy matches its receipt.</p>
+          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <div>
+              <p className="font-semibold">Support and recovery</p>
+              <p className="text-sm text-muted-foreground">Diagnostics exclude file contents and paths. Rollback succeeds only while the managed copy matches its receipt.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {action("copy-diagnostics", "quiet")}
+              {action("rollback", "danger")}
+            </div>
+          </footer>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {action("copy-diagnostics", "quiet")}
-          {action("rollback", "danger")}
-        </div>
-      </footer>
+      </details>
     </div>
   );
 }

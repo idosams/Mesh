@@ -41,6 +41,104 @@ static void mesh_copy_error(CFErrorRef error, char *out, size_t capacity) {
     if (message != NULL) CFRelease(message);
 }
 
+static bool mesh_is_string(CFTypeRef value) {
+    return value != NULL && CFGetTypeID(value) == CFStringGetTypeID();
+}
+
+static bool mesh_is_dictionary(CFTypeRef value) {
+    return value != NULL && CFGetTypeID(value) == CFDictionaryGetTypeID();
+}
+
+static bool mesh_is_array(CFTypeRef value) {
+    return value != NULL && CFGetTypeID(value) == CFArrayGetTypeID();
+}
+
+static bool mesh_array_contains_string(CFArrayRef values, CFStringRef expected) {
+    if (values == NULL || expected == NULL) return false;
+    CFIndex count = CFArrayGetCount(values);
+    for (CFIndex index = 0; index < count; index++) {
+        CFTypeRef value = CFArrayGetValueAtIndex(values, index);
+        if (mesh_is_string(value) && CFEqual(value, expected)) return true;
+    }
+    return false;
+}
+
+static bool mesh_identity_values_match(CFStringRef team, CFStringRef identifier,
+                                       CFArrayRef certificates, CFDictionaryRef entitlements) {
+    if (!mesh_is_string(team) || CFStringGetLength(team) == 0
+        || !mesh_is_string(identifier) || !CFEqual(identifier, CFSTR("dev.mesh.desktop"))
+        || !mesh_is_array(certificates) || CFArrayGetCount(certificates) == 0
+        || !mesh_is_dictionary(entitlements)) return false;
+
+    CFTypeRef entitlement_team = CFDictionaryGetValue(
+        entitlements, CFSTR("com.apple.developer.team-identifier"));
+    CFTypeRef application_identifier = CFDictionaryGetValue(
+        entitlements, CFSTR("com.apple.application-identifier"));
+    CFTypeRef keychain_groups = CFDictionaryGetValue(
+        entitlements, CFSTR("keychain-access-groups"));
+    if (!mesh_is_string(entitlement_team) || !CFEqual(entitlement_team, team)
+        || !mesh_is_string(application_identifier) || !mesh_is_array(keychain_groups)) return false;
+
+    CFMutableStringRef expected_application = CFStringCreateMutableCopy(
+        kCFAllocatorDefault, 0, team);
+    if (expected_application == NULL) return false;
+    CFStringAppend(expected_application, CFSTR(".dev.mesh.desktop"));
+    bool valid = CFEqual(application_identifier, expected_application)
+        && mesh_array_contains_string((CFArrayRef)keychain_groups, expected_application);
+    CFRelease(expected_application);
+    return valid;
+}
+
+// Read-only application identity preflight. Looking up a missing credential can return
+// errSecItemNotFound before Security.framework evaluates the app's signing identity, which used to
+// make an ad-hoc build advertise a setup ceremony that was guaranteed to fail. Inspect the running
+// code signature and its exact app-private keychain entitlements without creating or loading a key.
+int mesh_secure_enclave_availability(char *error_out, size_t error_capacity) {
+    @autoreleasepool {
+        SecCodeRef code = NULL;
+        OSStatus status = SecCodeCopySelf(kSecCSDefaultFlags, &code);
+        if (status != errSecSuccess || code == NULL) {
+            mesh_copy_string(CFSTR("validated Apple application identity is unavailable"),
+                             error_out, error_capacity);
+            if (code != NULL) CFRelease(code);
+            return MESH_SE_APPLICATION_IDENTITY_UNAVAILABLE;
+        }
+        status = SecCodeCheckValidity(code, kSecCSStrictValidate, NULL);
+        if (status != errSecSuccess) {
+            mesh_copy_string(CFSTR("validated Apple application identity is unavailable"),
+                             error_out, error_capacity);
+            CFRelease(code);
+            return MESH_SE_APPLICATION_IDENTITY_UNAVAILABLE;
+        }
+
+        CFDictionaryRef information = NULL;
+        status = SecCodeCopySigningInformation(
+            code, kSecCSSigningInformation | kSecCSRequirementInformation, &information);
+        CFRelease(code);
+        if (status != errSecSuccess || information == NULL) {
+            mesh_copy_string(CFSTR("validated Apple application identity is unavailable"),
+                             error_out, error_capacity);
+            if (information != NULL) CFRelease(information);
+            return MESH_SE_APPLICATION_IDENTITY_UNAVAILABLE;
+        }
+
+        CFTypeRef team = CFDictionaryGetValue(information, kSecCodeInfoTeamIdentifier);
+        CFTypeRef identifier = CFDictionaryGetValue(information, kSecCodeInfoIdentifier);
+        CFTypeRef certificates = CFDictionaryGetValue(information, kSecCodeInfoCertificates);
+        CFTypeRef entitlements = CFDictionaryGetValue(information, kSecCodeInfoEntitlementsDict);
+        bool valid = mesh_identity_values_match(
+            (CFStringRef)team, (CFStringRef)identifier,
+            (CFArrayRef)certificates, (CFDictionaryRef)entitlements);
+        CFRelease(information);
+        if (!valid) {
+            mesh_copy_string(CFSTR("validated Apple application identity is unavailable"),
+                             error_out, error_capacity);
+            return MESH_SE_APPLICATION_IDENTITY_UNAVAILABLE;
+        }
+        return MESH_SE_OK;
+    }
+}
+
 enum { MESH_ERROR_DOMAIN_LOCAL_AUTHENTICATION = 1, MESH_ERROR_DOMAIN_OS_STATUS = 2 };
 
 static int mesh_error_result_for_domain(CFStringRef domain, CFIndex code) {
@@ -142,6 +240,8 @@ static int mesh_export_public_key(SecKeyRef private_key, uint8_t *out, size_t ca
 int mesh_secure_enclave_load(uint8_t *public_key, size_t capacity,
                              char *error_out, size_t error_capacity) {
     @autoreleasepool {
+        int available = mesh_secure_enclave_availability(error_out, error_capacity);
+        if (available != MESH_SE_OK) return available;
         OSStatus status = errSecSuccess;
         SecKeyRef private_key = mesh_copy_private_key(&status);
         if (private_key == NULL) {
@@ -205,6 +305,8 @@ int mesh_secure_enclave_sign(const uint8_t *message, size_t message_length,
     @autoreleasepool {
         if (message == NULL || signature == NULL || signature_length == NULL || *signature_length < 72)
             return MESH_SE_FAILURE;
+        int available = mesh_secure_enclave_availability(error_out, error_capacity);
+        if (available != MESH_SE_OK) return available;
         OSStatus status = errSecSuccess;
         SecKeyRef private_key = mesh_copy_private_key(&status);
         if (private_key == NULL) {

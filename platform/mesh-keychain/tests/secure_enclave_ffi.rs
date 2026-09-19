@@ -45,6 +45,11 @@ fn classify(domain: i32, code: i64) -> i32 {
 
 #[test]
 fn status_is_read_only_and_challenges_are_fresh() {
+    assert_eq!(
+        SecureEnclaveApprovalCredential::availability(),
+        Err(mesh_keychain::SecureEnclaveApprovalError::ApplicationIdentityUnavailable),
+        "the ad-hoc test executable must not advertise approval enrollment",
+    );
     let first = SecureEnclaveApprovalCredential::load();
     let second = SecureEnclaveApprovalCredential::load();
     assert_eq!(first.is_ok(), second.is_ok());
@@ -93,6 +98,15 @@ fn only_explicit_framework_cancellation_results_are_cancelled() {
 
 #[test]
 fn credential_lookup_requires_the_data_protection_keychain_and_secure_enclave_token() {
+    assert!(NATIVE_BRIDGE.contains("SecCodeCopySelf(kSecCSDefaultFlags"));
+    assert!(NATIVE_BRIDGE.contains("SecCodeCheckValidity(code, kSecCSStrictValidate"));
+    assert!(NATIVE_BRIDGE.contains("kSecCodeInfoTeamIdentifier"));
+    assert!(NATIVE_BRIDGE.contains("kSecCodeInfoCertificates"));
+    assert!(NATIVE_BRIDGE.contains("kSecCodeInfoEntitlementsDict"));
+    assert!(NATIVE_BRIDGE.contains("com.apple.application-identifier"));
+    assert!(NATIVE_BRIDGE.contains("com.apple.developer.team-identifier"));
+    assert!(NATIVE_BRIDGE.contains("keychain-access-groups"));
+    assert!(NATIVE_BRIDGE.contains(".dev.mesh.desktop"));
     assert!(NATIVE_BRIDGE.contains("(id)kSecAttrTokenID: (id)kSecAttrTokenIDSecureEnclave"));
     assert!(NATIVE_BRIDGE.contains("(id)kSecUseDataProtectionKeychain: @YES"));
     assert!(NATIVE_BRIDGE.contains("SecKeyCopyAttributes(key)"));

@@ -1162,7 +1162,11 @@ test('source-owned confirmation accepts only an exact mounted generation and fai
   globalThis.CustomEvent = FakeCustomEvent;
   globalThis.confirm = () => { browserConfirmations += 1; return true; };
   const module = await import(`./app.js?accessible-confirmation=${Date.now()}`);
-  document.dispatchEvent(new FakeCustomEvent('mesh:confirmation-available'));
+  // Reproduce a cold-start ordering where the island's one-shot availability event fired before
+  // the coordinator listener existed. The durable host marker must still select React instead of
+  // falling back to the blocking browser confirmation.
+  document.getElementById('confirmation-dialog-next')
+    .setAttribute('data-mesh-confirmation-ready', 'true');
 
   let firstResolution = null;
   const first = module.requestAccessibleConfirmation({
@@ -1825,6 +1829,8 @@ test('a zero-history folder with ordinary files offers same-folder import instea
   };
   let imported = false;
   let importParameters = null;
+  let finishImport = null;
+  const importReply = new Promise((resolve) => { finishImport = resolve; });
   const confirmationPrompts = [];
   const invoke = async (command, parameters = {}) => {
     if (command === 'pick_folder') {
@@ -1870,6 +1876,7 @@ test('a zero-history folder with ordinary files offers same-folder import instea
     if (command === 'discover_native_missing_files') return '[]';
     if (command === 'import_managed_workspace') {
       importParameters = parameters;
+      await importReply;
       imported = true;
       return JSON.stringify({
         workspace: importedWorkspace,
@@ -1943,7 +1950,16 @@ test('a zero-history folder with ordinary files offers same-folder import instea
     'src/main.rs · 14 bytes',
   ]);
 
-  await document.emitImportWorkbenchIntent({ type: 'confirm-import' });
+  const importAttempt = document.emitImportWorkbenchIntent({ type: 'confirm-import' });
+  await waitFor(() => importParameters !== null);
+
+  assert.equal(document.importWorkbench?.import.busy, true);
+  assert.equal(document.importWorkbench?.import.canConfirm, false);
+  assert.equal(document.importWorkbench?.import.confirmLabel, 'Creating private workspace…');
+  assert.match(document.getElementById('notice').textContent, /large projects can take several minutes/i);
+  assert.match(document.getElementById('notice').textContent, /original stays unchanged/i);
+  finishImport();
+  await importAttempt;
 
   assert.deepEqual(confirmationPrompts, [], 'protected import falsely warned that its exact preview would be left behind');
   assert.deepEqual(importParameters, {
@@ -8623,6 +8639,192 @@ test('an agent-assigned recent workspace switches directly to its verified finis
   assert.equal(document.getElementById('workspace-current-next').classList.contains('hidden'), false);
   assert.match(document.getElementById('notice').textContent, /Opened the exact workspace assigned to a running agent/);
   assert.match(document.getElementById('notice').textContent, /Live changes are read-only/);
+});
+
+test('Files previews unchanged JSON and text while exact agent custody stays active', async () => {
+  const document = fakeDocument();
+  const workspace = {
+    root: '/managed/assigned-preview/mounts',
+    digest: 'workspace-assigned-preview',
+    installation: 'installation-assigned-preview',
+    records: 1,
+    reviews: 0,
+    review_items: [],
+    review_items_not_listed: 0,
+    private_version: { version: 'version-assigned-preview' },
+    shared_version: null,
+    entries: [
+      { path: 'mesh-test-one.txt', type: 'file' },
+      { path: 'mesh-test-three.json', type: 'file' },
+    ],
+    conditions: [],
+    not_yet: [],
+    file_histories: [
+      {
+        path: 'mesh-test-one.txt',
+        object_id: 'object-assigned-preview-text',
+        current: { version_id: 'version-assigned-preview-text', manifest_id: 'manifest-assigned-preview-text' },
+        retained_versions: [{ version_id: 'version-assigned-preview-text', manifest_id: 'manifest-assigned-preview-text' }],
+      },
+      {
+        path: 'mesh-test-three.json',
+        object_id: 'object-assigned-preview-json',
+        current: { version_id: 'version-assigned-preview-json', manifest_id: 'manifest-assigned-preview-json' },
+        retained_versions: [{ version_id: 'version-assigned-preview-json', manifest_id: 'manifest-assigned-preview-json' }],
+      },
+    ],
+    workspace_versions: [],
+  };
+  const previewed = [];
+  const recent = {
+    remembered: workspace.root,
+    workspaces: [workspace.root],
+    workspace_entries: [{
+      path: workspace.root,
+      agent_handoff_installation: workspace.installation,
+      agent_handoff_generation: TEST_AGENT_HANDOFF_GENERATION,
+    }],
+    active_folder: null,
+    auto_opened: false,
+  };
+  const invoke = async (command, parameters = {}) => {
+    if (command === 'recent_workspace_status') return JSON.stringify(recent);
+    if (command === 'managed_checkpoint_state') {
+      return JSON.stringify({
+        root: workspace.root,
+        workspace_digest: workspace.digest,
+        workspace_installation: workspace.installation,
+        native_folder: true,
+        native_folder_path: workspace.root,
+        working: false,
+      });
+    }
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') return JSON.stringify(workspace);
+    if (command === 'inspect_agent_live_work') {
+      return JSON.stringify({
+        schema: 'mesh.agent-live-work/v1',
+        workspace_root: workspace.root,
+        workspace_digest: workspace.digest,
+        workspace_installation: workspace.installation,
+        agent_handoff_generation: TEST_AGENT_HANDOFF_GENERATION,
+        changes: [],
+      });
+    }
+    if (command === 'inspect_agent_live_file') {
+      assert.equal(parameters.expectedWorkspaceRoot, workspace.root);
+      assert.equal(parameters.expectedWorkspaceDigest, workspace.digest);
+      assert.equal(parameters.expectedWorkspaceInstallation, workspace.installation);
+      assert.equal(parameters.expectedAgentHandoffGeneration, TEST_AGENT_HANDOFF_GENERATION);
+      previewed.push(parameters.relativePath);
+      const text = parameters.relativePath.endsWith('.json')
+        ? '{\n  "preview": true\n}\n'
+        : 'plain text preview\n';
+      return JSON.stringify({
+        schema: 'mesh.agent-live-file/v1',
+        workspace_root: workspace.root,
+        workspace_digest: workspace.digest,
+        workspace_installation: workspace.installation,
+        agent_handoff_generation: TEST_AGENT_HANDOFF_GENERATION,
+        path: parameters.relativePath,
+        kind: 'current-file',
+        byte_count: text.length,
+        content_digest: 'ab'.repeat(32),
+        executable: false,
+        text,
+        preview_kind: 'text',
+        image_data_url: null,
+        preview_error: null,
+        mutable: true,
+        recorded: false,
+      });
+    }
+    throw new Error(`unexpected assigned preview command: ${command}`);
+  };
+
+  globalThis.document = document;
+  globalThis.window = { __TAURI__: { core: { invoke } } };
+  globalThis.confirm = () => true;
+  await import(`./app.js?assigned-files-preview=${Date.now()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+
+  await document.emitWorkspaceWorkIntent({
+    type: 'set-field',
+    field: 'selectedEntry',
+    value: 'mesh-test-three.json',
+  });
+  await waitFor(() => document.workspaceWork?.workbench.changes.editorText.includes('"preview": true'));
+  assert.deepEqual(previewed, ['mesh-test-three.json']);
+  assert.equal(document.workspaceWork.workbench.files.workspaceState, 'agent-assigned');
+  assert.equal(document.workspaceWork.workbench.changes.editorKind, 'text');
+  assert.equal(document.workspaceWork.workbench.changes.canEditText, false);
+});
+
+test('an unchanged Current refresh renews actions without publishing another painted tree', async () => {
+  const document = fakeDocument();
+  const workspace = {
+    root: '/managed/no-flicker-refresh',
+    digest: 'workspace-no-flicker-refresh',
+    installation: 'installation-no-flicker-refresh',
+    records: 1,
+    reviews: 0,
+    review_items: [],
+    review_items_not_listed: 0,
+    private_version: { version: 'version-no-flicker-refresh' },
+    shared_version: null,
+    entries: [{ path: 'stable.txt', type: 'file' }],
+    conditions: [],
+    not_yet: [],
+    file_histories: [{
+      path: 'stable.txt',
+      object_id: 'object-no-flicker-refresh',
+      current: { version_id: 'version-no-flicker-refresh', manifest_id: 'manifest-no-flicker-refresh' },
+      retained_versions: [{ version_id: 'version-no-flicker-refresh', manifest_id: 'manifest-no-flicker-refresh' }],
+    }],
+    workspace_versions: [],
+  };
+  const recent = {
+    remembered: workspace.root,
+    workspaces: [workspace.root],
+    workspace_entries: [{ path: workspace.root, agent_handoff_installation: null, agent_handoff_generation: null }],
+    active_folder: null,
+    auto_opened: false,
+  };
+  let stateReads = 0;
+  const invoke = async (command, parameters = {}) => {
+    if (command === 'recent_workspace_status') return JSON.stringify(recent);
+    if (command === 'managed_checkpoint_state') {
+      return JSON.stringify({
+        root: workspace.root,
+        workspace_digest: workspace.digest,
+        workspace_installation: workspace.installation,
+        native_folder: true,
+        native_folder_path: workspace.root,
+        working: false,
+      });
+    }
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') {
+      stateReads += 1;
+      return JSON.stringify(workspace);
+    }
+    if (command === 'approval_credential_status') {
+      return JSON.stringify({ enrolled: false, available: false, unavailable_reason: 'Unavailable in test.' });
+    }
+    throw new Error(`unexpected no-flicker refresh command: ${command}`);
+  };
+
+  globalThis.document = document;
+  globalThis.window = { __TAURI__: { core: { invoke } } };
+  globalThis.confirm = () => true;
+  await import(`./app.js?no-flicker-refresh=${Date.now()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+  const mountedGeneration = document.workspaceCurrent.generation;
+  let repaints = 0;
+  document.addEventListener('mesh:workspace-current-projection', () => { repaints += 1; });
+
+  await document.emitWorkspaceCurrentIntent('refresh', mountedGeneration);
+  await waitFor(() => stateReads >= 2);
+  assert.equal(document.workspaceCurrent.generation, mountedGeneration);
+  assert.equal(repaints, 0, 'an unchanged native refresh republished the full Current React tree');
 });
 
 test('rollback removes the stable folder through the canonical deleted workspace identity', async () => {

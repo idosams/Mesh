@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assertCompleteArchiveFixtureProof,
   parseRenderedAppProofOutput,
   parseRendererProofReport,
   rendererProofReportsFromText,
@@ -16,8 +17,8 @@ function report(overrides = {}) {
     surface: 'onboarding',
     mounted: true,
     visible: true,
-    interaction: 'preview-path',
-    outcome: 'verified-preview',
+    interaction: 'preview-path-confirm-import',
+    outcome: 'import-completed-after-busy',
     ...overrides,
   };
 }
@@ -52,6 +53,26 @@ test('renderer proof accepts one exact nonce-bound surface result', () => {
     outcome: 'saved-side-native-launches-completed',
   }));
   assert.deepEqual(parseRendererProofReport(report({
+    surface: 'review',
+    interaction: 'bounded-incomplete-review-inspection',
+    outcome: 'incomplete-review-disclosed-without-authority',
+  }), {
+    nonce,
+    surface: 'review',
+  }), report({
+    surface: 'review',
+    interaction: 'bounded-incomplete-review-inspection',
+    outcome: 'incomplete-review-disclosed-without-authority',
+  }));
+  assert.throws(() => parseRendererProofReport(report({
+    surface: 'review',
+    interaction: 'bounded-incomplete-review-inspection',
+    outcome: 'saved-side-native-launches-completed',
+  }), {
+    nonce,
+    surface: 'review',
+  }), /interaction and outcome/);
+  assert.deepEqual(parseRendererProofReport(report({
     surface: 'versions',
     interaction: 'select-saved-point',
     outcome: 'verified-preview-ready',
@@ -74,6 +95,18 @@ test('renderer proof accepts one exact nonce-bound surface result', () => {
     surface: 'private-export',
     interaction: 'refuse-original-then-confirm-private',
     outcome: 'private-export-completed',
+  }));
+  assert.deepEqual(parseRendererProofReport(report({
+    surface: 'private-export',
+    interaction: 'bounded-review-private-export-refusal',
+    outcome: 'private-export-blocked-without-complete-review',
+  }), {
+    nonce,
+    surface: 'private-export',
+  }), report({
+    surface: 'private-export',
+    interaction: 'bounded-review-private-export-refusal',
+    outcome: 'private-export-blocked-without-complete-review',
   }));
   assert.deepEqual(parseRendererProofReport(report({
     surface: 'agent-handoff',
@@ -109,7 +142,26 @@ test('stderr extraction is prefix-scoped, bounded, and refuses duplicate reports
   assert.deepEqual(rendererProofReportsFromText(`ordinary diagnostic\n${line}\n`, {
     nonce,
     surface: 'onboarding',
+    interaction: 'preview-path-confirm-import',
+    outcome: 'import-completed-after-busy',
   }), [report()]);
+  assert.throws(
+    () => rendererProofReportsFromText(
+      `mesh-renderer-proof:${JSON.stringify(report({
+        surface: 'review',
+        interaction: 'bounded-incomplete-review-inspection',
+        outcome: 'incomplete-review-disclosed-without-authority',
+      }))}\n`,
+      {
+        nonce,
+        surface: 'review',
+        interaction: 'content-inline-native-open-reveal',
+        outcome: 'saved-side-native-launches-completed',
+      },
+    ),
+    /required claim/,
+    'a complete fixture claim must reject the real-workspace bounded alternative',
+  );
   assert.throws(
     () => rendererProofReportsFromText(`${line}\n${line}\n`, { nonce, surface: 'onboarding' }),
     /exactly one/,
@@ -135,7 +187,7 @@ function renderedProof(overrides = {}) {
       nonce_bound: true,
       onboarding: {
         surface: 'onboarding', mounted: true, visible: true,
-        interaction: 'preview-path', outcome: 'verified-preview',
+        interaction: 'preview-path-confirm-import', outcome: 'import-completed-after-busy',
       },
       files: {
         surface: 'files', mounted: true, visible: true,
@@ -203,6 +255,40 @@ test('the final rendered-app claim is derived only from all six exact surface pr
     () => parseRenderedAppProofOutput(`${JSON.stringify(proof)}\n${JSON.stringify(proof)}\n`),
     /exactly one/,
   );
+});
+
+test('archive fixtures require complete Review and completed private export', () => {
+  const complete = renderedProof();
+  assert.equal(assertCompleteArchiveFixtureProof(complete), complete);
+  for (const candidate of [
+    renderedProof({
+      renderer: {
+        ...complete.renderer,
+        review: {
+          surface: 'review', mounted: true, visible: true,
+          interaction: 'bounded-incomplete-review-inspection',
+          outcome: 'incomplete-review-disclosed-without-authority',
+        },
+      },
+    }),
+    renderedProof({
+      renderer: {
+        ...complete.renderer,
+        private_export: {
+          surface: 'private-export', mounted: true, visible: true,
+          interaction: 'bounded-review-private-export-refusal',
+          outcome: 'private-export-blocked-without-complete-review',
+        },
+      },
+    }),
+  ]) {
+    assert.throws(
+      () => assertCompleteArchiveFixtureProof(
+        parseRenderedAppProofOutput(`${JSON.stringify(candidate)}\n`),
+      ),
+      /archive fixture/,
+    );
+  }
 });
 
 test('the final rendered-app claim closes screenshot evidence over its native receipt fields', () => {

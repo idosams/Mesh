@@ -98,11 +98,53 @@ const PRIVATE_MANAGED_TOP_LEVEL: &[&str] = &[
 
 /// Canonical marker for the external-store/presented-folder layout.
 ///
-/// The store directory owns this marker and its `mounts/` child is the ordinary folder handed to
-/// editors and agents. Reopening `mounts/` consults only this exact regular file; no symlink or
-/// caller-supplied pointer can redirect storage authority.
+/// The store directory owns this marker and its human-named child is the ordinary folder handed
+/// to editors and agents. Reopening that child consults only this exact regular file; no symlink
+/// or caller-supplied pointer can redirect storage authority.
 pub const PRESENTED_LAYOUT_MARKER_NAME: &str = ".mesh-presented-workspace";
 pub(crate) const PRESENTED_LAYOUT_MARKER_BYTES: &[u8] = b"mesh.presented-workspace/1\n";
+
+/// Filesystem-visible name of a managed historical working folder.
+///
+/// This is intentionally product language rather than a storage term: it remains visible when
+/// Finder, an editor, a terminal, or a system file picker opens the folder outside Mesh.
+pub const PRESENTED_DIRECTORY_NAME: &str = "Mesh Version - Working Folder";
+
+/// Whether one exact leaf name is a current or legacy externally presented workspace.
+#[must_use]
+pub fn is_presented_directory_name(name: &std::ffi::OsStr) -> bool {
+    name == std::ffi::OsStr::new(PRESENTED_DIRECTORY_NAME)
+        || name == std::ffi::OsStr::new(mesh_store::MOUNT_DIRECTORY_NAME)
+}
+
+/// Resolve the one presented child below a private store without following links.
+///
+/// New stores use [`PRESENTED_DIRECTORY_NAME`]. Existing alpha stores named `mounts` remain
+/// readable, while two competing children are refused rather than guessed between.
+///
+/// # Errors
+///
+/// Returns an I/O error when either candidate cannot be inspected or both names exist.
+pub fn presented_workspace_path(storage_root: &Path) -> io::Result<PathBuf> {
+    let current = storage_root.join(PRESENTED_DIRECTORY_NAME);
+    let legacy = storage_root.join(mesh_store::MOUNT_DIRECTORY_NAME);
+    let exists = |path: &Path| match fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    };
+    let current_exists = exists(&current)?;
+    let legacy_exists = exists(&legacy)?;
+    match (current_exists, legacy_exists) {
+        (true, true) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the private store contains two competing presented folders",
+        )),
+        (true, false) => Ok(current),
+        (false, true) => Ok(legacy),
+        (false, false) => Ok(current),
+    }
+}
 
 #[cfg(test)]
 thread_local! {
@@ -143,7 +185,7 @@ pub const DATABASE_FILE_NAME: &str = mesh_store::DATABASE_FILE_NAME;
 
 /// Resolve private storage without following a linked namespace or choosing between two journals.
 pub(crate) fn presented_workspace_storage_root(root: &Path) -> io::Result<Option<PathBuf>> {
-    if root.file_name() == Some(std::ffi::OsStr::new(mesh_store::MOUNT_DIRECTORY_NAME)) {
+    if root.file_name().is_some_and(is_presented_directory_name) {
         let parent = root.parent().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -988,7 +1030,7 @@ pub struct OpenWorkspace {
     /// Descriptor authority for the private namespace.
     ///
     /// This differs from `pinned_root` for a presented workspace, where user content is under the
-    /// store's `mounts/` child and private state is its sibling. Keeping both descriptors is the
+    /// store's presented child and private state is its sibling. Keeping both descriptors is the
     /// structural separation: neither side reaches the other with a relative path.
     storage_pinned_root: PinnedWorkspaceRoot,
     /// Stable identity of the private namespace selected at open.
@@ -1050,7 +1092,7 @@ impl OpenWorkspace {
         Self::open_with_trusted_reviewers(root, &crate::TrustedReviewers::default())
     }
 
-    /// Create or reopen an external private store and present only its `mounts/` child.
+    /// Create or reopen an external private store and present only its human-named child.
     ///
     /// The returned workspace root is the ordinary folder a person should open in Finder, an
     /// editor or an agent. The journal, SQLite databases and CAS remain structurally outside it.
@@ -1109,7 +1151,8 @@ impl OpenWorkspace {
                 )));
             }
         }
-        let presented = storage_root.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented =
+            presented_workspace_path(&storage_root).map_err(OpenFailure::Unreachable)?;
         filesystem
             .create_dir_all(&presented)
             .map_err(OpenFailure::Unreachable)?;
@@ -1484,11 +1527,13 @@ impl OpenWorkspace {
     /// Whether private state is structurally outside the native folder shown to the person.
     ///
     /// In this layout a top-level user entry may truthfully be called `records.mesh`, `chunks`,
-    /// or `metadata.sqlite`: the actual private objects are siblings of `mounts/`, not entries
+    /// or `metadata.sqlite`: the actual private objects are siblings of the presented folder, not entries
     /// below it. Legacy and `.mesh/` layouts keep their historical name reservation.
     fn has_external_private_store(&self) -> bool {
-        self.physical_root.as_path().file_name()
-            == Some(std::ffi::OsStr::new(mesh_store::MOUNT_DIRECTORY_NAME))
+        self.physical_root
+            .as_path()
+            .file_name()
+            .is_some_and(is_presented_directory_name)
             && self.physical_root.as_path().parent() == Some(self.storage_root.as_path())
     }
 
@@ -5222,7 +5267,7 @@ mod tests {
         let storage = scratch("presented");
         let open = OpenWorkspace::open_presented(&storage).expect("create presented workspace");
         let canonical_storage = storage.canonicalize().expect("canonical private store");
-        let presented = canonical_storage.join(mesh_store::MOUNT_DIRECTORY_NAME);
+        let presented = canonical_storage.join(PRESENTED_DIRECTORY_NAME);
 
         assert_eq!(open.root().as_path(), presented);
         assert_eq!(open.physical_root().as_path(), presented);
@@ -5248,6 +5293,46 @@ mod tests {
         );
         assert!(!presented.join(STORAGE_DIRECTORY_NAME).exists());
         drop(reopened);
+        let _ = fs::remove_dir_all(&storage);
+    }
+
+    #[test]
+    fn a_legacy_mounts_workspace_reopens_without_losing_its_original_path() {
+        let storage = scratch("legacy-presented-name");
+        fs::create_dir_all(storage.join(mesh_store::MOUNT_DIRECTORY_NAME))
+            .expect("legacy presented directory");
+        fs::write(
+            storage.join(PRESENTED_LAYOUT_MARKER_NAME),
+            PRESENTED_LAYOUT_MARKER_BYTES,
+        )
+        .expect("presented marker");
+
+        let open = OpenWorkspace::open_presented(&storage).expect("reopen legacy presentation");
+        assert_eq!(
+            open.root().as_path(),
+            storage
+                .canonicalize()
+                .expect("canonical store")
+                .join(mesh_store::MOUNT_DIRECTORY_NAME)
+        );
+        drop(open);
+        let _ = fs::remove_dir_all(&storage);
+    }
+
+    #[test]
+    fn two_presented_folder_names_are_refused_instead_of_guessed_between() {
+        let storage = scratch("ambiguous-presented-name");
+        fs::create_dir_all(storage.join(PRESENTED_DIRECTORY_NAME))
+            .expect("current presented directory");
+        fs::create_dir_all(storage.join(mesh_store::MOUNT_DIRECTORY_NAME))
+            .expect("legacy presented directory");
+        fs::write(
+            storage.join(PRESENTED_LAYOUT_MARKER_NAME),
+            PRESENTED_LAYOUT_MARKER_BYTES,
+        )
+        .expect("presented marker");
+
+        assert!(OpenWorkspace::open_presented(&storage).is_err());
         let _ = fs::remove_dir_all(&storage);
     }
 

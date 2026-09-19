@@ -67,6 +67,22 @@ function button(text, onClick = null) {
   return node;
 }
 
+function installVerifiedImport(shadow) {
+  const verified = new Node({ proof: 'import-verified-preview' });
+  const heading = new Node({ proof: 'import-review-heading' });
+  const confirm = button('Create workspace and open folder', () => {
+    verified.setAttribute('aria-busy', 'true');
+    confirm.textContent = 'Creating private workspace…';
+    confirm.disabled = true;
+    shadow.children.push(new Node({ proof: 'import-confirmation-progress' }));
+    queueMicrotask(() => {
+      shadow.children = shadow.children.filter((child) => child !== verified);
+    });
+  });
+  shadow.children = [verified, heading, confirm];
+  shadow.activeElement = heading;
+}
+
 function productionNoticeShell(notice, pageLabel) {
   const shell = new Node();
   shell.setAttribute('data-mesh-react-shell-active', 'true');
@@ -124,9 +140,7 @@ test('onboarding proof requires a real preview click and verified React projecti
       'the proof must model the focused user action that owns review-heading focus',
     );
     assert.equal(input.value, '/tmp/proof-source');
-    const heading = new Node({ proof: 'import-review-heading' });
-    shadow.children = [new Node({ proof: 'import-verified-preview' }), heading];
-    shadow.activeElement = heading;
+    installVerifiedImport(shadow);
   });
   preview.focus = () => { shadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -144,7 +158,7 @@ test('onboarding proof requires a real preview click and verified React projecti
 
   assert.deepEqual(reports, [{
     schema: 'mesh-renderer-proof/v1', nonce, surface: 'onboarding', mounted: true,
-    visible: true, interaction: 'preview-path', outcome: 'verified-preview',
+    visible: true, interaction: 'preview-path-confirm-import', outcome: 'import-completed-after-busy',
   }]);
 });
 
@@ -156,9 +170,7 @@ test('packaged proof reaches a separated React page after the shell commit hands
   const select = new Node({ proof: 'import-select' });
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    const heading = new Node({ proof: 'import-review-heading' });
-    contentShadow.children = [new Node({ proof: 'import-verified-preview' }), heading];
-    contentShadow.activeElement = heading;
+    installVerifiedImport(contentShadow);
   });
   preview.focus = () => { contentShadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -187,7 +199,7 @@ test('packaged proof reaches a separated React page after the shell commit hands
     delay: async () => {},
   });
   assert.equal(pageOpen, true);
-  assert.equal(reports[0].outcome, 'verified-preview');
+  assert.equal(reports[0].outcome, 'import-completed-after-busy');
 });
 
 test('packaged proof waits for the React shell commit without timer polling', async () => {
@@ -197,9 +209,7 @@ test('packaged proof waits for the React shell commit without timer polling', as
   contentHost.shadowRoot = contentShadow;
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    const heading = new Node({ proof: 'import-review-heading' });
-    contentShadow.children = [new Node({ proof: 'import-verified-preview' }), heading];
-    contentShadow.activeElement = heading;
+    installVerifiedImport(contentShadow);
   });
   preview.focus = () => { contentShadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -233,7 +243,7 @@ test('packaged proof waits for the React shell commit without timer polling', as
   document.dispatchEvent(new Event('mesh:react-shell-committed'));
   await proving;
   assert.equal(pageOpen, true);
-  assert.equal(reports[0].outcome, 'verified-preview');
+  assert.equal(reports[0].outcome, 'import-completed-after-busy');
 });
 
 test('Files proof expands a nested file and completes exact native file and folder actions', async () => {
@@ -249,12 +259,17 @@ test('Files proof expands a nested file and completes exact native file and fold
   const filter = new Node({ proof: 'files-filter' });
   const selected = new Node({ proof: 'files-selected-entry' });
   selected.setAttribute('data-mesh-entry-path', '');
-  const openWorkspace = button('Open workspace folder', () => {
-    notice.textContent = 'Opened the current workspace folder in Finder.';
+  let workspaceOpenAttempts = 0;
+  const openWorkspace = button('Open folder', () => {
+    workspaceOpenAttempts += 1;
+    if (workspaceOpenAttempts >= 2) {
+      notice.textContent = 'Opened the current workspace folder in Finder.';
+    }
   });
   const folder = button('assets');
   let expanded = false;
   let openAttempts = 0;
+  let folderOpenAttempts = 0;
   const installBase = (...extra) => {
     shadow.children = [explorer, tree, filter, selected, folder, openWorkspace, ...extra];
   };
@@ -264,7 +279,7 @@ test('Files proof expands a nested file and completes exact native file and fold
       const file = button('mesh-proof.png', () => {
         selected.setAttribute('data-mesh-entry-path', 'assets/mesh-proof.png');
         const installFileActions = () => {
-          const open = button('Open with default app', () => {
+          const open = button('Open', () => {
             openAttempts += 1;
             if (openAttempts === 1) {
               notice = new Node({ proof: 'production-notice' });
@@ -274,7 +289,7 @@ test('Files proof expands a nested file and completes exact native file and fold
             }
             notice.textContent = 'Opened assets/mesh-proof.png with its default application.';
           });
-          const reveal = button('Reveal in Finder', () => {
+          const reveal = button('Reveal', () => {
             notice.textContent = 'Revealed assets/mesh-proof.png in Finder.';
           });
           installBase(file, open, reveal);
@@ -286,7 +301,8 @@ test('Files proof expands a nested file and completes exact native file and fold
     }
     selected.setAttribute('data-mesh-entry-path', 'assets');
     const openFolder = button('Open in Finder', () => {
-      notice.textContent = 'Opened assets in Finder.';
+      folderOpenAttempts += 1;
+      if (folderOpenAttempts >= 2) notice.textContent = 'Opened assets in Finder.';
     });
     installBase(openFolder);
   };
@@ -322,6 +338,8 @@ test('Files proof expands a nested file and completes exact native file and fold
   });
 
   assert.equal(openAttempts, 2, 'Files proof did not reacquire a replaced native Open control and notice');
+  assert.equal(folderOpenAttempts, 2, 'Files proof did not retry a transient selected-folder open');
+  assert.equal(workspaceOpenAttempts, 2, 'Files proof did not retry a transient workspace-folder open');
 
   assert.deepEqual(checkpoints, [
     'files-mounted',
@@ -340,6 +358,10 @@ test('Files proof expands a nested file and completes exact native file and fold
 });
 
 test('Files proof failures remain stage-specific and secret-free', () => {
+  assert.equal(
+    rendererProofFailureCode(new Error('the packaged React onboarding did not finish the confirmed import')),
+    'onboarding-confirm',
+  );
   assert.equal(
     rendererProofFailureCode(new Error('the packaged React Files explorer did not mount visibly')),
     'files-mount',
@@ -374,9 +396,7 @@ test('a bounded cold WKWebView start may take longer than the former ten-second 
   const select = new Node({ proof: 'import-select' });
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    const heading = new Node({ proof: 'import-review-heading' });
-    shadow.children = [new Node({ proof: 'import-verified-preview' }), heading];
-    shadow.activeElement = heading;
+    installVerifiedImport(shadow);
   });
   preview.proof = 'import-preview';
   shadow.children = [select, input, preview];
@@ -396,7 +416,7 @@ test('a bounded cold WKWebView start may take longer than the former ten-second 
   });
 
   assert.ok(delays >= 250);
-  assert.equal(reports[0].outcome, 'verified-preview');
+  assert.equal(reports[0].outcome, 'import-completed-after-busy');
 });
 
 test('review proof uses text for Inline and an admitted image for native Open and Reveal', async () => {
@@ -589,6 +609,106 @@ test('review proof uses text for Inline and an admitted image for native Open an
     'review-saved-open',
     'review-saved-reveal',
   ]);
+});
+
+test('review proof accepts a bounded incomplete real-workspace disclosure without authority', async () => {
+  const reports = [];
+  const checkpoints = [];
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  const unavailable = new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh could not verify a complete bounded review for the current saved version. No review or approval action is available.',
+  });
+  const disabledApproval = button('Approval unavailable');
+  disabledApproval.disabled = true;
+  const earlierReview = button('Saved abc123 earlier review');
+  shadow.children = [unavailable, disabledApproval, earlierReview];
+  const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
+
+  await runRendererProof({
+    document: {
+      getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'review',
+      source: null, destination: null,
+    }, reports, checkpoints),
+    getComputedStyle: visible,
+    delay: async () => {},
+  });
+
+  assert.deepEqual(reports, [{
+    schema: 'mesh-renderer-proof/v1', nonce, surface: 'review', mounted: true,
+    visible: true,
+    interaction: 'bounded-incomplete-review-inspection',
+    outcome: 'incomplete-review-disclosed-without-authority',
+  }]);
+  assert.deepEqual(checkpoints, ['review-bounded-unavailable']);
+});
+
+test('review proof refuses enabled decision authority in an unavailable state', async () => {
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  const unavailable = new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh could not verify a complete bounded review for the current saved version. No review or approval action is available.',
+  });
+  shadow.children = [unavailable, button('Choose export folder')];
+  const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
+
+  await assert.rejects(runRendererProof({
+    document: {
+      getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'review',
+      source: null, destination: null,
+    }, [], []),
+    getComputedStyle: visible,
+    delay: async () => {},
+  }), /exposed an action without complete review authority/);
+});
+
+test('review proof keeps every action disabled while workspace verification is settling', async () => {
+  const reports = [];
+  const checkpoints = [];
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  const unavailable = new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh has not verified the current workspace. Refresh successfully before relying on review details.',
+  });
+  const disabledApproval = button('Approval unavailable');
+  disabledApproval.disabled = true;
+  shadow.children = [unavailable, disabledApproval];
+  const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
+
+  await runRendererProof({
+    document: {
+      getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'review',
+      source: null, destination: null,
+    }, reports, checkpoints),
+    getComputedStyle: visible,
+    delay: async () => {},
+  });
+
+  assert.deepEqual(reports, [{
+    schema: 'mesh-renderer-proof/v1', nonce, surface: 'review', mounted: true,
+    visible: true,
+    interaction: 'bounded-incomplete-review-inspection',
+    outcome: 'incomplete-review-disclosed-without-authority',
+  }]);
+  assert.deepEqual(checkpoints, ['review-bounded-unavailable']);
 });
 
 test('review proof classifies a failed Visual transition as review interaction, not configuration', () => {
@@ -914,6 +1034,76 @@ test('private export proof refuses the original and completes the confirmed priv
   }]);
 });
 
+test('private export proof remains blocked when the large review is incomplete', async () => {
+  const reports = [];
+  const checkpoints = [];
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  shadow.children = [new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh could not verify a complete bounded review for the current saved version. No review or approval action is available.',
+  })];
+  const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
+
+  await runRendererProof({
+    document: {
+      getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+      addEventListener: () => {},
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'private-export',
+      source: '/tmp/source', destination: '/tmp/destination',
+    }, reports, checkpoints),
+    getComputedStyle: visible,
+    delay: async () => {},
+  });
+
+  assert.deepEqual(reports, [{
+    schema: 'mesh-renderer-proof/v1', nonce, surface: 'private-export', mounted: true,
+    visible: true,
+    interaction: 'bounded-review-private-export-refusal',
+    outcome: 'private-export-blocked-without-complete-review',
+  }]);
+  assert.deepEqual(checkpoints, ['private-export-start', 'private-export-bounded-blocked']);
+});
+
+test('private export proof remains blocked while workspace verification is settling', async () => {
+  const reports = [];
+  const checkpoints = [];
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  shadow.children = [new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh has not verified the current workspace. Refresh successfully before relying on review details.',
+  })];
+  const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
+
+  await runRendererProof({
+    document: {
+      getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
+      addEventListener: () => {},
+      defaultView: { Event: globalThis.Event, confirm: () => false },
+    },
+    invoke: invokeFor({
+      schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'private-export',
+      source: '/tmp/source', destination: '/tmp/destination',
+    }, reports, checkpoints),
+    getComputedStyle: visible,
+    delay: async () => {},
+  });
+
+  assert.deepEqual(reports, [{
+    schema: 'mesh-renderer-proof/v1', nonce, surface: 'private-export', mounted: true,
+    visible: true,
+    interaction: 'bounded-review-private-export-refusal',
+    outcome: 'private-export-blocked-without-complete-review',
+  }]);
+  assert.deepEqual(checkpoints, ['private-export-start', 'private-export-bounded-blocked']);
+});
+
 test('agent handoff proof drives Start, confirmed Finish, and the saved rescan result', async () => {
   const reports = [];
   const checkpoints = [];
@@ -927,6 +1117,9 @@ test('agent handoff proof drives Start, confirmed Finish, and the saved rescan r
   const notice = new Node({ proof: 'production-notice' });
   const productionHost = productionNoticeShell(notice, 'Current');
   const mounted = new Node({ proof: 'current-mounted' });
+  mounted.generation = 1;
+  let delayedRescanWaits = 900;
+  let commitAuthenticatedRescan = null;
   const installAvailable = () => {
     const start = button('Start Codex', () => {
       lifecycle.push('start-react-intent');
@@ -940,20 +1133,33 @@ test('agent handoff proof drives Start, confirmed Finish, and the saved rescan r
     ];
   };
   const installAssigned = () => {
-    const finish = button('Finish agent handoff', () => {
+    mounted.generation += 1;
+    const showConfirmation = () => {
       lifecycle.push('finish-react-intent');
       const accept = button('Finish agent handoff', () => {
         lifecycle.push('confirmation-accepted');
         confirmationShadow.children = [];
-        notice.textContent = 'Agent folder released after a complete native inspection. 1 changed file was authenticated and saved privately.';
-        notice.setAttribute('data-mesh-agent-proof', 'agent-handoff-rescanned');
-        lifecycle.push('authenticated-rescan-notice-committed');
-        installAvailable();
+        commitAuthenticatedRescan = () => {
+          notice.textContent = 'Agent folder released after a complete native inspection. 1 changed file was authenticated and saved privately.';
+          notice.setAttribute('data-mesh-agent-proof', 'agent-handoff-rescanned');
+          lifecycle.push('authenticated-rescan-notice-committed');
+          installAvailable();
+        };
       });
       accept.proof = 'confirmation-accept';
       confirmationShadow.children = [
         new Node({ proof: 'confirmation-backdrop' }),
         accept,
+      ];
+    };
+    const finish = button('Finish agent handoff', () => {
+      lifecycle.push('finish-stale-intent');
+      mounted.generation += 1;
+      finish.onClick = showConfirmation;
+      currentShadow.children = [
+        mounted,
+        new Node({ proof: 'current-agent-assigned' }),
+        finish,
       ];
     });
     finish.proof = 'current-finish-agent';
@@ -984,10 +1190,15 @@ test('agent handoff proof drives Start, confirmed Finish, and the saved rescan r
     },
     invoke: invokeFor({
       schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'agent-handoff',
-      source: '/tmp/mesh-app-proof/workspace-versions/proof.mesh/mounts', destination: null,
+      source: '/tmp/mesh-app-proof/workspace-versions/proof.mesh/Mesh Version - Working Folder', destination: null,
     }, reports, checkpoints),
     getComputedStyle: visible,
-    delay: async () => {},
+    delay: async () => {
+      if (commitAuthenticatedRescan && delayedRescanWaits > 0) {
+        delayedRescanWaits -= 1;
+        if (delayedRescanWaits === 0) commitAuthenticatedRescan();
+      }
+    },
   });
 
   assert.deepEqual(reports, [{
@@ -1003,10 +1214,12 @@ test('agent handoff proof drives Start, confirmed Finish, and the saved rescan r
   ]);
   assert.deepEqual(lifecycle, [
     'start-react-intent',
+    'finish-stale-intent',
     'finish-react-intent',
     'confirmation-accepted',
     'authenticated-rescan-notice-committed',
   ]);
+  assert.equal(delayedRescanWaits, 0, 'agent finish retained the ordinary 800-attempt UI deadline');
 });
 
 test('agent handoff proof fails closed when React does not commit the Finish confirmation', async () => {
@@ -1016,9 +1229,11 @@ test('agent handoff proof fails closed when React does not commit the Finish con
   const currentShadow = new Node();
   currentHost.shadowRoot = currentShadow;
   const mounted = new Node({ proof: 'current-mounted' });
+  mounted.generation = 1;
   const start = button('Start Codex', () => {
     const finish = button('Finish agent handoff', () => {});
     finish.proof = 'current-finish-agent';
+    mounted.generation += 1;
     currentShadow.children = [mounted, new Node({ proof: 'current-agent-assigned' }), finish];
   });
   start.proof = 'current-start-codex';
@@ -1036,7 +1251,7 @@ test('agent handoff proof fails closed when React does not commit the Finish con
     },
     invoke: invokeFor({
       schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'agent-handoff',
-      source: '/tmp/mesh-app-proof/workspace-versions/proof.mesh/mounts', destination: null,
+      source: '/tmp/mesh-app-proof/workspace-versions/proof.mesh/Mesh Version - Working Folder', destination: null,
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {},

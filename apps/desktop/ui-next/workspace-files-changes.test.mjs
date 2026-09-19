@@ -236,13 +236,37 @@ test("the component workbench exposes text review, native queue truth, and sourc
       },
     },
   }));
+  const assignedFilesHtml = renderToStaticMarkup(React.createElement(WorkspaceFiles, {
+    ...props,
+    model: {
+      ...workbench,
+      files: {
+        ...workbench.files,
+        workspaceState: "agent-assigned",
+        entries: [{ value: "mesh-test-three.json", label: "mesh-test-three.json", kind: "file" }],
+        selectedEntry: "mesh-test-three.json",
+      },
+      changes: {
+        ...workbench.changes,
+        files: [{ value: "mesh-test-three.json", label: "mesh-test-three.json" }],
+        selectedFile: "mesh-test-three.json",
+        canSelectFile: false,
+        editorKind: "text",
+        editorText: "{\n  \"preview\": true\n}\n",
+        baselineText: "",
+        baselineAvailable: false,
+        canEditText: false,
+        queue: [],
+      },
+    },
+  }));
 
   assert.match(filesHtml, /Explorer/);
   assert.match(filesHtml, /Alpha workspace/);
   assert.match(filesHtml, /Go to file/);
-  assert.match(filesHtml, />Hide</);
-  assert.match(filesHtml, />Collapse</);
-  assert.match(filesHtml, />Locate</);
+  assert.match(filesHtml, />Collapse all</);
+  assert.doesNotMatch(filesHtml, />Hide</);
+  assert.doesNotMatch(filesHtml, />Locate</);
   assert.match(filesHtml, /Plain text/);
   assert.match(filesHtml, /data-mesh-file-type="TXT"/);
   assert.match(filesHtml, /Working tree diff/, "Files must show the selected file's actual inspected content or diff");
@@ -259,6 +283,11 @@ test("the component workbench exposes text review, native queue truth, and sourc
   assert.match(filesHtml, /data-mesh-work-action="open-entry"/);
   assert.match(filesHtml, /data-mesh-work-action="reveal-entry"/);
   assert.match(filesHtml, /data-mesh-work-action="open-workspace-folder"/);
+  assert.match(filesHtml, /File details/);
+  assert.doesNotMatch(filesHtml, /File information view|>Preview</);
+  assert.match(assignedFilesHtml, /Read-only snapshot from the assigned agent folder/);
+  assert.match(assignedFilesHtml, /&quot;preview&quot;: true/);
+  assert.doesNotMatch(assignedFilesHtml, /Inline preview unavailable/);
   assert.match(changesHtml, /Working changes/);
   assert.match(changesHtml, /Source control/);
   assert.match(changesHtml, /Show Changes|>Hide</);

@@ -94,12 +94,14 @@ let workspaceCurrentNextGeneration = 0;
 let workspaceCurrentNextPending = null;
 let workspaceCurrentNextMounted = null;
 let workspaceCurrentNextActions = new Map();
+let currentRefreshInFlight = 0;
 let workspaceWorkNextAvailable = false;
 let workspaceWorkNextGeneration = 0;
 let workspaceWorkNextPending = null;
 let workspaceWorkNextMounted = null;
 let workspaceWorkNextActions = new Map();
 let workspaceWorkFieldEchoGeneration = null;
+let workspaceFilePreviewSequence = 0;
 let workspaceFilesState = {
   newPath: '',
   selectedEntry: '',
@@ -142,6 +144,7 @@ let importWorkbenchNextActions = new Map();
 let importWorkbenchNextInteraction = null;
 let importSourceDraft = '';
 let importDestinationChooserInFlight = null;
+let importConfirmationInFlight = false;
 const IMPORT_CHOOSER_FOCUS_SELECTOR = '[data-mesh-import-choose]';
 let workspaceVersionsNextAvailable = false;
 let workspaceVersionsNextGeneration = 0;
@@ -648,7 +651,7 @@ function installWorkspaceCurrentNextVisibility() {
       workspaceCurrentNextMounted,
     )
   );
-  host.setAttribute('aria-busy', String(transitioning));
+  host.setAttribute('aria-busy', String(transitioning || currentRefreshInFlight > 0));
   host.classList.toggle('hidden', !visibleMount);
   // Current has no hidden controller fallback. Rejection leaves this host hidden so the route's
   // IslandSlot owns the explicit failure and Reload recovery surface.
@@ -764,6 +767,14 @@ export function requestAccessibleConfirmation({
   staleMessage = 'This confirmation is no longer current. Review the latest workspace state and try again.',
 }) {
   if (!isCurrent()) return Promise.resolve(false);
+  // The confirmation island is intentionally dormant until an exact action requests it. Its
+  // one-shot availability event can race this coordinator during cold WebKit startup, so recover
+  // the same readiness from the durable host marker installed only after the island registered
+  // both projection and dismissal listeners.
+  if (!confirmationNextAvailable
+    && $('confirmation-dialog-next')?.getAttribute('data-mesh-confirmation-ready') === 'true') {
+    confirmationNextAvailable = true;
+  }
   if (!confirmationNextAvailable) {
     try {
       return Promise.resolve(confirm(description));
@@ -1201,6 +1212,7 @@ if (typeof appDocument.addEventListener === 'function') {
       generation: detail.generation,
       continuityKey: workspaceCurrentNextPending.continuityKey,
       interactionKey: workspaceCurrentNextPending.interactionKey,
+      projectionKey: workspaceCurrentNextPending.projectionKey,
     });
     installWorkspaceCurrentNextVisibility();
   });
@@ -3524,6 +3536,7 @@ function markWorkspaceUnverified() {
 
 function clearWorkspaceScopedState() {
   exportPreviewSequence += 1;
+  workspaceFilePreviewSequence += 1;
   pendingAgentVersionChoice = false;
   model.agentFolder = null;
   model.agentLive = null;
@@ -4768,9 +4781,9 @@ const WORKSPACE_WORK_ACTION_CONTROLS = Object.freeze([
   Object.freeze({ id: 'create-folder', label: 'Create folder', source: true }),
   Object.freeze({ id: 'move-entry', label: 'Move or rename', source: true }),
   Object.freeze({ id: 'delete-entry', label: 'Delete entry', source: true }),
-  Object.freeze({ id: 'open-entry', label: 'Open with default app', source: true }),
-  Object.freeze({ id: 'reveal-entry', label: 'Reveal in Finder', source: true }),
-  Object.freeze({ id: 'open-workspace-folder', label: 'Open workspace folder', source: true }),
+  Object.freeze({ id: 'open-entry', label: 'Open', source: true }),
+  Object.freeze({ id: 'reveal-entry', label: 'Reveal', source: true }),
+  Object.freeze({ id: 'open-workspace-folder', label: 'Open folder', source: true }),
   Object.freeze({ id: 'scan-files', label: 'Find folder changes', source: true }),
   Object.freeze({ id: 'load-file', label: 'Open file', source: true }),
   Object.freeze({ id: 'preserve-edit', label: 'Preserve edit', source: true }),
@@ -4834,7 +4847,7 @@ function renderWorkspaceFilesChangesNext(interactionGeneration = workspaceWorkFi
       label: spec.id === 'open-entry'
         ? model.workspace?.entries.find((entry) => entry.path === workspaceFilesState.selectedEntry)?.type === 'folder'
           ? 'Open in Finder'
-          : 'Open with default app'
+          : 'Open'
         : spec.id === 'scan-files'
         ? workspaceChangesQueueState.scanLabel
         : spec.id === 'save-all-private'
@@ -5319,8 +5332,31 @@ function renderWorkspaceCurrentNext() {
     installWorkspaceCurrentNextVisibility();
     return;
   }
-  const generation = ++workspaceCurrentNextGeneration;
+  const continuityKey = workspaceProjectionContinuityKey();
+  // Explicit Refresh revokes every old action immediately, but it keeps the last verified tree
+  // painted while native identity is being rechecked. Replacing the full WebKit layer with the
+  // temporary unverified projection produced a visible one-frame tear on macOS screen refresh.
+  if (currentRefreshInFlight
+    && !model.workspaceVerified
+    && workspaceCurrentNextMounted?.continuityKey === continuityKey
+    && workspaceCurrentNextPending?.continuityKey === continuityKey) {
+    // Keep only the read-only Refresh retry live. Every workspace, folder, agent, and recovery
+    // action remains revoked until one exact verification wins.
+    workspaceCurrentNextActions = new Map([['refresh', activateCurrentRefresh]]);
+    installWorkspaceCurrentNextVisibility();
+    return;
+  }
   const current = currentWorkspacePresentation();
+  const projectionKey = JSON.stringify(current);
+  const mountedGeneration = workspaceCurrentNextMounted?.generation ?? null;
+  const canUpdateAuthorityWithoutPainting = currentRefreshInFlight > 0
+    && Number.isSafeInteger(mountedGeneration)
+    && workspaceCurrentNextPending?.generation === mountedGeneration
+    && workspaceCurrentNextMounted?.continuityKey === continuityKey
+    && workspaceCurrentNextMounted?.projectionKey === projectionKey;
+  const generation = canUpdateAuthorityWithoutPainting
+    ? mountedGeneration
+    : ++workspaceCurrentNextGeneration;
   const authority = currentWorkspaceActionAuthority('current', generation);
   const actionHandlers = new Map();
   for (const action of current.actions) {
@@ -5336,18 +5372,20 @@ function renderWorkspaceCurrentNext() {
       );
     }
   }
-  const continuityKey = workspaceProjectionContinuityKey();
   const interactionKey = projectionSurfaceContinuityKey(
     workspaceProjectionContinuityKey(),
     'current-actions',
     current.actions,
   );
-  workspaceCurrentNextPending = Object.freeze({ generation, continuityKey, interactionKey });
+  workspaceCurrentNextPending = Object.freeze({ generation, continuityKey, interactionKey, projectionKey });
   if (workspaceCurrentNextMounted?.continuityKey !== continuityKey) {
     workspaceCurrentNextMounted = null;
   }
   installWorkspaceCurrentNextVisibility();
   workspaceCurrentNextActions = actionHandlers;
+  // A successful no-change refresh only renews the exact native action authority. The mounted
+  // React tree already represents the same bounded model, so repainting it adds risk and no truth.
+  if (canUpdateAuthorityWithoutPainting) return;
   appDocument.dispatchEvent(new appWindow.CustomEvent('mesh:workspace-current-projection', {
     detail: Object.freeze({
       generation,
@@ -6742,7 +6780,8 @@ async function refreshVerifiedWorkspaceForFolderScan({ preserveVerifiedPresentat
 function importWorkbenchPresentation() {
   const data = model.preview;
   const interactionBlocked = workspaceInteractionInFlight()
-    || workspaceEntrySelectionInFlight > 0;
+    || workspaceEntrySelectionInFlight > 0
+    || importConfirmationInFlight;
   if (!data) {
     return Object.freeze({
       phase: 'select',
@@ -6756,6 +6795,7 @@ function importWorkbenchPresentation() {
       fileListLabel: 'Review included files',
       destinationPath: '',
       confirmLabel: 'Create workspace and open folder',
+      busy: false,
       canChoose: !interactionBlocked,
       canPreviewPath: !interactionBlocked,
       canEditDestination: false,
@@ -6800,11 +6840,16 @@ function importWorkbenchPresentation() {
       ? 'Review 1 included file'
       : `Review ${data.files} included files`,
     destinationPath: model.destination || '',
-    confirmLabel: connectExistingImport
+    confirmLabel: importConfirmationInFlight
+      ? connectExistingImport
+        ? 'Connecting original folder…'
+        : 'Creating private workspace…'
+      : connectExistingImport
       ? 'Connect original folder'
       : emptyImport
       ? 'Create empty workspace'
       : 'Create workspace and open folder',
+    busy: importConfirmationInFlight,
     canChoose: !interactionBlocked,
     canPreviewPath: !interactionBlocked,
     canEditDestination: destinationAvailable,
@@ -6884,6 +6929,7 @@ function renderImportWorkbenchNext(
         files: presentation.files,
         destinationPath: presentation.destinationPath,
         confirmLabel: presentation.confirmLabel,
+        busy: presentation.busy,
         canChoose: actions.has('choose-folder'),
         canPreviewPath: presentation.canPreviewPath,
         canEditDestination: presentation.canEditDestination,
@@ -9899,7 +9945,14 @@ async function confirmImport(authority = null) {
       );
       return false;
     }
-    await coordinateWorkspaceMutation(async (sequence) => {
+    let completed = false;
+    importConfirmationInFlight = true;
+    try {
+      renderPreview();
+      showNotice(
+        `Creating a private workspace from ${model.preview.files} verified files and ${model.preview.directories} folders. The original stays unchanged. Keep Mesh open; large projects can take several minutes.`,
+      );
+      await coordinateWorkspaceMutation(async (sequence) => {
       const { answer, recoveredReply } = await importManagedWorkspaceWithRecovery({
         source,
         summary,
@@ -9941,7 +9994,12 @@ async function confirmImport(authority = null) {
         `${importOutcome} Its native working folder is ready and the original is unchanged.${git}${warning ? ` ${warning}` : ' Work there normally; Mesh will reopen this workspace automatically.'}`,
         Boolean(warning),
       );
-    });
+      });
+      completed = true;
+    } finally {
+      importConfirmationInFlight = false;
+      if (!completed && model.preview) renderPreview();
+    }
     return true;
   } catch (error) {
     showNotice(String(error), true);
@@ -10282,15 +10340,26 @@ async function forgetSelectedRecentWorkspace(path) {
 }
 
 async function activateCurrentRefresh() {
-  const verified = await refresh();
-  if (verified && restoreRecoveryScanPending) {
-    // Refresh is the documented recovery action after an ambiguous managed mutation. Reconcile
-    // the verified workspace with its physical folder without automatically saving anything, so
-    // a restore that committed before its reply was lost becomes visible instead of being replayed.
-    const inspected = await scanNativeFolder({ automatic: true, startup: true, allowAutomaticSave: false });
-    if (inspected) restoreRecoveryScanPending = false;
+  currentRefreshInFlight += 1;
+  installWorkspaceCurrentNextVisibility();
+  try {
+    const verified = await refresh();
+    if (verified && restoreRecoveryScanPending) {
+      // Refresh is the documented recovery action after an ambiguous managed mutation. Reconcile
+      // the verified workspace with its physical folder without automatically saving anything, so
+      // a restore that committed before its reply was lost becomes visible instead of being replayed.
+      const inspected = await scanNativeFolder({ automatic: true, startup: true, allowAutomaticSave: false });
+      if (inspected) restoreRecoveryScanPending = false;
+    }
+    await refreshApprovalStatus();
+    return verified;
+  } finally {
+    currentRefreshInFlight = Math.max(0, currentRefreshInFlight - 1);
+    // Failure leaves the verified bit false and therefore needs one explicit recovery projection.
+    // Success normally takes the no-paint authority-renewal path above.
+    if (currentRefreshInFlight === 0 && !model.workspaceVerified) renderWorkspaceCurrentNext();
+    else installWorkspaceCurrentNextVisibility();
   }
-  await refreshApprovalStatus();
 }
 
 function rollbackWorkspaceStillCurrent(binding) {
@@ -11581,11 +11650,87 @@ async function inspectSelectedManagedFile() {
 
 async function inspectManagedWorkspaceEntryFromFiles(relativePath) {
   const entry = model.workspace?.entries.find((candidate) => candidate.path === relativePath) || null;
-  if (!entry || entry.type !== 'file' || !model.workspaceVerified || workspaceInstallationMatchesHandoff()) return false;
+  if (!entry || entry.type !== 'file' || !model.workspaceVerified) return false;
   if (refuseEditorDraftFileDeparture(relativePath)) return false;
   const knownFile = (model.workspace?.file_histories || []).some((history) => history.path === relativePath)
     || (model.workspace?.native_untracked_files || []).includes(relativePath);
   if (!knownFile) return false;
+  if (workspaceInstallationMatchesHandoff()) {
+    const sequence = ++workspaceFilePreviewSequence;
+    const binding = captureVerifiedWorkspace();
+    const agentGeneration = canonicalAgentHandoffGeneration(model.agentHandoff?.generation);
+    if (!agentGeneration) return false;
+    workspaceChangesEditorState.selectedFile = relativePath;
+    model.editor = null;
+    workspaceChangesEditorState.editorText = '';
+    renderWorkspaceFilesChangesNext();
+    try {
+      const answer = JSON.parse(await invoke('inspect_agent_live_file', {
+        expectedWorkspaceRoot: binding.root,
+        expectedWorkspaceDigest: binding.digest,
+        expectedWorkspaceInstallation: binding.installation,
+        expectedAgentHandoffGeneration: agentGeneration,
+        relativePath,
+      }));
+      assertVerifiedWorkspace(binding);
+      const keys = answer && typeof answer === 'object' && !Array.isArray(answer)
+        ? Object.keys(answer).sort()
+        : [];
+      if (keys.join(',') !== 'agent_handoff_generation,byte_count,content_digest,executable,image_data_url,kind,mutable,path,preview_error,preview_kind,recorded,schema,text,workspace_digest,workspace_installation,workspace_root'
+        || answer.schema !== 'mesh.agent-live-file/v1'
+        || answer.workspace_root !== binding.root
+        || answer.workspace_digest !== binding.digest
+        || answer.workspace_installation !== binding.installation
+        || answer.agent_handoff_generation !== agentGeneration
+        || answer.path !== relativePath
+        || !['current-file', 'modified-file', 'new-file'].includes(answer.kind)
+        || !Number.isSafeInteger(answer.byte_count)
+        || answer.byte_count < 0
+        || typeof answer.content_digest !== 'string'
+        || !/^[0-9a-f]{64}$/u.test(answer.content_digest)
+        || typeof answer.executable !== 'boolean'
+        || !['text', 'image', 'artifact', 'metadata'].includes(answer.preview_kind)
+        || (answer.text !== null && (typeof answer.text !== 'string' || answer.text.length > 1_048_576))
+        || (answer.image_data_url !== null && (typeof answer.image_data_url !== 'string'
+          || !answer.image_data_url.startsWith('data:image/')
+          || answer.image_data_url.length > 12 * 1024 * 1024))
+        || (answer.preview_error !== null && (typeof answer.preview_error !== 'string'
+          || answer.preview_error.length > 1_024))
+        || answer.mutable !== true
+        || answer.recorded !== false) {
+        throw new Error('The assigned-folder file preview was stale or malformed.');
+      }
+      if (sequence !== workspaceFilePreviewSequence
+        || workspaceFilesState.selectedEntry !== relativePath
+        || !agentLiveInspectionStillCurrent({ ...binding, generation: agentGeneration })) return false;
+      const history = (model.workspace?.file_histories || []).find((candidate) => candidate.path === relativePath);
+      installEditorInspection({
+        path: answer.path,
+        current_version: history?.current?.version_id || 'agent-live-snapshot',
+        byte_count: answer.byte_count,
+        content_digest: answer.content_digest,
+        executable: answer.executable,
+        text: answer.text,
+        baseline_text: null,
+        text_editable: false,
+        modified_from_current_version: answer.kind !== 'current-file',
+        max_text_bytes: 1_048_576,
+        native_untracked: answer.kind === 'new-file',
+        agent_live: true,
+      });
+      renderWorkspaceFilesChangesNext();
+      return true;
+    } catch (error) {
+      if (sequence !== workspaceFilePreviewSequence
+        || workspaceFilesState.selectedEntry !== relativePath) return false;
+      workspaceChangesEditorState.selectedFile = '';
+      model.editor = null;
+      renderWorkspaceFilesChangesNext();
+      showNotice(`Mesh could not preview ${relativePath}: ${decodeDaemonRefusal(error).message || error}`, true);
+      return false;
+    }
+  }
+  workspaceFilePreviewSequence += 1;
   workspaceChangesEditorState.selectedFile = relativePath;
   renderEditorChoices();
   if (!workspaceChangesEditorState.canLoadFile) return false;

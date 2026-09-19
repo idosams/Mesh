@@ -20,6 +20,13 @@ pub struct SecureEnclaveApprovalCredential {
 }
 
 impl SecureEnclaveApprovalCredential {
+    /// Confirm that the running application has the exact Apple identity and keychain
+    /// entitlements required for the app-scoped Secure Enclave credential. This is read-only and
+    /// never creates, loads, or replaces a key.
+    pub fn availability() -> Result<(), SecureEnclaveApprovalError> {
+        backend::availability()
+    }
+
     /// Load the already-enrolled credential. This never creates a replacement key.
     pub fn load() -> Result<Self, SecureEnclaveApprovalError> {
         backend::load().and_then(Self::from_public_key)
@@ -134,6 +141,7 @@ mod backend {
     // MIRI: platform/mesh-keychain/tests/secure_enclave_ffi.rs
     #[allow(unsafe_code)]
     unsafe extern "C" {
+        fn mesh_secure_enclave_availability(error_out: *mut c_char, error_capacity: usize) -> i32;
         fn mesh_secure_enclave_load(
             public_key: *mut u8,
             capacity: usize,
@@ -154,6 +162,22 @@ mod backend {
             error_out: *mut c_char,
             error_capacity: usize,
         ) -> i32;
+    }
+
+    pub(super) fn availability() -> Result<(), SecureEnclaveApprovalError> {
+        let mut error = [0_i8; ERROR_BYTES];
+        // SAFETY: the error buffer is live and writable for the exact capacity supplied. The
+        // bridge performs only a read-only inspection of the running code signature and retains
+        // no pointer.
+        #[allow(unsafe_code)]
+        let result = unsafe { mesh_secure_enclave_availability(error.as_mut_ptr(), error.len()) };
+        match result {
+            OK => Ok(()),
+            APPLICATION_IDENTITY_UNAVAILABLE => {
+                Err(SecureEnclaveApprovalError::ApplicationIdentityUnavailable)
+            }
+            _ => Err(SecureEnclaveApprovalError::Backend(message(&error))),
+        }
     }
 
     pub(super) fn load() -> Result<[u8; PUBLIC_KEY_BYTES], SecureEnclaveApprovalError> {
@@ -234,6 +258,10 @@ mod backend {
 #[cfg(not(target_os = "macos"))]
 mod backend {
     use super::{SecureEnclaveApprovalError, PUBLIC_KEY_BYTES};
+
+    pub(super) fn availability() -> Result<(), SecureEnclaveApprovalError> {
+        Err(SecureEnclaveApprovalError::Unavailable)
+    }
 
     pub(super) fn load() -> Result<[u8; PUBLIC_KEY_BYTES], SecureEnclaveApprovalError> {
         Err(SecureEnclaveApprovalError::Unavailable)

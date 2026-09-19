@@ -9,6 +9,7 @@ const styles = readFileSync(new URL('styles.css', import.meta.url), 'utf8');
 const nextStyles = readFileSync(new URL('../ui-next/src/styles.css', import.meta.url), 'utf8');
 const buttonAtom = readFileSync(new URL('../ui-next/src/atoms/button.tsx', import.meta.url), 'utf8');
 const nativeHost = readFileSync(new URL('../src-tauri/main.rs', import.meta.url), 'utf8');
+const daemonLive = readFileSync(new URL('../../../crates/mesh-daemon/src/live.rs', import.meta.url), 'utf8');
 const codexWorkspace = readFileSync(new URL('../src-tauri/codex_workspace.rs', import.meta.url), 'utf8');
 const tauriConfig = readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url), 'utf8');
 const demo = readFileSync(new URL('../../../docs/demo.md', import.meta.url), 'utf8');
@@ -114,6 +115,19 @@ test('every managed mutation enters the process-shared agent custody transaction
     );
   }
   assert.match(nativeHost, /matches!\(method, "workspace\.state" \| "folder\.import\.preview"\)/);
+});
+
+test('approval availability validates the running Apple identity before offering enrollment', () => {
+  const status = nativeCommandSource('approval_credential_status');
+  const availability = status.indexOf('SecureEnclaveApprovalCredential::availability()');
+  const credentialLoad = status.indexOf('SecureEnclaveApprovalCredential::load()');
+  assert.notEqual(availability, -1, 'approval status omitted the read-only identity preflight');
+  assert.notEqual(credentialLoad, -1, 'approval status omitted the enrolled credential lookup');
+  assert.ok(
+    availability < credentialLoad,
+    'a missing credential can be mistaken for availability before app identity is checked',
+  );
+  assert.match(status, /approval_status_json\(None, Some\(&error\.to_string\(\)\)\)/);
 });
 
 test('desktop UI exposes the complete local-folder management journey', () => {
@@ -922,6 +936,35 @@ test('native managed-file reads require the verified workspace identity', () => 
     /fn read_managed_text\(/,
     'an obsolete relative-path-only Tauri command can read from a replacement workspace',
   );
+});
+
+test('Files previews assigned text and JSON through exact read-only custody authority', () => {
+  const filesInspection = script.slice(
+    script.indexOf('async function inspectManagedWorkspaceEntryFromFiles'),
+    script.indexOf('function updateEditorDraftPresentation'),
+  );
+  assert.match(filesInspection, /workspaceInstallationMatchesHandoff\(\)/);
+  assert.match(filesInspection, /invoke\('inspect_agent_live_file', \{[\s\S]*expectedWorkspaceRoot: binding\.root,[\s\S]*expectedWorkspaceDigest: binding\.digest,[\s\S]*expectedWorkspaceInstallation: binding\.installation,[\s\S]*expectedAgentHandoffGeneration: agentGeneration,[\s\S]*relativePath,/);
+  assert.match(filesInspection, /\['current-file', 'modified-file', 'new-file'\]\.includes\(answer\.kind\)/);
+  assert.match(filesInspection, /text_editable: false/);
+  assert.match(daemonLive, /if first\.modified_from_current_version\(\) \{[\s\S]*"modified-file"[\s\S]*\} else \{[\s\S]*"current-file"/);
+  assert.match(workspaceFilesChanges, /Read-only snapshot from the assigned agent folder/);
+});
+
+test('an unchanged Current refresh renews authority without repainting the mounted tree', () => {
+  const renderer = script.slice(
+    script.indexOf('function renderWorkspaceCurrentNext'),
+    script.indexOf('async function revealCurrentWorkspaceFolder'),
+  );
+  const refreshAction = script.slice(
+    script.indexOf('async function activateCurrentRefresh'),
+    script.indexOf('function rollbackWorkspaceStillCurrent'),
+  );
+  assert.match(renderer, /currentRefreshInFlight[\s\S]*!model\.workspaceVerified[\s\S]*workspaceCurrentNextActions = new Map\(\[\['refresh', activateCurrentRefresh\]\]\)[\s\S]*return;/);
+  assert.match(renderer, /projectionKey = JSON\.stringify\(current\)/);
+  assert.match(renderer, /canUpdateAuthorityWithoutPainting[\s\S]*if \(canUpdateAuthorityWithoutPainting\) return;/);
+  assert.match(refreshAction, /currentRefreshInFlight \+= 1/);
+  assert.match(refreshAction, /finally \{[\s\S]*currentRefreshInFlight = Math\.max\(0, currentRefreshInFlight - 1\)[\s\S]*!model\.workspaceVerified\) renderWorkspaceCurrentNext\(\)/);
 });
 
 test('workspace entries open only through exact closed native authority', () => {

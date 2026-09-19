@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { chmod, lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, writeFile } from 'node:fs/promises';
 import { createConnection } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +16,15 @@ import {
   RENDERER_PROOF_PREFIX,
   rendererProofReportsFromText,
 } from './renderer-proof-protocol.mjs';
+import { readRenderedProofImage } from './rendered-proof-image.mjs';
 import { writeNewPrivateScreenshot } from './proof-screenshot-output.mjs';
+import {
+  assertSeedRepositoryUnchanged,
+  inspectSeedRepository,
+  restoreSeedRepository,
+} from './proof-seed-repository.mjs';
+import { proofDaemonIdleTimeoutMs } from './proof-daemon-timeout.mjs';
+import { mirrorOrdinaryDirectories } from './proof-private-export-destination.mjs';
 
 const options = parseProofArguments(process.argv.slice(2));
 if (options.help) {
@@ -29,6 +37,9 @@ const repository = resolve(here, '../../..');
 const app = resolve(process.env.MESH_LOCAL_APP || join(repository, 'target/release/bundle/macos/Mesh.app'));
 const executable = join(app, 'Contents/MacOS/mesh-desktop');
 const screenshot = options.screenshot === null ? null : resolve(options.screenshot);
+const requestedSeedRepository = options.seedRepository === null
+  ? null
+  : resolve(options.seedRepository);
 
 // The desktop host creates its Unix socket below HOME/Library/Application Support. macOS limits
 // sockaddr_un paths to 104 bytes, so the usual /var/folders/... TMPDIR is not a safe proof root.
@@ -52,7 +63,12 @@ const FILES_PROOF_IMAGE_PATH = 'assets/mesh-proof.png';
 // Keep a real, decodable raster beside the text result so the review proof can exercise both the
 // exact text diff and a native-open type backed by the system image viewer. Text-file default
 // associations are user-configurable and may be absent on an otherwise valid clean Mac.
-const AGENT_PROOF_IMAGE = await readFile(join(repository, 'apps/desktop/src-tauri/icons/icon.png'));
+// build.rs carries the unbranded development PNG because Tauri generates the ignored icon file at
+// build time. Read that public-source constant directly so an extracted delivery can prove itself
+// from a clean source checkout without depending on a generated internal-worktree file.
+const AGENT_PROOF_IMAGE = await readRenderedProofImage();
+
+const seedRepository = await inspectSeedRepository(requestedSeedRepository);
 const proofEnvironment = {
   ...process.env,
   HOME: home,
@@ -69,15 +85,14 @@ delete proofEnvironment.MESH_RENDERER_PROOF_DESTINATION;
 delete proofEnvironment.MESH_RENDERER_PROOF_SCREENSHOT;
 
 await mkdir(source);
+if (seedRepository !== null) {
+  restoreSeedRepository(seedRepository, source, scratch);
+}
 await mkdir(privateExport, { recursive: true, mode: 0o700 });
-// The native export flow intentionally separates missing-folder creation from file updates, and
-// the proof authority permits exactly one confirmation. Seed only the empty parent directory so
-// this journey still proves a single bounded file-update confirmation for a nested saved file.
-await mkdir(join(privateExport, 'assets'), { mode: 0o700 });
-await mkdir(join(source, 'assets'));
-await writeFile(join(source, 'notes.txt'), 'first saved version\n');
-await writeFile(join(source, 'run.sh'), "#!/bin/sh\nprintf 'native mesh\\n'\n");
-await writeFile(join(source, FILES_PROOF_IMAGE_PATH), AGENT_PROOF_IMAGE);
+await mkdir(join(source, 'assets'), { recursive: true });
+await writeFile(join(source, 'notes.txt'), 'first saved version\n', { flag: 'wx' });
+await writeFile(join(source, 'run.sh'), "#!/bin/sh\nprintf 'native mesh\\n'\n", { flag: 'wx' });
+await writeFile(join(source, FILES_PROOF_IMAGE_PATH), AGENT_PROOF_IMAGE, { flag: 'wx' });
 await chmod(join(source, 'run.sh'), 0o755);
 // macOS exposes /tmp through a symlink to /private/tmp. The daemon returns canonical roots, so
 // compare filesystem identities instead of requiring temporary path spellings to survive.
@@ -96,6 +111,33 @@ function running(child) {
 async function assertExecutable(path, message) {
   const metadata = await lstat(path);
   assert.notEqual(metadata.mode & 0o111, 0, message);
+}
+
+async function waitForPrivateExportReceipt() {
+  if (seedRepository !== null) return;
+  const expected = [
+    'notes.txt',
+    'run.sh',
+    FILES_PROOF_IMAGE_PATH,
+    AGENT_PROOF_RESULT_PATH,
+    AGENT_PROOF_IMAGE_PATH,
+  ];
+  let lastError = null;
+  let visible = [];
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    try {
+      await Promise.all(expected.map((relative) => lstat(join(privateExport, relative))));
+      return;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      lastError = error;
+      visible = await readdir(privateExport, { recursive: true });
+      await delay(50);
+    }
+  }
+  throw new Error(
+    `the packaged private export reported completion before its exact files were visible: ${lastError?.message || 'missing receipt'}; visible=${visible.sort().join(',')}`,
+  );
 }
 
 async function stop(child) {
@@ -156,9 +198,16 @@ function rendererProofSession(surface, expectedWorkspace = null) {
 async function waitForRendererProof(child, stderr, session) {
   let lastDiagnostic = '';
   let agentResultWritten = false;
-  // A surface can contain two consecutive bounded renderer waits. Keep the process-level deadline
-  // longer than both so a stage-specific, secret-free failure marker wins instead of a timeout race.
-  for (let attempt = 0; attempt < 2_400; attempt += 1) {
+  // Onboarding contains six bounded 40-second setup waits followed by the bounded 15-minute
+  // confirmed import. Agent finish can likewise spend 15 minutes on its complete post-release
+  // scan and authenticated save. Keep each process-level deadline beyond its composed maximum so
+  // the renderer's stage-specific, secret-free failure marker wins instead of an outer race.
+  const maximumAttempts = session.surface === 'onboarding'
+    ? 26_400
+    : session.surface === 'agent-handoff'
+      ? 22_800
+      : 2_400;
+  for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
     if (!running(child)) throw new Error(`the bundled app exited before renderer proof: ${stderr()}`);
     const current = stderr();
     const lastNewline = current.lastIndexOf('\n');
@@ -193,20 +242,28 @@ async function waitForRendererProof(child, stderr, session) {
   );
 }
 
-function requestDaemon(method, params = {}) {
+function requestDaemon(method, params = {}, totalTimeoutMs = proofDaemonIdleTimeoutMs(method)) {
   return new Promise((resolveRequest, rejectRequest) => {
     const socket = createConnection(endpoint);
     let settled = false;
     let buffer = '';
     let partial = null;
+    const totalTimer = globalThis.setTimeout(
+      () => finish(new Error(`the embedded daemon did not complete ${method} within the overall deadline`)),
+      totalTimeoutMs,
+    );
     const finish = (error, value) => {
       if (settled) return;
       settled = true;
+      clearTimeout(totalTimer);
       socket.destroy();
       if (error) rejectRequest(error);
       else resolveRequest(value);
     };
-    socket.setTimeout(1_000, () => finish(new Error('the embedded daemon did not answer in time')));
+    socket.setTimeout(
+      proofDaemonIdleTimeoutMs(method),
+      () => finish(new Error(`the embedded daemon did not answer ${method} in its bounded time`)),
+    );
     socket.on('error', (error) => finish(error));
     socket.on('close', () => {
       if (!settled) finish(new Error('the embedded daemon closed before returning workspace state'));
@@ -302,19 +359,20 @@ function requestDaemon(method, params = {}) {
   });
 }
 
-function requestWorkspaceState() {
-  return requestDaemon('workspace.state');
+function requestWorkspaceState(totalTimeoutMs = proofDaemonIdleTimeoutMs('workspace.state')) {
+  return requestDaemon('workspace.state', {}, totalTimeoutMs);
 }
 
-async function waitForWorkspace(child, stderr) {
+async function waitForWorkspace(child, stderr, maximumAttempts = 50) {
   let lastFailure = '';
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  const deadline = Date.now() + proofDaemonIdleTimeoutMs('workspace.state');
+  for (let attempt = 0; attempt < maximumAttempts && Date.now() < deadline; attempt += 1) {
     if (!running(child)) throw new Error(`the bundled app exited before reopening: ${stderr()}`);
     try {
-      return await requestWorkspaceState();
+      return await requestWorkspaceState(Math.max(1, deadline - Date.now()));
     } catch (error) {
       lastFailure = error.message;
-      await delay(100);
+      await delay(Math.min(100, Math.max(0, deadline - Date.now())));
     }
   }
   throw new Error(`the embedded daemon did not reopen the remembered workspace: ${lastFailure}`);
@@ -322,10 +380,11 @@ async function waitForWorkspace(child, stderr) {
 
 async function waitForNoWorkspace(child, stderr) {
   let lastFailure = '';
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  const deadline = Date.now() + proofDaemonIdleTimeoutMs('workspace.state');
+  for (let attempt = 0; attempt < 50 && Date.now() < deadline; attempt += 1) {
     if (!running(child)) throw new Error(`the empty-state app exited early: ${stderr()}`);
     try {
-      const state = await requestWorkspaceState();
+      const state = await requestWorkspaceState(Math.max(1, deadline - Date.now()));
       lastFailure = `the daemon unexpectedly exposed ${state.root}`;
     } catch (error) {
       if (/^no-workspace-open:/.test(error.message)) {
@@ -333,9 +392,31 @@ async function waitForNoWorkspace(child, stderr) {
       }
       lastFailure = error.message;
     }
-    await delay(100);
+    await delay(Math.min(100, Math.max(0, deadline - Date.now())));
   }
   throw new Error(`the bundled app did not expose its truthful empty state: ${lastFailure}`);
+}
+
+async function waitForRememberedWorkspace(expectedWorkspace, child = null, stderr = () => '') {
+  let lastFailure = '';
+  const recentPath = join(appData, 'recent-workspace.json');
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    if (child && !running(child)) {
+      throw new Error(`the bundled app exited before remembering import: ${stderr()}`);
+    }
+    try {
+      const document = JSON.parse(await readFile(recentPath, 'utf8'));
+      const workspace = document.workspaces?.find(
+        (candidate) => candidate?.path === expectedWorkspace,
+      );
+      if (workspace) return { document, workspace };
+      lastFailure = `the recent list did not contain ${expectedWorkspace}`;
+    } catch (error) {
+      lastFailure = error.message;
+    }
+    await delay(100);
+  }
+  throw new Error(`the visible import did not remember its exact managed workspace: ${lastFailure}`);
 }
 
 async function proveConcurrentProcessForwardsAttention(expected) {
@@ -388,10 +469,17 @@ async function proveCodexContextBridge(expected) {
     bridge.stdin.write(`${JSON.stringify(request)}\n`);
   }
   bridge.stdin.end();
+  let deadline;
+  const deadlineReached = new Promise((resolveDeadline) => {
+    // mesh_workspace_state is the bridge's only tool and may inspect the complete native tree.
+    // Keep the process-level deadline beyond its bounded five-minute daemon reply window.
+    deadline = setTimeout(() => resolveDeadline(null), 6 * 60_000);
+  });
   const exited = await Promise.race([
     new Promise((resolveExit) => bridge.once('exit', (code, signal) => resolveExit({ code, signal }))),
-    delay(3_000).then(() => null),
+    deadlineReached,
   ]);
+  clearTimeout(deadline);
   if (exited === null) {
     await stop(bridge);
     throw new Error('the packaged Mesh context bridge did not finish after its input closed');
@@ -492,8 +580,25 @@ async function launch(
       const current = state.workspace_versions.at(-1)?.operation;
       const item = state.review_items.find((candidate) => candidate.subject_operation === current);
       assert.ok(item, `the reopened workspace had no review for its current version: ${JSON.stringify(state)}`);
-      assert.equal(item.content_complete, true, `the reopened current review was incomplete: ${JSON.stringify(item)}`);
-      assert.equal(item.bundle_changes_not_listed, 0, `the reopened current review omitted changes: ${JSON.stringify(item)}`);
+      assert.equal(
+        item.content_complete,
+        item.bundle_changes_not_listed === 0,
+        `the reopened review completeness contradicted its omitted-change count: ${JSON.stringify(item)}`,
+      );
+      if (seedRepository === null) {
+        assert.equal(item.content_complete, true, `the reopened current review was incomplete: ${JSON.stringify(item)}`);
+        assert.equal(item.bundle_changes_not_listed, 0, `the reopened current review omitted changes: ${JSON.stringify(item)}`);
+      } else {
+        assert.ok(
+          item.bundle_changes_not_listed > 0,
+          `the real-workspace review did not exercise its bounded incomplete state: ${JSON.stringify(item)}`,
+        );
+        assert.equal(
+          item.projection_authorizes_approval,
+          false,
+          `the bounded real-workspace review carried approval authority: ${JSON.stringify(item)}`,
+        );
+      }
       assert.ok(item.bundle_changes.length > 0, `the reopened current review contained no changes: ${JSON.stringify(item)}`);
     }
     if (rendererSurface === 'versions') {
@@ -590,44 +695,54 @@ async function launchEmpty() {
       waitForNoWorkspace(child, () => stderr.trim()),
       waitForRendererProof(child, () => stderr, rendererSession),
     ]);
-    // Startup is existing-only by design. Seed the proof through the same verified import
-    // boundary as the first-launch UI so later launches exercise the presented native layout,
-    // not the compatibility-only legacy layout.
-    const preview = await requestDaemon('folder.import.preview', { source });
-    await mkdir(versionStores, { mode: 0o700, recursive: true });
-    const privateStore = join(versionStores, `workspace-${preview.summary.slice(0, 12)}.mesh`);
-    const imported = await requestDaemon('folder.import.confirm', {
-      source,
-      destination: privateStore,
-      summary: preview.summary,
-    });
+    // The renderer proof drives Preview and Create through the visible first-launch UI. Wait for
+    // that exact transaction to finish instead of issuing a second daemon confirmation that could
+    // race the user-equivalent action or fail to cover its accessible progress state.
+    // A renderer success means the native import and navigation transaction has already returned.
+    // Leave only a short bounded allowance for the next socket read instead of nesting thousands
+    // of one-second daemon deadlines after visible completion.
+    const importedWorkspace = await waitForWorkspace(child, () => stderr.trim(), 20);
+    const privateStore = dirname(importedWorkspace.root);
+    const rememberedImport = await waitForRememberedWorkspace(
+      importedWorkspace.root,
+      child,
+      () => stderr.trim(),
+    );
     const initialized = await requestDaemon('review.open-current', {
       opened_by: '08'.repeat(32),
     });
     assert.equal(initialized.reviews, 1, 'the scratch workspace did not retain its exact review');
     assert.equal(initialized.review_items.length, 1, 'the scratch review projection was unavailable');
+    const initialReview = initialized.review_items[0];
     assert.equal(
-      initialized.review_items[0].content_complete,
-      true,
-      `the scratch review content was incomplete: ${JSON.stringify(initialized.review_items[0])}`,
+      initialReview.content_complete,
+      initialReview.bundle_changes_not_listed === 0,
+      'the scratch review completeness contradicted its omitted-change count',
     );
     assert.ok(
-      initialized.review_items[0].bundle_changes.length > 0,
-      `the scratch review contained no changes: ${JSON.stringify(initialized.review_items[0])}`,
+      initialReview.bundle_changes.length > 0,
+      'the scratch review contained no visible bounded changes',
     );
+    if (seedRepository === null) {
+      assert.equal(
+        initialReview.bundle_changes_not_listed,
+        0,
+        'the small scratch review unexpectedly omitted changes',
+      );
+    } else {
+      assert.ok(
+        initialReview.bundle_changes_not_listed > 0,
+        'the seeded large-workspace review did not exercise its bounded state',
+      );
+    }
     assert.equal(
-      initialized.review_items[0].bundle_changes_not_listed,
-      0,
-      `the scratch review omitted bounded changes: ${JSON.stringify(initialized.review_items[0])}`,
-    );
-    assert.equal(
-      initialized.review_items[0].projection_authorizes_approval,
+      initialReview.projection_authorizes_approval,
       false,
-      `the scratch review projection carried authority: ${JSON.stringify(initialized.review_items[0])}`,
+      'the scratch review projection carried approval authority',
     );
     assert.equal(
       await realpath(initialized.root),
-      await realpath(join(privateStore, 'mounts')),
+      await realpath(join(privateStore, 'Mesh Version - Working Folder')),
       'the explicit first-launch import initialized the wrong native workspace',
     );
     assert.equal(await readFile(join(source, 'notes.txt'), 'utf8'), 'first saved version\n');
@@ -635,7 +750,7 @@ async function launchEmpty() {
       join(initialized.root, 'run.sh'),
       'the first managed native folder lost the imported executable bit',
     );
-    return { window, state, initialized, imported, privateStore, rendererProof };
+    return { window, state, initialized, privateStore, rememberedImport, rendererProof };
   } finally {
     await stop(child);
   }
@@ -644,60 +759,21 @@ async function launchEmpty() {
 try {
   const empty = await launchEmpty();
   const canonicalWorkspace = await realpath(empty.initialized.root);
-  await writeFile(
-    join(appData, 'recent-workspace.json'),
-    JSON.stringify({
-      schema: 'mesh-desktop-recent-workspaces/v7',
-      workspaces: [{
-        path: canonicalWorkspace,
-        export_root: canonicalSource,
-        project_root: canonicalSource,
-        agent_handoff_installation: null,
-        source_point_ordinal: null,
-        original_update_version: null,
-      }],
-    }),
-    { encoding: 'utf8', flag: 'wx', mode: 0o600 },
-  );
-  const exported = await launch(
-    'private-export',
-    canonicalWorkspace,
-    false,
-    null,
-    'private-export',
+  const rememberedImport = empty.rememberedImport;
+  assert.equal(
+    rememberedImport.document.schema,
+    'mesh-desktop-recent-workspaces/v9',
+    'the visible import did not persist the current recent-workspace schema',
   );
   assert.equal(
-    await readFile(join(privateExport, 'notes.txt'), 'utf8'),
-    'first saved version\n',
-    'the packaged private export changed the saved text bytes',
+    await realpath(rememberedImport.workspace.export_root),
+    canonicalSource,
+    'the visible import remembered the wrong original export folder',
   );
   assert.equal(
-    await readFile(join(privateExport, 'run.sh'), 'utf8'),
-    "#!/bin/sh\nprintf 'native mesh\\n'\n",
-    'the packaged private export changed the saved executable bytes',
-  );
-  await assertExecutable(
-    join(privateExport, 'run.sh'),
-    'the packaged private export lost the executable bit',
-  );
-  assert.deepEqual(
-    await readFile(join(privateExport, FILES_PROOF_IMAGE_PATH)),
-    AGENT_PROOF_IMAGE,
-    'the packaged private export changed the nested saved image bytes',
-  );
-  assert.equal(
-    await readFile(join(source, 'notes.txt'), 'utf8'),
-    'first saved version\n',
-    'the private-export proof changed the unmanaged original text',
-  );
-  assert.equal(
-    await readFile(join(source, 'run.sh'), 'utf8'),
-    "#!/bin/sh\nprintf 'native mesh\\n'\n",
-    'the private-export proof changed the unmanaged original executable bytes',
-  );
-  await assertExecutable(
-    join(source, 'run.sh'),
-    'the private-export proof changed the unmanaged original executable mode',
+    await realpath(rememberedImport.workspace.project_root),
+    canonicalSource,
+    'the visible import remembered the wrong original project folder',
   );
   const agentHandoff = await launch(
     'agent-handoff',
@@ -730,6 +806,76 @@ try {
       return reviewed;
     },
     'agent-handoff',
+  );
+  // The native export flow intentionally separates missing-folder creation from file updates, and
+  // renderer proof authority permits exactly one confirmation. Reproduce only the current native
+  // workspace's ordinary directory topology in the isolated empty destination so that one visible
+  // confirmation still proves the complete file phase. Git metadata is not workspace content.
+  await mirrorOrdinaryDirectories(canonicalWorkspace, privateExport, {
+    excludedRootNames: ['.git'],
+  });
+  // A seeded real repository intentionally produces a bounded initial review. Exercise the agent
+  // lifecycle first so its two exact saved changes create a complete current review before the
+  // private-copy journey asks for whole-workspace export authority.
+  const exported = await launch(
+    'private-export',
+    canonicalWorkspace,
+    false,
+    waitForPrivateExportReceipt,
+    'private-export',
+  );
+  if (seedRepository === null) {
+    assert.equal(
+      await readFile(join(privateExport, 'notes.txt'), 'utf8'),
+      'first saved version\n',
+      'the packaged private export changed the saved text bytes',
+    );
+    assert.equal(
+      await readFile(join(privateExport, 'run.sh'), 'utf8'),
+      "#!/bin/sh\nprintf 'native mesh\\n'\n",
+      'the packaged private export changed the saved executable bytes',
+    );
+    await assertExecutable(
+      join(privateExport, 'run.sh'),
+      'the packaged private export lost the executable bit',
+    );
+    assert.deepEqual(
+      await readFile(join(privateExport, FILES_PROOF_IMAGE_PATH)),
+      AGENT_PROOF_IMAGE,
+      'the packaged private export changed the nested saved image bytes',
+    );
+    assert.equal(
+      await readFile(join(privateExport, AGENT_PROOF_RESULT_PATH), 'utf8'),
+      AGENT_PROOF_RESULT,
+      'the packaged private export omitted the current post-agent text result',
+    );
+    assert.deepEqual(
+      await readFile(join(privateExport, AGENT_PROOF_IMAGE_PATH)),
+      AGENT_PROOF_IMAGE,
+      'the packaged private export omitted the current post-agent image result',
+    );
+  } else {
+    for (const relative of ['notes.txt', 'run.sh', AGENT_PROOF_RESULT_PATH, AGENT_PROOF_IMAGE_PATH]) {
+      await assert.rejects(
+        lstat(join(privateExport, relative)),
+        { code: 'ENOENT' },
+        `the bounded incomplete review exported ${relative} without complete review authority`,
+      );
+    }
+  }
+  assert.equal(
+    await readFile(join(source, 'notes.txt'), 'utf8'),
+    'first saved version\n',
+    'the private-export proof changed the unmanaged original text',
+  );
+  assert.equal(
+    await readFile(join(source, 'run.sh'), 'utf8'),
+    "#!/bin/sh\nprintf 'native mesh\\n'\n",
+    'the private-export proof changed the unmanaged original executable bytes',
+  );
+  await assertExecutable(
+    join(source, 'run.sh'),
+    'the private-export proof changed the unmanaged original executable mode',
   );
   const versions = await launch(
     'workspace-versions',
@@ -879,6 +1025,7 @@ try {
     join(source, 'run.sh'),
     'the saved-version journey changed the unmanaged original executable',
   );
+  assertSeedRepositoryUnchanged(seedRepository);
   process.stdout.write(`${JSON.stringify({
     ...restarted.window,
     // The window probe has its own v1 schema. Write the composed envelope identity after that
@@ -896,6 +1043,14 @@ try {
       records: empty.initialized.records,
       digest: empty.initialized.digest,
       imported_from: canonicalSource,
+    },
+    seed_repository: seedRepository === null ? null : {
+      path: seedRepository.path,
+      revision: seedRepository.revision,
+      tree: seedRepository.tree,
+      tracked_files: seedRepository.trackedFiles,
+      restored_from_committed_archive: true,
+      original_unchanged: true,
     },
     endpoint_ownership: {
       concurrent_process_refused: true,
@@ -920,14 +1075,21 @@ try {
     },
     pinned_agent_context: pinnedAgentContext,
     selected_agent_context: restarted.result.selectedAgentContext,
-    private_export: {
-      destination: privateExport,
-      text_bytes_preserved: true,
-      executable_bytes_preserved: true,
-      executable_mode_preserved: true,
-      original_unchanged: true,
-      original_destination_refused: true,
-    },
+    private_export: seedRepository === null
+      ? {
+          destination: privateExport,
+          text_bytes_preserved: true,
+          executable_bytes_preserved: true,
+          executable_mode_preserved: true,
+          original_unchanged: true,
+          original_destination_refused: true,
+        }
+      : {
+          destination: privateExport,
+          blocked_by_incomplete_review: true,
+          destination_files_written: false,
+          original_unchanged: true,
+        },
     component_interface_mounted: true,
     renderer_controls_driven: true,
     renderer: {
@@ -979,5 +1141,10 @@ try {
     ipc: { version: IPC_VERSION, surface_version: IPC_VERSION },
   })}\n`);
 } finally {
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
 }

@@ -13,7 +13,10 @@ import {
   assertRegularExactFile,
   assertUniqueArchiveEntries,
 } from './alpha-guide-verification.mjs';
-import { parseRenderedAppProofOutput } from './renderer-proof-protocol.mjs';
+import {
+  assertCompleteArchiveFixtureProof,
+  parseRenderedAppProofOutput,
+} from './renderer-proof-protocol.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktop = resolve(here, '..');
@@ -238,7 +241,9 @@ try {
         },
       },
     );
-    renderedAppProof = parseRenderedAppProofOutput(renderedOutput);
+    renderedAppProof = assertCompleteArchiveFixtureProof(
+      parseRenderedAppProofOutput(renderedOutput),
+    );
   }
 } finally {
   await rm(extraction, { recursive: true, force: true });

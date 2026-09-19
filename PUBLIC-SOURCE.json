@@ -1,10 +1,10 @@
 {
   "schema": "mesh.public-source/v1",
-  "source_revision": "7448ae001027439c0b4a0d3b522b08a389802f38",
+  "source_revision": "73ff7222eb7383d67e2092f17e8e580445ae23c7",
   "destination_repository": "idosams/Mesh",
   "history": "clean-root",
-  "file_count": 1046,
-  "tree_sha256": "ad3acd493a9520a388b09d1a9634aae04c492aa37643da34c6cf8e9bbfa0a82f",
+  "file_count": 1055,
+  "tree_sha256": "f3fb3be7f8fed496a133b9e6e15a989fab3916d194c5f82e13a1f9ae889116bc",
   "files": [
     {
       "path": ".config/nextest.toml",
@@ -84,7 +84,7 @@
     {
       "path": "apps/desktop/README.md",
       "mode": "100644",
-      "sha256": "b4f062f7013f97535a41d8b4eef8520912ac901e6c2114b50af7ff81c85e1e08"
+      "sha256": "4a91ef9e45f95c388316955d5b836725d3bd297600816a8e079dc0d4cc036438"
     },
     {
       "path": "apps/desktop/scripts/alpha-checksum.mjs",
@@ -154,7 +154,7 @@
     {
       "path": "apps/desktop/scripts/local-app.test.mjs",
       "mode": "100644",
-      "sha256": "370b3632665dfb53319b9df3dc1f7ce4771879f82ef920a570a9d73f65ee8107"
+      "sha256": "fab934f83dcae8158e2def71e62bf98c1f5dcfd28af460c02f56aa5d159b8111"
     },
     {
       "path": "apps/desktop/scripts/macos-signing-preflight-args.mjs",
@@ -177,6 +177,26 @@
       "sha256": "22e2ed35cbda67e1d871e6bc667e49093956c7353ee1a8a4c1fee87268266522"
     },
     {
+      "path": "apps/desktop/scripts/proof-daemon-timeout.mjs",
+      "mode": "100644",
+      "sha256": "4003a26859d5aff6998a0fbfb72dfcae0bd5760b85bba47e090b3189ea869686"
+    },
+    {
+      "path": "apps/desktop/scripts/proof-daemon-timeout.test.mjs",
+      "mode": "100644",
+      "sha256": "b87b01879372152f7f4b048382a7354319bfffee94132cb60cb2af323b976ec5"
+    },
+    {
+      "path": "apps/desktop/scripts/proof-private-export-destination.mjs",
+      "mode": "100644",
+      "sha256": "6bd5f58c76c393c045cb5d1d51657fba2c3831121f2aef44dcfc7dec53ce1087"
+    },
+    {
+      "path": "apps/desktop/scripts/proof-private-export-destination.test.mjs",
+      "mode": "100644",
+      "sha256": "c3b77b0ea3afbe06e84002dcf59611efb25a24a7a3a2647a0701bf405136c607"
+    },
+    {
       "path": "apps/desktop/scripts/proof-screenshot-output.mjs",
       "mode": "100644",
       "sha256": "f6bcc3f499e50ef2deab6fda744cb50a02c79f99d85b2928c09c3724fac5c0c2"
@@ -187,19 +207,29 @@
       "sha256": "566e6babf9e461f4c55df3646e914ba6e39dbe795a9e28cbaa80b6212e731646"
     },
     {
+      "path": "apps/desktop/scripts/proof-seed-repository.mjs",
+      "mode": "100644",
+      "sha256": "c7775a844569976f516050ef7acebacd077bd995554759efbf4e0321611af408"
+    },
+    {
+      "path": "apps/desktop/scripts/proof-seed-repository.test.mjs",
+      "mode": "100644",
+      "sha256": "e2d75cabb749054789fd9de4ab5d81747c2caa4af55e6482dac63468c0d00a76"
+    },
+    {
       "path": "apps/desktop/scripts/prove-rendered-app-args.mjs",
       "mode": "100644",
-      "sha256": "13915b54e44d5b5e51b6551498525e2e095a09ed1a61634a928a6ee270d1fe92"
+      "sha256": "2421b8ff2de1142f2f62ba94a51d8a8236da853fbb9bd4d2ae6c29d15e5e3b7b"
     },
     {
       "path": "apps/desktop/scripts/prove-rendered-app-args.test.mjs",
       "mode": "100644",
-      "sha256": "63d67d70e6d1f231836f7b2209a7c8c8325780917df72ee59cd7cfe94ccceb58"
+      "sha256": "270d761d725fc357b55bf45715968b931fea1a599260d04a7f36e8bc6c7987cc"
     },
     {
       "path": "apps/desktop/scripts/prove-rendered-app.mjs",
       "mode": "100644",
-      "sha256": "5b403a4300aa882cba28d2e68fe1e9707fe28142297fb083aac92769f543a40e"
+      "sha256": "3f89026633c5dca021ce406196f38aeac9ddf59a3dd10b119a7b393adc87bded"
     },
     {
       "path": "apps/desktop/scripts/publish-alpha-artifacts.mjs",
@@ -212,19 +242,29 @@
       "sha256": "ab942161c051b746991e63c9789b4d4c1995b34c849f4ff4a6f81482f2ce7d69"
     },
     {
+      "path": "apps/desktop/scripts/rendered-proof-image.mjs",
+      "mode": "100644",
+      "sha256": "7659de043775cc6b9386f41400ff2d579c048c9802131a7a798a15640be83a1a"
+    },
+    {
+      "path": "apps/desktop/scripts/rendered-proof-image.test.mjs",
+      "mode": "100644",
+      "sha256": "d3e480a27dfdf44b4a163652431b9456e517bed775cf5de82350fb7521a37e38"
+    },
+    {
       "path": "apps/desktop/scripts/renderer-proof-protocol.mjs",
       "mode": "100644",
-      "sha256": "6e3ed130c107cf2778c9f7d0744cf14c6aaa4c88952c2221b8f2a088d71bfe04"
+      "sha256": "472d37eda01a785f749e73f9f5244aa3430dc78544cc22c05b40babd4f7723f0"
     },
     {
       "path": "apps/desktop/scripts/renderer-proof-protocol.test.mjs",
       "mode": "100644",
-      "sha256": "2b5c231f7065a3214fe4b078815cec0414cfedc827389a45dbd73d66743120ab"
+      "sha256": "a11e7063c57fba70c580a32fc5c49176d0bedda1f55f19727e6db570fa9abefb"
     },
     {
       "path": "apps/desktop/scripts/signed-alpha-archive.test.mjs",
       "mode": "100644",
-      "sha256": "3b7aeb8bcbfdaa880ce22ee2b260331a7783655407881f7d70172ae9cf5d5c41"
+      "sha256": "8680e63659f0dd806d2ab8969e8ff33931c3ef8e4911baa36df6fbfebef4e3e5"
     },
     {
       "path": "apps/desktop/scripts/verify-alpha-archive-args.test.mjs",
@@ -234,7 +274,7 @@
     {
       "path": "apps/desktop/scripts/verify-alpha-archive.mjs",
       "mode": "100644",
-      "sha256": "b2079b67cf38a2b6a31e0f03f1f6e8c6e0aedc88970effbab878ed5ace73c227"
+      "sha256": "3565c9e29335152222facbb62e7964fc24ba89b8ec6d11e0e69dab4469e90948"
     },
     {
       "path": "apps/desktop/scripts/verify-local-app.mjs",
@@ -244,7 +284,7 @@
     {
       "path": "apps/desktop/scripts/verify-signed-alpha-archive.mjs",
       "mode": "100644",
-      "sha256": "c9a7dba64da10d391bc3a6ef596646327978a8a224a2d69f2e637c09a8a9e00a"
+      "sha256": "7116e7dc920ef9c3433346c8f3fd62df51d02caa3e870c21595cd5765e9656b0"
     },
     {
       "path": "apps/desktop/scripts/window-proof.m",
@@ -434,7 +474,7 @@
     {
       "path": "apps/desktop/src-tauri/codex_workspace.rs",
       "mode": "100644",
-      "sha256": "e1efd48810170d918e440d92d769c3998985296412e363a70192591c58a0766b"
+      "sha256": "ec1dead7a3c1d7e8af0963c958ba8dd581d56eec6fd8a54179a8291f3ff071c8"
     },
     {
       "path": "apps/desktop/src-tauri/desktop_attention.rs",
@@ -449,7 +489,7 @@
     {
       "path": "apps/desktop/src-tauri/main.rs",
       "mode": "100644",
-      "sha256": "8e063e5ba266b908df3a7d7ffe08b6a29d6feaa6ea33d914559b5bf5f5cc7e81"
+      "sha256": "72914788bf8ad6e4a8e9245f2f6f5ca9455550f907c6a0869a85bb2355dc78a9"
     },
     {
       "path": "apps/desktop/src-tauri/native_capture_preference.rs",
@@ -464,7 +504,7 @@
     {
       "path": "apps/desktop/src-tauri/renderer_proof.rs",
       "mode": "100644",
-      "sha256": "4d2cb58c8a10f92f5ba7c5bf59b771835fdfc49f4cbceaf7b93f504070905fce"
+      "sha256": "7215816e14d6de9b7a3b3aa5464161d0382e8d0772a9e2b4bba58d09767f3df5"
     },
     {
       "path": "apps/desktop/src-tauri/review_inspection.rs",
@@ -499,12 +539,12 @@
     {
       "path": "apps/desktop/ui/app.js",
       "mode": "100644",
-      "sha256": "195959d3900b4e48cf2d4ebecba389deb228f47cd383a796c9b6736c95f79023"
+      "sha256": "03c03afcf2daaf8fba940ee8852ab6d1dfc53ed435b5f5d9ab9cad668ed3defb"
     },
     {
       "path": "apps/desktop/ui/app.test.mjs",
       "mode": "100644",
-      "sha256": "01b629885b88800431eaced8fa9463b216478e755cdeebdc680601d776aa00df"
+      "sha256": "250db3f1521c45b4d31c2ea56cfc76b14dd86935208a5125af9948a7c30dc018"
     },
     {
       "path": "apps/desktop/ui/index.html",
@@ -524,17 +564,17 @@
     {
       "path": "apps/desktop/ui/post-mutation-refresh.test.mjs",
       "mode": "100644",
-      "sha256": "a9ae21b3545d99c4d75faac096fcd5bc6fddec00328e416c70e5205dce672eba"
+      "sha256": "e03f651da757f5a32f339b3be296f46f07405794098791dce5f50dbff917f3df"
     },
     {
       "path": "apps/desktop/ui/renderer-proof.js",
       "mode": "100644",
-      "sha256": "1f73cfcb573defdfedc556220e22cdf76fe7815f484e55bece9ca956be199c93"
+      "sha256": "fe6133f475980e89e2078f4e21f1dc90cab1aa203f914a27d2e94753117cd3b2"
     },
     {
       "path": "apps/desktop/ui/renderer-proof.test.mjs",
       "mode": "100644",
-      "sha256": "6ddb9708dd6205fd11c21f022537644e502fe819ab339f9d30b6ddb18318ad09"
+      "sha256": "702ecca1a45c416f9680a5d15949958e963ac9f23ea2c812360e00acfa9ec884"
     },
     {
       "path": "apps/desktop/ui/styles.css",
@@ -614,7 +654,7 @@
     {
       "path": "apps/desktop/ui-next/src/island.tsx",
       "mode": "100644",
-      "sha256": "026d4dc867344eeb6d78decedcf0c7a1502658ca8d2ff2bbc7e3f1c69fef9579"
+      "sha256": "bef7e6f885b1be913039edb8628023cd0821f3117bcac8a3f6815dd6afa6b416"
     },
     {
       "path": "apps/desktop/ui-next/src/layouts/production-workspace-layout.tsx",
@@ -669,7 +709,7 @@
     {
       "path": "apps/desktop/ui-next/src/models/import-workbench.ts",
       "mode": "100644",
-      "sha256": "bf5f5d7689c4387899efadb25cd40bfddf6e7a32b9432ce8d3432c632058bffa"
+      "sha256": "456b70cd659fff6af9c2145bc243b84493b09750ff284c2bd701d1925cc05c79"
     },
     {
       "path": "apps/desktop/ui-next/src/models/island-liveness.ts",
@@ -814,7 +854,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/import-workbench.tsx",
       "mode": "100644",
-      "sha256": "fdd4eaa3893d568792873b5f6e2a4ee929815921c9cf0a8a84dbb0b0e5a1dd65"
+      "sha256": "acb34373bed7372c2a8688eb4ebf9ae2203d9e7aff070576220722fabd2d63d5"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/live-agent-review.tsx",
@@ -839,7 +879,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-current.tsx",
       "mode": "100644",
-      "sha256": "f7a400976a3efdbf67c37582b5caf558d731485885b8cc56cb55b9b6aa3acf30"
+      "sha256": "54a5b287514aef5869ec1761160628f0b8c9a744045a604a487a380594ed0695"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-destination.tsx",
@@ -854,7 +894,7 @@
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-files-changes.tsx",
       "mode": "100644",
-      "sha256": "2cb5e0c649c4b34424d403c44a35727585208163a18bae9c2bf1a6439d329ab1"
+      "sha256": "07e1e4df893ac9bb00aa13fd7bb2199284132d721449ccde80f6cba28c9c75bc"
     },
     {
       "path": "apps/desktop/ui-next/src/organisms/workspace-overview.tsx",
@@ -954,7 +994,7 @@
     {
       "path": "apps/desktop/ui-next/ui-next.test.mjs",
       "mode": "100644",
-      "sha256": "674bbe0ca6c24cea2f034116118807ba9ac864e01b800dd2827d92c259fb826f"
+      "sha256": "e6068aca4a979ec8d3ce4a5b18a73eb020c69434b43e633c56e8ecda04933070"
     },
     {
       "path": "apps/desktop/ui-next/vite.config.ts",
@@ -979,7 +1019,7 @@
     {
       "path": "apps/desktop/ui-next/workspace-files-changes.test.mjs",
       "mode": "100644",
-      "sha256": "a230eb22d1a29f4cf0ef42182a49ffbc53692d19595a06a626a00362290c2abf"
+      "sha256": "9e6539c187820d9c879bd03dd2708df9373e38ed6e308cb19b4f232cda94aec5"
     },
     {
       "path": "apps/desktop/ui-next/workspace-shell.test.mjs",
@@ -2389,7 +2429,7 @@
     {
       "path": "crates/mesh-daemon/src/folder_import.rs",
       "mode": "100644",
-      "sha256": "6fc17de6c89abc7ea13dae5054cd3599c3115759fc3691fb3f163953ed90096a"
+      "sha256": "5b2220a3400009189f02d97a1f07104bf6ae13c107caedb23d466bda439c3c42"
     },
     {
       "path": "crates/mesh-daemon/src/folder_watch/mod.rs",
@@ -2414,7 +2454,7 @@
     {
       "path": "crates/mesh-daemon/src/ipc/json.rs",
       "mode": "100644",
-      "sha256": "e16cd2e46ed5c6c52108ece16bd4832077593f94ea86b5d107ae4ebdfe02ebad"
+      "sha256": "3decc75cec83bb1b21844aa916348d742c00c59d8e3468ffdb321e85a3248bae"
     },
     {
       "path": "crates/mesh-daemon/src/ipc/message.rs",
@@ -2444,7 +2484,7 @@
     {
       "path": "crates/mesh-daemon/src/live.rs",
       "mode": "100644",
-      "sha256": "8ab416c2ce864a8b99dc53b474c0e72ab410e8d896527e5cd9a2c2b8f8a667c9"
+      "sha256": "0f88aae71048c3652988a22f413229f66b8e0943c98bc244131a8453c1b1de83"
     },
     {
       "path": "crates/mesh-daemon/src/main.rs",
@@ -2509,7 +2549,7 @@
     {
       "path": "crates/mesh-daemon/src/workspace.rs",
       "mode": "100644",
-      "sha256": "b2d5069aa6ccde0d7d4fc061b1c724b9ca369011399a69e3e88a1cef84454c41"
+      "sha256": "605d0c955de5e2c98bce868d8469f6928215a2df09687397ea2f545b974e661d"
     },
     {
       "path": "crates/mesh-daemon/tests/binary.rs",
@@ -2544,7 +2584,7 @@
     {
       "path": "crates/mesh-daemon/tests/desktop-management.rs",
       "mode": "100644",
-      "sha256": "6bf93f1053b0428e4f607f387f62dd3b039476425892d96a57232037e6d9f948"
+      "sha256": "90bcfab1d163ba37d16385f31c3b33d8be0b8d92acdddd9f2c0da52a2f278fab"
     },
     {
       "path": "crates/mesh-daemon/tests/folder-checkpoint.rs",
@@ -2569,12 +2609,12 @@
     {
       "path": "crates/mesh-daemon/tests/import-cli.rs",
       "mode": "100644",
-      "sha256": "8b036f81677268fb6d96db55e012688af12fc88c8dea2bb671ef613f9adf7df7"
+      "sha256": "d855bf7178b10ed02ce0371633d139ffe096d959801f7c6139ea236bdb4f275d"
     },
     {
       "path": "crates/mesh-daemon/tests/import.rs",
       "mode": "100644",
-      "sha256": "cbacd449e5cb32306c70d400284b74f298a927537c93680af70fb6332390fc8c"
+      "sha256": "c04bf42e1e5e6f4698d3a5a3395a5da57460133aa51adc50f41e253d099c8d01"
     },
     {
       "path": "crates/mesh-daemon/tests/ipc.rs",
@@ -2594,7 +2634,7 @@
     {
       "path": "crates/mesh-daemon/tests/managed-text-edit.rs",
       "mode": "100644",
-      "sha256": "40e50df5a0b9c16ff1be748b69ba0c87e2507f35326186cbaf0a42bfd648ace0"
+      "sha256": "4db8ea1dc04a92f5b0cdcdc7cd11197b1bf8d7055ee3995c47291c1a3dd9e16a"
     },
     {
       "path": "crates/mesh-daemon/tests/startup-recovery.rs",
@@ -2614,7 +2654,7 @@
     {
       "path": "crates/mesh-daemon/tests/workspace-version-fork.rs",
       "mode": "100644",
-      "sha256": "17a5c8dc15dfb61ff2109d38d5a0ccf49199206079f727814483365df725e573"
+      "sha256": "cfece9d72e325b6c2ee33f1dbf1a71b105c3f51ba3103615ee7238775e30ed40"
     },
     {
       "path": "crates/mesh-derivations/Cargo.toml",
@@ -2944,7 +2984,7 @@
     {
       "path": "crates/mesh-mcp/src/lib.rs",
       "mode": "100644",
-      "sha256": "42d668fc88ad8d5f34ae672688120c61c4de91df52b64c667ee3ff3775b8a93f"
+      "sha256": "a7229ba5b19c36f4244e9e0a03cbe9ea4ede7c46256a4e4370a06df4c887469e"
     },
     {
       "path": "crates/mesh-mcp/src/main.rs",
@@ -3979,7 +4019,7 @@
     {
       "path": "docs/CHANGELOG.md",
       "mode": "100644",
-      "sha256": "c04a39d327fe73dcf181f7ad1964b50c6321322f97db488e33214f2a2321453e"
+      "sha256": "fc5c9295ee416c19371f3c2a2300efcf81fd6e72aa5598c76e96095ae0a7451b"
     },
     {
       "path": "docs/charter.md",
@@ -3994,7 +4034,7 @@
     {
       "path": "docs/demo.md",
       "mode": "100644",
-      "sha256": "c8dea38a2e8c35878754161aa5d1349dc098157a0a569e2898623d7f42989851"
+      "sha256": "e64e5e29e9d8230a91d4af8ed083155a1976ac62312de9917dbd2e81adbc9295"
     },
     {
       "path": "docs/developer-guide.md",
@@ -4004,7 +4044,7 @@
     {
       "path": "docs/launch/public-alpha-contract.json",
       "mode": "100644",
-      "sha256": "ced076667326f14ee47fed21598adc2936e0a8899ae696bac58cd02bc928cc57"
+      "sha256": "99dfffc2f3a34aca2e29e2b788ceae74cb7fe873a72fa4eb162ec5511f5c1b05"
     },
     {
       "path": "docs/launch/public-alpha.md",
@@ -4025,6 +4065,11 @@
       "path": "docs/launch/v0.1.0-alpha.3.md",
       "mode": "100644",
       "sha256": "f988970e412ba04e83edd43e23adfa207a227bb6a243f06e920b140ec319efa2"
+    },
+    {
+      "path": "docs/launch/v0.1.0-alpha.4.md",
+      "mode": "100644",
+      "sha256": "135107cb53c4e9bb5a4bbc84d2037a998f70fda4ba10b226d00f803bc1aada6f"
     },
     {
       "path": "docs/local-mounted-demo.md",
@@ -4369,12 +4414,12 @@
     {
       "path": "package-lock.json",
       "mode": "100644",
-      "sha256": "ac85050a7569889064e73be5a3262ccfa49be1731e0905b2fe5e55e335a489cb"
+      "sha256": "266a7c8ec96d71ffc7e4234dc4a64621155f7654d3672813631a582224e3cde4"
     },
     {
       "path": "package.json",
       "mode": "100644",
-      "sha256": "9fbf38be7bee5d986f0f5b6cc01358d0acd13d8c09936ac45d9fc36dbc4107de"
+      "sha256": "abd2c909c2204e2ca40c8eadf5a3fc7414287da12b524dae991f295a7a499f97"
     },
     {
       "path": "platform/macos-fskit/README.md",
@@ -4414,12 +4459,12 @@
     {
       "path": "platform/mesh-keychain/src/secure_enclave.m",
       "mode": "100644",
-      "sha256": "e2713b0922573605d892c6ce3fc49c69b8ebcea3341f860d51015a4bf87602ac"
+      "sha256": "6b3d59fade1939559f83b77523ba54933b700c56271d2275ca903f64b04a1954"
     },
     {
       "path": "platform/mesh-keychain/src/secure_enclave.rs",
       "mode": "100644",
-      "sha256": "2a933971c46d0468c358f1940f96503e42d78613124a83917d3cfcaa7635df35"
+      "sha256": "cf38039cccc37a66cbd62d23f896191c72df11ac223c62c7e4d5d88bd8d061f5"
     },
     {
       "path": "platform/mesh-keychain/src/software.rs",
@@ -4439,7 +4484,7 @@
     {
       "path": "platform/mesh-keychain/tests/secure_enclave_ffi.rs",
       "mode": "100644",
-      "sha256": "237cf03feaddf11f19e55641a9db52d998c9e9be3adf2abc895df768f4a86765"
+      "sha256": "90d0d92b11b26f7d13f51fabd7205f4c760f6ea915b97a0daae8d739c4aa6792"
     },
     {
       "path": "platform/windows-spike/README.md",
