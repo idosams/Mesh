@@ -364,7 +364,8 @@ test('the alpha archive remains checksum-verifiable without claiming Apple trust
   assert.match(renderedProof, /mesh_desktop_build_revision/);
   assert.match(renderedProof, /mesh_desktop_build_exact/);
   assert.match(readme, /complete desktop control suite from the\s+same clean Git revision/);
-  assert.match(readme, /rather than clicking browser controls/);
+  assert.match(readme, /daemon checks and nonce-bound renderer receipts must agree/);
+  assert.match(readme, /exact saved file bytes and executable mode on disk/);
   assert.match(alphaVerifier, /assert\.equal\(record\.developer_id_signed, false\)/);
   assert.match(alphaVerifier, /assert\.equal\(record\.notarized, false\)/);
   assert.match(alphaVerifier, /assert\.equal\(record\.human_approval_available, false\)/);

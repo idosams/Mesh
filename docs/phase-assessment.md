@@ -61,14 +61,18 @@ redundant ancestry scans for ordinary appends while preserving out-of-order cycl
 same workload then measured 236 ms; all 308 storage tests, including the explicit timing test,
 passed. See [the recovery budget](../benchmarks/budgets/recovery.md) for measurement limits.
 
-One packaged run reported private-export completion with the expected files absent. Two reruns
-passed, including the original concurrent measurement setup. The proof also had a reproducible
-verification gap: it accepted a completion notice for a different destination. A regression test
-now rejects that notice; completion requires current controls and the exact selected destination.
-Failed runs retain private diagnostics instead of deleting the evidence. This is not yet a
-confirmed explanation of the first missing-file failure. The final rebuilt candidate and its
-complete suite remain under validation; packaged readiness must not be inferred from earlier
-passing reruns alone.
+The packaged export failure was reproduced with retained native logs. The renderer had actually
+reported **blocked without complete review**, but the outer harness treated that as completion
+and emitted a misleading missing-file error. The proof could stop at the temporary unverified
+workspace screen. It now waits for verification, fails if verification never settles, and requires
+the exact expected export/review outcome before checking disk receipts. These changes preserve the
+application's refusal to act before verification. Regression tests cover delayed verification,
+permanently unverified state, and a wrong-destination completion notice. Failed runs retain private
+native logs and the temporary home; successful runs remove them.
+
+The recovery repair passed 3,031 ordinary Rust tests and all four macOS renderer integrations.
+The final rebuilt candidate and complete validation command remain under validation. Earlier
+passing reruns alone were not accepted as evidence that the intermittent proof failure was fixed.
 
 The [developer guide](developer-guide.md) defines the commands and evidence boundaries. The
 [user playbooks](user-playbooks.md) are the operational acceptance path. Signing, a clean-Mac

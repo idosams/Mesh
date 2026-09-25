@@ -74,7 +74,6 @@ function buttonContaining(root, label) {
 
 function closedReviewUnavailableReason(status) {
   return /could not verify a complete bounded review/u.test(status)
-    || /has not verified the current workspace/u.test(status)
     || /has concurrent saved heads/u.test(status);
 }
 
@@ -429,6 +428,7 @@ async function proveReview(configuration, dependencies) {
     const shadow = host?.shadowRoot;
     const unavailable = proofElement(shadow, 'review-unavailable');
     return visible(host, getComputedStyle) && visible(unavailable, getComputedStyle)
+      && !/has not verified the current workspace/u.test(unavailable.textContent || '')
       ? { state: 'unavailable', shadow, unavailable }
       : null;
   }, delay, 'the packaged React review workbench did not mount visibly');
@@ -886,6 +886,7 @@ async function provePrivateExport(configuration, dependencies) {
       && !candidate.disabled) return { state: 'ready', choose: candidate };
     const unavailable = proofElement(shadow, 'review-unavailable');
     return visible(host, getComputedStyle) && visible(unavailable, getComputedStyle)
+      && !/has not verified the current workspace/u.test(unavailable.textContent || '')
       ? { state: 'unavailable', shadow, unavailable }
       : null;
   }, delay, 'the packaged private export controls did not mount visibly');

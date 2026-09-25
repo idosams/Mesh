@@ -230,7 +230,9 @@ launches the exact bundled executable across eight isolated processes. It checks
 onboarding, saved-state restart, native Files actions, agent handoff, private export, review,
 and version navigation. The daemon checks and nonce-bound renderer receipts must agree; private
 export also requires the exact saved file bytes and executable mode on disk. Completion must
-belong to the selected destination and current React controls.
+belong to the selected destination and current React controls. A temporary unverified workspace
+is not a completed refusal journey: the proof waits for verification within its existing deadline
+and checks the expected renderer outcome before inspecting export receipts.
 It uses CoreGraphics to require the exact process's layer-zero on-screen window at the configured
 dimensions. When macOS grants window-title access, it also requires the exact
 `Mesh — Local workspace` title. Pass `--screenshot /absolute/path.png` after `--` to retain a

@@ -617,6 +617,24 @@ async function launch(
       `${label} process reopened the wrong workspace`,
     );
     await verifyStableFolder(expectedWorkspace);
+    if (rendererSurface === 'private-export') {
+      assert.equal(
+        rendererProof.outcome,
+        seedRepository === null
+          ? 'private-export-completed'
+          : 'private-export-blocked-without-complete-review',
+        'the renderer outcome must match the expected export journey before checking disk receipts',
+      );
+    }
+    if (rendererSurface === 'review') {
+      assert.equal(
+        rendererProof.outcome,
+        seedRepository === null
+          ? 'saved-side-native-launches-completed'
+          : 'incomplete-review-disclosed-without-authority',
+        'the renderer outcome must match the expected review journey',
+      );
+    }
     const result = whileRunning ? await whileRunning(state) : null;
     let screenshotProof = null;
     if (takeScreenshot && screenshot) {
@@ -677,6 +695,7 @@ async function launch(
     return { window, state, result, rendererProof, screenshotProof };
   } finally {
     await stop(child);
+    await writeFile(join(scratch, `${label}-stderr.log`), stderr, { mode: 0o600 });
   }
 }
 

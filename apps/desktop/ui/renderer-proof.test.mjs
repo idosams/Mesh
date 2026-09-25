@@ -689,7 +689,7 @@ test('review proof keeps every action disabled while workspace verification is s
   shadow.children = [unavailable, disabledApproval];
   const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
 
-  await runRendererProof({
+  await assert.rejects(runRendererProof({
     document: {
       getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
       defaultView: { Event: globalThis.Event, confirm: () => false },
@@ -700,15 +700,10 @@ test('review proof keeps every action disabled while workspace verification is s
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {},
-  });
+  }), /the packaged React review workbench did not mount visibly/);
 
-  assert.deepEqual(reports, [{
-    schema: 'mesh-renderer-proof/v1', nonce, surface: 'review', mounted: true,
-    visible: true,
-    interaction: 'bounded-incomplete-review-inspection',
-    outcome: 'incomplete-review-disclosed-without-authority',
-  }]);
-  assert.deepEqual(checkpoints, ['review-bounded-unavailable']);
+  assert.deepEqual(reports, []);
+  assert.deepEqual(checkpoints, []);
 });
 
 test('review proof classifies a failed Visual transition as review interaction, not configuration', () => {
@@ -937,7 +932,11 @@ test('private export proof refuses the original and completes the confirmed priv
   host.shadowRoot = shadow;
   const mounted = new Node({ proof: 'review-mounted' });
   const choose = button('Choose export folder');
-  shadow.children = [mounted, choose];
+  shadow.children = [new Node({
+    proof: 'review-unavailable',
+    text: 'Review details are unavailable. Mesh has not verified the current workspace. Refresh successfully before relying on review details.',
+  })];
+  let verificationWaits = 0;
 
   const destinationHost = new Node();
   const destinationShadow = new Node();
@@ -1009,6 +1008,10 @@ test('private export proof refuses the original and completes the confirmed priv
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {
+      if (verificationWaits === 0) {
+        verificationWaits += 1;
+        shadow.children = [mounted, choose];
+      }
       if (completionPending) {
         completionWaits += 1;
         completionPending = false;
@@ -1021,6 +1024,7 @@ test('private export proof refuses the original and completes the confirmed priv
     },
   });
 
+  assert.equal(verificationWaits, 1, 'the proof must wait for workspace verification');
   assert.equal(completionWaits, 1, 'a different destination notice must not report completion');
   assert.equal(document.defaultView.confirm(), false, 'the proof must restore normal confirmation');
   assert.ok(blockedTransitionWaits >= 1, 'the proof clicked a destination control before its host became actionable');
@@ -1093,7 +1097,7 @@ test('private export proof remains blocked while workspace verification is settl
   })];
   const appHost = productionNoticeShell(new Node({ proof: 'production-notice' }), 'Review');
 
-  await runRendererProof({
+  await assert.rejects(runRendererProof({
     document: {
       getElementById: (id) => id === 'mesh-app-next' ? appHost : host,
       addEventListener: () => {},
@@ -1105,15 +1109,10 @@ test('private export proof remains blocked while workspace verification is settl
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {},
-  });
+  }), /the packaged private export controls did not mount visibly/);
 
-  assert.deepEqual(reports, [{
-    schema: 'mesh-renderer-proof/v1', nonce, surface: 'private-export', mounted: true,
-    visible: true,
-    interaction: 'bounded-review-private-export-refusal',
-    outcome: 'private-export-blocked-without-complete-review',
-  }]);
-  assert.deepEqual(checkpoints, ['private-export-start', 'private-export-bounded-blocked']);
+  assert.deepEqual(reports, []);
+  assert.deepEqual(checkpoints, ['private-export-start']);
 });
 
 test('agent handoff proof drives Start, confirmed Finish, and the saved rescan result', async () => {
