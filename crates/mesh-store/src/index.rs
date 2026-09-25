@@ -145,6 +145,10 @@ pub struct Index {
     /// index holds — the difference between a recovery that is linear in the journal and one that
     /// is quadratic, which is what plan §6.3's five-second budget is spent on.
     chains: BTreeMap<(RecordDigest, u64), RecordDigest>,
+    /// Parent identifiers named by accepted operations, including parents not yet received.
+    /// A new operation can close a cycle only if an existing edge already points to its id.
+    /// This derived lookup avoids scanning the whole ancestry of each ordinary append.
+    referenced_parents: BTreeSet<RecordDigest>,
     manifests: BTreeMap<RecordDigest, ManifestRecord>,
     peers: BTreeMap<RecordDigest, PeerRecord>,
     watermarks: BTreeMap<(RecordDigest, RecordDigest), u64>,
@@ -216,13 +220,16 @@ impl Index {
                     parent: *parent,
                 });
             }
-            if self.parent_path_reaches(parent, &operation.id) {
+            if self.referenced_parents.contains(&operation.id)
+                && self.parent_path_reaches(parent, &operation.id)
+            {
                 return Err(FoldError::CausalCycle {
                     operation: operation.id,
                     parent: *parent,
                 });
             }
         }
+        self.referenced_parents.extend(parents);
         self.chains.insert(slot, operation.id);
         self.operations.insert(operation.id, operation);
         Ok(())
@@ -891,6 +898,61 @@ mod tests {
             content_digest: digest(id.wrapping_add(50)),
             chunks,
         }
+    }
+
+    #[test]
+    fn out_of_order_cycles_are_refused_without_changing_the_index() {
+        let mut index = Index::new();
+        let mut first = operation(1, 9, 1);
+        first.parents = vec![digest(2)];
+        let mut second = operation(2, 9, 2);
+        second.parents = vec![digest(3)];
+        index.apply(StoredRecord::Operation(first)).unwrap();
+        index.apply(StoredRecord::Operation(second)).unwrap();
+        let before = index.clone();
+        let mut third = operation(3, 9, 3);
+        third.parents = vec![digest(4), digest(1)];
+        assert_eq!(
+            index.apply(StoredRecord::Operation(third)),
+            Err(FoldError::CausalCycle {
+                operation: digest(3),
+                parent: digest(1)
+            })
+        );
+        assert_eq!(
+            index, before,
+            "rejected edges must not enter the derived lookup"
+        );
+        index
+            .apply(StoredRecord::Operation(operation(3, 9, 3)))
+            .unwrap();
+        assert_eq!(
+            index.causally_ready_operations(),
+            vec![digest(3), digest(2), digest(1)]
+        );
+    }
+
+    #[test]
+    fn parent_lookup_is_independent_of_delivery_order() {
+        let first = operation(1, 9, 1);
+        let mut second = operation(2, 9, 2);
+        second.parents = vec![digest(1)];
+        let mut third = operation(3, 9, 3);
+        third.parents = vec![digest(1), digest(2)];
+        let records = [first, second, third];
+        let mut forward = Index::new();
+        let mut reverse = Index::new();
+        for record in &records {
+            forward
+                .apply(StoredRecord::Operation(record.clone()))
+                .unwrap();
+        }
+        for record in records.iter().rev() {
+            reverse
+                .apply(StoredRecord::Operation(record.clone()))
+                .unwrap();
+        }
+        assert_eq!(forward, reverse);
     }
 
     #[test]

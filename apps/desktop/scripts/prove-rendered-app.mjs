@@ -135,8 +135,9 @@ async function waitForPrivateExportReceipt() {
       await delay(50);
     }
   }
+  const state = await requestWorkspaceState();
   throw new Error(
-    `the packaged private export reported completion before its exact files were visible: ${lastError?.message || 'missing receipt'}; visible=${visible.sort().join(',')}`,
+    `workspace files=${state.file_histories.length}; the packaged private export reported completion before its exact files were visible: ${lastError?.message || 'missing receipt'}; visible=${visible.sort().join(',')}`,
   );
 }
 
@@ -756,6 +757,7 @@ async function launchEmpty() {
   }
 }
 
+let proofCompleted = false;
 try {
   const empty = await launchEmpty();
   const canonicalWorkspace = await realpath(empty.initialized.root);
@@ -1140,11 +1142,16 @@ try {
     },
     ipc: { version: IPC_VERSION, surface_version: IPC_VERSION },
   })}\n`);
+  proofCompleted = true;
 } finally {
-  await rm(scratch, {
-    recursive: true,
-    force: true,
-    maxRetries: 10,
-    retryDelay: 100,
-  });
+  if (proofCompleted) {
+    await rm(scratch, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
+  } else {
+    console.error(`Packaged proof failed; private diagnostic workspace retained at ${scratch}`);
+  }
 }

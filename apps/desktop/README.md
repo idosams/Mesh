@@ -226,15 +226,18 @@ onboarding, workspace-overview, and review-workbench markers. This independently
 archive whose build hook omitted the new interface even if the established controller tests pass. Before archive
 verification exercises the extracted app, it requires the complete desktop control suite from the
 same clean Git revision. The windowed app proof
-launches that exact bundled executable
-twice with an isolated home directory, queries the embedded daemon over its local Unix socket, and
-requires the same remembered workspace digest and record count after the second process starts. It
-also uses CoreGraphics to require the exact process's layer-zero on-screen window at the configured
+launches the exact bundled executable across eight isolated processes. It checks empty-state
+onboarding, saved-state restart, native Files actions, agent handoff, private export, review,
+and version navigation. The daemon checks and nonce-bound renderer receipts must agree; private
+export also requires the exact saved file bytes and executable mode on disk. Completion must
+belong to the selected destination and current React controls.
+It uses CoreGraphics to require the exact process's layer-zero on-screen window at the configured
 dimensions. When macOS grants window-title access, it also requires the exact
 `Mesh — Local workspace` title. Pass `--screenshot /absolute/path.png` after `--` to retain a
-picture of that window; macOS Screen Recording permission is required. The windowed proof drives
-the authenticated daemon boundary rather than clicking browser controls; the separately reported
-desktop control suite covers those controls and their fail-closed states. The build applies and
+picture of that window; macOS Screen Recording permission is required. A failed proof retains its
+private temporary home and prints its path for diagnosis; a successful proof removes that home.
+When using a real seed repository, retained diagnostics can contain project files: keep them
+private, review before sharing, and remove the printed temporary folder when finished. The build applies and
 strictly verifies an ad-hoc resource seal so the executable, Info.plist, and icon form one
 internally valid local application bundle after copying. It remains intentionally unsigned by an
 Apple Developer ID and unnotarized: the seal proves local bundle integrity, not that a

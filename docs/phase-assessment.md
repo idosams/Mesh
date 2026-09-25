@@ -48,10 +48,27 @@ Test discovery is not a passing-test claim.
 
 ## Validation status
 
-The documentation audit and its five regression tests pass. The restored storage-budget gate
-passes, including thirteen rejected mutations and seven accepted tolerances. Full-suite,
-platform-integration, and packaged-app validation are in progress; this document does not claim
-those results yet. Hosted CI has not run for this candidate.
+The initial candidate passed the complete local suite: 3,029 Rust, 92 React, 439 desktop,
+five documentation tests, the storage-budget mutation checks, and all 44 real-daemon assertions.
+All four explicit macOS PDF/Office renderer integrations passed using checked-in synthetic
+fixtures. The minimum supported Node 22.18 runtime passed the complete desktop suite. Dependency
+checks passed under the existing advisory policy; no exception was added to make them pass.
+Hosted CI has not run for this branch.
+
+The separate recovery measurement exposed a regression that the normal cost counters missed:
+6,912 ms on a quiet machine against the unchanged 5,000 ms limit. A derived parent lookup removes
+redundant ancestry scans for ordinary appends while preserving out-of-order cycle checks. The
+same workload then measured 236 ms; all 308 storage tests, including the explicit timing test,
+passed. See [the recovery budget](../benchmarks/budgets/recovery.md) for measurement limits.
+
+One packaged run reported private-export completion with the expected files absent. Two reruns
+passed, including the original concurrent measurement setup. The proof also had a reproducible
+verification gap: it accepted a completion notice for a different destination. A regression test
+now rejects that notice; completion requires current controls and the exact selected destination.
+Failed runs retain private diagnostics instead of deleting the evidence. This is not yet a
+confirmed explanation of the first missing-file failure. The final rebuilt candidate and its
+complete suite remain under validation; packaged readiness must not be inferred from earlier
+passing reruns alone.
 
 The [developer guide](developer-guide.md) defines the commands and evidence boundaries. The
 [user playbooks](user-playbooks.md) are the operational acceptance path. Signing, a clean-Mac

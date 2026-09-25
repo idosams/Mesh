@@ -61,20 +61,27 @@ towards the ceiling is visible before it crosses it.
 The span is an **upper bound on this hardware with this driver**, never "recovery takes 256 ms": the
 driver pays a process spawn a production one would not.
 
-## 4. Why counts are a faithful stand-in for the clock
+## 4. What the cost counters cover
 
-Under the process-per-batch driver a `sqlite3` spawn costs milliseconds and dominates everything
-else, so the five-second budget is spent in exactly two places: how many processes the rebuild asks
-for, and how much SQL it hands each one. A rebuild pinned at a fixed process count and a fixed
-number of statements per record cannot leave the budget without the hardware changing. A rebuild
-that spawns per record, or composes a second statement per record, breaks the counters — and, as §5
-shows by measurement rather than by argument, breaks the clock at the same time.
+The process-per-batch driver counters bound SQLite process launches, SQL statement count, and
+SQL bytes. They are independent of machine load and catch expensive changes at that boundary.
+They do **not** bound in-memory graph traversal or SQLite time per statement. The separate
+wall-clock measurement remains necessary; a passing cost model is not a latency result.
 
-The counters are identical on a saturated machine and an idle one, which is the whole property the
-elapsed-time comparison did not have.
+### 2026-09-25 local-alpha regression and repair
 
-What the counters do **not** catch is a change that makes SQLite itself slower per statement at
-constant statement count. That is what §2 is for, and it is stated here rather than left implied.
+The alpha.4-derived candidate recovered 4,006 records in **6,912 ms** on an otherwise quiet
+machine, exceeding the unchanged 5,000 ms budget. Causal cycle detection traversed the entire
+existing ancestry for every appended operation, making an ordinary chain quadratic even though
+the SQL counters passed.
+
+The index now derives a set of parent identifiers from accepted operations. If no existing edge
+names a new operation, inserting it cannot close a cycle; no ancestry scan is needed. When an
+out-of-order operation is already named by an existing edge, the full cycle check still runs.
+Rejected operations leave all derived lookups unchanged. No journal or database format changes.
+The same workload after this repair measured **236 ms** with the debug test profile and existing
+SQLite process driver. This is a local measurement, not a latency guarantee across hardware or
+arbitrarily ordered graphs. Out-of-order delivery can still require ancestry traversal.
 
 ## 5. The gate has been shown to fire, with the exit codes it fired with
 

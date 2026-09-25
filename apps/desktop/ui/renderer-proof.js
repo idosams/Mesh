@@ -1048,8 +1048,16 @@ async function provePrivateExport(configuration, dependencies) {
   // verifier-owned /tmp home. Normal launches retain the ordinary human confirmation dialog.
   controls.confirm.click();
   await waitFor(
-    () => visible(controls.notice, getComputedStyle)
-      && /^Saved changes, moves, and deletions are applied to /u.test(controls.notice.textContent || ''),
+    () => {
+      const current = readControls();
+      return current
+        && current.selected.textContent === configuration.destination
+        && current.confirm.disabled
+        && visible(current.notice, getComputedStyle)
+        && (current.notice.textContent || '').startsWith(
+          `Saved changes, moves, and deletions are applied to ${configuration.destination}.`,
+        );
+    },
     delay,
     'the packaged private export did not complete the confirmed private copy',
   );

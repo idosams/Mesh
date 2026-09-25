@@ -953,6 +953,8 @@ test('private export proof refuses the original and completes the confirmed priv
   const productionHost = productionNoticeShell(notice, 'Review');
   let generations = 0;
   let blockedTransitionWaits = 0;
+  let completionPending = false;
+  let completionWaits = 0;
   const installDestinationGeneration = (value = '', planText = null) => {
     generations += 1;
     destinationHost.inert = true;
@@ -969,7 +971,10 @@ test('private export proof refuses the original and completes the confirmed priv
     preview.proof = 'destination-preview-all';
     preview.disabled = !value || value === source;
     const confirm = button('Update changed files', () => {
-      notice.textContent = `Saved changes, moves, and deletions are applied to ${destination}.`;
+      // A notice from another destination must not satisfy this proof. Completion replaces
+      // the React controls, so retaining the pre-click notice is also insufficient.
+      notice.textContent = 'Saved changes, moves, and deletions are applied to /tmp/other.';
+      completionPending = true;
     });
     confirm.proof = 'destination-confirm-all';
     confirm.disabled = planText === null;
@@ -1004,12 +1009,19 @@ test('private export proof refuses the original and completes the confirmed priv
     }, reports, checkpoints),
     getComputedStyle: visible,
     delay: async () => {
+      if (completionPending) {
+        completionWaits += 1;
+        completionPending = false;
+        notice.textContent = `Saved changes, moves, and deletions are applied to ${destination}.`;
+        installDestinationGeneration(destination);
+      }
       if (destinationHost.inert) blockedTransitionWaits += 1;
       destinationHost.inert = false;
       destinationHost.setAttribute('aria-busy', 'false');
     },
   });
 
+  assert.equal(completionWaits, 1, 'a different destination notice must not report completion');
   assert.equal(document.defaultView.confirm(), false, 'the proof must restore normal confirmation');
   assert.ok(blockedTransitionWaits >= 1, 'the proof clicked a destination control before its host became actionable');
   assert.ok(generations >= 3, 'the proof did not cross replacement React generations');
