@@ -9,6 +9,7 @@
 - [Consistency model](consistency.md) — durability, actor heads, review, and publication.
 - [Threat model](threat-model.md) — assets, trust boundaries, attacks, and mitigations.
 - [Phase assessment](phase-assessment.md) — source baseline, readiness gaps, and validation boundaries.
+- [Local alpha validation](local-alpha-validation.md) — tested revision, results, fixes, and release limits.
 - [Project status](project-status.md) — implemented, partial, and planned behavior.
 - [Public alpha](launch/public-alpha.md) — release scope and installation boundary.
 

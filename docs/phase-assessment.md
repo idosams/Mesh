@@ -71,8 +71,12 @@ permanently unverified state, and a wrong-destination completion notice. Failed 
 native logs and the temporary home; successful runs remove them.
 
 The recovery repair passed 3,031 ordinary Rust tests and all four macOS renderer integrations.
-The final rebuilt candidate and complete validation command remain under validation. Earlier
-passing reruns alone were not accepted as evidence that the intermittent proof failure was fixed.
+The final candidate `d942533b4727d4b662690e9e59cbac024ca92195` passed the complete validation
+command and two consecutive eight-process packaged journeys, including concurrent recovery
+measurement. The local readiness phase is complete within its stated scope. See the
+[validation record](local-alpha-validation.md) for exact commands, results, skips, artifact
+identity, and release boundaries. Earlier passing reruns alone were not accepted as evidence
+that the intermittent proof failure was fixed.
 
 The [developer guide](developer-guide.md) defines the commands and evidence boundaries. The
 [user playbooks](user-playbooks.md) are the operational acceptance path. Signing, a clean-Mac
