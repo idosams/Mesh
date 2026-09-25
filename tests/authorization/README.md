@@ -4,8 +4,8 @@
 in this directory does not.** [`mesh-policy`](../../crates/mesh-policy/) tests agent, delegation,
 replay, expiry, revocation, epoch, and human-principal attack paths and treats zero unauthorized
 policy decisions as the bar. See
-[Project status](../../docs/project-status.md) and query the E13 owner in the
-[program map](../../docs/program-map.md).
+[Project status](../../docs/project-status.md) and use the
+[public issue tracker](https://github.com/idosams/Mesh/issues).
 
 The cross-component publication attack harness. Zero unauthorized publications is the bar.
 
@@ -15,6 +15,4 @@ guard; it is not evidence for every composed path.
 
 Find the tasks that fill it:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

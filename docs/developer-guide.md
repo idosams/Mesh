@@ -7,7 +7,7 @@ durable workspace state; clients use the local IPC protocol rather than opening 
 
 - Git
 - The Rust toolchain pinned in `rust-toolchain.toml`
-- Node.js 22.6 or newer
+- Node.js 22.18 or newer (the locked Vite build and direct TypeScript tests require it)
 - `cargo-nextest`
 - The native Tauri prerequisites for your operating system
 
@@ -20,10 +20,13 @@ development packages named in `.github/workflows/rust.yml`.
 npm test
 ```
 
-This runs the license mutation checks, Rust formatting and linting, all Rust workspace tests, and
-the complete desktop/React test suite. Individual commands:
+This runs the documentation audit and its regression tests, license and storage-budget mutation
+checks, Rust formatting and linting, all Rust workspace tests, the complete desktop/React suite, and the real daemon restart demo. Individual commands:
 
 ```bash
+npm run verify:docs
+npm run verify:storage
+npm run verify:demo
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo nextest run --workspace
@@ -51,3 +54,30 @@ backed-up projects during the alpha.
 
 Do not treat an internal Rust module or current JSON shape as a stable public API unless the
 protocol documentation explicitly says it is versioned.
+
+## Validation boundaries
+
+Run commands from the repository root unless a guide says otherwise. The documentation audit
+checks local Markdown file destinations and literal npm script examples against package manifests.
+It checks neither external URLs nor heading fragments and does not execute examples. Rendered HTML
+and packaged text guides still need the desktop guide tests and visual verification.
+
+Pull requests run Rust checks on Linux and macOS, full-workspace linting on macOS, and the
+macOS desktop/React, documentation, and storage checks. The nightly job runs the complete local
+command plus dependency policy. A configured workflow is not evidence of a successful hosted run;
+inspect the exact revision's results before release.
+
+On macOS, `npm run test:macos-renderers` runs all four PDFKit and Office integration cases using checked-in synthetic fixtures.
+It is also a separate macOS CI step. Other measurement and helper cases remain explicitly ignored in the ordinary Rust suite. Run those separately
+on the required platform before claiming their behavior. For a local macOS package, use the
+[desktop build and rendered-proof instructions](../apps/desktop/README.md). Build from a clean,
+committed tree so the embedded revision identifies the tested bytes. Ad-hoc packaging cannot prove
+Secure Enclave approval in an eligible signed distribution or installation on a clean Mac.
+
+When a test fails, retain its output and reproduce the named case before changing code. Local
+socket restrictions, absent renderer permissions, and missing tools are environment failures;
+report them separately from product defects. Never remove a check or relax its assertion merely
+to obtain a passing run.
+
+The Node minimum includes default TypeScript stripping, introduced in
+[Node 22.18](https://nodejs.org/en/blog/release/v22.18.0), and satisfies the locked Vite engine.

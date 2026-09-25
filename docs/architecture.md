@@ -1,9 +1,10 @@
 # Mesh architecture
 
-This document explains the repository's current structure and intended boundaries. The
-machine-checked authority for unit placement, capabilities, owners, and dependency direction is
-[`tools/program/arch-check/architecture.json`](../tools/program/arch-check/architecture.json).
-Run `node tools/program/arch-check/check.mjs` when that structure changes.
+This document explains the public repository's structure and intended boundaries. The workspace
+members and direct dependencies are declared in [Cargo.toml](../Cargo.toml) and each crate's
+manifest. The former internal architecture-map checker is not distributed in this public tree;
+its capability and ownership rules are not an automated public gate. Rust compilation, linting,
+and the subsystem tests validate the executable boundaries described below.
 
 For implementation maturity rather than design intent, use [Project status](project-status.md).
 
@@ -31,8 +32,7 @@ must not be inferred from the current local proof.
 
 ## The eight layers
 
-Dependencies point downward. A layer may depend on a lower-ranked layer, subject to the declared
-capabilities and exceptions in the machine map.
+Dependencies point downward. A layer may depend on a lower-ranked layer, subject to each crate's explicit dependency declarations.
 
 | Rank | Layer | Responsibility |
 |---:|---|---|
@@ -47,8 +47,8 @@ capabilities and exceptions in the machine map.
 
 Important capability labels include direct storage and database access, canonical mutation,
 network access, platform adaptation, model-provider access, UI presentation, and optional
-integration edges. The architecture checker rejects missing units, undeclared external
-dependencies, multiple owners, and dependency-direction violations.
+integration edges. Review changes to these boundaries explicitly; successful compilation alone does not prove
+architectural intent.
 
 ## Directory map
 
@@ -59,7 +59,7 @@ dependencies, multiple owners, and dependency-direction violations.
 | `platform/` | Operating-system adapters and packaging work |
 | `protocol/` | Versioned public schemas, vectors, conformance assets, and compatibility policy |
 | `integrations/` | Agent, provider, and version-control integration surfaces |
-| `services/` | Reserved-source hosted-service scaffolds; no operated service is present |
+| Hosted services | Maintained outside this public tree; no operated service is provided |
 | `tests/` | Cross-component, fault, security, convergence, and interoperability evidence |
 | `benchmarks/` and `models/` | Reproducible performance and correctness evidence |
 | `tools/program/` | Repository gates and program automation, not runtime product code |
@@ -119,7 +119,6 @@ benchmarks, simulators, or another reproducible oracle.
 
 ## Decisions and evolution
 
-Use [architecture decision records](adr/README.md) for durable tradeoffs. Change the machine map
-when unit placement or dependency authority changes, and update this document when that affects
-the reader-facing model. Product requirements belong in the [charter](charter.md) and
+Use the [public decision summaries](design-decisions.md) for durable tradeoffs. Update crate
+manifests and this document when dependency authority or the reader-facing model changes. Product requirements belong in the [charter](charter.md) and
 [PRD](product-prd.md); observed delivery belongs in [project status](project-status.md).

@@ -126,7 +126,7 @@ this protocol exists. There is no third rule and no second framing, and an exter
 built from [`protocol/`](../protocol/README.md) can therefore recompute every name it is given.
 
 That replaces a contradiction which stood here until
-[ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md) ruled on
+[ADR-0033](design-decisions.md#adr-0033) ruled on
 it: §3.10's `DigestWriter` row described a second framing that `derive_id` used, so this section and
 that row could not both be true, and the visible cost was that an outside implementer could
 recompute a record's `canonical_digest` and not its `record ID`. The canonical encoding won. **The
@@ -363,8 +363,8 @@ implementation.
 | `file manifest` | The ordered list of chunk references that reconstructs a file version's bytes exactly. | state | `mesh-cas` |
 | `chunk` | A content-addressed, compressed byte range — the unit of storage, transfer and deduplication. | state | `mesh-chunking` |
 | `chunk reference` | A manifest entry naming a chunk by content digest together with its position and length. | state | `mesh-cas` |
-| `entity ID` | A UUIDv7 naming a mutable entity — workspace, session, object, capability. Never derived from content, because the content changes. **Never an `actor`**, though this row listed one until the two normative sources were reconciled: plan §4.2's `ActorId` won, because an actor's identity is its `actor key`, and a name not derived from that key would have to be bound to it by a record somebody could later rewrite — after which past authorship would verify against a key its signer never held. The cost is that a key cannot be rotated in place: rotating one names a new participant. Ruled in [ADR-0003](adr/0003-name-an-actor-by-its-key-not-by-a-minted-identifier.md). | — | `mesh-types` |
-| `record ID` | The `content digest` of an immutable canonical record's `canonical encoding`, which is that record's name — version, file manifest, ChangeSet, head, bundle, approval, receipt, and an actor, which is named by the immutable record that is its `actor key` and never by the mutable actor record around it. A `chunk` is not on that list: it has no schema, so it is named by a `content digest` of its own bytes instead. Recomputes identically from content, which is what makes such records self-verifying, and recomputes from a published document rather than from an implementation, which is what makes them externally verifiable. Ruled in [ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md); `crates/mesh-types` lags the rule until `01KZFMZC4MTHTT3BW4Y0BW6NYA`. | — | `mesh-types` |
+| `entity ID` | A UUIDv7 naming a mutable entity — workspace, session, object, capability. Never derived from content, because the content changes. **Never an `actor`**, though this row listed one until the two normative sources were reconciled: plan §4.2's `ActorId` won, because an actor's identity is its `actor key`, and a name not derived from that key would have to be bound to it by a record somebody could later rewrite — after which past authorship would verify against a key its signer never held. The cost is that a key cannot be rotated in place: rotating one names a new participant. Ruled in [ADR-0003](design-decisions.md#adr-0003). | — | `mesh-types` |
+| `record ID` | The `content digest` of an immutable canonical record's `canonical encoding`, which is that record's name — version, file manifest, ChangeSet, head, bundle, approval, receipt, and an actor, which is named by the immutable record that is its `actor key` and never by the mutable actor record around it. A `chunk` is not on that list: it has no schema, so it is named by a `content digest` of its own bytes instead. Recomputes identically from content, which is what makes such records self-verifying, and recomputes from a published document rather than from an implementation, which is what makes them externally verifiable. Ruled in [ADR-0033](design-decisions.md#adr-0033); `crates/mesh-types` lags the rule until `01KZFMZC4MTHTT3BW4Y0BW6NYA`. | — | `mesh-types` |
 | `content digest` | The BLAKE3 hash of a byte sequence, used to name chunks and to verify content on receipt, and — applied to a record's `canonical encoding` — to produce that record's `record ID`. | — | `mesh-crypto` |
 | `canonical encoding` | The deterministic serialization every signed record is encoded with — CBOR for signed records, protobuf on the wire — such that two independent implementations produce byte-identical output. | — | `mesh-types` |
 | `test vector` | A published input/output pair that pins the canonical encoding, so an external implementation can prove byte-identical agreement. | — | `protocol/test-vectors` |
@@ -590,14 +590,14 @@ about that before this change.
 | `Blake3` | The `ContentDigest` implementation Mesh uses, and the only one today. | — | `crates/mesh-types` |
 | `Blake3Hasher` | The `DigestHasher` state `Blake3` drives: the BLAKE3 tree hasher, implemented in-crate so that `mesh-types` carries no dependency. | — | `crates/mesh-types` |
 | `DomainTag` | The versioned label naming a record type, encoded as the first element of that record's `canonical encoding`, so that two records with identical field values in different domains never share an identifier. | — | `crates/mesh-types` |
-| `DigestWriter` | The retired identity framing: a `DomainTag`, then every variable-length field preceded by its length. It produced a second byte string for every record, and no published document ever described it, which is why [ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md) retired it rather than publishing it. Present in `crates/mesh-types` until `01KZFMZC4MTHTT3BW4Y0BW6NYA` deletes it; it derives no name this document defines. | — | `crates/mesh-types` |
-| `Absorb` | The ability to contribute fields to a `DigestWriter` in a fixed order. Retired with it under [ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md); `CanonicalEncode` is the one remaining way a record produces bytes. | — | `crates/mesh-types` |
+| `DigestWriter` | The retired identity framing: a `DomainTag`, then every variable-length field preceded by its length. It produced a second byte string for every record, and no published document ever described it, which is why [ADR-0033](design-decisions.md#adr-0033) retired it rather than publishing it. Present in `crates/mesh-types` until `01KZFMZC4MTHTT3BW4Y0BW6NYA` deletes it; it derives no name this document defines. | — | `crates/mesh-types` |
+| `Absorb` | The ability to contribute fields to a `DigestWriter` in a fixed order. Retired with it under [ADR-0033](design-decisions.md#adr-0033); `CanonicalEncode` is the one remaining way a record produces bytes. | — | `crates/mesh-types` |
 | `CanonicalRecord` | An immutable record whose identity is a digest of its own content: it names the `record ID` type it produces and the `DomainTag` it is encoded under. Its name is the `content digest` of its `canonical encoding`, so a record's schema is the only thing that decides what it is called, and no `entity ID` can be named by it. | — | `crates/mesh-types` |
 | `derive_id` | The function that turns a `CanonicalRecord` into its `record ID`: the `content digest` of that record's `canonical encoding`, and nothing else. `crates/mesh-types` still computes it through the retired framing until `01KZFMZC4MTHTT3BW4Y0BW6NYA`. | — | `crates/mesh-types` |
 | `ActorId` | The `record ID` of an `actor`, derived from that actor's `actor key` and from nothing else, so that renaming or disabling an actor cannot rename it. The key is a canonical record in its own right — one thirty-two-byte field under its own `DomainTag` — so an `ActorId` comes from the one rule and not from a second one, which is also what makes it computable outside this repository. `crates/mesh-types` joins the tag to the key without an encoding until `01KZFMZC4MTHTT3BW4Y0BW6NYA`. | trust | `crates/mesh-types` |
 | `VersionId` | The `record ID` of a `version` — a `file version` or a `directory version`, each derived under its own `DomainTag`. | state | `crates/mesh-types` |
 | `ManifestId` | The `record ID` of a `file manifest`. | state | `crates/mesh-types` |
-| `ContentHash` | The `content digest` of a byte sequence: the name a `chunk` is stored and verified under. Not a `record ID` — a `chunk` has no schema and no `canonical encoding`, and hashing its bytes bare is what lets any BLAKE3 tool verify one. Reclassified in [ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md); nothing about how a chunk is hashed changed. | state | `crates/mesh-types` |
+| `ContentHash` | The `content digest` of a byte sequence: the name a `chunk` is stored and verified under. Not a `record ID` — a `chunk` has no schema and no `canonical encoding`, and hashing its bytes bare is what lets any BLAKE3 tool verify one. Reclassified in [ADR-0033](design-decisions.md#adr-0033); nothing about how a chunk is hashed changed. | state | `crates/mesh-types` |
 | `ChangeSetId` | The `record ID` of a `ChangeSet`, binding every field except the signature over them. | operation | `crates/mesh-types` |
 | `HeadId` | The `record ID` of a `head` — an `actor head` or the `canonical head`. | state | `crates/mesh-types` |
 | `ReviewBundleId` | The `record ID` of a `review bundle`. | trust | `crates/mesh-types` |
@@ -637,7 +637,7 @@ about that before this change.
 | `encode_canonical` | The function producing a record's `canonical encoding`: an array whose first element is its `DomainTag` and whose remaining elements are its fields in schema order. | — | `crates/mesh-types` |
 | `decode_canonical` | The inverse of `encode_canonical` under a known `RecordSchema`, refusing another record type's `DomainTag`, a field of the wrong shape, and any byte after the record ends. | — | `crates/mesh-types` |
 | `DecodeError` | Why some bytes are not the `canonical encoding` of a record under a given `RecordSchema`. | — | `crates/mesh-types` |
-| `canonical_digest` | The `content digest` of a record's `canonical encoding` — the digest a signature over that record's bytes covers, and, under [ADR-0033](adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md), that record's `record ID`. The two were separate values until that ruling and are one value afterwards. | — | `crates/mesh-types` |
+| `canonical_digest` | The `content digest` of a record's `canonical encoding` — the digest a signature over that record's bytes covers, and, under [ADR-0033](design-decisions.md#adr-0033), that record's `record ID`. The two were separate values until that ruling and are one value afterwards. | — | `crates/mesh-types` |
 | `schema_violations` | Every way a record's field values disagree with its published `RecordSchema`; empty when they agree. What keeps a published schema describing the bytes it claims to. | — | `crates/mesh-types` |
 | `SchemaViolation` | One such disagreement: a wrong field count, a wrong shape, or a fixed-width byte field of the wrong width, each naming the field it is about. | — | `crates/mesh-types` |
 | `SCHEMA_FORMAT` | The version of the schema vocabulary published under `protocol/schemas`. | — | `crates/mesh-types` |
@@ -1006,11 +1006,10 @@ copy would be a second definition. Two rules apply to every surface:
 > reproduced on every merge rather than on request.
 
 That block is the transcript recorded when the terminology gate landed, not a claim about this
-revision. On this tree the command reports **423 terms, 393 findings and exit 1**; none of those
-findings names `crates/mesh-operations`. `invocation-check` classifies the terminology entry point
-as deliberately not run because the remaining register debt would make every merge red. The
-historical transcript stays intact as evidence of its original run; these measured numbers state
-the current result without editing a past transcript into a result that never occurred.
+revision. The later internal audit recorded 423 terms, 393 findings, and exit 1; those historical
+counts have not been refreshed for this public tree. The terminology diagnostic is not on the
+public `npm test` path. Run it explicitly before relying on its current findings. The executable
+user-facing vocabulary checks remain on the desktop test path.
 
 **Where it lives.** Behind `--terminology` on the same entrypoint as the existing `--user-facing`
 mode, dispatched whole to a separate module. Two modes, two word lists, one entrypoint: §1.2 is why
@@ -1075,7 +1074,7 @@ failure mode a ceiling paragraph is supposed to prevent:
   it by name instead of expanding it — expanding it would let a crate's public surface grow without
   `src/lib.rs` changing, which is the silent drift the check exists to catch. The full argument, the
   alternatives it beat and the measurement behind it are
-  [`docs/adr/0019-reject-a-glob-re-export-rather-than-expand-it.md`](adr/0019-reject-a-glob-re-export-rather-than-expand-it.md).
+  [`docs/adr/0019-reject-a-glob-re-export-rather-than-expand-it.md`](design-decisions.md#adr-0019).
   This bullet cited `0027` until `01KZD0D413BE4GMX5RA9H3V8Z8`; `0027` was one of three copies of that
   one decision, and the two later copies are gone.
 - TL-10 reads the home cell, so it only asks a row to name a published item when that row is homed
@@ -1090,16 +1089,12 @@ failure mode a ceiling paragraph is supposed to prevent:
 until the term is defined or the code is renamed. This is the intended friction: the register is
 cheap to extend and expensive to bypass.
 
-**Where the check is wired.** `npm test` runs it. The `verify:terminology` script in `package.json`
-is `node tools/program/vocab-lint/lint.mjs --terminology`, `verify` invokes it between the ADR check
-and the storage budget, and `test` invokes `verify` — so deleting a row from §3.10, or breaking the
-implementation of a check in a way the repository tree cannot expose, turns the merge path red
-rather than staying green until somebody remembers to type the command. The self-test runs in the
-same invocation, which is the half that matters for the second case: four mutations planted in the
-reach — re-export scanning disabled, glob reporting removed, a rename ignored, the declaration site
-never resolved — each left the register itself clean over the real tree, and only the mutation suite
-caught them. `tools/program/npm-wiring.mjs`, enforced from two checkers, is what stops the script
-being defined and never invoked; that is the failure this paragraph used to describe as a deferral.
+**Current public gate wiring.** The terminology command and historical transcript above are
+retained as diagnostic evidence. The public package does not define `verify:terminology`, and
+`npm test` does not run that diagnostic. It does run the user-facing vocabulary gate through the
+desktop suite. See [the developer guide](developer-guide.md) for the complete current validation
+commands. The earlier internal wiring described in the historical transcript is not a current
+public-repository guarantee.
 
 ---
 

@@ -13,9 +13,7 @@ lists what a row must carry.
 **Mostly unstarted, and visibly so.** Two files is not a benchmark programme. The rest of E08
 fills this directory; find what is outstanding with:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.
 
 Reproduce any row from the row alone — clone the `repository.remote` it names, check out its
 `repository.commit`, and run its `invocation`. `benchmarks/runners/README.md` has the recipe and

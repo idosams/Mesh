@@ -1,35 +1,28 @@
 # Codex integration
 
-**Maturity: bounded functional alpha.** The desktop can open one exact native Mesh workspace in
-Codex with a bundled, read-only MCP bridge. It does not yet provide the complete distinct-agent-run
-identity or mutation surface described in the target architecture. Select **Open in Codex** under
-**Current**. Mesh then:
+**Maturity: bounded functional alpha.** The macOS desktop opens an exact native Mesh folder in
+Codex with optional read-only Mesh context. It does not provide complete per-run identity,
+version-attributed reads, or an agent mutation API.
 
-1. re-verifies the displayed workspace root, journal digest, physical installation, and real
-   version directory;
-2. writes the MCP configuration under the workspace's private store and exposes it through a
-   project-local `.codex` symlink, so the machine-specific application and socket paths never
-   become saved workspace content;
-3. opens the exact version directory in the Codex desktop app, never the retargetable
-   `native-workspace/current` convenience link; and
-4. runs the bridge from the same installed Mesh executable with the expected physical workspace
-   root and installation fixed in its arguments.
+Start Codex using the action on the selected current or saved version. Mesh verifies the physical
+workspace, installation, and version before handing off the real folder. The agent stays pinned to
+that folder when Mesh selects another version; the moving navigation link does not move its work.
 
-The [Mesh MCP alpha bridge](../../crates/mesh-mcp/README.md) documents the standalone protocol and
-manual configuration for development builds.
+The native launcher supplies session-specific MCP configuration to `codex app`. New workspaces do
+not receive a generated `.codex` entry, and existing project or global settings remain unchanged.
+Mesh can refresh the exact private compatibility link created by older alpha builds. If a suitable
+Codex CLI cannot accept the context configuration, Codex can still open the folder and Mesh reports
+that its optional tool is unavailable. This behavior is implemented and tested in
+[the native launcher](../../apps/desktop/src-tauri/main.rs) and
+[context configuration](../../apps/desktop/src-tauri/codex_workspace.rs).
 
-Codex may ask the user to trust that folder once before it loads project configuration. The only
-tool currently exposed is `mesh_workspace_state`. It returns the running daemon's bounded,
-structured workspace projection and reconnects for every call. Durable saves may advance normally
-inside the same physical folder. If Mesh later serves a different root or physical installation,
-the tool refuses instead of silently showing another workspace.
+The only exposed tool is `mesh_workspace_state`. It returns a bounded verified projection from the
+running daemon. If Mesh is serving another physical folder or installation, the tool refuses;
+select the agent's exact folder in Mesh to inspect it again. The bridge cannot save, approve,
+publish, finish a handoff, or update the original folder.
 
-The root `.codex` path is created only when absent. An existing file, directory, or unrelated
-symlink is preserved and the launch refuses with manual-setup guidance. Reopening after a valid
-private save refreshes Mesh's private binding for the new Codex session. Removing the generated
-`.codex` symlink does not delete private workspace history or user files.
-
-This is an honest read-only context slice, not the complete §8.2 agent integration. Codex edits the
-ordinary native files using its normal filesystem tools; return to Mesh to inspect and explicitly
-save those changes. The bridge does not yet expose Mesh file reads, search, changes, checkpoints,
-publication, or approval, and it does not yet record distinct agent-run/read-ledger identities.
+The agent edits ordinary files through its usual tools. When it finishes, stop every writer using
+that folder, select it in Mesh, and follow **Finish agent handoff** through inspection and private
+saving. See the [user playbooks](../../docs/user-playbooks.md) for the complete sequence, recovery,
+and export boundaries. The [MCP bridge guide](../../crates/mesh-mcp/README.md) covers standalone
+configuration for development.

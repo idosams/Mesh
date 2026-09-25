@@ -1,6 +1,6 @@
 # User guide
 
-This guide covers the local Mesh proof that works today. It does not describe a released product.
+This guide covers the local Mesh proof that works today. The downloadable technical alpha remains a prerelease.
 The default demonstration runs on macOS or Linux, uses a temporary workspace, and does not need an
 account or service credential.
 
@@ -22,7 +22,7 @@ See [Project status](project-status.md) for the complete boundary.
 
 - macOS or Linux
 - Git
-- Node.js 20 or newer
+- Node.js 22.18 or newer
 - the Rust toolchain selected by `rust-toolchain.toml`
 
 The first run may download Rust dependencies. From the repository root:
@@ -99,8 +99,7 @@ confirmation; Windows support and unattended installers are not ready. Follow th
 - Do not use this proof as the only copy of important work.
 
 Report security findings through the [private security channel](../.github/SECURITY.md), not a
-public issue. That channel is a publication blocker until private vulnerability reporting is
-enabled on the repository.
+public issue. Follow that policy for the report contents and response targets.
 
 ## Troubleshooting
 
@@ -109,11 +108,9 @@ command fails, run the normal command once so Cargo can populate its cache. If a
 starting, use the retained workspace path printed by the script and rerun without `--offline` to
 separate an environment problem from a product failure.
 
-For build-tool errors, run:
-
-```bash
-npm run preflight
-```
+For build-tool errors, check the prerequisites and commands in the
+[developer guide](developer-guide.md). For ordinary work, agent handoff, recovery, and export,
+follow the [user playbooks](user-playbooks.md).
 
 For known limitations or to verify whether a capability has landed since this guide was updated,
 check [Project status](project-status.md).

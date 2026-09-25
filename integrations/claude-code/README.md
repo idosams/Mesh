@@ -1,8 +1,8 @@
 # integrations/claude-code
 
 **Maturity: planned scaffold. No supported user-facing integration exists here.** See
-[Project status](../../docs/project-status.md) and query the E15 owner in the
-[program map](../../docs/program-map.md).
+[Project status](../../docs/project-status.md) and use the
+[public issue tracker](https://github.com/idosams/Mesh/issues).
 
 Claude Code integration with exact read attribution.
 
@@ -11,6 +11,4 @@ that "unstarted" is visible rather than absent. It is filled under **E15 context
 
 Find the tasks that fill it:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

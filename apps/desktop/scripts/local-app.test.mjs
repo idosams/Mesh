@@ -60,9 +60,9 @@ function generatedIconBytes() {
 }
 
 test('the local desktop package emits one macOS application bundle', () => {
-  assert.equal(pkg.engines.node, '>=22.6.0');
-  assert.match(readme, /Desktop development requires Node\.js 22\.6 or newer/);
-  assert.match(developerGuide, /Node\.js 22\.6 or newer/);
+  assert.equal(pkg.engines.node, '>=22.18.0');
+  assert.match(readme, /Desktop development requires Node\.js 22\.18 or newer/);
+  assert.match(developerGuide, /Node\.js 22\.18 or newer/);
   assert.equal(config.productName, 'Mesh');
   assert.equal(config.version, '0.1.0');
   assert.equal(config.identifier, 'dev.mesh.desktop');

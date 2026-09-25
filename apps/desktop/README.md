@@ -13,7 +13,7 @@ cannot open the database, store, filesystem or socket itself. Plan §8.1 and §8
 
 ## 0. Run the desktop app
 
-Desktop development requires Node.js 22.6 or newer, matching this package's `engines.node`
+Desktop development requires Node.js 22.18 or newer, matching this package's `engines.node`
 boundary and its direct TypeScript test/runtime commands. The narrower command-line demo described
 in `docs/demo.md` remains compatible with Node.js 20 or newer.
 

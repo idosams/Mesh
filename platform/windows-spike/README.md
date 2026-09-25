@@ -1,8 +1,8 @@
 # platform/windows-spike
 
 **Maturity: planned research scaffold. Windows is not a supported platform.** See
-[Project status](../../docs/project-status.md) and query the E06 owner in the
-[program map](../../docs/program-map.md).
+[Project status](../../docs/project-status.md) and use the
+[public issue tracker](https://github.com/idosams/Mesh/issues).
 
 WinFsp / ProjFS research. Deliberately after Linux and macOS stabilize.
 
@@ -11,6 +11,4 @@ that "unstarted" is visible rather than absent. It is filled under **E06 filesys
 
 Find the tasks that fill it:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

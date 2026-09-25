@@ -461,7 +461,7 @@ result. Two candidate homes exist in the register (`mesh-sync-protocol` for the 
 rather than a lane's preference.
 
 **That decision has since been taken, and it names this exact condition.**
-[ADR-0015](../docs/adr/0015-actor-heads-converge-without-a-global-lock-if-an-identifier-binds-its-parent-set.md)
+[ADR-0015](../docs/design-decisions.md#adr-0015)
 answers plan §11's research item R1 with *conditionally yes*, fixes the obligation on the crate that
 decodes a carried record into a delivered one, and states in its own words that the second half of
 the condition — a receiver recomputing the identifier from the bytes before head advancement sees

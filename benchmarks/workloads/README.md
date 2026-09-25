@@ -33,7 +33,7 @@ The generators are `crates/mesh-bench/src/corpus/**`; the determinism oracle is
 `crates/mesh-bench/tests/workload-generators.rs`. This directory holds the **contract surface**:
 the published digests, the verifier that re-checks them, and this page.
 
-That split is [ADR-0013](../../docs/adr/0013-describe-a-benchmark-corpus-before-materialising-it.md).
+That split is [ADR-0013](../../docs/design-decisions.md#adr-0013).
 The short version: `Cargo.lock` is governance surface no lane may write, so a new workspace member
 cannot exist, and the generators have to live inside a crate that already does. `mesh-bench` is
 the right one — the baseline runners and the Mesh runs must consume corpora from the *same*
@@ -270,6 +270,4 @@ drifting, not against an adversary choosing a corpus to collide with a published
 baseline runners and the Mesh runs consume identical generated corpora, which is what the
 manifest exists to make checkable.
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

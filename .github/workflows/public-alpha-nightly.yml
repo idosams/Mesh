@@ -20,13 +20,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.6.0
+          node-version: 22.18.0
           cache: npm
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@cargo-deny
       - name: Verify Rust and desktop source
         run: npm test
+      - name: Verify native PDF rendering
+        run: npm run test:macos-renderers
       - name: Verify dependency policy
         run: cargo deny check
       - name: Verify source manifest exists

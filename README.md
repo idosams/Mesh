@@ -35,27 +35,28 @@ different ordinary folder without presenting that export as approval.
 
 ## Run the local proof
 
-On macOS or Linux with the pinned Rust toolchain and Node.js 22.6 or newer:
+On macOS or Linux with the pinned Rust toolchain and Node.js 22.18 or newer:
 
 ```bash
 node examples/local-daemon-demo.mjs
 ```
 
-The proof builds and runs the real daemon and CLI, saves a file version, restarts over durable
+A normal passing run prints 44 `✓` checks. The proof builds and runs the real daemon and CLI, saves a file version, restarts over durable
 state, opens an exact review, proves software-held approval cannot publish, creates a redacted
 support bundle, and stops cleanly.
 
 ## Build and test
 
-Install the tools named in `rust-toolchain.toml`, plus `cargo-nextest`, Node.js 22.6 or newer, and
+Install the tools named in `rust-toolchain.toml`, plus `cargo-nextest`, Node.js 22.18 or newer, and
 the native desktop prerequisites for your platform.
 
 ```bash
 npm test
 ```
 
-The root test runs the Rust formatting, lint, and workspace suites, the complete desktop/React
-suite, and the source-licensing mutation checks. Useful individual commands:
+The root test runs documentation and storage-budget checks, Rust formatting, lint, and workspace
+suites, the complete desktop/React suite, source-licensing mutation checks, and the real daemon
+restart demonstration. Useful individual commands:
 
 ```bash
 cargo fmt --all --check
@@ -68,6 +69,7 @@ node tools/program/license-check.mjs --self-test
 ## Documentation
 
 - [User guide](docs/user-guide.md)
+- [User playbooks](docs/user-playbooks.md)
 - [Developer guide](docs/developer-guide.md)
 - [Architecture](docs/architecture.md)
 - [Protocol](docs/protocol.md)

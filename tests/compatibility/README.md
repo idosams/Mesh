@@ -16,6 +16,4 @@ Editor, build-tool, package-manager and filesystem-edge corpus.
 
 Find the tasks that fill it:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

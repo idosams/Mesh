@@ -4170,6 +4170,18 @@ mod tests {
     }
 
     #[cfg(target_os = "macos")]
+    fn renderer_fixture(variable: &str, name: &str) -> std::path::PathBuf {
+        std::env::var_os(variable).map_or_else(
+            || {
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../../tests/fixtures/artifact-renderers")
+                    .join(name)
+            },
+            std::path::PathBuf::from,
+        )
+    }
+
+    #[cfg(target_os = "macos")]
     #[test]
     #[ignore = "explicit macOS PDFKit process integration proof"]
     fn macos_pdfkit_renders_a_real_pdf_page_to_bounded_png_and_text() {
@@ -4184,7 +4196,7 @@ mod tests {
         let text = rendered.text.expect("page-aware inert text");
         assert_eq!(text.source, ArtifactTextSource::PdfPageText);
         assert_eq!(text.sections[0].label, "Page 1");
-        assert!(text.lines.iter().any(|line| line == "Mesh alpha"));
+        assert!(text.lines.iter().any(|line| line == "Mesh alpha page 1"));
     }
 
     #[cfg(target_os = "macos")]
@@ -4215,7 +4227,7 @@ mod tests {
     #[test]
     #[ignore = "explicit generated multi-page PDF and macOS PDFKit process integration proof"]
     fn macos_pdfkit_preserves_real_page_order_and_finance_hr_text() {
-        let fixture = std::env::var_os("MESH_TEST_PDF").expect("explicit PDF fixture path");
+        let fixture = renderer_fixture("MESH_TEST_PDF", "review.pdf");
         let bytes = std::fs::read(fixture).expect("read generated PDF fixture");
         for (page, expected) in [
             (1, "Board summary"),
@@ -4263,8 +4275,13 @@ mod tests {
             ),
         ];
         for (variable, path, kind, expected_text, expected_section) in fixtures {
-            let fixture = std::env::var_os(variable).expect("explicit Office fixture path");
-            let fixture = std::path::PathBuf::from(fixture);
+            let fixture_name = match kind {
+                ArtifactKind::Presentation => "review.pptx",
+                ArtifactKind::Document => "review.docx",
+                ArtifactKind::Spreadsheet => "review.xlsx",
+                _ => unreachable!("the fixture list contains only Office documents"),
+            };
+            let fixture = renderer_fixture(variable, fixture_name);
             let bytes = std::fs::read(&fixture).expect("read generated Office fixture");
             if kind == ArtifactKind::Presentation {
                 let presentation =
@@ -4307,7 +4324,7 @@ mod tests {
                 assert!(text
                     .lines
                     .iter()
-                    .any(|line| line == "D2\tformula\tB2-C2\tresult\t35000"));
+                    .any(|line| line == "D2\tformula\texpression\tpresent\tB2-C2\tattributes\t0\tresult\tcached\tnumber\t35000"));
             } else if kind == ArtifactKind::Presentation {
                 assert_eq!(text.source, ArtifactTextSource::PresentationSlides);
                 assert_eq!(

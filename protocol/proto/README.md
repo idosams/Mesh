@@ -62,7 +62,7 @@ than write into a claimed directory.
 ### One identifier here cannot be recomputed from published material
 
 `CarriedChangeSet.id` is a ChangeSet's record identifier, and
-[ADR-0015](../../docs/adr/0015-actor-heads-converge-without-a-global-lock-if-an-identifier-binds-its-parent-set.md)
+[ADR-0015](../../docs/design-decisions.md#adr-0015)
 requires a receiver to recompute it from `body` before that identifier may reach head advancement.
 An implementation built from this directory alone **cannot do that today**:
 [`../../docs/protocol.md`](../../docs/protocol.md) §2.1 says a content-derived name is computed
@@ -75,6 +75,4 @@ file, and it is stated here rather than left for an implementer to hit.
 
 ## Find the tasks that fill this directory
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

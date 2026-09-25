@@ -167,7 +167,7 @@ step.
 **Evidence that this is implementable from the published material.** A second CBOR decoder *and*
 encoder were written in Python from the profile page and the vectors alone — no Rust — and agreed
 with all ten published canonical vectors. That is recorded in
-[ADR-0007](../docs/adr/0007-encode-signed-records-as-fixed-order-cbor-arrays.md#consequences). The
+[ADR-0007](../docs/design-decisions.md#adr-0007). The
 Python artifact is not in this tree, so the claim is a recorded result and not something you can
 re-run here; PV-3 and PV-6 are the re-runnable version of the same idea, in JavaScript, over both
 the records and the messages.
@@ -190,7 +190,7 @@ This replaced a genuine contradiction:
 [`../docs/protocol.md`](../docs/protocol.md) §2.1 said a name comes from the canonical encoding while
 §3.10's `DigestWriter` row said the identity framing is **not** the canonical encoding, and the
 derivation function used the framing.
-[`../docs/adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md`](../docs/adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md)
+[`../docs/adr/0033-name-an-immutable-record-by-the-digest-of-its-canonical-encoding.md`](../docs/design-decisions.md#adr-0033)
 ruled for the canonical encoding, retired the framing, and reclassified a chunk's name as a content
 digest rather than a record identifier.
 

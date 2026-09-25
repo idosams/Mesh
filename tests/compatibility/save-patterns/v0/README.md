@@ -4,7 +4,7 @@ What real tools do to a folder when a person saves, and what the single meaningf
 is in each case. Research item R5, plan §11; task `01KZC2VTSZCB4Q7DC9C9X5NM1V`.
 
 The decision this corpus exists to support is
-[ADR-0039](../../../../docs/adr/0039-anchor-a-checkpoint-on-the-last-boundary-a-backend-can-prove-and-close-the-window-on-quiescence.md).
+[ADR-0039](../../../../docs/design-decisions.md#adr-0039).
 The consumer is `01KZC2YXH6FG9C67JP9DQX7JH6`, whose own `## Automated validation` already names
 `cargo nextest run --test save-patterns`.
 

@@ -34,3 +34,17 @@ running the local daemon and desktop application against a disposable or backed-
 
 See the [user guide](user-guide.md), [architecture](architecture.md), and
 [public-alpha guide](launch/public-alpha.md) for operational boundaries.
+
+## Reproduce local evidence
+
+From a prepared checkout, run `npm test` for documentation, licensing, storage budgets, Rust,
+desktop/React, and the real daemon demonstration. The local demo should print 44 passing checks:
+
+```bash
+node examples/local-daemon-demo.mjs
+```
+
+This proves explicit local capture, restart, review, and software-key publication refusal. It does
+not prove protected approval in an eligible signed build, remote collaboration, or a clean-Mac
+installation. See the [phase assessment](phase-assessment.md) for the candidate's validation status
+and the [user playbooks](user-playbooks.md) for the operational journey.

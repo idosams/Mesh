@@ -58,6 +58,4 @@ authoritative macOS adapter.
 
 Find the tasks that fill this directory:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

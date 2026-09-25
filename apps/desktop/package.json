@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "The Mesh desktop client: the local IPC surface it talks to the Mesh daemon over, and nothing else.",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "start": "node --experimental-strip-types src/main.ts",

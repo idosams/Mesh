@@ -54,7 +54,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo nextest run --workspace
+      - run: npm run test:macos-renderers
+      - run: npm run verify:demo
 
   deny:
     runs-on: ubuntu-latest
@@ -75,3 +81,17 @@ jobs:
           node-version: 22
       - run: node tools/program/license-check.mjs
       - run: node tools/program/license-check.mjs --self-test
+
+  desktop-and-docs:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+          cache-dependency-path: apps/desktop/ui-next/package-lock.json
+      - run: npm run verify:docs
+      - run: npm run verify:storage
+      - run: npm run verify:desktop

@@ -4,7 +4,7 @@ The R3 chunking-policy spike: twelve policies over twenty corpus segments, and t
 are compared against. Task `01KZC2E6N03KVPK93EESJ15Z4V`.
 
 **The decision and all of its numbers live in
-[ADR-0021](../../../docs/adr/0021-cut-every-file-by-content-and-split-the-parameters-at-one-mebibyte.md),
+[ADR-0021](../../../docs/design-decisions.md#adr-0021),
 with the full plan §11 record.** This page is how you re-run it.
 
 ```bash

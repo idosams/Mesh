@@ -44,6 +44,4 @@ The rest of the CWP schema surface — the wire message set, the knowledge model
 profile — is filled under **E16 open protocol** and by the tasks that own
 `docs/protocol.md` §7. Find them with:
 
-```bash
-See the public GitHub issue tracker
-```
+Use the [public issue tracker](https://github.com/idosams/Mesh/issues) to propose or track this work.

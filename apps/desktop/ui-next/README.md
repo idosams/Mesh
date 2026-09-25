@@ -24,12 +24,12 @@ current action before invoking a native operation. Malformed or stale input is r
 
 ## Offline verification
 
-From `apps/desktop`:
+From the repository root:
 
 ```sh
-npm --prefix ui-next ci --offline --ignore-scripts --no-audit --no-fund
-npm run ui:next:check
-npm run ui:next:build:island
+npm --prefix apps/desktop/ui-next ci --offline --ignore-scripts --no-audit --no-fund
+npm --prefix apps/desktop run ui:next:check
+npm --prefix apps/desktop run ui:next:build:island
 ```
 
 The dependency URLs and integrity hashes are pinned by `ui-next/package-lock.json`. `esbuild` and
