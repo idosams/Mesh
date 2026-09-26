@@ -346,7 +346,9 @@ struct OwnedDestination {
 /// filesystem failures.
 pub fn preview_folder_import(source: &Path) -> Result<ImportSummary, FolderImportError> {
     let source = validated_source(source)?;
-    Ok(import_snapshot(&source)?.summary)
+    let snapshot = import_snapshot(&source)?;
+    require_import_entries(&source, &snapshot)?;
+    Ok(snapshot.summary)
 }
 
 /// Preview user content from the exact zero-history workspace already opened by the daemon.
@@ -357,7 +359,9 @@ pub(crate) fn preview_open_workspace_import(
     source: &Path,
 ) -> Result<ImportSummary, FolderImportError> {
     let source = validated_source(source)?;
-    Ok(import_snapshot_with_private_fence(&source)?.summary)
+    let snapshot = import_snapshot_with_private_fence(&source)?;
+    require_import_entries(&source, &snapshot)?;
+    Ok(snapshot.summary)
 }
 
 /// A verified managed copy waiting for the user to confirm its exact summary.
@@ -565,6 +569,7 @@ impl PreparedFolderImport {
         }
 
         let before = import_snapshot_for_layout(&source, source_private_fence)?;
+        require_import_entries(&source, &before)?;
         if presented_store.is_none() {
             reject_reserved_workspace_path(&before)?;
         }
@@ -1294,6 +1299,11 @@ pub fn recover_pending_import(destination: &Path) -> Result<bool, FolderImportEr
 /// Why an existing-folder import was refused or rolled back.
 #[derive(Debug)]
 pub enum FolderImportError {
+    /// No included entries can establish a durable root in the current import format.
+    NoImportableEntries {
+        /// The selected source, after applying import exclusions.
+        path: PathBuf,
+    },
     /// The selected source is not a real directory.
     SourceNotDirectory {
         /// The selected path.
@@ -1398,6 +1408,11 @@ impl FolderImportError {
 impl fmt::Display for FolderImportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NoImportableEntries { path } => write!(
+                formatter,
+                "{} has no importable files or folders after exclusions. Choose a folder containing project files. Empty-folder import is not supported yet; no workspace was created",
+                path.display()
+            ),
             Self::SourceNotDirectory { path } => {
                 write!(formatter, "{} is not a directory", path.display())
             }
@@ -2305,6 +2320,15 @@ fn ingest_private_workspace(
         entries,
         linked_bytes,
     })
+}
+
+fn require_import_entries(source: &Path, snapshot: &Snapshot) -> Result<(), FolderImportError> {
+    if snapshot.summary.files.is_empty() && snapshot.directories.is_empty() {
+        return Err(FolderImportError::NoImportableEntries {
+            path: source.to_path_buf(),
+        });
+    }
+    Ok(())
 }
 
 fn normalized_component(path: &Path) -> Result<NormalizedName, FolderImportError> {

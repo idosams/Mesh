@@ -14,6 +14,9 @@ launches Codex in an independently pinned folder, privately saves unambiguous re
 the person confirms that the agent has finished, and can return an approved version to the original
 folder after a fresh preview.
 
+Desktop import requires at least one included file or subfolder. Empty folders and Git-metadata-only
+folders are unsupported; see the [import troubleshooting playbook](user-playbooks.md#first-session).
+
 It does **not** prove background saving of every editor change, another device receiving the work,
 a hosted service, an unattended distributable installer, or a complete agent integration.
 See [Project status](project-status.md) for the complete boundary.

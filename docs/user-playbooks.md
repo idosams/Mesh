@@ -18,6 +18,14 @@ Expected result: the managed copy contains the saved edit after restart, with re
 If the folder is empty, unsupported, or changes during import, preserve it and resolve the reported
 problem before retrying. Do not delete private storage to clear an error.
 
+An import must contain at least one included file or subfolder. An empty folder, or a folder
+containing only excluded Git metadata, cannot establish the current journal's directory tree.
+Choose a folder containing project content. Alpha.4 reports this case as “the imported journal
+did not materialize the verified tree exactly”; the subsequent source fix refuses it clearly at
+preview/preparation instead. Refresh alone does not add the missing project content. If that
+message appears for a populated folder, preserve it and report its path and entry counts; do not
+assume the empty-folder diagnosis applies.
+
 ## Work with an agent
 
 1. Select the exact version and native folder the agent should use. Start Codex from Mesh.

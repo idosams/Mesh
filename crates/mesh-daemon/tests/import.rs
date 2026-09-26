@@ -617,3 +617,56 @@ fn rollback_sees_new_excluded_content_and_never_deletes_it() {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn empty_and_git_only_imports_are_refused_before_journal_creation() {
+    for git_only in [false, true] {
+        let root = scratch("empty-folder");
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        if git_only {
+            fs::create_dir(source.join(".git")).unwrap();
+            fs::write(source.join(".git/config"), b"original metadata").unwrap();
+        }
+        let store = root.join("managed.mesh");
+        assert!(matches!(
+            preview_folder_import(&source),
+            Err(FolderImportError::NoImportableEntries { .. })
+        ));
+        assert!(matches!(
+            PreparedFolderImport::prepare_presented(&source, &store),
+            Err(FolderImportError::NoImportableEntries { .. })
+        ));
+        assert!(!store.exists(), "refusal must leave no managed store");
+        assert_eq!(
+            fs::read_dir(&source).unwrap().count(),
+            usize::from(git_only)
+        );
+        if git_only {
+            assert_eq!(
+                fs::read(source.join(".git/config")).unwrap(),
+                b"original metadata"
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[test]
+fn an_empty_subdirectory_still_establishes_a_valid_imported_tree() {
+    let root = scratch("empty-subdirectory");
+    let source = root.join("source");
+    fs::create_dir_all(source.join("empty-child")).unwrap();
+    let store = root.join("managed.mesh");
+    let prepared = PreparedFolderImport::prepare_presented(&source, &store).unwrap();
+    let (confirmed, outcome) = prepared.confirm_into_workspace().unwrap();
+    assert_eq!(outcome.entries(), 1);
+    let working = confirmed.destination().to_path_buf();
+    drop(confirmed);
+    let reopened = mesh_daemon::OpenWorkspace::open(&working).unwrap();
+    assert!(reopened.names_answered());
+    assert_eq!(reopened.entries().len(), 1);
+    assert!(working.join("empty-child").is_dir());
+    drop(reopened);
+    fs::remove_dir_all(root).unwrap();
+}
