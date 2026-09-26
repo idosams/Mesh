@@ -477,7 +477,7 @@ test('verified workspaces expose direct navigation to every alpha journey', () =
   ]) {
     assert.match(productionRoute, new RegExp(`id: "${id}",[\\s\\S]*?label: "${label}"`));
   }
-  assert.match(productionNavigation, /aria-label="Primary pages"/);
+  assert.match(productionNavigation, /aria-label=\{t\("Primary pages"\)\}/);
   assert.match(productionNavigation, /nativeChangeCount > 0/);
 });
 
@@ -761,7 +761,7 @@ test('managed-copy rollback uses destructive exact-workspace confirmation author
 });
 
 test('the primary import and version actions lead directly to native folders', () => {
-  assert.match(importWorkbench, /\{model\.confirmLabel\}/);
+  assert.match(importWorkbench, /\{t\(model\.confirmLabel\)\}/);
   assert.match(script, /Create workspace and open folder/);
   assert.match(script, /Counts cover the files Mesh will bring into the native working folder/);
   assert.match(script, /\.gitignore/);
@@ -771,8 +771,8 @@ test('the primary import and version actions lead directly to native folders', (
   assert.match(script, /Excluded paths stay only in the original folder/);
   assert.match(script, /openLabel: 'Open in working folder'/);
   assert.match(script, /codexLabel: pendingAgentVersionChoice \? 'Start another agent from this point' : 'Start Codex on this point'/);
-  assert.match(workspaceVersions, /\{model\.openLabel\}/);
-  assert.match(workspaceVersions, /\{model\.codexLabel\}/);
+  assert.match(workspaceVersions, /\{t\(model\.openLabel\)\}/);
+  assert.match(workspaceVersions, /\{t\(model\.codexLabel\)\}/);
   assert.match(workspaceVersions, /The workspace you leave stays untouched/);
   assert.match(script, /The stable working path now opens this version/);
   assert.match(workspaceVersions, /Open an exact saved point/);
