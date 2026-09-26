@@ -6831,7 +6831,7 @@ function importWorkbenchPresentation() {
     scopeNote: connectExistingImport
       ? 'Mesh will use the selected folder only as the verified original for this existing workspace. Exact private origin receipts must agree before Mesh records the relationship; no second managed copy will be created.'
       : emptyImport
-      ? 'This preview contains no ordinary project files or folders. Creating it will produce an empty workspace. Choose another folder unless an empty workspace is intentional.'
+      ? 'This folder has no importable files or folders. Choose another folder containing project content. No workspace can be created from this preview.'
       : sameFolderMigration
         ? 'This is the currently open zero-history folder. Mesh will bring only its ordinary project files. Existing Mesh private history, databases, and content-store folders stay in the original and are not copied.'
         : "Counts cover the files Mesh will bring into the native working folder. Mesh applies this project's .gitignore and .meshignore. The source .git directory is never copied as workspace content; for Git projects, Mesh separately recreates independently owned history, branch, and index state in the new working folder. Excluded paths stay only in the original folder.",
@@ -6847,14 +6847,14 @@ function importWorkbenchPresentation() {
       : connectExistingImport
       ? 'Connect original folder'
       : emptyImport
-      ? 'Create empty workspace'
+      ? 'Choose a folder with content'
       : 'Create workspace and open folder',
     busy: importConfirmationInFlight,
     canChoose: !interactionBlocked,
     canPreviewPath: !interactionBlocked,
     canEditDestination: destinationAvailable,
     canChooseDestination: destinationAvailable,
-    canConfirm: destinationAvailable,
+    canConfirm: destinationAvailable && !emptyImport,
     stepLabel: '2 / 2',
   });
 }

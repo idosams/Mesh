@@ -1,3 +1,6 @@
+import { useTranslation, getLocale } from "../lib/localization";
+import { hebrewDiagnostic } from "../lib/hebrew-safety";
+import { LanguagePicker } from "../organisms/language-picker";
 import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { ProductionWorkspaceLayout } from "../layouts/production-workspace-layout";
@@ -62,6 +65,7 @@ function ProductionRoutePage({ route, activePage, surfaceFailures }: Readonly<{
 }
 
 export function ProductionWorkspacePage() {
+  const t = useTranslation();
   const { activePage, workspaceReady, nativeChangeCount, notice, buildIdentity, focusRequest, surfaceFailures } = useSyncExternalStore(
     subscribeProductionShell,
     productionShellSnapshot,
@@ -86,6 +90,7 @@ export function ProductionWorkspacePage() {
       header={<slot name="workspace-header" />}
       navigation={(
         <div className="flex gap-1 overflow-x-auto border-b border-border bg-background/80 px-1">
+          <LanguagePicker />
           <ProductionNavigation
             activePage={activePage}
             workspaceReady={workspaceReady}
@@ -97,10 +102,10 @@ export function ProductionWorkspacePage() {
       notice={(
         <div data-mesh-proof="production-notice" data-mesh-notice-generation={notice?.generation} data-mesh-agent-proof={notice?.proof ?? undefined} className={notice ? `mt-4 whitespace-pre-line rounded-xl border p-3 text-sm leading-6 ${notice.error ? "border-destructive text-red-200" : "border-primary/40 text-foreground"}` : undefined}>
           <div role="status" aria-live="polite" aria-atomic="true">
-            {notice && !notice.error ? notice.message : null}
+            {notice && !notice.error ? t(notice.message) : null}
           </div>
           <div role="alert" aria-live="assertive" aria-atomic="true">
-            {notice?.error ? notice.message : null}
+            {notice?.error ? (getLocale() === "he" ? hebrewDiagnostic(notice.message) : notice.message) : null}
           </div>
         </div>
       )}

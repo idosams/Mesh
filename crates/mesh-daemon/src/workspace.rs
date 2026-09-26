@@ -2939,10 +2939,15 @@ impl OpenWorkspace {
         let (state, entries) = self.historical_workspace_materialization(operation)?;
         let mut objects_by_path = BTreeMap::new();
         for (id, object) in state.objects() {
+            // Retained deleted or unlinked objects belong to history, not to this saved tree.
+            // Match visible-entry materialization; every required entry is still resolved below.
+            if *id == state.root() || object.is_deleted() {
+                continue;
+            }
             record_historical_path_resolution();
-            let path = state.path_of(*id).ok_or_else(|| {
-                WorkspaceVersionFailure::IncompleteHistory(vec!["materialization-incomplete"])
-            })?;
+            let Some(path) = state.path_of(*id) else {
+                continue;
+            };
             let rendered = path
                 .iter()
                 .map(mesh_operations::NormalizedName::as_str)

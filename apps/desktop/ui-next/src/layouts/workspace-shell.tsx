@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import type { ReactNode } from "react";
 import { Badge } from "../atoms/badge";
 
@@ -29,14 +30,15 @@ export function WorkspaceShell({
   contextLabel = "Private workspace",
   status = checkingStatus,
 }: WorkspaceShellProps) {
+  const t = useTranslation();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary font-bold text-primary-foreground">M</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary font-bold text-primary-foreground">{t("M")}</span>
             <div className="min-w-0">
-              <strong className="block text-sm">Mesh</strong>
+              <strong className="block text-sm">{t("Mesh")}</strong>
               <span className="block truncate text-xs text-muted-foreground">{contextLabel}</span>
             </div>
           </div>

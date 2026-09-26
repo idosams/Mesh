@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
@@ -73,6 +74,7 @@ export function ArtifactReview({
   artifactPreviewLoading = false,
   artifactPreviewError = null,
 }: ArtifactReviewProps) {
+  const t = useTranslation();
   const change = selectedReviewChange(model);
   const selectedView = model.mode === "visual" ? "Visual" : "Content changes";
   const selectView = (value: string) => {
@@ -81,19 +83,19 @@ export function ArtifactReview({
   };
 
   return (
-    <Card aria-label="Review workbench" data-mesh-proof="review-mounted" className="overflow-hidden">
+    <Card aria-label={t("Review workbench")} data-mesh-proof="review-mounted" className="overflow-hidden">
       <header className="flex flex-col gap-4 border-b border-border p-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Review workbench</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("Review workbench")}</p>
             <Badge tone="neutral">{model.bundleLabel}</Badge>
           </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">Understand exactly what changed</h2>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">{t("Understand exactly what changed")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {model.workspaceName} · {model.versionLabel}
           </p>
         </div>
-        <SegmentedControl proof="comparison-view" label="Comparison view" options={views} value={selectedView} onChange={selectView} />
+        <SegmentedControl proof="comparison-view" label={t("Comparison view")} options={views} value={selectedView} onChange={selectView} />
       </header>
 
       <div className="border-b border-border p-5">
@@ -110,7 +112,7 @@ export function ArtifactReview({
         <div className="min-w-0">
         <section
           className="min-w-0 p-5"
-          aria-label="Selected change comparison"
+          aria-label={t("Selected change comparison")}
           aria-busy={artifactPreviewLoading}
           data-mesh-proof="selected-change-comparison"
           data-mesh-change-id={change.id}
@@ -118,16 +120,16 @@ export function ArtifactReview({
           data-mesh-change-kind={change.kind}
         >
           <p className="sr-only" role="status" aria-live="polite">
-            Selected {change.path}. {change.summary}
+            {t("Selected")}{" "}{change.path}. {change.summary}
           </p>
           <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-5 border-b border-border bg-card/95 px-5 py-4 backdrop-blur">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold">{change.path}</h3>
               <Badge tone="changed">{change.kindLabel}</Badge>
-              <Badge tone="neutral">Saved review</Badge>
+              <Badge tone="neutral">{t("Saved review")}</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">{change.summary}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Before and after are exact immutable saved sides. They are not the writable workspace.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("Before and after are exact immutable saved sides. They are not the writable workspace.")}</p>
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               <SavedSideActions
                 label="Before"
@@ -147,24 +149,23 @@ export function ArtifactReview({
           {change.comparisonLimitation ? (
             <section
               className="mb-4 rounded-lg border border-amber-300/40 bg-amber-300/10 p-4"
-              aria-label="Text comparison unavailable"
+              aria-label={t("Text comparison unavailable")}
             >
-              <h4 className="font-semibold" role="status">Text comparison unavailable</h4>
+              <h4 className="font-semibold" role="status">{t("Text comparison unavailable")}</h4>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {change.comparisonLimitation === "above-line-ceiling"
-                  ? "This change exceeds Mesh's 4,096-line comparison limit. Mesh is showing saved-version metadata only, not file contents. Do not treat the values below as a content diff."
-                  : "One saved side is text and the other is binary, so a line comparison would be misleading. Mesh is showing saved-version metadata only, not file contents. Do not treat the values below as a content diff."}
+                  ? t("This change exceeds Mesh's 4,096-line comparison limit. Mesh is showing saved-version metadata only, not file contents. Do not treat the values below as a content diff.")
+                  : t("One saved side is text and the other is binary, so a line comparison would be misleading. Mesh is showing saved-version metadata only, not file contents. Do not treat the values below as a content diff.")}
               </p>
             </section>
           ) : null}
 
           {change.kind === "file" ? (
             <div className="grid gap-4">
-              <section className="rounded-lg border border-border bg-muted/20 p-4" aria-label="Saved file metadata comparison">
-                <h4 className="font-semibold">Exact file metadata</h4>
+              <section className="rounded-lg border border-border bg-muted/20 p-4" aria-label={t("Saved file metadata comparison")}>
+                <h4 className="font-semibold">{t("Exact file metadata")}</h4>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Mesh saved and compared the exact bytes, but this file type has no specialized visual or text preview. The metadata below remains part of this review; inspect the file in its owning application when content-level review is required.
-                </p>
+                  {t("Mesh saved and compared the exact bytes, but this file type has no specialized visual or text preview. The metadata below remains part of this review; inspect the file in its owning application when content-level review is required.")}</p>
               </section>
               <div className="grid gap-4 md:grid-cols-2">
                 <ReviewPanel label={change.beforeLabel} tone="before" values={change.beforeValues} />
@@ -203,14 +204,14 @@ export function ArtifactReview({
           )}
         </section>
 
-        <aside className="border-t border-border bg-muted/20 p-5" aria-label="Review decision">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Decision</p>
-          <h3 className="mt-2 text-base font-semibold">Review this exact saved version</h3>
+        <aside className="border-t border-border bg-muted/20 p-5" aria-label={t("Review decision")}>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("Decision")}</p>
+          <h3 className="mt-2 text-base font-semibold">{t("Review this exact saved version")}</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{model.approvalReason}</p>
           <dl className="mt-5 grid gap-4 text-sm">
-            <Proof label="Saved version" value={model.versionLabel} />
-            <Proof label="Review bundle" value={model.bundleLabel} />
-            <Proof label="Working folder" value="Unchanged during review" />
+            <Proof label={t("Saved version")} value={model.versionLabel} />
+            <Proof label={t("Review bundle")} value={model.bundleLabel} />
+            <Proof label={t("Working folder")} value="Unchanged during review" />
           </dl>
           <div className="mt-6 grid gap-2">
             <Button
@@ -218,42 +219,34 @@ export function ArtifactReview({
               disabled={change.kind === "text" || change.kind === "file" || !model.canInspectExactCopies}
               onClick={() => onIntent({ type: "inspect-exact-copies", changeId: change.id })}
             >
-              Inspect exact copies
-            </Button>
+              {t("Inspect exact copies")}</Button>
             <Button
               variant="secondary"
               disabled={!model.canRecordReview}
               onClick={() => onIntent({ type: "record-review" })}
             >
-              Confirm review complete
-            </Button>
+              {t("Confirm review complete")}</Button>
             {model.canExportPrivateCopy ? (
               <Button variant="secondary" onClick={() => onIntent({ type: "choose-private-export" })}>
-                Choose export folder
-              </Button>
+                {t("Choose export folder")}</Button>
             ) : null}
             <Button
               variant="primary"
               disabled={!model.canApprove}
               onClick={() => onIntent({ type: "approve-version" })}
             >
-              Approve exact version
-            </Button>
+              {t("Approve exact version")}</Button>
             {model.canApproveAndExport ? (
               <Button variant="primary" onClick={() => onIntent({ type: "approve-and-export" })}>
-                Approve and create Git branch
-              </Button>
+                {t("Approve and create Git branch")}</Button>
             ) : null}
             {model.canExportGit ? (
               <Button variant="secondary" onClick={() => onIntent({ type: "export-git" })}>
-                Create Git branch
-              </Button>
+                {t("Create Git branch")}</Button>
             ) : null}
           </div>
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
-            Exporting a separate copy, confirming review, and approving are independent actions. It does not approve or change the original folder.
-            Agents and web content cannot skip the native user-presence approval ceremony.
-          </p>
+            {t("Exporting a separate copy, confirming review, and approving are independent actions. It does not approve or change the original folder. Agents and web content cannot skip the native user-presence approval ceremony.")}</p>
         </aside>
         </div>
       </div>
@@ -274,12 +267,13 @@ function SavedSideActions({
   canOpenInDefaultApp: boolean;
   onAction: (action: SavedSideAction) => void;
 }) {
+  const t = useTranslation();
   const unavailableId = `${label.toLowerCase()}-default-app-unavailable`;
   return (
     <div className="rounded-lg border border-border bg-background/70 p-3" role="group" aria-label={`${label} exact saved side actions`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.12em]">{label}</span>
-        <Badge tone={present ? "neutral" : "changed"}>{present ? "Exact copy" : "Not present"}</Badge>
+        <span className="text-xs font-semibold uppercase tracking-[0.12em]">{t(label)}</span>
+        <Badge tone={present ? "neutral" : "changed"}>{present ? t("Exact copy") : t("Not present")}</Badge>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button
@@ -287,14 +281,13 @@ function SavedSideActions({
           disabled={!present || !canOpenInDefaultApp}
           aria-describedby={present && !canOpenInDefaultApp ? unavailableId : undefined}
           onClick={() => onAction("open-entry")}
-        >Open in default app</Button>
-        <Button variant="quiet" disabled={!present} onClick={() => onAction("reveal-entry")}>Reveal in Finder</Button>
-        <Button variant="quiet" disabled={!present} onClick={() => onAction("open-folder")}>Open copy folder</Button>
+        >{t("Open in default app")}</Button>
+        <Button variant="quiet" disabled={!present} onClick={() => onAction("reveal-entry")}>{t("Reveal in Finder")}</Button>
+        <Button variant="quiet" disabled={!present} onClick={() => onAction("open-folder")}>{t("Open copy folder")}</Button>
       </div>
       {present && !canOpenInDefaultApp ? (
         <p id={unavailableId} className="mt-2 text-xs leading-5 text-muted-foreground">
-          Default-app opening stays unavailable until native inspection admits this exact content type. Reveal preserves the exact read-only copy in Finder.
-        </p>
+          {t("Default-app opening stays unavailable until native inspection admits this exact content type. Reveal preserves the exact read-only copy in Finder.")}</p>
       ) : null}
     </div>
   );
@@ -310,6 +303,7 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
   onLayout: (layout: DiffLayout) => void;
   onLoad: (pageNumber: number) => void;
 }) {
+  const t = useTranslation();
   const currentPage = preview?.requestedPage ?? 1;
   const totalPages = artifactPageCount(preview);
   const contentState = change.kind === "text"
@@ -326,19 +320,19 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
       <div className="grid gap-3">
         <section
           className="grid gap-3 rounded-lg border border-border bg-muted/20 p-5"
-          aria-label="Artifact content comparison unavailable"
+          aria-label={t("Artifact content comparison unavailable")}
         >
           <h4 className="font-semibold" role={failed ? "alert" : "status"}>
             {failed
-              ? "Content comparison could not be loaded"
+              ? t("Content comparison could not be loaded")
               : incompatible
-                ? "These versions do not expose one comparable text view"
-                : "Load the exact versions to compare their content"}
+                ? t("These versions do not expose one comparable text view")
+                : t("Load the exact versions to compare their content")}
           </h4>
           <p className="text-sm leading-6 text-muted-foreground">
             {incompatible
-              ? "Use Visual view or inspect the exact copies. Mesh will not guess across incompatible extraction sources."
-              : "Mesh derives this view from bounded inert text in the exact saved artifact. It never executes document actions, formulas, links, or embedded content."}
+              ? t("Use Visual view or inspect the exact copies. Mesh will not guess across incompatible extraction sources.")
+              : t("Mesh derives this view from bounded inert text in the exact saved artifact. It never executes document actions, formulas, links, or embedded content.")}
           </p>
           {failed ? (
             <ul className="grid gap-1 text-sm text-red-100">
@@ -347,13 +341,13 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
           ) : null}
           {!incompatible ? (
             <Button className="w-fit" variant="secondary" disabled={!canLoad || loading} onClick={() => onLoad(currentPage)}>
-              {loading ? "Reading exact versions…" : failed ? "Try content comparison again" : "Load content comparison"}
+              {loading ? t("Reading exact versions…") : failed ? t("Try content comparison again") : t("Load content comparison")}
             </Button>
           ) : null}
         </section>
         {change.kind === "pdf" && preview && totalPages > 1 ? (
           <PdfPageNavigation
-            label="PDF page content comparison"
+            label={t("PDF page content comparison")}
             currentPage={currentPage}
             totalPages={totalPages}
             loading={loading}
@@ -375,7 +369,7 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
       ) : null}
       {change.kind === "pdf" && preview && totalPages > 1 ? (
         <PdfPageNavigation
-          label="PDF page content comparison"
+          label={t("PDF page content comparison")}
           currentPage={currentPage}
           totalPages={totalPages}
           loading={loading}
@@ -388,7 +382,7 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
         <div className="flex justify-end">
           <SegmentedControl
             proof="content-diff-layout"
-            label="Content diff layout"
+            label={t("Content diff layout")}
             options={diffLayouts}
             value={layout === "split" ? "Split" : "Inline"}
             onChange={(value) => onLayout(value === "Split" ? "split" : "inline")}
@@ -414,6 +408,7 @@ function ArtifactContentChanges({ change, layout, comparison }: {
   layout: DiffLayout;
   comparison: ArtifactContentComparison;
 }) {
+  const t = useTranslation();
   const [sectionIndex, setSectionIndex] = useState<number | null>(null);
   const sectionLabels = comparison.sectionLabels;
   const selectedLabel = sectionIndex === null ? null : sectionLabels[sectionIndex] ?? null;
@@ -424,32 +419,29 @@ function ArtifactContentChanges({ change, layout, comparison }: {
   return (
     <div className="grid gap-3">
       {sectionLabels.length > 0 ? (
-        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3" aria-label="Document section comparison">
+        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3" aria-label={t("Document section comparison")}>
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
               disabled={sectionLabels.length === 0 || sectionIndex === 0}
               onClick={() => setSectionIndex(sectionIndex === null ? sectionLabels.length - 1 : Math.max(0, sectionIndex - 1))}
             >
-              Previous section
-            </Button>
+              {t("Previous section")}</Button>
             <Button
               variant="secondary"
               disabled={sectionLabels.length === 0 || sectionIndex === sectionLabels.length - 1}
               onClick={() => setSectionIndex(sectionIndex === null ? 0 : Math.min(sectionLabels.length - 1, sectionIndex + 1))}
             >
-              Next section
-            </Button>
+              {t("Next section")}</Button>
           </div>
           <label className="flex items-center gap-2 text-sm font-medium">
-            Section
-            <select
+            {t("Section")}<select
               className="max-w-64 rounded-md border border-border bg-background px-3 py-2 text-foreground"
-              aria-label="Artifact section"
+              aria-label={t("Artifact section")}
               value={sectionIndex === null ? "all" : String(sectionIndex)}
               onChange={(event) => setSectionIndex(event.target.value === "all" ? null : Number(event.target.value))}
             >
-              <option value="all">All sections</option>
+              <option value="all">{t("All sections")}</option>
               {sectionLabels.map((label, index) => <option key={`${index}:${label}`} value={index}>{label}</option>)}
             </select>
           </label>
@@ -480,6 +472,7 @@ function ArtifactVisualComparison({
   canLoad: boolean;
   onLoad: (pageNumber: number) => void;
 }) {
+  const t = useTranslation();
   const currentPage = preview?.requestedPage ?? 1;
   const totalPages = artifactPageCount(preview);
   const failureMessage = [
@@ -488,12 +481,12 @@ function ArtifactVisualComparison({
     preview?.afterError ? `Current version: ${preview.afterError}` : null,
   ].filter((message): message is string => message !== null).join(" ");
   return (
-    <section className="grid gap-4" aria-label="Exact visual artifact comparison">
+    <section className="grid gap-4" aria-label={t("Exact visual artifact comparison")}>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
         <p className="text-sm text-muted-foreground">
           {change.kind === "pdf"
-            ? "Rendered from the exact saved PDF pages."
-            : "Representative macOS previews from the exact saved files; inspect exact copies for complete formatting and interactions."}
+            ? t("Rendered from the exact saved PDF pages.")
+            : t("Representative macOS previews from the exact saved files; inspect exact copies for complete formatting and interactions.")}
         </p>
         <Button
           variant="secondary"
@@ -501,10 +494,10 @@ function ArtifactVisualComparison({
           onClick={() => onLoad(currentPage)}
         >
           {loading
-            ? "Rendering exact versions…"
+            ? t("Rendering exact versions…")
             : failureMessage
-              ? "Try visual comparison again"
-              : preview ? "Reload visual comparison" : "Load visual comparison"}
+              ? t("Try visual comparison again")
+              : preview ? t("Reload visual comparison") : t("Load visual comparison")}
         </Button>
       </div>
       {failureMessage ? (
@@ -541,7 +534,7 @@ function ArtifactVisualComparison({
       )}
       {change.kind === "pdf" && preview && totalPages > 1 ? (
         <PdfPageNavigation
-          label="PDF page comparison"
+          label={t("PDF page comparison")}
           currentPage={currentPage}
           totalPages={totalPages}
           loading={loading}
@@ -572,6 +565,7 @@ export function PdfPageNavigation({ label, currentPage, totalPages, loading, fai
   canLoad: boolean;
   onLoad: (pageNumber: number) => void;
 }) {
+  const t = useTranslation();
   const lastPreviewablePage = Math.min(totalPages, PDF_PREVIEW_PAGE_LIMIT);
   const previousUnavailable = !canLoad || loading || currentPage <= 1;
   const nextUnavailable = !canLoad || loading || currentPage >= lastPreviewablePage;
@@ -582,7 +576,7 @@ export function PdfPageNavigation({ label, currentPage, totalPages, loading, fai
       : `Page ${currentPage} of ${totalPages} is shown.`;
   return (
     <div className="grid gap-2 text-center">
-      <nav className="flex items-center justify-center gap-3" aria-label={label}>
+      <nav className="flex items-center justify-center gap-3" aria-label={t(label)}>
         <Button
           className="aria-disabled:pointer-events-none aria-disabled:opacity-45"
           variant="secondary"
@@ -592,8 +586,7 @@ export function PdfPageNavigation({ label, currentPage, totalPages, loading, fai
             if (!previousUnavailable) onLoad(currentPage - 1);
           }}
         >
-          Previous page
-        </Button>
+          {t("Previous page")}</Button>
         <strong
           className="text-sm"
           data-mesh-proof="pdf-page-status"
@@ -612,13 +605,11 @@ export function PdfPageNavigation({ label, currentPage, totalPages, loading, fai
             if (!nextUnavailable) onLoad(currentPage + 1);
           }}
         >
-          Next page
-        </Button>
+          {t("Next page")}</Button>
       </nav>
       {totalPages > PDF_PREVIEW_PAGE_LIMIT ? (
         <p className="text-xs leading-5 text-muted-foreground">
-          Visual preview is limited to the first {PDF_PREVIEW_PAGE_LIMIT} pages. Use Inspect exact copies to review the remaining pages in your PDF reader.
-        </p>
+          {t("Visual preview is limited to the first")}{" "}{PDF_PREVIEW_PAGE_LIMIT} {t("pages. Use Inspect exact copies to review the remaining pages in your PDF reader.")}</p>
       ) : null}
     </div>
   );
@@ -631,6 +622,7 @@ function ArtifactPreviewPanel({ label, preview, absentPage, requestedPage, error
   requestedPage: number;
   error: string | null;
 }) {
+  const t = useTranslation();
   return (
     <figure className="overflow-hidden rounded-lg border border-border bg-background">
       {preview ? (
@@ -643,9 +635,9 @@ function ArtifactPreviewPanel({ label, preview, absentPage, requestedPage, error
         </div>
       )}
       <figcaption className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-        {label}{preview?.pageNumber
+        {t(label)}{" "}{preview?.pageNumber
           ? ` · page ${preview.pageNumber} of ${preview.pageCount}`
-          : absentPage ? " · page not present in this version" : ""}
+          : absentPage ? t(" · page not present in this version") : ""}
       </figcaption>
     </figure>
   );
@@ -692,19 +684,20 @@ function lineStatus(line: ReviewDiffLine): string {
 }
 
 function InlineTextDiff({ change }: { change: ReviewChange }) {
+  const t = useTranslation();
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background font-mono text-xs" aria-label="Inline text diff">
+    <div className="overflow-hidden rounded-lg border border-border bg-background font-mono text-xs" aria-label={t("Inline text diff")}>
       {change.diffHunks.map((hunk, hunkIndex) => (
         <div key={`${hunk.beforeStart}:${hunk.afterStart}:${hunkIndex}`}>
           <div className="border-y border-border bg-muted/60 px-3 py-2 text-muted-foreground">
-            <span className="sr-only">Changed lines beginning at </span>
-            @@ before {hunk.beforeStart} · after {hunk.afterStart} @@
+            <span className="sr-only">{t("Changed lines beginning at")}</span>
+            {t("@@ before")}{" "}{hunk.beforeStart} {t("· after")}{" "}{hunk.afterStart} @@
           </div>
           {hunk.lines.map((line, index) => (
             line.section ? (
               <SectionDiffHeading line={line} key={`${line.kind}:section:${line.text}:${index}`} />
             ) : <div className={`grid grid-cols-[3rem_3rem_2rem_minmax(0,1fr)] ${lineTone(line)}`} key={`${line.kind}:${line.before}:${line.after}:${index}`}>
-              <span className="sr-only">{lineStatus(line)}. {line.before === null ? "No earlier line" : `Earlier line ${line.before}`}. {line.after === null ? "No current line" : `Current line ${line.after}`}. </span>
+              <span className="sr-only">{lineStatus(line)}. {line.before === null ? t("No earlier line") : `Earlier line ${line.before}`}. {line.after === null ? t("No current line") : `Current line ${line.after}`}. </span>
               <span aria-hidden="true" className="border-r border-border px-2 py-1 text-right text-muted-foreground">{line.before ?? ""}</span>
               <span aria-hidden="true" className="border-r border-border px-2 py-1 text-right text-muted-foreground">{line.after ?? ""}</span>
               <span className="px-2 py-1 text-center" aria-hidden="true">{lineMark(line)}</span>
@@ -718,8 +711,9 @@ function InlineTextDiff({ change }: { change: ReviewChange }) {
 }
 
 function SplitTextDiff({ change }: { change: ReviewChange }) {
+  const t = useTranslation();
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-background font-mono text-xs" aria-label="Split text diff">
+    <div className="overflow-x-auto rounded-lg border border-border bg-background font-mono text-xs" aria-label={t("Split text diff")}>
       <div className="grid min-w-[46rem] grid-cols-2 border-b border-border font-sans text-xs font-semibold text-muted-foreground">
         <span className="px-3 py-2">{change.beforeLabel}</span>
         <span className="border-l border-border px-3 py-2">{change.afterLabel}</span>
@@ -742,10 +736,11 @@ function SplitTextDiff({ change }: { change: ReviewChange }) {
 }
 
 function SectionDiffHeading({ line }: { line: ReviewDiffLine }) {
+  const t = useTranslation();
   return (
     <div className={`flex items-center justify-between gap-3 border-y border-border px-4 py-3 font-sans ${lineTone(line)}`}>
       <h5 className="font-semibold">{line.text}</h5>
-      <span className="text-xs font-medium">{lineStatus(line)} section</span>
+      <span className="text-xs font-medium">{lineStatus(line)} {t("section")}</span>
     </div>
   );
 }
@@ -769,9 +764,10 @@ function DiffSide({ side, line, number, emptyTone, right = false }: {
 }
 
 function ReviewPanel({ label, tone, values }: { label: string; tone: "before" | "after"; values: readonly string[] }) {
+  const t = useTranslation();
   return (
     <figure className="overflow-hidden rounded-lg border border-border bg-background">
-      <figcaption className="border-b border-border px-4 py-3 text-xs font-semibold text-muted-foreground">{label}</figcaption>
+      <figcaption className="border-b border-border px-4 py-3 text-xs font-semibold text-muted-foreground">{t(label)}</figcaption>
       <div className="grid grid-cols-[1.5fr_1fr_1fr] text-sm">
         {values.map((value, index) => (
           <div key={value} className={index === 2 ? (tone === "after" ? "bg-emerald-400/10 p-4 text-emerald-100" : "bg-red-400/10 p-4 text-red-100") : "p-4"}>
@@ -784,9 +780,10 @@ function ReviewPanel({ label, tone, values }: { label: string; tone: "before" | 
 }
 
 function Proof({ label, value }: { label: string; value: string }) {
+  const t = useTranslation();
   return (
     <div>
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="text-muted-foreground">{t(label)}</dt>
       <dd className="mt-1 break-all font-mono text-xs text-foreground">{value}</dd>
     </div>
   );

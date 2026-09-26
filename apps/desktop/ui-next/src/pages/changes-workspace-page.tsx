@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import type { ProductionRoute } from "../models/production-route";
 import type { ProductionShellState } from "../models/production-shell-store";
 import { IslandSlot, WorkspaceView } from "../views/workspace-view";
@@ -9,12 +10,13 @@ export function ChangesWorkspacePage({ active, route, surfaceFailures }: Readonl
   route: ChangesWorkspaceRoute;
   surfaceFailures: ProductionShellState["surfaceFailures"];
 }>) {
+  const t = useTranslation();
   const slot = route.slots[0];
   return (
-    <WorkspaceView active={active} label={route.pageLabel}>
+    <WorkspaceView active={active} label={t(route.pageLabel)}>
       <IslandSlot
         name={slot.name}
-        label={slot.loadingLabel}
+        label={t(slot.loadingLabel)}
         failed={surfaceFailures[slot.name]}
         chrome="workbench"
       />

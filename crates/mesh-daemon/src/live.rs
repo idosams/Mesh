@@ -8222,6 +8222,12 @@ impl LiveDaemon {
             let snapshot = open
                 .historical_workspace_preview(operation)
                 .map_err(|_| workspace_version_refusal("workspace-version-history-incomplete"))?;
+            if snapshot.directories.is_empty() && snapshot.files.is_empty() {
+                return Err(Unavailable::new(
+                    "workspace-version-empty",
+                    "This saved version contains no files or folders. Mesh cannot open an empty saved version as a new working folder yet. Choose a saved version containing files or folders. The current workspace was not changed and no folder was created.",
+                ));
+            }
             let source_ordinal = open
                 .workspace_versions()
                 .into_iter()

@@ -29,3 +29,14 @@ workspace you need has been exported. There is no automatic updater in this rele
 
 Report functional problems through GitHub Issues. Report security problems privately according to
 the [security policy](../../.github/SECURITY.md).
+
+## Family-and-friends first session
+
+Choose English or Hebrew from the language control. Start with a small, independently backed-up
+folder containing a file or subfolder; empty and Git-only sources are unsupported. Edit the managed
+copy, save privately, restart, and export to a different empty destination. Check the exported
+contents yourself. The bilingual `FIRST-SESSION.txt` in the delivery provides this exercise.
+
+Detailed native error messages, project text, filenames, and paths are not translated. Keep those
+exact values when reporting a problem. Copy safe diagnostics and describe the failed action,
+build revision, language, and macOS version. See the [user playbooks](../user-playbooks.md).

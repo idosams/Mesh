@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useId, useLayoutEffect, useRef, type KeyboardEvent } from "react";
 import { Button } from "../atoms/button";
 import {
@@ -49,6 +50,7 @@ export function ConfirmationDialog({ model, onIntent }: {
   model: ConfirmationModel;
   onIntent: (intent: ConfirmationIntent) => void;
 }) {
+  const t = useTranslation();
   const titleId = useId();
   const descriptionId = useId();
   const dialog = useRef<HTMLElement>(null);
@@ -106,13 +108,13 @@ export function ConfirmationDialog({ model, onIntent }: {
         className="grid max-h-[calc(100vh-2rem)] w-full max-w-xl gap-5 overflow-y-auto rounded-xl border border-border bg-card p-5 text-card-foreground shadow-2xl sm:p-6"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Confirm exact action</p>
-          <h2 id={titleId} className="mt-2 text-xl font-semibold tracking-tight">{model.title}</h2>
-          <p id={descriptionId} className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{model.description}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("Confirm exact action")}</p>
+          <h2 id={titleId} className="mt-2 text-xl font-semibold tracking-tight">{t(model.title)}</h2>
+          <p id={descriptionId} className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{t(model.description)}</p>
         </div>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button ref={cancelButton} variant="secondary" onClick={() => onIntent({ type: "cancel" })}>
-            {model.cancelLabel}
+            {t(model.cancelLabel)}
           </Button>
           <Button
             ref={confirmButton}
@@ -120,7 +122,7 @@ export function ConfirmationDialog({ model, onIntent }: {
             variant={model.tone === "destructive" ? "danger" : "primary"}
             onClick={() => onIntent({ type: "confirm" })}
           >
-            {model.confirmLabel}
+            {t(model.confirmLabel)}
           </Button>
         </div>
       </section>

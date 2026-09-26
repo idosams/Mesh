@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useRef, type ReactNode } from "react";
 
 export function activateWorkspaceSkipLink(
@@ -17,6 +18,7 @@ export function ProductionWorkspaceLayout({ header, navigation, notice, children
   children: ReactNode;
   buildIdentity: Readonly<{ label: string; title: string }>;
 }>) {
+  const t = useTranslation();
   const mainRef = useRef<HTMLElement | null>(null);
   return (
     <div id="mesh-react-page-content" className="min-h-screen bg-background text-foreground">
@@ -25,8 +27,7 @@ export function ProductionWorkspaceLayout({ header, navigation, notice, children
         href="#mesh-react-main"
         onClick={(event) => activateWorkspaceSkipLink(event, mainRef.current)}
       >
-        Skip to workspace
-      </a>
+        {t("Skip to workspace")}</a>
       <header className="border-b border-border bg-background/95">
         <div className="mx-auto max-w-[100rem] px-4 sm:px-6 lg:px-8">{header}</div>
       </header>
@@ -36,8 +37,7 @@ export function ProductionWorkspaceLayout({ header, navigation, notice, children
         {children}
       </main>
       <footer className="mx-auto max-w-[100rem] px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-8">
-        <span title={buildIdentity.title}>{buildIdentity.label}</span> · Local only · No network listener
-      </footer>
+        <span title={buildIdentity.title}>{buildIdentity.label}</span> {t("· Local only · No network listener")}</footer>
     </div>
   );
 }

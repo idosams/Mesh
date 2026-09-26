@@ -136,6 +136,29 @@ async function proveOnboarding(configuration, dependencies) {
       ? { shadow, input, preview }
       : null;
   }, delay, 'the packaged React onboarding did not mount visibly');
+  // A rejected empty folder must leave the same window ready for a valid import.
+  const emptySource = `${configuration.source}-empty`;
+  await waitFor(() => {
+    if (controls.input.value !== emptySource) installInputValue(controls.input, emptySource, document);
+    return !controls.preview.disabled && controls.input.value === emptySource;
+  }, delay, 'the packaged onboarding did not accept the empty-folder proof path');
+  controls.preview.focus({ preventScroll: true });
+  controls.preview.click();
+  await waitFor(() => {
+    if (proofElement(controls.shadow, 'import-verified-preview')
+      || buttonNamed(controls.shadow, 'Create workspace and open folder')) {
+      throw new Error('the packaged onboarding offered confirmation for an empty folder');
+    }
+    const notice = proofElement(
+      document.getElementById('mesh-app-next')?.shadowRoot || controls.shadow,
+      'production-notice',
+    );
+    return visible(notice, getComputedStyle)
+      && /no importable files or folders after exclusions/u.test(notice.textContent || '')
+      && /Choose a folder containing project files/u.test(notice.textContent || '')
+      && /no workspace was created/u.test(notice.textContent || '');
+  }, delay, 'the packaged onboarding did not show actionable empty-folder refusal');
+  await dependencies.invoke('renderer_proof_checkpoint', { code: 'onboarding-empty-refused' });
   await waitFor(
     () => {
       // Startup may refresh the same select-phase projection while the native workspace check is
@@ -210,6 +233,26 @@ async function proveOnboarding(configuration, dependencies) {
     interaction: 'preview-path-confirm-import',
     outcome: 'import-completed-after-busy',
   };
+}
+
+export async function proveLanguageSelection({ document, invoke, getComputedStyle, delay }) {
+  const shell = document.getElementById('mesh-app-next');
+  for (const [locale, direction, label] of [['he', 'rtl', 'קבצים'], ['en', 'ltr', 'Files']]) {
+    const picker = await waitFor(() => {
+      const current = proofElement(shell?.shadowRoot, 'language-picker');
+      return visible(current, getComputedStyle) && !current.disabled ? current : null;
+    }, delay, 'the packaged Files language picker was unavailable');
+    picker.value = locale;
+    picker.dispatchEvent(new document.defaultView.Event('change', { bubbles: true }));
+    await waitFor(() => {
+      const navigation = buttonNamed(shell.shadowRoot, label);
+      return document.documentElement.lang === locale
+        && document.documentElement.dir === direction
+        && document.defaultView.localStorage.getItem('mesh.ui.locale.v1') === locale
+        && visible(navigation, getComputedStyle);
+    }, delay, 'the packaged Files language selection did not update navigation, direction, and preference');
+    if (locale === 'he') await invoke('renderer_proof_checkpoint', { code: 'files-hebrew-verified' });
+  }
 }
 
 async function proveFiles(configuration, dependencies) {
@@ -393,6 +436,7 @@ async function proveFiles(configuration, dependencies) {
     'the packaged React Files explorer did not open the current workspace folder',
   );
   await invoke('renderer_proof_checkpoint', { code: 'files-workspace-opened' });
+  await proveLanguageSelection(dependencies);
   return {
     schema: 'mesh-renderer-proof/v1',
     nonce: configuration.nonce,
@@ -1099,12 +1143,14 @@ export async function runRendererProof({
 
 export function rendererProofFailureCode(error) {
   const message = error instanceof Error ? error.message : '';
+  if (message.includes('empty-folder') || message.includes('confirmation for an empty folder')) return 'onboarding-preview';
   if (message.includes('onboarding did not mount')) return 'onboarding-mount';
   if (message.includes('did not accept the proof path')) return 'onboarding-path';
   if (message.includes('did not render the verified preview')) return 'onboarding-preview';
   if (message.includes('did not expose exact import confirmation')
     || message.includes('did not expose its bounded import progress state')
     || message.includes('did not finish the confirmed import')) return 'onboarding-confirm';
+  if (message.includes('Files language')) return 'files-navigation';
   if (message.includes('Files explorer did not mount')) return 'files-mount';
   if (message.includes('Files explorer did not expand')
     || message.includes('Files explorer did not select')

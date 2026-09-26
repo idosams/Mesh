@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import { Card, CardContent } from "../atoms/card";
@@ -8,6 +9,7 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
   model: WorkspaceEntryModel;
   onIntent: (intent: WorkspaceEntryIntent) => void;
 }>) {
+  const t = useTranslation();
   const submitManagedPath = (path: string) => {
     if (path.length > 0) onIntent({ type: "open-managed-path", path });
   };
@@ -16,21 +18,21 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
     <section aria-labelledby="workspace-entry-title" className="py-6 sm:py-8 lg:py-10">
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] lg:gap-10">
         <div className="max-w-3xl pt-2">
-          <Badge tone={model.mode === "ready" ? "positive" : "neutral"}>{model.eyebrow}</Badge>
-          <h1 id="workspace-entry-title" className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">{model.title}</h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">{model.description}</p>
+          <Badge tone={model.mode === "ready" ? "positive" : "neutral"}>{t(model.eyebrow)}</Badge>
+          <h1 id="workspace-entry-title" className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">{t(model.title)}</h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">{t(model.description)}</p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button variant="primary" disabled={!model.canChoose} onClick={() => onIntent({ type: "choose-folder" })}>
-              {model.chooseLabel}
+              {t(model.chooseLabel)}
             </Button>
             <Button
               variant="secondary"
               disabled={!model.canRetry}
               onClick={() => onIntent({ type: "retry" })}
             >
-              {model.retryLabel}
+              {t(model.retryLabel)}
             </Button>
-            <span className="text-xs leading-5 text-muted-foreground">Your original folder stays untouched.</span>
+            <span className="text-xs leading-5 text-muted-foreground">{t("Your original folder stays untouched.")}</span>
           </div>
         </div>
 
@@ -42,13 +44,12 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
               className="group"
             >
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold outline-none marker:content-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                {model.disclosureLabel}
+                {t(model.disclosureLabel)}
                 <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="space-y-5 border-t border-border p-5">
                 <Button className="w-full" variant="secondary" disabled={!model.canChooseManaged} onClick={() => onIntent({ type: "choose-managed-folder" })}>
-                  Choose managed workspace
-                </Button>
+                  {t("Choose managed workspace")}</Button>
 
                 <form
                   className="space-y-2"
@@ -57,9 +58,10 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
                     submitManagedPath(event.currentTarget.querySelector<HTMLInputElement>("#workspace-entry-path")?.value ?? model.openPath);
                   }}
                 >
-                  <label className="block text-sm font-semibold" htmlFor="workspace-entry-path">Or enter its path</label>
+                  <label className="block text-sm font-semibold" htmlFor="workspace-entry-path">{t("Or enter its path")}</label>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input
+                dir="ltr"
                       id="workspace-entry-path"
                       value={model.openPath}
                       disabled={!model.canEditPath}
@@ -76,7 +78,7 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
                         submitManagedPath(event.currentTarget.value);
                       }}
                     />
-                    <Button variant="secondary" type="submit" disabled={!model.canOpenPath || model.openPath.length === 0}>Open path</Button>
+                    <Button variant="secondary" type="submit" disabled={!model.canOpenPath || model.openPath.length === 0}>{t("Open path")}</Button>
                   </div>
                 </form>
 
@@ -84,11 +86,11 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
                   recents={model.recents}
                   selectedPath={model.selectedRecentPath}
                   canSelect={model.canSelectRecent}
-                  hint={model.recentHint}
-                  openLabel={model.recentOpenLabel}
+                  hint={t(model.recentHint)}
+                  openLabel={t(model.recentOpenLabel)}
                   canOpen={model.canOpenRecent}
                   canForget={model.canForgetRecent}
-                  forgetTitle={model.forgetRecentTitle}
+                  forgetTitle={t(model.forgetRecentTitle)}
                   onIntent={onIntent}
                 />
               </div>

@@ -12,10 +12,12 @@ publish it, restarts again, previews a redacted support bundle, and shuts down c
 desktop alpha imports an ordinary folder without changing it, opens a stable native working path,
 launches Codex in an independently pinned folder, privately saves unambiguous returned changes when
 the person confirms that the agent has finished, and can return an approved version to the original
-folder after a fresh preview.
+folder after a fresh preview in builds with a validated Developer ID identity. Protected approval
+and updating the original folder are unavailable in the ad-hoc public alpha.
 
 Desktop import requires at least one included file or subfolder. Empty folders and Git-metadata-only
 folders are unsupported; see the [import troubleshooting playbook](user-playbooks.md#first-session).
+The desktop offers English and Hebrew; see [language support](localization.md) for coverage.
 
 It does **not** prove background saving of every editor change, another device receiving the work,
 a hosted service, an unattended distributable installer, or a complete agent integration.

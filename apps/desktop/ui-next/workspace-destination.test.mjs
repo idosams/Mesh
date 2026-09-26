@@ -261,7 +261,7 @@ test("production keeps destination continuity while retaining an exact failure f
 
   assert.match(html, /id="workspace-destination-next"[^>]*class="hidden"/);
   assert.doesNotMatch(html, /id="workspace-destination-current"/);
-  assert.match(page, /<IslandSlot[\s\S]*label=\{slot\.loadingLabel\}[\s\S]*failed=\{surfaceFailures\[slot\.name\]\}/);
+  assert.match(page, /<IslandSlot[\s\S]*label=\{t\(slot\.loadingLabel\)\}[\s\S]*failed=\{surfaceFailures\[slot\.name\]\}/);
   for (const removedId of ["update-destination-eyebrow", "update-destination-title", "export-target", "export-hint", "export-output"]) {
     assert.doesNotMatch(html, new RegExp(`id="${removedId}"`));
     assert.doesNotMatch(coordinator, new RegExp(`\\$\\('${removedId}'\\)`));

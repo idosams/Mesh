@@ -46,6 +46,7 @@ const requestedSeedRepository = options.seedRepository === null
 const scratch = await realpath(await mkdtemp('/tmp/mesh-app-'));
 const home = join(scratch, 'home');
 const source = join(scratch, 'source');
+const emptySource = `${source}-empty`;
 const privateExport = join(home, 'private-export');
 const appData = join(home, 'Library/Application Support/dev.mesh.desktop');
 const endpoint = join(appData, 'runtime/daemon.sock');
@@ -85,6 +86,7 @@ delete proofEnvironment.MESH_RENDERER_PROOF_DESTINATION;
 delete proofEnvironment.MESH_RENDERER_PROOF_SCREENSHOT;
 
 await mkdir(source);
+await mkdir(emptySource);
 if (seedRepository !== null) {
   restoreSeedRepository(seedRepository, source, scratch);
 }
@@ -723,6 +725,11 @@ async function launchEmpty() {
     // of one-second daemon deadlines after visible completion.
     const importedWorkspace = await waitForWorkspace(child, () => stderr.trim(), 20);
     const privateStore = dirname(importedWorkspace.root);
+    assert.ok(stderr.includes('mesh-renderer-proof-checkpoint:onboarding-empty-refused'),
+      'onboarding did not prove the empty-folder refusal before its valid import');
+    assert.deepEqual(await readdir(emptySource), [], 'empty-folder preview changed its source');
+    assert.deepEqual((await readdir(versionStores)).sort(), [privateStore.split('/').at(-1)],
+      'empty-folder preview left an unexpected managed workspace store');
     const rememberedImport = await waitForRememberedWorkspace(
       importedWorkspace.root,
       child,

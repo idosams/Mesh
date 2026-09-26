@@ -36,6 +36,245 @@ fn new_daemon() -> LiveDaemon {
 }
 
 #[test]
+fn an_empty_saved_version_refuses_copy_without_breaking_its_original_workspace() {
+    let root = scratch("empty-saved-version");
+    let source = root.join("source");
+    let private = root.join("current.mesh");
+    let refused = root.join("empty-copy.mesh");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&source).expect("source");
+    fs::write(source.join("original.txt"), b"original bytes\n").expect("source file");
+    let daemon = new_daemon();
+    let preview = daemon
+        .preview_folder_import(&source.to_string_lossy())
+        .expect("preview");
+    let imported = daemon
+        .confirm_folder_import(
+            &source.to_string_lossy(),
+            &private.to_string_lossy(),
+            preview
+                .get("summary")
+                .and_then(mesh_daemon::ipc::Json::as_text)
+                .unwrap(),
+        )
+        .expect("import");
+    let working = PathBuf::from(
+        imported
+            .get("destination")
+            .and_then(mesh_daemon::ipc::Json::as_text)
+            .unwrap(),
+    );
+    let signing = SigningKey::from_bytes(&[0x71; 32]);
+    let public = PublicKey::from_bytes(signing.verifying_key().to_bytes());
+    let inspected = daemon
+        .inspect_managed_file("original.txt")
+        .expect("inspect");
+    daemon
+        .delete_managed_entry_privately(
+            "original.txt",
+            Some(inspected.content_digest()),
+            Some(inspected.executable()),
+            public,
+            |payload| {
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    signing.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .expect("delete last entry");
+    assert!(!working.join("original.txt").exists());
+    drop(daemon);
+
+    let restarted = new_daemon();
+    restarted
+        .open_at_start(&working)
+        .expect("reopen empty saved workspace");
+    let state = restarted.workspace_state().expect("empty state");
+    let empty_version = state
+        .workspace_versions
+        .last()
+        .expect("deletion version")
+        .operation()
+        .to_string();
+    let before = fs::read_dir(&root)
+        .map(|entries| {
+            entries
+                .map(|entry| entry.unwrap().file_name())
+                .collect::<std::collections::BTreeSet<_>>()
+        })
+        .unwrap();
+    let failure = restarted
+        .fork_workspace_version(
+            &empty_version,
+            &refused.to_string_lossy(),
+            &state.root,
+            &state.digest,
+            &state.installation,
+        )
+        .expect_err("an empty saved version cannot initialize an independent root");
+    assert_eq!(failure.code, "workspace-version-empty");
+    assert!(failure
+        .message
+        .contains("Choose a saved version containing files or folders"));
+    assert!(!refused.exists());
+    let after = fs::read_dir(&root)
+        .map(|entries| {
+            entries
+                .map(|entry| entry.unwrap().file_name())
+                .collect::<std::collections::BTreeSet<_>>()
+        })
+        .unwrap();
+    assert_eq!(
+        before, after,
+        "refusal left temporary export or import artifacts"
+    );
+    let unchanged = restarted
+        .workspace_state()
+        .expect("unchanged current workspace");
+    assert_eq!(unchanged.root, state.root);
+    assert_eq!(unchanged.digest, state.digest);
+    assert_eq!(unchanged.installation, state.installation);
+    restarted
+        .create_managed_text_file("new.txt", "new bytes\n", public, |payload| {
+            Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                signing.sign(payload.as_bytes()).to_bytes(),
+            ))
+        })
+        .expect("create first entry after last deletion and restart");
+    drop(restarted);
+    let reopened = OpenWorkspace::open(&working).expect("reopen new saved file");
+    assert!(reopened.names_answered());
+    assert_eq!(reopened.entries().len(), 1);
+    assert_eq!(fs::read(working.join("new.txt")).unwrap(), b"new bytes\n");
+    assert_eq!(
+        fs::read(source.join("original.txt")).unwrap(),
+        b"original bytes\n"
+    );
+    drop(reopened);
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
+fn a_saved_version_after_deletion_copies_only_live_entries_and_still_requires_their_content() {
+    let root = scratch("saved-deletion");
+    let source = root.join("source");
+    let private = root.join("current.mesh");
+    let copied = root.join("copy.mesh");
+    let refused = root.join("missing-content.mesh");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&source).expect("source");
+    fs::write(source.join("retained.txt"), b"retained bytes\n").unwrap();
+    fs::write(source.join("deleted.txt"), b"deleted bytes\n").unwrap();
+    let daemon = new_daemon();
+    let preview = daemon
+        .preview_folder_import(&source.to_string_lossy())
+        .unwrap();
+    let imported = daemon
+        .confirm_folder_import(
+            &source.to_string_lossy(),
+            &private.to_string_lossy(),
+            preview
+                .get("summary")
+                .and_then(mesh_daemon::ipc::Json::as_text)
+                .unwrap(),
+        )
+        .unwrap();
+    let working = PathBuf::from(
+        imported
+            .get("destination")
+            .and_then(mesh_daemon::ipc::Json::as_text)
+            .unwrap(),
+    );
+    let signing = SigningKey::from_bytes(&[0x72; 32]);
+    let public = PublicKey::from_bytes(signing.verifying_key().to_bytes());
+    let inspected = daemon.inspect_managed_file("deleted.txt").unwrap();
+    daemon
+        .delete_managed_entry_privately(
+            "deleted.txt",
+            Some(inspected.content_digest()),
+            Some(inspected.executable()),
+            public,
+            |payload| {
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    signing.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    let state = daemon.workspace_state().unwrap();
+    let version = state
+        .workspace_versions
+        .last()
+        .unwrap()
+        .operation()
+        .to_string();
+    let forked = daemon
+        .fork_workspace_version(
+            &version,
+            &copied.to_string_lossy(),
+            &state.root,
+            &state.digest,
+            &state.installation,
+        )
+        .expect("a deleted retained object does not invalidate the saved live tree");
+    let fork = PathBuf::from(
+        forked
+            .get("destination")
+            .and_then(mesh_daemon::ipc::Json::as_text)
+            .unwrap(),
+    );
+    assert_eq!(
+        fs::read(fork.join("retained.txt")).unwrap(),
+        b"retained bytes\n"
+    );
+    assert!(!fork.join("deleted.txt").exists());
+    let saved = OpenWorkspace::open(&fork).unwrap();
+    assert!(saved.names_answered());
+    assert_eq!(saved.entries().len(), 1);
+    drop(saved);
+
+    // Missing content for a required live entry must never become a plausible partial copy.
+    let original = OpenWorkspace::open(&working).unwrap();
+    let file = &original.file_histories()[0];
+    let manifest = original
+        .manifest_record(file.current().unwrap().manifest())
+        .unwrap();
+    let chunk = manifest.chunks[0].digest;
+    let cas =
+        mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(private.clone(), mesh_cas::StdFs)
+            .unwrap();
+    fs::remove_file(
+        cas.layout()
+            .chunk_path(&mesh_cas::Digest32::from_bytes(*chunk.as_bytes())),
+    )
+    .unwrap();
+    drop(original);
+    let original_daemon = new_daemon();
+    original_daemon.open_at_start(&working).unwrap();
+    let damaged = original_daemon.workspace_state().unwrap();
+    let failure = original_daemon
+        .fork_workspace_version(
+            &version,
+            &refused.to_string_lossy(),
+            &damaged.root,
+            &damaged.digest,
+            &damaged.installation,
+        )
+        .expect_err("missing live content must be refused");
+    assert_eq!(failure.code, "workspace-version-history-incomplete");
+    assert!(!refused.exists());
+    assert_eq!(
+        fs::read(source.join("deleted.txt")).unwrap(),
+        b"deleted bytes\n"
+    );
+    assert_eq!(
+        fs::read(working.join("retained.txt")).unwrap(),
+        b"retained bytes\n"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn an_imported_executable_stays_executable_in_a_loaded_workspace_version() {
     let root = scratch("fork-executable");
     let source = root.join("source");

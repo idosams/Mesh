@@ -56,7 +56,9 @@ const FAILURE_CODES: [&str; 33] = [
     "agent-handoff-start",
     "agent-handoff-finish",
 ];
-const CHECKPOINT_CODES: [&str; 56] = [
+const CHECKPOINT_CODES: [&str; 58] = [
+    "files-hebrew-verified",
+    "onboarding-empty-refused",
     "files-mounted",
     "files-folder-expanded",
     "files-file-selected",
@@ -776,6 +778,7 @@ impl RendererProofRuntime {
             .as_ref()
             .ok_or_else(|| "packaged renderer proof is not enabled".to_owned())?;
         let surface_matches = match configuration.surface {
+            "onboarding" => code.starts_with("onboarding-"),
             "files" => code.starts_with("files-"),
             "review" => code.starts_with("review-"),
             "versions" => code.starts_with("versions-"),
@@ -1162,6 +1165,18 @@ mod tests {
 
     #[test]
     fn renderer_checkpoints_are_surface_bound_and_closed() {
+        assert_eq!(
+            runtime("onboarding")
+                .report_checkpoint("onboarding-empty-refused")
+                .expect("closed onboarding checkpoint"),
+            "onboarding-empty-refused"
+        );
+        assert!(runtime("files")
+            .report_checkpoint("onboarding-empty-refused")
+            .is_err());
+        assert!(runtime("onboarding")
+            .report_checkpoint("onboarding-invented")
+            .is_err());
         assert!(RendererProofRuntime::disabled()
             .report_checkpoint("private-export-start")
             .is_err());

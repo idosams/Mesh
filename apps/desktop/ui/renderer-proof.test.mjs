@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { rendererProofFailureCode, runRendererProof } from './renderer-proof.js';
+import { rendererProofFailureCode, runRendererProof, proveLanguageSelection } from './renderer-proof.js';
 
 const nonce = 'ab'.repeat(32);
 
@@ -83,6 +83,14 @@ function installVerifiedImport(shadow) {
   shadow.activeElement = heading;
 }
 
+function installImportPreview(shadow, noticeShadow = shadow) {
+  const input = shadow.querySelector('[data-mesh-proof="import-path"]');
+  if (input?.value.endsWith('-empty')) {
+    noticeShadow.children.push(new Node({ proof: 'production-notice', text:
+      'The folder has no importable files or folders after exclusions. Choose a folder containing project files. Empty-folder import is not supported yet; no workspace was created' }));
+  } else installVerifiedImport(shadow);
+}
+
 function productionNoticeShell(notice, pageLabel) {
   const shell = new Node();
   shell.setAttribute('data-mesh-react-shell-active', 'true');
@@ -139,8 +147,8 @@ test('onboarding proof requires a real preview click and verified React projecti
       preview,
       'the proof must model the focused user action that owns review-heading focus',
     );
-    assert.equal(input.value, '/tmp/proof-source');
-    installVerifiedImport(shadow);
+    assert.ok(['/tmp/proof-source-empty', '/tmp/proof-source'].includes(input.value));
+    installImportPreview(shadow);
   });
   preview.focus = () => { shadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -162,6 +170,24 @@ test('onboarding proof requires a real preview click and verified React projecti
   }]);
 });
 
+test('onboarding proof rejects an empty folder offered for creation before accepting a valid import', async () => {
+  const reports = [];
+  const host = new Node();
+  const shadow = new Node();
+  host.shadowRoot = shadow;
+  const input = new Node({ proof: 'import-path' });
+  const preview = button('Preview folder', () => installVerifiedImport(shadow));
+  preview.proof = 'import-preview';
+  shadow.children = [new Node({ proof: 'import-select' }), input, preview];
+  await assert.rejects(runRendererProof({
+    document: documentWith(host),
+    invoke: invokeFor({ schema: 'mesh-renderer-proof-config/v2', nonce,
+      surface: 'onboarding', source: '/tmp/proof-source', destination: null }, reports),
+    getComputedStyle: visible, delay: async () => {},
+  }), /offered confirmation for an empty folder/u);
+  assert.deepEqual(reports, []);
+});
+
 test('packaged proof reaches a separated React page after the shell commit handshake', async () => {
   const reports = [];
   const contentHost = new Node();
@@ -170,7 +196,7 @@ test('packaged proof reaches a separated React page after the shell commit hands
   const select = new Node({ proof: 'import-select' });
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    installVerifiedImport(contentShadow);
+    installImportPreview(contentShadow, appHost.shadowRoot);
   });
   preview.focus = () => { contentShadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -209,7 +235,7 @@ test('packaged proof waits for the React shell commit without timer polling', as
   contentHost.shadowRoot = contentShadow;
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    installVerifiedImport(contentShadow);
+    installImportPreview(contentShadow, appHost.shadowRoot);
   });
   preview.focus = () => { contentShadow.activeElement = preview; };
   preview.proof = 'import-preview';
@@ -245,6 +271,53 @@ test('packaged proof waits for the React shell commit without timer polling', as
   assert.equal(pageOpen, true);
   assert.equal(reports[0].outcome, 'import-completed-after-busy');
 });
+
+function languageDocument(shell, { updateDirection = true, persist = true } = {}) {
+  const documentElement = { lang: 'en', dir: 'ltr' };
+  const values = new Map();
+  const localStorage = { getItem: (key) => values.get(key) ?? null };
+  const navigation = shell.shadowRoot.querySelectorAll('button').find((node) => node.textContent === 'Files');
+  const picker = new Node({ proof: 'language-picker' });
+  picker.value = 'en';
+  picker.onDispatch = () => {
+    documentElement.lang = picker.value;
+    if (updateDirection) documentElement.dir = picker.value === 'he' ? 'rtl' : 'ltr';
+    if (persist) values.set('mesh.ui.locale.v1', picker.value);
+    navigation.textContent = picker.value === 'he' ? 'קבצים' : 'Files';
+  };
+  shell.shadowRoot.children.push(picker);
+  return { documentElement, defaultView: { Event: globalThis.Event, localStorage } };
+}
+
+test('packaged language proof verifies Hebrew and restores English after persisting both choices', async () => {
+  const shell = productionNoticeShell(new Node(), 'Files');
+  const document = { ...languageDocument(shell), getElementById: () => shell };
+  const checkpoints = [];
+  await proveLanguageSelection({ document, getComputedStyle: visible, delay: async () => {},
+    invoke: async (_command, { code }) => {
+      checkpoints.push(code);
+      assert.equal(document.documentElement.lang, 'he');
+      assert.equal(document.documentElement.dir, 'rtl');
+      assert.equal(document.defaultView.localStorage.getItem('mesh.ui.locale.v1'), 'he');
+    },
+  });
+  assert.deepEqual(checkpoints, ['files-hebrew-verified']);
+  assert.deepEqual(document.documentElement, { lang: 'en', dir: 'ltr' });
+  assert.equal(document.defaultView.localStorage.getItem('mesh.ui.locale.v1'), 'en');
+});
+
+for (const failure of ['direction', 'persistence', 'picker']) {
+  test(`packaged language proof refuses missing ${failure}`, async () => {
+    const shell = productionNoticeShell(new Node(), 'Files');
+    const document = { ...languageDocument(shell, {
+      updateDirection: failure !== 'direction', persist: failure !== 'persistence',
+    }), getElementById: () => shell };
+    if (failure === 'picker') shell.shadowRoot.children.pop();
+    await assert.rejects(proveLanguageSelection({ document, getComputedStyle: visible,
+      invoke: async () => {}, delay: async () => {},
+    }), /language/u);
+  });
+}
 
 test('Files proof expands a nested file and completes exact native file and folder actions', async () => {
   const reports = [];
@@ -314,8 +387,8 @@ test('Files proof expands a nested file and completes exact native file and fold
 
   await runRendererProof({
     document: {
+      ...languageDocument(productionHost),
       getElementById: (id) => elements.get(id) || null,
-      defaultView: { Event: globalThis.Event, confirm: () => false },
     },
     invoke: invokeFor({
       schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'files',
@@ -349,6 +422,7 @@ test('Files proof expands a nested file and completes exact native file and fold
     'files-file-revealed',
     'files-folder-opened',
     'files-workspace-opened',
+    'files-hebrew-verified',
   ]);
   assert.deepEqual(reports, [{
     schema: 'mesh-renderer-proof/v1', nonce, surface: 'files', mounted: true,
@@ -396,7 +470,7 @@ test('a bounded cold WKWebView start may take longer than the former ten-second 
   const select = new Node({ proof: 'import-select' });
   const input = new Node({ proof: 'import-path' });
   const preview = button('Preview folder', () => {
-    installVerifiedImport(shadow);
+    installImportPreview(shadow);
   });
   preview.proof = 'import-preview';
   shadow.children = [select, input, preview];
@@ -1257,8 +1331,8 @@ test('agent handoff proof fails closed when React does not commit the Finish con
 
   await assert.rejects(runRendererProof({
     document: {
-      getElementById: (id) => elements.get(id) || null,
       defaultView: { Event: globalThis.Event, confirm: () => false },
+      getElementById: (id) => elements.get(id) || null,
     },
     invoke: invokeFor({
       schema: 'mesh-renderer-proof-config/v2', nonce, surface: 'agent-handoff',

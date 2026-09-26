@@ -1788,9 +1788,11 @@ test('a remembered empty workspace leads back to importing an ordinary folder', 
   await document.emitWorkspaceEntryIntent({ type: 'choose-folder' });
   assert.equal(document.importWorkbench?.import.sourcePath, source);
   assert.equal(document.importWorkbench?.import.fileCount, '0');
-  assert.equal(document.importWorkbench?.import.confirmLabel, 'Create empty workspace');
-  assert.match(document.importWorkbench?.import.scopeNote, /no ordinary project files or folders/i);
-  assert.match(document.importWorkbench?.import.scopeNote, /empty workspace/i);
+  assert.equal(document.importWorkbench?.import.confirmLabel, 'Choose a folder with content');
+  assert.equal(document.importWorkbench?.import.canConfirm, false);
+  assert.match(document.importWorkbench?.import.scopeNote, /no importable files or folders/i);
+  assert.match(document.importWorkbench?.import.scopeNote, /No workspace can be created/i);
+  await document.emitImportWorkbenchIntent({ type: 'confirm-import' });
 });
 
 test('a zero-history folder with ordinary files offers same-folder import instead of version navigation', async () => {

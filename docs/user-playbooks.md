@@ -88,3 +88,14 @@ problem. Keep raw project files and private keys out of reports.
 Use [GitHub Issues](https://github.com/idosams/Mesh/issues) for functional problems. Use the
 [security policy](../.github/SECURITY.md) for security findings. If work might be lost, stop writes
 and preserve the affected folder before retrying.
+
+## Language and empty saved versions
+
+Choose **עברית** beside the page navigation for Hebrew, or **English** to switch back.
+The choice is saved on this Mac. See [language support](localization.md) for translation scope.
+Project contents and paths remain unchanged.
+
+A saved version containing no files or subfolders cannot yet become a new working folder.
+Choose a version with content instead. This refusal leaves the current workspace unchanged
+and creates no destination. A version with remaining content can be copied even when its
+history contains deleted files.

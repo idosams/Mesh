@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
@@ -20,6 +21,7 @@ type LiveAgentReviewProps = {
 const previewableKinds = new Set(["modified-file", "new-file"]);
 
 export function LiveAgentReview({ model, preview, loading, error, errorPath, onIntent }: LiveAgentReviewProps) {
+  const t = useTranslation();
   const [query, setQuery] = useState("");
   const changeProjection = useMemo(
     () => liveReviewChangeProjection(model.changes, query),
@@ -42,24 +44,22 @@ export function LiveAgentReview({ model, preview, loading, error, errorPath, onI
   const currentWorkspace = model.workspaces.find((workspace) => workspace.state === "current")?.path ?? model.workspaceRoot;
 
   return (
-    <section className="grid gap-4" aria-label="Live agent work review">
+    <section className="grid gap-4" aria-label={t("Live agent work review")}>
       <header className="rounded-xl border border-amber-300/40 bg-amber-300/10 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-100">Live agent work</p>
-          <Badge tone="warning">Mutable</Badge>
-          <Badge tone="warning">Unrecorded</Badge>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-100">{t("Live agent work")}</p>
+          <Badge tone="warning">{t("Mutable")}</Badge>
+          <Badge tone="warning">{t("Unrecorded")}</Badge>
           <Badge tone={model.state === "error" ? "warning" : model.available ? "positive" : "neutral"}>
-            {model.state === "scanning" ? "Checking" : model.available ? "Agent assigned" : "No assigned agent"}
+            {model.state === "scanning" ? t("Checking") : model.available ? t("Agent assigned") : t("No assigned agent")}
           </Badge>
         </div>
-        <h2 className="mt-2 text-xl font-semibold">Inspect work without finishing the handoff</h2>
+        <h2 className="mt-2 text-xl font-semibold">{t("Inspect work without finishing the handoff")}</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground" role="status" aria-live="polite">{model.summary}</p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          This surface is read-only. It cannot record, approve, export, save, or update the original folder. Finish agent handoff remains the authoritative complete scan and private save.
-        </p>
+          {t("This surface is read-only. It cannot record, approve, export, save, or update the original folder. Finish agent handoff remains the authoritative complete scan and private save.")}</p>
         <label className="mt-4 grid max-w-xl gap-2 text-sm font-medium">
-          Workspace or assigned agent
-          <select
+          {t("Workspace or assigned agent")}<select
             className="min-h-11 rounded-lg border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={currentWorkspace}
             onChange={(event) => {
@@ -78,18 +78,17 @@ export function LiveAgentReview({ model, preview, loading, error, errorPath, onI
 
       {!model.available ? (
         <p className="rounded-xl border border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-          Choose an assigned workspace above, or start an agent from Current. Saved Review remains available separately.
-        </p>
+          {t("Choose an assigned workspace above, or start an agent from Current. Saved Review remains available separately.")}</p>
       ) : (
         <div className="grid min-h-[30rem] overflow-hidden rounded-xl border border-border bg-background/40 lg:grid-cols-[20rem_minmax(0,1fr)]">
-          <nav className="border-b border-border p-3 lg:border-b-0 lg:border-r" aria-label="Live changed files">
+          <nav className="border-b border-border p-3 lg:border-b-0 lg:border-r" aria-label={t("Live changed files")}>
             <label className="grid gap-2 text-sm font-medium">
-              <span className="sr-only">Filter live changes</span>
+              <span className="sr-only">{t("Filter live changes")}</span>
               <input
-                type="search"
+                type="search" dir="auto"
                 value={query}
                 onChange={(event) => setQuery(event.currentTarget.value)}
-                placeholder="Filter live changes"
+                placeholder={t("Filter live changes")}
                 className="min-h-11 rounded-lg border border-border bg-background px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
@@ -113,48 +112,46 @@ export function LiveAgentReview({ model, preview, loading, error, errorPath, onI
               ))}
               {changeProjection.truncated ? (
                 <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
-                  Showing the first {visible.length} visible live changes. Refine the search to inspect a narrower result set.
-                </p>
+                  {t("Showing the first")}{" "}{visible.length} {t("visible live changes. Refine the search to inspect a narrower result set.")}</p>
               ) : null}
-              {visible.length === 0 ? <p className="p-3 text-sm text-muted-foreground">No live changes match this filter.</p> : null}
+              {visible.length === 0 ? <p className="p-3 text-sm text-muted-foreground">{t("No live changes match this filter.")}</p> : null}
             </div>
           </nav>
 
-          <section className="min-w-0 p-5" aria-label="Stable live file snapshot" aria-busy={loading}>
+          <section className="min-w-0 p-5" aria-label={t("Stable live file snapshot")} aria-busy={loading}>
             {selected ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
                   <div className="min-w-0">
                     <h3 className="truncate font-mono text-base font-semibold">{selected.path}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">Mutable working file · exact snapshot required</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("Mutable working file · exact snapshot required")}</p>
                   </div>
                   <Button
                     variant="secondary"
                     disabled={loading || !previewableKinds.has(selected.kind)}
                     onClick={() => requestPreview(selected.path)}
                   >
-                    {loading ? "Reading…" : preview?.path === selected.path ? "Retry snapshot" : "Inspect stable snapshot"}
+                    {loading ? t("Reading…") : preview?.path === selected.path ? t("Retry snapshot") : t("Inspect stable snapshot")}
                   </Button>
                 </div>
                 {error && errorPath === selected.path ? (
                   <div className="mt-4 rounded-lg border border-amber-300/40 bg-amber-300/10 p-4" role="alert">
-                    <h4 className="font-semibold">Stable snapshot unavailable</h4>
+                    <h4 className="font-semibold">{t("Stable snapshot unavailable")}</h4>
                     <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">Wait for the current write to finish, then retry. Nothing was recorded or saved.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{t("Wait for the current write to finish, then retry. Nothing was recorded or saved.")}</p>
                   </div>
                 ) : preview?.path === selected.path ? (
                   <div className="mt-4 grid gap-4">
                     <dl className="grid gap-3 rounded-lg border border-border bg-muted/20 p-4 text-sm sm:grid-cols-3">
-                      <div><dt className="text-xs text-muted-foreground">Bytes</dt><dd className="mt-1 font-mono">{preview.byteCount}</dd></div>
-                      <div><dt className="text-xs text-muted-foreground">Digest</dt><dd className="mt-1 truncate font-mono" title={preview.contentDigest}>{preview.contentDigest.slice(0, 16)}…</dd></div>
-                      <div><dt className="text-xs text-muted-foreground">Executable</dt><dd className="mt-1">{preview.executable ? "Yes" : "No"}</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">{t("Bytes")}</dt><dd className="mt-1 font-mono">{preview.byteCount}</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">{t("Digest")}</dt><dd className="mt-1 truncate font-mono" title={preview.contentDigest}>{preview.contentDigest.slice(0, 16)}…</dd></div>
+                      <div><dt className="text-xs text-muted-foreground">{t("Executable")}</dt><dd className="mt-1">{preview.executable ? t("Yes") : t("No")}</dd></div>
                     </dl>
                     {preview.imageDataUrl ? (
                       <figure className="overflow-hidden rounded-lg border border-border bg-background">
                         <img className="block max-h-[38rem] w-full bg-white object-contain" src={preview.imageDataUrl} alt={`Read-only live preview of ${preview.path}`} />
                         <figcaption className="border-t border-border p-3 text-xs text-muted-foreground">
-                          Inert {preview.previewKind === "artifact" ? "document" : "image"} preview from one stable read pair. It is mutable and not recorded.
-                        </figcaption>
+                          {t("Inert")}{" "}{preview.previewKind === "artifact" ? t("document") : t("image")} {t("preview from one stable read pair. It is mutable and not recorded.")}</figcaption>
                       </figure>
                     ) : preview.text === null ? (
                       <p className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -165,16 +162,16 @@ export function LiveAgentReview({ model, preview, loading, error, errorPath, onI
                     )}
                   </div>
                 ) : selected.kind === "missing-file" ? (
-                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">This saved path is currently missing. There are no live bytes to preview.</p>
+                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">{t("This saved path is currently missing. There are no live bytes to preview.")}</p>
                 ) : selected.kind === "new-folder" ? (
-                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">This is a new folder. Finish agent handoff will authoritatively inspect its complete descendants.</p>
+                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">{t("This is a new folder. Finish agent handoff will authoritatively inspect its complete descendants.")}</p>
                 ) : selected.kind === "unsupported" ? (
-                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">Mesh will not follow or preview this unsupported entry. Remove or replace it with a regular file, then retry.</p>
+                  <p className="mt-4 rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">{t("Mesh will not follow or preview this unsupported entry. Remove or replace it with a regular file, then retry.")}</p>
                 ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">Choose Inspect stable snapshot to read this changing file twice under exact agent custody.</p>
+                  <p className="mt-4 text-sm text-muted-foreground">{t("Choose Inspect stable snapshot to read this changing file twice under exact agent custody.")}</p>
                 )}
               </>
-            ) : <p className="text-sm text-muted-foreground">No live file changes are currently visible.</p>}
+            ) : <p className="text-sm text-muted-foreground">{t("No live file changes are currently visible.")}</p>}
           </section>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import {
   productionRouteIsAvailable,
   productionRoutes,
@@ -10,8 +11,9 @@ export function ProductionNavigation({ activePage, workspaceReady, nativeChangeC
   nativeChangeCount: number;
   onNavigate: (page: WorkspacePageId) => void;
 }>) {
+  const t = useTranslation();
   return (
-    <nav aria-label="Primary pages" className="flex gap-1.5">
+    <nav aria-label={t("Primary pages")} className="flex gap-1.5">
       {productionRoutes.filter((page) => productionRouteIsAvailable(page.id, workspaceReady)).map((page) => {
         const active = activePage === page.id;
         return (
@@ -23,7 +25,7 @@ export function ProductionNavigation({ activePage, workspaceReady, nativeChangeC
             data-state={active ? "active" : "inactive"}
             onClick={() => onNavigate(page.id)}
           >
-            {page.label}
+            {t(page.label)}
             {page.id === "changes" && nativeChangeCount > 0 ? (
               <span className="ml-2 min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] text-primary-foreground" aria-label={`${nativeChangeCount} folder changes`}>
                 {nativeChangeCount}

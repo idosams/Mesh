@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import {
   useEffect,
   useMemo,
@@ -109,8 +110,9 @@ function WorkspaceTree({ rows, selectedEntry, focusedPath, disabled, changes, ro
   onToggle: (path: string) => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, path: string) => void;
 }) {
+  const t = useTranslation();
   return (
-    <div role="tree" aria-label="Workspace files" className="grid gap-px" data-mesh-proof="files-tree">
+    <div role="tree" aria-label={t("Workspace files")} className="grid gap-px" data-mesh-proof="files-tree">
       {rows.map((row) => {
         const change = changes.get(row.node.path);
         const presentation = row.node.kind === "file" ? workspaceFilePresentation(row.node.path) : null;
@@ -168,6 +170,7 @@ function WorkAction({ id, actions, onIntent, variant = "secondary", activationEc
   activationIntent?: () => WorkspaceFilesChangesIntent;
   enabledOverride?: boolean;
 }) {
+  const t = useTranslation();
   const action = actions.get(id);
   if (!action) return null;
   return (
@@ -176,7 +179,7 @@ function WorkAction({ id, actions, onIntent, variant = "secondary", activationEc
       const echo = exactIntent ? null : activationEcho?.();
       onIntent(exactIntent || (echo ? { type: "activate", action: id, ...echo } as WorkspaceFilesChangesIntent : { type: "activate", action: id }));
     }} data-mesh-work-action={id}>
-      {action.label}
+      {t(action.label)}
     </Button>
   );
 }
@@ -184,12 +187,13 @@ function WorkAction({ id, actions, onIntent, variant = "secondary", activationEc
 type SelectedWorkspaceEntry = WorkspaceFilesChangesModel["files"]["entries"][number];
 
 function ReadOnlyTextPreview({ path, text }: { path: string; text: string }) {
+  const t = useTranslation();
   const preview = useMemo(() => workspaceTextPreview(text), [text]);
   return (
     <section className="min-w-0 overflow-hidden rounded-md border border-border bg-[#070b10]" aria-label={`Current content of ${path}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/25 px-3 py-2">
-        <h4 className="text-xs font-semibold">Current file</h4>
-        <span className="font-mono text-[11px] text-muted-foreground">{preview.totalLines.toLocaleString()} {preview.totalLines === 1 ? "line" : "lines"}</span>
+        <h4 className="text-xs font-semibold">{t("Current file")}</h4>
+        <span className="font-mono text-[11px] text-muted-foreground">{preview.totalLines.toLocaleString()} {preview.totalLines === 1 ? t("line") : t("lines")}</span>
       </div>
       <div className="max-h-[34rem] overflow-auto font-mono text-[13px] leading-6" tabIndex={0}>
         {preview.lines.map((line, index) => (
@@ -199,7 +203,7 @@ function ReadOnlyTextPreview({ path, text }: { path: string; text: string }) {
           </div>
         ))}
       </div>
-      {preview.truncated ? <p className="border-t border-border bg-amber-400/5 px-3 py-2 text-xs text-amber-100" role="status">Previewing the first {preview.lines.length.toLocaleString()} of {preview.totalLines.toLocaleString()} lines. Open the exact file for the complete content.</p> : null}
+      {preview.truncated ? <p className="border-t border-border bg-amber-400/5 px-3 py-2 text-xs text-amber-100" role="status">{t("Previewing the first")}{" "}{preview.lines.length.toLocaleString()} {t("of")}{" "}{preview.totalLines.toLocaleString()} {t("lines. Open the exact file for the complete content.")}</p> : null}
     </section>
   );
 }
@@ -209,17 +213,18 @@ function WorkspaceFilePreview({ selected, selectedChange, changes }: {
   selectedChange: WorkspaceNativeChange | null;
   changes: WorkspaceFilesChangesModel["changes"];
 }) {
+  const t = useTranslation();
   if (selected.kind === "folder") {
-    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div><h4 className="font-semibold">Folder selected</h4><p className="mt-2 text-sm text-muted-foreground">Use Open in Finder to browse this exact folder, or expand it in Explorer.</p></div></div>;
+    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div><h4 className="font-semibold">{t("Folder selected")}</h4><p className="mt-2 text-sm text-muted-foreground">{t("Use Open in Finder to browse this exact folder, or expand it in Explorer.")}</p></div></div>;
   }
   const matchesInspection = changes.selectedFile === selected.value && changes.editorKind !== "none";
   if (!matchesInspection) {
     const canInspect = changes.selectedFile === selected.value
       || (changes.canSelectFile && changes.files.some((choice) => choice.value === selected.value));
-    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-live="polite"><div className="max-w-lg"><h4 className="font-semibold">{canInspect ? "Loading exact file preview…" : "Inline preview unavailable"}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{canInspect ? "Mesh is verifying the current working bytes before showing content." : "Mesh cannot safely inspect this file in the current workspace state. The external Open and Finder actions remain available."}</p></div></div>;
+    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-live="polite"><div className="max-w-lg"><h4 className="font-semibold">{canInspect ? t("Loading exact file preview…") : t("Inline preview unavailable")}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{canInspect ? t("Mesh is verifying the current working bytes before showing content.") : t("Mesh cannot safely inspect this file in the current workspace state. The external Open and Finder actions remain available.")}</p></div></div>;
   }
   if (changes.editorKind === "binary") {
-    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div className="max-w-lg"><h4 className="font-semibold">Native preview required</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{workspaceFilePresentation(selected.value).label} content is kept outside the text renderer. Open the exact working file with its default app.</p></div></div>;
+    return <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div className="max-w-lg"><h4 className="font-semibold">{t("Native preview required")}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{workspaceFilePresentation(selected.value).label} {t("content is kept outside the text renderer. Open the exact working file with its default app.")}</p></div></div>;
   }
   if (selectedChange && changes.baselineAvailable) {
     return <TextComparison before={changes.baselineText} after={changes.editorText} split={false} baselineAvailable />;
@@ -231,23 +236,25 @@ function WorkspaceFileDetails({ selected, selectedChange }: {
   selected: SelectedWorkspaceEntry;
   selectedChange: WorkspaceNativeChange | null;
 }) {
+  const t = useTranslation();
   const presentation = selected.kind === "file" ? workspaceFilePresentation(selected.value) : null;
   const folder = selected.value.includes("/") ? selected.value.slice(0, selected.value.lastIndexOf("/")) : "Workspace root";
-  return <section className="overflow-hidden rounded-md border border-border bg-background/35" aria-label="File details">
+  return <section className="overflow-hidden rounded-md border border-border bg-background/35" aria-label={t("File details")}>
     <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
-      <div><h4 className="text-sm font-semibold">Details</h4><p className="mt-0.5 text-xs text-muted-foreground">Identity and working-tree state</p></div>
+      <div><h4 className="text-sm font-semibold">{t("Details")}</h4><p className="mt-0.5 text-xs text-muted-foreground">{t("Identity and working-tree state")}</p></div>
       <Badge tone="neutral">{presentation?.shortLabel ?? "FOLDER"}</Badge>
     </div>
     <dl className="grid text-sm sm:grid-cols-[9rem_minmax(0,1fr)]">
-      {selectedChange ? <><dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">Working tree</dt><dd className="border-b border-border px-4 py-3"><span className="font-semibold">{selectedChange.status}</span><span className="ml-2 text-muted-foreground">{selectedChange.detail || selectedChange.description}</span></dd></> : null}
-      <dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">Path</dt><dd className="break-all border-b border-border px-4 py-3 font-mono">{selected.value}</dd>
-      <dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">Parent</dt><dd className="break-all border-b border-border px-4 py-3 font-mono">{folder}</dd>
-      <dt className="px-4 py-3 font-medium text-muted-foreground sm:border-r">Type</dt><dd className="px-4 py-3">{selected.kind === "file" ? presentation?.label : "Folder"}</dd>
+      {selectedChange ? <><dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">{t("Working tree")}</dt><dd className="border-b border-border px-4 py-3"><span className="font-semibold">{selectedChange.status}</span><span className="ml-2 text-muted-foreground">{selectedChange.detail || selectedChange.description}</span></dd></> : null}
+      <dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">{t("Path")}</dt><dd className="break-all border-b border-border px-4 py-3 font-mono">{selected.value}</dd>
+      <dt className="border-b border-border px-4 py-3 font-medium text-muted-foreground sm:border-r">{t("Parent")}</dt><dd className="break-all border-b border-border px-4 py-3 font-mono">{folder}</dd>
+      <dt className="px-4 py-3 font-medium text-muted-foreground sm:border-r">{t("Type")}</dt><dd className="px-4 py-3">{selected.kind === "file" ? presentation?.label : t("Folder")}</dd>
     </dl>
   </section>;
 }
 
 export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
+  const t = useTranslation();
   const actions = useMemo(() => actionMap(model), [model]);
   const tree = useMemo(() => workspaceExplorerTree(model.files.entries), [model.files.entries]);
   const [filter, setFilter] = useState("");
@@ -313,7 +320,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
   };
 
   return (
-    <div className="grid" aria-label="Workspace file explorer" data-mesh-proof="files-explorer">
+    <div className="grid" aria-label={t("Workspace file explorer")} data-mesh-proof="files-explorer">
       <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/35 px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-muted text-sky-300"><RepositoryGlyph /></span>
@@ -321,14 +328,14 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-base font-semibold tracking-tight">{model.files.workspaceLabel}</h2>
               <Badge tone={model.files.workspaceState === "agent-assigned" ? "warning" : "neutral"}>
-                {model.files.workspaceState === "agent-assigned" ? "Agent assigned" : "Current workspace"}
+                {model.files.workspaceState === "agent-assigned" ? t("Agent assigned") : t("Current workspace")}
               </Badge>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">Browse and open the exact working files.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("Browse and open the exact working files.")}</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground">{summary.files}</strong> files · <strong className="text-foreground">{summary.folders}</strong> folders · <strong className={model.changes.queue.length ? "text-amber-300" : "text-foreground"}>{model.changes.queue.length}</strong> changes</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground">{summary.files}</strong> {t("files ·")}<strong className="text-foreground">{summary.folders}</strong> {t("folders ·")}<strong className={model.changes.queue.length ? "text-amber-300" : "text-foreground"}>{model.changes.queue.length}</strong> {t("changes")}</p>
           <WorkAction id="open-workspace-folder" actions={actions} onIntent={onIntent} variant="quiet" />
         </div>
       </header>
@@ -337,24 +344,24 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
         <section id="workspace-files-explorer-panel" className="min-w-0 border-b border-border bg-background/55 lg:border-b-0 lg:border-r" aria-labelledby="workspace-tree-heading">
           <div className="flex min-h-12 items-center justify-between gap-2 border-b border-border px-3">
             <div>
-              <h3 id="workspace-tree-heading" className="text-xs font-semibold uppercase tracking-[0.14em]">Explorer</h3>
+              <h3 id="workspace-tree-heading" className="text-xs font-semibold uppercase tracking-[0.14em]">{t("Explorer")}</h3>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {explorerProjection.truncated
                   ? `${rows.length} of ${explorerProjection.matched} visible paths shown`
                   : `${rows.length} of ${summary.total} visible`}
               </p>
             </div>
-            <Button className="px-2" size="compact" variant="quiet" onClick={() => setExpanded(new Set())}>Collapse all</Button>
+            <Button className="px-2" size="compact" variant="quiet" onClick={() => setExpanded(new Set())}>{t("Collapse all")}</Button>
           </div>
           <label className="relative m-3 block">
-            <span className="sr-only">Filter workspace files</span>
+            <span className="sr-only">{t("Filter workspace files")}</span>
             <span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-muted-foreground"><SearchGlyph /></span>
             <input
               data-mesh-proof="files-filter"
-              type="search"
+              type="search" dir="auto"
               value={filter}
               onChange={(event) => setFilter(event.currentTarget.value)}
-              placeholder="Go to file…"
+              placeholder={t("Go to file…")}
               className="min-h-11 w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
@@ -381,20 +388,19 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
                 />
                 {explorerProjection.truncated ? (
                   <p className="m-2 rounded-md border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
-                    Showing the first {rows.length} visible paths. Collapse folders or refine the file search to narrow the result set.
-                  </p>
+                    {t("Showing the first")}{" "}{rows.length} {t("visible paths. Collapse folders or refine the file search to narrow the result set.")}</p>
                 ) : null}
               </>
             ) : (
               <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground" role="status">
-                {model.files.entries.length ? "No files match this filter." : "This workspace has no files or folders yet."}
+                {model.files.entries.length ? t("No files match this filter.") : t("This workspace has no files or folders yet.")}
               </p>
             )}
           </div>
         </section>
 
         <section className="grid min-w-0 grid-rows-[auto_auto_1fr_auto] bg-[#0b1016]" aria-labelledby="workspace-details-heading">
-          <nav aria-label="Selected path" className="flex min-h-12 min-w-0 items-center gap-1 overflow-x-auto border-b border-border bg-background/30 px-4 text-xs text-muted-foreground">
+          <nav aria-label={t("Selected path")} className="flex min-h-12 min-w-0 items-center gap-1 overflow-x-auto border-b border-border bg-background/30 px-4 text-xs text-muted-foreground">
             <span className="flex shrink-0 items-center gap-1.5 font-semibold text-foreground"><RepositoryGlyph />{model.files.workspaceLabel}</span>
             {breadcrumbs.map((part) => (
               <span key={part.path} className="flex shrink-0 items-center gap-1">
@@ -413,7 +419,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
                   {selectedPresentation ? <Badge tone="neutral">{selectedPresentation.label}</Badge> : null}
                   {selectedChange ? <Badge tone="changed">{selectedChange.status}</Badge> : null}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">{selected ? `${selected.kind === "file" ? "Regular file" : "Directory"} · exact mounted workspace` : "Select an item from Files"}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{selected ? `${selected.kind === "file" ? "Regular file" : "Directory"} · exact mounted workspace` : t("Select an item from Files")}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -427,42 +433,39 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
               <>
                 {model.files.workspaceState === "agent-assigned" ? (
                   <p className="rounded-md border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs leading-5 text-amber-100" role="status">
-                    Read-only snapshot from the assigned agent folder. Selecting the file again refreshes it; Mesh never saves from this preview.
-                  </p>
+                    {t("Read-only snapshot from the assigned agent folder. Selecting the file again refreshes it; Mesh never saves from this preview.")}</p>
                 ) : null}
                 <WorkspaceFilePreview selected={selected} selectedChange={selectedChange} changes={model.changes} />
                 <details className="rounded-md border border-border bg-background/35">
-                  <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">File details</summary>
+                  <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{t("File details")}</summary>
                   <WorkspaceFileDetails selected={selected} selectedChange={selectedChange} />
                 </details>
               </>
             ) : (
               <div className="grid min-h-52 place-items-center rounded-lg border border-dashed border-border p-8 text-center">
-                <div><p className="font-semibold">Choose a file or folder</p><p className="mt-2 text-sm text-muted-foreground">Use Files to inspect an exact workspace entry.</p></div>
+                <div><p className="font-semibold">{t("Choose a file or folder")}</p><p className="mt-2 text-sm text-muted-foreground">{t("Use Files to inspect an exact workspace entry.")}</p></div>
               </div>
             )}
           </div>
 
           <details className="border-t border-border bg-background/35">
-            <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-5 text-sm font-semibold hover:bg-muted/50"><Chevron /> Repository actions</summary>
+            <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-5 text-sm font-semibold hover:bg-muted/50"><Chevron /> {t("Repository actions")}</summary>
             <div className="grid gap-4 border-t border-border p-5 xl:grid-cols-3">
               <section aria-labelledby="new-entry-heading">
-                <h4 id="new-entry-heading" className="text-sm font-semibold">New</h4>
-                <label className="mt-2 grid gap-2 text-xs font-medium text-muted-foreground">Relative path
-                  <input ref={newPathRef} className="min-h-11 rounded-md border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" value={model.files.newPath} disabled={!model.files.canEditNewPath} placeholder="notes/idea.txt" onChange={(event) => onIntent({ type: "set-field", field: "newPath", value: event.currentTarget.value })} />
+                <h4 id="new-entry-heading" className="text-sm font-semibold">{t("New")}</h4>
+                <label className="mt-2 grid gap-2 text-xs font-medium text-muted-foreground">{t("Relative path")}<input ref={newPathRef} className="min-h-11 rounded-md border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" value={model.files.newPath} disabled={!model.files.canEditNewPath} placeholder={t("notes/idea.txt")} onChange={(event) => onIntent({ type: "set-field", field: "newPath", value: event.currentTarget.value })} />
                 </label>
                 <div className="mt-3 flex flex-wrap gap-2"><WorkAction id="create-text" actions={actions} onIntent={onIntent} activationEcho={() => ({ field: "newPath", value: newPathRef.current?.value ?? model.files.newPath })} /><WorkAction id="create-folder" actions={actions} onIntent={onIntent} activationEcho={() => ({ field: "newPath", value: newPathRef.current?.value ?? model.files.newPath })} /></div>
               </section>
               <section className="border-t border-border pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0" aria-labelledby="move-entry-heading">
-                <h4 id="move-entry-heading" className="text-sm font-semibold">Rename or move</h4>
-                <label className="mt-2 grid gap-2 text-xs font-medium text-muted-foreground">New relative path
-                  <input ref={movePathRef} className="min-h-11 rounded-md border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" value={model.files.movePath} disabled={!model.files.canEditMovePath} placeholder="notes/final.txt" onChange={(event) => onIntent({ type: "set-field", field: "movePath", value: event.currentTarget.value })} />
+                <h4 id="move-entry-heading" className="text-sm font-semibold">{t("Rename or move")}</h4>
+                <label className="mt-2 grid gap-2 text-xs font-medium text-muted-foreground">{t("New relative path")}<input ref={movePathRef} className="min-h-11 rounded-md border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" value={model.files.movePath} disabled={!model.files.canEditMovePath} placeholder={t("notes/final.txt")} onChange={(event) => onIntent({ type: "set-field", field: "movePath", value: event.currentTarget.value })} />
                 </label>
                 <div className="mt-3"><WorkAction id="move-entry" actions={actions} onIntent={onIntent} activationEcho={() => ({ field: "movePath", value: movePathRef.current?.value ?? model.files.movePath })} /></div>
               </section>
               <section className="border-t border-red-400/25 pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0" aria-labelledby="delete-entry-heading">
-                <h4 id="delete-entry-heading" className="text-sm font-semibold text-red-200">Delete selected item</h4>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">Deletion accepts files and empty folders and requires confirmation. Saved file content remains in immutable history.</p>
+                <h4 id="delete-entry-heading" className="text-sm font-semibold text-red-200">{t("Delete selected item")}</h4>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{t("Deletion accepts files and empty folders and requires confirmation. Saved file content remains in immutable history.")}</p>
                 <div className="mt-3"><WorkAction id="delete-entry" actions={actions} onIntent={onIntent} variant="danger" /></div>
               </section>
             </div>
@@ -475,6 +478,7 @@ export function WorkspaceFiles({ model, onIntent }: WorkbenchProps) {
 }
 
 export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
+  const t = useTranslation();
   const actions = useMemo(() => actionMap(model), [model]);
   const [changesPanelOpen, setChangesPanelOpen] = useState(true);
   const [view, setView] = useState<"Edit" | "Inline" | "Split">("Inline");
@@ -564,21 +568,21 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
     focusChange(nextPath);
   };
   return (
-    <div className="grid" aria-label="Changes and text editor">
+    <div className="grid" aria-label={t("Changes and text editor")}>
       <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/35 px-4 py-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold tracking-tight">Working changes</h2>
+            <h2 className="text-base font-semibold tracking-tight">{t("Working changes")}</h2>
             <Badge tone={changeRows.length ? "warning" : "neutral"}>{model.changes.queueSummary}</Badge>
-            <Badge tone="neutral">LOCAL + AUTHENTICATED</Badge>
+            <Badge tone="neutral">{t("LOCAL + AUTHENTICATED")}</Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">Review the working set, compare exact bytes, then save selected work privately.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("Review the working set, compare exact bytes, then save selected work privately.")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="flex items-center gap-3 font-mono text-[11px]" aria-label="Change summary">
-            <span className="text-amber-300">{changeCounts.M} modified</span>
-            <span className="text-emerald-300">{changeCounts.A} added</span>
-            <span className="text-red-300">{changeCounts.D} deleted</span>
+          <p className="flex items-center gap-3 font-mono text-[11px]" aria-label={t("Change summary")}>
+            <span className="text-amber-300">{changeCounts.M} {t("modified")}</span>
+            <span className="text-emerald-300">{changeCounts.A} {t("added")}</span>
+            <span className="text-red-300">{changeCounts.D} {t("deleted")}</span>
           </p>
           <WorkAction id="scan-files" actions={actions} onIntent={onIntent} />
         </div>
@@ -588,7 +592,7 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
         {changesPanelOpen ? <section id="workspace-changes-panel" className="grid min-w-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] border-b border-border bg-background/55 lg:border-b-0 lg:border-r" aria-labelledby="native-queue-heading" data-mesh-native-queue tabIndex={-1}>
           <div className="flex min-h-14 items-center justify-between border-b border-border px-3">
             <div>
-              <h3 id="native-queue-heading" className="text-xs font-semibold uppercase tracking-[0.14em]">Source control</h3>
+              <h3 id="native-queue-heading" className="text-xs font-semibold uppercase tracking-[0.14em]">{t("Source control")}</h3>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {changeProjection.truncated
                   ? `${changeProjection.offset + 1}–${changeProjection.offset + changeProjection.displayed} of ${changeProjection.matched} visible changes shown`
@@ -596,24 +600,24 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <span className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">WORKING</span>
-              <Button className="px-2" size="compact" variant="quiet" aria-controls="workspace-changes-panel" aria-expanded="true" onClick={() => setChangesPanelOpen(false)}>Hide</Button>
+              <span className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground">{t("WORKING")}</span>
+              <Button className="px-2" size="compact" variant="quiet" aria-controls="workspace-changes-panel" aria-expanded="true" onClick={() => setChangesPanelOpen(false)}>{t("Hide")}</Button>
             </div>
           </div>
 
           <div className="grid gap-2 border-b border-border p-3">
             <label className="relative block">
-              <span className="sr-only">Search working changes</span>
+              <span className="sr-only">{t("Search working changes")}</span>
               <span className="pointer-events-none absolute inset-y-0 left-3 grid place-items-center text-muted-foreground"><SearchGlyph /></span>
               <input
-                type="search"
+                type="search" dir="auto"
                 value={changeQuery}
                 onChange={(event) => setChangeQuery(event.currentTarget.value)}
-                placeholder="Filter changed files…"
+                placeholder={t("Filter changed files…")}
                 className="min-h-11 w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
-            <div className="flex gap-1 overflow-x-auto" aria-label="Filter changes by status">
+            <div className="flex gap-1 overflow-x-auto" aria-label={t("Filter changes by status")}>
               {([
                 ["all", "All", "All changes"],
                 ["M", "Modified", "Modified changes"],
@@ -640,12 +644,12 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
 
           <div className="max-h-[31rem] overflow-y-auto p-2">
             {changeGroups.length ? (
-              <div className="grid gap-3" role="listbox" aria-label="Working changes">
+              <div className="grid gap-3" role="listbox" aria-label={t("Working changes")}>
                 {changeGroups.map((group) => (
                   <section key={group.folder || "workspace-root"} role="group" aria-label={group.folder || "Workspace root"}>
                     <div className="flex min-h-8 items-center justify-between gap-2 px-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       <span className="truncate normal-case tracking-normal">{group.folder || "Workspace root"}</span>
-                      <span className="font-mono">{group.changes.length}{changeProjection.truncated ? " shown" : ""}</span>
+                      <span className="font-mono">{group.changes.length}{changeProjection.truncated ? t(" shown") : ""}</span>
                     </div>
                     <ul className="grid gap-px" role="presentation">
                       {group.changes.map((change) => {
@@ -686,33 +690,32 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
                   </section>
                 ))}
               </div>
-            ) : <div className="grid min-h-40 place-items-center p-5 text-center"><div><p className="text-sm font-semibold">{changeRows.length ? "No matching changes" : model.changes.scanState === "clean" ? "No working changes" : model.changes.scanState === "error" ? "Folder check incomplete" : model.changes.scanState === "scanning" ? "Checking folder…" : "Check the working folder"}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{changeRows.length ? "Adjust the search or status filter." : model.changes.scanState === "clean" ? "The native folder matches private history exactly." : model.changes.scanState === "error" ? "Retry the folder check before saving or review." : model.changes.scanState === "scanning" ? "Mesh is comparing current bytes with private history." : "Run a folder check to compare current bytes with private history."}</p>{!changeRows.length && model.changes.scanState !== "scanning" ? <div className="mt-3"><WorkAction id="scan-files" actions={actions} onIntent={onIntent} variant="primary" /></div> : null}</div></div>}
+            ) : <div className="grid min-h-40 place-items-center p-5 text-center"><div><p className="text-sm font-semibold">{changeRows.length ? t("No matching changes") : model.changes.scanState === "clean" ? t("No working changes") : model.changes.scanState === "error" ? t("Folder check incomplete") : model.changes.scanState === "scanning" ? t("Checking folder…") : t("Check the working folder")}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{changeRows.length ? t("Adjust the search or status filter.") : model.changes.scanState === "clean" ? t("The native folder matches private history exactly.") : model.changes.scanState === "error" ? t("Retry the folder check before saving or review.") : model.changes.scanState === "scanning" ? t("Mesh is comparing current bytes with private history.") : t("Run a folder check to compare current bytes with private history.")}</p>{!changeRows.length && model.changes.scanState !== "scanning" ? <div className="mt-3"><WorkAction id="scan-files" actions={actions} onIntent={onIntent} variant="primary" /></div> : null}</div></div>}
 
             {changeProjection.truncated ? (
               <p className="mt-3 rounded-md border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
-                Showing changes {changeProjection.offset + 1}–{changeProjection.offset + changeProjection.displayed} of {changeProjection.matched}. Refine the change search or status filter to inspect a narrower result set.
-              </p>
+                {t("Showing changes")}{" "}{changeProjection.offset + 1}–{changeProjection.offset + changeProjection.displayed} {t("of")}{" "}{changeProjection.matched}{" "}{t(". Refine the change search or status filter to inspect a narrower result set.")}</p>
             ) : null}
 
             {model.changes.structural ? (
               <details className="mt-3 rounded-md border border-amber-400/25 bg-amber-400/5">
-                <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-xs font-semibold text-amber-200"><Chevron /> Resolve missing file</summary>
+                <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 text-xs font-semibold text-amber-200"><Chevron /> {t("Resolve missing file")}</summary>
                 <div className="grid gap-3 border-t border-amber-400/20 p-3">
                   <div className="grid gap-1.5 text-xs font-medium">
-                    <label htmlFor="changes-missing-source-filter">Find a missing tracked file</label>
-                    <input id="changes-missing-source-filter" type="search" value={missingSourceQuery} onChange={(event) => setMissingSourceQuery(event.currentTarget.value)} placeholder="Filter missing files…" className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
-                    <label htmlFor="changes-missing-source">Missing tracked file</label>
+                    <label htmlFor="changes-missing-source-filter">{t("Find a missing tracked file")}</label>
+                    <input id="changes-missing-source-filter" type="search" dir="auto" value={missingSourceQuery} onChange={(event) => setMissingSourceQuery(event.currentTarget.value)} placeholder={t("Filter missing files…")} className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+                    <label htmlFor="changes-missing-source">{t("Missing tracked file")}</label>
                     <select id="changes-missing-source" ref={missingSourceRef} className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground" value={model.changes.structural.missingSource} data-mesh-work-field="missingSource" disabled={!model.changes.structural.canChoose} onChange={(event) => onIntent({ type: "set-field", field: "missingSource", value: event.currentTarget.value })}>
                       {missingSourceProjection.items.map((item) => <option data-mesh-structural-source="true" key={item.value} value={item.value}>{item.label}</option>)}
                     </select>
                     <span className="font-normal text-muted-foreground">{structuralProjectionCopy(missingSourceProjection, "missing files")}</span>
                   </div>
                   <div className="grid gap-1.5 text-xs font-medium">
-                    <label htmlFor="changes-move-target-filter">Find a possible destination</label>
-                    <input id="changes-move-target-filter" type="search" value={moveTargetQuery} onChange={(event) => setMoveTargetQuery(event.currentTarget.value)} placeholder="Filter possible destinations…" className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
-                    <label htmlFor="changes-move-target">Resolution</label>
+                    <label htmlFor="changes-move-target-filter">{t("Find a possible destination")}</label>
+                    <input id="changes-move-target-filter" type="search" dir="auto" value={moveTargetQuery} onChange={(event) => setMoveTargetQuery(event.currentTarget.value)} placeholder={t("Filter possible destinations…")} className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+                    <label htmlFor="changes-move-target">{t("Resolution")}</label>
                     <select id="changes-move-target" ref={moveTargetRef} className="min-h-11 min-w-0 rounded-md border border-border bg-background px-2 text-foreground" value={model.changes.structural.moveTarget} data-mesh-work-field="moveTarget" disabled={!model.changes.structural.canChoose} onChange={(event) => onIntent({ type: "set-field", field: "moveTarget", value: event.currentTarget.value })}>
-                      <option value="">It was deleted</option>
+                      <option value="">{t("It was deleted")}</option>
                       {moveTargetProjection.items.map((item) => <option data-mesh-structural-target="true" key={item.value} value={item.value}>{item.label}</option>)}
                     </select>
                     <span className="font-normal text-muted-foreground">{structuralProjectionCopy(moveTargetProjection, "possible destinations")}</span>
@@ -728,11 +731,11 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
             <WorkAction id="save-all-private" actions={actions} onIntent={onIntent} variant="primary" />
             <label className="flex min-h-11 items-start gap-2 rounded-md border border-border bg-muted/20 p-2.5 text-xs">
               <input className="mt-0.5 size-4" type="checkbox" checked={model.changes.autoSaveChecked} disabled={!model.changes.autoSaveEnabled} onChange={(event) => onIntent({ type: "set-auto-save", checked: event.currentTarget.checked })} />
-              <span><strong>Auto-save safe changes</strong><span className="mt-1 block leading-4 text-muted-foreground">{model.changes.autoSaveHint}</span></span>
+              <span><strong>{t("Auto-save safe changes")}</strong><span className="mt-1 block leading-4 text-muted-foreground">{model.changes.autoSaveHint}</span></span>
             </label>
           </div>
-        </section> : <aside id="workspace-changes-panel" className="flex min-h-12 items-start justify-center border-b border-border bg-background/55 p-2 lg:border-b-0 lg:border-r" aria-label="Source control collapsed">
-          <Button className="px-2 lg:[writing-mode:vertical-rl]" size="compact" variant="quiet" aria-controls="workspace-changes-panel" aria-expanded="false" onClick={() => setChangesPanelOpen(true)}>Show Changes</Button>
+        </section> : <aside id="workspace-changes-panel" className="flex min-h-12 items-start justify-center border-b border-border bg-background/55 p-2 lg:border-b-0 lg:border-r" aria-label={t("Source control collapsed")}>
+          <Button className="px-2 lg:[writing-mode:vertical-rl]" size="compact" variant="quiet" aria-controls="workspace-changes-panel" aria-expanded="false" onClick={() => setChangesPanelOpen(true)}>{t("Show Changes")}</Button>
         </aside>}
 
         <section className="grid min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-[#0b1016]" aria-labelledby="file-editor-heading">
@@ -745,7 +748,7 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center" aria-label="Navigate inspectable changes">
+              <div className="flex items-center" aria-label={t("Navigate inspectable changes")}>
                 <Button
                   size="compact"
                   variant="quiet"
@@ -753,7 +756,7 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
                   disabled={!navigation.previous}
                   data-mesh-change-navigation="previous"
                   onClick={() => navigation.previous && inspect(navigation.previous)}
-                >Previous</Button>
+                >{t("Previous")}</Button>
                 <Button
                   size="compact"
                   variant="quiet"
@@ -761,9 +764,9 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
                   disabled={!navigation.next}
                   data-mesh-change-navigation="next"
                   onClick={() => navigation.next && inspect(navigation.next)}
-                >Next</Button>
+                >{t("Next")}</Button>
               </div>
-              {model.changes.editorKind === "text" ? <SegmentedControl label="Text workspace view" value={view} onChange={(value) => setView(value as "Edit" | "Inline" | "Split")} options={["Edit", "Inline", "Split"]} /> : null}
+              {model.changes.editorKind === "text" ? <SegmentedControl label={t("Text workspace view")} value={view} onChange={(value) => setView(value as "Edit" | "Inline" | "Split")} options={["Edit", "Inline", "Split"]} /> : null}
             </div>
           </div>
 
@@ -771,15 +774,14 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
             {editorVisible ? (
               model.changes.editorKind === "text" && view === "Edit" ? (
                 <label className="grid gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Inspected working text
-                  <textarea ref={editorRef} className="min-h-[27rem] w-full resize-y rounded-md border border-border bg-[#070b10] p-4 font-mono text-[13px] font-normal leading-6 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" spellCheck={false} value={model.changes.editorText} disabled={!model.changes.canEditText} onChange={(event) => onIntent({ type: "set-field", field: "editorText", value: event.currentTarget.value })} />
+                  {t("Inspected working text")}<textarea ref={editorRef} className="min-h-[27rem] w-full resize-y rounded-md border border-border bg-[#070b10] p-4 font-mono text-[13px] font-normal leading-6 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" spellCheck={false} value={model.changes.editorText} disabled={!model.changes.canEditText} onChange={(event) => onIntent({ type: "set-field", field: "editorText", value: event.currentTarget.value })} />
                 </label>
               ) : model.changes.editorKind === "text" ? (
                 <TextComparison before={model.changes.baselineText} after={model.changes.editorText} split={view === "Split"} baselineAvailable={model.changes.baselineAvailable} />
               ) : (
-                <div className="grid min-h-72 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div><p className="font-semibold">Preview unavailable</p><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Binary or large content stays outside the text editor. Mesh still tracks and saves it by exact identity.</p></div></div>
+                <div className="grid min-h-72 place-items-center rounded-md border border-dashed border-border p-8 text-center"><div><p className="font-semibold">{t("Preview unavailable")}</p><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{t("Binary or large content stays outside the text editor. Mesh still tracks and saves it by exact identity.")}</p></div></div>
               )
-            ) : <div className="grid min-h-72 place-items-center text-center"><div className="max-w-lg"><p className="font-semibold">{changeRows.length ? "Select a working change" : model.changes.scanState === "clean" ? "No working changes" : model.changes.scanState === "error" ? "Folder check incomplete" : "Review current folder changes"}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{changeRows.length ? "Choose an inspectable file from Source control to see its exact inline or split diff." : model.changes.scanState === "clean" ? "The native folder matches the latest private version. Edit a file in your usual app, then check again." : model.changes.scanState === "error" ? "Mesh could not complete an exact comparison. Retry before trusting or saving this view." : "Check the native folder, then select a changed file to see its exact inline or split diff here."}</p>{!changeRows.length && model.changes.scanState !== "scanning" ? <div className="mt-4"><WorkAction id="scan-files" actions={actions} onIntent={onIntent} variant="primary" /></div> : null}</div></div>}
+            ) : <div className="grid min-h-72 place-items-center text-center"><div className="max-w-lg"><p className="font-semibold">{changeRows.length ? t("Select a working change") : model.changes.scanState === "clean" ? t("No working changes") : model.changes.scanState === "error" ? t("Folder check incomplete") : t("Review current folder changes")}</p><p className="mt-2 text-sm leading-6 text-muted-foreground">{changeRows.length ? t("Choose an inspectable file from Source control to see its exact inline or split diff.") : model.changes.scanState === "clean" ? t("The native folder matches the latest private version. Edit a file in your usual app, then check again.") : model.changes.scanState === "error" ? t("Mesh could not complete an exact comparison. Retry before trusting or saving this view.") : t("Check the native folder, then select a changed file to see its exact inline or split diff here.")}</p>{!changeRows.length && model.changes.scanState !== "scanning" ? <div className="mt-4"><WorkAction id="scan-files" actions={actions} onIntent={onIntent} variant="primary" /></div> : null}</div></div>}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/35 px-4 py-3">
@@ -793,10 +795,10 @@ export function WorkspaceChanges({ model, onIntent }: WorkbenchProps) {
       </div>
 
       <details className="border-t border-border bg-background/35">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-semibold"><Chevron /> How Mesh handles working changes</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-semibold"><Chevron /> {t("How Mesh handles working changes")}</summary>
         <div className="grid gap-3 border-t border-border p-4 text-xs leading-5 text-muted-foreground">
-          <p>Edit here or work normally in the stable native folder with a local editor. Give Terminal or a long-running agent the independent agent folder shown under Current; it starts at the selected durable version and then remains writable even if Mesh switches elsewhere. Returning to Mesh automatically inspects the selected folder; selecting a different recent agent folder inspects it immediately, while inactive agent folders are not continuously watched. Find folder changes retries the read explicitly.</p>
-          <p>Inspect re-reads exact operating-system bytes; binary and large files stay outside the text editor but remain savable. Choose Save privately to sign and append one inspected file. Mesh reviews a complete new folder tree and admits its folders parent-first. Outside the confirmed agent-finish flow, saving remains an explicit authenticated action. Choose Save all privately for the complete inspected queue. Automatic save uses the same complete scan, reinspection, signature, and post-save verification. It pauses for deletions, renames, symbolic links, special entries, active agent handoffs, or files that keep changing. Mesh stops on the first mismatch.</p>
+          <p>{t("Edit here or work normally in the stable native folder with a local editor. Give Terminal or a long-running agent the independent agent folder shown under Current; it starts at the selected durable version and then remains writable even if Mesh switches elsewhere. Returning to Mesh automatically inspects the selected folder; selecting a different recent agent folder inspects it immediately, while inactive agent folders are not continuously watched. Find folder changes retries the read explicitly.")}</p>
+          <p>{t("Inspect re-reads exact operating-system bytes; binary and large files stay outside the text editor but remain savable. Choose Save privately to sign and append one inspected file. Mesh reviews a complete new folder tree and admits its folders parent-first. Outside the confirmed agent-finish flow, saving remains an explicit authenticated action. Choose Save all privately for the complete inspected queue. Automatic save uses the same complete scan, reinspection, signature, and post-save verification. It pauses for deletions, renames, symbolic links, special entries, active agent handoffs, or files that keep changing. Mesh stops on the first mismatch.")}</p>
         </div>
       </details>
     </div>
@@ -817,38 +819,39 @@ function structuralProjectionCopy(
 }
 
 export function TextComparison({ before, after, split, baselineAvailable = true }: { before: string; after: string; split: boolean; baselineAvailable?: boolean }) {
+  const t = useTranslation();
   const comparison = useMemo(
     () => baselineAvailable ? workspaceTextDiff(before, after) : null,
     [after, baselineAvailable, before],
   );
   if (!baselineAvailable) {
-    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label="Text comparison unavailable">
+    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Text comparison unavailable")}>
       <div className="max-w-lg">
-        <h4 className="font-semibold">Saved baseline cannot be displayed</h4>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">The saved baseline is not available as bounded text. The exact working file remains available in Edit.</p>
+        <h4 className="font-semibold">{t("Saved baseline cannot be displayed")}</h4>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("The saved baseline is not available as bounded text. The exact working file remains available in Edit.")}</p>
       </div>
     </section>;
   }
   if (!comparison) return null;
   if (comparison.kind === "unavailable") {
-    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label="Text comparison unavailable">
+    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Text comparison unavailable")}>
       <div className="max-w-lg">
-        <h4 className="font-semibold">Comparison is too large to display</h4>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{comparison.reason} The exact file remains available in Edit.</p>
+        <h4 className="font-semibold">{t("Comparison is too large to display")}</h4>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{comparison.reason} {t("The exact file remains available in Edit.")}</p>
       </div>
     </section>;
   }
   if (comparison.kind === "unchanged") {
-    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label="Unchanged text comparison">
-      <div><h4 className="font-semibold">No text changes</h4><p className="mt-2 text-sm text-muted-foreground">The working copy matches the saved version exactly.</p></div>
+    return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Unchanged text comparison")}>
+      <div><h4 className="font-semibold">{t("No text changes")}</h4><p className="mt-2 text-sm text-muted-foreground">{t("The working copy matches the saved version exactly.")}</p></div>
     </section>;
   }
   return <section className="min-w-0 overflow-hidden rounded-md border border-border bg-[#070b10]" aria-label={split ? "Split text comparison" : "Inline text comparison"}>
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/25 px-3 py-2">
-      <h4 className="text-xs font-semibold">Working tree diff</h4>
+      <h4 className="text-xs font-semibold">{t("Working tree diff")}</h4>
       <p className="flex items-center gap-3 font-mono text-[11px]">
-        <span className="text-emerald-300">+{comparison.additions} {comparison.additions === 1 ? "addition" : "additions"}</span>
-        <span className="text-red-300">−{comparison.deletions} {comparison.deletions === 1 ? "deletion" : "deletions"}</span>
+        <span className="text-emerald-300">+{comparison.additions} {comparison.additions === 1 ? t("addition") : t("additions")}</span>
+        <span className="text-red-300">−{comparison.deletions} {comparison.deletions === 1 ? t("deletion") : t("deletions")}</span>
       </p>
     </div>
     <div className="max-h-[32rem] overflow-auto">
@@ -876,25 +879,28 @@ function diffLineStatus(line: WorkspaceTextDiffLine): string {
 }
 
 function DiffLineEnding({ line }: { line: WorkspaceTextDiffLine }) {
+  const t = useTranslation();
   if (line.ending === "lf" || (line.ending === "crlf" && line.kind === "context")) return null;
   return <span className="ml-3 select-none rounded border border-border bg-muted/50 px-1.5 py-0.5 font-sans text-[9px] uppercase tracking-wide text-muted-foreground">
-    {line.ending === "none" ? "No newline" : "CRLF"}
+    {line.ending === "none" ? t("No newline") : t("CRLF")}
   </span>;
 }
 
 function HunkHeader({ hunk }: { hunk: WorkspaceTextDiffHunk }) {
+  const t = useTranslation();
   return <div className="border-y border-border bg-sky-400/5 px-3 py-2 font-mono text-[11px] text-sky-200">
-    <span className="sr-only">Changed lines. </span>
+    <span className="sr-only">{t("Changed lines.")}</span>
     @@ -{hunk.beforeStart},{hunk.beforeCount} +{hunk.afterStart},{hunk.afterCount} @@
   </div>;
 }
 
 function InlineWorkingDiff({ hunks }: { hunks: readonly WorkspaceTextDiffHunk[] }) {
+  const t = useTranslation();
   return <div className="min-w-max font-mono text-[13px] leading-6">
     {hunks.map((hunk, hunkIndex) => <div key={`${hunk.beforeStart}:${hunk.afterStart}:${hunkIndex}`}>
       <HunkHeader hunk={hunk} />
       {hunk.lines.map((line, index) => <div className={`grid min-h-6 grid-cols-[3rem_3rem_2rem_minmax(0,1fr)] ${diffLineTone(line)}`} key={`${line.kind}:${line.before}:${line.after}:${index}`} data-mesh-work-diff-line={line.kind}>
-        <span className="sr-only">{diffLineStatus(line)}. {line.before === null ? "No earlier line" : `Earlier line ${line.before}`}. {line.after === null ? "No current line" : `Current line ${line.after}`}. </span>
+        <span className="sr-only">{diffLineStatus(line)}. {line.before === null ? t("No earlier line") : `Earlier line ${line.before}`}. {line.after === null ? t("No current line") : `Current line ${line.after}`}. </span>
         <span aria-hidden="true" className="select-none border-r border-border/60 px-2 text-right text-muted-foreground/70">{line.before ?? ""}</span>
         <span aria-hidden="true" className="select-none border-r border-border/60 px-2 text-right text-muted-foreground/70">{line.after ?? ""}</span>
         <span aria-hidden="true" className="select-none text-center">{diffLineMark(line)}</span>
@@ -905,10 +911,11 @@ function InlineWorkingDiff({ hunks }: { hunks: readonly WorkspaceTextDiffHunk[] 
 }
 
 function SplitWorkingDiff({ hunks }: { hunks: readonly WorkspaceTextDiffHunk[] }) {
+  const t = useTranslation();
   return <div className="min-w-[48rem] font-mono text-[13px] leading-6">
     <div className="grid grid-cols-2 border-b border-border bg-muted/20 font-sans text-xs font-semibold text-muted-foreground">
-      <span className="px-3 py-2">Saved version</span>
-      <span className="border-l border-border px-3 py-2">Working copy</span>
+      <span className="px-3 py-2">{t("Saved version")}</span>
+      <span className="border-l border-border px-3 py-2">{t("Working copy")}</span>
     </div>
     {hunks.map((hunk, hunkIndex) => <div key={`${hunk.beforeStart}:${hunk.afterStart}:${hunkIndex}`}>
       <HunkHeader hunk={hunk} />

@@ -1,3 +1,11 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+function renderComponentTree(Component, props) {
+  let tree;
+  function Capture() { tree = Component(props); return tree; }
+  renderToStaticMarkup(React.createElement(Capture));
+  return tree;
+}
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -166,7 +174,7 @@ test("the detailed current view exposes custody, conditions, destination, diagno
 test("the Current organism emits exact action intents without a legacy control proxy", async () => {
   const { WorkspaceCurrentView } = await loadModule("./src/organisms/workspace-current.tsx");
   const intents = [];
-  const tree = WorkspaceCurrentView({
+  const tree = renderComponentTree(WorkspaceCurrentView, {
     model: projection,
     onIntent: (intent) => intents.push(intent),
     workspaceQuery: "",

@@ -3,6 +3,21 @@
 Mesh is not yet a stable product. This changelog records public, installable releases; internal
 development commits and private test builds are deliberately omitted.
 
+## [0.1.0-alpha.5] — 2026-09-26
+
+Family-and-friends technical alpha: local-readiness fixes and Hebrew interface support.
+
+- Clear early refusal for empty/Git-only imports without creating a journal or changing originals.
+- Historical copies handle deleted entries; empty saved copies receive an explicit unsupported-state message.
+- Faster ordinary recovery with unchanged causal validation and recovery budgets.
+- English/Hebrew language choice with right-to-left presentation and preserved project text.
+- Stronger packaged startup/export checks, checked-in document renderer fixtures, expanded CI,
+  repaired documentation links, and operational user playbooks.
+
+The app remains ad-hoc signed and unnotarized. Protected approval and Update original folder are
+unavailable. Empty project creation and copying an entirely empty saved version are unsupported.
+See the [release notes](launch/v0.1.0-alpha.5.md).
+
 ## [0.1.0-alpha.4] — 2026-09-19
 
 Preview and workspace-identity fixes for the macOS technical alpha.
@@ -89,6 +104,7 @@ First public macOS technical alpha.
 - Filesystem changes made while Mesh is not running are inspected when the workspace is reopened;
   continuous background capture is not claimed.
 
+[0.1.0-alpha.5]: launch/v0.1.0-alpha.5.md
 [0.1.0-alpha.4]: launch/v0.1.0-alpha.4.md
 [0.1.0-alpha.3]: launch/v0.1.0-alpha.3.md
 [0.1.0-alpha.2]: launch/v0.1.0-alpha.2.md

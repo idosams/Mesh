@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
@@ -40,6 +41,7 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
   workspaceQuery: string;
   onWorkspaceQueryChange: (query: string) => void;
 }) {
+  const t = useTranslation();
   const workspaceProjection = workspaceCurrentWorkspaceProjection(model.workspaces, workspaceQuery);
   const agentChangeProjection = workspaceCurrentListProjection(model.agentActivity.changes, CURRENT_MONITOR_ROW_LIMIT);
   const entryProjection = workspaceCurrentListProjection(model.entries, CURRENT_DETAIL_ROW_LIMIT);
@@ -60,25 +62,25 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
         disabled={!item.enabled}
         onClick={() => onIntent({ type: "activate", action: id })}
       >
-        {item.label}
+        {t(item.label)}
       </Button>
     ) : null;
   };
 
   return (
-    <div data-mesh-proof="current-mounted" data-mesh-generation={generation} aria-label="Current workspace details" className="grid gap-5 p-5 lg:p-6">
+    <div data-mesh-proof="current-mounted" data-mesh-generation={generation} aria-label={t("Current workspace details")} className="grid gap-5 p-5 lg:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Workspace details</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("Workspace details")}</p>
             <Badge tone={model.state === "Needs attention" ? "warning" : model.state === "Working" ? "neutral" : "positive"}>
               {model.state}
             </Badge>
             <span data-mesh-proof={model.agentAssigned ? "current-agent-assigned" : "current-agent-available"}>
-              {model.agentAssigned ? <Badge tone="warning">Agent folder assigned</Badge> : <Badge tone="neutral">Agent folder available</Badge>}
+              {model.agentAssigned ? <Badge tone="warning">{t("Agent folder assigned")}</Badge> : <Badge tone="neutral">{t("Agent folder available")}</Badge>}
             </span>
           </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">Current workspace</h2>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">{t("Current workspace")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{model.recordSummary}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -89,23 +91,23 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
 
       <details className="rounded-xl border border-border bg-background/40" aria-labelledby="workspace-switcher-heading">
         <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 py-3 font-semibold">
-          <span>Switch workspace</span>
-          <span className="text-xs font-normal text-muted-foreground">{model.workspaces.length.toLocaleString()} recent</span>
+          <span>{t("Switch workspace")}</span>
+          <span className="text-xs font-normal text-muted-foreground">{model.workspaces.length.toLocaleString()} {t("recent")}</span>
         </summary>
         <div className="border-t border-border p-4">
           <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspaces and agents</p>
-            <h3 id="workspace-switcher-heading" className="mt-1 font-semibold">Switch without losing agent context</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("Workspaces and agents")}</p>
+            <h3 id="workspace-switcher-heading" className="mt-1 font-semibold">{t("Switch without losing agent context")}</h3>
           </div>
           </div>
         <label className="mt-3 grid max-w-xl gap-1.5 text-xs font-medium text-muted-foreground">
-          <span>Find a workspace or agent</span>
+          <span>{t("Find a workspace or agent")}</span>
           <input
-            type="search"
+            type="search" dir="auto"
             value={workspaceQuery}
             onChange={(event) => onWorkspaceQueryChange(event.currentTarget.value)}
-            placeholder="Search by name, state, or path…"
+            placeholder={t("Search by name, state, or path…")}
             className="min-h-11 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           />
         </label>
@@ -128,28 +130,27 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
             >
               <span className="block truncate font-medium">{workspace.label}</span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                {workspace.state === "current" ? "Current workspace" : workspace.state === "agent-assigned" ? "Agent running" : "Available"}
+                {workspace.state === "current" ? t("Current workspace") : workspace.state === "agent-assigned" ? t("Agent running") : t("Available")}
               </span>
             </button>
           ))}
         </div>
         {workspaceProjection.truncated ? (
           <p className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
-            Showing the first {workspaceProjection.items.length.toLocaleString()} matching workspaces. Refine the search to reach a narrower result set.
-          </p>
+            {t("Showing the first")}{" "}{workspaceProjection.items.length.toLocaleString()} {t("matching workspaces. Refine the search to reach a narrower result set.")}</p>
         ) : null}
-        {workspaceProjection.matched === 0 ? <p className="mt-3 text-sm text-muted-foreground">No workspace or agent matches this search.</p> : null}
+        {workspaceProjection.matched === 0 ? <p className="mt-3 text-sm text-muted-foreground">{t("No workspace or agent matches this search.")}</p> : null}
         </div>
       </details>
 
       <section className="rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="live-agent-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Read-only monitor</p>
-            <h3 id="live-agent-heading" className="mt-1 font-semibold">Live agent work</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("Read-only monitor")}</p>
+            <h3 id="live-agent-heading" className="mt-1 font-semibold">{t("Live agent work")}</h3>
           </div>
           <Badge tone={model.agentActivity.state === "error" ? "warning" : model.agentAssigned ? "positive" : "neutral"}>
-            {model.agentActivity.state === "scanning" ? "Checking" : model.agentAssigned ? "Monitoring" : "No active agent"}
+            {model.agentActivity.state === "scanning" ? t("Checking") : model.agentAssigned ? t("Monitoring") : t("No active agent")}
           </Badge>
         </div>
         <p className="mt-2 text-sm leading-6 text-muted-foreground" role="status" aria-live="polite">
@@ -165,21 +166,20 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
             ))}
             {agentChangeProjection.truncated ? (
               <li className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-3 text-xs leading-5 text-amber-100" role="status">
-                Showing the first {agentChangeProjection.items.length.toLocaleString()} of {agentChangeProjection.matched.toLocaleString()} live changes. Open Live agent work in Review and filter to inspect a narrower result set.
-              </li>
+                {t("Showing the first")}{" "}{agentChangeProjection.items.length.toLocaleString()} {t("of")}{" "}{agentChangeProjection.matched.toLocaleString()} {t("live changes. Open Live agent work in Review and filter to inspect a narrower result set.")}</li>
             ) : null}
           </ul>
         ) : null}
         {model.agentAssigned ? (
-          <p className="mt-3 text-xs text-muted-foreground">Monitoring never saves or approves work. Finish agent handoff still performs the authoritative complete scan before the work enters private history and Review.</p>
+          <p className="mt-3 text-xs text-muted-foreground">{t("Monitoring never saves or approves work. Finish agent handoff still performs the authoritative complete scan before the work enters private history and Review.")}</p>
         ) : null}
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-border bg-background/40 p-4" aria-labelledby="working-folder-heading">
-          <p id="working-folder-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Working folder</p>
+          <p id="working-folder-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("Working folder")}</p>
           <p className="mt-2 break-all font-mono text-sm" title={model.workingFolder}>{model.workingFolder}</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">This stable path follows the version opened in Mesh.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("This stable path follows the version opened in Mesh.")}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {action("open-folder", "primary")}
             {action("copy-working-path", "quiet")}
@@ -189,11 +189,11 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
 
         <section className="min-w-0 rounded-xl border border-border bg-background/40 p-4" aria-labelledby="agent-folder-heading">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p id="agent-folder-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{model.agentFolderLabel}</p>
-            <Badge tone={model.agentAssigned ? "warning" : "neutral"}>{model.agentAssigned ? "In custody" : "Ready"}</Badge>
+            <p id="agent-folder-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t(model.agentFolderLabel)}</p>
+            <Badge tone={model.agentAssigned ? "warning" : "neutral"}>{model.agentAssigned ? t("In custody") : t("Ready")}</Badge>
           </div>
           <p className="mt-2 break-all font-mono text-sm" title={model.agentFolder}>{model.agentFolder}</p>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">{model.nativeFolderHint}</p>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">{t(model.nativeFolderHint)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {action("start-codex", "primary")}
             {action("start-agent-copy", "secondary")}
@@ -205,44 +205,44 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
       </div>
 
       <details className="rounded-xl border border-border bg-background/30">
-        <summary className="min-h-12 cursor-pointer px-4 py-3 font-semibold">Workspace details and recovery</summary>
+        <summary className="min-h-12 cursor-pointer px-4 py-3 font-semibold">{t("Workspace details and recovery")}</summary>
         <div className="grid gap-4 border-t border-border p-4">
           <section className="min-w-0 rounded-xl border border-border bg-muted/20 p-4" aria-labelledby="destination-heading">
-            <p id="destination-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Original or destination folder</p>
+            <p id="destination-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("Original or destination folder")}</p>
             <p className="mt-2 break-all font-mono text-sm" title={model.destination}>{model.destination}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Mesh previews and rechecks saved content before any destination write.</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("Mesh previews and rechecks saved content before any destination write.")}</p>
             <div className="mt-4">{action("update-destination", "secondary")}</div>
           </section>
 
           <dl className="grid gap-3 text-sm sm:grid-cols-3">
-            <Fact label="Private version" value={model.privateVersion} title={model.privateVersionTitle} />
-            <Fact label="Shared version" value={model.sharedVersion} title={model.sharedVersionTitle} />
-            <Fact label="Files and folders" value={String(model.entryCount)} />
+            <Fact label={t("Private version")} value={model.privateVersion} title={model.privateVersionTitle} />
+            <Fact label={t("Shared version")} value={model.sharedVersion} title={model.sharedVersionTitle} />
+            <Fact label={t("Files and folders")} value={String(model.entryCount)} />
           </dl>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <details className="rounded-xl border border-border bg-background/40 p-4">
-          <summary className="min-h-11 cursor-pointer font-semibold">Materialized paths ({model.entries.length})</summary>
+          <summary className="min-h-11 cursor-pointer font-semibold">{t("Materialized paths (")}{model.entries.length})</summary>
           <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm">
             {entryProjection.items.map((entry, index) => <li data-mesh-materialized-entry="true" className="break-all font-mono" key={`${index}:${entry}`}>{entry}</li>)}
-            {entryProjection.truncated ? <li className="text-xs text-muted-foreground">Showing the first {entryProjection.items.length.toLocaleString()} of {entryProjection.matched.toLocaleString()} paths. Use Files to search the complete workspace.</li> : null}
+            {entryProjection.truncated ? <li className="text-xs text-muted-foreground">{t("Showing the first")}{" "}{entryProjection.items.length.toLocaleString()} {t("of")}{" "}{entryProjection.matched.toLocaleString()} {t("paths. Use Files to search the complete workspace.")}</li> : null}
           </ul>
             </details>
             <details className="rounded-xl border border-border bg-background/40 p-4" open={model.conditions.length > 0}>
-          <summary className="min-h-11 cursor-pointer font-semibold">Conditions and unavailable controls ({model.conditions.length})</summary>
+          <summary className="min-h-11 cursor-pointer font-semibold">{t("Conditions and unavailable controls (")}{model.conditions.length})</summary>
           {model.conditions.length ? (
             <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm text-muted-foreground">
               {conditionProjection.items.map((condition, index) => <li data-mesh-current-condition="true" key={`${index}:${condition}`}>{condition}</li>)}
-              {conditionProjection.truncated ? <li>Showing the first {conditionProjection.items.length.toLocaleString()} of {conditionProjection.matched.toLocaleString()} conditions.</li> : null}
+              {conditionProjection.truncated ? <li>{t("Showing the first")}{" "}{conditionProjection.items.length.toLocaleString()} {t("of")}{" "}{conditionProjection.matched.toLocaleString()} {t("conditions.")}</li> : null}
             </ul>
-          ) : <p className="mt-3 text-sm text-muted-foreground">No reported conditions.</p>}
+          ) : <p className="mt-3 text-sm text-muted-foreground">{t("No reported conditions.")}</p>}
             </details>
           </div>
 
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             <div>
-              <p className="font-semibold">Support and recovery</p>
-              <p className="text-sm text-muted-foreground">Diagnostics exclude file contents and paths. Rollback succeeds only while the managed copy matches its receipt.</p>
+              <p className="font-semibold">{t("Support and recovery")}</p>
+              <p className="text-sm text-muted-foreground">{t("Diagnostics exclude file contents and paths. Rollback succeeds only while the managed copy matches its receipt.")}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {action("copy-diagnostics", "quiet")}
@@ -256,10 +256,11 @@ export function WorkspaceCurrentView({ model, generation, onIntent, workspaceQue
 }
 
 function Fact({ label, value, title = value }: { label: string; value: string; title?: string }) {
+  const t = useTranslation();
   return (
     <div className="min-w-0 rounded-lg border border-border bg-background/40 p-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 truncate font-medium" title={title}>{value}</dd>
+      <dt className="text-xs text-muted-foreground">{t(label)}</dt>
+      <dd className="mt-1 truncate font-medium" title={t(title)}>{value}</dd>
     </div>
   );
 }

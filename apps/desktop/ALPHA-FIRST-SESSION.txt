@@ -4,6 +4,32 @@ Thank you for trying Mesh. This is a small, invite-only Mac alpha. We are testin
 product makes agent work easier to understand and safer to recover—not whether you can tolerate
 unfinished software.
 
+Start here if you are trying Mesh with family or friends
+
+You do not need an agent for this first check:
+1. Choose English or Hebrew from the language control.
+2. Use a small backed-up folder containing a text file. Empty and Git-only folders cannot be imported.
+3. Preview and create the private workspace. Open its managed working folder.
+4. Edit the text file in that managed copy, return to Mesh, and save privately.
+5. Quit and reopen Mesh. Check the saved contents, then export a private copy to a separate empty folder.
+6. Check the exported bytes yourself. Keep the original and managed copies until this succeeds.
+
+The longer agent exercise below is optional and requires Codex to be available.
+
+תחילת עבודה — למשפחה ולחברים
+
+לבדיקה הראשונה אין צורך בסוכן בינה מלאכותית:
+1. בחרו עברית בבורר השפה.
+2. השתמשו בתיקייה קטנה ומגובה שמכילה קובץ טקסט. אי אפשר לייבא תיקייה ריקה או תיקייה שמכילה רק נתוני Git.
+3. בדקו את התצוגה המקדימה, צרו סביבת עבודה פרטית ופתחו את תיקיית העבודה המנוהלת.
+4. ערכו את הקובץ בעותק המנוהל, חזרו ל-Mesh ושמרו באופן פרטי.
+5. סגרו ופתחו את Mesh מחדש. בדקו שהתוכן נשמר, ואז ייצאו עותק לתיקייה ריקה נפרדת.
+6. בדקו את הקבצים שיוצאו. אל תמחקו את המקור או את העותק המנוהל לפני שהבדיקה הצליחה.
+
+אם מופיעה שגיאה, עצרו ושמרו את הקבצים. ציינו מה ניסיתם לעשות, את גרסת הבנייה ואת גרסת macOS.
+שמות קבצים, נתיבים ותוכן המסמכים נשארים בשפת המקור. הודעות אבחון טכניות מסוימות נשארות באנגלית.
+התרגיל עם Codex בהמשך הוא רשות ודורש ש-Codex יהיה זמין במחשב.
+
 Before you begin
 
 - Read START-HERE.txt and verify the application checksum first.

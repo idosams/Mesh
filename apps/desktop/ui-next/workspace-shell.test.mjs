@@ -1,3 +1,11 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+function renderComponentTree(Component, props) {
+  let tree;
+  function Capture() { tree = Component(props); return tree; }
+  renderToStaticMarkup(React.createElement(Capture));
+  return tree;
+}
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -172,7 +180,7 @@ test("the workspace entry page keeps one primary action and responsive keyboard-
     "Open and Forget must emit the live selected option while its projection commit is delayed",
   );
   const intents = [];
-  const tree = WorkspaceEntry({ model, onIntent: (intent) => intents.push(intent) });
+  const tree = renderComponentTree(WorkspaceEntry, { model, onIntent: (intent) => intents.push(intent) });
   const findElement = (value, predicate) => {
     if (Array.isArray(value)) {
       for (const item of value) {

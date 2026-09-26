@@ -58,3 +58,10 @@ button {
 button:disabled {
   cursor: not-allowed;
 }
+
+/* Direction follows the UI language through each shadow host. Technical values retain their order. */
+:host { direction: inherit; }
+.text-left { text-align: start; }
+.text-right { text-align: end; }
+.font-mono, pre, code { direction: ltr; unicode-bidi: isolate; text-align: left; }
+input, textarea { unicode-bidi: plaintext; }

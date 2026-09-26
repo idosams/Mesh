@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
@@ -32,6 +33,7 @@ function changeStatus(change: ReviewChange): ReviewChange["status"] {
 }
 
 export function ChangeNavigator({ changes, selectedChangeId, onSelect }: ChangeNavigatorProps) {
+  const t = useTranslation();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -73,40 +75,38 @@ export function ChangeNavigator({ changes, selectedChangeId, onSelect }: ChangeN
   const kinds = [...new Set(changes.map((change) => change.kind))].sort();
 
   return (
-    <nav ref={navigatorRef} aria-label="Changed files" className="border-b border-border bg-card/45 xl:border-b-0 xl:border-r">
+    <nav ref={navigatorRef} aria-label={t("Changed files")} className="border-b border-border bg-card/45 xl:border-b-0 xl:border-r">
       <div className="grid gap-3 border-b border-border p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Changed files</p>
-            <p className="mt-1 text-xs text-muted-foreground">{filtered.length} of {changes.length}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t("Changed files")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{filtered.length} {t("of")}{" "}{changes.length}</p>
           </div>
           <div className="flex gap-1">
-            <Button variant="quiet" disabled={filtered.length === 0 || activeIndex <= 0} onClick={() => selectAt(activeIndex - 1)}>Previous</Button>
-            <Button variant="quiet" disabled={filtered.length === 0 || activeIndex >= filtered.length - 1} onClick={() => selectAt(activeIndex + 1)}>Next</Button>
+            <Button variant="quiet" disabled={filtered.length === 0 || activeIndex <= 0} onClick={() => selectAt(activeIndex - 1)}>{t("Previous")}</Button>
+            <Button variant="quiet" disabled={filtered.length === 0 || activeIndex >= filtered.length - 1} onClick={() => selectAt(activeIndex + 1)}>{t("Next")}</Button>
           </div>
         </div>
         <label className="grid gap-1 text-xs font-medium">
-          <span className="sr-only">Search changed files</span>
+          <span className="sr-only">{t("Search changed files")}</span>
           <input
-            type="search"
+            type="search" dir="auto"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder="Search changed files"
+            placeholder={t("Search changed files")}
             className="min-h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="grid gap-1 text-xs font-medium text-muted-foreground">
-            Status
-            <select className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm text-foreground" value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
-              <option value="all">All statuses</option>
-              {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {t("Status")}<select className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm text-foreground" value={status} onChange={(event) => setStatus(event.currentTarget.value as StatusFilter)}>
+              <option value="all">{t("All statuses")}</option>
+              {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
             </select>
           </label>
           <label className="grid gap-1 text-xs font-medium text-muted-foreground">
-            File type
-            <select className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm text-foreground" value={kind} onChange={(event) => setKind(event.currentTarget.value as KindFilter)}>
-              <option value="all">All types</option>
+            {t("File type")}<select className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm text-foreground" value={kind} onChange={(event) => setKind(event.currentTarget.value as KindFilter)}>
+              <option value="all">{t("All types")}</option>
               {kinds.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
@@ -150,7 +150,7 @@ export function ChangeNavigator({ changes, selectedChangeId, onSelect }: ChangeN
           );
         })}
         {filtered.length === 0 ? (
-          <p className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground" role="status">No changed files match these filters.</p>
+          <p className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground" role="status">{t("No changed files match these filters.")}</p>
         ) : null}
       </div>
     </nav>

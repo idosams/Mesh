@@ -29,8 +29,8 @@ test('the prototype keeps the atomic component taxonomy explicit', () => {
 test('the alpha gives each primary journey one explicit visual action', () => {
   const onboarding = readFileSync(join(root, 'src/organisms/import-workbench.tsx'), 'utf8');
   const overview = readFileSync(join(root, 'src/organisms/workspace-overview.tsx'), 'utf8');
-  assert.match(onboarding, /variant="primary"[\s\S]{0,240}\{model\.confirmLabel\}<\/Button>/);
-  assert.match(onboarding, /variant="primary"[\s\S]{0,240}>Choose a folder<\/Button>/);
+  assert.match(onboarding, /variant="primary"[\s\S]{0,240}\{t\(model\.confirmLabel\)\}<\/Button>/);
+  assert.match(onboarding, /variant="primary"[\s\S]{0,240}>\{t\("Choose a folder"\)\}<\/Button>/);
   assert.match(overview, /variant="primary"[\s\S]{0,240}onClick=\{\(\) => onIntent\(\{ type: "recommended" \}\)\}/);
   assert.equal((onboarding.match(/variant="primary"/g) || []).length, 2);
   assert.equal((overview.match(/variant="primary"/g) || []).length, 1);
@@ -48,10 +48,10 @@ test('the document workbench keeps before and after visible at alpha window widt
   assert.doesNotMatch(organism, /grid-cols-\[17rem_minmax\(0,1fr\)_18rem\]/);
   assert.match(navigator, /max-h-72[^"\n]*overflow-y-auto[^"\n]*xl:max-h-\[44rem\]/);
   assert.match(navigator, /xl:border-b-0 xl:border-r/);
-  assert.match(organism, /aria-label="Document section comparison"/);
-  assert.match(organism, />\s*Previous section\s*</);
-  assert.match(organism, />\s*Next section\s*</);
-  assert.match(organism, /aria-label="Artifact section"/);
+  assert.match(organism, /aria-label=\{t\("Document section comparison"\)\}/);
+  assert.match(organism, />\s*\{t\("Previous section"\)\}\s*</);
+  assert.match(organism, />\s*\{t\("Next section"\)\}\s*</);
+  assert.match(organism, /aria-label=\{t\("Artifact section"\)\}/);
   assert.match(organism, /<h5 className="font-semibold">\{line\.text\}<\/h5>/);
 });
 
@@ -3152,9 +3152,9 @@ test('the alpha workbench exposes keyboard focus, audible diff meaning, and AA c
   assert.match(navigator, /aria-pressed=\{selected\}/);
   assert.match(navigator, /const roving = selected \|\| \(selectedIndex < 0 && index === 0\)/);
   assert.match(navigator, /tabIndex=\{roving \? 0 : -1\}/);
-  assert.match(navigator, /placeholder="Search changed files"/);
-  assert.match(navigator, />All statuses<\/option>/);
-  assert.match(navigator, />All types<\/option>/);
+  assert.match(navigator, /placeholder=\{t\("Search changed files"\)\}/);
+  assert.match(navigator, />\{t\("All statuses"\)\}<\/option>/);
+  assert.match(navigator, />\{t\("All types"\)\}<\/option>/);
   assert.match(navigator, /focus-visible:ring-2/);
   assert.match(review, /aria-busy=\{artifactPreviewLoading\}/);
   assert.match(review, /role=\{failed \? "alert" : "status"\}/);
@@ -3535,7 +3535,12 @@ test('PDF page navigation announces async page changes without disabling the foc
         import { PdfPageNavigation } from "./src/organisms/artifact-review.tsx";
         module.exports.renderNavigation = (props) =>
           renderToStaticMarkup(React.createElement(PdfPageNavigation, props));
-        module.exports.navigation = (props) => PdfPageNavigation(props);
+        module.exports.navigation = (props) => {
+          let tree;
+          function Capture() { tree = PdfPageNavigation(props); return tree; }
+          renderToStaticMarkup(React.createElement(Capture));
+          return tree;
+        };
       `,
       resolveDir: root,
       loader: 'js',

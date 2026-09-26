@@ -95,3 +95,17 @@ review. A full quit performs no capture; reopening performs another complete sca
 
 Do not use this alpha as the only copy of important work. Report any unexpected write, lost file,
 wrong-version folder, checksum failure, or approval mismatch before continuing the test.
+
+עברית — לפני הפתיחה הראשונה
+
+זו גרסת אלפא ניסיונית למחשבי Mac עם Apple silicon. היא אינה חתומה באמצעות Developer ID ואינה
+מאושרת בתהליך notarization של Apple. לכן macOS עשויה לדרוש אישור פתיחה מפורש. אין להשבית את
+Gatekeeper ואין להסיר את סימון ההורדה. פעלו לפי הוראות האימות והפתיחה שלמעלה; אם אינכם בטוחים,
+בקשו עזרה ממי שהזמין אתכם לבדיקה.
+
+שמרו עותק גיבוי נפרד. אין עדכון אוטומטי: סגרו את הגרסה הישנה לפני פתיחת הגרסה החדשה, ואל תמחקו
+את נתוני היישום או תיקיות העבודה. לאחר הפתיחה אפשר לבחור עברית בבורר השפה.
+
+בגרסה זו אישור מוגן ועדכון תיקיית המקור אינם זמינים. בדקו ייצוא לעותק פרטי בתיקייה ריקה נפרדת.
+ייבוא תיקייה ריקה או תיקייה שמכילה רק נתוני Git אינו נתמך. התחילו מתיקייה שמכילה קובץ או תת-תיקייה.
+קראו את ההוראות בעברית בקובץ FIRST-SESSION.txt לפני שימוש בקבצים חשובים.

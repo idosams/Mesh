@@ -1,3 +1,4 @@
+import { useTranslation } from "../lib/localization";
 import { Button } from "../atoms/button";
 import type { ReviewPageControls as ReviewPageControlsModel } from "../models/review-page";
 import type { ReviewWorkbenchIntent } from "../models/review-workbench";
@@ -6,8 +7,9 @@ export function ReviewPageControls({ controls, onIntent }: Readonly<{
   controls: ReviewPageControlsModel;
   onIntent: (intent: ReviewWorkbenchIntent) => void;
 }>) {
+  const t = useTranslation();
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4" aria-label="Review workspace summary">
+    <section className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4" aria-label={t("Review workspace summary")}>
       <div>
         <p className="text-sm font-semibold">{controls.countLabel}</p>
         {controls.overflowLabel ? (
@@ -33,8 +35,8 @@ export function ReviewPageControls({ controls, onIntent }: Readonly<{
         </Button>
       </div>
       {controls.earlierReviews.length > 0 ? (
-        <div className="grid gap-2 border-t border-border pt-3" aria-label="Earlier recorded reviews">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Earlier saved reviews</p>
+        <div className="grid gap-2 border-t border-border pt-3" aria-label={t("Earlier recorded reviews")}>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("Earlier saved reviews")}</p>
           {controls.earlierReviews.map((review) => (
             <Button
               key={review.operation}
