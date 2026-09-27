@@ -78,6 +78,11 @@ assert.match(
   /Signature=adhoc/,
   'the local bundle must remain ad-hoc rather than claiming a Developer ID identity',
 );
+assert.ok(
+  executableStrings.includes('mesh.desktop-build-identity/v1'),
+  'the executable must support side-effect-free build identity before it can be queried',
+);
+
 // Query only after the local resource seal has been verified. Incidental strings (including
 // all-zero hashes) are not evidence of the revision this executable actually reports.
 const buildIdentity = spawnSync(executable, ['--mesh-build-identity'], {

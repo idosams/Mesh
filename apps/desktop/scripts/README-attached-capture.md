@@ -76,7 +76,8 @@ node apps/desktop/scripts/prove-attached-capture.mjs \
 Packaged mode verifies the bundle seal, embedded revision and current component interface markers
 before and after execution. After verifying the seal, it asks the executable for its
 `--mesh-build-identity` JSON and compares the reported revision exactly. Incidental revision-like
-strings in executable constants are insufficient. The identity command accepts no additional
+strings in executable constants are insufficient. Older bundles without the identity-mode marker
+are refused before execution, avoiding their ordinary window startup. The identity command accepts no additional
 arguments and exits without opening a window, reading a workspace or generating keys. It records the executable SHA-256 and refuses a byte change during the
 run. The temporary fixture is registered with this checkout's development `meshctl`; capture,
 watch, stop and version listing execute the packaged desktop binary. Output explicitly distinguishes
