@@ -157,7 +157,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A06 | `ba65636e1a097a5491172226859c6d61994d8539` | Persist project detachment while retaining history and ordinary workflow | A06d: replacement `a7bda0f5105d77fd048ef704cadec8cfe21ada54`, [PR #27](https://github.com/idosams/Mesh/pull/27), stacked on #26; localized persistent detachment; full local gate passed (3,138 Rust, 572 desktop, 44 daemon checks); all seven hosted checks pass at `74a1c0d6f90bfe0dbff17b9b8fac01a593011ed0` (run 36350651196); not merged |
 | A07 | `e3a2dc84ca3fcc33997cb802a0d7ccb319f921c8` | Verify packaged attachment capture against exact sealed bundles | A07a: [PR #28](https://github.com/idosams/Mesh/pull/28), transfer `7ddffdee0c8e2f57f4c1c0b490c785c7f4630ccb` plus exact-identity fixes through `fda9df38835421d72ca71abff2ac0c568162297d`; stacked on #27; packaged CLI proof at `fda9df38835421d72ca71abff2ac0c568162297d` passed (three versions, 6,000 ms), wrong-revision/broken-seal refusals pass; final full gate passed (3,139 Rust, 574 desktop, 44 daemon checks); all seven hosted checks pass at `716de71ecfe96b6a078447f2c960ccc9e1795d7e` (run 36351777392); not merged |
 | A07 | `f99295541624f312172947ec75458dd6ae01bcb3` | Wake attached project capture from native macOS filesystem events | A07b: [PR #29](https://github.com/idosams/Mesh/pull/29), native filesystem-event wakeups with periodic fallback and localized status; replacement `c80c9fab57a19f10589bdb8bd9cf6cbdebb5f9e4`, stacked on #28; full local gate passed (3,141 Rust, 576 desktop, 44 daemon checks) and packaged event capture passed; initial post-sign identity-check failure retained; all seven hosted checks passed at `052e0d24254ce7066b433997c2c50c524e4640d4` in run 36352654983, not merged |
-| A08 | `e320c5c928ad01af204570566f546daf8a76a045` | Record exact review requests from attached project history | A08a: native durable requests, exact desktop reopen and localized saved-result inspection; implementation `129966e4d669ee969fa80312baabc814e3f02442`; includes the directory-lock prerequisite from `60b9234ee123d242980f472a2558766f0b62659f`; stacked on #30; final validation and PR publication pending, not merged |
+| A08 | `e320c5c928ad01af204570566f546daf8a76a045` | Record exact review requests from attached project history | A08a: native durable requests, exact desktop reopen and localized saved-result inspection; implementation `129966e4d669ee969fa80312baabc814e3f02442`; includes the directory-lock prerequisite from `60b9234ee123d242980f472a2558766f0b62659f`; stacked on #30; corrected full gate passed (3,146 Rust tests, 13 skipped; 580 desktop tests; 44 daemon checks); PR publication pending, not merged |
 | A08 | `0823850023496505f3c45074ea972c2b36c1dbc0` | Preserve pending review bases as shared main advances | A08 prerequisite: [PR #30](https://github.com/idosams/Mesh/pull/30), replacement `9b17bf50e10f4c972dd3dae371bb691c26913c6b`, transferred before review-request admission to preserve immutable pending reviews; stacked on #29; full local gate passed (3,142 Rust tests, 13 skipped; 576 desktop tests; 44 daemon checks), all seven hosted checks passed at `a054186c4ee0828239dfa247de420507077c3b10` in run 36353559670, not merged |
 | A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | Directory-lock prerequisite transferred with A08a (`root_authority.rs` and `workspace_custody.rs`); remaining approval implementation pending |
 | A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | Pending transfer |
@@ -232,14 +232,16 @@ when transferring the remaining approval implementation rather than applying the
 An isolated host check demonstrated duplicate-handle lock inheritance and refusal of a separately
 opened contender. The native regression failed against the parent locking implementation and passed with the fix;
 all three attached-review regressions passed alongside it. Correction `1a7fede14c7b713d86dee7cf135d1d1d062d5a8f`
-restores independent lock ownership. The final combined canonical gate remains required.
+restores independent lock ownership. The corrected combined gate passed at `7fa2bdd41b631327278669032c6ee38593ca69ab`: 3,146 native
+tests, 580 desktop tests and 44 real-daemon checks; 13 platform/provider tests skipped.
 
 The original A08a gate at `129966e4d669ee969fa80312baabc814e3f02442` stopped with two existing
 desktop capture waits exceeding ten seconds (1,690 native tests passed, two failed, 1,453 not run
 after fail-fast, 13 skipped). Compilation in the independent correction build overlapped that run;
 causation is not established. Both unchanged failing tests passed on a focused recheck (4.067s
 and 6.371s). Preserve the failure log; neither the recheck nor the original gate validates the
-corrected full tree. The combined gate runs separately at `7fa2bdd41b631327278669032c6ee38593ca69ab`.
+corrected full tree. The corrected combined gate at `7fa2bdd41b631327278669032c6ee38593ca69ab` exited zero,
+including both previously failing capture tests. No assertions or wait bounds were changed.
 
 ## Remaining full objective
 
