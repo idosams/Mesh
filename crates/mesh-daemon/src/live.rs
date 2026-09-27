@@ -638,6 +638,7 @@ fn workspace_version_preview_changes(
 thread_local! {
     static BEFORE_HISTORICAL_EXPORT_REMOVE: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_REOPEN_DIRECTORY_LOCK: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
+    static AFTER_MANAGED_MOVE_PERSIST: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_VERSION_FORK_CONFIRM: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static BETWEEN_AGENT_LIVE_FILE_READS: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
 }
@@ -7485,6 +7486,13 @@ impl LiveDaemon {
                 .map_err(|error| std::io::Error::other(error.to_string()))
         })?;
         self.finish_managed_intent(&intent);
+        // Only test builds can inject an OS replacement at this exact durable-to-settling boundary.
+        #[cfg(test)]
+        AFTER_MANAGED_MOVE_PERSIST.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
         let meaningful = match saved {
             Some((_saved, installation)) => {
                 self.settle_managed_change(&root, installation, sequence, || {
@@ -10011,6 +10019,85 @@ mod tests {
         journal_records, no_session, OperationRecord, RecoverySnapshot,
         RecoveryStatePersistence as _, SqlExecutor as _, Sqlite, RECOVERY_DATABASE_FILE_NAME,
     };
+
+    #[test]
+    fn a_newer_os_change_during_move_settling_stays_working() {
+        use ed25519_dalek::Signer as _;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let parent = scratch("move-settling");
+        let source = parent.join("source");
+        let managed = parent.join("managed");
+        fs::create_dir_all(source.join("existing")).unwrap();
+        fs::write(source.join("existing/keep.txt"), "keep\n").unwrap();
+        crate::PreparedFolderImport::prepare(&source, &managed)
+            .unwrap()
+            .confirm_into_workspace()
+            .unwrap();
+        let daemon = LiveDaemon::with_checkpoint_runtime(
+            started(),
+            CheckpointRuntimeParameters {
+                idle_interval: Some(Duration::from_millis(50)),
+                maximum_uncheckpointed_bytes: Some(65_536),
+                maximum_uncheckpointed_interval: Some(Duration::from_millis(25)),
+            },
+        )
+        .unwrap();
+        daemon.open_at_start(&managed).unwrap();
+        let key = SigningKey::from_bytes(&[0x63; 32]);
+        let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+        let sign = |payload: &SigningPayload| -> Result<Signature, std::convert::Infallible> {
+            Ok(Signature::from_bytes(
+                key.sign(payload.as_bytes()).to_bytes(),
+            ))
+        };
+        daemon
+            .create_managed_text_file("draft.txt", "durable bytes\n", public, sign)
+            .unwrap();
+        let target = managed.join("final.txt");
+        let displaced = managed.join("externally-moved.txt");
+        let called = Rc::new(Cell::new(false));
+        AFTER_MANAGED_MOVE_PERSIST.with(|hook| {
+            let target = target.clone();
+            let displaced = displaced.clone();
+            let managed = managed.clone();
+            let called = Rc::clone(&called);
+            *hook.borrow_mut() = Some(Box::new(move || {
+                assert!(!managed.join("draft.txt").exists());
+                assert!(!managed.join(".mesh-managed-mutation").exists());
+                assert_eq!(fs::read(&target).unwrap(), b"durable bytes\n");
+                fs::rename(&target, &displaced).expect("external move");
+                fs::create_dir(&target).expect("newer external folder");
+                called.set(true);
+            }));
+        });
+        let moved = daemon
+            .move_managed_entry_privately("draft.txt", "final.txt", public, sign)
+            .unwrap();
+        assert!(
+            called.get(),
+            "the replacement must precede the settling check"
+        );
+        assert_eq!(
+            daemon.durable_operation(RecordDigest::parse_hex(moved.changeset()).unwrap()),
+            Some(true)
+        );
+        assert!(!moved.meaningful_saved());
+        assert!(target.is_dir());
+        assert_eq!(fs::read(displaced).unwrap(), b"durable bytes\n");
+        assert!(daemon
+            .checkpoint_snapshot()
+            .unwrap()
+            .open_window()
+            .is_some());
+        assert!(
+            daemon.workspace_state().unwrap().review_items.is_empty(),
+            "a newer unsettled operating-system change must suppress the stale automatic card"
+        );
+        drop(daemon);
+        fs::remove_dir_all(parent).unwrap();
+    }
 
     fn started() -> StartupSummary {
         StartupSummary::from(&nothing_to_recover())
