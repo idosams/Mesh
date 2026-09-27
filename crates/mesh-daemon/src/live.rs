@@ -1678,21 +1678,6 @@ impl Drop for VerifiedMutationContext {
 struct IdleCheckpointScheduler {
     state: Mutex<IdleCheckpointSchedulerState>,
     wake: Condvar,
-    // Temporary failure diagnostics in debug builds only. No scheduling decision reads this.
-    // 1 spawned, 2 reading schedule, 3 maximum wait, 4 woke, 5 recovery locks,
-    // 6 preserving, 7 idle wait, 8 settlement locks, 9 settling. This is the last entered
-    // phase; worker_running remains the authority for whether the worker retired.
-    #[cfg(debug_assertions)]
-    worker_phase: AtomicU64,
-}
-
-impl IdleCheckpointScheduler {
-    fn trace_phase(&self, phase: u64) {
-        #[cfg(debug_assertions)]
-        self.worker_phase.store(phase, Ordering::Relaxed);
-        #[cfg(not(debug_assertions))]
-        let _ = phase;
-    }
 }
 
 #[derive(Debug, Default)]
@@ -1702,8 +1687,6 @@ struct IdleCheckpointSchedulerState {
     shutdown: bool,
     scheduled: Option<IdleCheckpointSchedule>,
     maximum_started_at: Option<Instant>,
-    #[cfg(debug_assertions)]
-    last_wait: Option<(Instant, Duration)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1728,15 +1711,6 @@ struct PendingCheckpointIntervals {
 }
 
 impl IdleCheckpointSchedulerState {
-    fn trace_wait(&mut self, duration: Duration) {
-        #[cfg(debug_assertions)]
-        {
-            self.last_wait = Some((Instant::now(), duration));
-        }
-        #[cfg(not(debug_assertions))]
-        let _ = duration;
-    }
-
     fn publish(&mut self, scheduled: IdleCheckpointSchedule) -> IdleScheduleUpdate {
         self.publish_at(scheduled, Instant::now())
     }
@@ -1786,6 +1760,19 @@ impl IdleCheckpointSchedulerState {
         self.scheduled = None;
         self.maximum_started_at = None;
         true
+    }
+
+    // Pure deadline selection, shared by the real worker and deterministic clock tests.
+    fn next_wait_at(
+        &self,
+        intervals: PendingCheckpointIntervals,
+        now: Instant,
+    ) -> (Duration, bool) {
+        let maximum_remaining = self.maximum_remaining_at(intervals.maximum, now);
+        (
+            intervals.idle.min(maximum_remaining),
+            maximum_remaining <= intervals.idle,
+        )
     }
 
     fn maximum_remaining_at(&self, maximum: Duration, now: Instant) -> Duration {
@@ -4383,9 +4370,7 @@ impl LiveDaemon {
         let open = Arc::downgrade(&self.open);
         let feed = Arc::downgrade(&self.feed);
         let checkpoint_idle = Arc::clone(&self.checkpoint_idle);
-        checkpoint_idle.trace_phase(1);
         Some(std::thread::spawn(move || loop {
-            checkpoint_idle.trace_phase(2);
             let (Some(checkpoint), Some(open), Some(feed)) =
                 (checkpoint.upgrade(), open.upgrade(), feed.upgrade())
             else {
@@ -4463,15 +4448,11 @@ impl LiveDaemon {
                 // replacement can then start a fresh one with its exact installation identity.
                 return Ok(None);
             }
-            let maximum_remaining = idle.maximum_remaining_at(intervals.maximum, Instant::now());
-            let first_interval = intervals.idle.min(maximum_remaining);
-            idle.trace_wait(first_interval);
-            checkpoint_idle.trace_phase(3);
+            let (first_interval, maximum_first) = idle.next_wait_at(intervals, Instant::now());
             let (idle, waited) = checkpoint_idle
                 .wake
                 .wait_timeout(idle, first_interval)
                 .unwrap_or_else(PoisonError::into_inner);
-            checkpoint_idle.trace_phase(4);
             if idle.shutdown {
                 return Ok(None);
             }
@@ -4483,8 +4464,7 @@ impl LiveDaemon {
             }
             drop(idle);
 
-            if maximum_remaining <= intervals.idle {
-                checkpoint_idle.trace_phase(5);
+            if maximum_first {
                 let mut checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
                 let mut held = open.lock().unwrap_or_else(PoisonError::into_inner);
                 let mut idle = checkpoint_idle
@@ -4500,7 +4480,6 @@ impl LiveDaemon {
                 let attention_was_visible = held
                     .as_ref()
                     .is_some_and(OpenWorkspace::checkpoint_recovery_needs_attention);
-                checkpoint_idle.trace_phase(6);
                 let recovery = Self::preserve_pending_recovery_locked(
                     &mut checkpoint,
                     &mut held,
@@ -4530,7 +4509,7 @@ impl LiveDaemon {
 
             let remaining = intervals.idle.saturating_sub(first_interval);
             if !remaining.is_zero() {
-                let mut idle = checkpoint_idle
+                let idle = checkpoint_idle
                     .state
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner);
@@ -4540,8 +4519,6 @@ impl LiveDaemon {
                 if idle.generation != generation || idle.scheduled.as_ref() != Some(&scheduled) {
                     continue;
                 }
-                idle.trace_wait(remaining);
-                checkpoint_idle.trace_phase(7);
                 let (idle, waited) = checkpoint_idle
                     .wake
                     .wait_timeout(idle, remaining)
@@ -4558,7 +4535,6 @@ impl LiveDaemon {
                 drop(idle);
             }
 
-            checkpoint_idle.trace_phase(8);
             let mut checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
             let mut held = open.lock().unwrap_or_else(PoisonError::into_inner);
             let mut idle = checkpoint_idle
@@ -4574,7 +4550,6 @@ impl LiveDaemon {
             let attention_was_visible = held
                 .as_ref()
                 .is_some_and(OpenWorkspace::checkpoint_recovery_needs_attention);
-            checkpoint_idle.trace_phase(9);
             let result = Self::settle_pending_checkpoint_locked(
                 &mut checkpoint,
                 &mut held,
@@ -9617,6 +9592,67 @@ mod tests {
         path.push(format!("mesh-live-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         path
+    }
+
+    #[test]
+    fn worker_wait_uses_the_exact_remaining_maximum_without_restarting_it() {
+        let started = Instant::now();
+        let mut scheduler = IdleCheckpointSchedulerState::default();
+        scheduler.publish_at(
+            IdleCheckpointSchedule {
+                through: RecoverySequence::new(1).unwrap(),
+                installation: CheckpointInstallation(1),
+                root: PathBuf::from("/workspace"),
+            },
+            started,
+        );
+        for maximum_ms in [20, 40] {
+            let intervals = PendingCheckpointIntervals {
+                idle: Duration::from_secs(2),
+                maximum: Duration::from_millis(maximum_ms),
+            };
+            for (elapsed, remaining) in [
+                (0, maximum_ms),
+                (maximum_ms - 1, 1),
+                (maximum_ms, 0),
+                (maximum_ms + 100, 0),
+            ] {
+                assert_eq!(
+                    scheduler.next_wait_at(intervals, started + Duration::from_millis(elapsed)),
+                    (Duration::from_millis(remaining), true)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn worker_selects_idle_only_while_it_precedes_the_remaining_maximum() {
+        let started = Instant::now();
+        let mut scheduler = IdleCheckpointSchedulerState::default();
+        scheduler.publish_at(
+            IdleCheckpointSchedule {
+                through: RecoverySequence::new(1).unwrap(),
+                installation: CheckpointInstallation(1),
+                root: PathBuf::from("/workspace"),
+            },
+            started,
+        );
+        let intervals = PendingCheckpointIntervals {
+            idle: Duration::from_millis(20),
+            maximum: Duration::from_millis(200),
+        };
+        assert_eq!(
+            scheduler.next_wait_at(intervals, started),
+            (Duration::from_millis(20), false)
+        );
+        assert_eq!(
+            scheduler.next_wait_at(intervals, started + Duration::from_millis(180)),
+            (Duration::from_millis(20), true)
+        );
+        assert_eq!(
+            scheduler.next_wait_at(intervals, started + Duration::from_millis(190)),
+            (Duration::from_millis(10), true)
+        );
     }
 
     #[test]

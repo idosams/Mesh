@@ -40,19 +40,6 @@ fn startup() -> StartupSummary {
     StartupSummary::from(&nothing_to_recover())
 }
 
-// Failure-only evidence from this synthetic fixture. Keep the diagnostic limited to the
-// scheduler instead of printing unrelated workspace state, and do not acquire new authority.
-fn worker_diagnostic(daemon: &LiveDaemon) -> String {
-    let diagnostic = format!("{daemon:?}");
-    let scheduler = diagnostic
-        .split_once(", checkpoint_idle: ")
-        .and_then(|(_, tail)| tail.split_once(", workspace_open: "))
-        .map_or("scheduler debug state unavailable", |(scheduler, _)| {
-            scheduler
-        });
-    format!("observed_at={:?}; {scheduler}", std::time::Instant::now())
-}
-
 fn parameters() -> CheckpointRuntimeParameters {
     CheckpointRuntimeParameters {
         idle_interval: Some(Duration::from_millis(8)),
@@ -330,8 +317,11 @@ fn a_caller_cannot_fabricate_the_idle_interval() {
 fn repeated_saves_share_one_resettable_idle_worker() {
     let root = scratch("coalesced-idle-worker");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(80)),
+        idle_interval: Some(Duration::from_secs(2)),
         ..parameters()
     };
     let daemon = LiveDaemon::with_checkpoint_runtime(startup(), runtime).expect("config");
@@ -363,7 +353,7 @@ fn repeated_saves_share_one_resettable_idle_worker() {
         "one pending extent must not create another detached sleeper"
     );
 
-    let recovery_deadline = std::time::Instant::now() + Duration::from_millis(70);
+    let recovery_deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint snapshot");
         if snapshot
@@ -375,13 +365,12 @@ fn repeated_saves_share_one_resettable_idle_worker() {
         }
         assert!(
             std::time::Instant::now() < recovery_deadline,
-            "the coalesced worker preserved an old extent or missed the maximum interval; snapshot={snapshot:?}; worker={}",
-            worker_diagnostic(&daemon)
+            "the coalesced worker preserved an old extent or missed the maximum interval; snapshot={snapshot:?}",
         );
         std::thread::sleep(Duration::from_millis(2));
     }
 
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    let deadline = std::time::Instant::now() + Duration::from_secs(4);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint snapshot");
         if snapshot
@@ -590,8 +579,11 @@ fn maximum_byte_bound_preserves_recovery_before_the_idle_boundary() {
 fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
     let root = scratch("automatic-time-recovery");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(200)),
+        idle_interval: Some(Duration::from_secs(2)),
         maximum_uncheckpointed_bytes: Some(u64::MAX),
         maximum_uncheckpointed_interval: Some(Duration::from_millis(20)),
     };
@@ -609,7 +601,7 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         )
         .expect("durable save");
 
-    let deadline = std::time::Instant::now() + Duration::from_millis(150);
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint state");
         if snapshot.latest_recovery().is_some() {
@@ -620,8 +612,7 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; worker={}; conditions={:?}",
-            worker_diagnostic(&daemon),
+            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; conditions={:?}",
             daemon.workspace_state().map(|state| state.conditions.iter().map(|condition| condition.code().to_owned()).collect::<Vec<_>>())
         );
         std::thread::sleep(Duration::from_millis(2));
@@ -943,8 +934,11 @@ fn review_open_refuses_an_already_preserved_pending_prefix_without_a_second_writ
 fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention() {
     let root = scratch("automatic-time-recovery-refusal");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(200)),
+        idle_interval: Some(Duration::from_secs(2)),
         maximum_uncheckpointed_bytes: Some(u64::MAX),
         maximum_uncheckpointed_interval: Some(Duration::from_millis(40)),
     };
@@ -985,7 +979,7 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         )
         .expect("durable save");
 
-    let deadline = std::time::Instant::now() + Duration::from_millis(150);
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let state = daemon
             .workspace_state()
@@ -999,9 +993,8 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; worker={}; conditions={:?}",
+            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; conditions={:?}",
             daemon.checkpoint_snapshot(),
-            worker_diagnostic(&daemon),
             state.conditions.iter().map(|condition| condition.code()).collect::<Vec<_>>()
         );
         std::thread::sleep(Duration::from_millis(2));

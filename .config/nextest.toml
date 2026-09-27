@@ -5,18 +5,3 @@
 # bounds remain unchanged.
 filter = 'test(continuous_activity_cannot_postpone_the_maximum_time_bound)'
 threads-required = "num-test-threads"
-
-[[profile.default.overrides]]
-# This worker-coalescing test uses a 70 ms wall-clock recovery deadline. Give it
-# the complete nextest worker pool so unrelated macOS scheduler pressure cannot
-# create a false timeout. The product assertion and deadline remain unchanged.
-filter = 'test(repeated_saves_share_one_resettable_idle_worker)'
-threads-required = "num-test-threads"
-
-[[profile.default.overrides]]
-# These real-worker recovery tests must observe preservation or its failure before
-# a 150 ms deadline and a later idle boundary. Like the timing tests above, reserve
-# the pool so unrelated test I/O cannot consume their wall-clock observation window.
-# Keep the product code, timer configuration, assertions and deadlines unchanged.
-filter = 'test(=maximum_time_bound_preserves_recovery_before_the_idle_boundary) | test(=maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention)'
-threads-required = "num-test-threads"
