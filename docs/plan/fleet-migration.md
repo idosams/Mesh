@@ -301,7 +301,8 @@ verification passed. Executable SHA-256:
 The prior sealed bundle was preserved and its executable hash compared before rebuilding.
 This managed-workspace journey does not verify the new attached-project controls or actual Secure
 Enclave presence. The bundle truthfully reports approval unavailable without validated Apple identity.
-Hosted CI and PR publication are pending; no merge is implied.
+[Mesh PR #34](https://github.com/idosams/Mesh/pull/34) publishes this correction, stacked on #33.
+Hosted CI is pending; no merge is implied.
 
 The prerequisite [Mesh PR #33](https://github.com/idosams/Mesh/pull/33) passed all seven hosted
 checks at `f27287d4e99e6c63e2a602a83a2c1283703c601c` in run 36356728345 and is ready for required
