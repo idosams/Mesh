@@ -234,6 +234,13 @@ opened contender. The native regression failed against the parent locking implem
 all three attached-review regressions passed alongside it. Correction `1a7fede14c7b713d86dee7cf135d1d1d062d5a8f`
 restores independent lock ownership. The final combined canonical gate remains required.
 
+The original A08a gate at `129966e4d669ee969fa80312baabc814e3f02442` stopped with two existing
+desktop capture waits exceeding ten seconds (1,690 native tests passed, two failed, 1,453 not run
+after fail-fast, 13 skipped). Compilation in the independent correction build overlapped that run;
+causation is not established. Both unchanged failing tests passed on a focused recheck (4.067s
+and 6.371s). Preserve the failure log; neither the recheck nor the original gate validates the
+corrected full tree. The combined gate runs separately at `7fa2bdd41b631327278669032c6ee38593ca69ab`.
+
 ## Remaining full objective
 
 Migration does not close any product phase. Native graphical approval and recovery, worker recovery
