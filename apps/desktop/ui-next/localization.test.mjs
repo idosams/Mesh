@@ -224,3 +224,22 @@ test('detached projects explain retained work in Hebrew and only enable explicit
   ui.setLocale('en');
   assert.match(ui.renderAttachments(), /Detached · saved history retained/);
 });
+
+
+test('native event and periodic fallback status are localized and absent for stopped or detached capture', async () => {
+  for (const [nativeEvents, phase, detached, expected] of [
+    [true, 'waiting', false, 'File-change signals active, with periodic checks for missed changes.'],
+    [false, 'waiting', false, 'Using periodic checks for file changes.'],
+    [true, 'stopped', false, null], [true, 'waiting', true, null],
+  ]) {
+    const ui = await loadLocalization({ projects: [{ nativeEvents, phase, detached, recovery: null,
+      id: 'a'.repeat(64), generation: '1', root: '/Users/משפחה/Files', outcome: 'unchanged', savedVersion: null, captureAgeMs: null }],
+      histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '',
+      busy: false, error: '', available: true });
+    ui.setLocale('he');
+    const html = ui.renderAttachments();
+    assert.ok(html.includes('<bdi dir="ltr">/Users/משפחה/Files</bdi>'));
+    if (expected) { assert.ok(html.includes(ui.translate('he', expected))); assert.ok(!html.includes(expected)); }
+    else assert.doesNotMatch(html, /התראות על שינויי קבצים פעילות|שינויים בקבצים נבדקים באופן תקופתי/);
+  }
+});

@@ -1,5 +1,7 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"File-change signals active, with periodic checks for missed changes.":"התראות על שינויי קבצים פעילות, עם בדיקות תקופתיות לאיתור שינויים שהוחמצו.",
+"Using periodic checks for file changes.":"שינויים בקבצים נבדקים באופן תקופתי.",
 "Detached · saved history retained":"מנותק · ההיסטוריה השמורה נשמרת",
 "Reattach to enable capture controls":"חברו מחדש כדי להפעיל את בקרות הלכידה",
 "Reattach project":"חיבור הפרויקט מחדש",

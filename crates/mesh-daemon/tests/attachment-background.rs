@@ -92,6 +92,7 @@ impl CheckpointSigner for Signer {
 }
 fn schedule() -> CaptureSchedule {
     CaptureSchedule {
+        native_signals: false,
         reconciliation_interval: Duration::from_secs(30),
         ..CaptureSchedule::default()
     }
@@ -134,6 +135,8 @@ fn periodic_capture_and_restart_reconcile_edits_without_any_event_signal() {
     };
     let service = AttachmentCaptureService::start(&f.metadata, signer.clone(), policy).unwrap();
     let first = outcome(&service, CaptureOutcome::Saved, 0);
+    assert!(!first.native_events);
+    assert_eq!(first.event_signals, 0);
     fs::write(f.source.join("work"), b"two").unwrap();
     let second = wait(&service, |status| {
         status.saved_version.is_some() && status.saved_version != first.saved_version
@@ -361,4 +364,86 @@ fn provisioned_capture_retains_store_authority_through_startup() {
         .start_capture(Arc::new(Signer::default()), schedule())
         .is_err());
     assert_eq!(fs::read_dir(&metadata).unwrap().count(), 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn native_events_capture_nested_edits_and_atomic_replacement_before_reconciliation() {
+    let f = Fixture::new("native-events");
+    let service = AttachmentCaptureService::start(
+        &f.metadata,
+        Arc::new(Signer::default()),
+        CaptureSchedule {
+            native_signals: true,
+            reconciliation_interval: Duration::from_secs(300),
+            ..CaptureSchedule::default()
+        },
+    )
+    .unwrap();
+    let first = outcome(&service, CaptureOutcome::Saved, 0);
+    assert!(
+        first.native_events,
+        "the macOS event stream must actually start"
+    );
+    fs::create_dir(f.source.join("nested")).unwrap();
+    fs::write(f.source.join("nested/work"), b"nested edit").unwrap();
+    let nested = wait(&service, |status| {
+        status.saved_version.is_some_and(|version| {
+            version != first.saved_version.unwrap()
+                && f.attached()
+                    .saved_file(&f.metadata, version, "nested/work")
+                    .unwrap()
+                    == Some(b"nested edit".to_vec())
+        })
+    });
+    assert!(nested.event_signals > 0);
+    fs::write(f.source.join("replacement"), b"atomic replacement").unwrap();
+    fs::rename(f.source.join("replacement"), f.source.join("nested/work")).unwrap();
+    let replaced = wait(&service, |status| {
+        status.saved_version.is_some_and(|version| {
+            version != nested.saved_version.unwrap()
+                && f.attached()
+                    .saved_file(&f.metadata, version, "nested/work")
+                    .unwrap()
+                    == Some(b"atomic replacement".to_vec())
+        })
+    });
+    assert!(replaced.event_signals >= nested.event_signals);
+    assert_eq!(
+        replaced.to_json().get("attribution"),
+        Some(&mesh_daemon::ipc::Json::text("unknown"))
+    );
+    let stopped = service.stop_and_join().unwrap();
+    assert!(!stopped.native_events);
+    let versions = f.attached().saved_versions(&f.metadata).unwrap();
+    fs::write(f.source.join("nested/work"), b"ordinary work after stop").unwrap();
+    assert_eq!(f.attached().saved_versions(&f.metadata).unwrap(), versions);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn native_root_change_wakes_capture_without_adopting_the_replacement() {
+    let f = Fixture::new("native-root-event");
+    let service = AttachmentCaptureService::start(
+        &f.metadata,
+        Arc::new(Signer::default()),
+        CaptureSchedule {
+            native_signals: true,
+            reconciliation_interval: Duration::from_secs(300),
+            ..CaptureSchedule::default()
+        },
+    )
+    .unwrap();
+    let first = outcome(&service, CaptureOutcome::Saved, 0);
+    assert!(first.native_events);
+    fs::rename(&f.source, f.root.join("original-project")).unwrap();
+    fs::create_dir(&f.source).unwrap();
+    fs::write(f.source.join("work"), b"replacement must not be admitted").unwrap();
+    let refused = outcome(&service, CaptureOutcome::SourceUnavailable, first.attempts);
+    assert_eq!(refused.saved_version, first.saved_version);
+    service.stop_and_join().unwrap();
+    assert_eq!(
+        fs::read(f.root.join("original-project/work")).unwrap(),
+        b"one"
+    );
 }

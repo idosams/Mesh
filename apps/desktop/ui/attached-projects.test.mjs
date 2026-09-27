@@ -411,3 +411,11 @@ test('detached projects retain history identity and send only explicit generatio
   assert.equal(calls.length, count);
   h.dispose();
 });
+
+test('native event availability is explicit and older status falls back to periodic checks', () => {
+  assert.equal(attachedProjectList(reply())[0].nativeEvents, false);
+  const value = reply(); value.projects[0].capture.native_events = true;
+  assert.equal(attachedProjectList(value)[0].nativeEvents, true);
+  value.projects[0].capture.native_events = 'active';
+  assert.throws(() => attachedProjectList(value));
+});

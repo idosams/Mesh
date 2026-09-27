@@ -10,9 +10,15 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "macos")]
+#[path = "signals_macos.rs"]
+mod signals_macos;
+
 /// Native scheduling policy. Scans remain bounded by the observer's separate resource limits.
 #[derive(Clone, Copy, Debug)]
 pub struct CaptureSchedule {
+    /// Request available native wakeup signals; reconciliation still runs if disabled or unavailable.
+    pub native_signals: bool,
     /// Delay after a completed attempt, from 250 ms to five minutes. Signals may wake it sooner.
     pub reconciliation_interval: Duration,
     /// Per-attempt entry and byte limits; incomplete traversal never produces a saved version.
@@ -21,6 +27,7 @@ pub struct CaptureSchedule {
 impl Default for CaptureSchedule {
     fn default() -> Self {
         Self {
+            native_signals: true,
             reconciliation_interval: Duration::from_secs(5),
             limits: ObservationLimits::default(),
         }
@@ -70,6 +77,10 @@ pub enum CaptureOutcome {
 /// Live, redacted status. Ages are measured with a monotonic clock in this process only.
 #[derive(Clone, Debug)]
 pub struct CaptureStatus {
+    /// A native event stream is active; it is lossy and does not attest to content or authorship.
+    pub native_events: bool,
+    /// Count of coalesced native callback batches, not file edits or saved versions.
+    pub event_signals: u64,
     /// Monotonic status revision for waiting clients.
     pub revision: u64,
     /// Current worker activity.
@@ -129,6 +140,8 @@ impl CaptureStatus {
                     Json::text(version.operation().to_string())
                 }),
             ),
+            ("native_events", Json::Bool(self.native_events)),
+            ("event_signals", Json::Number(self.event_signals)),
             ("attempts", Json::Number(self.attempts)),
             ("versions_saved", Json::Number(self.versions_saved)),
             (
@@ -150,6 +163,7 @@ struct State {
     status: CaptureStatus,
     stop: bool,
     pending: bool,
+    filesystem_pending: bool,
     last_attempt: Option<Instant>,
     last_complete: Option<Instant>,
 }
@@ -231,6 +245,8 @@ impl AttachmentCaptureService {
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
                 status: CaptureStatus {
+                    native_events: false,
+                    event_signals: 0,
                     revision: 0,
                     phase: CapturePhase::Starting,
                     last_outcome: CaptureOutcome::Pending,
@@ -243,6 +259,7 @@ impl AttachmentCaptureService {
                 },
                 stop: false,
                 pending: true,
+                filesystem_pending: false,
                 last_attempt: None,
                 last_complete: None,
             }),
@@ -256,6 +273,7 @@ impl AttachmentCaptureService {
                     run(&running, attachment, store, metadata, signer, schedule);
                 }));
                 running.change(|state| {
+                    state.status.native_events = false;
                     state.status.phase = if result.is_ok() {
                         CapturePhase::Stopped
                     } else {
@@ -330,7 +348,7 @@ impl Drop for AttachmentCaptureService {
 }
 
 fn run(
-    shared: &Shared,
+    shared: &Arc<Shared>,
     attachment: ProjectAttachment,
     store: PinnedWorkspaceRoot,
     metadata: PathBuf,
@@ -340,6 +358,14 @@ fn run(
     if shared.stopped() {
         return;
     }
+    #[cfg(target_os = "macos")]
+    let events = if schedule.native_signals {
+        signals_macos::Events::start(attachment.root(), shared).ok()
+    } else {
+        None
+    };
+    #[cfg(target_os = "macos")]
+    shared.change(|state| state.status.native_events = events.is_some());
     let actor = signer.public_key();
     if store
         .filesystem()
@@ -358,18 +384,37 @@ fn run(
     loop {
         {
             let mut state = shared.lock();
-            if !state.stop && !state.pending {
+            loop {
+                if state.stop {
+                    return;
+                }
+                let now = Instant::now();
+                let reconcile = state
+                    .last_attempt
+                    .map(|time| time + schedule.reconciliation_interval)
+                    .unwrap_or(now);
+                let event_ready = state
+                    .last_attempt
+                    .map(|time| time + Duration::from_millis(250))
+                    .unwrap_or(now);
+                if state.pending
+                    || now >= reconcile
+                    || (state.filesystem_pending && now >= event_ready)
+                {
+                    break;
+                }
+                let deadline = if state.filesystem_pending {
+                    reconcile.min(event_ready)
+                } else {
+                    reconcile
+                };
                 let (next, _) = shared
                     .changed
-                    .wait_timeout_while(state, schedule.reconciliation_interval, |state| {
-                        !state.stop && !state.pending
-                    })
+                    .wait_timeout(state, deadline.saturating_duration_since(now))
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
                 state = next;
             }
-            if state.stop {
-                return;
-            }
+            state.filesystem_pending = false;
             state.pending = false;
         }
         let started = Instant::now();

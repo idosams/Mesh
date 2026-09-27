@@ -1,8 +1,9 @@
 # Existing-project attachment identity
 
-Status: native registration, bounded observation, immutable capture inputs and signed external
-history commits and a native background reconciliation controller implemented. Desktop integration
-and incremental filesystem event handling remain planned.
+Status: native attachment, bounded capture, signed external history, desktop inspection and persistent
+comparison pins, detachment, and macOS event wakeups with periodic reconciliation are implemented
+on review branches. Packaged graphical proof, incremental hashing, correlation, approval and
+integration remain incomplete.
 
 ## Decision
 
@@ -504,3 +505,29 @@ Wrong all-zero revision, extra identity-command arguments and a modified executa
 refused. The original bundle remained sealed; the preserved older bundle without the identity mode
 was refused before launch. These results prove the executable boundary above, not the graphical
 attachment, review-pin or detachment acceptance journeys.
+
+
+## Native event wakeups with reconciliation
+
+macOS capture now owns a recursive FSEvents stream on a private serial dispatch queue. The native
+adapter is a small platform-gated FFI boundary using the installed SDK contract; it adds no dependency.
+Its context is retained/released with Arc through the framework callbacks, panics cannot cross the C
+callback, and the capture worker stops, invalidates and releases the stream before finishing.
+The stream starts before the initial scan; every callback batch, including dropped-event or root-change
+notifications, only sets one pending rescan flag. No event path, identifier or flag authorizes content,
+proves authorship or substitutes for the complete descriptor-confined inventory.
+
+Manual requests remain immediate and coalesced. Event requests wait at least 250 ms after the last
+attempt completed. The normal five-second reconciliation deadline remains independent of callbacks,
+so native startup failure, missed events, unsupported platforms or explicitly disabled signals still
+reconcile. Every attempt retains the original source/store checks and signed-history boundary.
+A replaced root may wake capture but is never adopted. Ignored-path events can cause an unchanged
+rescan; selective dirty-path hashing and large-project resource measurements remain future work.
+
+Status adds `native_events` and `event_signals` (callback batches, not edit counts). The desktop shows
+native signals plus periodic checks or periodic fallback. Stop clears the active-stream status only
+after the worker has released its native watcher. Real macOS tests use a five-minute reconciliation
+interval and observe nested edits, atomic replacement and root-change refusal within an eight-second
+deadline, proving the wakeup path rather than the fallback timer. Separate disabled-signal tests
+verify periodic capture and restart catch-up. This does not establish a four-worker latency target or
+the packaged graphical journey.

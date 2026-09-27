@@ -26,7 +26,8 @@ target/debug/mesh-desktop --mesh-attachment capture /absolute/private-metadata
 target/debug/mesh-desktop --mesh-attachment versions /absolute/private-metadata
 ```
 
-Start background reconciliation, normally every five seconds:
+Start background capture. macOS uses native change signals, with reconciliation every five seconds
+to catch missed changes; unavailable native signals fall back to periodic reconciliation:
 
 ```sh
 target/debug/mesh-desktop --mesh-attachment watch /absolute/private-metadata
@@ -83,3 +84,9 @@ run. The temporary fixture is registered with this checkout's development `meshc
 watch, stop and version listing execute the packaged desktop binary. Output explicitly distinguishes
 `packaged: true` from `graphical: false`. This is not a rendered-window, installed-app, Apple trust,
 approval or main-integration proof.
+
+
+Native event batches only request bounded rescans. They do not establish authorship, durability or
+a complete snapshot, and do not bypass capture identity checks. Linux currently uses reconciliation
+only. Event-triggered scans are coalesced and separated by at least 250 ms after the previous attempt;
+this is not yet an incremental content-hashing or large-project performance claim.

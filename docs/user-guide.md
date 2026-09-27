@@ -94,6 +94,11 @@ folder identity and restores the controls with capture still stopped; choose **R
 separately when ready. An unavailable or replaced folder cannot be reattached. If detachment cannot
 be confirmed, refresh status and reconcile the reported problem rather than assuming it was saved.
 
+While capture is running, Mesh reports whether file-change signals are active or it is using
+periodic checks. On macOS, signals can wake capture sooner; periodic checks still catch missed
+changes. This status does not mean an edit has been saved: check the latest saved version and
+capture outcome. Mesh does not infer who made a change from filesystem events.
+
 ## The six words Mesh shows people
 
 | Status | Meaning |

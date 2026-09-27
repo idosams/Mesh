@@ -42,7 +42,11 @@ capture verifier now accepts a sealed local bundle plus exact revision, checks i
 after execution, and records its executable hash. A fresh canonical bundle passed capture, restart catch-up and
 Git-preservation checks, with wrong-revision and broken-seal refusals. Exact revision verification
 now queries native build identity after checking the seal; incidental binary strings do not suffice.
-This does not claim rendered-window acceptance. Packaged
+This does not claim rendered-window acceptance. macOS capture now uses coalesced native filesystem
+events to wake bounded scans, with periodic reconciliation retained for missed or unavailable events.
+The desktop shows active native signals or periodic fallback. Events never authorize content or
+establish authorship; source/store identities are rechecked on every capture. Linux uses periodic
+reconciliation. Incremental hashing and large-project performance remain unverified. Packaged
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

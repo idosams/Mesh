@@ -444,6 +444,8 @@ impl AttachmentHost {
 
 fn stopped_status() -> CaptureStatus {
     CaptureStatus {
+        native_events: false,
+        event_signals: 0,
         revision: 0,
         phase: CapturePhase::Stopped,
         last_outcome: CaptureOutcome::Pending,

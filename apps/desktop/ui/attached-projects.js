@@ -20,6 +20,7 @@ export function attachedProjectList(raw) {
       || ![undefined, null, 'restored-stopped', 'unavailable'].includes(project.recovery)
       || capture?.schema !== 'mesh.attachment-capture/v1'
       || !PHASES.has(capture.phase) || !OUTCOMES.has(capture.last_outcome)
+      || (capture.native_events !== undefined && typeof capture.native_events !== 'boolean')
       || capture.attribution !== 'unknown' || capture.atomic_snapshot !== false
       || (capture.saved_version !== null && !/^[a-f0-9]{64}$/.test(capture.saved_version))
       || (capture.last_complete_capture_age_ms !== null
@@ -27,7 +28,7 @@ export function attachedProjectList(raw) {
       throw new Error('Invalid attachment status');
     }
     ids.add(project.id);
-    return Object.freeze({ detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
+    return Object.freeze({ nativeEvents: capture.native_events ?? false, detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
       phase: capture.phase, outcome: capture.last_outcome, savedVersion: capture.saved_version,
       captureAgeMs: capture.last_complete_capture_age_ms, recovery: project.recovery ?? null });
   });

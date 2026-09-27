@@ -98,11 +98,13 @@ try {
   assert.deepEqual(await list(), [first]);
 
   const live = watch();
-  await live.next(value => value.phase === 'waiting' && value.last_outcome === 'unchanged');
-  await writeFile(join(project, 'work.txt'), 'ordinary edit, no event signal\n');
+  const watching = await live.next(value => value.phase === 'waiting' && value.last_outcome === 'unchanged');
+  if (process.platform === 'darwin') assert.equal(watching.native_events, true, 'native change signals must be active in the executable proof');
+  await writeFile(join(project, 'work.txt'), 'ordinary edit, no manual capture request\n');
   const expectedGit = await git(['status', '--porcelain=v1']);
   const saved = await live.next(value => value.phase === 'waiting' && value.last_outcome === 'saved' && value.saved_version !== first);
   assert.equal(saved.attribution, 'unknown');
+  if (process.platform === 'darwin') assert.ok(saved.event_signals > watching.event_signals, 'the executable proof must observe a native event batch after the edit');
   live.child.stdin.write('capture\n');
   await live.next(value => value.phase === 'waiting' && value.last_outcome === 'unchanged');
   live.child.stdin.end('stop\n');
@@ -132,7 +134,7 @@ try {
   assert.equal(await readFile(join(project, 'work.txt'), 'utf8'), 'edit while Mesh was stopped\n');
   assert.equal(createHash('sha256').update(await readFile(desktop)).digest('hex'), executableDigest, 'capture executable changed during proof');
   await verifyBundle();
-  process.stdout.write(`${JSON.stringify({ proof: 'mesh-attached-capture-cli/v1', passed: true, versions: 3, elapsed_ms: Math.round(performance.now() - started), packaged: app !== null, graphical: false, revision: options.revision, executable_sha256: executableDigest, registration: 'development-meshctl' })}\n`);
+  process.stdout.write(`${JSON.stringify({ proof: 'mesh-attached-capture-cli/v1', passed: true, versions: 3, elapsed_ms: Math.round(performance.now() - started), packaged: app !== null, graphical: false, revision: options.revision, executable_sha256: executableDigest, registration: 'development-meshctl', native_event_stream: watching.native_events === true, event_signals: saved.event_signals ?? 0 })}\n`);
 } finally {
   for (const child of children) child.kill('SIGKILL');
   await Promise.all([...children].map(child => new Promise(done => child.once('close', done))));
