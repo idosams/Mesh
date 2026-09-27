@@ -18,9 +18,12 @@ scans or signing failures, and reports redacted capture health. It needs an expl
 lifetime. The desktop executable now exposes headless capture, version listing and watch controls
 for an existing harness, with ephemeral native capture identities and joined stop handling. Native
 provisioning now creates a private per-project store under a host-owned external directory and hands
-retained source/store authority directly to capture; partial or replaced stores refuse. Packaged
-lifecycle, desktop attachment flows, live fleet UI, process-tree recovery and complete acceptance
-journeys remain pending migration and verification.
+retained source/store authority directly to capture; partial or replaced stores refuse. Desktop
+attachment controls now select or type an existing project path, show native capture health, and
+request capture, stop or resume using exact session generations. The attachment and separate-copy
+flows retain English/Hebrew localization. Session lists reset on quit; saved history remains.
+Packaged lifecycle, attachment version browsing and review, live fleet UI, process-tree recovery
+and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

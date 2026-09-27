@@ -16,9 +16,9 @@ use std::time::Duration;
 
 /// This key attests to a local capture session, not the author of externally edited files.
 /// It stays in native custody, is never serialized, and has no human approval credential.
-struct NativeCaptureSigner(SoftwareActorCustody);
+pub(crate) struct NativeCaptureSigner(SoftwareActorCustody);
 impl NativeCaptureSigner {
-    fn generate() -> Result<Arc<dyn CheckpointSigner>, String> {
+    pub(crate) fn generate() -> Result<Arc<dyn CheckpointSigner>, String> {
         SoftwareActorCustody::generate()
             .map(|key| Arc::new(Self(key)) as Arc<dyn CheckpointSigner>)
             .map_err(|_| "The local capture identity could not be created".to_owned())

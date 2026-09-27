@@ -1,4 +1,5 @@
 import { useTranslation } from "../lib/localization";
+import { AttachedProjects } from "./attached-projects";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
@@ -121,9 +122,10 @@ export function ImportWorkbench({ model, onIntent, reviewFocusAuthorization = nu
   };
   return (
     <section className="grid gap-5" aria-label={t("Bring in a folder")} data-mesh-proof="import-select">
+      <AttachedProjects />
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("Start with your folder")}</p>
-        <h3 className="mt-2 text-2xl font-semibold tracking-tight">{t("Keep working in ordinary files")}</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t("Separate workspace")}</p>
+        <h3 className="mt-2 text-2xl font-semibold tracking-tight">{t("Create a working copy")}</h3>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("Mesh verifies the folder before creating a private workspace. Your original stays untouched.")}</p>
       </div>
       <Button data-mesh-import-choose variant="primary" disabled={!model.canChoose} onClick={() => onIntent({ type: "choose-folder" })}>{t("Choose a folder")}</Button>

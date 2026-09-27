@@ -118,3 +118,16 @@ test('artifact section names that coincide with translated UI copy remain exact 
   assert.match(html, /<option value="2">שמות מקוריים<\/option>/);
   assert.doesNotMatch(html, /<option value="[01]">(?:סקירה|קבצים)<\/option>/);
 });
+
+test('existing-project attachment stays localized beside the copy flow and keeps paths literal', async () => {
+  const ui = await loadLocalization();
+  const model = { phase: 'select', sourcePath: '/Users/משפחה/Files', destinationPath: '', fileCount: '0', folderCount: '0', byteCount: '0 B', files: [], summary: '', scopeNote: '', busy: false, canChoose: true, canConfirm: false, canEditDestination: true, canChooseDestination: true, confirmLabel: 'Choose a folder' };
+  ui.setLocale('he');
+  const html = ui.renderImport(model);
+  assert.match(html, /aria-label="פרויקטים מחוברים"/);
+  assert.match(html, /חיבור פרויקט קיים/);
+  assert.match(html, /יצירת עותק עבודה/);
+  assert.match(html, /dir="ltr"[^>]*value="\/Users\/משפחה\/Files"/);
+  ui.setLocale('en');
+  assert.match(ui.renderImport(model), /Use your existing project/);
+});

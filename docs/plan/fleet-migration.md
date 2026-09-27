@@ -38,10 +38,16 @@ For every increment record replacement commit(s), PR URL, exact local validation
 status. Source test logs are historical context; rerun the actual canonical checks. Human merge
 authorization is separate and mandatory; no self-approval or check bypass.
 
-Independent CI prerequisite: [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
-`337d2f56caa719f903c32c1170c74111c25ca328`, isolates two recovery deadline tests
-using the existing nextest scheduling policy. It changes no timer, assertion or product code.
-It is based directly on canonical main, is not included in this fleet stack, and remains unmerged.
+Independent CI corrections are based directly on canonical main, are not included in this fleet
+stack, and remain unmerged. [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
+`ba211c7c4ea11305fcbaacd34e689cfdb71481d7`, tests the unchanged recovery deadline calculation with
+an exact clock, synchronizes the persistence-refusal fixture, and gives real-worker observations an
+explicit scheduling budget. Hosted measurements showed a requested 19.915 ms wait had not resumed
+after 155.816 ms. All three corrected recovery cases passed hosted run 36340947488; a separate
+managed-edit stability test failed, so overall CI remains unresolved. The macOS gate collects all
+failures without retrying or skipping tests. [Mesh PR #14](https://github.com/idosams/Mesh/pull/14),
+`d1e6567cb9141646501fa8a1724bfbf997e8e576`, synchronizes a counter test so its writer cannot finish
+before its reader starts. That test passed hosted CI, whose later recovery test still failed.
 
 ## Preserved source commits
 
@@ -67,8 +73,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A03 | `9e3e367c9be2f72fecd2fcd6304fbbac5ac31035` | feat: reconcile attached projects with a native background capture controller | [Mesh PR #11](https://github.com/idosams/Mesh/pull/11), `eb344f5460a332d7daa545e1d051b17368227367`; A03a native controller; stacked on #10; not merged |
 | A03 | `8e595348462ebcdc772e71f455f5b1f457aae109` | feat: expose native attached-project capture commands for harnesses | [Mesh PR #12](https://github.com/idosams/Mesh/pull/12), `4259c8b8c8815d8145e457167e7ec7990d081ff2`; A03b harness controls; stacked on #11; not merged |
 | A03 | `f8ec9022b9dbe6a44b6a8fa8894758e6962b1a62` | feat: provision native external attachment history storage | [Mesh PR #13](https://github.com/idosams/Mesh/pull/13), `5f4fe06673e476223ad53edad515b7f4d411521b`; A03c native storage provisioning; stacked on #12; not merged |
-| A04 | `76f453c67687525a88dd63171530e63a722eaead` | feat: add native desktop attachment session controls | Pending transfer |
-| A04 | `367e86a1b933d167083a0cb396e62b0ac3695710` | feat: connect existing-project attachment controls to desktop UI | Pending transfer |
+| A04 | `76f453c67687525a88dd63171530e63a722eaead` | feat: add native desktop attachment session controls | A04 transfer in this branch; localized desktop attachment controls; stacked on #13; not merged |
+| A04 | `367e86a1b933d167083a0cb396e62b0ac3695710` | feat: connect existing-project attachment controls to desktop UI | A04 transfer in this branch; localized desktop attachment controls; stacked on #13; not merged |
 | A05 | `29caceb1bfcb353abe1a6d8927adc8a05fa7c3ca` | feat: browse exact attached-project version history pages | Pending transfer |
 | A05 | `d52640a58edc6fb2b9ab07dd59ddbcb087c31499` | feat: inspect immutable attached-project files in desktop | Pending transfer |
 | A05 | `923187d270568917c7805435b3e3020ab353d51c` | feat: compare exact attached-project versions with pinned previews | Pending transfer |

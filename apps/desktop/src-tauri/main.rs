@@ -12,6 +12,9 @@ mod active_workspace;
 mod attachment_capture;
 
 #[cfg(unix)]
+mod attachment_host;
+
+#[cfg(unix)]
 mod artifact_preview;
 
 #[cfg(unix)]
@@ -73,6 +76,7 @@ mod desktop {
 
     use crate::active_workspace::ActiveWorkspaceLink;
     use crate::artifact_preview::{encode_base64, inspection_extension, render as render_artifact};
+    use crate::attachment_host::AttachmentHost;
     #[cfg(test)]
     use crate::codex_workspace::ensure_codex_project_config;
     use crate::codex_workspace::{
@@ -760,6 +764,38 @@ mod desktop {
                     .map_err(|error| error.to_string())
             })
             .transpose()
+    }
+
+    #[tauri::command]
+    async fn attach_existing_project(
+        host: State<'_, Arc<AttachmentHost>>,
+        source: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.attach(Path::new(&source)))
+            .await
+            .map_err(|_| "Project attachment did not finish".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn attached_projects(host: State<'_, Arc<AttachmentHost>>) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.projects())
+            .await
+            .map_err(|_| "Attachment status is unavailable".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn control_attached_project(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        generation: String,
+        action: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.control(&id, &generation, &action))
+            .await
+            .map_err(|_| "Attachment control did not finish".to_owned())?
     }
 
     #[tauri::command]
@@ -6590,6 +6626,9 @@ mod desktop {
             })
             .invoke_handler(tauri::generate_handler![
                 pick_folder,
+                attach_existing_project,
+                attached_projects,
+                control_attached_project,
                 recent_workspace_status,
                 renderer_proof_configuration,
                 renderer_proof_capture_files_screenshot,
@@ -6722,6 +6761,7 @@ mod desktop {
                 let active_workspace = ActiveWorkspaceLink::new(&app_data_dir);
                 let version_workspaces = VersionWorkspaceDirectory::new(&app_data_dir);
                 let native_capture = NativeCapturePreference::new(&app_data_dir);
+                app.manage(Arc::new(AttachmentHost::new(&app_data_dir)));
                 let recent = RecentWorkspace::new(app_data_dir);
                 let recent_status =
                     reopen_remembered_workspace(&daemon, &recent, &active_workspace);

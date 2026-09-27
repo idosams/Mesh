@@ -212,3 +212,49 @@ and graphical lifecycle. This API does not yet connect the desktop onboarding or
 Tests cover idempotent provisioning, unchanged source contents, owner-only child creation, refusing
 storage inside the source, partial receipts, linked or replaced storage, actual signed capture through
 the provisioned handle, and replacement between provisioning and capture startup.
+
+## Desktop session controller
+
+The graphical native host now manages an independent `AttachmentHost` alongside the selected managed
+workspace. `attach_existing_project(source)` lazily creates the host's owner-only `attached-projects`
+storage root below application data, provisions a registered project and starts native capture with
+an in-process software session key. A renderer never supplies metadata destinations or signing keys.
+`attached_projects()` returns the session's project handles, original roots and redacted capture
+status. `control_attached_project(id, generation, action)` admits only capture, stop or resume for
+that exact session generation. These operations run on the blocking worker pool, not the UI thread.
+
+Admission and launch are serialized. Concurrent selections of one project return one capture worker;
+reselecting a stopped or failed project does not resume it. Resume requires a terminal prior worker
+and the same registered project identity, creates a new generation and rejects earlier controls.
+The controller bounds its session list to 32 projects. Stop is a request, not a claim of termination;
+status reports the native worker's actual phase. No operation switches the selected managed workspace,
+reconfigures a harness, writes project files, or grants approval authority.
+
+The session registry is currently in memory. Saved registrations/history survive, and explicit
+reattachment recovers them; persistent project listing, restart preferences, detached/offline browsing,
+UI wiring, history presentation and packaged lifecycle proof remain unfinished. Dropping the host
+requests its workers to stop through their existing controller lifecycle; graceful process shutdown
+is not yet a verified desktop guarantee. Tests cover eight concurrent requests sharing one worker,
+stop/reselect/resume, stale controls, source replacement refusal and linked storage refusal. These are
+native controller tests, not evidence of user-visible controls or a packaged attachment journey.
+
+## Initial graphical attachment panel
+
+The existing folder-entry page now leads with an attached-project panel, followed by the separate
+working-copy import flow. The React panel emits typed intents to a shell coordinator; only that
+coordinator calls the native attach/status/control commands. The native picker and a typed absolute
+source path are supported. The user sees original location, capture phase and outcome, latest saved
+identity, age of the last complete capture and unknown authorship. Capture, stop and explicit resume
+use the native project handle and session generation. No UI action grants main approval.
+
+The coordinator serializes requests and refreshes native status every two seconds while the panel
+is mounted. It validates bounded projections, rejects stale control generations and unexpected
+operations, and stops scheduling when unmounted. Failed refresh retains the last displayed saved
+identity, labels status as potentially stale and disables control intents until refresh succeeds.
+Picker cancellation does not attach a project. Native capture continues independently of UI polling.
+
+This panel explains session-only listing and retained history. Its presentation follows the canonical
+English/Hebrew preference, while paths and saved identities remain literal and left-to-right.
+It is source-integrated graphical UI, not yet a packaged runtime proof. Persistent catalog,
+restart preferences, version navigation, pinned parallel review and the full packaged journey remain
+required before the attachment product loop is complete.

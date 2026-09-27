@@ -1,3 +1,4 @@
+import { startAttachedProjects } from './attached-projects.js';
 import { workspaceVersionsRetainedInteraction } from './workspace-versions-interaction-policy.js';
 import { createNoticeSource } from './notice-source.js';
 import {
@@ -10,6 +11,7 @@ import {
 const appWindow = window;
 const appDocument = document;
 const invoke = appWindow.__TAURI__?.core?.invoke;
+startAttachedProjects({ document: appDocument, invoke, CustomEvent });
 const $ = (id) => appDocument.getElementById(id);
 const noticeSource = createNoticeSource(appDocument, CustomEvent);
 const model = { source: null, destination: null, preview: null, workspace: null, workspaceVerified: false, checkpoint: null, agentFolder: null, agentHandoff: null, agentLive: null, editor: null, folderChanges: [], nativeInspectionFailed: false, nativeCaptureEnabled: false, nativeCaptureAvailable: false, nativeCaptureChanging: false, exportPreview: null, exportBatchPreview: null, exportRoot: null, pullBackPrompt: null, restorePreview: null, restoreUndo: null, workspaceVersionPreview: null, workspaceVersionPreviewError: null, recent: null, activeFolder: null, approval: null };
