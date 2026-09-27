@@ -118,7 +118,7 @@ additional canonical verification work, not another transferred commit from the 
 full combined gate and hosted CI must be checked on this base; original PRs and histories remain
 preserved, and duplicate corrections must be reconciled before main integration. Replacement
 `3e0e81c` passed the full combined gate with exit 0: 3,131 Rust tests (13 skipped), 564 desktop tests
-and 44 real daemon checks. [Mesh PR #24](https://github.com/idosams/Mesh/pull/24) publishes this transfer; hosted CI is pending
+and 44 real daemon checks. [Mesh PR #24](https://github.com/idosams/Mesh/pull/24) publishes this transfer; all seven hosted checks pass in run 36348196200
 and no merge is implied.
 
 ## Preserved source commits
@@ -152,7 +152,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A05 | `923187d270568917c7805435b3e3020ab353d51c` | feat: compare exact attached-project versions with pinned previews | [Mesh PR #19](https://github.com/idosams/Mesh/pull/19), `8c4884efdbe7bd34d3f05079193324df1a5e534c`; exact localized comparison; canonical historical-path handling retained; stacked on #18; not merged |
 | A05 | `9a68afb42be45259902fa5061970d297223c7eae` | feat: pin independent attached-project comparisons side by side | [Mesh PR #21](https://github.com/idosams/Mesh/pull/21), `548fc7b1c488dc9f123a5aee7195e9eaa8f74831`; independent localized pins, stacked on #20; full local gate passed (3,128 Rust, 563 desktop, 44 daemon checks); hosted CI: six jobs pass, macOS move-settling regression fails (run 36346038402); not merged |
 | A06 | `894127b78ba9d1c4104b013fd3c3e31dce15a504` | feat: restore registered attachment projects stopped after restart | [Mesh PR #22](https://github.com/idosams/Mesh/pull/22), `397b98b0d3c22814c4f3b569d575e1b02de6ab66`; native catalog and stopped restart recovery; stacked on #21; full local gate passed (3,131 Rust, 564 desktop, 44 daemon checks); all seven hosted checks pass (run 36346924533); not merged |
-| A06 | `d2d9e8c5ca43e592dd5eaeaa889fe21e067c3cec` | feat: persist native comparison pin selectors with revision checks | Pending transfer |
+| A06 | `d2d9e8c5ca43e592dd5eaeaa889fe21e067c3cec` | feat: persist native comparison pin selectors with revision checks | A06b: bounded catalog-bound native pin snapshots; stacked on #24; full local gate passed (3,134 Rust, one passed/leaky, 564 desktop, 44 daemon checks); PR publication pending, not merged |
 | A06 | `db065842401b6743d4b44f6f71517306be09d33e` | Restore attached project comparison pins through native history | Pending transfer |
 | A06 | `ba65636e1a097a5491172226859c6d61994d8539` | Persist project detachment while retaining history and ordinary workflow | Pending transfer |
 | A07 | `e3a2dc84ca3fcc33997cb802a0d7ccb319f921c8` | Verify packaged attachment capture against exact sealed bundles | Pending transfer |

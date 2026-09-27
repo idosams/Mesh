@@ -389,3 +389,35 @@ of capture-before-resume, catch-up after resume, offline listing, replacement re
 the original folder returns, linked stores, malformed receipts and preserved partial provisioning.
 The UI distinguishes restored-stopped projects from unavailable history. These are native and source-UI
 proofs; packaged restart and durable pin restoration remain required.
+
+## Native durable pin selector snapshots
+
+`AttachmentStorage::load_comparison_pins` and `save_comparison_pins(expected_revision, pins)` now
+provide a native persistence seam for comparison navigation. The `mesh.attachment-pins/v1` record
+stores at most eight ordered selectors: display key, registered project identity, base and target
+operation identities, page cursor and selected path. It stores no file bytes, rendered previews,
+credentials, approval state or claimed validity of those versions. Consumers must reverify each
+selector through native history before restoring content; unavailable history must remain unavailable.
+The current desktop pin controller is not yet wired to this persistence seam.
+
+Snapshots are bound to the retained catalog's device/inode identity and read through native directory
+authority. Parsing is bounded to 128 KiB and validates canonical fields, unique numeric display keys,
+hex identities and bounded relative path selectors. The final record is owner-only. A missing initial
+record yields revision zero; an empty snapshot after removal of the last pin is persisted with a new
+revision, so restart cannot resurrect the earlier list. Repeating an unchanged snapshot at its current
+revision does not write. Stale revisions refuse instead of overwriting another update.
+
+A catalog-directory lock serializes cooperating readers/writers. Publication creates and syncs an
+owner-only pending file through the retained descriptor, checks catalog identity, atomically renames
+it to the fixed snapshot name, syncs the parent, rechecks identity and reads back the exact published
+snapshot before acknowledgment. Partial
+staging is preserved. A pending initial snapshot is not interpreted as an empty catalog, and a pending
+file beside a valid snapshot prevents publication of a different snapshot until reconciliation. Copied,
+linked, corrupt or substituted records refuse rather than becoming trusted preferences. This is local
+native identity protection, not a portable or signed approval format.
+
+Tests cover restart round-trips, stale and unchanged updates, durable removal, concurrent writers with
+one winner, field/count limits, traversal refusal, copied catalog identity, symlink/corruption refusal,
+interrupted initial staging and replaced catalog paths. This introduces an additive preferences format;
+existing registration and signed history formats are unchanged. Desktop load/save orchestration,
+selector revalidation and visible pin restoration remain unfinished, as does packaged restart proof.

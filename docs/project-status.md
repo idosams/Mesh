@@ -30,7 +30,10 @@ files have explicit unavailable states, and paths/content stay literal in the lo
 saved-version comparisons now report path, content and executable-mode changes with fixed before/after
 previews. Up to eight pinned comparisons now retain independent pages and file selections across
 projects while captures and active comparisons advance. Closing a pin during a read cannot recreate
-it. Pins remain session-only. Selecting a new comparison base does not change an open comparison. Packaged
+it. Desktop pins remain session-only. Native storage now supports catalog-bound pin selector snapshots
+with atomic publication, bounded parsing and revision checks; desktop save/restore orchestration
+and revalidation of restored content are not yet connected. Selecting a new comparison base does
+not change an open comparison. Packaged
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

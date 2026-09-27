@@ -16,6 +16,9 @@ const RECEIPT: &str = "attachment.json";
 const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
 
+mod pins;
+pub use pins::{AttachmentPin, AttachmentPinState};
+
 mod provisioning;
 pub use provisioning::{AttachmentStorage, ProvisionedAttachment, RegisteredAttachment};
 

@@ -960,3 +960,148 @@ fn catalog_preserves_partial_and_modified_registration_evidence() {
     assert!(storage.registrations().is_err());
     assert!(!receipt.exists());
 }
+
+fn pin_selector(key: &str) -> mesh_daemon::project_attachment::AttachmentPin {
+    mesh_daemon::project_attachment::AttachmentPin {
+        key: key.into(),
+        project: "a".repeat(64),
+        base: "b".repeat(64),
+        target: "c".repeat(64),
+        after: Some("docs/readme.md".into()),
+        path: Some("src/main.rs".into()),
+    }
+}
+
+#[test]
+fn pin_snapshot_roundtrips_with_revision_and_persists_last_pin_removal() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("pins-roundtrip");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    assert_eq!(storage.load_comparison_pins().unwrap().revision, 0);
+    let first = storage
+        .save_comparison_pins(0, vec![pin_selector("1"), pin_selector("2")])
+        .unwrap();
+    assert_eq!(first.revision, 1);
+    let restarted = AttachmentStorage::open(&f.metadata).unwrap();
+    assert_eq!(restarted.load_comparison_pins().unwrap(), first);
+    assert_eq!(
+        restarted
+            .save_comparison_pins(1, first.pins.clone())
+            .unwrap(),
+        first
+    );
+    assert!(restarted.save_comparison_pins(0, vec![]).is_err());
+    let removed = restarted.save_comparison_pins(1, vec![]).unwrap();
+    assert_eq!(removed.revision, 2);
+    assert!(AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .load_comparison_pins()
+        .unwrap()
+        .pins
+        .is_empty());
+    assert_eq!(fs::read_dir(&f.source).unwrap().count(), 0);
+    assert_eq!(
+        fs::metadata(f.metadata.join("desktop-comparison-pins.json"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    assert!(storage.registrations().unwrap().is_empty());
+}
+
+#[test]
+fn pin_snapshots_refuse_corruption_links_copies_and_incomplete_first_write() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("pins-refusal");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    storage
+        .save_comparison_pins(0, vec![pin_selector("1")])
+        .unwrap();
+    let record = f.metadata.join("desktop-comparison-pins.json");
+    let original = fs::read(&record).unwrap();
+    let copy = f.root.join("copy");
+    fs::create_dir(&copy).unwrap();
+    fs::write(copy.join("desktop-comparison-pins.json"), &original).unwrap();
+    fs::set_permissions(
+        copy.join("desktop-comparison-pins.json"),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    assert!(AttachmentStorage::open(&copy)
+        .unwrap()
+        .load_comparison_pins()
+        .is_err());
+    let staged = f.metadata.join("desktop-comparison-pins.pending");
+    fs::write(&staged, b"interrupted next snapshot").unwrap();
+    assert!(storage.save_comparison_pins(1, vec![]).is_err());
+    assert_eq!(
+        storage.load_comparison_pins().unwrap().pins,
+        vec![pin_selector("1")]
+    );
+    assert_eq!(fs::read(&record).unwrap(), original);
+    assert_eq!(fs::read(&staged).unwrap(), b"interrupted next snapshot");
+    fs::remove_file(staged).unwrap();
+    fs::write(&record, b"{}").unwrap();
+    assert!(storage.load_comparison_pins().is_err());
+    assert!(storage.save_comparison_pins(1, vec![]).is_err());
+    assert_eq!(fs::read(&record).unwrap(), b"{}");
+    fs::remove_file(&record).unwrap();
+    let outside = f.root.join("outside");
+    fs::write(&outside, &original).unwrap();
+    symlink(&outside, &record).unwrap();
+    assert!(storage.load_comparison_pins().is_err());
+    assert!(storage.save_comparison_pins(1, vec![]).is_err());
+    assert_eq!(fs::read(&outside).unwrap(), original);
+    fs::remove_file(&record).unwrap();
+    let pending = f.metadata.join("desktop-comparison-pins.pending");
+    fs::write(&pending, b"interrupted snapshot").unwrap();
+    assert!(storage.load_comparison_pins().is_err());
+    assert!(storage
+        .save_comparison_pins(0, vec![pin_selector("1")])
+        .is_err());
+    assert_eq!(fs::read(pending).unwrap(), b"interrupted snapshot");
+}
+
+#[test]
+fn concurrent_pin_updates_have_one_winner_and_invalid_selectors_never_publish() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    use std::sync::{Arc, Barrier};
+    let f = Fixture::new("pins-concurrent");
+    let barrier = Arc::new(Barrier::new(2));
+    let workers: Vec<_> = ["1", "2"]
+        .into_iter()
+        .map(|key| {
+            let barrier = barrier.clone();
+            let metadata = f.metadata.clone();
+            std::thread::spawn(move || {
+                let storage = AttachmentStorage::open(&metadata).unwrap();
+                barrier.wait();
+                storage.save_comparison_pins(0, vec![pin_selector(key)])
+            })
+        })
+        .collect();
+    let results: Vec<_> = workers
+        .into_iter()
+        .map(|worker| worker.join().unwrap())
+        .collect();
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let before = storage.load_comparison_pins().unwrap();
+    assert_eq!(before.revision, 1);
+    let mut invalid = pin_selector("3");
+    invalid.path = Some("../outside".into());
+    assert!(storage.save_comparison_pins(1, vec![invalid]).is_err());
+    assert!(storage
+        .save_comparison_pins(1, vec![pin_selector("3"); 9])
+        .is_err());
+    assert!(storage
+        .save_comparison_pins(1, vec![pin_selector("3"); 2])
+        .is_err());
+    assert_eq!(storage.load_comparison_pins().unwrap(), before);
+    fs::rename(&f.metadata, f.root.join("old-catalog")).unwrap();
+    fs::create_dir(&f.metadata).unwrap();
+    assert!(storage.save_comparison_pins(1, vec![]).is_err());
+    assert!(fs::read_dir(&f.metadata).unwrap().next().is_none());
+}

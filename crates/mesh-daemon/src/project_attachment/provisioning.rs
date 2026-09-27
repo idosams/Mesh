@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// The host supplies this directory from its own configuration, never a renderer-selected path.
 pub struct AttachmentStorage {
     path: PathBuf,
-    pinned: PinnedWorkspaceRoot,
+    pub(super) pinned: PinnedWorkspaceRoot,
 }
 
 /// A registered project and its exact native store authority, ready for capture.
@@ -52,7 +52,7 @@ fn receipt_id(receipt: &str) -> String {
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
-fn valid_id(id: &str) -> bool {
+pub(super) fn valid_id(id: &str) -> bool {
     id.len() == 64
         && id
             .bytes()
