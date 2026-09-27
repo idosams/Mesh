@@ -129,6 +129,14 @@ pub(crate) fn fold<F: mesh_cas::DurableFs>(
     SharedVersion::HumanAuthorityUnavailable
 }
 
+/// Reconstructed publication history. Heads enter only after exact receipt verification.
+/// Review-base hints are journal-order observations, never authority without bundle recomputation.
+pub(crate) struct FoldedPublication {
+    pub(crate) version: SharedVersion,
+    pub(crate) heads: Vec<HeadId>,
+    pub(crate) review_bases: BTreeMap<RecordDigest, HeadId>,
+}
+
 /// Derive a protected head from exact v1 receipts and independently recomputed review contexts.
 ///
 /// A malformed or contradictory approval poisons the answer rather than being skipped. The
@@ -139,64 +147,75 @@ pub(crate) fn fold_human<F: mesh_cas::DurableFs>(
     store: &mesh_cas::Cas<F, mesh_cas::Blake3>,
     trusted: &TrustedReviewers,
     mut context_for: impl FnMut(&ReviewRecord, HeadId) -> Option<HumanApprovalContext>,
-) -> SharedVersion {
-    if !trusted.is_configured() {
-        return SharedVersion::TrustNotConfigured;
-    }
-
-    let mut reviews = BTreeMap::<RecordDigest, ReviewRecord>::new();
-    let mut used_challenges = BTreeSet::<[u8; 32]>::new();
-    let mut current = GENESIS_SHARED_HEAD;
-    let mut advanced = false;
-
-    for record in records {
-        match record {
-            StoredRecord::Review(review) => {
-                reviews.insert(review.bundle, *review);
-            }
-            StoredRecord::Approval(approval) if approval.verdict == ReviewVerdict::Approved => {
-                let Some(review) = reviews.get(&approval.bundle) else {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                };
-                let Ok(bytes) = store.read(&mesh_cas::Digest32::from_bytes(
-                    *approval.approval.as_bytes(),
-                )) else {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                };
-                let Ok(receipt) = HumanApprovalReceipt::from_canonical_bytes(&bytes) else {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                };
-                let carried = receipt.draft().expected();
-                let credential_id = carried.credential().id();
-                let Some(credential) = trusted.human_credential(credential_id) else {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                };
-                let Some(context) = context_for(review, current) else {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                };
-                let challenge = *carried.challenge();
-                let expected = ExpectedHumanApproval::new(context, credential, challenge);
-                if expected.context().expected_canonical_head() != current
-                    || approval.bundle.as_bytes()
-                        != expected.context().review_bundle().digest().as_bytes()
-                    || approval.approver.as_bytes() != credential_id.as_bytes()
-                    || challenge == [0; 32]
-                    || !used_challenges.insert(challenge)
-                    || verify_human_approval_receipt(&bytes, &expected).is_err()
-                {
-                    return SharedVersion::HumanAuthorityUnavailable;
-                }
-                current = expected.context().reviewed_actor_head();
-                advanced = true;
-            }
-            _ => {}
+) -> FoldedPublication {
+    let mut heads = vec![GENESIS_SHARED_HEAD];
+    let mut review_bases = BTreeMap::new();
+    let version = (|| {
+        if !trusted.is_configured() {
+            return SharedVersion::TrustNotConfigured;
         }
-    }
 
-    if advanced {
-        SharedVersion::Available(current)
-    } else {
-        SharedVersion::HumanAuthorityUnavailable
+        let mut reviews = BTreeMap::<RecordDigest, ReviewRecord>::new();
+        let mut used_challenges = BTreeSet::<[u8; 32]>::new();
+        let mut current = GENESIS_SHARED_HEAD;
+        let mut advanced = false;
+
+        for record in records {
+            match record {
+                StoredRecord::Review(review) => {
+                    review_bases.entry(review.bundle).or_insert(current);
+                    reviews.insert(review.bundle, *review);
+                }
+                StoredRecord::Approval(approval) if approval.verdict == ReviewVerdict::Approved => {
+                    let Some(review) = reviews.get(&approval.bundle) else {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    };
+                    let Ok(bytes) = store.read(&mesh_cas::Digest32::from_bytes(
+                        *approval.approval.as_bytes(),
+                    )) else {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    };
+                    let Ok(receipt) = HumanApprovalReceipt::from_canonical_bytes(&bytes) else {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    };
+                    let carried = receipt.draft().expected();
+                    let credential_id = carried.credential().id();
+                    let Some(credential) = trusted.human_credential(credential_id) else {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    };
+                    let Some(context) = context_for(review, current) else {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    };
+                    let challenge = *carried.challenge();
+                    let expected = ExpectedHumanApproval::new(context, credential, challenge);
+                    if expected.context().expected_canonical_head() != current
+                        || approval.bundle.as_bytes()
+                            != expected.context().review_bundle().digest().as_bytes()
+                        || approval.approver.as_bytes() != credential_id.as_bytes()
+                        || challenge == [0; 32]
+                        || !used_challenges.insert(challenge)
+                        || verify_human_approval_receipt(&bytes, &expected).is_err()
+                    {
+                        return SharedVersion::HumanAuthorityUnavailable;
+                    }
+                    current = expected.context().reviewed_actor_head();
+                    heads.push(current);
+                    advanced = true;
+                }
+                _ => {}
+            }
+        }
+
+        if advanced {
+            SharedVersion::Available(current)
+        } else {
+            SharedVersion::HumanAuthorityUnavailable
+        }
+    })();
+    FoldedPublication {
+        version,
+        heads,
+        review_bases,
     }
 }
 

@@ -51,6 +51,10 @@ active stream and an observed callback batch. Incremental hashing and large-proj
 remain unverified. Packaged graphical
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
+Pending review presentation now recovers its exact original main base from recomputed bundle
+identities and verified publication history, including after restart or delayed request arrival.
+Historical readability does not authorize stale approval or recover poisoned current authority.
+Attached-project review admission and approval controls remain pending migration.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

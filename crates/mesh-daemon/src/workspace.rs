@@ -1056,6 +1056,8 @@ pub struct OpenWorkspace {
     digest: mesh_store::Digest16,
     private_version: PrivateVersion,
     shared_version: SharedVersion,
+    shared_history: Vec<mesh_approval::HeadId>,
+    review_base_hints: BTreeMap<RecordDigest, mesh_approval::HeadId>,
     materialized_state: Option<mesh_materializer::WorkspaceState>,
     entries: Vec<WorkspaceEntry>,
     file_histories: Vec<WorkspaceFileHistory>,
@@ -1481,6 +1483,8 @@ impl OpenWorkspace {
             digest,
             private_version,
             shared_version,
+            shared_history: Vec::new(),
+            review_base_hints: BTreeMap::new(),
             materialized_state: names.state,
             entries: names.entries,
             file_histories: names.file_histories,
@@ -1494,7 +1498,9 @@ impl OpenWorkspace {
             trusted_reviewers,
             |review, current| opened.human_approval_context_at(review, current).ok(),
         );
-        opened.shared_version = shared_version;
+        opened.shared_version = shared_version.version;
+        opened.shared_history = shared_version.heads;
+        opened.review_base_hints = shared_version.review_bases;
         if recover_working_files {
             match crate::managed_mutation::reconcile_pending_mutation(root, |id| {
                 opened.has_operation(id)
@@ -1753,12 +1759,15 @@ impl OpenWorkspace {
         self.retired_entries = names.retired_entries;
         self.conditions = names.conditions;
         self.names_answered = names.complete;
-        self.shared_version = publication::fold_human(
+        let shared = publication::fold_human(
             &records,
             &self.payload_store,
             trusted_reviewers,
             |review, current| self.human_approval_context_at(review, current).ok(),
         );
+        self.shared_version = shared.version;
+        self.shared_history = shared.heads;
+        self.review_base_hints = shared.review_bases;
         Ok(())
     }
 
@@ -2098,9 +2107,10 @@ impl OpenWorkspace {
         Ok((context, bundle, state))
     }
 
-    /// The predecessor carried by an existing approved receipt, or the current protected head for
-    /// a review that has not been approved yet. A carried value is never trusted by itself: every
-    /// caller recomputes the exact bundle and the publication fold independently checks linearity.
+    /// Recover the exact base committed by the immutable bundle. For an unapproved request,
+    /// journal-order hints are tried first, then verified publication history (including genesis).
+    /// Arrival order never substitutes for matching the recomputed bundle identity. Approval
+    /// continues to check the current protected head independently of historical presentation.
     fn canonical_head_for_review(
         &self,
         review: &ReviewRecord,
@@ -2110,9 +2120,34 @@ impl OpenWorkspace {
             .approvals_for_bundle(&review.bundle)
             .filter(|approval| approval.verdict == ReviewVerdict::Approved);
         let Some(approval) = approvals.next() else {
-            return Ok(self
+            let current = self
                 .shared_version()
-                .unwrap_or(crate::publication::GENESIS_SHARED_HEAD));
+                .unwrap_or(crate::publication::GENESIS_SHARED_HEAD);
+            let candidates = self
+                .review_base_hints
+                .get(&review.bundle)
+                .copied()
+                .into_iter()
+                .chain(std::iter::once(current))
+                .chain(self.shared_history.iter().rev().copied())
+                .chain(std::iter::once(crate::publication::GENESIS_SHARED_HEAD));
+            let mut checked = BTreeSet::new();
+            for base in candidates {
+                if !checked.insert(base) {
+                    continue;
+                }
+                if self
+                    .publication_review(review.subject_operation, base, false)
+                    .is_ok_and(|(bundle, _, _)| {
+                        bundle.id().digest().as_bytes() == review.bundle.as_bytes()
+                    })
+                {
+                    return Ok(base);
+                }
+            }
+            // Preserve the existing mismatch/unavailable diagnostics downstream. A forged bundle
+            // still fails exact recomputation; no unmatched historical base becomes authority.
+            return Ok(current);
         };
         if approvals.next().is_some() {
             return Err("the review has more than one approved envelope".to_owned());

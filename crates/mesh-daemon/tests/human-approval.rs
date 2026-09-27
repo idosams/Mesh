@@ -376,6 +376,248 @@ fn exact_human_receipt_advances_once_and_survives_restart() {
 }
 
 #[test]
+fn pending_review_keeps_its_original_base_after_main_advances_and_restart() {
+    let base = scratch("pending-review-base");
+    let source = base.join("source");
+    let workspace = base.join("workspace");
+    std::fs::create_dir_all(&source).expect("source");
+    std::fs::write(source.join("notes.txt"), b"initial\n").expect("source bytes");
+    let (confirmed, _) = PreparedFolderImport::prepare(&source, &workspace)
+        .expect("prepare")
+        .confirm_into_workspace()
+        .expect("import");
+    drop(confirmed);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let daemon = LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+        startup(),
+        trust.clone(),
+        checkpoint_parameters(),
+    )
+    .expect("runtime");
+    daemon.open_at_start(&workspace).expect("open");
+    let open_review = |daemon: &LiveDaemon| {
+        let state = Operations::workspace_state(daemon).expect("state");
+        daemon
+            .open_current_review_for_workspace(
+                &state.root,
+                &state.digest,
+                &state.installation,
+                PublicKey::from_bytes([0x31; 32]),
+            )
+            .expect("review")
+    };
+    let context = |daemon: &LiveDaemon, bundle: &str, target: &str| {
+        let state = Operations::workspace_state(daemon).expect("state");
+        daemon
+            .human_approval_context_for_workspace(
+                &state.root,
+                &state.digest,
+                &state.installation,
+                bundle,
+                target,
+            )
+            .expect("exact context")
+    };
+    let initial = open_review(&daemon);
+    let card = initial.review_items.first().expect("initial card");
+    let initial_bundle = text_field(card, "bundle");
+    let initial_target = text_field(card, "subject_operation");
+    let initial_context = context(&daemon, initial_bundle, initial_target);
+    let original_main = initial_context.reviewed_actor_head();
+    let receipt = signer.sign(ExpectedHumanApproval::new(
+        initial_context,
+        signer.credential.clone(),
+        [0x41; 32],
+    ));
+    Operations::approve_review(&daemon, initial_bundle, initial_target, &hex(&receipt))
+        .expect("initial approval");
+
+    let actor = SigningKey::from_bytes(&[0x52; 32]);
+    let actor_public = PublicKey::from_bytes(actor.verifying_key().to_bytes());
+    let save = |name: &str| {
+        daemon
+            .create_managed_text_file(name, "saved\n", actor_public, |payload| {
+                Ok::<_, core::convert::Infallible>(MeshSignature::from_bytes(
+                    actor.sign(payload.as_bytes()).to_bytes(),
+                ))
+            })
+            .expect("save")
+            .changeset()
+            .to_owned()
+    };
+    let pending_target = save("pending.txt");
+    let pending = open_review(&daemon);
+    let pending_card = pending
+        .review_items
+        .iter()
+        .find(|item| text_field(item, "subject_operation") == pending_target)
+        .expect("pending card")
+        .clone();
+    let pending_bundle = text_field(&pending_card, "bundle");
+    let pending_context = context(&daemon, pending_bundle, &pending_target);
+    assert_eq!(pending_context.expected_canonical_head(), original_main);
+    let stale_receipt = signer.sign(ExpectedHumanApproval::new(
+        pending_context.clone(),
+        signer.credential.clone(),
+        [0x42; 32],
+    ));
+
+    let latest_target = save("latest.txt");
+    let latest = open_review(&daemon);
+    let latest_card = latest
+        .review_items
+        .iter()
+        .find(|item| text_field(item, "subject_operation") == latest_target)
+        .expect("latest card");
+    let latest_bundle = text_field(latest_card, "bundle");
+    let latest_context = context(&daemon, latest_bundle, &latest_target);
+    assert_eq!(latest_context.expected_canonical_head(), original_main);
+    let latest_main = latest_context.reviewed_actor_head();
+    let receipt = signer.sign(ExpectedHumanApproval::new(
+        latest_context,
+        signer.credential.clone(),
+        [0x43; 32],
+    ));
+    Operations::approve_review(&daemon, latest_bundle, &latest_target, &hex(&receipt))
+        .expect("advance main past the pending review");
+    assert_eq!(
+        context(&daemon, pending_bundle, &pending_target),
+        pending_context
+    );
+    drop(daemon);
+
+    let restarted = LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+        startup(),
+        trust.clone(),
+        checkpoint_parameters(),
+    )
+    .expect("restart runtime");
+    let state = restarted.open_at_start(&workspace).expect("restart");
+    assert_eq!(
+        state.shared_version.as_deref(),
+        Some(latest_main.to_string().as_str())
+    );
+    let card = state
+        .review_items
+        .iter()
+        .find(|item| text_field(item, "bundle") == pending_bundle)
+        .expect("retained pending card");
+    assert_eq!(card, &pending_card, "immutable review presentation changed");
+    assert_eq!(
+        context(&restarted, pending_bundle, &pending_target),
+        pending_context
+    );
+    assert!(
+        restarted
+            .human_approval_preview_for_workspace(
+                &state.root,
+                &state.digest,
+                &state.installation,
+                pending_bundle,
+                &pending_target,
+            )
+            .is_err(),
+        "historical presentation must not authorize a current approval"
+    );
+    assert!(
+        Operations::approve_review(
+            &restarted,
+            pending_bundle,
+            &pending_target,
+            &hex(&stale_receipt),
+        )
+        .is_err(),
+        "stale receipt must not move main backwards"
+    );
+    let after = Operations::workspace_state(&restarted).expect("state after refusal");
+    assert_eq!(after.shared_version, state.shared_version);
+    assert_eq!(
+        after.digest, state.digest,
+        "refusal must not append a record"
+    );
+    drop(restarted);
+
+    // Simulate a peer delivering the pending request after main has advanced. The journal-order
+    // hint is now wrong; only recomputation against verified historical heads can recover its base.
+    let journal = workspace.join(".mesh").join(mesh_daemon::RECORD_FILE_NAME);
+    let mut records = mesh_store::scan_journal(&std::fs::read(&journal).expect("journal"))
+        .expect("valid journal")
+        .into_records();
+    let index = records.iter().position(|record| matches!(record,
+        mesh_store::StoredRecord::Review(review) if review.bundle.to_string() == pending_bundle
+    )).expect("pending request record");
+    let request = records.remove(index);
+    records.push(request);
+    let bytes: Vec<u8> = records.iter().flat_map(mesh_store::frame_record).collect();
+    std::fs::write(&journal, bytes).expect("delayed request fixture");
+    let delayed = LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+        startup(),
+        trust.clone(),
+        checkpoint_parameters(),
+    )
+    .expect("delayed runtime");
+    let state = delayed
+        .open_at_start(&workspace)
+        .expect("delayed request reopen");
+    assert_eq!(
+        state.shared_version.as_deref(),
+        Some(latest_main.to_string().as_str())
+    );
+    assert_eq!(
+        context(&delayed, pending_bundle, &pending_target),
+        pending_context
+    );
+    assert_eq!(
+        state
+            .review_items
+            .iter()
+            .find(|item| text_field(item, "bundle") == pending_bundle),
+        Some(&pending_card)
+    );
+    drop(delayed);
+
+    // A contradictory receipt must still poison current authority. Its presence must not turn
+    // a historical read into permission to publish, even though the verified prefix is retained.
+    let bad_approval = records
+        .iter()
+        .find_map(|record| match record {
+            mesh_store::StoredRecord::Approval(_) => Some(record.clone()),
+            _ => None,
+        })
+        .expect("approval fixture");
+    records.push(bad_approval);
+    let bytes: Vec<u8> = records.iter().flat_map(mesh_store::frame_record).collect();
+    std::fs::write(&journal, bytes).expect("contradictory receipt fixture");
+    let poisoned = LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+        startup(),
+        trust,
+        checkpoint_parameters(),
+    )
+    .expect("poisoned runtime");
+    let state = poisoned
+        .open_at_start(&workspace)
+        .expect("readable journal");
+    assert!(
+        state.shared_version.is_none(),
+        "invalid authority cannot claim main"
+    );
+    assert_eq!(
+        context(&poisoned, pending_bundle, &pending_target),
+        pending_context
+    );
+    assert!(Operations::approve_review(
+        &poisoned,
+        pending_bundle,
+        &pending_target,
+        &hex(&stale_receipt),
+    )
+    .is_err());
+    drop(poisoned);
+    let _ = std::fs::remove_dir_all(base);
+}
+
+#[test]
 fn a_second_saved_version_can_be_reviewed_and_approved_against_the_shared_head() {
     let base = scratch("second-roundtrip");
     let source = base.join("source");

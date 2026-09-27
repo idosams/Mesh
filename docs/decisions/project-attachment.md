@@ -542,3 +542,24 @@ The build wrapper's first post-sign identity check ended without a normal exit c
 executable subsequently reported the correct revision within the same timeout and completed the
 entire proof. The initial failure log is retained and its cause is not established. No timeout or
 check was weakened. This is packaged executable evidence, not graphical acceptance.
+
+
+## Preserve pending review bases before attachment review admission
+
+A pending immutable review must remain readable against its original main version even after
+another review advances main. Publication replay now retains the genesis and independently verified
+main heads, plus journal-order hints for review requests. Reading an unapproved review tries its
+hint, current main and verified historical heads, accepting a base only when recomputing the complete
+bundle reproduces the recorded review identity. A delayed request can therefore recover its exact
+base even when its journal arrival order gives the wrong hint.
+
+This is presentation recovery, not approval authority. Receipt verification still checks the current
+main predecessor independently. Stale approval previews and receipts refuse; malformed, contradictory
+or replayed receipts still make current authority unavailable. A verified historical prefix can remain
+readable without authorizing another publication. No journal record or approval-receipt format changes.
+
+The native regression advances main past a pending review, reopens the workspace, verifies unchanged
+review presentation and context, then refuses the stale receipt without appending a record. It also
+reorders the pending request after the accepted approvals and checks a contradictory receipt. Tests
+use fixture credentials, not native human presence. This prerequisite is transferred before the
+attached-project review-request UI; that UI and its approval journey remain separate increments.

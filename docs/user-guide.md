@@ -99,6 +99,11 @@ periodic checks. On macOS, signals can wake capture sooner; periodic checks stil
 changes. This status does not mean an edit has been saved: check the latest saved version and
 capture outcome. Mesh does not infer who made a change from filesystem events.
 
+In the unmerged review-history increment, an already-open pending review stays on its original
+comparison base when another review advances main, including after restart. This keeps the reviewed
+changes stable; it does not make an old approval valid against the new main version. A stale approval
+must be prepared and reviewed again through the normal current-main flow.
+
 ## The six words Mesh shows people
 
 | Status | Meaning |
