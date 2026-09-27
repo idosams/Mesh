@@ -276,3 +276,48 @@ test('saved review requests render translated bounds and preserve inert exact id
   assert.match(missing, /Review content is unavailable; the request is retained/);
   assert.match(missing, /<button[^>]*disabled=""[^>]*>Inspect saved result<\/button>/);
 });
+
+
+test('attached main approval renders localized availability and never enables an unverified review', async () => {
+  const id = 'a'.repeat(64), target = 'b'.repeat(64), bundle = 'c'.repeat(64), head = 'd'.repeat(64);
+  const review = { bundle, target, reviewed_head: head, presentation: 'e'.repeat(64), complete: true,
+    unavailable: null, changes: [], changes_not_listed: 0, operations_not_listed: 0 };
+  const ready = { available: true, enrolled: true, reason: null, mainAvailable: true, main: null };
+  const base = { projects: [{ id, generation: '1', root: '/Users/משפחה/Files', phase: 'waiting',
+    outcome: 'saved', savedVersion: 'f'.repeat(64), captureAgeMs: null, recovery: null }],
+    histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '',
+    busy: false, error: '', available: true, selectedReviews: { [id]: review } };
+  for (const [state, selected, disabled, label] of [
+    [undefined, review, true, 'Approve as Mesh main…'],
+    [ready, review, false, 'Approve as Mesh main…'],
+    [{ ...ready, enrolled: false }, review, true, 'Approve as Mesh main…'],
+    [{ ...ready, mainAvailable: false }, review, true, 'Approve as Mesh main…'],
+    [ready, { ...review, complete: false, changes_not_listed: 1 }, true, 'Approve as Mesh main…'],
+    [ready, { ...review, complete: false, unavailable: 'missing-content' }, true, 'Approve as Mesh main…'],
+    [{ ...ready, main: { head, target, bundle } }, review, true, 'This version is Mesh main'],
+  ]) {
+    const ui = await loadLocalization({ ...base, selectedReviews: { [id]: selected }, approvalStates: state ? { [id]: state } : {} });
+    ui.setLocale('he');
+    const html = ui.renderAttachments();
+    const button = [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].find(([, , text]) => text === ui.translate('he', label));
+    assert.ok(button, label);
+    assert.equal(/ disabled=""/.test(button[1]), disabled);
+    assert.notEqual(ui.translate('he', label), label);
+    assert.ok(html.includes(ui.translate('he', 'Mesh main · last checked')));
+    assert.ok(html.includes('<bdi dir="ltr">/Users/משפחה/Files</bdi>'));
+    if (state?.main) {
+      assert.ok(html.includes('<bdi dir="ltr">' + target + '</bdi>'));
+      assert.ok(html.includes(ui.translate('he', 'Inspect Mesh main')));
+    }
+    if (state && !state.enrolled) assert.ok(html.includes(ui.translate('he', 'Set up approvals on this Mac')));
+  }
+  const feedback = 'Approval was not confirmed or was cancelled. Refresh Mesh main before retrying.';
+  const ui = await loadLocalization({ ...base, approvalStates: { [id]: { ...ready, available: false, enrolled: false, reason: '<script>unavailable</script>' } }, approvalFeedback: { [id]: feedback } });
+  ui.setLocale('he');
+  const html = ui.renderAttachments();
+  assert.ok(html.includes(ui.translate('he', feedback)));
+  assert.ok(html.includes('&lt;script&gt;unavailable&lt;/script&gt;'));
+  assert.doesNotMatch(html, /<script>/);
+  ui.setLocale('en');
+  assert.match(ui.renderAttachments(), /Refresh main and approval availability/);
+});

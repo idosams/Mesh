@@ -626,3 +626,24 @@ same source commit was already transferred in A08a. Tests use fixture P-256 cred
 receipt verification and durable replay; they do not prove native human presence. Desktop confirmation,
 provider-backed signing, graphical acceptance and applying accepted results to source files remain
 separate pending work.
+
+## Desktop confirmation and accepted-main inspection
+
+The A08c desktop increment obtains native credential availability and independently verified main
+status. It labels main as last checked, distinguishes unverified authority from an empty starting
+state, and can reopen the accepted review even when it is outside the bounded request queue.
+English/Hebrew views retain exact literal identifiers and paths. Renderer messages carry only known
+project, bundle and target selectors; they never supply receipts or human authority.
+
+Approval retains the exact native attachment throughout the ceremony, reconstructs the preview from
+durable history, bounds the complete native prompt, requires explicit confirmation and supported
+Secure Enclave user presence, then applies the receipt through A08b's current-main checks. Changed
+source/store identity or a moved main refuses. Native trust is supplied to subsequent review reads
+and requests. Credentials, challenges and signatures stay native. Ineligible builds report approval
+unavailable, and incomplete or unavailable reviews cannot initiate approval from the UI.
+
+The coordinator clears cached approval availability while a mutation is in flight, permits only one
+ceremony at a time, rechecks main after success or uncertainty, and never describes a lost response
+as a rollback. A failed refresh leaves approval disabled until a new native check succeeds.
+These source, rendering and native fixture tests do not prove an actual platform ceremony or the
+packaged graphical journey. Those acceptance boundaries require separate evidence.

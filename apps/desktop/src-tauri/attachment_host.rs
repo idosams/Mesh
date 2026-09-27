@@ -279,7 +279,7 @@ impl AttachmentHost {
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
 
-    fn review_history(&self, id: &str) -> Result<ProvisionedAttachment, String> {
+    pub(crate) fn review_history(&self, id: &str) -> Result<ProvisionedAttachment, String> {
         self.state
             .lock()
             .map_err(|_| UNAVAILABLE)?
@@ -291,11 +291,16 @@ impl AttachmentHost {
             .ok_or("Saved history is unavailable".into())
     }
 
-    pub fn request_review(&self, id: &str, target: &str) -> Result<String, String> {
+    pub fn request_review(
+        &self,
+        id: &str,
+        target: &str,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
         let history = self.review_history(id)?;
         let actor = NativeCaptureSigner::generate()?.public_key();
         let review = history
-            .request_review(target, actor)
+            .request_review_with_trusted_reviewers(target, actor, trusted)
             .map_err(|_| "The exact saved review could not be recorded")?;
         Ok(Json::object([
             ("schema", Json::text("mesh.desktop-attachment-review/v1")),
@@ -305,10 +310,14 @@ impl AttachmentHost {
         .encode())
     }
 
-    pub fn reviews(&self, id: &str) -> Result<String, String> {
+    pub fn reviews(
+        &self,
+        id: &str,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
         let queue = self
             .review_history(id)?
-            .reviews()
+            .reviews_with_trusted_reviewers(trusted)
             .map_err(|_| "Saved reviews are unavailable")?;
         Ok(Json::object([
             ("schema", Json::text("mesh.desktop-attachment-reviews/v1")),
@@ -318,10 +327,16 @@ impl AttachmentHost {
         .encode())
     }
 
-    pub fn review(&self, id: &str, bundle: &str, target: &str) -> Result<String, String> {
+    pub fn review(
+        &self,
+        id: &str,
+        bundle: &str,
+        target: &str,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
         let review = self
             .review_history(id)?
-            .review(bundle, target)
+            .review_with_trusted_reviewers(bundle, target, trusted)
             .map_err(|_| "The exact saved review is unavailable")?;
         Ok(Json::object([
             ("schema", Json::text("mesh.desktop-attachment-review/v1")),

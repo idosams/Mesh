@@ -314,6 +314,29 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Resolve verified Mesh main to its exact saved version and review, independently of queue bounds.
+    pub fn accepted_main(&self, trusted: &crate::TrustedReviewers) -> io::Result<Json> {
+        self.attachment.with_review_history(
+            &self.metadata,
+            self.store.clone(),
+            trusted,
+            |workspace, _| {
+                let Some(head) = super::approval::main_head(workspace)? else {
+                    return Ok(Json::Null);
+                };
+                let review = workspace
+                    .accepted_main_review()
+                    .map_err(io::Error::other)?
+                    .ok_or_else(|| invalid("verified main review unavailable"))?;
+                Ok(Json::object([
+                    ("head", Json::text(head.to_string())),
+                    ("bundle", Json::text(review.bundle.to_string())),
+                    ("target", Json::text(review.subject_operation.to_string())),
+                ]))
+            },
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

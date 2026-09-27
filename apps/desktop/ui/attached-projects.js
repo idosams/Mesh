@@ -144,6 +144,30 @@ export function attachedReviews(raw, id) {
   return { reviews, notListed: value.queue.not_listed };
 }
 
+export function attachedMain(raw, id) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const credential = value?.credential;
+  const main = value?.main;
+  if (value?.schema !== 'mesh.desktop-attachment-main/v1' || value.project !== id
+    || typeof value.main_available !== 'boolean'
+    || typeof credential?.available !== 'boolean' || typeof credential.enrolled !== 'boolean'
+    || (credential.enrolled && !credential.available)
+    || (credential.available ? credential.unavailable_reason !== null : !safeText(credential.unavailable_reason, 4096))
+    || (!value.main_available && main !== null)
+    || (main !== null && (!reviewIdentity(main?.head) || !reviewIdentity(main.bundle) || !reviewIdentity(main.target)))) {
+    throw new Error('Invalid attachment main');
+  }
+  return { available: credential.available, enrolled: credential.enrolled, reason: credential.unavailable_reason,
+    mainAvailable: value.main_available, main };
+}
+export function attachedApproval(raw, id, review) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.desktop-attachment-approval/v1' || value.project !== id
+    || value.bundle !== review.bundle || value.target !== review.target || value.head !== review.reviewed_head
+    || !reviewIdentity(value.head)) throw new Error('Approval result identity mismatch');
+  return value;
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
@@ -152,6 +176,8 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let comparisons = {};
   let reviewQueues = {};
   let selectedReviews = {};
+  let approvalStates = {};
+  let approvalFeedback = {};
   let pins = [];
   let nextPin = 1n;
   let pinStatus = 'loading';
@@ -163,9 +189,17 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
+  async function readApproval(id) {
+    const status = attachedMain(await invoke('attachment_approval_status', { id }), id);
+    approvalStates = { ...approvalStates, [id]: status };
+  }
+  function forgetApproval(id) {
+    approvalStates = { ...approvalStates };
+    delete approvalStates[id];
+  }
   async function readComparisonFile(id, comparison, change) {
     const read = async (side, operation) => side?.kind === 'file'
       ? attachedText(await invoke('inspect_attached_version', { id, operation, path: change.path, after: null }),
@@ -277,8 +311,54 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       });
       return;
     }
-    if (['reviews', 'request-review', 'open-review', 'review-files'].includes(value.type)
+    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main'].includes(value.type)
       && !projects.some((project) => project.id === value.id)) return;
+    if (value.type === 'check-approval' && Object.keys(value).length === 2) {
+      void run(async () => {
+        forgetApproval(value.id);
+        try { await readApproval(value.id); approvalFeedback = { ...approvalFeedback, [value.id]: '' }; }
+        catch { approvalFeedback = { ...approvalFeedback, [value.id]: 'Mesh main and approval availability could not be checked. Retry when ready.' }; }
+      }); return;
+    }
+    if (value.type === 'enroll-approval' && Object.keys(value).length === 2
+      && approvalStates[value.id]?.available && !approvalStates[value.id]?.enrolled) {
+      void run(async () => {
+        forgetApproval(value.id);
+        try {
+          await invoke('enroll_approval_credential');
+          await readApproval(value.id);
+          approvalFeedback = { ...approvalFeedback, [value.id]: '' };
+        } catch { approvalFeedback = { ...approvalFeedback, [value.id]: 'Approval setup was not confirmed. Check availability before retrying.' }; }
+      }); return;
+    }
+    if (value.type === 'open-main' && Object.keys(value).length === 2 && approvalStates[value.id]?.main) {
+      const main = approvalStates[value.id].main;
+      void run(async () => {
+        const review = attachedReview(await invoke('inspect_attached_review', {
+          id: value.id, bundle: main.bundle, target: main.target,
+        }), value.id, main.target, main.bundle);
+        if (review.reviewed_head !== main.head) throw new Error('Main review identity mismatch');
+        selectedReviews = { ...selectedReviews, [value.id]: review };
+      }); return;
+    }
+    if (value.type === 'approve-review' && Object.keys(value).length === 4) {
+      const selected = selectedReviews[value.id];
+      const status = approvalStates[value.id];
+      if (!selected?.complete || selected.unavailable || selected.bundle !== value.bundle || selected.target !== value.target
+        || !status?.available || !status.enrolled || !status.mainAvailable || status.main?.head === selected.reviewed_head) return;
+      void run(async () => {
+        forgetApproval(value.id);
+        try {
+          attachedApproval(await invoke('approve_attached_review', { id: value.id, bundle: value.bundle, target: value.target }), value.id, selected);
+          await readApproval(value.id);
+          approvalFeedback = { ...approvalFeedback, [value.id]: 'Approval confirmed. Mesh main was refreshed.' };
+        } catch {
+          // The native append may have succeeded before a reply was lost. Never claim rollback.
+          approvalFeedback = { ...approvalFeedback, [value.id]: 'Approval was not confirmed or was cancelled. Refresh Mesh main before retrying.' };
+          try { await readApproval(value.id); } catch { forgetApproval(value.id); }
+        }
+      }); return;
+    }
     if (value.type === 'reviews' && Object.keys(value).length === 2) {
       void run(async () => {
         const queue = attachedReviews(await invoke('attached_project_reviews', { id: value.id }), value.id);

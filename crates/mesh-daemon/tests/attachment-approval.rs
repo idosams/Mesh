@@ -413,3 +413,45 @@ fn retained_attachment_approval_handle_refuses_replaced_private_store() {
         "reviewed"
     );
 }
+
+#[test]
+fn accepted_main_resolves_its_saved_review_after_restart_and_outside_the_queue() {
+    let f = Fixture::new("main-lookup");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let mut requests = Vec::new();
+    for index in 0..33 {
+        let target = f.save(&format!("saved content {index}"));
+        let bundle = f.request(&target, &trust);
+        requests.push((bundle, target));
+    }
+    assert_eq!(f.history.accepted_main(&trust).unwrap(), Json::Null);
+    // The overview is sorted by bundle identity and bounded to 32. Approve the omitted request.
+    requests.sort();
+    let (bundle, target) = requests.pop().unwrap();
+    let receipt = f.receipt(&signer, &trust, &bundle, &target, 1);
+    let head = f
+        .history
+        .approve_review(&bundle, &target, &receipt, &trust)
+        .unwrap();
+    let queue = f.history.reviews_with_trusted_reviewers(&trust).unwrap();
+    let Json::Array(cards) = queue.get("reviews").unwrap() else {
+        panic!("review queue")
+    };
+    assert_eq!(cards.len(), 32);
+    assert!(cards
+        .iter()
+        .all(|card| card.get("bundle") != Some(&Json::text(&bundle))));
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    let main = reopened.accepted_main(&trust).unwrap();
+    assert_eq!(main.get("head"), Some(&Json::text(head.to_string())));
+    assert_eq!(main.get("bundle"), Some(&Json::text(&bundle)));
+    assert_eq!(main.get("target"), Some(&Json::text(&target)));
+    assert!(reopened
+        .accepted_main(&TrustedReviewers::default())
+        .is_err());
+    let card = reopened
+        .review_with_trusted_reviewers(&bundle, &target, &trust)
+        .unwrap();
+    assert_eq!(card.get("complete"), Some(&Json::Bool(true)));
+}

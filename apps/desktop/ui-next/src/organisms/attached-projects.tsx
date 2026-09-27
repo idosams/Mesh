@@ -14,7 +14,9 @@ type PinnedComparison = { key: string; project: string; root: string; comparison
 type SavedReview = { bundle: string; target: string; reviewed_head: string | null; presentation: string | null; complete: boolean; unavailable: string | null;
   changes: { before: string | null; after: string | null; effect: string }[]; changes_not_listed: number; operations_not_listed: number };
 type ReviewQueue = { reviews: SavedReview[]; notListed: number };
-type Projection = { reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+type ApprovalState = { available: boolean; enrolled: boolean; reason: string | null; mainAvailable: boolean;
+  main: { head: string; bundle: string; target: string } | null };
+type Projection = { approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -97,6 +99,21 @@ export function AttachedProjects() {
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: project.detached ? "reattach" : "detach" })}>{t(project.detached ? "Reattach project" : "Detach Mesh")}</Button>
         </div>
         {project.detached && <p className="text-xs text-muted-foreground">{t("Capture is disabled. Your files, Git workflow and saved history are retained. Reattach, then resume capture when ready.")}</p>}
+        <section aria-label={t("Mesh main")} className="grid gap-2 rounded-lg border border-border p-3">
+          <h4 className="text-sm font-semibold">{t("Mesh main · last checked")}</h4>
+          <p className="text-xs text-muted-foreground">{t("The accepted saved version in Mesh. Your current files and Git branch can keep changing independently.")}</p>
+          {!projection.approvalStates?.[project.id] ? <p className="text-sm">{t("Main and approval availability have not been verified.")}</p>
+            : !projection.approvalStates[project.id].mainAvailable ? <p className="text-sm">{t("Mesh main cannot currently be verified. Its history is retained.")}</p>
+            : projection.approvalStates[project.id].main ? <>
+              <p className="break-all text-xs">{t("Accepted saved version:")} <bdi dir="ltr">{projection.approvalStates[project.id].main!.target}</bdi></p>
+              <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "open-main", id: project.id })}>{t("Inspect Mesh main")}</Button>
+            </> : <p className="text-sm">{t("No version has been accepted as Mesh main yet.")}</p>}
+          <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "check-approval", id: project.id })}>{t("Refresh main and approval availability")}</Button>
+          {projection.approvalStates?.[project.id] && !projection.approvalStates[project.id].available && <p className="text-sm">{t("Approval unavailable:")} {t(projection.approvalStates[project.id].reason)}</p>}
+          {projection.approvalStates?.[project.id]?.available && !projection.approvalStates[project.id].enrolled && <Button disabled={disabled}
+            onClick={() => send({ type: "enroll-approval", id: project.id })}>{t("Set up approvals on this Mac")}</Button>}
+          {projection.approvalFeedback?.[project.id] && <p role="status" className="text-sm">{t(projection.approvalFeedback[project.id])}</p>}
+        </section>
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
           <p className="text-xs text-muted-foreground">{t("Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
@@ -122,12 +139,12 @@ export function AttachedProjects() {
             onClick={() => send({ type: "open-review", id: project.id, bundle: review.bundle, target: review.target })}>{t("Open review")} <bdi dir="ltr">{review.bundle}</bdi></button>)}
           {projection.reviewQueues[project.id].notListed > 0 && <p className="text-xs">{projection.reviewQueues[project.id].notListed} {t("more requests are outside this page. Request review from a saved version to reopen its exact request.")}</p>}
         </section>}
-        {projection.selectedReviews?.[project.id] && <AttachmentReview project={project.id} review={projection.selectedReviews[project.id]} disabled={disabled} />}
+        {projection.selectedReviews?.[project.id] && <AttachmentReview project={project.id} review={projection.selectedReviews[project.id]} disabled={disabled} approval={projection.approvalStates?.[project.id]} />}
         {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} canPin={projection.pins.length < 8 && projection.pinStatus !== "loading" && !projection.pinError} />}
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
-    <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")} {t("Writing saved versions back to your working folder is not available here yet.")}</p>
   </section>;
 }
 
@@ -192,7 +209,7 @@ function ComparisonSide({ label, file, kind }: { label: string; file: SavedFile 
   </section>;
 }
 
-function AttachmentReview({ project, review, disabled }: { project: string; review: SavedReview; disabled: boolean }) {
+function AttachmentReview({ project, review, disabled, approval }: { project: string; review: SavedReview; disabled: boolean; approval?: ApprovalState }) {
   const t = useTranslation();
   return <section aria-label={t("Selected saved review")} className="grid gap-2 rounded-lg border border-border p-3">
     <h4 className="text-sm font-semibold">{t("Review request recorded")}</h4>
@@ -207,6 +224,8 @@ function AttachmentReview({ project, review, disabled }: { project: string; revi
     {(review.changes_not_listed > 0 || review.operations_not_listed > 0) && <p className="text-xs">{review.changes_not_listed} {t("changes and")} {review.operations_not_listed} {t("operations omitted from this overview.")}</p>}
     <Button variant="secondary" disabled={disabled || Boolean(review.unavailable)}
       onClick={() => send({ type: "review-files", id: project, bundle: review.bundle, target: review.target })}>{t("Inspect saved result")}</Button>
-    <p className="text-xs text-muted-foreground">{t("This request stays on its saved version while work continues. Change author unknown. Approval and main-version integration are not available here yet.")}</p>
+    <Button disabled={disabled || !review.complete || Boolean(review.unavailable) || !approval?.available || !approval.enrolled || !approval.mainAvailable || approval.main?.head === review.reviewed_head}
+      onClick={() => send({ type: "approve-review", id: project, bundle: review.bundle, target: review.target })}>{t(approval?.main?.head === review.reviewed_head ? "This version is Mesh main" : "Approve as Mesh main…")}</Button>
+    <p className="text-xs text-muted-foreground">{t("This request stays on its saved version while work continues. Change author unknown. Approval requires native confirmation and Touch ID or your Mac password. Working files and Git remain unchanged.")}</p>
   </section>;
 }

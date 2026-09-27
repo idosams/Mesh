@@ -54,7 +54,10 @@ and complete acceptance journeys remain pending migration and verification.
 Pending review presentation now recovers its exact original main base from recomputed bundle
 identities and verified publication history, including after restart or delayed request arrival.
 Historical readability does not authorize stale approval or recover poisoned current authority.
-Attached-project review admission and approval controls remain pending migration.
+Attached-project review requests and native main approval are now transferred on unmerged branches.
+Desktop controls can refresh verified main, set up eligible native credentials, inspect accepted
+saved content and request exact native confirmation. Working files and Git stay unchanged.
+Packaged graphical and actual human-presence acceptance remain unverified.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac
@@ -113,7 +116,8 @@ review engine, with exact bundle/target identity, idempotent retries against the
 a bounded request queue and direct lookup. The desktop reopens requests and inspects their saved
 result while capture continues. Unknown authorship, unavailable content and omitted entries remain
 explicit. English and Hebrew views preserve literal identities and paths. This does not yet provide
-attached-project human approval, integration or a packaged graphical acceptance result.
+source integration or a packaged graphical acceptance result. Native approval and its desktop
+controls are separate increments described below.
 
 ### Attached Mesh main approval (unmerged native increment)
 
@@ -121,5 +125,5 @@ Native APIs can prepare an exact saved-review preview and apply a trusted human 
 Mesh main while ordinary editing and capture continue. They retain identical-receipt retry, refuse
 stale/foreign/reused authority before journal mutation, and revalidate current main under independent
 custody. The source folder and Git state remain untouched. Verification uses fixture credentials;
-this is not native human-presence or packaged graphical approval proof. Desktop approval controls and
-source integration are still separate pending increments.
+this is not native human-presence or packaged graphical approval proof. Desktop approval controls
+now use this path on an unmerged increment; source integration remains pending.

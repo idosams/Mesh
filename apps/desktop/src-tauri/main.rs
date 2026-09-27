@@ -839,9 +839,11 @@ mod desktop {
         target: String,
     ) -> Result<String, String> {
         let host = Arc::clone(host.inner());
-        tauri::async_runtime::spawn_blocking(move || host.request_review(&id, &target))
-            .await
-            .map_err(|_| "Review request stopped".to_owned())?
+        tauri::async_runtime::spawn_blocking(move || {
+            host.request_review(&id, &target, &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| "Review request stopped".to_owned())?
     }
 
     #[tauri::command]
@@ -850,7 +852,7 @@ mod desktop {
         id: String,
     ) -> Result<String, String> {
         let host = Arc::clone(host.inner());
-        tauri::async_runtime::spawn_blocking(move || host.reviews(&id))
+        tauri::async_runtime::spawn_blocking(move || host.reviews(&id, &attachment_review_trust()))
             .await
             .map_err(|_| "Review listing stopped".to_owned())?
     }
@@ -863,9 +865,11 @@ mod desktop {
         target: String,
     ) -> Result<String, String> {
         let host = Arc::clone(host.inner());
-        tauri::async_runtime::spawn_blocking(move || host.review(&id, &bundle, &target))
-            .await
-            .map_err(|_| "Review inspection stopped".to_owned())?
+        tauri::async_runtime::spawn_blocking(move || {
+            host.review(&id, &bundle, &target, &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| "Review inspection stopped".to_owned())?
     }
 
     #[tauri::command]
@@ -1845,6 +1849,95 @@ mod desktop {
     }
 
     const MAX_NATIVE_APPROVAL_PROMPT_BYTES: usize = 48 * 1024;
+    fn attachment_review_trust() -> mesh_daemon::TrustedReviewers {
+        SecureEnclaveApprovalCredential::load().map_or_else(
+            |_| mesh_daemon::TrustedReviewers::default(),
+            |credential| {
+                mesh_daemon::TrustedReviewers::with_human_credentials([credential
+                    .credential()
+                    .clone()])
+            },
+        )
+    }
+
+    #[tauri::command(async)]
+    fn attachment_approval_status(
+        host: State<'_, Arc<AttachmentHost>>,
+        runtime: State<'_, DesktopRuntime>,
+        id: String,
+    ) -> Result<String, String> {
+        let credential = Json::parse(&approval_credential_status(runtime)?)
+            .map_err(|_| "Approval availability could not be read".to_owned())?;
+        let history = host.review_history(&id)?;
+        let main = history.accepted_main(&attachment_review_trust());
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-main/v1")),
+            ("project", Json::text(id)),
+            ("credential", credential),
+            ("main_available", Json::Bool(main.is_ok())),
+            ("main", main.unwrap_or(Json::Null)),
+        ])
+        .encode())
+    }
+
+    #[tauri::command(async)]
+    fn approve_attached_review(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        bundle: String,
+        target: String,
+    ) -> Result<String, String> {
+        let credential =
+            SecureEnclaveApprovalCredential::load().map_err(|error| error.to_string())?;
+        let trust = mesh_daemon::TrustedReviewers::with_human_credentials([credential
+            .credential()
+            .clone()]);
+        // Retain the exact native attachment through the entire ceremony. Never resolve a fresh
+        // source/store handle from a renderer path after the person confirms.
+        let history = host.review_history(&id)?;
+        let preview = history.approval_preview(&bundle, &target, &trust)
+            .map_err(|_| "This review cannot advance the current Mesh main. Refresh main and request a new review if its base changed.".to_owned())?;
+        let expected = ExpectedHumanApproval::new(
+            preview.context().clone(),
+            credential.credential().clone(),
+            fresh_approval_challenge().map_err(|error| error.to_string())?,
+        );
+        let draft = HumanApprovalReceiptDraft::new(expected, ApprovalDecision::Approve);
+        let prompt = format!("This approves a saved version as Mesh main. Your working files and Git remain unchanged.\n\n{}",
+            native_approval_prompt(&format!("{:?}", history.project().root()), &preview, &draft, None));
+        if prompt.len() > MAX_NATIVE_APPROVAL_PROMPT_BYTES {
+            return Err("This review is too large to show completely in the native approval dialog. Mesh will not omit approval details.".to_owned());
+        }
+        if !app
+            .dialog()
+            .message(prompt)
+            .title("Approve to Mesh main")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Approve this version".to_owned(),
+                "Cancel".to_owned(),
+            ))
+            .blocking_show()
+        {
+            return Err("Approval was cancelled".to_owned());
+        }
+        let receipt = credential
+            .approve(draft)
+            .map_err(|error| error.to_string())?;
+        let head = history
+            .approve_review(&bundle, &target, &receipt.canonical_bytes(), &trust)
+            .map_err(|_| {
+                "Approval could not be confirmed. Refresh Mesh main before retrying.".to_owned()
+            })?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-approval/v1")),
+            ("project", Json::text(id)),
+            ("bundle", Json::text(bundle)),
+            ("target", Json::text(target)),
+            ("head", Json::text(head.to_string())),
+        ])
+        .encode())
+    }
 
     #[tauri::command(async)]
     fn approval_credential_status(runtime: State<'_, DesktopRuntime>) -> Result<String, String> {
@@ -6752,6 +6845,8 @@ mod desktop {
                 request_attached_review,
                 attached_project_reviews,
                 inspect_attached_review,
+                attachment_approval_status,
+                approve_attached_review,
                 load_attachment_pins,
                 save_attachment_pins,
                 compare_attached_path,

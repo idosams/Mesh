@@ -1987,6 +1987,23 @@ impl OpenWorkspace {
         Ok(found)
     }
 
+    pub(crate) fn accepted_main_review(&self) -> Result<Option<ReviewRecord>, String> {
+        let Some(head) = self.shared_version() else {
+            return Ok(None);
+        };
+        for bundle in self.record_index.review_bundles() {
+            let Some(review) = self.review(&bundle) else {
+                continue;
+            };
+            if self.approved_envelope(&bundle).is_ok()
+                && self.human_approval_context(&review)?.reviewed_actor_head() == head
+            {
+                return Ok(Some(review));
+            }
+        }
+        Err("verified main has no exact retained review".to_owned())
+    }
+
     /// Refuse challenge reuse before append, rather than poisoning a previously valid main.
     pub(crate) fn approval_challenge_used(&self, challenge: &[u8; 32]) -> Result<bool, String> {
         for bundle in self.record_index.review_bundles() {

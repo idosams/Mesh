@@ -180,7 +180,8 @@ Use **Show review requests** and **Open review** to return to it after other edi
 The queue shows up to 32 requests and reports omitted requests. A saved-version request can reopen
 its exact current-base request beyond that overview. A selected request remains fixed while capture
 continues. Incomplete or unavailable content is labeled; a path overview alone is not complete review.
-Change authorship remains unknown. Approval and main-version integration are separate pending steps.
+Change authorship remains unknown. Native main approval and desktop confirmation are separate development increments; applying accepted
+content to the working folder remains pending.
 
 ## Accepted main for attached projects (native development API)
 
@@ -188,5 +189,19 @@ The unmerged native approval increment can accept an exact saved review as Mesh 
 editor or harness continues producing newer changes. Acceptance records the reviewed saved content
 in Mesh history; it does not replace your working files or change Git. A review prepared before main
 advances must be prepared again against the new main before approval. Returning to an old review is
-still supported for inspection. Desktop approval controls and applying accepted content to the working
-folder are not delivered by this native API increment.
+still supported for inspection. Desktop approval controls are described below. Applying accepted content to the working folder
+remains a separate pending increment.
+
+## Confirm an attached version as Mesh main (development builds)
+
+Choose **Refresh main and approval availability**. Mesh reports the last verified accepted version
+and whether this build can approve. If eligible, **Set up approvals on this Mac** enables the native
+credential flow. Open a complete saved review, inspect its content, then choose **Approve as Mesh
+main…**. The native dialog shows the exact saved result and requires confirmation and Touch ID or
+your Mac password. Your working files and Git remain unchanged.
+
+Use **Inspect Mesh main** to reopen the accepted saved result. If confirmation is cancelled or the
+response is uncertain, refresh main before retrying; an uncertain response does not mean acceptance
+was rolled back. A main change requires a new review against the current main. Ineligible builds and
+unverified main status keep approval unavailable. This development flow still needs packaged graphical
+and actual platform-presence acceptance evidence.

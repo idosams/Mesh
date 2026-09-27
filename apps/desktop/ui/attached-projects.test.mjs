@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -479,5 +479,157 @@ test('reopened review queue can select a durable request outside the loaded vers
   await settle(); h.intent({ type: 'reviews', id }); await settle();
   h.intent({ type: 'open-review', id, bundle: '6'.repeat(64), target: operation }); await settle();
   assert.equal(h.projections.at(-1).selectedReviews[id].presentation, '8'.repeat(64));
+  h.dispose();
+});
+
+const mainReply = (main = null) => ({ schema: 'mesh.desktop-attachment-main/v1', project: id,
+  credential: { available: true, enrolled: true, unavailable_reason: null }, main_available: true, main });
+const acceptedMain = () => ({ head: reviewRecord().reviewed_head, bundle: reviewRecord().bundle, target: operation });
+const approvalReply = () => ({ schema: 'mesh.desktop-attachment-approval/v1', project: id, ...acceptedMain() });
+test('main and approval results bind project, bundle, target, head and truthful availability', () => {
+  assert.equal(attachedMain(mainReply(), id).main, null);
+  assert.deepEqual(attachedMain(mainReply(acceptedMain()), id).main, acceptedMain());
+  for (const mutate of [
+    value => { value.project = 'f'.repeat(64); },
+    value => { value.main_available = false; },
+    value => { value.main.head = 'unknown'; },
+    value => { value.main.target = null; },
+    value => { value.credential.available = false; },
+    value => { value.credential.unavailable_reason = 'invented'; },
+  ]) { const value = mainReply(acceptedMain()); mutate(value); assert.throws(() => attachedMain(value, id)); }
+  const unavailable = mainReply(); unavailable.main_available = false;
+  unavailable.credential = { available: false, enrolled: false, unavailable_reason: 'Validated application identity required' };
+  assert.equal(attachedMain(unavailable, id).mainAvailable, false);
+  assert.equal(attachedMain(unavailable, id).available, false);
+  assert.equal(attachedApproval(approvalReply(), id, reviewRecord()).head, acceptedMain().head);
+  for (const field of ['project', 'bundle', 'target', 'head']) {
+    const value = approvalReply(); value[field] = 'f'.repeat(64);
+    assert.throws(() => attachedApproval(value, id, reviewRecord()));
+  }
+});
+async function selectReview(h) {
+  await settle(); h.intent({ type: 'reviews', id }); await settle();
+  h.intent({ type: 'open-review', id, bundle: reviewRecord().bundle, target: operation }); await settle();
+}
+test('only a selected verified review invokes native approval and capture does not replace its identity', async () => {
+  let main = null; let finish; const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_review') return reviewReply();
+    if (command === 'attachment_approval_status') return mainReply(main);
+    if (command === 'approve_attached_review') return new Promise(resolve => { finish = () => { main = acceptedMain(); resolve(approvalReply()); }; });
+    const value = reply(); value.projects[0].capture.saved_version = comparedTarget; return value;
+  });
+  await selectReview(h);
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation }); await settle();
+  assert.equal(calls.some(call => call.command === 'approve_attached_review'), false);
+  h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: comparedTarget });
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation, receipt: 'renderer-supplied' });
+  assert.equal(calls.some(call => call.command === 'approve_attached_review'), false);
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation }); await settle();
+  assert.deepEqual(calls.at(-1), { command: 'approve_attached_review', args: { id, bundle: reviewRecord().bundle, target: operation } });
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation });
+  assert.equal(calls.filter(call => call.command === 'approve_attached_review').length, 1);
+  assert.equal(h.projections.at(-1).busy, true);
+  finish(); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  assert.equal(h.projections.at(-1).projects[0].savedVersion, comparedTarget);
+  assert.equal(h.projections.at(-1).approvalStates[id].main.target, operation);
+  assert.match(h.projections.at(-1).approvalFeedback[id], /confirmed/);
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation });
+  assert.equal(calls.filter(call => call.command === 'approve_attached_review').length, 1);
+  h.dispose();
+});
+test('lost approval reply refreshes main without claiming rollback and main opens outside the queue', async () => {
+  let main = null;
+  const h = harness(async command => {
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_review') return reviewReply();
+    if (command === 'attachment_approval_status') return mainReply(main);
+    if (command === 'approve_attached_review') { main = acceptedMain(); throw new Error('lost reply'); }
+    return reply();
+  });
+  await selectReview(h); h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation }); await settle();
+  assert.equal(h.projections.at(-1).approvalStates[id].main.head, acceptedMain().head);
+  assert.match(h.projections.at(-1).approvalFeedback[id], /not confirmed/);
+  assert.doesNotMatch(h.projections.at(-1).approvalFeedback[id], /unchanged|rolled back/);
+  h.dispose();
+  const fresh = harness(async command => {
+    if (command === 'attachment_approval_status') return mainReply(acceptedMain());
+    if (command === 'inspect_attached_review') return reviewReply();
+    return reply();
+  });
+  await settle(); fresh.intent({ type: 'check-approval', id }); await settle();
+  fresh.intent({ type: 'open-main', id }); await settle();
+  assert.equal(fresh.projections.at(-1).selectedReviews[id].bundle, acceptedMain().bundle);
+  assert.equal(fresh.projections.at(-1).reviewQueues[id], undefined);
+  fresh.dispose();
+});
+test('unavailable approval blocks enrollment and signing while verified main remains readable', async () => {
+  const calls = [];
+  const unavailable = mainReply(acceptedMain());
+  unavailable.credential = { available: false, enrolled: false, unavailable_reason: 'Validated application identity required' };
+  const h = harness(async command => {
+    calls.push(command);
+    if (command === 'attachment_approval_status') return unavailable;
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_review') return reviewReply();
+    return reply();
+  });
+  await selectReview(h); h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'enroll-approval', id });
+  h.intent({ type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation });
+  assert.equal(calls.includes('enroll_approval_credential'), false);
+  assert.equal(calls.includes('approve_attached_review'), false);
+  h.intent({ type: 'open-main', id }); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  h.dispose();
+});
+test('enrollment requires checked availability and rereads native status after setup', async () => {
+  let enrolled = false; const calls = [];
+  const h = harness(async command => {
+    calls.push(command);
+    if (command === 'attachment_approval_status') { const value = mainReply(); value.credential.enrolled = enrolled; return value; }
+    if (command === 'enroll_approval_credential') { enrolled = true; return {}; }
+    return reply();
+  });
+  await settle(); h.intent({ type: 'enroll-approval', id }); await settle();
+  assert.equal(enrolled, false);
+  h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'enroll-approval', id }); await settle();
+  assert.equal(h.projections.at(-1).approvalStates[id].enrolled, true);
+  assert.equal(calls.filter(command => command === 'enroll_approval_credential').length, 1);
+  h.dispose();
+});
+
+test('uncertain approval plus failed refresh clears authority until a new status check succeeds', async () => {
+  let statusReadable = true; let approvals = 0;
+  const h = harness(async command => {
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_review') return reviewReply();
+    if (command === 'attachment_approval_status') {
+      if (!statusReadable) throw new Error('status unavailable');
+      return mainReply();
+    }
+    if (command === 'approve_attached_review') {
+      approvals++; statusReadable = false; throw new Error('reply lost');
+    }
+    return reply();
+  });
+  await selectReview(h); h.intent({ type: 'check-approval', id }); await settle();
+  const intent = { type: 'approve-review', id, bundle: reviewRecord().bundle, target: operation };
+  h.intent(intent); await settle();
+  assert.equal(approvals, 1);
+  assert.equal(h.projections.at(-1).approvalStates[id], undefined);
+  assert.match(h.projections.at(-1).approvalFeedback[id], /Refresh Mesh main/);
+  h.intent(intent); await settle(); assert.equal(approvals, 1);
+  statusReadable = true;
+  h.intent(intent); await settle(); assert.equal(approvals, 1);
+  h.intent({ type: 'check-approval', id }); await settle();
+  assert.equal(h.projections.at(-1).approvalStates[id].available, true);
+  h.intent(intent); await settle(); assert.equal(approvals, 2);
   h.dispose();
 });
