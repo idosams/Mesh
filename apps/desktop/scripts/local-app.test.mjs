@@ -33,6 +33,7 @@ const alphaVisualGuide = await readFile(
   'utf8',
 );
 const renderedProof = await readFile(new URL('./prove-rendered-app.mjs', import.meta.url), 'utf8');
+const daemonIpc = await readFile(new URL('../../../crates/mesh-daemon/src/ipc/message.rs', import.meta.url), 'utf8');
 const renderedProofArguments = await readFile(
   new URL('./prove-rendered-app-args.mjs', import.meta.url),
   'utf8',
@@ -196,7 +197,11 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.doesNotMatch(renderedProof, /const privateStore = join\(scratch, 'workspace\.mesh'\)/);
   assert.match(renderedProof, /app_managed_storage: true/);
   assert.match(renderedProof, /requestDaemon\('workspace\.version\.fork'/);
-  assert.match(renderedProof, /const IPC_VERSION = 7/);
+  const declaredSurface = daemonIpc.match(/^pub const SURFACE_VERSION: u32 = (\d+);$/m);
+  const requestedVersion = renderedProof.match(/^const IPC_VERSION = (\d+);$/m);
+  assert.ok(declaredSurface && requestedVersion, 'daemon and packaged proof must declare their exact IPC versions');
+  assert.equal(Number(requestedVersion[1]), Number(declaredSurface[1]),
+    'the packaged proof must exercise the current daemon IPC surface');
   assert.match(renderedProof, /message\.t === 'chunk'/);
   assert.match(renderedProof, /MAX_DAEMON_MESSAGE_BYTES/);
   assert.match(renderedProof, /message\.surface_version, IPC_VERSION/);

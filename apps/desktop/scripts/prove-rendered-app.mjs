@@ -54,7 +54,7 @@ const stableFolder = join(appData, 'native-workspace/current');
 const versionStores = join(appData, 'workspace-versions');
 const forkStore = join(versionStores, 'point-proof.mesh');
 const probe = join(scratch, 'window-proof');
-const IPC_VERSION = 7;
+const IPC_VERSION = 8;
 const MAX_DAEMON_MESSAGE_BYTES = 16 * 1024 * 1024;
 const CHUNK_DATA_BYTES = 30_000;
 const AGENT_PROOF_RESULT_PATH = 'agent-proof-result.txt';
@@ -347,7 +347,7 @@ function requestDaemon(method, params = {}, totalTimeoutMs = proofDaemonIdleTime
           return;
         }
         if (message.t === 'welcome' && message.id === 1) {
-          assert.equal(message.version, IPC_VERSION, 'the packaged daemon did not negotiate IPC v7');
+          assert.equal(message.version, IPC_VERSION, 'the packaged daemon did not negotiate the current IPC version');
           assert.equal(message.surface_version, IPC_VERSION, 'the packaged daemon exposed a stale surface');
           socket.write(`${JSON.stringify({
             t: 'call', id: 2, method, version: IPC_VERSION, params,

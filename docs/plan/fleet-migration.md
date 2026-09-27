@@ -279,3 +279,14 @@ the daemon exposes surface 8 and retains protocol 7 compatibility. Its pinned so
 must be reconciled and an actual packaged run completed before current graphical-proof claims.
 These remain part of the full objective; working-folder integration and the rest of the fleet plan
 are not removed from scope.
+
+## Packaged verifier prerequisite after A08c
+
+The rendered-app verifier still requested protocol 7 and required surface 7 after F02 introduced
+surface 8. The daemon retains protocol-7 compatibility but truthfully advertises surface 8, so this
+verifier could not establish a current packaged journey. A separate canonical correction on #33
+requests protocol 8 while retaining the exact negotiated-version and advertised-surface assertions.
+Its repository contract test now compares the proof's declared version with the daemon's declared
+surface rather than pinning the stale literal. The regression fails against the original proof
+(`7 != 8`). This is a validation correction, not a replacement of any preserved product commit.
+Full gate, revision-bound bundle and actual rendered journey results remain pending.
