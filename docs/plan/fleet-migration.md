@@ -118,7 +118,8 @@ additional canonical verification work, not another transferred commit from the 
 full combined gate and hosted CI must be checked on this base; original PRs and histories remain
 preserved, and duplicate corrections must be reconciled before main integration. Replacement
 `3e0e81c` passed the full combined gate with exit 0: 3,131 Rust tests (13 skipped), 564 desktop tests
-and 44 real daemon checks. Hosted CI and PR publication are pending; no merge is implied.
+and 44 real daemon checks. [Mesh PR #24](https://github.com/idosams/Mesh/pull/24) publishes this transfer; hosted CI is pending
+and no merge is implied.
 
 ## Preserved source commits
 
