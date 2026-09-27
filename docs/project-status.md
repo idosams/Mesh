@@ -10,8 +10,10 @@ host discovers delegated lanes and dispatches them within durable limits; uncert
 their slots and custody. These are native/MCP integration foundations on unmerged review branches.
 Existing-project registration now pins the original folder and keeps metadata outside the project.
 Bounded native observation and immutable capture inputs leave source files and Git state untouched,
-without claiming custody or a saved version. Durable attachment history, background capture, live
-fleet UI, process-tree recovery and complete acceptance journeys remain pending migration and
+without claiming custody. Native attachment history now saves captured bytes as signed versions in
+the external store and reopens exact old content after restart. Unchanged captures are no-ops;
+policy changes and ambiguous store bindings refuse. Background capture, desktop attachment flows,
+live fleet UI, process-tree recovery and complete acceptance journeys remain pending migration and
 verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 

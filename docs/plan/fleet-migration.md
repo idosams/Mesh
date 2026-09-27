@@ -62,8 +62,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A01 | `09f4d863796aa52c7fc60530dfd1a73a68e94178` | feat: register existing projects without moving or taking custody | [Mesh PR #9](https://github.com/idosams/Mesh/pull/9), `7ce3b0c484ef482ca5a39385d11e38f8206a64d0`; registration/observation/capture; direction retained by #2; stacked on #8; not merged |
 | A01 | `920a71f36fa21e4646129a75d5bfd086630c9c25` | feat: observe attached projects through bounded native inventories | [Mesh PR #9](https://github.com/idosams/Mesh/pull/9), `7ce3b0c484ef482ca5a39385d11e38f8206a64d0`; registration/observation/capture; direction retained by #2; stacked on #8; not merged |
 | A01 | `ddf6086860b38c104a4e199e4b770800fa34b715` | feat: capture immutable inputs from attached projects without taking custody | [Mesh PR #9](https://github.com/idosams/Mesh/pull/9), `7ce3b0c484ef482ca5a39385d11e38f8206a64d0`; registration/observation/capture; direction retained by #2; stacked on #8; not merged |
-| A02 | `41bc6bf58615da3ff73922be2bb968b92925bd42` | feat: commit captured file batches as one durable signed version | Pending transfer |
-| A02 | `f5860ae7d0647f6539616890037b3b4ec1080ffc` | feat: save attached-project versions in external native history | Pending transfer |
+| A02 | `41bc6bf58615da3ff73922be2bb968b92925bd42` | feat: commit captured file batches as one durable signed version | Transferred on `idosams/external-project-history`; validation/PR pending; stacked on #9; not merged |
+| A02 | `f5860ae7d0647f6539616890037b3b4ec1080ffc` | feat: save attached-project versions in external native history | Transferred on `idosams/external-project-history`; validation/PR pending; stacked on #9; not merged |
 | A03 | `9e3e367c9be2f72fecd2fcd6304fbbac5ac31035` | feat: reconcile attached projects with a native background capture controller | Pending transfer |
 | A03 | `8e595348462ebcdc772e71f455f5b1f457aae109` | feat: expose native attached-project capture commands for harnesses | Pending transfer |
 | A03 | `f8ec9022b9dbe6a44b6a8fa8894758e6962b1a62` | feat: provision native external attachment history storage | Pending transfer |

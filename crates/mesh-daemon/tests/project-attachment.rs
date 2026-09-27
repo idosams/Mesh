@@ -372,3 +372,335 @@ fn captured_exclusion_policy_survives_later_ignore_changes() {
         .iter()
         .any(|file| file.path() == std::path::Path::new("ignored.txt")));
 }
+
+fn save_attached(
+    attached: &ProjectAttachment,
+    metadata: &std::path::Path,
+    input: &mesh_daemon::project_attachment::CapturedProjectInput,
+) -> std::io::Result<mesh_daemon::project_attachment::SavedAttachmentVersion> {
+    use ed25519_dalek::{Signer as _, SigningKey};
+    let key = SigningKey::from_bytes(&[67; 32]);
+    attached.save_capture(
+        metadata,
+        input,
+        mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+        |payload| {
+            Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                key.sign(payload.as_bytes()).to_bytes(),
+            ))
+        },
+    )
+}
+
+#[test]
+fn attached_history_saves_changes_and_reopens_old_bytes_without_changing_git_or_tools() {
+    use ed25519_dalek::{Signer as _, SigningKey};
+    let f = Fixture::new("history");
+    f.git(&["init", "--quiet"]);
+    fs::write(f.source.join("work.txt"), b"staged").unwrap();
+    f.git(&["add", "work.txt"]);
+    fs::write(f.source.join("work.txt"), b"captured").unwrap();
+    fs::create_dir(f.source.join("empty")).unwrap();
+    fs::create_dir(f.source.join("nested")).unwrap();
+    fs::write(f.source.join("nested/binary"), b"\0\xff").unwrap();
+    let index = fs::read(f.source.join(".git/index")).unwrap();
+    let head = fs::read(f.source.join(".git/HEAD")).unwrap();
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    let first_input = attached
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let mut editor = OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    let key = SigningKey::from_bytes(&[67; 32]);
+    let first = attached
+        .save_capture(
+            &f.metadata,
+            &first_input,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                // The source remains writable while the external history commit holds its own serial lock.
+                editor.write_all(b" while saving").unwrap();
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        attached
+            .saved_file(&f.metadata, first, "work.txt")
+            .unwrap()
+            .unwrap(),
+        b"captured"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"captured while saving"
+    );
+    fs::remove_file(f.source.join("nested/binary")).unwrap();
+    fs::remove_dir(f.source.join("nested")).unwrap();
+    fs::write(f.source.join("nested"), b"directory became a file").unwrap();
+    fs::create_dir(f.source.join("new-folder")).unwrap();
+    fs::write(f.source.join("new-folder/item"), b"new").unwrap();
+    let status = f.git(&["status", "--porcelain=v1"]);
+    let second = save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap(),
+    )
+    .unwrap();
+    assert_ne!(first, second);
+    drop(attached);
+    let reopened = ProjectAttachment::reopen(&f.metadata).unwrap();
+    assert_eq!(
+        reopened.saved_versions(&f.metadata).unwrap(),
+        vec![first, second]
+    );
+    assert_eq!(
+        reopened
+            .saved_file(&f.metadata, first, "nested/binary")
+            .unwrap()
+            .unwrap(),
+        b"\0\xff"
+    );
+    assert!(reopened
+        .saved_file(&f.metadata, second, "nested/binary")
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        reopened
+            .saved_file(&f.metadata, second, "work.txt")
+            .unwrap()
+            .unwrap(),
+        b"captured while saving"
+    );
+    assert_eq!(
+        reopened
+            .saved_file(&f.metadata, second, "nested")
+            .unwrap()
+            .unwrap(),
+        b"directory became a file"
+    );
+    let same = reopened
+        .save_capture(
+            &f.metadata,
+            &reopened
+                .capture_inputs(ObservationLimits::default())
+                .unwrap(),
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |_| -> Result<mesh_types::Signature, &'static str> {
+                panic!("unchanged capture must not create another signed version")
+            },
+        )
+        .unwrap();
+    assert_eq!(same, second);
+    assert_eq!(f.git(&["status", "--porcelain=v1"]), status);
+    assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), head);
+    assert!(!f.source.join(".mesh").exists());
+    let workspace = mesh_daemon::OpenWorkspace::open(&f.metadata).unwrap();
+    assert!(workspace.shared_version().is_none());
+    let history = workspace
+        .file_histories()
+        .iter()
+        .find(|h| h.path() == "work.txt")
+        .unwrap();
+    assert_eq!(history.retained().len(), 2);
+}
+
+#[test]
+fn attachment_history_refuses_policy_changes_wrong_inputs_and_missing_journal() {
+    let f = Fixture::new("history-refusals");
+    fs::write(f.source.join("work"), b"first").unwrap();
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    let first = save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap(),
+    )
+    .unwrap();
+    let journal = f.metadata.join(mesh_daemon::RECORD_FILE_NAME);
+    let before = fs::read(&journal).unwrap();
+    fs::write(f.source.join(".meshignore"), "work\n").unwrap();
+    assert!(save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap()
+    )
+    .is_err());
+    assert_eq!(fs::read(&journal).unwrap(), before);
+    assert_eq!(
+        attached
+            .saved_file(&f.metadata, first, "work")
+            .unwrap()
+            .unwrap(),
+        b"first"
+    );
+    let other = Fixture::new("history-other");
+    fs::write(other.source.join("work"), b"other").unwrap();
+    let other_attached = ProjectAttachment::register(&other.source, &other.metadata).unwrap();
+    let other_input = other_attached
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    assert!(save_attached(&attached, &f.metadata, &other_input).is_err());
+    assert_eq!(fs::read(&journal).unwrap(), before);
+    fs::remove_file(&journal).unwrap();
+    assert!(attached.saved_versions(&f.metadata).is_err());
+    fs::remove_file(f.source.join(".meshignore")).unwrap();
+    assert!(save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap()
+    )
+    .is_err());
+    assert!(
+        !journal.exists(),
+        "missing history must not be silently recreated"
+    );
+}
+
+#[test]
+fn history_rechecks_the_source_identity_after_the_signer_returns() {
+    use ed25519_dalek::{Signer as _, SigningKey};
+    let f = Fixture::new("history-source-replaced");
+    fs::write(f.source.join("work"), b"captured").unwrap();
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    let input = attached
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let key = SigningKey::from_bytes(&[67; 32]);
+    let original = f.root.join("original");
+    let result = attached.save_capture(
+        &f.metadata,
+        &input,
+        mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+        |payload| {
+            fs::rename(&f.source, &original).unwrap();
+            fs::create_dir(&f.source).unwrap();
+            fs::write(f.source.join("work"), b"replacement").unwrap();
+            Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                key.sign(payload.as_bytes()).to_bytes(),
+            ))
+        },
+    );
+    assert!(result.is_err());
+    assert_eq!(fs::read(original.join("work")).unwrap(), b"captured");
+    assert_eq!(fs::read(f.source.join("work")).unwrap(), b"replacement");
+    assert!(fs::read(f.metadata.join(mesh_daemon::RECORD_FILE_NAME))
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn attached_history_retains_empty_versions_and_never_reinitializes_a_copied_binding() {
+    let f = Fixture::new("history-empty");
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    assert!(save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap()
+    )
+    .is_err());
+    fs::write(f.source.join("only"), b"kept in history").unwrap();
+    let first = save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap(),
+    )
+    .unwrap();
+    fs::remove_file(f.source.join("only")).unwrap();
+    let empty = save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap(),
+    )
+    .unwrap();
+    assert_ne!(first, empty);
+    assert!(attached
+        .saved_file(&f.metadata, empty, "only")
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        attached
+            .saved_file(&f.metadata, first, "only")
+            .unwrap()
+            .unwrap(),
+        b"kept in history"
+    );
+    let copied = f.root.join("copied");
+    fs::create_dir(&copied).unwrap();
+    for name in ["attachment.json", "attachment-history.json"] {
+        fs::copy(f.metadata.join(name), copied.join(name)).unwrap();
+    }
+    assert!(attached.saved_versions(&copied).is_err());
+    assert!(!copied.join(mesh_daemon::RECORD_FILE_NAME).exists());
+}
+
+#[test]
+fn changing_a_history_binding_cannot_relabel_existing_signed_versions() {
+    let f = Fixture::new("history-binding");
+    fs::write(f.source.join("work"), b"original").unwrap();
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    let first = save_attached(
+        &attached,
+        &f.metadata,
+        &attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap(),
+    )
+    .unwrap();
+    let binding_path = f.metadata.join("attachment-history.json");
+    let binding = fs::read_to_string(&binding_path).unwrap();
+    let parsed = Json::parse(&binding).unwrap();
+    let digest = parsed.get("exclusions").unwrap().as_text().unwrap();
+    fs::write(&binding_path, binding.replace(digest, &"a".repeat(64))).unwrap();
+    assert!(attached.saved_versions(&f.metadata).is_err());
+    assert!(attached.saved_file(&f.metadata, first, "work").is_err());
+    fs::write(&binding_path, &binding).unwrap();
+    assert_eq!(attached.saved_versions(&f.metadata).unwrap(), vec![first]);
+}
+
+#[test]
+fn concurrent_identical_captures_commit_once_under_external_store_serialization() {
+    let f = Fixture::new("history-concurrent");
+    fs::write(f.source.join("work"), b"same capture").unwrap();
+    let attached = ProjectAttachment::register(&f.source, &f.metadata).unwrap();
+    let first = attached
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let second = attached
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let barrier = std::sync::Barrier::new(2);
+    let versions = std::thread::scope(|scope| {
+        let run = |input: mesh_daemon::project_attachment::CapturedProjectInput| {
+            let attached = ProjectAttachment::reopen(&f.metadata).unwrap();
+            barrier.wait();
+            save_attached(&attached, &f.metadata, &input).unwrap()
+        };
+        let one = scope.spawn(move || run(first));
+        let two = scope.spawn(move || run(second));
+        (one.join().unwrap(), two.join().unwrap())
+    });
+    assert_eq!(versions.0, versions.1);
+    assert_eq!(
+        attached.saved_versions(&f.metadata).unwrap(),
+        vec![versions.0]
+    );
+}

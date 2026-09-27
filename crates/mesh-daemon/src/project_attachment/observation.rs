@@ -74,7 +74,7 @@ impl std::fmt::Debug for CapturedFileInput {
     }
 }
 
-/// Native input for a future durable version commit. This is not an acknowledgment of saved work.
+/// Native input for an explicit durable version commit. This is not an acknowledgment of saved work.
 /// Construction requires a complete traversal and recheck; fields cannot be supplied by a renderer.
 pub struct CapturedProjectInput {
     root: PathBuf,

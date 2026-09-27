@@ -1,7 +1,8 @@
 //! Persistent, non-exclusive attachment to an existing project. No project files are written.
 //!
 //! The native caller chooses a private metadata directory outside the source project. This record
-//! establishes observation identity only: it grants no custody, saved-version or write-back authority.
+//! establishes observation identity only. Explicit signed saves use external history and grant no
+//! source custody, approval or write-back authority.
 
 use std::fs;
 use std::io::{self, Read as _};
@@ -14,6 +15,9 @@ use crate::root_authority::{PinnedWorkspaceRoot, ProtectedWorkspaceRoot};
 const RECEIPT: &str = "attachment.json";
 const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
+
+mod history;
+pub use history::SavedAttachmentVersion;
 
 mod observation;
 pub use observation::{CapturedFileInput, CapturedProjectInput, ObservationLimits};

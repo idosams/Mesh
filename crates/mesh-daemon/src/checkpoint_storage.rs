@@ -5,6 +5,7 @@
 //! between them; neither storage crate gains an upward dependency.
 
 use core::fmt;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mesh_cas::{
     Blake3 as CasBlake3, Cas, CasError, Digest32 as CasDigest, DurableFs, Promotion, PromotionStep,
@@ -576,7 +577,7 @@ pub struct JournaledPrivateSave {
     reused_cas_objects: usize,
 }
 
-/// One authenticated operation-only ChangeSet after CAS, index, and immutable journal durability.
+/// One authenticated ChangeSet after CAS, index, and immutable journal durability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct JournaledPrivateMutation {
     acknowledgement: PrivateSaved,
@@ -649,6 +650,8 @@ pub enum CheckpointSaveError<J> {
     ActorSequenceNotIssued,
     /// A ChangeSet with no operations cannot describe a workspace mutation.
     EmptyOperationSet,
+    /// Supplied file content is unrelated to the signed operations, or a referenced manifest is absent.
+    ManifestSetMismatch,
     /// Explicit physical manifest preparation failed before CAS was changed.
     ManifestPaging(ManifestPagingError),
     /// The authenticated envelope did not bind and verify the exact actor statement.
@@ -668,6 +671,9 @@ impl<J: fmt::Display> fmt::Display for CheckpointSaveError<J> {
             Self::EmptyOperationSet => {
                 formatter.write_str("an empty operation set cannot be saved")
             }
+            Self::ManifestSetMismatch => {
+                formatter.write_str("checkpoint file manifests do not match the signed operations")
+            }
             Self::ManifestPaging(error) => error.fmt(formatter),
             Self::Authentication(error) => error.fmt(formatter),
             Self::DurableSequence(error) => error.fmt(formatter),
@@ -684,6 +690,20 @@ pub(crate) fn save_authenticated_operations<F: DurableFs, D: HeadDerivation + ?S
     workspace: &mut OpenWorkspace,
     cas: &Cas<F, CasBlake3>,
     request: AuthenticatedOperationCheckpointRequest,
+    derivation: &D,
+) -> Result<JournaledPrivateMutation, CheckpointSaveError<std::io::Error>> {
+    save_authenticated_checkpoint(workspace, cas, request, Vec::new(), derivation)
+}
+
+/// Commit all admitted file content and one signed operation set through the existing journal.
+/// Files are immutable prepared bytes; this path never reads a working directory. Acknowledgment
+/// follows all manifest records and the operation record, so an interrupted append cannot expose
+/// a partially recorded set of file writes as the new operation.
+pub(crate) fn save_authenticated_checkpoint<F: DurableFs, D: HeadDerivation + ?Sized>(
+    workspace: &mut OpenWorkspace,
+    cas: &Cas<F, CasBlake3>,
+    request: AuthenticatedOperationCheckpointRequest,
+    files: Vec<PreparedCheckpointFile>,
     derivation: &D,
 ) -> Result<JournaledPrivateMutation, CheckpointSaveError<std::io::Error>> {
     if request.actor_sequence.value() == 0 {
@@ -718,7 +738,41 @@ pub(crate) fn save_authenticated_operations<F: DurableFs, D: HeadDerivation + ?S
         payload_digest: changeset_id,
         parents: parent_records,
     };
+    let referenced = request
+        .operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::WriteFileVersion { manifest_id, .. } => {
+                Some(RecordDigest::from_bytes(*manifest_id.as_bytes()))
+            }
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let mut manifests = BTreeMap::new();
+    let mut objects = BTreeMap::new();
+    for file in files {
+        let (manifest, chunks, paged) = file.into_parts();
+        if !referenced.contains(&manifest.id) {
+            return Err(CheckpointSaveError::ManifestSetMismatch);
+        }
+        manifests.entry(manifest.id).or_insert(manifest);
+        for bytes in chunks.into_iter().chain(
+            paged
+                .into_iter()
+                .flat_map(|pages| pages.cas_objects().to_vec()),
+        ) {
+            let digest = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+            objects.entry(digest).or_insert(bytes);
+        }
+    }
+    for manifest in referenced {
+        if !manifests.contains_key(&manifest) && !workspace.has_journaled_manifest(manifest) {
+            return Err(CheckpointSaveError::ManifestSetMismatch);
+        }
+    }
+    objects.entry(changeset_id).or_insert(payload);
     let checkpoint = Checkpoint {
+        manifests: manifests.into_values().collect(),
         operations: vec![operation_record],
         ..Checkpoint::default()
     };
@@ -727,7 +781,7 @@ pub(crate) fn save_authenticated_operations<F: DurableFs, D: HeadDerivation + ?S
     let saved = DurableCommit::new(
         workspace.checkpoint_store_mut(),
         &mut promoter,
-        vec![payload],
+        objects.into_values().collect(),
         checkpoint,
     )
     .finish()
@@ -903,3 +957,6 @@ where
         reused_cas_objects,
     })
 }
+
+#[cfg(test)]
+mod tests;

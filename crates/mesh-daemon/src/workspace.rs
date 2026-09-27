@@ -1212,6 +1212,7 @@ impl OpenWorkspace {
             trusted_reviewers,
             true,
             Some((pinned_root, storage_pinned_root)),
+            true,
         )
     }
 
@@ -1227,6 +1228,24 @@ impl OpenWorkspace {
             trusted_reviewers,
             create_missing,
             None,
+            true,
+        )
+    }
+
+    /// Open only an attachment's external history store. No observed source path is accepted.
+    /// The caller holds the private-store initialization guard for the entire read/write operation.
+    pub(crate) fn open_attachment_store(
+        metadata: &Path,
+        pinned: PinnedWorkspaceRoot,
+        create_missing: bool,
+    ) -> Result<Self, OpenFailure> {
+        Self::open_layout_inner(
+            metadata,
+            Some(metadata),
+            &crate::TrustedReviewers::default(),
+            create_missing,
+            Some((pinned.clone(), pinned)),
+            false,
         )
     }
 
@@ -1236,6 +1255,7 @@ impl OpenWorkspace {
         trusted_reviewers: &crate::TrustedReviewers,
         create_missing: bool,
         prepared: Option<(PinnedWorkspaceRoot, PinnedWorkspaceRoot)>,
+        recover_working_files: bool,
     ) -> Result<Self, OpenFailure> {
         let started = Instant::now();
         if create_missing && prepared.is_none() {
@@ -1475,19 +1495,21 @@ impl OpenWorkspace {
             |review, current| opened.human_approval_context_at(review, current).ok(),
         );
         opened.shared_version = shared_version;
-        match crate::managed_mutation::reconcile_pending_mutation(root, |id| {
-            opened.has_operation(id)
-        }) {
-            Ok(Some(recovery)) => {
-                opened
-                    .conditions
-                    .push(condition(recovery.code(), recovery.message(), Vec::new()))
-            }
-            Ok(None) => {}
-            Err(error) => {
-                opened
-                    .conditions
-                    .push(condition(error.code(), error.message(), Vec::new()))
+        if recover_working_files {
+            match crate::managed_mutation::reconcile_pending_mutation(root, |id| {
+                opened.has_operation(id)
+            }) {
+                Ok(Some(recovery)) => opened.conditions.push(condition(
+                    recovery.code(),
+                    recovery.message(),
+                    Vec::new(),
+                )),
+                Ok(None) => {}
+                Err(error) => {
+                    opened
+                        .conditions
+                        .push(condition(error.code(), error.message(), Vec::new()))
+                }
             }
         }
         opened
@@ -3276,6 +3298,13 @@ impl OpenWorkspace {
         ))
     }
 
+    /// Whether a manifest was present in the journal at the last open or refresh. The mutable
+    /// checkpoint index can be ahead of the journal after an interrupted save and is insufficient
+    /// evidence for reusing content without appending its manifest again.
+    pub(crate) fn has_journaled_manifest(&self, id: RecordDigest) -> bool {
+        self.record_index.manifest(&id).is_some()
+    }
+
     /// Exact retained manifest record used by the native managed-folder restore boundary.
     pub fn manifest_record(
         &self,
@@ -3296,6 +3325,45 @@ impl OpenWorkspace {
             .as_ref()?
             .file_version(id)
             .map(mesh_materializer::FileVersion::portable_metadata)
+    }
+
+    /// Exact workspace identity agreed by every causally ready journal operation.
+    pub(crate) fn journal_workspace_id(&self) -> Result<WorkspaceId, String> {
+        self.ensure_physical_root()
+            .map_err(|error| error.to_string())?;
+        self.workspace_id_for_operations(&self.record_index.causally_ready_operations())
+    }
+
+    fn workspace_id_for_operations(&self, ready: &[RecordDigest]) -> Result<WorkspaceId, String> {
+        let cas = &self.payload_store;
+        let mut workspace_ids = BTreeSet::new();
+        for id in ready {
+            let record = self
+                .store
+                .index()
+                .operation(id)
+                .ok_or_else(|| "a ready operation disappeared from the index".to_owned())?;
+            let payload = cas
+                .read(&CasDigest::from_bytes(*record.payload_digest.as_bytes()))
+                .map_err(|error| format!("an authoring payload could not be read: {error}"))?;
+            let fields = decode_changeset_fields(&payload)
+                .ok_or_else(|| "an authoring payload is not a verified ChangeSet".to_owned())?;
+            let workspace = match fields.first() {
+                Some(CanonicalValue::Bytes(bytes)) if bytes.len() == WorkspaceId::WIDTH => {
+                    let mut exact = [0_u8; WorkspaceId::WIDTH];
+                    exact.copy_from_slice(bytes);
+                    WorkspaceId::from_bytes(exact)
+                }
+                _ => return Err("a ChangeSet has no exact workspace identifier".to_owned()),
+            };
+            workspace_ids.insert(workspace);
+        }
+        if workspace_ids.len() != 1 {
+            return Err("durable ChangeSets disagree about the workspace identifier".to_owned());
+        }
+        Ok(*workspace_ids
+            .first()
+            .expect("one workspace identifier was checked above"))
     }
 
     /// Derive the next authenticated local authoring context from durable workspace truth.
@@ -3321,35 +3389,7 @@ impl OpenWorkspace {
             return Err("the workspace has no causally ready operation".to_owned());
         }
 
-        let cas = &self.payload_store;
-        let mut workspace_ids = BTreeSet::new();
-        for id in &ready {
-            let record = self
-                .store
-                .index()
-                .operation(id)
-                .ok_or_else(|| "a ready operation disappeared from the index".to_owned())?;
-            let payload = cas
-                .read(&CasDigest::from_bytes(*record.payload_digest.as_bytes()))
-                .map_err(|error| format!("an authoring payload could not be read: {error}"))?;
-            let fields = decode_changeset_fields(&payload)
-                .ok_or_else(|| "an authoring payload is not a verified ChangeSet".to_owned())?;
-            let workspace = match fields.first() {
-                Some(CanonicalValue::Bytes(bytes)) if bytes.len() == WorkspaceId::WIDTH => {
-                    let mut exact = [0_u8; WorkspaceId::WIDTH];
-                    exact.copy_from_slice(bytes);
-                    WorkspaceId::from_bytes(exact)
-                }
-                _ => return Err("a ChangeSet has no exact workspace identifier".to_owned()),
-            };
-            workspace_ids.insert(workspace);
-        }
-        if workspace_ids.len() != 1 {
-            return Err("durable ChangeSets disagree about the workspace identifier".to_owned());
-        }
-        let workspace_id = *workspace_ids
-            .first()
-            .expect("one workspace identifier was checked above");
+        let workspace_id = self.workspace_id_for_operations(&ready)?;
 
         let ready_set = ready.iter().copied().collect::<BTreeSet<_>>();
         let referenced = ready
