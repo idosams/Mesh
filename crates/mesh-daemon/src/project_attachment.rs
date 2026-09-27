@@ -16,6 +16,9 @@ const RECEIPT: &str = "attachment.json";
 const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
 
+mod provisioning;
+pub use provisioning::{AttachmentStorage, ProvisionedAttachment};
+
 mod background;
 pub use background::{
     AttachmentCaptureService, CaptureOutcome, CapturePhase, CaptureSchedule, CaptureStatus,
@@ -41,8 +44,13 @@ impl ProjectAttachment {
     pub fn register(root: &Path, metadata: &Path) -> io::Result<Self> {
         let attached = Self::admit(root)?;
         let store = external_store(metadata, &attached)?;
-        let encoded = attached.receipt()?.encode();
-        attached.ensure_current()?;
+        attached.register_in_store(&store)?;
+        Ok(attached)
+    }
+
+    fn register_in_store(&self, store: &PinnedWorkspaceRoot) -> io::Result<()> {
+        let encoded = self.receipt()?.encode();
+        self.ensure_current()?;
         match store.filesystem().write_new_file(
             Path::new(RECEIPT),
             encoded.as_bytes(),
@@ -50,7 +58,7 @@ impl ProjectAttachment {
         ) {
             Ok(()) => {}
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                if read_receipt(&store)? != encoded {
+                if read_receipt(store)? != encoded {
                     return Err(invalid(
                         "attachment metadata already belongs to another project",
                     ));
@@ -60,8 +68,8 @@ impl ProjectAttachment {
         }
         // A failed final identity check preserves the receipt for explicit recovery, never deletion.
         store.ensure_namespace_identity()?;
-        attached.ensure_current()?;
-        Ok(attached)
+        self.ensure_current()?;
+        Ok(())
     }
 
     /// Reopen an existing registration and verify the named folder still has its admitted identity.

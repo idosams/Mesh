@@ -189,3 +189,26 @@ host lifecycle integration, and the packaged existing-project journey.
 Persist captured content and history outside the project. Present registration, catch-up, incomplete
 capture and saved versions separately. Then integrate the attachment with desktop onboarding and
 parallel review. Registration tests alone do not satisfy the full existing-project acceptance journey.
+
+## Native host provisioning
+
+`AttachmentStorage` pins an existing host-configured storage directory. `provision(source)` admits
+an existing project and derives a direct child name from the full canonical registration receipt's
+BLAKE3 digest. The identifier is a native lookup hint, not original authorship or approval authority.
+A new child is created with owner-only permissions through the retained parent descriptor; existing
+children must have the exact receipt. Missing, partial, foreign or linked children are preserved and
+refused rather than silently initialized. An interrupted allocation before receipt persistence needs
+explicit recovery. Registration and signed-history formats remain unchanged.
+
+The parent must be outside the original project, and its retained identity must still agree with its
+pathname before provisioning. Source and store identity checks surround allocation. The resulting
+`ProvisionedAttachment` transfers both retained descriptors directly into `start_capture`, without
+reopening and adopting a replacement store between allocation and background startup. Repeated
+provisioning of the same admitted source recovers the same location. Source rename or replacement
+is not an automatic history migration. The native host remains responsible for maintaining the
+project catalog, admitting its own private root, deduplicating running controllers, restart preferences,
+and graphical lifecycle. This API does not yet connect the desktop onboarding or review UI.
+
+Tests cover idempotent provisioning, unchanged source contents, owner-only child creation, refusing
+storage inside the source, partial receipts, linked or replaced storage, actual signed capture through
+the provisioned handle, and replacement between provisioning and capture startup.

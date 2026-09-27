@@ -704,3 +704,53 @@ fn concurrent_identical_captures_commit_once_under_external_store_serialization(
         vec![versions.0]
     );
 }
+
+#[test]
+fn native_provisioning_is_idempotent_and_preserves_source() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("provision");
+    fs::write(f.source.join("work.txt"), "ordinary work").unwrap();
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let first = storage.provision(&f.source).unwrap();
+    let again = storage.provision(&f.source).unwrap();
+    assert_eq!(first.id(), again.id());
+    assert_eq!(first.metadata_path(), again.metadata_path());
+    assert_eq!(fs::read_dir(&f.metadata).unwrap().count(), 1);
+    assert_eq!(fs::read_dir(&f.source).unwrap().count(), 1);
+    assert_eq!(
+        fs::metadata(first.metadata_path())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    ProjectAttachment::reopen(first.metadata_path()).unwrap();
+    let inside = f.source.join("internal");
+    fs::create_dir(&inside).unwrap();
+    assert!(AttachmentStorage::open(&inside)
+        .unwrap()
+        .provision(&f.source)
+        .is_err());
+    assert_eq!(fs::read_dir(inside).unwrap().count(), 0);
+}
+
+#[test]
+fn provisioning_refuses_replaced_roots_links_and_partial_receipts() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("provision-replacement");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let first = storage.provision(&f.source).unwrap();
+    let receipt = first.metadata_path().join("attachment.json");
+    fs::remove_file(&receipt).unwrap();
+    assert!(storage.provision(&f.source).is_err());
+    assert!(!receipt.exists());
+    fs::remove_dir(first.metadata_path()).unwrap();
+    symlink(&f.source, first.metadata_path()).unwrap();
+    assert!(storage.provision(&f.source).is_err());
+    assert!(!f.source.join("attachment.json").exists());
+    fs::rename(&f.metadata, f.root.join("old-metadata")).unwrap();
+    fs::create_dir(&f.metadata).unwrap();
+    assert!(storage.provision(&f.source).is_err());
+    assert_eq!(fs::read_dir(&f.metadata).unwrap().count(), 0);
+}

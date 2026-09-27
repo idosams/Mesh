@@ -331,3 +331,34 @@ fn unchanged_capture_updates_health_without_adding_a_version_or_exposing_content
     assert!(!projection.encode().contains(f.source.to_str().unwrap()));
     service.stop_and_join().unwrap();
 }
+
+#[test]
+fn provisioned_capture_retains_store_authority_through_startup() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("provisioned");
+    let private = f.root.join("host-storage");
+    fs::create_dir(&private).unwrap();
+    let storage = AttachmentStorage::open(&private).unwrap();
+    let provisioned = storage.provision(&f.source).unwrap();
+    let metadata = provisioned.metadata_path().to_owned();
+    let service = provisioned
+        .start_capture(Arc::new(Signer::default()), schedule())
+        .unwrap();
+    let saved = outcome(&service, CaptureOutcome::Saved, 0)
+        .saved_version
+        .unwrap();
+    service.stop_and_join().unwrap();
+    let reopened = ProjectAttachment::reopen(&metadata).unwrap();
+    assert_eq!(
+        reopened.saved_file(&metadata, saved, "work").unwrap(),
+        Some(b"one".to_vec())
+    );
+
+    let provisioned = storage.provision(&f.source).unwrap();
+    fs::rename(&metadata, f.root.join("old-store")).unwrap();
+    fs::create_dir(&metadata).unwrap();
+    assert!(provisioned
+        .start_capture(Arc::new(Signer::default()), schedule())
+        .is_err());
+    assert_eq!(fs::read_dir(&metadata).unwrap().count(), 0);
+}

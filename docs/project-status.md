@@ -16,7 +16,9 @@ policy changes and ambiguous store bindings refuse. A native background controll
 registered projects periodically, coalesces capture signals, retains saved history through incomplete
 scans or signing failures, and reports redacted capture health. It needs an explicit host signer and
 lifetime. The desktop executable now exposes headless capture, version listing and watch controls
-for an existing harness, with ephemeral native capture identities and joined stop handling. Packaged
+for an existing harness, with ephemeral native capture identities and joined stop handling. Native
+provisioning now creates a private per-project store under a host-owned external directory and hands
+retained source/store authority directly to capture; partial or replaced stores refuse. Packaged
 lifecycle, desktop attachment flows, live fleet UI, process-tree recovery and complete acceptance
 journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

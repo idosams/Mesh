@@ -200,6 +200,28 @@ impl PinnedWorkspaceRoot {
         })
     }
 
+    /// Reopen one direct child through the retained parent, refusing links and traversal.
+    pub(crate) fn open_child_directory(&self, name: &OsStr) -> io::Result<Self> {
+        if name.is_empty()
+            || name == OsStr::new(".")
+            || name == OsStr::new("..")
+            || name.as_bytes().contains(&b'/')
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid child name",
+            ));
+        }
+        self.ensure_namespace_identity()?;
+        let directory = openat(&self.directory, name, OPEN_DIRECTORY_FLAGS, 0)?;
+        let child = Self {
+            namespace: self.namespace.join(name),
+            directory: Arc::new(directory),
+        };
+        child.ensure_namespace_identity()?;
+        Ok(child)
+    }
+
     /// Stable device and inode identity of the retained directory descriptor.
     pub(crate) fn identity(&self) -> io::Result<(u64, u64)> {
         let metadata = self.directory.metadata()?;

@@ -203,6 +203,20 @@ impl AttachmentCaptureService {
         signer: Arc<dyn CheckpointSigner>,
         schedule: CaptureSchedule,
     ) -> io::Result<Self> {
+        let attachment = ProjectAttachment::reopen(metadata)?;
+        let store = external_store(metadata, &attachment)?;
+        Self::start_pinned(metadata, attachment, store, signer, schedule)
+    }
+
+    pub(super) fn start_pinned(
+        metadata: &Path,
+        attachment: ProjectAttachment,
+        store: PinnedWorkspaceRoot,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+    ) -> io::Result<Self> {
+        attachment.ensure_current()?;
+        store.ensure_namespace_identity()?;
         schedule.limits.validate()?;
         if !(Duration::from_millis(250)..=Duration::from_secs(300))
             .contains(&schedule.reconciliation_interval)
@@ -212,8 +226,6 @@ impl AttachmentCaptureService {
                 "capture interval must be between 250 ms and five minutes",
             ));
         }
-        let attachment = ProjectAttachment::reopen(metadata)?;
-        let store = external_store(metadata, &attachment)?;
         let metadata = metadata.to_path_buf();
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
