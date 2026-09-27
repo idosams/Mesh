@@ -475,6 +475,11 @@ source-UI validation; packaged detach/restart proof remains outstanding.
 
 The capture harness accepts an explicit local app bundle and exact embedded revision. It runs the
 bundle verifier before and after the journey and checks that the executable SHA-256 is unchanged.
+After validating the seal, the verifier queries `--mesh-build-identity` and compares its structured
+`mesh.desktop-build-identity/v1` revision and exact-build flag. This side-effect-free native mode
+runs before any attachment, MCP or graphical setup and rejects extra arguments. Searching arbitrary
+executable strings alone is insufficient: the all-zero revision occurs in unrelated constants and
+was accepted by the historical verifier. A regression covers that false-positive case.
 The package gate checks the current attachment heading, detach/reattach controls and pinned
 comparisons alongside existing import/review markers. Marker presence proves embedded UI resources;
 it does not prove a rendered or exercised window.

@@ -9,6 +9,9 @@ compile_error!("The Mesh desktop MVP currently requires the daemon's Unix-domain
 mod active_workspace;
 
 #[cfg(unix)]
+mod build_identity;
+
+#[cfg(unix)]
 mod attachment_capture;
 
 #[cfg(unix)]
@@ -11639,6 +11642,9 @@ mod mesh_mcp_mode_tests {
 
 #[cfg(target_os = "macos")]
 fn main() {
+    if build_identity::run_if_requested() {
+        return;
+    }
     if let Some(result) = attachment_capture::run_if_requested() {
         if let Err(problem) = result {
             eprintln!("Mesh attachment: {problem}");
@@ -11656,6 +11662,9 @@ fn main() {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn main() {
+    if build_identity::run_if_requested() {
+        return;
+    }
     if let Some(result) = attachment_capture::run_if_requested() {
         if let Err(problem) = result {
             eprintln!("Mesh attachment: {problem}");

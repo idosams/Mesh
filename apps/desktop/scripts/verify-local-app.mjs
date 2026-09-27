@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import { verifyBuildIdentity } from './build-identity-proof.mjs';
 import { access, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -77,6 +78,14 @@ assert.match(
   /Signature=adhoc/,
   'the local bundle must remain ad-hoc rather than claiming a Developer ID identity',
 );
+// Query only after the local resource seal has been verified. Incidental strings (including
+// all-zero hashes) are not evidence of the revision this executable actually reports.
+const buildIdentity = spawnSync(executable, ['--mesh-build-identity'], {
+  encoding: 'utf8', timeout: 15_000, maxBuffer: 4096,
+});
+assert.equal(buildIdentity.status, 0, 'the sealed executable must report its build identity without opening a window');
+verifyBuildIdentity(buildIdentity.stdout, revision);
+
 const entitlementDescription = spawnSync(
   '/usr/bin/codesign',
   ['-d', '--entitlements', ':-', app],

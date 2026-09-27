@@ -136,6 +136,8 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(verifier, /component_interface_embedded: true/);
   assert.match(verifier, /source_revision: revision/);
   assert.match(verifier, /source_exact: true/);
+  assert.match(verifier, /--mesh-build-identity/);
+  assert.match(verifier, /verifyBuildIdentity\(buildIdentity.stdout, revision\)/);
   assert.match(verifier, /\['--verify', '--deep', '--strict', '--verbose=4', app\]/);
   assert.match(verifier, /Signature=adhoc/);
   assert.match(verifier, /bundle_sealed: true/);
