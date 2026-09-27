@@ -469,3 +469,23 @@ Tests cover owned-worker termination, generation refusal, restart, unavailable/r
 reattachment refusal, continued ordinary edits, historical reads while detached, resumed catch-up,
 unchanged Git status, offline discovery, and corrupt/symlink marker preservation. This is native and
 source-UI validation; packaged detach/restart proof remains outstanding.
+
+
+## Packaged executable capture verification
+
+The capture harness accepts an explicit local app bundle and exact embedded revision. It runs the
+bundle verifier before and after the journey and checks that the executable SHA-256 is unchanged.
+The package gate checks the current attachment heading, detach/reattach controls and pinned
+comparisons alongside existing import/review markers. Marker presence proves embedded UI resources;
+it does not prove a rendered or exercised window.
+
+The fixture is registered using this checkout's development meshctl. Capture, periodic
+reconciliation, restart catch-up, explicit/EOF stop, invalid-command refusal, and Git index/HEAD
+plus directory-identity preservation run against the packaged desktop executable. Output records
+`packaged: true` and `graphical: false` separately. A missing or malformed revision is refused.
+
+The preserved fleet source's bundle evidence is historical and is not canonical Mesh validation.
+Fresh canonical bundle results must identify the exact commit, executable hash and observed checks.
+Rendered attachment, pin restoration and detach/reattach interactions remain separate packaged
+acceptance work. No installed application is replaced, and neither Apple-trusted signing nor human
+approval is claimed by this executable proof.

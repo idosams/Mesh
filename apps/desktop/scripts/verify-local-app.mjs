@@ -43,7 +43,10 @@ const executableStrings = execFileSync('/usr/bin/strings', [executable], {
 });
 assert.ok(executableStrings.includes(revision), 'the bundled executable must contain the exact source revision');
 const componentInterfaceMarkers = [
-  'Keep working in ordinary files',
+  'Use your existing project',
+  'Detach Mesh',
+  'Reattach project',
+  'Pinned comparisons',
   'Review what Mesh will bring in',
   'Recommended next action',
   'Approve exact version',

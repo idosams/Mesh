@@ -126,7 +126,10 @@ test('bundle verification checks the runnable envelope and keeps distribution cl
   assert.match(verifier, /mesh-local-app-proof\/v2/);
   assert.match(verifier, /--revision must name the exact bundled Git commit/);
   assert.match(verifier, /the bundled executable must contain the exact source revision/);
-  assert.match(verifier, /Keep working in ordinary files/);
+  assert.match(verifier, /Use your existing project/);
+  assert.match(verifier, /Detach Mesh/);
+  assert.match(verifier, /Reattach project/);
+  assert.match(verifier, /Pinned comparisons/);
   assert.match(verifier, /Review what Mesh will bring in/);
   assert.match(verifier, /Recommended next action/);
   assert.match(verifier, /Approve exact version/);

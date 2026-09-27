@@ -37,7 +37,10 @@ without claiming durability, and conflicts require explicit reload of the saved 
 not change an open comparison. Persistent detachment now joins the desktop-owned capture worker,
 retains original files and history, and refuses subsequent native saves until explicit reattachment.
 Reattachment verifies the original source and remains stopped until resume. Detachment survives
-restart and unavailable sources; corrupt or linked records require reconciliation. Packaged
+restart and unavailable sources; corrupt or linked records require reconciliation. An isolated
+capture verifier now accepts a sealed local bundle plus exact revision, checks its seal before and
+after execution, and records its executable hash. Canonical packaged runtime evidence is pending;
+this does not claim rendered-window acceptance. Packaged
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

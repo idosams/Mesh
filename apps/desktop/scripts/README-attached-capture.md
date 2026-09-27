@@ -1,8 +1,9 @@
 # Attached-project capture from an existing harness
 
 Development entry points in the desktop executable use the same native history and key-custody
-implementation as the application. They do not open its window or start an agent. The graphical
-attachment/review journey and packaged proof remain unfinished.
+implementation as the application. They do not open its window or start an agent. Graphical
+attachment and history inspection are implemented in source; packaged-window acceptance and
+attachment approval remain outstanding. Packaged executable capture proof is available below.
 
 Build from the checkout:
 
@@ -61,4 +62,20 @@ node apps/desktop/scripts/prove-attached-capture.mjs
 It uses temporary fixture folders, launches only the checkout's built binaries, checks direct and
 periodic saves, catches up after restart, stops through both the command and EOF paths, and verifies
 Git and directory identity preservation. It cleans up its fixture and does not replace an installed
-application. Successful output explicitly reports `packaged: false`.
+application. The default development run explicitly reports `packaged: false`.
+
+To test the executable inside an existing locally sealed bundle, supply both its path and exact
+embedded commit:
+
+```sh
+node apps/desktop/scripts/prove-attached-capture.mjs \
+  --app /absolute/Mesh.app \
+  --revision <40-character-lowercase-commit>
+```
+
+Packaged mode verifies the bundle seal, embedded revision and current component interface markers
+before and after execution. It records the executable SHA-256 and refuses a byte change during the
+run. The temporary fixture is registered with this checkout's development `meshctl`; capture,
+watch, stop and version listing execute the packaged desktop binary. Output explicitly distinguishes
+`packaged: true` from `graphical: false`. This is not a rendered-window, installed-app, Apple trust,
+approval or main-integration proof.

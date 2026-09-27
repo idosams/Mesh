@@ -1,5 +1,7 @@
-// Development executable proof. Uses only an isolated fixture and the binaries from this checkout.
+// Isolated executable proof. Packaged mode verifies the exact sealed bundle; it never opens a GUI.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { captureProofArguments } from './attached-capture-proof-args.mjs';
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile, stat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 
 const root = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
-const desktop = join(root, 'target/debug/mesh-desktop');
+const options = captureProofArguments(process.argv.slice(2));
+const app = options.app === null ? null : resolve(options.app);
+const desktop = app === null ? join(root, 'target/debug/mesh-desktop') : join(app, 'Contents/MacOS/mesh-desktop');
 const meshctl = join(root, 'target/debug/meshctl');
 const fixture = await mkdtemp(join(tmpdir(), 'mesh-attached-capture-proof-'));
 const project = join(fixture, 'project');
@@ -74,6 +78,11 @@ async function git(args) { return run('git', ['-C', project, ...args]); }
 async function list() { return JSON.parse(await run(desktop, ['--mesh-attachment', 'versions', metadata])).versions; }
 
 try {
+  const verifyBundle = async () => {
+    if (app !== null) await run(process.execPath, [join(root, 'apps/desktop/scripts/verify-local-app.mjs'), '--app', app, '--revision', options.revision]);
+  };
+  await verifyBundle();
+  const executableDigest = createHash('sha256').update(await readFile(desktop)).digest('hex');
   await mkdir(project); await mkdir(metadata);
   await git(['init', '--quiet']);
   await writeFile(join(project, 'work.txt'), 'staged\n');
@@ -121,7 +130,9 @@ try {
   assert.deepEqual(await readFile(join(project, '.git/HEAD')), head);
   assert.equal((await stat(project)).ino, identity);
   assert.equal(await readFile(join(project, 'work.txt'), 'utf8'), 'edit while Mesh was stopped\n');
-  process.stdout.write(`${JSON.stringify({ proof: 'mesh-attached-capture-cli/v1', passed: true, versions: 3, elapsed_ms: Math.round(performance.now() - started), packaged: false })}\n`);
+  assert.equal(createHash('sha256').update(await readFile(desktop)).digest('hex'), executableDigest, 'capture executable changed during proof');
+  await verifyBundle();
+  process.stdout.write(`${JSON.stringify({ proof: 'mesh-attached-capture-cli/v1', passed: true, versions: 3, elapsed_ms: Math.round(performance.now() - started), packaged: app !== null, graphical: false, revision: options.revision, executable_sha256: executableDigest, registration: 'development-meshctl' })}\n`);
 } finally {
   for (const child of children) child.kill('SIGKILL');
   await Promise.all([...children].map(child => new Promise(done => child.once('close', done))));
