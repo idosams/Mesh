@@ -74,7 +74,10 @@ the configured minimum wait directly while retaining separate external-edit cove
 collects every failure without retries or skips, and still fails for any failed test. None of these
 changes establishes a product latency, packaged lifecycle or remote-execution claim.
 
-Validation replacement and PR: pending publication of this increment; not merged.
+Validation replacement: `82310c2a34fe0484948123b0ff84de4702641a18`,
+[Mesh PR #20](https://github.com/idosams/Mesh/pull/20), stacked on #19; not merged.
+The full combined local gate passed: 3,128 Rust tests (13 skipped), 558 desktop tests and 44 real
+daemon checks. Hosted CI remains pending; no product latency or packaged proof is implied.
 
 ## Preserved source commits
 
