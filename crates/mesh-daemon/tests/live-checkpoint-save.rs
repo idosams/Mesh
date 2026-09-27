@@ -375,7 +375,8 @@ fn repeated_saves_share_one_resettable_idle_worker() {
         }
         assert!(
             std::time::Instant::now() < recovery_deadline,
-            "the coalesced worker preserved an old extent or missed the maximum interval"
+            "the coalesced worker preserved an old extent or missed the maximum interval; snapshot={snapshot:?}; worker={}",
+            worker_diagnostic(&daemon)
         );
         std::thread::sleep(Duration::from_millis(2));
     }

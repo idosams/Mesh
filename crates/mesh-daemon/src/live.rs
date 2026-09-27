@@ -1678,6 +1678,21 @@ impl Drop for VerifiedMutationContext {
 struct IdleCheckpointScheduler {
     state: Mutex<IdleCheckpointSchedulerState>,
     wake: Condvar,
+    // Temporary failure diagnostics in debug builds only. No scheduling decision reads this.
+    // 1 spawned, 2 reading schedule, 3 maximum wait, 4 woke, 5 recovery locks,
+    // 6 preserving, 7 idle wait, 8 settlement locks, 9 settling. This is the last entered
+    // phase; worker_running remains the authority for whether the worker retired.
+    #[cfg(debug_assertions)]
+    worker_phase: AtomicU64,
+}
+
+impl IdleCheckpointScheduler {
+    fn trace_phase(&self, phase: u64) {
+        #[cfg(debug_assertions)]
+        self.worker_phase.store(phase, Ordering::Relaxed);
+        #[cfg(not(debug_assertions))]
+        let _ = phase;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1687,6 +1702,8 @@ struct IdleCheckpointSchedulerState {
     shutdown: bool,
     scheduled: Option<IdleCheckpointSchedule>,
     maximum_started_at: Option<Instant>,
+    #[cfg(debug_assertions)]
+    last_wait: Option<(Instant, Duration)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1711,6 +1728,15 @@ struct PendingCheckpointIntervals {
 }
 
 impl IdleCheckpointSchedulerState {
+    fn trace_wait(&mut self, duration: Duration) {
+        #[cfg(debug_assertions)]
+        {
+            self.last_wait = Some((Instant::now(), duration));
+        }
+        #[cfg(not(debug_assertions))]
+        let _ = duration;
+    }
+
     fn publish(&mut self, scheduled: IdleCheckpointSchedule) -> IdleScheduleUpdate {
         self.publish_at(scheduled, Instant::now())
     }
@@ -4357,7 +4383,9 @@ impl LiveDaemon {
         let open = Arc::downgrade(&self.open);
         let feed = Arc::downgrade(&self.feed);
         let checkpoint_idle = Arc::clone(&self.checkpoint_idle);
+        checkpoint_idle.trace_phase(1);
         Some(std::thread::spawn(move || loop {
+            checkpoint_idle.trace_phase(2);
             let (Some(checkpoint), Some(open), Some(feed)) =
                 (checkpoint.upgrade(), open.upgrade(), feed.upgrade())
             else {
@@ -4437,10 +4465,13 @@ impl LiveDaemon {
             }
             let maximum_remaining = idle.maximum_remaining_at(intervals.maximum, Instant::now());
             let first_interval = intervals.idle.min(maximum_remaining);
+            idle.trace_wait(first_interval);
+            checkpoint_idle.trace_phase(3);
             let (idle, waited) = checkpoint_idle
                 .wake
                 .wait_timeout(idle, first_interval)
                 .unwrap_or_else(PoisonError::into_inner);
+            checkpoint_idle.trace_phase(4);
             if idle.shutdown {
                 return Ok(None);
             }
@@ -4453,6 +4484,7 @@ impl LiveDaemon {
             drop(idle);
 
             if maximum_remaining <= intervals.idle {
+                checkpoint_idle.trace_phase(5);
                 let mut checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
                 let mut held = open.lock().unwrap_or_else(PoisonError::into_inner);
                 let mut idle = checkpoint_idle
@@ -4468,6 +4500,7 @@ impl LiveDaemon {
                 let attention_was_visible = held
                     .as_ref()
                     .is_some_and(OpenWorkspace::checkpoint_recovery_needs_attention);
+                checkpoint_idle.trace_phase(6);
                 let recovery = Self::preserve_pending_recovery_locked(
                     &mut checkpoint,
                     &mut held,
@@ -4497,7 +4530,7 @@ impl LiveDaemon {
 
             let remaining = intervals.idle.saturating_sub(first_interval);
             if !remaining.is_zero() {
-                let idle = checkpoint_idle
+                let mut idle = checkpoint_idle
                     .state
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner);
@@ -4507,6 +4540,8 @@ impl LiveDaemon {
                 if idle.generation != generation || idle.scheduled.as_ref() != Some(&scheduled) {
                     continue;
                 }
+                idle.trace_wait(remaining);
+                checkpoint_idle.trace_phase(7);
                 let (idle, waited) = checkpoint_idle
                     .wake
                     .wait_timeout(idle, remaining)
@@ -4523,6 +4558,7 @@ impl LiveDaemon {
                 drop(idle);
             }
 
+            checkpoint_idle.trace_phase(8);
             let mut checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
             let mut held = open.lock().unwrap_or_else(PoisonError::into_inner);
             let mut idle = checkpoint_idle
@@ -4538,6 +4574,7 @@ impl LiveDaemon {
             let attention_was_visible = held
                 .as_ref()
                 .is_some_and(OpenWorkspace::checkpoint_recovery_needs_attention);
+            checkpoint_idle.trace_phase(9);
             let result = Self::settle_pending_checkpoint_locked(
                 &mut checkpoint,
                 &mut held,
