@@ -1875,6 +1875,7 @@ dependencies = [
  "mesh-git-bridge",
  "mesh-keychain",
  "mesh-mcp",
+ "mesh-types",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

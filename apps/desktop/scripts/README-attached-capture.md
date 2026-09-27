@@ -1,0 +1,64 @@
+# Attached-project capture from an existing harness
+
+Development entry points in the desktop executable use the same native history and key-custody
+implementation as the application. They do not open its window or start an agent. The graphical
+attachment/review journey and packaged proof remain unfinished.
+
+Build from the checkout:
+
+```sh
+cargo build -p mesh-desktop -p mesh-daemon --bin mesh-desktop --bin meshctl
+```
+
+Register a project where it already lives. Both directories must exist, use absolute paths, and
+the dedicated private metadata directory must be outside the project. Initial history creation
+requires that directory to contain only Mesh's registration receipt.
+
+```sh
+target/debug/meshctl attach /absolute/project /absolute/private-metadata
+```
+
+Save a complete bounded capture once, or list the resulting immutable version identities:
+
+```sh
+target/debug/mesh-desktop --mesh-attachment capture /absolute/private-metadata
+target/debug/mesh-desktop --mesh-attachment versions /absolute/private-metadata
+```
+
+Start background reconciliation, normally every five seconds:
+
+```sh
+target/debug/mesh-desktop --mesh-attachment watch /absolute/private-metadata
+```
+
+The watch command emits JSON lines with capture phase, health, last saved identity, and observation
+age. Send one of these newline-terminated commands on its standard input:
+
+- `capture`: request a rescan; multiple in-flight requests coalesce.
+- `status`: emit current status.
+- `stop`: request stop, wait for the capture worker, emit stopped status, and exit.
+
+Closing stdin also requests a joined stop. A capture already entering a durable write may finish;
+a stop request is distinct from confirmed termination. An external signer or slow filesystem can
+delay termination. A successful watch exit means it stopped cleanly, not necessarily that a version
+was saved. Read `saved_version` and `last_outcome` to determine the capture result.
+
+A fresh native software-held actor key signs each capture invocation or watch session. It is never
+written to a key file, the project, or command output. This identity attests to captured content;
+original file authorship stays unknown. Captures cannot approve or advance main.
+
+The current defaults allow 10,000 directory names, 8 MiB per file and 64 MiB of captured bytes. A
+partial or changing scan, changed exclusion policy, or replaced project/store is reported without
+substituting a new project or claiming a saved version. Initial empty projects cannot yet mint a
+history point. Existing-project sessions, files, and Git state remain under the user's control.
+
+Run the isolated executable proof after building:
+
+```sh
+node apps/desktop/scripts/prove-attached-capture.mjs
+```
+
+It uses temporary fixture folders, launches only the checkout's built binaries, checks direct and
+periodic saves, catches up after restart, stops through both the command and EOF paths, and verifies
+Git and directory identity preservation. It cleans up its fixture and does not replace an installed
+application. Successful output explicitly reports `packaged: false`.

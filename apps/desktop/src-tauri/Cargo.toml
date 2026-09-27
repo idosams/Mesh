@@ -19,6 +19,7 @@ name = "mesh-desktop"
 path = "main.rs"
 
 [dependencies]
+mesh-types = { path = "../../../crates/mesh-types", version = "=0.0.0" }
 mesh-approval = { path = "../../../crates/mesh-approval", version = "=0.0.0" }
 mesh-daemon = { path = "../../../crates/mesh-daemon", version = "=0.0.0" }
 mesh-crypto = { path = "../../../crates/mesh-crypto", version = "=0.0.0" }

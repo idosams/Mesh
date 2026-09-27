@@ -15,8 +15,10 @@ the external store and reopens exact old content after restart. Unchanged captur
 policy changes and ambiguous store bindings refuse. A native background controller now reconciles
 registered projects periodically, coalesces capture signals, retains saved history through incomplete
 scans or signing failures, and reports redacted capture health. It needs an explicit host signer and
-lifetime; packaged lifecycle, harness commands, desktop attachment flows, live fleet UI, process-tree
-recovery and complete acceptance journeys remain pending migration and verification.
+lifetime. The desktop executable now exposes headless capture, version listing and watch controls
+for an existing harness, with ephemeral native capture identities and joined stop handling. Packaged
+lifecycle, desktop attachment flows, live fleet UI, process-tree recovery and complete acceptance
+journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

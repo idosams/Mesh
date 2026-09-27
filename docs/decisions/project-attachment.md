@@ -116,8 +116,8 @@ rename reconciliation remain unfinished. The initial completely empty project ca
 root history point; removing all content from a previously saved project does save an empty version.
 
 This is a native library path. CLI attachment registration/observation remain separate and do not
-start saves. There is no automatic key generation, CLI background command, packaged desktop save
-flow, or agent attribution in this milestone. Tests cover ordinary concurrent editing, unchanged Git
+start saves. Separate desktop-binary harness commands now create a native in-process capture identity
+and invoke these APIs; there is still no packaged graphical save flow or agent attribution. Tests cover ordinary concurrent editing, unchanged Git
 index/HEAD, old bytes after restart, file history, no-op and concurrent saves, policy changes,
 missing journals, copied bindings and source replacement while signing.
 
@@ -158,8 +158,34 @@ capture and signer failure recovery, unchanged captures, signal coalescing, stop
 and source/store replacement. They do not establish packaged desktop lifecycle behavior or sustained
 performance on representative projects.
 
-Implement incremental filesystem observations, evidence-based file/session correlation, native host
-key/lifecycle integration, and the packaged existing-project journey.
+## Harness-accessible native commands
+
+The desktop executable now supports `--mesh-attachment capture|watch|versions <absolute-metadata-folder>`
+before graphical app initialization. These commands use an existing registration and do not open a
+window, switch desktop workspaces, configure a harness, or launch an agent. Capture saves once;
+versions lists exact immutable operation identities; watch runs the background controller and emits
+its redacted JSON status as revisions arrive. On watch stdin, `capture`, `status`, and `stop` are
+newline-delimited commands; EOF requests a stop too. Control input is bounded, with one queued command,
+and invalid input is refused without echoing it. The capture worker is joined before normal exit or
+control/output failure. A graceful watch exit does not itself assert a save: consumers must inspect
+`saved_version` and the reported outcome.
+
+The native host uses the existing `SoftwareActorCustody` implementation for a fresh capture-session
+key. The key remains in process, is not written to a key file or project, and is dropped with its
+native session. Restart creates a new capture actor while preserving the same attachment history;
+this is evidence of capture, not original authorship or a human approval credential. Graphical key
+and lifecycle integration remain separate work. The desktop adds a direct dependency on the existing
+workspace `mesh-types` crate for the signer interface; no new third-party dependency is introduced.
+
+The executable proof at `apps/desktop/scripts/prove-attached-capture.mjs` drives actual built binaries
+against an isolated dirty Git project. It verifies duplicate-free direct saves, periodic capture with
+no event signal, restart catch-up, explicit and EOF stop, invalid-command refusal, version listing,
+and preservation of the Git index/HEAD and original directory identity. See the adjacent
+`README-attached-capture.md` for reproduction. This is a development executable proof, not a packaged
+GUI or installed-app claim.
+
+Implement incremental filesystem observations, evidence-based file/session correlation, graphical
+host lifecycle integration, and the packaged existing-project journey.
 Persist captured content and history outside the project. Present registration, catch-up, incomplete
 capture and saved versions separately. Then integrate the attachment with desktop onboarding and
 parallel review. Registration tests alone do not satisfy the full existing-project acceptance journey.

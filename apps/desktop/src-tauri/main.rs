@@ -9,6 +9,9 @@ compile_error!("The Mesh desktop MVP currently requires the daemon's Unix-domain
 mod active_workspace;
 
 #[cfg(unix)]
+mod attachment_capture;
+
+#[cfg(unix)]
 mod artifact_preview;
 
 #[cfg(unix)]
@@ -11511,6 +11514,13 @@ mod mesh_mcp_mode_tests {
 
 #[cfg(target_os = "macos")]
 fn main() {
+    if let Some(result) = attachment_capture::run_if_requested() {
+        if let Err(problem) = result {
+            eprintln!("Mesh attachment: {problem}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(result) = run_mesh_mcp_if_requested() {
         finish_mesh_mcp_mode(result);
         return;
@@ -11521,6 +11531,13 @@ fn main() {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn main() {
+    if let Some(result) = attachment_capture::run_if_requested() {
+        if let Err(problem) = result {
+            eprintln!("Mesh attachment: {problem}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(result) = run_mesh_mcp_if_requested() {
         finish_mesh_mcp_mode(result);
         return;

@@ -65,7 +65,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A02 | `41bc6bf58615da3ff73922be2bb968b92925bd42` | feat: commit captured file batches as one durable signed version | [Mesh PR #10](https://github.com/idosams/Mesh/pull/10), `f6bda8b1b915367bd7f9b6e0f981ecf4a1a64521`; external signed history; stacked on #9; not merged |
 | A02 | `f5860ae7d0647f6539616890037b3b4ec1080ffc` | feat: save attached-project versions in external native history | [Mesh PR #10](https://github.com/idosams/Mesh/pull/10), `f6bda8b1b915367bd7f9b6e0f981ecf4a1a64521`; external signed history; stacked on #9; not merged |
 | A03 | `9e3e367c9be2f72fecd2fcd6304fbbac5ac31035` | feat: reconcile attached projects with a native background capture controller | [Mesh PR #11](https://github.com/idosams/Mesh/pull/11), `eb344f5460a332d7daa545e1d051b17368227367`; A03a native controller; stacked on #10; not merged |
-| A03 | `8e595348462ebcdc772e71f455f5b1f457aae109` | feat: expose native attached-project capture commands for harnesses | Pending transfer |
+| A03 | `8e595348462ebcdc772e71f455f5b1f457aae109` | feat: expose native attached-project capture commands for harnesses | A03b transfer in this branch; headless harness controls; stacked on #11; not merged |
 | A03 | `f8ec9022b9dbe6a44b6a8fa8894758e6962b1a62` | feat: provision native external attachment history storage | Pending transfer |
 | A04 | `76f453c67687525a88dd63171530e63a722eaead` | feat: add native desktop attachment session controls | Pending transfer |
 | A04 | `367e86a1b933d167083a0cb396e62b0ac3695710` | feat: connect existing-project attachment controls to desktop UI | Pending transfer |
