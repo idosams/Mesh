@@ -2,7 +2,7 @@ import { useTranslation } from "../lib/localization";
 import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
-type Project = { recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
+type Project = { detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
 type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null; digest: string | null; executable: boolean | null };
 type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
 type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
@@ -77,17 +77,20 @@ export function AttachedProjects() {
       const terminal = project.phase === "stopped" || project.phase === "failed";
       return <article key={project.id} className="grid gap-2 rounded-lg border border-border p-4">
         <p className="break-all text-sm font-medium"><bdi dir="ltr">{project.root}</bdi></p>
-        <p className="text-sm">{t(projection.error ? "Status may be out of date" : phases[project.phase])} · {t(project.recovery === "restored-stopped" ? "Saved history restored; resume when ready" : project.recovery === "unavailable" ? "Project or history needs reconciliation" : outcomes[project.outcome])}</p>
+        <p className="text-sm">{t(projection.error ? "Status may be out of date" : project.detached ? "Detached · saved history retained" : phases[project.phase])} · {t(project.detached ? "Reattach to enable capture controls" : project.recovery === "restored-stopped" ? "Saved history restored; resume when ready" : project.recovery === "unavailable" ? "Project or history needs reconciliation" : outcomes[project.outcome])}</p>
         <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t(project.recovery === "unavailable" ? "Saved version unavailable until history is verified" : "No saved version yet")}</p>
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
             onClick={() => send({ type: "versions", id: project.id, before: null })}>{t("Show latest versions")}</Button>
-          <Button variant="secondary" disabled={disabled || terminal || project.phase === "stopping"}
+          <Button variant="secondary" disabled={disabled || project.detached || terminal || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: "capture" })}>{t("Capture now")}</Button>
-          <Button variant="secondary" disabled={disabled || project.phase === "stopping"}
+          <Button variant="secondary" disabled={disabled || project.detached || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: terminal ? "resume" : "stop" })}>{t(terminal ? project.recovery === "unavailable" ? "Retry capture" : "Resume capture" : "Stop capture")}</Button>
+          <Button variant="secondary" disabled={disabled}
+            onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: project.detached ? "reattach" : "detach" })}>{t(project.detached ? "Reattach project" : "Detach Mesh")}</Button>
         </div>
+        {project.detached && <p className="text-xs text-muted-foreground">{t("Capture is disabled. Your files, Git workflow and saved history are retained. Reattach, then resume capture when ready.")}</p>}
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
           <p className="break-all text-xs text-muted-foreground">{projection.bases[project.id] && <>{t("Selected comparison base:")} <bdi dir="ltr">{projection.bases[project.id]}</bdi></>}</p>

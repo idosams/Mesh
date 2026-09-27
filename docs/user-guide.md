@@ -87,6 +87,13 @@ Choose **Resume capture** when ready to capture changes made while Mesh was clos
 project or history is unavailable, Mesh keeps the registration visible and requires the exact original
 folder and history before retrying; a replacement folder at the same path is not adopted.
 
+Choose **Detach Mesh** to stop Mesh tracking this project across restarts. Mesh joins its capture
+worker before confirming detachment and retains the original files, Git state, saved history and
+comparison pins. You can keep using your existing tools. **Reattach project** checks the original
+folder identity and restores the controls with capture still stopped; choose **Resume capture**
+separately when ready. An unavailable or replaced folder cannot be reattached. If detachment cannot
+be confirmed, refresh status and reconcile the reported problem rather than assuming it was saved.
+
 ## The six words Mesh shows people
 
 | Status | Meaning |

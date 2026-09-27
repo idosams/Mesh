@@ -16,6 +16,7 @@ export function attachedProjectList(raw) {
       || !/^[a-f0-9]{64}$/.test(project.id) || ids.has(project.id)
       || !/^[1-9][0-9]{0,19}$/.test(project.generation ?? '')
       || !safeText(project.root, 4096) || !project.root.startsWith('/')
+      || (project.detached !== undefined && typeof project.detached !== 'boolean')
       || ![undefined, null, 'restored-stopped', 'unavailable'].includes(project.recovery)
       || capture?.schema !== 'mesh.attachment-capture/v1'
       || !PHASES.has(capture.phase) || !OUTCOMES.has(capture.last_outcome)
@@ -26,7 +27,7 @@ export function attachedProjectList(raw) {
       throw new Error('Invalid attachment status');
     }
     ids.add(project.id);
-    return Object.freeze({ id: project.id, generation: project.generation, root: project.root,
+    return Object.freeze({ detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
       phase: capture.phase, outcome: capture.last_outcome, savedVersion: capture.saved_version,
       captureAgeMs: capture.last_complete_capture_age_ms, recovery: project.recovery ?? null });
   });
@@ -340,7 +341,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       return;
     }
     if (error || value.type !== 'control' || Object.keys(value).length !== 4
-      || !['capture', 'stop', 'resume'].includes(value.action)
+      || !['capture', 'stop', 'resume', 'detach', 'reattach'].includes(value.action)
       || !projects.some((project) => project.id === value.id && project.generation === value.generation)) return;
     void run(() => invoke('control_attached_project', { id: value.id, generation: value.generation, action: value.action }));
   }

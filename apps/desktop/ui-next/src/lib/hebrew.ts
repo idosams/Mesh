@@ -1,5 +1,10 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Detached · saved history retained":"מנותק · ההיסטוריה השמורה נשמרת",
+"Reattach to enable capture controls":"חברו מחדש כדי להפעיל את בקרות הלכידה",
+"Reattach project":"חיבור הפרויקט מחדש",
+"Detach Mesh":"ניתוק Mesh",
+"Capture is disabled. Your files, Git workflow and saved history are retained. Reattach, then resume capture when ready.":"הלכידה מושבתת. הקבצים, תהליך העבודה עם Git וההיסטוריה השמורה נשמרים. חברו מחדש, ואז חדשו את הלכידה כשמוכנים.",
 "Saved history restored; resume when ready":"ההיסטוריה השמורה שוחזרה; אפשר לחדש את הלכידה כשמוכנים",
 "Project or history needs reconciliation":"יש לאמת מחדש את הפרויקט או ההיסטוריה",
 "Saved version unavailable until history is verified":"הגרסה השמורה אינה זמינה עד לאימות ההיסטוריה",

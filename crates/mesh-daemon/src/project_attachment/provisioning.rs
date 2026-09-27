@@ -34,8 +34,13 @@ pub struct ProvisionedAttachment {
 pub struct RegisteredAttachment {
     id: String,
     root: PathBuf,
+    detached: bool,
 }
 impl RegisteredAttachment {
+    /// Capture was explicitly disabled without removing history.
+    pub fn detached(&self) -> bool {
+        self.detached
+    }
     /// Native identifier bound to the complete registration receipt.
     pub fn id(&self) -> &str {
         &self.id
@@ -136,10 +141,26 @@ impl AttachmentStorage {
             registrations.push(RegisteredAttachment {
                 id: id.to_owned(),
                 root,
+                detached: super::detachment::detached(&store)?,
             });
         }
         self.pinned.ensure_namespace_identity()?;
         Ok(registrations)
+    }
+
+    /// Set capture opt-out for an existing receipt, even while its source is offline.
+    /// Callers stop and join their owned workers before acknowledging detachment.
+    pub fn set_detached(&self, id: &str, detached: bool) -> io::Result<()> {
+        if !valid_id(id) {
+            return Err(invalid("invalid catalog project identity"));
+        }
+        let name = format!("project-{id}");
+        let store = self.pinned.open_child_directory(OsStr::new(&name))?;
+        if receipt_id(&read_receipt(&store)?) != id {
+            return Err(invalid("catalog receipt identity changed"));
+        }
+        super::detachment::set_detached(&store, detached)?;
+        self.pinned.ensure_namespace_identity()
     }
 
     /// Reopen only an exact existing registration through the retained catalog directory.

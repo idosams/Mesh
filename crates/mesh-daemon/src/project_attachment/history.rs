@@ -84,6 +84,7 @@ impl ProjectAttachment {
         }
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
+        super::detachment::ensure_attached(&store)?;
         let (configuration, created) =
             self.history_configuration(&store, Some(input.exclusion_digest()))?;
         let workspace_id = WorkspaceId::from_bytes(short_id(configuration.as_bytes()));
@@ -164,6 +165,7 @@ impl ProjectAttachment {
         {
             return Err(invalid("attachment history binding changed while signing"));
         }
+        super::detachment::ensure_attached(&store)?;
         let cas =
             Cas::with_filesystem(metadata.to_path_buf(), store.filesystem()).map_err(error)?;
         let saved = save_authenticated_checkpoint(

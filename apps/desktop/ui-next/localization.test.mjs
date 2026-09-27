@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { build } from "esbuild";
 
-async function loadLocalization() {
+async function loadLocalization(attachmentProjection) {
   const result = await build({ stdin: { contents: `
     import React from 'react';
     import { renderToStaticMarkup } from 'react-dom/server';
@@ -12,15 +12,16 @@ async function loadLocalization() {
     import { LanguagePicker } from './src/organisms/language-picker';
     import { ArtifactContentChanges } from './src/organisms/artifact-review';
     import { ImportWorkbench } from './src/organisms/import-workbench';
-    import { SavedInspection, SavedComparison } from './src/organisms/attached-projects';
+    import { AttachedProjects, SavedInspection, SavedComparison } from './src/organisms/attached-projects';
     export * from './src/lib/localization';
     export const renderNavigation = () => renderToStaticMarkup(<ProductionNavigation activePage="files" workspaceReady={true} nativeChangeCount={0} onNavigate={() => {}} />);
     export const renderPicker = () => renderToStaticMarkup(<LanguagePicker />);
     export const renderSections = (comparison) => renderToStaticMarkup(<ArtifactContentChanges change={{diffHunks: [], beforeLabel: 'Before', afterLabel: 'After', beforeValues: [], afterValues: []}} layout="inline" comparison={comparison} />);
+    export const renderAttachments = () => renderToStaticMarkup(<AttachedProjects />);
     export const renderSavedComparison = (comparison, props = {}) => renderToStaticMarkup(<SavedComparison project="project" comparison={comparison} disabled={false} {...props} />);
     export const renderSavedInspection = (inspection) => renderToStaticMarkup(<SavedInspection project="project" inspection={inspection} disabled={false} />);
     export const renderImport = (model) => renderToStaticMarkup(<ImportWorkbench model={model} onIntent={() => {}} />);
-  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { SavedInspection, SavedComparison };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
+  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8').replace('useState<Projection>(empty)', attachmentProjection ? `useState<Projection>(${JSON.stringify(attachmentProjection)})` : 'useState<Projection>(empty)') + '\nexport { SavedInspection, SavedComparison };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
   const module = { exports: {} };
   Function('require', 'module', 'exports', result.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
   return module.exports;
@@ -200,4 +201,26 @@ test('comparison pin controls localize disabled states and pinned views cannot r
   assert.ok(pinned.includes(comparison.base) && pinned.includes(comparison.target));
   ui.setLocale('en');
   assert.match(ui.renderSavedComparison(comparison, { canPin: true }), /Pin comparison alongside others/);
+});
+
+
+test('detached projects explain retained work in Hebrew and only enable explicit reattachment', async () => {
+  const project = { detached: true, recovery: 'restored-stopped', id: 'a'.repeat(64), generation: '2',
+    root: '/Users/משפחה/Files', phase: 'stopped', outcome: 'saved', savedVersion: 'b'.repeat(64), captureAgeMs: null };
+  const ui = await loadLocalization({ projects: [project], histories: {}, bases: {}, comparisons: {},
+    inspections: {}, pins: [], pinStatus: 'saved', pinError: '', busy: false, error: '', available: true });
+  ui.setLocale('he');
+  const html = ui.renderAttachments();
+  assert.match(html, /מנותק · ההיסטוריה השמורה נשמרת/);
+  assert.match(html, /הקבצים, תהליך העבודה עם Git וההיסטוריה השמורה נשמרים/);
+  assert.ok(html.includes('<bdi dir="ltr">/Users/משפחה/Files</bdi>'));
+  const buttons = [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)];
+  const button = text => buttons.find(([, , body]) => body === ui.translate('he', text));
+  assert.match(button('Capture now')[1], /\sdisabled=""/);
+  assert.match(button('Resume capture')[1], /\sdisabled=""/);
+  assert.doesNotMatch(button('Reattach project')[1], /\sdisabled=""/);
+  assert.doesNotMatch(button('Show latest versions')[1], /\sdisabled=""/);
+  assert.equal(button('Detach Mesh'), undefined);
+  ui.setLocale('en');
+  assert.match(ui.renderAttachments(), /Detached · saved history retained/);
 });

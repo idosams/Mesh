@@ -26,6 +26,7 @@ struct HostState {
     generation: u64,
 }
 struct Project {
+    detached: bool,
     source: PathBuf,
     generation: u64,
     service: Option<AttachmentCaptureService>,
@@ -41,6 +42,7 @@ impl Project {
     }
     fn projection(&self, id: &str) -> Json {
         Json::object([
+            ("detached", Json::Bool(self.detached)),
             ("id", Json::text(id)),
             ("generation", Json::text(self.generation.to_string())),
             ("root", Json::text(self.source.to_string_lossy())),
@@ -95,6 +97,7 @@ impl AttachmentHost {
             recovered.insert(
                 registration.id().to_owned(),
                 Project {
+                    detached: registration.detached(),
                     source: registration.root().to_owned(),
                     generation,
                     service: None,
@@ -144,6 +147,7 @@ impl AttachmentHost {
             .map_err(|_| UNAVAILABLE)?;
         state.generation = generation;
         let project = Project {
+            detached: false,
             source,
             generation,
             service: Some(service),
@@ -336,7 +340,48 @@ impl AttachmentHost {
         if project.generation.to_string() != generation {
             return Err("This attachment control belongs to an older capture session".into());
         }
+        if project.detached && !matches!(action, "detach" | "reattach") {
+            return Err("Reattach this project before controlling capture".into());
+        }
         match action {
+            "detach" => {
+                let next = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
+                let project = state.projects.get_mut(id).ok_or(UNAVAILABLE)?;
+                if let Some(service) = project.service.take() {
+                    project.recovered = service
+                        .stop_and_join()
+                        .map_err(|_| "Capture stop needs reconciliation")?;
+                }
+                state
+                    .storage
+                    .as_ref()
+                    .ok_or(UNAVAILABLE)?
+                    .set_detached(id, true)
+                    .map_err(|_| "Capture stopped, but detachment could not be confirmed")?;
+                let project = state.projects.get_mut(id).ok_or(UNAVAILABLE)?;
+                project.detached = true;
+                project.generation = next;
+                state.generation = next;
+            }
+            "reattach" => {
+                if !project.detached {
+                    return Err("This project is already attached".into());
+                }
+                let next = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
+                let storage = state.storage.as_ref().ok_or(UNAVAILABLE)?;
+                let history = storage
+                    .reopen(id)
+                    .map_err(|_| "The original project must be available before reattachment")?;
+                storage
+                    .set_detached(id, false)
+                    .map_err(|_| "Reattachment could not be confirmed")?;
+                let project = state.projects.get_mut(id).ok_or(UNAVAILABLE)?;
+                project.detached = false;
+                project.history = Some(history);
+                project.generation = next;
+                project.recovery = Some("restored-stopped");
+                state.generation = next;
+            }
             "capture" => {
                 if !project
                     .service
@@ -376,6 +421,7 @@ impl AttachmentHost {
                 state.projects.insert(
                     id.to_owned(),
                     Project {
+                        detached: false,
                         source,
                         generation: next,
                         service: Some(service),
@@ -694,6 +740,64 @@ mod tests {
         offline.control(id, &generation, "stop").unwrap();
         wait_for_project(&offline, id, |status| status.phase == CapturePhase::Stopped);
         drop(offline);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn detach_joins_capture_survives_restart_and_reattach_stays_stopped() {
+        let root = std::env::temp_dir().join(format!("mesh-desktop-detach-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "before detachment").unwrap();
+        let host = AttachmentHost::new(&root);
+        let attached = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = attached.get("id").unwrap().as_text().unwrap();
+        let generation = attached.get("generation").unwrap().as_text().unwrap();
+        let saved = wait_for_project(&host, id, |status| status.saved_version.is_some())
+            .saved_version
+            .unwrap();
+        let detached = Json::parse(&host.control(id, generation, "detach").unwrap()).unwrap();
+        assert_eq!(detached.get("detached"), Some(&Json::Bool(true)));
+        let next = detached.get("generation").unwrap().as_text().unwrap();
+        assert!(host.control(id, generation, "resume").is_err());
+        assert!(host.control(id, next, "resume").is_err());
+        assert!(host.control(id, next, "capture").is_err());
+        assert!(host.state.lock().unwrap().projects[id].service.is_none());
+        fs::write(source.join("work"), "normal tools continue").unwrap();
+        assert!(host
+            .versions(id, None)
+            .unwrap()
+            .contains(&saved.operation().to_string()));
+        drop(host);
+        let host = AttachmentHost::new(&root);
+        host.projects().unwrap();
+        let generation = host.state.lock().unwrap().projects[id]
+            .generation
+            .to_string();
+        assert!(host.state.lock().unwrap().projects[id].detached);
+        fs::rename(&source, root.join("offline")).unwrap();
+        assert!(host.control(id, &generation, "reattach").is_err());
+        fs::create_dir(&source).unwrap();
+        assert!(host.control(id, &generation, "reattach").is_err());
+        fs::remove_dir(&source).unwrap();
+        fs::rename(root.join("offline"), &source).unwrap();
+        let reattached = Json::parse(&host.control(id, &generation, "reattach").unwrap()).unwrap();
+        assert_eq!(reattached.get("detached"), Some(&Json::Bool(false)));
+        assert!(host.state.lock().unwrap().projects[id].service.is_none());
+        let next = reattached.get("generation").unwrap().as_text().unwrap();
+        host.control(id, next, "resume").unwrap();
+        wait_for_project(&host, id, |status| {
+            status.saved_version.is_some_and(|version| version != saved)
+        });
+        let next = host.state.lock().unwrap().projects[id]
+            .generation
+            .to_string();
+        host.control(id, &next, "detach").unwrap();
+        assert_eq!(
+            fs::read_to_string(source.join("work")).unwrap(),
+            "normal tools continue"
+        );
+        drop(host);
         fs::remove_dir_all(root).unwrap();
     }
 }

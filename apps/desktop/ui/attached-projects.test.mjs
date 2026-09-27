@@ -394,3 +394,20 @@ test('restart revalidates selected file outside restored page and retains unavai
   assert.equal(h.projections.at(-1).pinStatus, 'saved');
   h.dispose();
 });
+
+test('detached projects retain history identity and send only explicit generation-bound lifecycle controls', async () => {
+  const calls = [];
+  const value = reply(); value.projects[0].detached = true;
+  assert.equal(attachedProjectList(value)[0].detached, true);
+  const invalid = reply(); invalid.projects[0].detached = 'yes';
+  assert.throws(() => attachedProjectList(invalid));
+  const h = harness(async (command, args) => { calls.push({ command, args }); return value; });
+  await settle();
+  assert.equal(h.projections.at(-1).projects[0].savedVersion, 'b'.repeat(64));
+  h.intent({ type: 'control', id, generation: '1', action: 'reattach' }); await settle();
+  assert.deepEqual(calls[1], { command: 'control_attached_project', args: { id, generation: '1', action: 'reattach' } });
+  const count = calls.length;
+  h.intent({ type: 'control', id, generation: '0', action: 'detach' }); await settle();
+  assert.equal(calls.length, count);
+  h.dispose();
+});

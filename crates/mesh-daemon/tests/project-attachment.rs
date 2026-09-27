@@ -1145,3 +1145,60 @@ fn pin_ui_projection_roundtrips_without_content_and_refuses_ambiguous_fields() {
     invalid.pins[0].path = Some("../outside".into());
     assert!(AttachmentPinState::parse_projection(&invalid.to_json().encode()).is_err());
 }
+
+#[test]
+fn detachment_retains_history_refuses_capture_and_survives_offline_discovery() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("detach-history");
+    f.git(&["init", "--quiet"]);
+    fs::write(f.source.join("work"), "saved").unwrap();
+    let git_before = f.git(&["status", "--porcelain=v1"]);
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let history = storage.provision(&f.source).unwrap();
+    let input = history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let saved = save_attached(history.project(), history.metadata_path(), &input).unwrap();
+    storage.set_detached(history.id(), true).unwrap();
+    storage.set_detached(history.id(), true).unwrap();
+    assert!(storage.registrations().unwrap()[0].detached());
+    assert!(save_attached(history.project(), history.metadata_path(), &input).is_err());
+    assert_eq!(history.saved_versions().unwrap(), vec![saved]);
+    assert_eq!(f.git(&["status", "--porcelain=v1"]), git_before);
+    fs::rename(&f.source, f.root.join("offline")).unwrap();
+    assert!(storage.registrations().unwrap()[0].detached());
+    storage.set_detached(history.id(), true).unwrap();
+    fs::rename(f.root.join("offline"), &f.source).unwrap();
+    storage.set_detached(history.id(), false).unwrap();
+    assert!(!storage.registrations().unwrap()[0].detached());
+    fs::write(f.source.join("work"), "continued").unwrap();
+    let input = history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let next = save_attached(history.project(), history.metadata_path(), &input).unwrap();
+    assert_ne!(saved, next);
+}
+
+#[test]
+fn corrupt_or_linked_detachment_records_are_preserved_and_never_treated_as_attached() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("detach-refusal");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let history = storage.provision(&f.source).unwrap();
+    storage.set_detached(history.id(), true).unwrap();
+    let marker = history.metadata_path().join("attachment-detached.json");
+    let original = fs::read(&marker).unwrap();
+    fs::write(&marker, b"partial").unwrap();
+    assert!(storage.registrations().is_err());
+    assert!(storage.set_detached(history.id(), false).is_err());
+    assert_eq!(fs::read(&marker).unwrap(), b"partial");
+    fs::remove_file(&marker).unwrap();
+    let outside = f.root.join("outside");
+    fs::write(&outside, original).unwrap();
+    symlink(&outside, &marker).unwrap();
+    assert!(storage.registrations().is_err());
+    assert!(storage.set_detached(history.id(), false).is_err());
+    assert!(outside.exists());
+}

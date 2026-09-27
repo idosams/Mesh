@@ -34,7 +34,10 @@ it. Desktop pin selections now persist through native revision-checked snapshots
 restart only by revalidating their exact history, including selected paths outside the restored page.
 Unavailable pins retain their selectors and expose retry controls; failed saves keep local views open
 without claiming durability, and conflicts require explicit reload of the saved set. Selecting a new comparison base does
-not change an open comparison. Packaged
+not change an open comparison. Persistent detachment now joins the desktop-owned capture worker,
+retains original files and history, and refuses subsequent native saves until explicit reattachment.
+Reattachment verifies the original source and remains stopped until resume. Detachment survives
+restart and unavailable sources; corrupt or linked records require reconciliation. Packaged
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

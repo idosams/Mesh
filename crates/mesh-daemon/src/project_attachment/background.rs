@@ -217,6 +217,7 @@ impl AttachmentCaptureService {
     ) -> io::Result<Self> {
         attachment.ensure_current()?;
         store.ensure_namespace_identity()?;
+        super::detachment::ensure_attached(&store)?;
         schedule.limits.validate()?;
         if !(Duration::from_millis(250)..=Duration::from_secs(300))
             .contains(&schedule.reconciliation_interval)

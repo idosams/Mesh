@@ -442,3 +442,30 @@ Focused native and coordinator tests cover projection bounds, independent select
 restoration outside the current page, unavailable pins, close during save, uncertain acknowledgements,
 revision conflicts and corrupt initial records. These are source and native test results; packaged
 desktop restart proof, human approval and integration remain outstanding.
+
+## Persistent detachment without deleting work
+
+The native desktop now exposes Detach Mesh and Reattach project. Detachment requests stop and
+joins its owned capture worker before acknowledging completion. It writes an owner-only
+`mesh.attachment-detached/v1` marker in that project's external store, bound to the exact
+registration receipt and store device/inode. The marker is created through the retained directory
+descriptor, synchronized and reread. Reattachment removes only that verified marker and syncs the
+directory. Corrupt, partial, linked or substituted markers refuse instead of becoming an attached
+default. A missing marker preserves compatibility with existing registrations.
+
+Detachment retains receipts, history, review pins and original project contents. Discovery reads the
+marker even while the source is offline. The desktop projects projection adds a boolean `detached`
+field. Native controls reject capture/resume while detached; reattachment verifies the original source
+identity and advances the control generation. Reattachment stays stopped until explicit resume.
+This keeps reattachment distinct from accidentally restarting a previously stopped worker.
+
+All native capture entry points refuse detached storage at worker start, and signed save checks the
+marker under the history serialization lock before preparing and before committing a capture.
+Other already-running processes are not forcibly terminated; their subsequent saves are refused.
+The desktop only claims to have joined the worker it owns. A failure while writing the marker can
+leave capture stopped without a confirmed detach and is reported as such. Partial evidence is retained.
+
+Tests cover owned-worker termination, generation refusal, restart, unavailable/replaced source
+reattachment refusal, continued ordinary edits, historical reads while detached, resumed catch-up,
+unchanged Git status, offline discovery, and corrupt/symlink marker preservation. This is native and
+source-UI validation; packaged detach/restart proof remains outstanding.
