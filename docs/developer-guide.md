@@ -1,5 +1,7 @@
 # Developer guide
 
+The canonical development repository is [idosams/Mesh](https://github.com/idosams/Mesh). Verify actual remotes and base ancestry; the local folder name proves nothing. Follow the [agent workflow](../AGENTS.md) and [migration ledger](plan/fleet-migration.md) when transferring older work.
+
 Mesh is a Rust workspace with a Tauri desktop application and a React interface. The daemon owns
 durable workspace state; clients use the local IPC protocol rather than opening its database.
 

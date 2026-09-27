@@ -1,5 +1,7 @@
 # Contributing to Mesh
 
+Development and delivery use [idosams/Mesh](https://github.com/idosams/Mesh), the canonical repository. Mesh-internal is deprecated for ongoing development. Agents follow [AGENTS.md](AGENTS.md), including repository/base checks before edits and delivery.
+
 Thank you for helping test and improve Mesh. Start with the [developer guide](docs/developer-guide.md)
 and [project status](docs/project-status.md), then open an issue before beginning a substantial
 change.

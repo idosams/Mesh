@@ -1,5 +1,7 @@
 # Mesh
 
+**Canonical repository:** [idosams/Mesh](https://github.com/idosams/Mesh). Development, issues and pull requests belong here; Mesh-internal is retained as deprecated history. See the [contribution workflow](CONTRIBUTING.md).
+
 Mesh is a local-first workspace system for humans and coding agents. Each actor works in a durable
 private state, and only an exact human-reviewed state can advance the protected shared version.
 

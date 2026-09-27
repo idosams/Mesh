@@ -10,11 +10,13 @@
     "verify:license": "node tools/program/license-check.mjs && node tools/program/license-check.mjs --self-test",
     "verify:rust": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo fmt --all --check && PATH=\"$HOME/.cargo/bin:$PATH\" cargo clippy --workspace --all-targets -- -D warnings && PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run --workspace",
     "verify:desktop": "npm --prefix apps/desktop test",
-    "verify": "npm run verify:docs && npm run verify:license && npm run verify:storage && npm run verify:rust && npm run verify:desktop && npm run verify:demo",
+    "verify": "npm run verify:repository && npm run verify:docs && npm run verify:license && npm run verify:storage && npm run verify:rust && npm run verify:desktop && npm run verify:demo",
     "verify:docs": "node --test tools/docs/check.test.mjs && node tools/docs/check.mjs",
     "verify:storage": "node tools/program/storage-budget/check.mjs && node tools/program/storage-budget/check.mjs --self-test",
     "verify:demo": "node examples/local-daemon-demo.mjs",
-    "test:macos-renderers": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run -p mesh-desktop --run-ignored only"
+    "test:macos-renderers": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run -p mesh-desktop --run-ignored only",
+    "repo:target": "node tools/program/repository-target.mjs",
+    "verify:repository": "node --test tools/program/repository-target.test.mjs"
   },
   "engines": {
     "node": ">=22.18.0"
