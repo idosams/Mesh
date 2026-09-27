@@ -596,3 +596,9 @@ and restart. A new request is computed against the current accepted main; reopen
 bundle retains its original base. Attachment approval/integration and packaged graphical proof
 remain unfinished. No broader parallel
 publication or dependency-closure guarantee is claimed by this request-queue step.
+
+The review-request increment includes the independent directory-lock prerequisite originally found
+in the subsequent approval source commit. Cloned pinned roots retain the same directory object but
+must acquire flock through separately opened file descriptions; a duplicated descriptor inherits
+lock ownership. The native cloned-root regression checks that a concurrent contender cannot enter
+until the first guard is released. Directory identity is still rechecked after the wait.

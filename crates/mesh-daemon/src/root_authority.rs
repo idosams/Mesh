@@ -249,6 +249,12 @@ impl PinnedWorkspaceRoot {
         self.directory.try_clone()
     }
 
+    /// Open the retained directory with an independent lock description. A duplicated descriptor
+    /// shares flock ownership, so concurrent users of cloned roots must not lock a `try_clone`.
+    pub(crate) fn independent_lock_directory(&self) -> io::Result<File> {
+        openat(&self.directory, OsStr::new("."), OPEN_DIRECTORY_FLAGS, 0)
+    }
+
     /// Prove the retained descriptor still names the admitted directory object.
     pub(crate) fn ensure_identity(&self, device: u64, inode: u64) -> io::Result<()> {
         let metadata = self.directory.metadata()?;

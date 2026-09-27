@@ -484,7 +484,7 @@ fn lock_physical_workspace(
             "nested workspace custody acquisition was refused",
         ));
     }
-    let file = physical.try_clone_directory().map_err(|error| {
+    let file = physical.independent_lock_directory().map_err(|error| {
         WorkspaceAgentCustodyError::io("open workspace custody directory", error)
     })?;
     let lock = lock_exclusive(file, identity)
@@ -691,6 +691,34 @@ mod tests {
         assert!(locked.acquire(false, None).is_err());
         assert!(locked.require_unassigned().is_err());
         drop(open);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cloned_pinned_roots_do_not_share_lock_ownership() {
+        let root = scratch("cloned-root-lock");
+        let physical = PinnedWorkspaceRoot::open(root.clone()).expect("pin");
+        let clone = physical.clone();
+        let guard = lock_workspace_initialization(&physical).expect("first lock");
+        let (started, entered) = mpsc::channel();
+        let (acquired, result) = mpsc::channel();
+        let contender = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            let _guard = lock_workspace_initialization(&clone).expect("second lock");
+            acquired.send(()).unwrap();
+        });
+        entered
+            .recv_timeout(Duration::from_secs(2))
+            .expect("contender started");
+        assert!(
+            result.recv_timeout(Duration::from_millis(100)).is_err(),
+            "a cloned descriptor must not inherit the first caller's lock ownership"
+        );
+        drop(guard);
+        result
+            .recv_timeout(Duration::from_secs(2))
+            .expect("contender acquired after release");
+        contender.join().unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
 
