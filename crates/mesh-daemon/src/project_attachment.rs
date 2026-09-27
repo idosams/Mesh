@@ -1,0 +1,189 @@
+//! Persistent, non-exclusive attachment to an existing project. No project files are written.
+//!
+//! The native caller chooses a private metadata directory outside the source project. This record
+//! establishes observation identity only: it grants no custody, saved-version or write-back authority.
+
+use std::fs;
+use std::io::{self, Read as _};
+use std::os::unix::fs::PermissionsExt as _;
+use std::path::{Path, PathBuf};
+
+use crate::ipc::Json;
+use crate::root_authority::{PinnedWorkspaceRoot, ProtectedWorkspaceRoot};
+
+const RECEIPT: &str = "attachment.json";
+const SCHEMA: &str = "mesh.project-attachment/v1";
+const MAX_RECEIPT_BYTES: u64 = 65_536;
+
+mod observation;
+pub use observation::{CapturedFileInput, CapturedProjectInput, ObservationLimits};
+
+/// An admitted existing folder. It remains writable by the user's ordinary tools.
+pub struct ProjectAttachment {
+    root: PathBuf,
+    pinned: PinnedWorkspaceRoot,
+    device: u64,
+    inode: u64,
+}
+
+impl ProjectAttachment {
+    /// Register a project in an existing private metadata directory, without modifying the project.
+    /// Repeating the same registration is idempotent; an existing different receipt is preserved.
+    pub fn register(root: &Path, metadata: &Path) -> io::Result<Self> {
+        let attached = Self::admit(root)?;
+        let store = external_store(metadata, &attached)?;
+        let encoded = attached.receipt()?.encode();
+        attached.ensure_current()?;
+        match store.filesystem().write_new_file(
+            Path::new(RECEIPT),
+            encoded.as_bytes(),
+            fs::Permissions::from_mode(0o600),
+        ) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                if read_receipt(&store)? != encoded {
+                    return Err(invalid(
+                        "attachment metadata already belongs to another project",
+                    ));
+                }
+            }
+            Err(error) => return Err(error),
+        }
+        // A failed final identity check preserves the receipt for explicit recovery, never deletion.
+        store.ensure_namespace_identity()?;
+        attached.ensure_current()?;
+        Ok(attached)
+    }
+
+    /// Reopen an existing registration and verify the named folder still has its admitted identity.
+    /// Missing source folders are never recreated or silently rebound to a replacement.
+    pub fn reopen(metadata: &Path) -> io::Result<Self> {
+        let store = pin_absolute_directory(metadata)?;
+        let encoded = read_receipt(&store)?;
+        let receipt = Json::parse(&encoded).map_err(|_| invalid("invalid attachment receipt"))?;
+        if receipt.get("schema").and_then(Json::as_text) != Some(SCHEMA) {
+            return Err(invalid("unsupported attachment receipt"));
+        }
+        let root = receipt
+            .get("root")
+            .and_then(Json::as_text)
+            .ok_or_else(|| invalid("missing attachment root"))?;
+        let attached = Self::admit(Path::new(root))?;
+        // Canonical equality checks every identity field and rejects unknown fields/schema changes.
+        if attached.receipt()?.encode() != encoded {
+            return Err(invalid("attached project identity changed"));
+        }
+        let checked = external_store(metadata, &attached)?;
+        if checked.identity()? != store.identity()? {
+            return Err(invalid("attachment metadata identity changed"));
+        }
+        store.ensure_namespace_identity()?;
+        attached.ensure_current()?;
+        Ok(attached)
+    }
+
+    fn admit(root: &Path) -> io::Result<Self> {
+        let pinned = pin_absolute_directory(root)?;
+        let (device, inode) = pinned.identity()?;
+        let root = root.canonicalize()?;
+        let canonical = pin_absolute_directory(&root)?;
+        canonical.ensure_identity(device, inode)?;
+        pinned.ensure_namespace_identity()?;
+        Ok(Self {
+            root,
+            pinned: canonical,
+            device,
+            inode,
+        })
+    }
+
+    /// The original project location, not a newly provisioned working copy.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Check both the retained descriptor and its current pathname before observing the project.
+    pub fn ensure_current(&self) -> io::Result<()> {
+        self.pinned.ensure_identity(self.device, self.inode)?;
+        self.pinned.ensure_namespace_identity()
+    }
+
+    /// Native registration status. Observation/capture availability is explicit, not inferred.
+    pub fn status(&self) -> io::Result<Json> {
+        self.ensure_current()?;
+        Ok(Json::object([
+            ("schema", Json::text(SCHEMA)),
+            (
+                "root",
+                Json::text(
+                    self.root
+                        .to_str()
+                        .ok_or_else(|| invalid("project path is not UTF-8"))?,
+                ),
+            ),
+            ("mode", Json::text("non-exclusive")),
+            ("registered", Json::Bool(true)),
+            ("observation", Json::text("not-started")),
+            ("saved_version", Json::Null),
+            ("exclusive_custody", Json::Bool(false)),
+        ]))
+    }
+
+    fn receipt(&self) -> io::Result<Json> {
+        Ok(Json::object([
+            ("schema", Json::text(SCHEMA)),
+            (
+                "root",
+                Json::text(
+                    self.root
+                        .to_str()
+                        .ok_or_else(|| invalid("project path is not UTF-8"))?,
+                ),
+            ),
+            ("device", Json::text(format!("{:016x}", self.device))),
+            ("inode", Json::text(format!("{:016x}", self.inode))),
+        ]))
+    }
+}
+
+fn pin_absolute_directory(path: &Path) -> io::Result<PinnedWorkspaceRoot> {
+    if !path.is_absolute() || fs::symlink_metadata(path)?.file_type().is_symlink() {
+        return Err(invalid(
+            "attachment directories must be absolute real directories",
+        ));
+    }
+    let pinned = PinnedWorkspaceRoot::open(path.to_path_buf())?;
+    pinned.ensure_namespace_identity()?;
+    Ok(pinned)
+}
+
+fn external_store(path: &Path, attached: &ProjectAttachment) -> io::Result<PinnedWorkspaceRoot> {
+    let store = pin_absolute_directory(path)?;
+    let source = ProtectedWorkspaceRoot::from_directory_token(&format!(
+        "{:016x}:{:016x}",
+        attached.device, attached.inode
+    ))?;
+    if store.is_within(source)? {
+        return Err(invalid(
+            "attachment metadata must remain outside the project",
+        ));
+    }
+    Ok(store)
+}
+
+fn read_receipt(store: &PinnedWorkspaceRoot) -> io::Result<String> {
+    let file = store.filesystem().inspect_entry(Path::new(RECEIPT))?;
+    if !file.metadata()?.is_file() {
+        return Err(invalid("attachment receipt is not a regular file"));
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_RECEIPT_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_RECEIPT_BYTES {
+        return Err(invalid("attachment receipt is too large"));
+    }
+    String::from_utf8(bytes).map_err(|_| invalid("attachment receipt is not UTF-8"))
+}
+
+fn invalid(message: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, message)
+}

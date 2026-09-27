@@ -57,6 +57,17 @@ future database versions fail closed. Schema changes need migration tests and th
 
 ## Authority
 
+Existing-project attachment is a distinct authority mode. Native registration is implemented as
+described in [the attachment decision](project-attachment.md); observation and capture are planned.
+That mode observes and captures work
+without exclusive custody, relocating the project or changing existing tool sessions. Native code
+must bind the observed root and captured file identities, detect concurrent writes, reconcile event
+gaps and preserve unsupported or ambiguous work. Keep attachment metadata outside project content by
+default. Correlating filesystem events with a run is not authenticated authorship; absent evidence
+must remain explicit. Existing exclusive custody and human approval guards remain unchanged until
+the separate attachment operations and their contracts are implemented. Importing a copy or opening
+an app-managed agent folder is not proof of this mode.
+
 Agent tools carry scoped session identity. Agent-supplied lane IDs or paths never prove authority.
 The daemon chooses private folders and validates workspace identity/generation. Every lane gets an
 independent service context, so UI navigation cannot redirect an agent.

@@ -290,6 +290,10 @@ mod call {
         SupportBundle { workspace: String },
         /// Hash an existing folder without writing it or creating a managed copy.
         ImportPreview { source: String },
+        /// Register an existing project without moving it or claiming write custody.
+        Attach { source: String, metadata: String },
+        /// Verify an existing attachment after restart.
+        AttachmentStatus { metadata: String, observe: bool },
         /// Copy and confirm the exact summary a person previously previewed.
         ImportConfirm {
             source: String,
@@ -309,6 +313,40 @@ mod call {
     impl Local {
         fn run(self) -> Result<ExitCode, String> {
             match self {
+                Self::Attach { source, metadata } => {
+                    let result = mesh_daemon::project_attachment::ProjectAttachment::register(
+                        Path::new(&source),
+                        Path::new(&metadata),
+                    )
+                    .and_then(|attached| attached.status());
+                    match result {
+                        Ok(status) => println!("{}", status.encode()),
+                        Err(error) => {
+                            eprintln!("meshctl: attachment could not be confirmed: {error}. Existing files and any receipt were preserved.");
+                            return Ok(ExitCode::from(1));
+                        }
+                    }
+                }
+                Self::AttachmentStatus { metadata, observe } => {
+                    match mesh_daemon::project_attachment::ProjectAttachment::reopen(Path::new(
+                        &metadata,
+                    ))
+                    .and_then(|attached| {
+                        if observe {
+                            attached.observe(
+                                mesh_daemon::project_attachment::ObservationLimits::default(),
+                            )
+                        } else {
+                            attached.status()
+                        }
+                    }) {
+                        Ok(status) => println!("{}", status.encode()),
+                        Err(error) => {
+                            eprintln!("meshctl: attachment is unavailable: {error}");
+                            return Ok(ExitCode::from(1));
+                        }
+                    }
+                }
                 Self::Exclusions { workspace, path } => {
                     let effective = mesh_daemon::EffectiveExclusions::load(
                         std::path::Path::new(&workspace),
@@ -561,6 +599,25 @@ mod call {
                             source: next(&mut rest, "import-preview", "source folder")?.to_owned(),
                         });
                     }
+                    "attach" => {
+                        request.local = Some(Local::Attach {
+                            source: next(&mut rest, "attach", "existing project folder")?
+                                .to_owned(),
+                            metadata: next(&mut rest, "attach", "external metadata folder")?
+                                .to_owned(),
+                        });
+                    }
+                    "attachment-status" | "attachment-observe" => {
+                        request.local = Some(Local::AttachmentStatus {
+                            observe: argument == "attachment-observe",
+                            metadata: next(
+                                &mut rest,
+                                "attachment-status",
+                                "external metadata folder",
+                            )?
+                            .to_owned(),
+                        });
+                    }
                     "import-confirm" => {
                         let source = next(&mut rest, "import-confirm", "source folder")?.to_owned();
                         let destination =
@@ -803,6 +860,13 @@ Usage: meshctl --endpoint <path> <command>
 
 Answered without the service when --endpoint is omitted:
 
+  attach <existing-project> <external-metadata-folder>
+                         Register an existing project in place. Both folders must already exist
+                         and use absolute paths. Does not start observation or capture versions.
+  attachment-status <external-metadata-folder>
+                         Reopen the attachment and refuse a replaced or missing project folder.
+  attachment-observe <external-metadata-folder>
+                         Read one bounded live inventory. Does not save a version or start watching.
   exclusions <folder> [path]
                          What that workspace does not version, and — when a path is
                          given — which source said so.

@@ -388,9 +388,18 @@ impl PinnedRootFs {
     /// never resolves the caller's pathname again. Entry names are subsequently opened through
     /// [`Self::inspect_entry`], which re-confines every component.
     pub(crate) fn read_directory_names(&self, path: &Path) -> io::Result<Vec<OsString>> {
+        self.read_directory_names_bounded(path, usize::MAX)
+    }
+
+    /// Bound directory-entry allocation before enumeration, including excluded names.
+    pub(crate) fn read_directory_names_bounded(
+        &self,
+        path: &Path,
+        limit: usize,
+    ) -> io::Result<Vec<OsString>> {
         let directory = self.open_directory_components(&self.relative(path)?)?;
         let expected = directory.metadata()?;
-        let mut names = read_directory_descriptor(&directory)?;
+        let mut names = read_directory_descriptor(&directory, limit)?;
         let after = directory.metadata()?;
         if after.dev() != expected.dev() || after.ino() != expected.ino() {
             return Err(io::Error::other(
@@ -525,7 +534,7 @@ struct NativeDirent {
 }
 
 #[allow(unsafe_code)]
-fn read_directory_descriptor(directory: &File) -> io::Result<Vec<OsString>> {
+fn read_directory_descriptor(directory: &File, limit: usize) -> io::Result<Vec<OsString>> {
     unsafe extern "C" {
         fn fdopendir(descriptor: i32) -> *mut std::ffi::c_void;
         fn readdir(stream: *mut std::ffi::c_void) -> *mut NativeDirent;
@@ -550,6 +559,7 @@ fn read_directory_descriptor(directory: &File) -> io::Result<Vec<OsString>> {
         unsafe { __errno_location() }
     }
 
+    // open_directory_components already supplied an independent description for this walk.
     let duplicate = directory.try_clone()?;
     let descriptor = duplicate.into_raw_fd();
     // SAFETY: ownership of the duplicated descriptor transfers to the directory stream on
@@ -583,6 +593,12 @@ fn read_directory_descriptor(directory: &File) -> io::Result<Vec<OsString>> {
             let bytes = unsafe { CStr::from_ptr((*entry).name.as_ptr()) }.to_bytes();
             if bytes == b"." || bytes == b".." {
                 continue;
+            }
+            if names.len() == limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "directory entry limit exceeded",
+                ));
             }
             names.push(OsString::from_vec(bytes.to_vec()));
         }

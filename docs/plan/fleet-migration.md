@@ -58,10 +58,10 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | F04 | `4741d895b3eb34a5f9c8d6e7a8c482c527cbc8a6` | feat: submit completed agent checkpoints as immutable reviews | [Mesh PR #7](https://github.com/idosams/Mesh/pull/7), `592dfbf3d7363053073a106d4918e1169af8e9af`; immutable review submission; stacked on #6; not merged |
 | F05 | `0d6127f1371bec3cbf150bcf2540097fbf980aad` | feat: launch scoped Codex workers with durable ownership claims | [Mesh PR #8](https://github.com/idosams/Mesh/pull/8), `5f39c955f4e3c982c762a39b125a442f616b486c`; native provider execution/scheduling; stacked on #7; not merged |
 | F05 | `ca9b48a59f14934e9b05dacef1ecbaa9c93453f3` | feat: schedule delegated Codex workers within native fleet limits | [Mesh PR #8](https://github.com/idosams/Mesh/pull/8), `5f39c955f4e3c982c762a39b125a442f616b486c`; native provider execution/scheduling; stacked on #7; not merged |
-| A01 | `c6e62e0be68307fa315928d0d90bb6eaf8852b94` | docs: prioritize non-disruptive existing-project attachment | Pending transfer |
-| A01 | `09f4d863796aa52c7fc60530dfd1a73a68e94178` | feat: register existing projects without moving or taking custody | Pending transfer |
-| A01 | `920a71f36fa21e4646129a75d5bfd086630c9c25` | feat: observe attached projects through bounded native inventories | Pending transfer |
-| A01 | `ddf6086860b38c104a4e199e4b770800fa34b715` | feat: capture immutable inputs from attached projects without taking custody | Pending transfer |
+| A01 | `c6e62e0be68307fa315928d0d90bb6eaf8852b94` | docs: prioritize non-disruptive existing-project attachment | Transferred on `idosams/existing-project-capture`; validation/PR pending; stacked on #8; not merged |
+| A01 | `09f4d863796aa52c7fc60530dfd1a73a68e94178` | feat: register existing projects without moving or taking custody | Transferred on `idosams/existing-project-capture`; validation/PR pending; stacked on #8; not merged |
+| A01 | `920a71f36fa21e4646129a75d5bfd086630c9c25` | feat: observe attached projects through bounded native inventories | Transferred on `idosams/existing-project-capture`; validation/PR pending; stacked on #8; not merged |
+| A01 | `ddf6086860b38c104a4e199e4b770800fa34b715` | feat: capture immutable inputs from attached projects without taking custody | Transferred on `idosams/existing-project-capture`; validation/PR pending; stacked on #8; not merged |
 | A02 | `41bc6bf58615da3ff73922be2bb968b92925bd42` | feat: commit captured file batches as one durable signed version | Pending transfer |
 | A02 | `f5860ae7d0647f6539616890037b3b4ec1080ffc` | feat: save attached-project versions in external native history | Pending transfer |
 | A03 | `9e3e367c9be2f72fecd2fcd6304fbbac5ac31035` | feat: reconcile attached projects with a native background capture controller | Pending transfer |

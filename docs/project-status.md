@@ -8,8 +8,11 @@ can submit a completed checkpoint while newer work continues, without approval o
 Native Codex execution now records durable launch ownership and redacted activity. A tick-driven
 host discovers delegated lanes and dispatches them within durable limits; uncertain processes retain
 their slots and custody. These are native/MCP integration foundations on unmerged review branches.
-Existing-project attachment, live fleet UI, process-tree recovery and complete acceptance journeys
-remain pending migration and verification.
+Existing-project registration now pins the original folder and keeps metadata outside the project.
+Bounded native observation and immutable capture inputs leave source files and Git state untouched,
+without claiming custody or a saved version. Durable attachment history, background capture, live
+fleet UI, process-tree recovery and complete acceptance journeys remain pending migration and
+verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac
