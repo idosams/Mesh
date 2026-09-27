@@ -289,4 +289,20 @@ requests protocol 8 while retaining the exact negotiated-version and advertised-
 Its repository contract test now compares the proof's declared version with the daemon's declared
 surface rather than pinning the stale literal. The regression fails against the original proof
 (`7 != 8`). This is a validation correction, not a replacement of any preserved product commit.
-Full gate, revision-bound bundle and actual rendered journey results remain pending.
+Implementation `254ec5bafa5589874051da584413d44c07460dc8` passed the full canonical gate:
+3,151 native tests, 587 desktop tests and 44 real-daemon checks; 13 platform/provider tests skipped.
+There were no lingering-handle flags. All five focused local-app tests also passed.
+A fresh sealed ad-hoc bundle at that exact revision passed the isolated rendered journey
+(`mesh-rendered-app-proof/v6`, renderer v5), including import, restart, version selection, Files
+open/reveal, review, private export and agent handoff. Both negotiated IPC and advertised surface
+were 8. The 2400 by 1586 captured window was inspected; post-journey native identity and seal
+verification passed. Executable SHA-256:
+`c020f3f47e6ee019ed4d45cb5e5c6d82cf3ac6fce96674031319327a825aab3b`.
+The prior sealed bundle was preserved and its executable hash compared before rebuilding.
+This managed-workspace journey does not verify the new attached-project controls or actual Secure
+Enclave presence. The bundle truthfully reports approval unavailable without validated Apple identity.
+Hosted CI and PR publication are pending; no merge is implied.
+
+The prerequisite [Mesh PR #33](https://github.com/idosams/Mesh/pull/33) passed all seven hosted
+checks at `f27287d4e99e6c63e2a602a83a2c1283703c601c` in run 36356728345 and is ready for required
+human review. It remains unmerged.
