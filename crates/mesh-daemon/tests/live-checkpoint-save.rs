@@ -606,7 +606,8 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the time bound elapsed without automatic recovery preservation"
+            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; conditions={:?}",
+            daemon.workspace_state().map(|state| state.conditions.iter().map(|condition| condition.code().to_owned()).collect::<Vec<_>>())
         );
         std::thread::sleep(Duration::from_millis(2));
     }
@@ -983,7 +984,9 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the detached maximum-recovery refusal was not surfaced"
+            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; conditions={:?}",
+            daemon.checkpoint_snapshot(),
+            state.conditions.iter().map(|condition| condition.code()).collect::<Vec<_>>()
         );
         std::thread::sleep(Duration::from_millis(2));
     }
