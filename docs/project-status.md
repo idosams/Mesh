@@ -39,8 +39,10 @@ retains original files and history, and refuses subsequent native saves until ex
 Reattachment verifies the original source and remains stopped until resume. Detachment survives
 restart and unavailable sources; corrupt or linked records require reconciliation. An isolated
 capture verifier now accepts a sealed local bundle plus exact revision, checks its seal before and
-after execution, and records its executable hash. Canonical packaged runtime evidence is pending;
-this does not claim rendered-window acceptance. Packaged
+after execution, and records its executable hash. A fresh canonical bundle passed capture, restart catch-up and
+Git-preservation checks, with wrong-revision and broken-seal refusals. Exact revision verification
+now queries native build identity after checking the seal; incidental binary strings do not suffice.
+This does not claim rendered-window acceptance. Packaged
 lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).

@@ -494,3 +494,13 @@ Fresh canonical bundle results must identify the exact commit, executable hash a
 Rendered attachment, pin restoration and detach/reattach interactions remain separate packaged
 acceptance work. No installed application is replaced, and neither Apple-trusted signing nor human
 approval is claimed by this executable proof.
+
+
+Canonical verification built the clean commit `fda9df38835421d72ca71abff2ac0c568162297d` in an
+isolated packaging checkout. The sealed executable SHA-256 is
+`8363abbf5e05f526eff51d1bd28900183a6f37c785352dc8d487be983ad74071`. The packaged capture
+journey passed with three versions in 6,000 ms on this host (an observation, not a latency promise).
+Wrong all-zero revision, extra identity-command arguments and a modified executable copy were
+refused. The original bundle remained sealed; the preserved older bundle without the identity mode
+was refused before launch. These results prove the executable boundary above, not the graphical
+attachment, review-pin or detachment acceptance journeys.
