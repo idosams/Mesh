@@ -27,6 +27,13 @@ Implementation proceeds from canonical `idosams/Mesh` main. Older fleet work is 
 transferred through the [migration ledger](fleet-migration.md), with fresh checks on this history.
 No phase is complete merely because a source branch implemented part of it.
 
+Completion requires every accepted increment to be merged into `idosams/Mesh` main, with the
+combined main revision passing the actual repository checks and the acceptance journeys required
+by this plan. Published PRs and passing branch tests are intermediate states. Record exact tested
+and merged revisions, hosted CI results, packaged evidence where required, and unresolved issues.
+The owner's 2026-09-27 instruction authorizes eventual merges after checks and required reviews
+are satisfied. It does not waive human review, permit self-approval, or authorize bypassing checks.
+
 ## Product model
 
 - Objective: desired outcome; delegated execution additionally has human-authorized limits.

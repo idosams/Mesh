@@ -38,6 +38,15 @@ For every increment record replacement commit(s), PR URL, exact local validation
 status. Source test logs are historical context; rerun the actual canonical checks. Human merge
 authorization is separate and mandatory; no self-approval or check bypass.
 
+On 2026-09-27 the owner made tested, merged delivery an explicit goal requirement and authorized
+eventual merges once checks and required reviews are satisfied. This supersedes the earlier lack
+of merge authorization; it is not a completed code review. Integrate dependencies in order, refresh
+checks after base changes, and verify the final combined canonical main revision. Keep source PRs
+and replacement mappings traceable when a correction is delivered through another increment.
+Repository-required named human reviews remain outstanding; do not infer approval from absent
+GitHub branch rules. Until final main and the full acceptance journeys are verified, the goal stays
+incomplete even if all migration PRs have been published.
+
 The following CI corrections were originally published independently against canonical main and
 remain unmerged. The validation increment stacked on #19 now transfers their final patches into
 this fleet stack; it does not merge, close or rewrite their original PRs. [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
