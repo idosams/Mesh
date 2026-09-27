@@ -19,3 +19,6 @@ path = "src/main.rs"
 [dev-dependencies]
 mesh-daemon = { path = "../mesh-daemon", version = "=0.0.0" }
 mesh-store = { path = "../mesh-store", version = "=0.0.0" }
+mesh-types = { path = "../mesh-types", version = "=0.0.0" }
+mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }
+ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }

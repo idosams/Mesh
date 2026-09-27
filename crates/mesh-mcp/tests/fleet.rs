@@ -15,6 +15,19 @@ use std::process::{Command as Process, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
+struct NativeSigner(ed25519_dalek::SigningKey);
+impl mesh_daemon::fleet::service::CheckpointSigner for NativeSigner {
+    fn public_key(&self) -> mesh_types::PublicKey {
+        mesh_types::PublicKey::from_bytes(self.0.verifying_key().to_bytes())
+    }
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String> {
+        use ed25519_dalek::Signer as _;
+        Ok(mesh_types::Signature::from_bytes(
+            self.0.sign(payload.as_bytes()).to_bytes(),
+        ))
+    }
+}
+
 fn text<'a>(value: &'a Json, key: &str) -> &'a str {
     value.get(key).and_then(Json::as_text).unwrap()
 }
@@ -144,7 +157,16 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
             },
         )
         .unwrap();
-    let credential = service.grant(&lane, "run", "actor", "session").unwrap();
+    let credential = service
+        .grant_with_signer(
+            &lane,
+            "run",
+            "session",
+            Arc::new(NativeSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x71; 32],
+            ))),
+        )
+        .unwrap();
     desktop.register_fleet(service.clone()).unwrap();
     let endpoint = root.join("ipc/daemon.sock");
     let server = IpcServer::bind(&endpoint)
@@ -189,7 +211,7 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        4
     );
     let context = call(
         &mut stdin,
@@ -276,6 +298,42 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
         token,
     );
     assert!(denied.get("error").is_some());
+    assert_eq!(desktop.workspace_state().unwrap().root, source.root);
+    let working_root = std::path::PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::write(working_root.join("note.txt"), "saved through real MCP\n").unwrap();
+    let args = Json::object([("request", Json::text("capture"))]);
+    let captured = call(
+        &mut stdin,
+        &mut stdout,
+        10,
+        "tools/call",
+        tool("mesh_fleet_checkpoint", args.clone()),
+        token,
+    );
+    let captured = captured
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap()
+        .clone();
+    assert_eq!(captured.get("complete"), Some(&Json::Bool(true)));
+    assert_eq!(
+        captured.get("saved_changes").and_then(Json::as_u64),
+        Some(1)
+    );
+    fs::write(working_root.join("note.txt"), "newer unsaved work\n").unwrap();
+    let retried = call(
+        &mut stdin,
+        &mut stdout,
+        11,
+        "tools/call",
+        tool("mesh_fleet_checkpoint", args),
+        token,
+    );
+    assert_eq!(
+        retried.get("result").unwrap().get("structuredContent"),
+        Some(&captured)
+    );
     assert_eq!(desktop.workspace_state().unwrap().root, source.root);
     service.revoke(&credential).unwrap();
     let revoked = call(

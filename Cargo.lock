@@ -1926,8 +1926,11 @@ dependencies = [
 name = "mesh-mcp"
 version = "0.0.0"
 dependencies = [
+ "ed25519-dalek",
+ "mesh-crypto",
  "mesh-daemon",
  "mesh-store",
+ "mesh-types",
 ]
 
 [[package]]

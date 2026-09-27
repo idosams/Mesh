@@ -15,7 +15,15 @@ use super::{Command, Lane, RunState, Runtime};
 use crate::ipc::{Json, Unavailable, WorkspaceSummary};
 use crate::{CheckpointRuntimeParameters, ProtectedWorkspaceRoot, TrustedReviewers};
 use mesh_store::RecordDigest;
-use mesh_types::{Blake3, ContentDigest};
+use mesh_types::{Blake3, ContentDigest, PublicKey, Signature};
+
+/// Native host signing capability. Key custody stays outside the daemon and agent transport.
+pub trait CheckpointSigner: Send + Sync {
+    /// Public actor key bound to the issued session.
+    fn public_key(&self) -> PublicKey;
+    /// Sign only a canonical private ChangeSet payload. Errors must contain no secret material.
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<Signature, String>;
+}
 
 /// Private allocation policy implemented by the native host, never supplied over agent IPC.
 pub trait LaneAllocator: Send + Sync {
@@ -121,6 +129,7 @@ struct Grant {
     actor: String,
     session: String,
     generation: String,
+    signer: Option<Arc<dyn CheckpointSigner>>,
 }
 struct Inner {
     runtime: Runtime,
@@ -262,6 +271,29 @@ impl FleetService {
         actor: &str,
         session: &str,
     ) -> Result<AgentCredential, Unavailable> {
+        self.grant_inner(lane, run, actor, session, None)
+    }
+
+    /// Issue a capture-enabled session whose actor identity is the native signer's actual key.
+    pub fn grant_with_signer(
+        &self,
+        lane: &str,
+        run: &str,
+        session: &str,
+        signer: Arc<dyn CheckpointSigner>,
+    ) -> Result<AgentCredential, Unavailable> {
+        let actor = RecordDigest::from_bytes(*signer.public_key().as_bytes()).to_string();
+        self.grant_inner(lane, run, &actor, session, Some(signer))
+    }
+
+    fn grant_inner(
+        &self,
+        lane: &str,
+        run: &str,
+        actor: &str,
+        session: &str,
+        signer: Option<Arc<dyn CheckpointSigner>>,
+    ) -> Result<AgentCredential, Unavailable> {
         super::id_valid(actor).map_err(runtime_error)?;
         super::id_valid(session).map_err(runtime_error)?;
         let mut random = [0_u8; 32];
@@ -308,6 +340,7 @@ impl FleetService {
                 actor: actor.into(),
                 session: session.into(),
                 generation,
+                signer,
             },
         );
         Ok(AgentCredential(token))
@@ -347,6 +380,97 @@ impl FleetService {
         let state = exact_state(&workspace)?;
         verify_custody(&workspace, &state, &grant.generation)?;
         match action {
+            "checkpoint" => {
+                exact_fields(arguments, &["request"])?;
+                let request = field(arguments, "request")?;
+                let id = format!(
+                    "checkpoint-{}",
+                    &lane_identity(inner.runtime.objective(), &grant.lane, request)?[5..]
+                );
+                let origin = super::AgentOrigin {
+                    actor: grant.actor.clone(),
+                    session: grant.session.clone(),
+                    run: grant.run.clone(),
+                    generation: grant.generation.clone(),
+                };
+                if let Some(previous) = inner.runtime.state().checkpoints.get(&id) {
+                    if previous.lane != grant.lane || previous.origin != origin {
+                        return Err(refusal("fleet-checkpoint-request-conflict"));
+                    }
+                    return previous
+                        .result
+                        .as_ref()
+                        .map(|result| checkpoint_summary(&id, result))
+                        .ok_or_else(|| refusal("fleet-checkpoint-needs-recovery"));
+                }
+                let signer = grant
+                    .signer
+                    .as_ref()
+                    .ok_or_else(|| refusal("fleet-checkpoint-signer-unavailable"))?;
+                let public = signer.public_key();
+                if RecordDigest::from_bytes(*public.as_bytes()).to_string() != grant.actor {
+                    return Err(refusal("fleet-checkpoint-signer-changed"));
+                }
+                {
+                    let _authority = workspace
+                        .daemon()
+                        .lock_workspace_agent_setup(
+                            &state.root,
+                            &state.digest,
+                            &state.installation,
+                            &grant.generation,
+                        )
+                        .map_err(|_| refusal("fleet-session-custody-changed"))?;
+                    inner
+                        .runtime
+                        .record(
+                            &format!("begin-{id}"),
+                            Command::BeginCheckpoint {
+                                id: id.clone(),
+                                lane: grant.lane.clone(),
+                                origin,
+                                input_digest: state.digest.clone(),
+                            },
+                        )
+                        .map_err(runtime_error)?;
+                }
+                let report = workspace
+                    .daemon()
+                    .checkpoint_agent_workspace(
+                        crate::AgentWorkspaceCheckpointRequest {
+                            root: &state.root,
+                            digest: &state.digest,
+                            installation: &state.installation,
+                            generation: &grant.generation,
+                        },
+                        public,
+                        |payload| signer.sign(payload),
+                    )
+                    .map_err(|_| refusal("fleet-checkpoint-needs-recovery"))?;
+                let result = super::CheckpointResult {
+                    complete: report.complete,
+                    version: report
+                        .workspace
+                        .workspace_versions
+                        .last()
+                        .ok_or_else(|| refusal("fleet-checkpoint-version-unavailable"))?
+                        .operation(),
+                    workspace_digest: report.workspace.digest.clone(),
+                    saved_changes: report.saved_changes.len() as u64,
+                    issue: report.issue.map(str::to_owned),
+                };
+                inner
+                    .runtime
+                    .record(
+                        &format!("finish-{id}"),
+                        Command::FinishCheckpoint {
+                            id: id.clone(),
+                            result: result.clone(),
+                        },
+                    )
+                    .map_err(runtime_error)?;
+                Ok(checkpoint_summary(&id, &result))
+            }
             "context" => {
                 exact_fields(arguments, &[])?;
                 Ok(Json::object([
@@ -461,6 +585,23 @@ impl FleetService {
             ),
         ]))
     }
+}
+
+fn checkpoint_summary(id: &str, result: &super::CheckpointResult) -> Json {
+    Json::object([
+        ("request", Json::text(id)),
+        ("complete", Json::Bool(result.complete)),
+        ("version", Json::text(result.version.to_string())),
+        (
+            "workspace_digest",
+            Json::text(result.workspace_digest.to_string()),
+        ),
+        ("saved_changes", Json::Number(result.saved_changes)),
+        (
+            "issue",
+            result.issue.as_ref().map(Json::text).unwrap_or(Json::Null),
+        ),
+    ])
 }
 
 fn exact_state(workspace: &LaneWorkspace) -> Result<WorkspaceSummary, Unavailable> {

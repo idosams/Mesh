@@ -130,9 +130,11 @@ pub use crate::folder_import::{
 };
 #[cfg(unix)]
 pub use crate::live::{
-    AgentFinishPreflight, AgentLiveFileSnapshot, DurableHumanApproval, HumanApprovalPreview,
-    LiveCheckpointSaveError, LiveDaemon, ReviewArtifact, VerifiedManagedWorkspaceEntry,
-    VerifiedManagedWorkspacePath, WorkspaceAgentSetupGuard, WorkspaceVersionForkRequest,
+    AgentFileCheckpointRequest, AgentFinishPreflight, AgentLiveFileSnapshot,
+    AgentWorkspaceCheckpoint, AgentWorkspaceCheckpointRequest, DurableHumanApproval,
+    HumanApprovalPreview, LiveCheckpointSaveError, LiveDaemon, ReviewArtifact,
+    VerifiedManagedWorkspaceEntry, VerifiedManagedWorkspacePath, WorkspaceAgentSetupGuard,
+    WorkspaceVersionForkRequest,
 };
 pub use crate::managed_file::{
     ManagedDirectoryExport, ManagedDirectoryExportBatchPreview, ManagedDirectoryExportPreview,

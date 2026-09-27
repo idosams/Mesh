@@ -859,3 +859,492 @@ fn invalid_signature_and_confined_refusals_change_no_folder_or_journal_byte() {
     );
     let _ = fs::remove_dir_all(parent);
 }
+
+#[test]
+fn agent_checkpoint_preserves_custody_and_private_history_for_tracked_and_new_files() {
+    let (parent, managed) = workspace("agent-checkpoint");
+    let daemon = open_daemon(&managed);
+    let initial = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &initial.root,
+            &initial.digest,
+            &initial.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let key = SigningKey::from_bytes(&[0x41; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    for (path, new_file) in [("existing/keep.txt", false), ("added.txt", true)] {
+        fs::write(managed.join(path), "agent-authored content\n").unwrap();
+        let preflight = daemon
+            .inspect_agent_finish_preflight(
+                &initial.root,
+                &daemon.workspace_state().unwrap().digest,
+                &initial.installation,
+                &generation,
+            )
+            .unwrap();
+        let (digest, executable) = if new_file {
+            let entry = preflight
+                .native_files()
+                .iter()
+                .find(|entry| entry.path() == path)
+                .unwrap();
+            (entry.content_digest(), entry.executable())
+        } else {
+            let entry = preflight
+                .managed_files()
+                .iter()
+                .find(|entry| entry.path() == path)
+                .unwrap();
+            (entry.content_digest(), entry.executable())
+        };
+        let before = daemon.workspace_state().unwrap();
+        let receipt = daemon
+            .checkpoint_agent_file(
+                mesh_daemon::AgentFileCheckpointRequest {
+                    root: &before.root,
+                    digest: &before.digest,
+                    installation: &before.installation,
+                    generation: &generation,
+                    path,
+                    content_digest: digest,
+                    executable,
+                    new_file,
+                },
+                public,
+                signer(&key),
+            )
+            .unwrap();
+        assert!(receipt.author_authenticated());
+        assert!(receipt.meaningful_saved());
+        assert_eq!(
+            fs::read_to_string(managed.join(path)).unwrap(),
+            "agent-authored content\n"
+        );
+        let after = daemon.workspace_state().unwrap();
+        assert_eq!(after.shared_version, initial.shared_version);
+        assert_eq!(
+            daemon
+                .workspace_agent_custody_for_workspace(
+                    &after.root,
+                    &after.digest,
+                    &after.installation,
+                )
+                .unwrap()
+                .generation(),
+            Some(generation.as_str())
+        );
+        assert!(daemon
+            .create_managed_folder("not-authorized", public, signer(&key))
+            .is_err());
+    }
+    drop(daemon);
+    let reopened = open_daemon(&managed);
+    assert!(!reopened
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .modified_from_current_version());
+    assert!(!reopened
+        .inspect_managed_file("added.txt")
+        .unwrap()
+        .modified_from_current_version());
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_checkpoint_refuses_stale_custody_and_changed_bytes_before_signing() {
+    let (parent, managed) = workspace("agent-checkpoint-stale");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let inspection = daemon.inspect_managed_file("existing/keep.txt").unwrap();
+    fs::write(managed.join("existing/keep.txt"), "later bytes\n").unwrap();
+    let key = SigningKey::from_bytes(&[0x42; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let journal = fs::read(private_storage(&managed).join("records.mesh")).unwrap();
+    for session in [generation.as_str(), "stale-generation"] {
+        let result = daemon.checkpoint_agent_file(
+            mesh_daemon::AgentFileCheckpointRequest {
+                root: &state.root,
+                digest: &state.digest,
+                installation: &state.installation,
+                generation: session,
+                path: "existing/keep.txt",
+                content_digest: inspection.content_digest(),
+                executable: inspection.executable(),
+                new_file: false,
+            },
+            public,
+            |_| -> Result<Signature, &'static str> { panic!("stale capture reached signing") },
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+            journal
+        );
+    }
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_checkpoint_signer_cannot_reuse_mutation_authority() {
+    let (parent, managed) = workspace("agent-checkpoint-signer");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::write(managed.join("existing/keep.txt"), "private edit\n").unwrap();
+    let inspection = daemon.inspect_managed_file("existing/keep.txt").unwrap();
+    let key = SigningKey::from_bytes(&[0x43; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let receipt = daemon
+        .checkpoint_agent_file(
+            mesh_daemon::AgentFileCheckpointRequest {
+                root: &state.root,
+                digest: &state.digest,
+                installation: &state.installation,
+                generation: &generation,
+                path: "existing/keep.txt",
+                content_digest: inspection.content_digest(),
+                executable: inspection.executable(),
+                new_file: false,
+            },
+            public,
+            |payload| {
+                assert!(daemon
+                    .create_managed_folder("smuggled", public, signer(&key))
+                    .is_err());
+                assert!(daemon
+                    .open_current_review_for_workspace(
+                        &state.root,
+                        &state.digest,
+                        &state.installation,
+                        public,
+                    )
+                    .is_err());
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert!(receipt.meaningful_saved());
+    assert!(!managed.join("smuggled").exists());
+    let after = daemon.workspace_state().unwrap();
+    daemon
+        .release_workspace_agent_custody(
+            &after.root,
+            &after.digest,
+            &after.installation,
+            &generation,
+        )
+        .unwrap();
+    daemon
+        .create_managed_folder("human-after-release", public, signer(&key))
+        .unwrap();
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn failed_agent_signer_leaves_journal_and_authority_recoverable() {
+    let (parent, managed) = workspace("agent-checkpoint-sign-failure");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::write(
+        managed.join("existing/keep.txt"),
+        "retryable private edit\n",
+    )
+    .unwrap();
+    let inspection = daemon.inspect_managed_file("existing/keep.txt").unwrap();
+    let key = SigningKey::from_bytes(&[0x44; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let request = || mesh_daemon::AgentFileCheckpointRequest {
+        root: &state.root,
+        digest: &state.digest,
+        installation: &state.installation,
+        generation: &generation,
+        path: "existing/keep.txt",
+        content_digest: inspection.content_digest(),
+        executable: inspection.executable(),
+        new_file: false,
+    };
+    let journal = fs::read(private_storage(&managed).join("records.mesh")).unwrap();
+    assert!(daemon
+        .checkpoint_agent_file(request(), public, |_| Err::<Signature, _>(
+            "signer unavailable"
+        ))
+        .is_err());
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        journal
+    );
+    assert!(daemon
+        .create_managed_folder("still-agent-owned", public, signer(&key))
+        .is_err());
+    assert!(daemon
+        .checkpoint_agent_file(request(), public, signer(&key))
+        .unwrap()
+        .meaningful_saved());
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_workspace_checkpoint_saves_nested_additions_and_retries_without_duplicates() {
+    let (parent, managed) = workspace("agent-workspace-checkpoint");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::write(managed.join("existing/keep.txt"), "edited\n").unwrap();
+    fs::create_dir_all(managed.join("new/deeper")).unwrap();
+    fs::write(managed.join("new/deeper/added.txt"), "new contents\n").unwrap();
+    let key = SigningKey::from_bytes(&[0x51; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let mut first_changes = Vec::new();
+    for attempt in 0..2 {
+        let current = daemon.workspace_state().unwrap();
+        let report = daemon
+            .checkpoint_agent_workspace(
+                mesh_daemon::AgentWorkspaceCheckpointRequest {
+                    root: &current.root,
+                    digest: &current.digest,
+                    installation: &current.installation,
+                    generation: &generation,
+                },
+                public,
+                |payload| {
+                    Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                        key.sign(payload.as_bytes()).to_bytes(),
+                    ))
+                },
+            )
+            .unwrap();
+        assert!(report.complete, "{:?}", report.issue);
+        assert_eq!(report.workspace.shared_version, state.shared_version);
+        if attempt == 0 {
+            assert_eq!(report.saved_changes.len(), 4);
+            first_changes = report.saved_changes;
+        } else {
+            assert!(report.saved_changes.is_empty());
+        }
+    }
+    assert!(!daemon
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .modified_from_current_version());
+    assert!(!daemon
+        .inspect_managed_file("new/deeper/added.txt")
+        .unwrap()
+        .modified_from_current_version());
+    let current = daemon.workspace_state().unwrap();
+    assert!(first_changes.iter().all(|change| current
+        .workspace_versions
+        .iter()
+        .any(|version| version.operation().to_string() == *change)));
+    assert_eq!(
+        daemon
+            .workspace_agent_custody_for_workspace(
+                &current.root,
+                &current.digest,
+                &current.installation
+            )
+            .unwrap()
+            .generation(),
+        Some(generation.as_str())
+    );
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_workspace_checkpoint_reports_partial_signing_failure_and_preserves_saved_work() {
+    let (parent, managed) = workspace("agent-workspace-partial");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::write(managed.join("existing/keep.txt"), "first durable edit\n").unwrap();
+    fs::write(managed.join("added.txt"), "second edit\n").unwrap();
+    let key = SigningKey::from_bytes(&[0x52; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let mut signatures = 0;
+    let report = daemon
+        .checkpoint_agent_workspace(
+            mesh_daemon::AgentWorkspaceCheckpointRequest {
+                root: &state.root,
+                digest: &state.digest,
+                installation: &state.installation,
+                generation: &generation,
+            },
+            public,
+            |payload| {
+                signatures += 1;
+                if signatures == 2 {
+                    return Err("signer disconnected");
+                }
+                Ok(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.issue, Some("checkpoint-file-save-failed"));
+    assert_eq!(report.saved_changes.len(), 1);
+    assert!(!daemon
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .modified_from_current_version());
+    let current = daemon.workspace_state().unwrap();
+    let retry = daemon
+        .checkpoint_agent_workspace(
+            mesh_daemon::AgentWorkspaceCheckpointRequest {
+                root: &current.root,
+                digest: &current.digest,
+                installation: &current.installation,
+                generation: &generation,
+            },
+            public,
+            |payload| {
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert!(retry.complete);
+    assert_eq!(retry.saved_changes.len(), 1);
+    assert_eq!(retry.workspace.shared_version, state.shared_version);
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_workspace_checkpoint_final_scan_detects_edits_to_an_already_saved_file() {
+    let (parent, managed) = workspace("agent-workspace-moving");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::write(managed.join("existing/keep.txt"), "first observed edit\n").unwrap();
+    fs::write(managed.join("added.txt"), "new file\n").unwrap();
+    let key = SigningKey::from_bytes(&[0x53; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let mut signatures = 0;
+    let report = daemon
+        .checkpoint_agent_workspace(
+            mesh_daemon::AgentWorkspaceCheckpointRequest {
+                root: &state.root,
+                digest: &state.digest,
+                installation: &state.installation,
+                generation: &generation,
+            },
+            public,
+            |payload| {
+                signatures += 1;
+                if signatures == 2 {
+                    fs::write(managed.join("existing/keep.txt"), "later external edit\n").unwrap();
+                }
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.issue, Some("checkpoint-working-folder-changed"));
+    assert_eq!(report.saved_changes.len(), 2);
+    assert_eq!(
+        fs::read_to_string(managed.join("existing/keep.txt")).unwrap(),
+        "later external edit\n"
+    );
+    assert_eq!(report.workspace.shared_version, state.shared_version);
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_workspace_checkpoint_refuses_ambiguous_missing_entries_before_any_save() {
+    let (parent, managed) = workspace("agent-workspace-missing");
+    let daemon = open_daemon(&managed);
+    let state = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    fs::rename(
+        managed.join("existing/keep.txt"),
+        managed.join("renamed.txt"),
+    )
+    .unwrap();
+    let key = SigningKey::from_bytes(&[0x54; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let report = daemon
+        .checkpoint_agent_workspace(
+            mesh_daemon::AgentWorkspaceCheckpointRequest {
+                root: &state.root,
+                digest: &state.digest,
+                installation: &state.installation,
+                generation: &generation,
+            },
+            public,
+            |_| -> Result<Signature, &'static str> { panic!("ambiguous change reached signer") },
+        )
+        .unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.issue, Some("checkpoint-entry-resolution-required"));
+    assert!(report.saved_changes.is_empty());
+    assert_eq!(report.workspace.digest, state.digest);
+    assert!(managed.join("renamed.txt").exists());
+    fs::remove_dir_all(parent).unwrap();
+}

@@ -99,6 +99,34 @@ pub struct AgentOrigin {
     pub generation: String,
 }
 
+/// Durable request identity for a native agent capture, without secrets or file contents.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// Bound lane.
+    pub lane: String,
+    /// Accepted native session.
+    pub origin: AgentOrigin,
+    /// Exact fold before capture began.
+    pub input_digest: String,
+    /// Absent means capture must be reconciled, never implicitly repeated.
+    pub result: Option<CheckpointResult>,
+}
+
+/// Bounded immutable capture acknowledgment, safe to replay after later working edits.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckpointResult {
+    /// Whether native final inventory and recovery checks completed.
+    pub complete: bool,
+    /// Latest retained workspace operation, not publication authority.
+    pub version: RecordDigest,
+    /// Fold after capture, including partial progress.
+    pub workspace_digest: String,
+    /// Number of authenticated appends completed by this invocation.
+    pub saved_changes: u64,
+    /// Stable bounded reason when incomplete.
+    pub issue: Option<String>,
+}
+
 /// Persistent work stream, surviving replacement of an agent process.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lane {
@@ -137,11 +165,31 @@ pub struct State {
     pub cancelled: bool,
     /// Lanes in stable identity order.
     pub lanes: BTreeMap<String, Lane>,
+    /// Acknowledged capture intents and immutable outcomes, retained across restart.
+    pub checkpoints: BTreeMap<String, Checkpoint>,
 }
 
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    /// Commit capture intent before calling the native filesystem/journal operation.
+    BeginCheckpoint {
+        /// Objective-unique request identity.
+        id: String,
+        /// Exact lane.
+        lane: String,
+        /// Native-authorized caller.
+        origin: AgentOrigin,
+        /// Record fold admitted at acceptance.
+        input_digest: String,
+    },
+    /// Record the outcome of an accepted capture, including incomplete results.
+    FinishCheckpoint {
+        /// Original request identity.
+        id: String,
+        /// Native-verified outcome.
+        result: CheckpointResult,
+    },
     /// Initialize an objective once.
     Start {
         /// Human-requested outcome.
@@ -359,6 +407,76 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::BeginCheckpoint {
+                id,
+                lane,
+                origin,
+                input_digest,
+            } => {
+                id_valid(id)?;
+                id_valid(&origin.actor)?;
+                id_valid(&origin.session)?;
+                fold_digest_valid(input_digest)?;
+                if self.cancelled {
+                    return refuse("objective-cancelled");
+                }
+                if origin.generation.len() != 32
+                    || !origin.generation.bytes().all(|b| b.is_ascii_hexdigit())
+                {
+                    return refuse("invalid-generation");
+                }
+                if self.checkpoints.contains_key(id) {
+                    return refuse("checkpoint-exists");
+                }
+                if self.checkpoints.len() >= 4096 {
+                    return refuse("checkpoint-limit");
+                }
+                let run = current_run(&mut self.lanes, lane, &origin.run)?;
+                if !matches!(
+                    run.state,
+                    RunState::Launching | RunState::Running | RunState::Waiting
+                ) {
+                    return refuse("run-not-saveable");
+                }
+                self.checkpoints.insert(
+                    id.clone(),
+                    Checkpoint {
+                        lane: lane.clone(),
+                        origin: origin.clone(),
+                        input_digest: input_digest.clone(),
+                        result: None,
+                    },
+                );
+            }
+            Command::FinishCheckpoint { id, result } => {
+                fold_digest_valid(&result.workspace_digest)?;
+                if result.saved_changes > 1024 || result.complete != result.issue.is_none() {
+                    return refuse("invalid-checkpoint-result");
+                }
+                if let Some(issue) = &result.issue {
+                    id_valid(issue)?;
+                }
+                let checkpoint = self
+                    .checkpoints
+                    .get_mut(id)
+                    .ok_or(Error::Refused("checkpoint-missing"))?;
+                if checkpoint.result.is_some() {
+                    return refuse("checkpoint-already-finished");
+                }
+                checkpoint.result = Some(result.clone());
+                let lane = self
+                    .lanes
+                    .get_mut(&checkpoint.lane)
+                    .ok_or(Error::Refused("lane-missing"))?;
+                if result.complete
+                    && lane
+                        .runs
+                        .last()
+                        .is_some_and(|run| run.id == checkpoint.origin.run)
+                {
+                    lane.saved = Some(result.version);
+                }
+            }
             Command::CreateLane {
                 id,
                 parent,
@@ -592,6 +710,17 @@ fn transition(from: RunState, to: RunState) -> bool {
         Succeeded | Failed | Cancelled => false,
     }
 }
+fn fold_digest_valid(value: &str) -> Result<(), Error> {
+    if value.len() != 32
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return refuse("invalid-workspace-digest");
+    }
+    Ok(())
+}
+
 fn id_valid(value: &str) -> Result<(), Error> {
     if value.is_empty()
         || value.len() > 128

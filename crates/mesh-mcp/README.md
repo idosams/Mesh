@@ -52,12 +52,21 @@ A native fleet host can launch this same binary with `MESH_FLEET_OBJECTIVE` and
 credential in a prompt, command-line argument, workspace file or support log. This is a native
 integration surface; the desktop does not yet expose a complete fleet launch journey.
 
-In this mode the bridge advertises three tools:
+In this mode the bridge advertises four tools:
 
 - `mesh_fleet_context`: the bound objective, actor, session, run, lane and exact workspace.
 - `mesh_fleet_delegate`: allocate a child from one of that lane's saved versions, with a stable
   request identity, goal and configured provider. Destinations are chosen by native code.
 - `mesh_fleet_children`: observe only that lane's direct children.
+- `mesh_fleet_checkpoint`: capture supported private edits and additions using a stable `request`.
+  Requires a native capture-enabled session backed by its actual actor signing key. Incomplete
+  results preserve any saved progress and identify the remaining issue; they are not full saves.
+
+Checkpoint intent and bounded result are durable. Retrying a completed request returns its original
+version even after newer working edits. Use a new request for a new capture or to continue after an
+incomplete result. A pending request after interruption requires native recovery and is never
+silently executed again. Missing or unsupported entries require explicit resolution. Checkpoints
+retain agent custody and never advance the main/shared version.
 
 The native host checks the current run and exact custody generation on every call. Rotation,
 revocation, cancellation, terminal runs and a service restart invalidate credentials. Repeated
@@ -66,5 +75,5 @@ lanes retain durable actor/session/run attribution. Tokens never enter the contr
 
 Fleet mode requires IPC surface 8 and refuses an older daemon before sending credentials. Default
 workspace mode remains compatible with earlier supported surfaces. Child allocation is real native
-version reconstruction, but scheduling providers, saving their output, and opening review from this
+version reconstruction, but scheduling providers and opening review from this
 MCP surface are subsequent integration work. These tools cannot approve or publish shared state.

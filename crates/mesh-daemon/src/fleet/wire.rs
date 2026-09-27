@@ -1,10 +1,44 @@
 //! Versioned deterministic command encoding. Unknown fields/versions refuse during replay.
-use super::{AgentOrigin, Command, Error, Limits, RunState, WorkspaceBinding};
+use super::{AgentOrigin, CheckpointResult, Command, Error, Limits, RunState, WorkspaceBinding};
 use crate::ipc::Json;
 use mesh_store::RecordDigest;
 
 pub(super) fn encode(command: &Command) -> String {
     let (kind, fields) = match command {
+        Command::BeginCheckpoint {
+            id,
+            lane,
+            origin,
+            input_digest,
+        } => (
+            "begin-checkpoint",
+            vec![
+                ("id", Json::text(id)),
+                ("lane", Json::text(lane)),
+                ("actor", Json::text(&origin.actor)),
+                ("session", Json::text(&origin.session)),
+                ("run", Json::text(&origin.run)),
+                ("generation", Json::text(&origin.generation)),
+                ("input_digest", Json::text(input_digest.to_string())),
+            ],
+        ),
+        Command::FinishCheckpoint { id, result } => (
+            "finish-checkpoint",
+            vec![
+                ("id", Json::text(id)),
+                ("complete", Json::Bool(result.complete)),
+                ("version", Json::text(result.version.to_string())),
+                (
+                    "workspace_digest",
+                    Json::text(result.workspace_digest.to_string()),
+                ),
+                ("saved_changes", Json::Number(result.saved_changes)),
+                (
+                    "issue",
+                    result.issue.as_ref().map(Json::text).unwrap_or(Json::Null),
+                ),
+            ],
+        ),
         Command::Start { goal, limits } => (
             "start",
             vec![
@@ -119,6 +153,34 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     };
     let digest = |key| RecordDigest::parse_hex(&text(key)?).map_err(|_| Error::InvalidHistory);
     let command = match json.get("kind").and_then(Json::as_text) {
+        Some("begin-checkpoint") => Command::BeginCheckpoint {
+            id: text("id")?,
+            lane: text("lane")?,
+            input_digest: text("input_digest")?,
+            origin: AgentOrigin {
+                actor: text("actor")?,
+                session: text("session")?,
+                run: text("run")?,
+                generation: text("generation")?,
+            },
+        },
+        Some("finish-checkpoint") => Command::FinishCheckpoint {
+            id: text("id")?,
+            result: CheckpointResult {
+                complete: fields
+                    .get("complete")
+                    .and_then(Json::as_bool)
+                    .ok_or(Error::InvalidHistory)?,
+                version: digest("version")?,
+                workspace_digest: text("workspace_digest")?,
+                saved_changes: number("saved_changes")?,
+                issue: match fields.get("issue") {
+                    Some(Json::Null) => None,
+                    Some(Json::Text(value)) => Some(value.clone()),
+                    _ => return Err(Error::InvalidHistory),
+                },
+            },
+        },
         Some("start") => Command::Start {
             goal: text("goal")?,
             limits: Limits {

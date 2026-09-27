@@ -398,3 +398,107 @@ fn native_custody_rotation_invalidates_the_session_before_delegation() {
         1
     );
 }
+
+struct TestCheckpointSigner(ed25519_dalek::SigningKey);
+impl mesh_daemon::fleet::service::CheckpointSigner for TestCheckpointSigner {
+    fn public_key(&self) -> mesh_types::PublicKey {
+        mesh_types::PublicKey::from_bytes(self.0.verifying_key().to_bytes())
+    }
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String> {
+        use ed25519_dalek::Signer as _;
+        Ok(mesh_types::Signature::from_bytes(
+            self.0.sign(payload.as_bytes()).to_bytes(),
+        ))
+    }
+}
+
+#[test]
+fn authenticated_checkpoint_retry_pins_result_and_new_request_captures_later_work() {
+    let mut f = Fixture::new("checkpoint-replay");
+    let args = Json::object([("request", Json::text("checkpoint-a"))]);
+    assert_eq!(
+        f.call("checkpoint", &args).unwrap_err().code,
+        "fleet-checkpoint-signer-unavailable"
+    );
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "signed-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x61; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::write(root.join("note.txt"), "checkpoint one\n").unwrap();
+    let first = f.call("checkpoint", &args).unwrap();
+    assert_eq!(first.get("complete"), Some(&Json::Bool(true)));
+    assert_eq!(first.get("saved_changes").and_then(Json::as_u64), Some(1));
+    fs::write(root.join("note.txt"), "later working bytes\n").unwrap();
+    assert_eq!(f.call("checkpoint", &args).unwrap(), first);
+    let second = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("checkpoint-b"))]),
+        )
+        .unwrap();
+    assert_ne!(text(&first, "version"), text(&second, "version"));
+    let child = f
+        .call(
+            "delegate",
+            &Json::object([
+                ("request", Json::text("from-checkpoint")),
+                ("goal", Json::text("Continue saved work")),
+                ("provider", Json::text("codex")),
+                ("version", first.get("version").unwrap().clone()),
+            ]),
+        )
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(
+            PathBuf::from(text(child.get("workspace").unwrap(), "root")).join("note.txt")
+        )
+        .unwrap(),
+        "checkpoint one\n"
+    );
+    let replay = Runtime::open(
+        FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    assert_eq!(replay.state().checkpoints.len(), 2);
+    let recorded = &replay.state().checkpoints[text(&first, "request")];
+    assert_eq!(recorded.origin.actor, text(&context, "actor"));
+    assert_eq!(recorded.origin.session, "signed-session");
+    assert!(recorded.result.as_ref().unwrap().complete);
+    assert_eq!(
+        replay.state().lanes[&f.lane].saved.unwrap().to_string(),
+        text(&second, "version")
+    );
+}
+
+#[test]
+fn checkpoint_identity_cannot_be_reused_by_a_rotated_session() {
+    let mut f = Fixture::new("checkpoint-session-conflict");
+    let signer = Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+        &[0x62; 32],
+    )));
+    f.credential = f
+        .service
+        .grant_with_signer(&f.lane, "root-run", "session-one", signer.clone())
+        .unwrap();
+    let args = Json::object([("request", Json::text("stable"))]);
+    let first = f.call("checkpoint", &args).unwrap();
+    assert_eq!(first.get("complete"), Some(&Json::Bool(true)));
+    f.credential = f
+        .service
+        .grant_with_signer(&f.lane, "root-run", "session-two", signer)
+        .unwrap();
+    assert_eq!(
+        f.call("checkpoint", &args).unwrap_err().code,
+        "fleet-checkpoint-request-conflict"
+    );
+}

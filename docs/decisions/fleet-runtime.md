@@ -60,6 +60,29 @@ read-only behavior. Scoped MCP refuses version downgrade before sending a creden
 on service restart; native process/custody reconciliation must precede future reauthorization.
 Credential revocation alone does not assert process termination or release native custody.
 
+Native agent file capture retains exact custody throughout signing, durable save and settling.
+`checkpoint_agent_file` admits one inspected tracked or new regular file; it cannot approve,
+publish, delete or rewrite working content. The native host retains signing keys outside the
+daemon. Its signing callback receives the canonical payload with inherited mutation authority
+suspended, restored on return or unwind. Nested capture is refused before acquiring custody again.
+The result is a per-file receipt. The native `checkpoint_agent_workspace` operation retains custody
+across a bounded inventory, parent-first directory adoption and private file saves. A final complete
+inventory and settled recovery state are required before reporting completion. Missing or unsupported
+entries require explicit resolution before any save, rather than guessing a rename or deletion.
+Failure retains durable partial progress and reports an incomplete result. A fresh unchanged capture
+does not append duplicate changes.
+
+Scoped MCP capture requires a native signer whose public key is the session's actual actor identity.
+The host commits `begin-checkpoint` with lane/run/actor/session/generation and the admitted index
+fold before capture. `finish-checkpoint` stores the bounded immutable result, including incomplete
+outcomes. These additive event kinds use the versioned control envelope; older decoders refuse them.
+The index fold is a 128-bit drift detector, not a signature or content hash. Retained version IDs
+remain 256-bit operation identities. Completed retries return the recorded outcome without capturing
+later edits. Pending intents require native reconciliation; they are never blindly replayed. Session
+changes cannot reuse an earlier session's request. Capture accepted before cancellation may still
+record its result, preserving work without authorizing another run. Native restart reconciliation
+and review submission still need integration.
+
 Allocation uses service-generated identities and descriptor-pinned parent creation. Both temporary
 export and final import verify the admitted parent object before writing. An occupied reservation
 or ambiguous allocation is preserved and reported for recovery, never deleted or silently reused.

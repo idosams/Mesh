@@ -1611,6 +1611,51 @@ fn local_version_id(workspace: &[u8], object: &[u8], manifest: &[u8], path: &str
     VersionId::from_bytes(*Blake3::digest_bytes(&statement).as_bytes())
 }
 
+/// Exact native admission for saving one observed agent file into private history.
+/// The host supplies the workspace/session identity; none of these fields grants authority alone.
+pub struct AgentFileCheckpointRequest<'a> {
+    /// Canonical workspace root admitted by the host.
+    pub root: &'a str,
+    /// Exact workspace fold before this save.
+    pub digest: &'a str,
+    /// Exact physical installation.
+    pub installation: &'a str,
+    /// Current native agent custody generation.
+    pub generation: &'a str,
+    /// Confined relative path discovered by native inspection.
+    pub path: &'a str,
+    /// Observed content identity, rechecked before durable save.
+    pub content_digest: RecordDigest,
+    /// Observed executable metadata.
+    pub executable: bool,
+    /// Whether native inventory identified a new, previously untracked regular file.
+    pub new_file: bool,
+}
+
+/// Native identity for capturing the working folder of one active agent assignment.
+pub struct AgentWorkspaceCheckpointRequest<'a> {
+    /// Canonical admitted workspace root.
+    pub root: &'a str,
+    /// Exact record fold before capture begins.
+    pub digest: &'a str,
+    /// Exact physical installation.
+    pub installation: &'a str,
+    /// Current native agent custody generation.
+    pub generation: &'a str,
+}
+
+/// Whole-folder observation after a bounded private capture. Never an approval receipt.
+pub struct AgentWorkspaceCheckpoint {
+    /// State after capture, including any durable partial progress.
+    pub workspace: WorkspaceSummary,
+    /// Authenticated changes saved during this invocation, in order.
+    pub saved_changes: Vec<String>,
+    /// True only when final native inspection found no uncaptured or unsupported changes.
+    pub complete: bool,
+    /// Stable explanation when complete is false. Successfully saved history is retained.
+    pub issue: Option<&'static str>,
+}
+
 /// A daemon with a real workspace behind it.
 #[derive(Debug)]
 pub struct LiveDaemon {
@@ -1652,8 +1697,30 @@ pub struct WorkspaceAgentSetupGuard<'a> {
     _workspace_open: MutexGuard<'a, ()>,
 }
 
+#[derive(Clone)]
+enum MutationContext {
+    Authorized(usize, String),
+    Signing,
+}
+
 thread_local! {
-    static VERIFIED_MUTATION_CONTEXT: RefCell<Option<(usize, String)>> = const { RefCell::new(None) };
+    static VERIFIED_MUTATION_CONTEXT: RefCell<Option<MutationContext>> = const { RefCell::new(None) };
+}
+
+// A signing callback receives bytes to sign, never the enclosing capture's mutation authority.
+// Restore on unwind too, before the outer authority context and custody guards are dropped.
+struct SuspendedMutationContext(Option<MutationContext>);
+impl SuspendedMutationContext {
+    fn enter() -> Self {
+        Self(
+            VERIFIED_MUTATION_CONTEXT.with(|active| active.replace(Some(MutationContext::Signing))),
+        )
+    }
+}
+impl Drop for SuspendedMutationContext {
+    fn drop(&mut self) {
+        VERIFIED_MUTATION_CONTEXT.with(|active| active.replace(self.0.take()));
+    }
 }
 
 struct VerifiedMutationContext;
@@ -1667,7 +1734,7 @@ impl VerifiedMutationContext {
                     "nested verified workspace mutation context was refused".to_owned(),
                 ));
             }
-            *active = Some((
+            *active = Some(MutationContext::Authorized(
                 daemon as *const LiveDaemon as usize,
                 installation.to_owned(),
             ));
@@ -2127,7 +2194,12 @@ impl LiveDaemon {
             )
         };
         let verified = VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().clone());
-        if let Some((daemon, verified)) = verified {
+        if matches!(verified, Some(MutationContext::Signing)) {
+            return Err(ManagedTextFileError::Recovery(
+                "a checkpoint signer cannot perform workspace mutations".to_owned(),
+            ));
+        }
+        if let Some(MutationContext::Authorized(daemon, verified)) = verified {
             if daemon != self as *const LiveDaemon as usize || verified != installation {
                 return Err(ManagedTextFileError::StaleWorkspace);
             }
@@ -2550,6 +2622,22 @@ impl LiveDaemon {
             .workspace_open
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
+        self.inspect_agent_folder_locked(
+            expected_root,
+            expected_digest,
+            expected_installation,
+            expected_generation,
+        )
+    }
+
+    // Caller holds exact custody and workspace_open throughout this closed inventory operation.
+    fn inspect_agent_folder_locked(
+        &self,
+        expected_root: &str,
+        expected_digest: &str,
+        expected_installation: &str,
+        expected_generation: &str,
+    ) -> Result<AgentFinishPreflight, ManagedTextFileError> {
         let (managed_paths, native_paths, unsupported_entries) = {
             let held = self.held();
             let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
@@ -6430,6 +6518,206 @@ impl LiveDaemon {
             meaningful_saved,
             true,
         ))
+    }
+
+    /// Save one exact agent-owned file without releasing custody or granting publication power.
+    ///
+    /// This closed operation only records private file content. The native signer retains secret
+    /// custody outside the daemon and receives no inherited mutation context. Reuse existing
+    /// confinement, authenticated journal, content recheck and settling guarantees. A returned
+    /// per-file receipt is not proof that the entire working folder has been checkpointed.
+    pub fn checkpoint_agent_file<F, E>(
+        &self,
+        request: AgentFileCheckpointRequest<'_>,
+        actor_public_key: PublicKey,
+        sign: F,
+    ) -> Result<ManagedPrivateSave, ManagedTextFileError>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested agent checkpoint was refused".to_owned(),
+            ));
+        }
+        let _authority = self.lock_workspace_agent_setup(
+            request.root,
+            request.digest,
+            request.installation,
+            request.generation,
+        )?;
+        let _context = VerifiedMutationContext::enter(self, request.installation)?;
+        let sign = |payload: &SigningPayload| {
+            let _suspended = SuspendedMutationContext::enter();
+            sign(payload)
+        };
+        if request.new_file {
+            self.adopt_native_file_privately(
+                request.path,
+                request.content_digest,
+                request.executable,
+                actor_public_key,
+                sign,
+            )
+        } else {
+            self.save_managed_file_privately(
+                request.path,
+                request.content_digest,
+                request.executable,
+                actor_public_key,
+                sign,
+            )
+        }
+    }
+
+    /// Capture supported edits and additions under one exact native assignment.
+    ///
+    /// Native files are never rewritten. Missing/unsupported entries require explicit resolution;
+    /// a rename is never guessed from a disappearance plus an addition. Each successful append is
+    /// durable even if a later save fails. Only a clean final inventory yields complete=true.
+    pub fn checkpoint_agent_workspace<F, E>(
+        &self,
+        request: AgentWorkspaceCheckpointRequest<'_>,
+        actor_public_key: PublicKey,
+        mut sign: F,
+    ) -> Result<AgentWorkspaceCheckpoint, ManagedTextFileError>
+    where
+        F: FnMut(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested agent checkpoint was refused".to_owned(),
+            ));
+        }
+        let _authority = self.lock_workspace_agent_setup(
+            request.root,
+            request.digest,
+            request.installation,
+            request.generation,
+        )?;
+        let _context = VerifiedMutationContext::enter(self, request.installation)?;
+        let before = self.inspect_agent_folder_locked(
+            request.root,
+            request.digest,
+            request.installation,
+            request.generation,
+        )?;
+        let mut saved_changes = Vec::new();
+        let mut capture = || -> Result<(), &'static str> {
+            if !before.unsupported_entries.is_empty() || !before.missing_files.is_empty() {
+                return Err("checkpoint-entry-resolution-required");
+            }
+            let changed = before
+                .managed_files
+                .iter()
+                .filter(|file| file.modified_from_current_version());
+            let count = changed.clone().count()
+                + before.native_files.len()
+                + before.native_directories.len();
+            if count > 1024 {
+                return Err("checkpoint-change-limit");
+            }
+            let mut directories = before.native_directories.iter().collect::<Vec<_>>();
+            directories.sort_by_key(|entry| (entry.path().split('/').count(), entry.path()));
+            for directory in directories {
+                let receipt = self
+                    .adopt_native_directory_privately(
+                        directory.path(),
+                        directory.installation(),
+                        actor_public_key,
+                        |payload| {
+                            let _suspended = SuspendedMutationContext::enter();
+                            sign(payload)
+                        },
+                    )
+                    .map_err(|_| "checkpoint-directory-save-failed")?;
+                saved_changes.push(receipt.changeset().to_owned());
+                if !receipt.meaningful_saved() {
+                    return Err("checkpoint-content-not-settled");
+                }
+            }
+            for file in changed {
+                let receipt = self
+                    .save_managed_file_privately(
+                        file.path(),
+                        file.content_digest(),
+                        file.executable(),
+                        actor_public_key,
+                        |payload| {
+                            let _suspended = SuspendedMutationContext::enter();
+                            sign(payload)
+                        },
+                    )
+                    .map_err(|_| "checkpoint-file-save-failed")?;
+                saved_changes.push(receipt.changeset().to_owned());
+                if !receipt.meaningful_saved() {
+                    return Err("checkpoint-content-not-settled");
+                }
+            }
+            for file in &before.native_files {
+                let receipt = self
+                    .adopt_native_file_privately(
+                        file.path(),
+                        file.content_digest(),
+                        file.executable(),
+                        actor_public_key,
+                        |payload| {
+                            let _suspended = SuspendedMutationContext::enter();
+                            sign(payload)
+                        },
+                    )
+                    .map_err(|_| "checkpoint-file-save-failed")?;
+                saved_changes.push(receipt.changeset().to_owned());
+                if !receipt.meaningful_saved() {
+                    return Err("checkpoint-content-not-settled");
+                }
+            }
+            let digest = self
+                .held()
+                .as_ref()
+                .ok_or("checkpoint-workspace-unavailable")?
+                .digest()
+                .to_string();
+            let after = self
+                .inspect_agent_folder_locked(
+                    request.root,
+                    &digest,
+                    request.installation,
+                    request.generation,
+                )
+                .map_err(|_| "checkpoint-final-inspection-failed")?;
+            if !after.unsupported_entries.is_empty()
+                || !after.missing_files.is_empty()
+                || !after.native_files.is_empty()
+                || !after.native_directories.is_empty()
+                || after
+                    .managed_files
+                    .iter()
+                    .any(|file| file.modified_from_current_version())
+            {
+                return Err("checkpoint-working-folder-changed");
+            }
+            if self
+                .checkpoint_snapshot()
+                .map_err(|_| "checkpoint-recovery-unavailable")?
+                .pending_meaningful()
+                .is_some()
+            {
+                return Err("checkpoint-recovery-pending");
+            }
+            Ok(())
+        };
+        let issue = capture().err();
+        let held = self.held();
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        Ok(AgentWorkspaceCheckpoint {
+            workspace: summarise(open, None),
+            complete: issue.is_none(),
+            saved_changes,
+            issue,
+        })
     }
 
     /// Adopt an existing native regular file as a new authenticated private file.

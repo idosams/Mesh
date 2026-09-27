@@ -326,3 +326,100 @@ fn allocation_must_match_the_lanes_exact_input_version() {
         "allocation-version-mismatch",
     );
 }
+
+#[test]
+fn checkpoint_intent_survives_restart_and_completion_is_immutable_after_cancel() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    let begin = Command::BeginCheckpoint {
+        id: "capture".into(),
+        lane: "worker".into(),
+        origin: AgentOrigin {
+            actor: "actor".into(),
+            session: "session".into(),
+            run: "run".into(),
+            generation: "a".repeat(32),
+        },
+        input_digest: "b".repeat(32),
+    };
+    let event = runtime.record("begin-capture", begin.clone()).unwrap();
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert!(runtime.state().checkpoints["capture"].result.is_none());
+    assert_eq!(runtime.record("begin-capture", begin).unwrap(), event);
+    send(&mut runtime, Command::Cancel);
+    let result = CheckpointResult {
+        complete: true,
+        version: RecordDigest::from_bytes([4; 32]),
+        workspace_digest: "c".repeat(32),
+        saved_changes: 2,
+        issue: None,
+    };
+    let finish = Command::FinishCheckpoint {
+        id: "capture".into(),
+        result: result.clone(),
+    };
+    let finished = runtime.record("finish-capture", finish.clone()).unwrap();
+    assert_eq!(
+        runtime.record("finish-capture", finish.clone()).unwrap(),
+        finished
+    );
+    refuses(&mut runtime, finish, "checkpoint-already-finished");
+    drop(runtime);
+    let runtime = fixture.runtime();
+    assert_eq!(runtime.state().checkpoints["capture"].result, Some(result));
+    assert!(runtime.state().cancelled);
+}
+
+#[test]
+fn checkpoint_refuses_invalid_completion_and_stale_run_without_advancing_history() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    let mut origin = AgentOrigin {
+        actor: "actor".into(),
+        session: "session".into(),
+        run: "other-run".into(),
+        generation: "a".repeat(32),
+    };
+    refuses(
+        &mut runtime,
+        Command::BeginCheckpoint {
+            id: "capture".into(),
+            lane: "worker".into(),
+            origin: origin.clone(),
+            input_digest: "b".repeat(32),
+        },
+        "stale-run",
+    );
+    origin.run = "run".into();
+    send(
+        &mut runtime,
+        Command::BeginCheckpoint {
+            id: "capture".into(),
+            lane: "worker".into(),
+            origin,
+            input_digest: "b".repeat(32),
+        },
+    );
+    refuses(
+        &mut runtime,
+        Command::FinishCheckpoint {
+            id: "capture".into(),
+            result: CheckpointResult {
+                complete: true,
+                version: RecordDigest::from_bytes([4; 32]),
+                workspace_digest: "c".repeat(32),
+                saved_changes: 2,
+                issue: Some("capture-failed".into()),
+            },
+        },
+        "invalid-checkpoint-result",
+    );
+    assert!(runtime.state().checkpoints["capture"].result.is_none());
+}
