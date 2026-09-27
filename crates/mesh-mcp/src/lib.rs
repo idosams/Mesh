@@ -326,7 +326,7 @@ fn call_tool(request: &Json, id: Json, provider: &dyn WorkspaceStateProvider) ->
     Some(rpc_result(id, result))
 }
 
-const FLEET_INSTRUCTIONS: &str = "Call mesh_fleet_context first. It identifies your exact lane, run and native working folder. Work only there. Use mesh_fleet_checkpoint to save supported private edits and additions; incomplete results require attention and do not mean the whole folder was saved. Use a stable request identity for retries: it returns the same result even after later edits. A new capture needs a new request. You can delegate private child lanes from one of your saved workspace_versions with mesh_fleet_delegate, then observe them with mesh_fleet_children. Use a stable request identity when retrying delegation. This session cannot approve shared state, choose output paths, or grant authority to another lane.";
+const FLEET_INSTRUCTIONS: &str = "Call mesh_fleet_context first. It identifies your exact lane, run and native working folder. Work only there. Use mesh_fleet_checkpoint to save supported private edits and additions; incomplete results require attention and do not mean the whole folder was saved. Use a stable request identity for retries: it returns the same result even after later edits. A new capture needs a new request. Submit a complete checkpoint for immutable review with mesh_fleet_submit_review using its returned checkpoint identity. Submission does not approve or publish it. You can delegate private child lanes from one of your saved workspace_versions with mesh_fleet_delegate, then observe them with mesh_fleet_children. Use a stable request identity when retrying delegation. This session cannot approve shared state, choose output paths, or grant authority to another lane.";
 
 fn fleet_tools() -> Vec<Json> {
     [
@@ -349,6 +349,11 @@ fn fleet_tools() -> Vec<Json> {
             "mesh_fleet_checkpoint",
             "Save private workspace edits and additions with a stable request identity",
             &["request"][..],
+        ),
+        (
+            "mesh_fleet_submit_review",
+            "Submit a completed checkpoint as an immutable review without approving it",
+            &["checkpoint"][..],
         ),
     ]
     .into_iter()
@@ -403,6 +408,7 @@ fn fleet_tool_call(
         Some("mesh_fleet_children") => ("children", &[]),
         Some("mesh_fleet_delegate") => ("delegate", &["request", "goal", "provider", "version"]),
         Some("mesh_fleet_checkpoint") => ("checkpoint", &["request"]),
+        Some("mesh_fleet_submit_review") => ("submit_review", &["checkpoint"]),
         _ => return rpc_error(id, -32602, "unknown Mesh fleet tool"),
     };
     let empty = Json::empty_object();

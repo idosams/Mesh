@@ -211,7 +211,7 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
             .as_array()
             .unwrap()
             .len(),
-        4
+        5
     );
     let context = call(
         &mut stdin,
@@ -333,6 +333,39 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
     assert_eq!(
         retried.get("result").unwrap().get("structuredContent"),
         Some(&captured)
+    );
+    let review_args = Json::object([("checkpoint", captured.get("checkpoint").unwrap().clone())]);
+    let submitted = call(
+        &mut stdin,
+        &mut stdout,
+        12,
+        "tools/call",
+        tool("mesh_fleet_submit_review", review_args.clone()),
+        token,
+    );
+    let submitted = submitted
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap()
+        .clone();
+    assert_eq!(submitted.get("version"), captured.get("version"));
+    assert_eq!(submitted.get("recorded"), Some(&Json::Bool(true)));
+    let repeated = call(
+        &mut stdin,
+        &mut stdout,
+        13,
+        "tools/call",
+        tool("mesh_fleet_submit_review", review_args),
+        token,
+    );
+    assert_eq!(
+        repeated.get("result").unwrap().get("structuredContent"),
+        Some(&submitted)
+    );
+    assert_eq!(
+        fs::read_to_string(working_root.join("note.txt")).unwrap(),
+        "newer unsaved work\n"
     );
     assert_eq!(desktop.workspace_state().unwrap().root, source.root);
     service.revoke(&credential).unwrap();

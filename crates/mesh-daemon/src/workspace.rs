@@ -1909,6 +1909,39 @@ impl OpenWorkspace {
             .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
     }
 
+    /// Pin a private saved version for inspection, even after later private work has started.
+    /// This creates no approval authority. Publication still requires its current-head checks.
+    pub(crate) fn saved_publication_review_bundle(
+        &self,
+        target: RecordDigest,
+    ) -> Result<RecordDigest, String> {
+        let canonical = self
+            .shared_version()
+            .unwrap_or(crate::publication::GENESIS_SHARED_HEAD);
+        self.publication_review(target, canonical, false)
+            .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
+    }
+
+    /// Resolve durable review identity from the complete index, never a bounded UI projection.
+    pub(crate) fn recorded_review_for_actor(
+        &self,
+        target: RecordDigest,
+        actor: RecordDigest,
+    ) -> Result<Option<RecordDigest>, String> {
+        let mut found = None;
+        for bundle in self.record_index.review_bundles() {
+            if self.review(&bundle).is_some_and(|review| {
+                review.subject_operation == target && review.opened_by == actor
+            }) {
+                if found.is_some() {
+                    return Err("multiple saved reviews match the same actor and target".into());
+                }
+                found = Some(bundle);
+            }
+        }
+        Ok(found)
+    }
+
     /// Recompute the exact v1 human-approval context for one durable review record.
     pub(crate) fn human_approval_context(
         &self,

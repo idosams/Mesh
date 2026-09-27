@@ -3204,6 +3204,87 @@ impl LiveDaemon {
         )
     }
 
+    /// Record an immutable saved-version review for the exact assigned agent workspace.
+    ///
+    /// Newer working bytes are irrelevant to the selected immutable closure. This closed operation
+    /// retains custody and supplies no approval/signing capability. Repeating the same target and
+    /// native actor returns the original record, including after later private saves.
+    pub fn submit_agent_saved_review(
+        &self,
+        request: AgentWorkspaceCheckpointRequest<'_>,
+        target: RecordDigest,
+        actor: PublicKey,
+    ) -> Result<RecordDigest, Unavailable> {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(publication_refusal(
+                "agent-review-nested",
+                "A signing callback cannot submit a review.",
+            ));
+        }
+        let _authority = self
+            .lock_workspace_agent_setup(
+                request.root,
+                request.digest,
+                request.installation,
+                request.generation,
+            )
+            .map_err(|_| {
+                publication_refusal(
+                    "agent-review-custody-changed",
+                    "The agent workspace assignment changed.",
+                )
+            })?;
+        let mut checkpoint = self
+            .checkpoint
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut held = self.held();
+        let open = held.as_mut().ok_or_else(Unavailable::no_workspace_open)?;
+        let opened_by = RecordDigest::from_bytes(*actor.actor_id::<Blake3>().digest().as_bytes());
+        if let Some(bundle) = open
+            .recorded_review_for_actor(target, opened_by)
+            .map_err(|_| {
+                publication_refusal(
+                    "agent-review-ambiguous",
+                    "More than one saved review matches this request.",
+                )
+            })?
+        {
+            return Ok(bundle);
+        }
+        let bundle = open.saved_publication_review_bundle(target).map_err(|_| {
+            publication_refusal(
+                "agent-review-unavailable",
+                "The exact saved review could not be reconstructed.",
+            )
+        })?;
+        if let Some(review) = open.review(&bundle) {
+            if review.subject_operation == target {
+                return Ok(bundle);
+            }
+            return Err(publication_refusal(
+                "agent-review-conflict",
+                "The saved review identity conflicts with its target.",
+            ));
+        }
+        checkpoint
+            .preserve_pending_recovery_for_signal(open, RecoveryRuntimeSignal::ReviewOpened)
+            .map_err(|_| {
+                publication_refusal(
+                    "publication-recovery-preservation-failed",
+                    user_messages::PUBLICATION_RECOVERY_PRESERVATION_FAILED,
+                )
+            })?;
+        open.append_record(&StoredRecord::Review(ReviewRecord {
+            bundle,
+            subject_operation: target,
+            opened_by,
+        }))
+        .map_err(|_| publication_save_failed())?;
+        reopen(&mut held, &self.trusted_reviewers)?;
+        Ok(bundle)
+    }
+
     /// Recompute the exact approval context for one recorded review in the displayed workspace.
     pub fn human_approval_context_for_workspace(
         &self,

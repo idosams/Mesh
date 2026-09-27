@@ -368,9 +368,21 @@ fn checkpoint_intent_survives_restart_and_completion_is_immutable_after_cancel()
         finished
     );
     refuses(&mut runtime, finish, "checkpoint-already-finished");
+    let bundle = RecordDigest::from_bytes([5; 32]);
+    let submitted = Command::SubmitReview {
+        checkpoint: "capture".into(),
+        bundle,
+    };
+    let review_event = runtime.record("review-capture", submitted.clone()).unwrap();
+    assert_eq!(
+        runtime.record("review-capture", submitted.clone()).unwrap(),
+        review_event
+    );
+    refuses(&mut runtime, submitted, "checkpoint-review-exists");
     drop(runtime);
     let runtime = fixture.runtime();
     assert_eq!(runtime.state().checkpoints["capture"].result, Some(result));
+    assert_eq!(runtime.state().checkpoints["capture"].review, Some(bundle));
     assert!(runtime.state().cancelled);
 }
 
@@ -422,4 +434,12 @@ fn checkpoint_refuses_invalid_completion_and_stale_run_without_advancing_history
         "invalid-checkpoint-result",
     );
     assert!(runtime.state().checkpoints["capture"].result.is_none());
+    refuses(
+        &mut runtime,
+        Command::SubmitReview {
+            checkpoint: "capture".into(),
+            bundle: RecordDigest::from_bytes([5; 32]),
+        },
+        "checkpoint-incomplete",
+    );
 }

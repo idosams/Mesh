@@ -52,7 +52,7 @@ A native fleet host can launch this same binary with `MESH_FLEET_OBJECTIVE` and
 credential in a prompt, command-line argument, workspace file or support log. This is a native
 integration surface; the desktop does not yet expose a complete fleet launch journey.
 
-In this mode the bridge advertises four tools:
+In this mode the bridge advertises five tools:
 
 - `mesh_fleet_context`: the bound objective, actor, session, run, lane and exact workspace.
 - `mesh_fleet_delegate`: allocate a child from one of that lane's saved versions, with a stable
@@ -61,6 +61,10 @@ In this mode the bridge advertises four tools:
 - `mesh_fleet_checkpoint`: capture supported private edits and additions using a stable `request`.
   Requires a native capture-enabled session backed by its actual actor signing key. Incomplete
   results preserve any saved progress and identify the remaining issue; they are not full saves.
+- `mesh_fleet_submit_review`: submit the opaque `checkpoint` identity returned by a completed
+  capture. The native host records a review of its exact saved version; retry returns the same
+  bundle, even while newer private files are being edited. Incomplete and other-session captures
+  cannot be submitted. This operation retains agent custody and cannot approve anything.
 
 Checkpoint intent and bounded result are durable. Retrying a completed request returns its original
 version even after newer working edits. Use a new request for a new capture or to continue after an
@@ -75,5 +79,5 @@ lanes retain durable actor/session/run attribution. Tokens never enter the contr
 
 Fleet mode requires IPC surface 8 and refuses an older daemon before sending credentials. Default
 workspace mode remains compatible with earlier supported surfaces. Child allocation is real native
-version reconstruction, but scheduling providers and opening review from this
-MCP surface are subsequent integration work. These tools cannot approve or publish shared state.
+version reconstruction. Scheduling real providers, packaged review UI integration and native restart
+reconciliation remain incomplete. These tools cannot approve or publish shared state.

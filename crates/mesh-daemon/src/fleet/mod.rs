@@ -110,6 +110,8 @@ pub struct Checkpoint {
     pub input_digest: String,
     /// Absent means capture must be reconciled, never implicitly repeated.
     pub result: Option<CheckpointResult>,
+    /// Immutable native review bundle for the completed checkpoint, if submitted.
+    pub review: Option<RecordDigest>,
 }
 
 /// Bounded immutable capture acknowledgment, safe to replay after later working edits.
@@ -172,6 +174,13 @@ pub struct State {
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    /// A native review record was durably created for one completed checkpoint.
+    SubmitReview {
+        /// Original checkpoint identity.
+        checkpoint: String,
+        /// Exact native bundle identity, not approval authority.
+        bundle: RecordDigest,
+    },
     /// Commit capture intent before calling the native filesystem/journal operation.
     BeginCheckpoint {
         /// Objective-unique request identity.
@@ -407,6 +416,23 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::SubmitReview { checkpoint, bundle } => {
+                let checkpoint = self
+                    .checkpoints
+                    .get_mut(checkpoint)
+                    .ok_or(Error::Refused("checkpoint-missing"))?;
+                if !checkpoint
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.complete)
+                {
+                    return refuse("checkpoint-incomplete");
+                }
+                if checkpoint.review.is_some() {
+                    return refuse("checkpoint-review-exists");
+                }
+                checkpoint.review = Some(*bundle);
+            }
             Command::BeginCheckpoint {
                 id,
                 lane,
@@ -445,6 +471,7 @@ impl State {
                         origin: origin.clone(),
                         input_digest: input_digest.clone(),
                         result: None,
+                        review: None,
                     },
                 );
             }

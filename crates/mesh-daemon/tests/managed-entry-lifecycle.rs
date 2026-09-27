@@ -1348,3 +1348,144 @@ fn agent_workspace_checkpoint_refuses_ambiguous_missing_entries_before_any_save(
     assert!(managed.join("renamed.txt").exists());
     fs::remove_dir_all(parent).unwrap();
 }
+
+#[test]
+fn agent_submits_historical_review_while_newer_private_work_continues() {
+    let (parent, managed) = workspace("agent-saved-review");
+    let daemon = open_daemon(&managed);
+    let initial = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &initial.root,
+            &initial.digest,
+            &initial.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let key = SigningKey::from_bytes(&[0x65; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let mut versions = Vec::new();
+    for contents in ["first review bytes\n", "second review bytes\n"] {
+        fs::write(managed.join("existing/keep.txt"), contents).unwrap();
+        let state = daemon.workspace_state().unwrap();
+        let report = daemon
+            .checkpoint_agent_workspace(
+                mesh_daemon::AgentWorkspaceCheckpointRequest {
+                    root: &state.root,
+                    digest: &state.digest,
+                    installation: &state.installation,
+                    generation: &generation,
+                },
+                public,
+                |payload| {
+                    Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                        key.sign(payload.as_bytes()).to_bytes(),
+                    ))
+                },
+            )
+            .unwrap();
+        assert!(report.complete);
+        versions.push(
+            report
+                .workspace
+                .workspace_versions
+                .last()
+                .unwrap()
+                .operation(),
+        );
+    }
+    fs::write(
+        managed.join("existing/keep.txt"),
+        "third unsaved working edit\n",
+    )
+    .unwrap();
+    let mut bundles = Vec::new();
+    for version in &versions {
+        let state = daemon.workspace_state().unwrap();
+        bundles.push(
+            daemon
+                .submit_agent_saved_review(
+                    mesh_daemon::AgentWorkspaceCheckpointRequest {
+                        root: &state.root,
+                        digest: &state.digest,
+                        installation: &state.installation,
+                        generation: &generation,
+                    },
+                    *version,
+                    public,
+                )
+                .unwrap(),
+        );
+    }
+    let before_retry = daemon.workspace_state().unwrap();
+    assert_eq!(
+        daemon
+            .submit_agent_saved_review(
+                mesh_daemon::AgentWorkspaceCheckpointRequest {
+                    root: &before_retry.root,
+                    digest: &before_retry.digest,
+                    installation: &before_retry.installation,
+                    generation: &generation,
+                },
+                versions[0],
+                public
+            )
+            .unwrap(),
+        bundles[0]
+    );
+    let state = daemon.workspace_state().unwrap();
+    assert_eq!(state.records, before_retry.records);
+    assert_eq!(state.shared_version, initial.shared_version);
+    assert_eq!(state.reviews, 2);
+    let first = state
+        .review_items
+        .iter()
+        .find(|item| {
+            item.get("bundle").and_then(mesh_daemon::ipc::Json::as_text)
+                == Some(bundles[0].to_string().as_str())
+        })
+        .unwrap();
+    assert_eq!(
+        first.get("content_complete"),
+        Some(&mesh_daemon::ipc::Json::Bool(true))
+    );
+    let change = first
+        .get("bundle_changes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|change| {
+            change
+                .get("path_after")
+                .and_then(mesh_daemon::ipc::Json::as_text)
+                .is_some_and(|path| path.ends_with("existing/keep.txt"))
+        })
+        .unwrap();
+    let object = change.get("object_id").unwrap().as_text().unwrap();
+    let artifact = daemon
+        .review_artifact_for_workspace(
+            &state.root,
+            &state.digest,
+            &state.installation,
+            &bundles[0].to_string(),
+            &versions[0].to_string(),
+            object,
+            "after",
+        )
+        .unwrap();
+    assert_eq!(artifact.bytes(), b"first review bytes\n");
+    assert_eq!(
+        fs::read_to_string(managed.join("existing/keep.txt")).unwrap(),
+        "third unsaved working edit\n"
+    );
+    assert_eq!(
+        daemon
+            .workspace_agent_custody_for_workspace(&state.root, &state.digest, &state.installation)
+            .unwrap()
+            .generation(),
+        Some(generation.as_str())
+    );
+    fs::remove_dir_all(parent).unwrap();
+}

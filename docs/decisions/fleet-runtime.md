@@ -81,7 +81,16 @@ remain 256-bit operation identities. Completed retries return the recorded outco
 later edits. Pending intents require native reconciliation; they are never blindly replayed. Session
 changes cannot reuse an earlier session's request. Capture accepted before cancellation may still
 record its result, preserving work without authorizing another run. Native restart reconciliation
-and review submission still need integration.
+still needs integration.
+
+Review submission accepts only a completed checkpoint from the current authorized session. Native
+code reconstructs its immutable closure, preserves pending recovery, records the exact review and
+acknowledges its bundle in the control ledger. A repeated submission returns the same bundle. The
+native record can be recovered across the gap before the control acknowledgment using the complete
+review index, never the bounded UI projection. This saved-review entry point does not require newer
+working bytes to equal the selected historical version. It does not weaken existing human approval
+or publication guards. Approval/integration of pinned results while work continues and stable base
+presentation across shared-head advances still require the planned parallel-review integration.
 
 Allocation uses service-generated identities and descriptor-pinned parent creation. Both temporary
 export and final import verify the admitted parent object before writing. An occupied reservation

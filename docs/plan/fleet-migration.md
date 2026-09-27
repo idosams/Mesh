@@ -55,7 +55,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | F03 | `766852b17e8e06fbd01d5cf8b2504947fb19a280` | feat: capture private agent files under exact native custody | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
 | F03 | `4be9ae2f8a0de2515e10ee7fdd9be486ff8ddaa1` | feat: capture agent workspace additions with explicit partial results | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
 | F03 | `b0da3c728cfb84dcd1d98dbe2e214a5977016c79` | feat: expose durable signed checkpoints through scoped MCP sessions | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
-| F04 | `4741d895b3eb34a5f9c8d6e7a8c482c527cbc8a6` | feat: submit completed agent checkpoints as immutable reviews | Pending transfer |
+| F04 | `4741d895b3eb34a5f9c8d6e7a8c482c527cbc8a6` | feat: submit completed agent checkpoints as immutable reviews | Transferred on `idosams/fleet-immutable-reviews`; validation/PR pending; stacked on #6; not merged |
 | F05 | `0d6127f1371bec3cbf150bcf2540097fbf980aad` | feat: launch scoped Codex workers with durable ownership claims | Pending transfer |
 | F05 | `ca9b48a59f14934e9b05dacef1ecbaa9c93453f3` | feat: schedule delegated Codex workers within native fleet limits | Pending transfer |
 | A01 | `c6e62e0be68307fa315928d0d90bb6eaf8852b94` | docs: prioritize non-disruptive existing-project attachment | Pending transfer |

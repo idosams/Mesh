@@ -1,14 +1,13 @@
 # Project status
 
-Canonical fleet migration F01 adds the native durable objective/lane/run control model, a separate
-SQLite event ledger with transactional retries and revision checks, and isolated lane allocation
-from exact saved versions. This is a library foundation: scoped agent tools, providers, attachment,
-live fleet UI and the complete acceptance journeys remain pending migration and verification.
-F02 adds native-issued, revocable agent sessions and MCP context, child observation and delegation.
-Agents can request child lanes from their own saved versions; native code chooses and pins destinations.
-F03 adds custody-bound private file/workspace capture and signed checkpoint receipts through scoped
-MCP. Incomplete capture retains durable partial progress; exact retries return the recorded outcome.
-Provider scheduling and complete desktop fleet journeys remain pending.
+Canonical fleet migration provides durable objective/lane/run state, an independent SQLite event
+ledger, and isolated lanes opened from exact saved versions. Native-issued sessions expose scoped
+MCP context, child delegation, signed private checkpoints and immutable review submission. Capture
+retains custody and durable partial progress; exact retries return the recorded outcome. An agent
+can submit a completed checkpoint while newer work continues, without approval or publication power.
+These are native/MCP integration foundations on unmerged review branches. Provider scheduling,
+existing-project attachment, live fleet UI and complete acceptance journeys remain pending migration
+and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

@@ -1,7 +1,8 @@
 //! Native fleet host and scoped agent calls. Agent input never selects filesystem destinations.
 //!
 //! The native host creates objectives, dispatches runs and issues credentials. This agent surface
-//! only inspects its bound workspace, observes direct children and delegates private child lanes.
+//! inspects its bound workspace, observes/delegates children, captures private work and submits
+//! immutable reviews. No agent call can approve or publish a version.
 //! Credentials are ephemeral, redacted from Debug, and never written to the event ledger. A
 //! restart requires native reauthorization; disconnect never implies a worker has stopped.
 
@@ -380,6 +381,62 @@ impl FleetService {
         let state = exact_state(&workspace)?;
         verify_custody(&workspace, &state, &grant.generation)?;
         match action {
+            "submit_review" => {
+                exact_fields(arguments, &["checkpoint"])?;
+                let id = field(arguments, "checkpoint")?;
+                let checkpoint = inner
+                    .runtime
+                    .state()
+                    .checkpoints
+                    .get(id)
+                    .ok_or_else(|| refusal("fleet-checkpoint-unavailable"))?;
+                if checkpoint.lane != grant.lane
+                    || checkpoint.origin.actor != grant.actor
+                    || checkpoint.origin.session != grant.session
+                    || checkpoint.origin.run != grant.run
+                    || checkpoint.origin.generation != grant.generation
+                {
+                    return Err(refusal("fleet-checkpoint-not-in-session"));
+                }
+                let result = checkpoint
+                    .result
+                    .as_ref()
+                    .filter(|result| result.complete)
+                    .ok_or_else(|| refusal("fleet-checkpoint-incomplete"))?;
+                let version = result.version;
+                if let Some(bundle) = checkpoint.review {
+                    return Ok(review_summary(id, version, bundle));
+                }
+                let signer = grant
+                    .signer
+                    .as_ref()
+                    .ok_or_else(|| refusal("fleet-checkpoint-signer-unavailable"))?;
+                let public = signer.public_key();
+                if RecordDigest::from_bytes(*public.as_bytes()).to_string() != grant.actor {
+                    return Err(refusal("fleet-checkpoint-signer-changed"));
+                }
+                let bundle = workspace.daemon().submit_agent_saved_review(
+                    crate::AgentWorkspaceCheckpointRequest {
+                        root: &state.root,
+                        digest: &state.digest,
+                        installation: &state.installation,
+                        generation: &grant.generation,
+                    },
+                    version,
+                    public,
+                )?;
+                inner
+                    .runtime
+                    .record(
+                        &format!("review-{id}"),
+                        Command::SubmitReview {
+                            checkpoint: id.into(),
+                            bundle,
+                        },
+                    )
+                    .map_err(runtime_error)?;
+                Ok(review_summary(id, version, bundle))
+            }
             "checkpoint" => {
                 exact_fields(arguments, &["request"])?;
                 let request = field(arguments, "request")?;
@@ -587,9 +644,18 @@ impl FleetService {
     }
 }
 
+fn review_summary(checkpoint: &str, version: RecordDigest, bundle: RecordDigest) -> Json {
+    Json::object([
+        ("checkpoint", Json::text(checkpoint)),
+        ("version", Json::text(version.to_string())),
+        ("bundle", Json::text(bundle.to_string())),
+        ("recorded", Json::Bool(true)),
+    ])
+}
+
 fn checkpoint_summary(id: &str, result: &super::CheckpointResult) -> Json {
     Json::object([
-        ("request", Json::text(id)),
+        ("checkpoint", Json::text(id)),
         ("complete", Json::Bool(result.complete)),
         ("version", Json::text(result.version.to_string())),
         (

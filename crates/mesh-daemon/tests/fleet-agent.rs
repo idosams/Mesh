@@ -470,7 +470,7 @@ fn authenticated_checkpoint_retry_pins_result_and_new_request_captures_later_wor
     )
     .unwrap();
     assert_eq!(replay.state().checkpoints.len(), 2);
-    let recorded = &replay.state().checkpoints[text(&first, "request")];
+    let recorded = &replay.state().checkpoints[text(&first, "checkpoint")];
     assert_eq!(recorded.origin.actor, text(&context, "actor"));
     assert_eq!(recorded.origin.session, "signed-session");
     assert!(recorded.result.as_ref().unwrap().complete);
@@ -500,5 +500,57 @@ fn checkpoint_identity_cannot_be_reused_by_a_rotated_session() {
     assert_eq!(
         f.call("checkpoint", &args).unwrap_err().code,
         "fleet-checkpoint-request-conflict"
+    );
+    assert_eq!(
+        f.call(
+            "submit_review",
+            &Json::object([("checkpoint", first.get("checkpoint").unwrap().clone())])
+        )
+        .unwrap_err()
+        .code,
+        "fleet-checkpoint-not-in-session"
+    );
+}
+
+#[test]
+fn incomplete_checkpoint_cannot_be_submitted_for_review() {
+    let mut f = Fixture::new("checkpoint-incomplete-review");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "signed-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x67; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::rename(root.join("note.txt"), root.join("renamed.txt")).unwrap();
+    let captured = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("incomplete"))]),
+        )
+        .unwrap();
+    assert_eq!(captured.get("complete"), Some(&Json::Bool(false)));
+    assert_eq!(
+        f.call(
+            "submit_review",
+            &Json::object([("checkpoint", captured.get("checkpoint").unwrap().clone())])
+        )
+        .unwrap_err()
+        .code,
+        "fleet-checkpoint-incomplete"
+    );
+    assert_eq!(
+        f.context()
+            .get("workspace")
+            .unwrap()
+            .get("reviews")
+            .and_then(Json::as_u64),
+        Some(0)
     );
 }
