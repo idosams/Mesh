@@ -754,3 +754,68 @@ fn provisioning_refuses_replaced_roots_links_and_partial_receipts() {
     assert!(storage.provision(&f.source).is_err());
     assert_eq!(fs::read_dir(&f.metadata).unwrap().count(), 0);
 }
+
+#[test]
+fn saved_inspection_is_paged_exact_and_never_reads_current_source_content() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("inspection");
+    for number in 0..201 {
+        fs::write(
+            f.source.join(format!("file-{number:03}")),
+            format!("saved {number}"),
+        )
+        .unwrap();
+    }
+    fs::create_dir(f.source.join("empty")).unwrap();
+    fs::write(f.source.join("binary"), b"\0\xff").unwrap();
+    fs::write(f.source.join("large"), vec![b'x'; 262_145]).unwrap();
+    let history = AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .provision(&f.source)
+        .unwrap();
+    let input = history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let saved = save_attached(history.project(), history.metadata_path(), &input)
+        .unwrap()
+        .operation()
+        .to_string();
+    let first = history.inspect_entries(&saved, None).unwrap();
+    let cursor = first.get("next_after").unwrap().as_text().unwrap();
+    assert!(
+        history
+            .inspect_entries(&saved, Some(cursor))
+            .unwrap()
+            .get("next_after")
+            .unwrap()
+            == &Json::Null
+    );
+    fs::write(f.source.join("file-000"), "new live work").unwrap();
+    fs::remove_file(f.source.join("binary")).unwrap();
+    let text = history.inspect_text(&saved, "file-000").unwrap();
+    assert_eq!(text.get("text").and_then(Json::as_text), Some("saved 0"));
+    assert_eq!(history.inspect_entries(&saved, None).unwrap(), first);
+    assert_eq!(
+        history
+            .inspect_text(&saved, "binary")
+            .unwrap()
+            .get("state")
+            .and_then(Json::as_text),
+        Some("binary")
+    );
+    assert_eq!(
+        history
+            .inspect_text(&saved, "large")
+            .unwrap()
+            .get("state")
+            .and_then(Json::as_text),
+        Some("too-large")
+    );
+    assert!(history.inspect_text(&saved, "../outside").is_err());
+    assert!(history.inspect_entries(&"f".repeat(64), None).is_err());
+    assert!(history.inspect_entries(&saved, Some("missing")).is_err());
+    fs::rename(history.metadata_path(), f.root.join("old-history")).unwrap();
+    fs::create_dir(history.metadata_path()).unwrap();
+    assert!(history.inspect_text(&saved, "file-000").is_err());
+}

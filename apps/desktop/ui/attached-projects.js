@@ -43,9 +43,47 @@ export function attachedVersionPage(raw, id, before) {
   return Object.freeze({ versions: Object.freeze([...value.versions]), nextBefore: value.next_before });
 }
 
+const parseInspection = (raw, id, operation, schema) => {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.project !== id || value.inspection?.operation !== operation || value.inspection.schema !== schema) {
+    throw new Error('Saved inspection identity mismatch');
+  }
+  return value.inspection;
+};
+export function attachedEntries(raw, id, operation, after) {
+  const value = parseInspection(raw, id, operation, 'mesh.attachment-entries/v1');
+  if (value.after !== after || !Array.isArray(value.entries) || value.entries.length > 200) throw new Error('Invalid saved entries');
+  const paths = new Set();
+  for (const entry of value.entries) {
+    if (!safeText(entry?.path, 4096) || entry.path.startsWith('/')
+      || entry.path.split('/').some((part) => !part || part === '.' || part === '..')
+      || paths.has(entry.path) || entry.path === after
+      || !['file', 'folder'].includes(entry.kind)
+      || (entry.kind === 'folder' && (entry.bytes !== null || entry.digest !== null || entry.executable !== null))
+      || (entry.kind === 'file' && (!Number.isSafeInteger(entry.bytes) || entry.bytes < 0
+        || typeof entry.digest !== 'string' || !/^[a-f0-9]{64}$/.test(entry.digest) || typeof entry.executable !== 'boolean'))) {
+      throw new Error('Invalid saved entry');
+    }
+    paths.add(entry.path);
+  }
+  if (value.next_after !== null && (value.entries.length !== 200 || value.next_after !== value.entries.at(-1).path)) {
+    throw new Error('Invalid entry cursor');
+  }
+  return { operation, entries: value.entries, nextAfter: value.next_after, file: null };
+}
+export function attachedText(raw, id, operation, entry) {
+  const value = parseInspection(raw, id, operation, 'mesh.attachment-text/v1');
+  if (value.path !== entry.path || value.digest !== entry.digest || value.bytes !== entry.bytes || value.executable !== entry.executable
+    || !['text', 'binary', 'too-large'].includes(value.state)
+    || (value.state === 'text' && (typeof value.text !== 'string' || value.text.length > 262144 || value.bytes > 262144))
+    || (value.state !== 'text' && value.text !== null)) throw new Error('Saved text identity mismatch');
+  return value;
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
+  let inspections = {};
   let busy = false;
   let error = '';
   let mounted = false;
@@ -53,7 +91,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, busy, error, available: typeof invoke === 'function' },
     }));
   };
   const planRefresh = () => {
@@ -107,6 +145,38 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
           id: value.id, before: value.before,
         }), value.id, value.before);
         histories = { ...histories, [value.id]: page };
+      });
+      return;
+    }
+    if (value.type === 'inspect' && Object.keys(value).length === 3
+      && histories[value.id]?.versions.includes(value.operation)) {
+      void run(async () => {
+        const inspected = attachedEntries(await invoke('inspect_attached_version', {
+          id: value.id, operation: value.operation, path: null, after: null,
+        }), value.id, value.operation, null);
+        inspections = { ...inspections, [value.id]: inspected };
+      });
+      return;
+    }
+    const selected = inspections[value.id];
+    if (selected && value.type === 'entries' && Object.keys(value).length === 4 && selected.operation === value.operation
+      && typeof value.after === 'string' && value.after === selected.nextAfter) {
+      void run(async () => {
+        const inspected = attachedEntries(await invoke('inspect_attached_version', {
+          id: value.id, operation: value.operation, path: null, after: value.after,
+        }), value.id, value.operation, value.after);
+        inspections = { ...inspections, [value.id]: { ...inspected, file: selected.file } };
+      });
+      return;
+    }
+    if (selected && value.type === 'file' && Object.keys(value).length === 4 && selected.operation === value.operation) {
+      const entry = selected.entries.find((entry) => entry.path === value.path && entry.kind === 'file');
+      if (!entry) return;
+      void run(async () => {
+        const file = attachedText(await invoke('inspect_attached_version', {
+          id: value.id, operation: value.operation, path: value.path, after: null,
+        }), value.id, value.operation, entry);
+        inspections = { ...inspections, [value.id]: { ...selected, file } };
       });
       return;
     }

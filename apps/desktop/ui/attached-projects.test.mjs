@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -115,6 +115,59 @@ test('status refresh preserves the explicitly loaded immutable version page', as
   assert.deepEqual(h.projections.at(-1).histories[id].versions, ['b'.repeat(64)]);
   const count = calls.length;
   h.intent({ type: 'versions', id, before: 'd'.repeat(64) });
+  assert.equal(calls.length, count);
+  h.dispose();
+});
+
+
+const operation = 'b'.repeat(64);
+const savedEntry = { path: 'notes.txt', kind: 'file', bytes: 5, digest: 'd'.repeat(64), executable: false };
+const entryReply = () => ({ project: id, inspection: { schema: 'mesh.attachment-entries/v1', operation,
+  after: null, entries: [{ ...savedEntry }], next_after: null } });
+const textReply = () => ({ project: id, inspection: { schema: 'mesh.attachment-text/v1', operation,
+  path: savedEntry.path, digest: savedEntry.digest, bytes: 5, executable: false, state: 'text', text: 'saved' } });
+test('saved inspection binds version, path, content metadata and page cursor', () => {
+  assert.equal(attachedEntries(entryReply(), id, operation, null).entries[0].path, 'notes.txt');
+  assert.equal(attachedText(textReply(), id, operation, savedEntry).text, 'saved');
+  assert.throws(() => attachedEntries(entryReply(), id, 'c'.repeat(64), null));
+  assert.throws(() => attachedEntries(entryReply(), id, operation, 'another-path'));
+  const traversal = entryReply(); traversal.inspection.entries[0].path = '../outside';
+  assert.throws(() => attachedEntries(traversal, id, operation, null));
+  const altered = textReply(); altered.inspection.digest = 'e'.repeat(64);
+  assert.throws(() => attachedText(altered, id, operation, savedEntry));
+  const wrong = textReply(); wrong.inspection.path = 'other.txt';
+  assert.throws(() => attachedText(wrong, id, operation, savedEntry));
+});
+test('file selection remains pinned while native capture advances and stale intents are refused', async () => {
+  let live = operation; const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: id,
+      before: null, versions: [operation], next_before: null };
+    if (command === 'inspect_attached_version') return args.path === null ? entryReply() : textReply();
+    const value = reply(); value.projects[0].capture.saved_version = live; return value;
+  });
+  await settle(); h.intent({ type: 'versions', id, before: null }); await settle();
+  h.intent({ type: 'inspect', id, operation }); await settle();
+  h.intent({ type: 'file', id, operation, path: 'notes.txt' }); await settle();
+  live = 'c'.repeat(64); h.intent({ type: 'refresh' }); await settle();
+  assert.equal(h.projections.at(-1).projects[0].savedVersion, live);
+  assert.equal(h.projections.at(-1).inspections[id].operation, operation);
+  assert.equal(h.projections.at(-1).inspections[id].file.text, 'saved');
+  const count = calls.length;
+  h.intent({ type: 'file', id, operation: live, path: 'notes.txt' });
+  h.intent({ type: 'file', id, operation, path: '../outside' });
+  assert.equal(calls.length, count); h.dispose();
+});
+
+test('unselected saved-file intents cannot dereference or invoke an absent inspection', async () => {
+  const calls = [];
+  const h = harness(async (command) => { calls.push(command); return reply(); });
+  await settle();
+  const count = calls.length;
+  h.intent({ type: 'file', id, operation: undefined, path: 'note.txt' });
+  h.intent({ type: 'entries', id, operation: undefined, after: 'note.txt' });
+  await settle();
   assert.equal(calls.length, count);
   h.dispose();
 });

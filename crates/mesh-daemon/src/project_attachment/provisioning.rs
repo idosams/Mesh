@@ -104,6 +104,22 @@ impl ProvisionedAttachment {
             .saved_versions_in_store(&self.metadata, self.store.clone())
     }
 
+    /// Inspect one bounded page of entries in an exact saved version, never live files.
+    pub fn inspect_entries(
+        &self,
+        operation: &str,
+        after: Option<&str>,
+    ) -> io::Result<crate::ipc::Json> {
+        self.attachment
+            .inspect_entries(&self.metadata, self.store.clone(), operation, after)
+    }
+
+    /// Preview exact saved UTF-8 text up to 256 KiB; binary and larger files return metadata only.
+    pub fn inspect_text(&self, operation: &str, path: &str) -> io::Result<crate::ipc::Json> {
+        self.attachment
+            .inspect_text(&self.metadata, self.store.clone(), operation, path)
+    }
+
     /// Share the admitted source and store descriptors directly with the capture worker.
     pub fn start_capture(
         &self,

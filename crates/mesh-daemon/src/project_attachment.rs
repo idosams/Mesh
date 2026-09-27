@@ -25,6 +25,7 @@ pub use background::{
 };
 
 mod history;
+mod inspection;
 pub use history::SavedAttachmentVersion;
 
 mod observation;

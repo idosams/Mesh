@@ -163,6 +163,33 @@ impl AttachmentHost {
         .encode())
     }
 
+    pub fn inspect(
+        &self,
+        id: &str,
+        operation: &str,
+        path: Option<&str>,
+        after: Option<&str>,
+    ) -> Result<String, String> {
+        if path.is_some() && after.is_some() {
+            return Err("Choose either file preview or entry paging".into());
+        }
+        let history = self
+            .state
+            .lock()
+            .map_err(|_| UNAVAILABLE)?
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open in this desktop session")?
+            .history
+            .clone();
+        let inspection = match path {
+            Some(path) => history.inspect_text(operation, path),
+            None => history.inspect_entries(operation, after),
+        }
+        .map_err(|_| "The exact saved version could not be inspected")?;
+        Ok(Json::object([("project", Json::text(id)), ("inspection", inspection)]).encode())
+    }
+
     pub fn control(&self, id: &str, generation: &str, action: &str) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         let project = state

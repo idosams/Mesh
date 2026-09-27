@@ -798,6 +798,22 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn inspect_attached_version(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        operation: String,
+        path: Option<String>,
+        after: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.inspect(&id, &operation, path.as_deref(), after.as_deref())
+        })
+        .await
+        .map_err(|_| "Saved version inspection is unavailable".to_owned())?
+    }
+
+    #[tauri::command]
     async fn control_attached_project(
         host: State<'_, Arc<AttachmentHost>>,
         id: String,
@@ -6641,6 +6657,7 @@ mod desktop {
                 attach_existing_project,
                 attached_projects,
                 attached_project_versions,
+                inspect_attached_version,
                 control_attached_project,
                 recent_workspace_status,
                 renderer_proof_configuration,

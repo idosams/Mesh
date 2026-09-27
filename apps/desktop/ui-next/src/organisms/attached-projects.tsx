@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
 type Project = { id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
+type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null; digest: string | null; executable: boolean | null };
+type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
+type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
 type VersionPage = { versions: string[]; nextBefore: string | null };
-type Projection = { histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
-const empty: Projection = { histories: {}, projects: [], busy: false, error: "", available: false };
+type Projection = { inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+const empty: Projection = { inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
   starting: "Starting capture", scanning: "Checking changes", saving: "Saving a version",
@@ -67,14 +70,39 @@ export function AttachedProjects() {
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
           <ol className="max-h-64 overflow-auto text-xs">
-            {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><bdi dir="ltr">{version}</bdi></li>)}
+            {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><button className="text-left underline" disabled={disabled}
+              onClick={() => send({ type: "inspect", id: project.id, operation: version })}><bdi dir="ltr">{version}</bdi></button></li>)}
           </ol>
           {projection.histories[project.id].nextBefore && <Button variant="secondary" disabled={disabled}
             onClick={() => send({ type: "versions", id: project.id, before: projection.histories[project.id].nextBefore })}>{t("Older versions")}</Button>}
-          <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues. File previews and review are not available here yet.")}</p>
+          <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues.")}</p>
         </section>}
+        {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
     <p className="text-xs text-muted-foreground">{t("After reopening Mesh, attach the same project to resume capture. Saved history is retained.")}</p>
+  </section>;
+}
+
+function SavedInspection({ project, inspection, disabled }: { project: string; inspection: Inspection; disabled: boolean }) {
+  const t = useTranslation();
+  return <section aria-label={t("Saved version files")} className="grid gap-3 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Files in saved version")}</h4>
+    <p className="break-all text-xs text-muted-foreground"><bdi dir="ltr">{inspection.operation}</bdi></p>
+    <ul className="max-h-64 overflow-auto text-sm">
+      {inspection.entries.map((entry) => <li key={entry.path} className="break-all py-1">
+        {entry.kind === "folder" ? <bdi dir="ltr">{entry.path}/</bdi> : <button className="text-left underline" disabled={disabled}
+          onClick={() => send({ type: "file", id: project, operation: inspection.operation, path: entry.path })}><bdi dir="ltr">{entry.path}</bdi> · {entry.bytes} {t("Bytes")}{entry.executable ? <> · {t("Executable")}</> : ""}</button>}
+      </li>)}
+    </ul>
+    {inspection.entries.length === 0 && <p className="text-sm">{t("This saved version has no files or folders.")}</p>}
+    {inspection.nextAfter && <Button variant="secondary" disabled={disabled}
+      onClick={() => send({ type: "entries", id: project, operation: inspection.operation, after: inspection.nextAfter })}>{t("More files")}</Button>}
+    {inspection.file && <div className="grid gap-2">
+      <p className="break-all text-sm font-medium"><bdi dir="ltr">{inspection.file.path}</bdi></p>
+      {inspection.file.state === "text" ? <pre dir="ltr" className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{inspection.file.text}</pre>
+        : <p className="text-sm text-muted-foreground">{t(inspection.file.state === "binary" ? "Binary file. Text preview is unavailable." : "This file exceeds the 256 KiB text preview limit.")}</p>}
+    </div>}
+    <p className="text-xs text-muted-foreground">{t("Read-only saved content. Edits in your working folder do not change this view.")}</p>
   </section>;
 }

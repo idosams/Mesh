@@ -1,5 +1,13 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"This history page stays fixed while capture continues.":"עמוד ההיסטוריה נשאר קבוע בזמן שהלכידה נמשכת.",
+"Saved version files":"קבצי הגרסה השמורה",
+"Files in saved version":"קבצים בגרסה השמורה",
+"This saved version has no files or folders.":"בגרסה השמורה הזו אין קבצים או תיקיות.",
+"More files":"קבצים נוספים",
+"Binary file. Text preview is unavailable.":"קובץ בינארי. תצוגת טקסט אינה זמינה.",
+"This file exceeds the 256 KiB text preview limit.":"הקובץ חורג ממגבלת תצוגת הטקסט של 256 KiB.",
+"Read-only saved content. Edits in your working folder do not change this view.":"תוכן שמור לקריאה בלבד. עריכות בתיקיית העבודה אינן משנות תצוגה זו.",
 "Show latest versions":"הצגת הגרסאות האחרונות",
 "Saved versions for":"גרסאות שמורות עבור",
 "Saved versions · newest first":"גרסאות שמורות · החדשות תחילה",

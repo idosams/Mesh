@@ -277,7 +277,35 @@ performance claim.
 The attachment panel exposes latest and older version pages. The coordinator validates identities,
 project binding and cursor continuity. Labels follow the English/Hebrew preference and exact
 version IDs remain left-to-right. A normal status refresh never replaces the explicit history
-page. The UI currently displays saved identities; file previews, comparisons, approval and parallel
-review still require implementation. Native tests save more than one page, continue saving, verify
+page. The UI lists saved identities and now exposes the saved-file inspection described below;
+comparisons, approval and parallel review still require implementation. Native tests save more
+than one page, continue saving, verify
 cursor stability and refuse replaced history storage. UI tests cover malformed pages and preserving
 a loaded page while the live saved-version status advances. Packaged runtime verification is pending.
+
+## Exact saved-file inspection
+
+`ProvisionedAttachment::inspect_entries(operation, after)` and `inspect_text(operation, path)` retain
+the same native directory authority used for capture. Each operation validates the canonical saved
+identity, receipt, history binding and signed journal membership before reconstructing that causal
+version. It rechecks source and storage identity after the read. Neither reads current source bytes
+or creates a working copy. Exact relative paths are looked up in the materialized saved version, not
+resolved as arbitrary filesystem paths.
+
+Entry pages contain at most 200 files/folders with file size, content digest and executable metadata.
+Cursors must identify an entry in that exact version. Text previews are bounded to 256 KiB; invalid
+UTF-8 or NUL-containing content is reported as binary, and larger files return metadata plus an explicit
+unavailable-preview state. Text is returned as data and rendered by React as plain text, never HTML.
+The historical preview currently verifies manifests across the selected version before reading a
+file, so bounded response size does not imply constant-time reads on large projects.
+
+The desktop `inspect_attached_version` command accepts an existing project handle, saved operation,
+and either entry paging or a file selection. The shell validates project/version/cursor binding and
+requires text metadata to match the selected native file entry. The panel displays the exact selected
+version, file list and saved preview. Background status and version-list refresh do not replace it;
+mismatched saved-version or unlisted file intents are refused. An absent inspection is rejected
+before dereferencing a selection or invoking native code. Native tests cover paging, text remaining unchanged
+after external edits, binary preview after live deletion, large-file limits, absent identities, invalid
+paths/cursors and replaced storage. Coordinator tests bind responses to content metadata and preserve
+selected text while the latest capture advances. Comparison, parallel pinned review and packaged proof
+remain outstanding.

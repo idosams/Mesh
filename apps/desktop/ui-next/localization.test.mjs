@@ -12,12 +12,14 @@ async function loadLocalization() {
     import { LanguagePicker } from './src/organisms/language-picker';
     import { ArtifactContentChanges } from './src/organisms/artifact-review';
     import { ImportWorkbench } from './src/organisms/import-workbench';
+    import { SavedInspection } from './src/organisms/attached-projects';
     export * from './src/lib/localization';
     export const renderNavigation = () => renderToStaticMarkup(<ProductionNavigation activePage="files" workspaceReady={true} nativeChangeCount={0} onNavigate={() => {}} />);
     export const renderPicker = () => renderToStaticMarkup(<LanguagePicker />);
     export const renderSections = (comparison) => renderToStaticMarkup(<ArtifactContentChanges change={{diffHunks: [], beforeLabel: 'Before', afterLabel: 'After', beforeValues: [], afterValues: []}} layout="inline" comparison={comparison} />);
+    export const renderSavedInspection = (inspection) => renderToStaticMarkup(<SavedInspection project="project" inspection={inspection} disabled={false} />);
     export const renderImport = (model) => renderToStaticMarkup(<ImportWorkbench model={model} onIntent={() => {}} />);
-  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
+  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { SavedInspection };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
   const module = { exports: {} };
   Function('require', 'module', 'exports', result.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
   return module.exports;
@@ -130,4 +132,27 @@ test('existing-project attachment stays localized beside the copy flow and keeps
   assert.match(html, /dir="ltr"[^>]*value="\/Users\/משפחה\/Files"/);
   ui.setLocale('en');
   assert.match(ui.renderImport(model), /Use your existing project/);
+});
+
+test('saved attachment inspection localizes controls while preserving literal paths and inert content', async () => {
+  const ui = await loadLocalization();
+  ui.setLocale('he');
+  const inspection = {
+    operation: 'a'.repeat(64),
+    entries: [{ path: 'Review/קובץ.txt', kind: 'file', bytes: 40, digest: 'b'.repeat(64), executable: true }],
+    nextAfter: 'Review/קובץ.txt',
+    file: { path: 'Review/קובץ.txt', state: 'text', text: 'Files <script>alert(1)</script>', bytes: 40 },
+  };
+  const html = ui.renderSavedInspection(inspection);
+  assert.match(html, /aria-label="קבצי הגרסה השמורה"/);
+  assert.match(html, /קבצים נוספים/);
+  assert.match(html, /ניתן להרצה/);
+  assert.match(html, /<bdi dir="ltr">Review\/קובץ.txt<\/bdi>/);
+  assert.match(html, /<pre dir="ltr"[^>]*>Files &lt;script&gt;alert\(1\)&lt;\/script&gt;<\/pre>/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.ok(html.includes(inspection.operation));
+  inspection.file = { ...inspection.file, state: 'binary', text: null };
+  assert.match(ui.renderSavedInspection(inspection), /קובץ בינארי/);
+  ui.setLocale('en');
+  assert.match(ui.renderSavedInspection(inspection), /Binary file. Text preview is unavailable/);
 });

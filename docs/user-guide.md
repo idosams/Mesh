@@ -55,6 +55,26 @@ For the expanded transcript and equivalent manual commands, read
 [mounted-workspace evidence](local-mounted-demo.md) records a privileged environment-specific
 proof and its limits.
 
+## Inspect an attached project's saved files (development builds)
+
+The unmerged attachment increments in the [migration ledger](plan/fleet-migration.md) add this
+flow to development builds. This is not a claim that the downloadable alpha contains it or that
+its packaged UI acceptance is complete.
+
+1. In the folder selection view, use **Choose project to attach**, or enter the existing project
+   path and choose **Attach existing project**. Continue using the same folder in your editor,
+   terminal or harness; Mesh keeps its history in separate storage.
+2. Once a version is saved, choose **Show latest versions**. Use **Older versions** to page back.
+3. Select a saved version identity to list its files and folders. **More files** opens the next page.
+4. Select a file to inspect its saved text. This preview stays on that exact version even when the
+   live folder changes or capture saves a newer version. Refreshing capture status does not replace
+   the preview; select another saved version or file to change it.
+
+Text previews are read-only and limited to 256 KiB. Binary and larger files show why text is
+unavailable. This view does not compare or approve versions yet. **Stop capture** and **Resume
+capture** control the session without changing the original project's files. After restarting this
+development build, attach the same project again to access its retained history.
+
 ## The six words Mesh shows people
 
 | Status | Meaning |

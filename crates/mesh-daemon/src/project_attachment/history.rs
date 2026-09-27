@@ -268,7 +268,7 @@ impl ProjectAttachment {
         Ok(store)
     }
 
-    fn history_configuration(
+    pub(super) fn history_configuration(
         &self,
         store: &PinnedWorkspaceRoot,
         policy: Option<Digest32>,
@@ -332,7 +332,10 @@ impl ProjectAttachment {
     }
 }
 
-fn verify_history_binding(workspace: &OpenWorkspace, configuration: &str) -> io::Result<()> {
+pub(super) fn verify_history_binding(
+    workspace: &OpenWorkspace,
+    configuration: &str,
+) -> io::Result<()> {
     if workspace.operations() > 0
         && workspace.journal_workspace_id().map_err(error)?
             != WorkspaceId::from_bytes(short_id(configuration.as_bytes()))
