@@ -3,8 +3,8 @@
 use crate::attachment_capture::NativeCaptureSigner;
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
-    AttachmentCaptureService, AttachmentStorage, CaptureOutcome, CapturePhase, CaptureSchedule,
-    CaptureStatus, ProvisionedAttachment,
+    AttachmentCaptureService, AttachmentPinState, AttachmentStorage, CaptureOutcome, CapturePhase,
+    CaptureSchedule, CaptureStatus, ProvisionedAttachment,
 };
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
@@ -272,6 +272,58 @@ impl AttachmentHost {
         let comparison = history
             .compare_versions(base, target, after)
             .map_err(|_| "The exact saved versions could not be compared")?;
+        Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
+    }
+
+    pub fn load_pins(&self) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let pins = match &state.storage {
+            Some(storage) => storage
+                .load_comparison_pins()
+                .map_err(|_| "Saved pin selectors need reconciliation")?,
+            None => AttachmentPinState {
+                revision: 0,
+                pins: Vec::new(),
+            },
+        };
+        Ok(pins.to_json().encode())
+    }
+
+    pub fn save_pins(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot =
+            AttachmentPinState::parse_projection(snapshot).map_err(|_| "Invalid pin selectors")?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        let stored = state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_comparison_pins(snapshot.revision, snapshot.pins)
+            .map_err(|_| "Pin state changed or could not be saved")?;
+        Ok(stored.to_json().encode())
+    }
+
+    pub fn comparison_path(
+        &self,
+        id: &str,
+        base: &str,
+        target: &str,
+        path: &str,
+    ) -> Result<String, String> {
+        let history = self
+            .state
+            .lock()
+            .map_err(|_| UNAVAILABLE)?
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open in this desktop session")?
+            .history
+            .clone()
+            .ok_or("Saved history is unavailable")?;
+        let comparison = history
+            .comparison_path(base, target, path)
+            .map_err(|_| "Saved comparison path is unavailable")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
 

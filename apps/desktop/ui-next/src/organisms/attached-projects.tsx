@@ -10,9 +10,9 @@ type VersionPage = { versions: string[]; nextBefore: string | null };
 type Change = { path: string; change: string; before: Omit<SavedEntry, "path"> | null; after: Omit<SavedEntry, "path"> | null };
 type Comparison = { base: string; target: string; changes: Change[]; total: number; nextAfter: string | null;
   file: { path: string; before: SavedFile | null; after: SavedFile | null; beforeKind: string; afterKind: string } | null };
-type PinnedComparison = { key: string; project: string; root: string; comparison: Comparison };
-type Projection = { pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
-const empty: Projection = { pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
+type PinnedComparison = { key: string; project: string; root: string; comparison: Comparison | null; selector: { base: string; target: string } };
+type Projection = { pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
   starting: "Starting capture", scanning: "Checking changes", saving: "Saving a version",
@@ -56,14 +56,22 @@ export function AttachedProjects() {
       <Button variant="secondary" disabled={projection.busy || !projection.available} onClick={() => send({ type: "refresh" })}>{t("Refresh status")}</Button>
       <span role="status" className="text-sm text-muted-foreground">{t(projection.busy ? "Updating…" : projection.error ? "Status may be out of date" : "")}</span>
     </div>
+    <p role="status" className="text-xs text-muted-foreground">{t(projection.pinStatus === "loading" ? "Restoring saved comparisons…" : projection.pinStatus === "saving" ? "Saving comparison selections…" : projection.pinStatus === "saved" ? "Comparison selections saved" : "")}</p>
+    {projection.pinError && <div role="alert" className="grid gap-2 text-sm"><p>{t(projection.pinError)}</p>
+      <Button disabled={projection.busy} onClick={() => send({ type: "retry-pin-save" })}>{t("Retry saving or loading pins")}</Button>
+      <Button variant="secondary" disabled={projection.busy} onClick={() => send({ type: "reload-pins" })}>{t("Replace open pins with saved set")}</Button>
+    </div>}
     {projection.pins.length > 0 && <section aria-label={t("Pinned comparisons")} className="grid gap-3">
       <h3 className="text-lg font-semibold">{t("Pinned comparisons")} · {projection.pins.length} / 8</h3>
       <div className="grid items-start gap-4 xl:grid-cols-2">{projection.pins.map((pin) => <article key={pin.key} className="min-w-0 rounded-lg border border-border p-3">
         <div className="mb-3 flex items-start justify-between gap-2"><p className="break-all text-sm font-medium"><bdi dir="ltr">{pin.root}</bdi></p>
-          <Button variant="secondary" onClick={() => send({ type: "close-pin", pin: pin.key })}>{t("Close comparison")} <bdi dir="ltr">{pin.key}</bdi></Button></div>
-        <SavedComparison project={pin.project} comparison={pin.comparison} disabled={disabled} pinKey={pin.key} />
+          <Button variant="secondary" disabled={projection.pinStatus === "loading"} onClick={() => send({ type: "close-pin", pin: pin.key })}>{t("Close comparison")} <bdi dir="ltr">{pin.key}</bdi></Button></div>
+        {pin.comparison ? <SavedComparison project={pin.project} comparison={pin.comparison} disabled={disabled} pinKey={pin.key} />
+          : <div className="grid gap-2 text-sm"><p>{t("Saved comparison unavailable. Its selection is retained.")}</p>
+            <p className="break-all text-xs">{t("Base:")} <bdi dir="ltr">{pin.selector.base}</bdi></p><p className="break-all text-xs">{t("Compared version:")} <bdi dir="ltr">{pin.selector.target}</bdi></p>
+            <Button disabled={projection.busy} onClick={() => send({ type: "retry-pin", pin: pin.key })}>{t("Retry saved comparison")}</Button></div>}
       </article>)}</div>
-      <p className="text-xs text-muted-foreground">{t("Each pin keeps its own version pair, page and file selection. Pins are retained during this desktop session.")}</p>
+      <p className="text-xs text-muted-foreground">{t("Each pin keeps its own version pair, page and file selection. Saved selections return when Mesh opens; content is verified again from history.")}</p>
     </section>}
     {projection.projects.map((project) => {
       const terminal = project.phase === "stopped" || project.phase === "failed";
@@ -95,7 +103,7 @@ export function AttachedProjects() {
             onClick={() => send({ type: "versions", id: project.id, before: projection.histories[project.id].nextBefore })}>{t("Older versions")}</Button>}
           <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues.")}</p>
         </section>}
-        {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} canPin={projection.pins.length < 8} />}
+        {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} canPin={projection.pins.length < 8 && projection.pinStatus !== "loading" && !projection.pinError} />}
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
@@ -135,7 +143,7 @@ function SavedComparison({ project, comparison, disabled, pinKey, canPin = false
   return <section aria-label={t("Saved version comparison")} className="grid gap-3 rounded-lg border border-border p-3">
     <h4 className="text-sm font-semibold">{t("Compare saved versions")} · {comparison.total} {t("changed paths")}</h4>
     {!pinKey && <Button variant="secondary" disabled={disabled || !canPin}
-      onClick={() => send({ type: "pin-comparison", id: project, base: comparison.base, target: comparison.target })}>{t(canPin ? "Pin comparison alongside others" : "Eight comparisons pinned; close one to add another")}</Button>}
+      onClick={() => send({ type: "pin-comparison", id: project, base: comparison.base, target: comparison.target })}>{t("Pin comparison alongside others")}</Button>}
     <p className="break-all text-xs text-muted-foreground">{t("Base:")} <bdi dir="ltr">{comparison.base}</bdi></p>
     <p className="break-all text-xs text-muted-foreground">{t("Compared version:")} <bdi dir="ltr">{comparison.target}</bdi></p>
     <ul className="max-h-64 overflow-auto text-sm">{comparison.changes.map((change) => <li key={change.path} className="py-1">

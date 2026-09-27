@@ -830,6 +830,41 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn load_attachment_pins(host: State<'_, Arc<AttachmentHost>>) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.load_pins())
+            .await
+            .map_err(|_| "Pin loading stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn save_attachment_pins(
+        host: State<'_, Arc<AttachmentHost>>,
+        snapshot: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.save_pins(&snapshot))
+            .await
+            .map_err(|_| "Pin saving stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn compare_attached_path(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        base: String,
+        target: String,
+        path: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.comparison_path(&id, &base, &target, &path)
+        })
+        .await
+        .map_err(|_| "Pin preview stopped".to_owned())?
+    }
+
+    #[tauri::command]
     async fn control_attached_project(
         host: State<'_, Arc<AttachmentHost>>,
         id: String,
@@ -6675,6 +6710,9 @@ mod desktop {
                 attached_project_versions,
                 inspect_attached_version,
                 compare_attached_versions,
+                load_attachment_pins,
+                save_attachment_pins,
+                compare_attached_path,
                 control_attached_project,
                 recent_workspace_status,
                 renderer_proof_configuration,

@@ -56,8 +56,9 @@ impl ProjectAttachment {
         store: PinnedWorkspaceRoot,
         base: &str,
         target: &str,
-        after: Option<&str>,
+        selection: (Option<&str>, Option<&str>),
     ) -> io::Result<Json> {
+        let (after, selected_path) = selection;
         self.inspect_saved(metadata, store, base, |workspace, base_digest| {
             let target_digest = RecordDigest::parse_hex(target).map_err(error)?;
             if target_digest.to_string() != target
@@ -111,6 +112,23 @@ impl ProjectAttachment {
                     ))
                 })
                 .collect();
+            if let Some(path) = selected_path {
+                let change = changes
+                    .iter()
+                    .find(|change| change.0 == path)
+                    .ok_or_else(|| {
+                        invalid("selected path does not change between these versions")
+                    })?;
+                return Ok(Json::object([
+                    ("schema", Json::text("mesh.attachment-comparison/v1")),
+                    ("base", Json::text(base)),
+                    ("target", Json::text(target)),
+                    ("after", Json::Null),
+                    ("total", Json::Number(1)),
+                    ("changes", Json::Array(vec![change.1.clone()])),
+                    ("next_after", Json::Null),
+                ]));
+            }
             let start = match after {
                 None => 0,
                 Some(cursor) => {

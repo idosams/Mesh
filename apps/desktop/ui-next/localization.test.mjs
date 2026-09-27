@@ -130,6 +130,7 @@ test('existing-project attachment stays localized beside the copy flow and keeps
   assert.match(html, /aria-label="פרויקטים מחוברים"/);
   assert.match(html, /חיבור פרויקט קיים/);
   assert.match(html, /פרויקטים ששוחזרו נשארים עצורים עד לחידוש הלכידה/);
+  assert.match(html, /משחזר השוואות שמורות/);
   assert.match(html, /יצירת עותק עבודה/);
   assert.match(html, /dir="ltr"[^>]*value="\/Users\/משפחה\/Files"/);
   ui.setLocale('en');
@@ -184,7 +185,7 @@ test('saved comparison localizes both sides without translating or interpreting 
 });
 
 
-test('comparison pin controls localize capacity and pinned views cannot recursively pin', async () => {
+test('comparison pin controls localize disabled states and pinned views cannot recursively pin', async () => {
   const ui = await loadLocalization();
   const comparison = { base: 'a'.repeat(64), target: 'b'.repeat(64), total: 0, nextAfter: null, changes: [], file: null };
   ui.setLocale('he');
@@ -192,7 +193,7 @@ test('comparison pin controls localize capacity and pinned views cannot recursiv
   assert.match(available, /נעיצת השוואה לצד השוואות אחרות/);
   assert.doesNotMatch(available, / disabled=""/);
   const full = ui.renderSavedComparison(comparison);
-  assert.match(full, /שמונה השוואות נעוצות/);
+  assert.match(full, /נעיצת השוואה לצד השוואות אחרות/);
   assert.match(full, / disabled=""/);
   const pinned = ui.renderSavedComparison(comparison, { pinKey: '17', canPin: true });
   assert.doesNotMatch(pinned, /נעיצת השוואה|שמונה השוואות/);

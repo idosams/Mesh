@@ -76,8 +76,11 @@ another. Select a changed path to see its saved before/after contents. The open 
 fixed when capture advances or you choose the next comparison base. Missing files, folders and
 unavailable text previews have explicit states. Choose **Pin comparison alongside others** to keep up
 to eight comparisons open across projects. Each pin has its own page and selected file; you can pin
-the same version pair twice to inspect different files. Close a pin to free a slot. Pins survive
-navigation within this desktop session but reset when Mesh quits. This view does not approve or apply changes. **Stop capture** and **Resume
+the same version pair twice to inspect different files. Close a pin to free a slot. Pin selections are saved separately from file contents and return after restart, with contents
+verified again from native history. Wait for **Comparison selections saved** before quitting. If
+saving fails, views remain open and the status offers retry or an explicit reload of the saved set.
+Unavailable comparisons retain their version selection and offer retry rather than showing
+unverified content. This view does not approve or apply changes. **Stop capture** and **Resume
 capture** control the session without changing the original project's files. After restarting this
 development build, registered projects return with capture stopped and their saved history available.
 Choose **Resume capture** when ready to capture changes made while Mesh was closed. If the original

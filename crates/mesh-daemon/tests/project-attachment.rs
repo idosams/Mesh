@@ -872,6 +872,17 @@ fn saved_comparison_tracks_content_modes_types_and_pinned_pages() {
     let Json::Array(second_changes) = second.get("changes").unwrap() else {
         panic!("changes");
     };
+    let exact = history.comparison_path(&base, &target, "removed").unwrap();
+    assert_eq!(exact.get("total"), Some(&Json::Number(1)));
+    assert_eq!(exact.get("after"), Some(&Json::Null));
+    assert_eq!(exact.get("next_after"), Some(&Json::Null));
+    assert!(history.comparison_path(&base, &target, "stable").is_err());
+    assert!(history
+        .comparison_path(&base, &target, "../outside")
+        .is_err());
+    assert!(history
+        .comparison_path(&base, &"f".repeat(64), "removed")
+        .is_err());
     assert_eq!(first_changes.len(), 200);
     let changes: Vec<_> = first_changes.iter().chain(second_changes.iter()).collect();
     for (path, kind) in [
@@ -1104,4 +1115,33 @@ fn concurrent_pin_updates_have_one_winner_and_invalid_selectors_never_publish() 
     fs::create_dir(&f.metadata).unwrap();
     assert!(storage.save_comparison_pins(1, vec![]).is_err());
     assert!(fs::read_dir(&f.metadata).unwrap().next().is_none());
+}
+
+#[test]
+fn pin_ui_projection_roundtrips_without_content_and_refuses_ambiguous_fields() {
+    use mesh_daemon::project_attachment::AttachmentPinState;
+    let state = AttachmentPinState {
+        revision: u64::MAX,
+        pins: vec![pin_selector("1")],
+    };
+    let encoded = state.to_json().encode();
+    assert_eq!(
+        AttachmentPinState::parse_projection(&encoded).unwrap(),
+        state
+    );
+    assert!(AttachmentPinState::parse_projection(
+        &encoded.replace("18446744073709551615", "18446744073709551616")
+    )
+    .is_err());
+    assert!(
+        AttachmentPinState::parse_projection(&encoded.replace("18446744073709551615", "01"))
+            .is_err()
+    );
+    assert!(
+        AttachmentPinState::parse_projection(&encoded.replacen("{", "{\"extra\":null,", 1))
+            .is_err()
+    );
+    let mut invalid = state;
+    invalid.pins[0].path = Some("../outside".into());
+    assert!(AttachmentPinState::parse_projection(&invalid.to_json().encode()).is_err());
 }

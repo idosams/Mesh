@@ -248,8 +248,29 @@ impl ProvisionedAttachment {
         target: &str,
         after: Option<&str>,
     ) -> io::Result<crate::ipc::Json> {
-        self.attachment
-            .compare_saved(&self.metadata, self.store.clone(), base, target, after)
+        self.attachment.compare_saved(
+            &self.metadata,
+            self.store.clone(),
+            base,
+            target,
+            (after, None),
+        )
+    }
+
+    /// Resolve one changed path in an exact comparison, independently of the current page.
+    pub fn comparison_path(
+        &self,
+        base: &str,
+        target: &str,
+        path: &str,
+    ) -> io::Result<crate::ipc::Json> {
+        self.attachment.compare_saved(
+            &self.metadata,
+            self.store.clone(),
+            base,
+            target,
+            (None, Some(path)),
+        )
     }
 
     /// Share the admitted source and store descriptors directly with the capture worker.

@@ -11,13 +11,22 @@ const reply = (generation = '1') => ({ schema: 'mesh.desktop-attachments/v1', pr
     last_complete_capture_age_ms: 1000, attribution: 'unknown', atomic_snapshot: false },
 }] });
 const settle = () => new Promise((resolve) => setImmediate(resolve));
-function harness(invoke) {
+function harness(invoke, pinInvoke) {
   const document = new EventTarget();
   const projections = [];
   const timers = new Map();
   let sequence = 0;
   document.addEventListener('mesh:attachments-projection', (event) => projections.push(event.detail));
-  const dispose = startAttachedProjects({ document, invoke, CustomEvent,
+  let stored = { schema: 'mesh.desktop-pin-selectors/v1', revision: '0', pins: [] };
+  const native = async (command, args) => {
+    if (['load_attachment_pins', 'save_attachment_pins'].includes(command)) {
+      if (pinInvoke) return pinInvoke(command, args);
+      if (command === 'save_attachment_pins') stored = { ...JSON.parse(args.snapshot), revision: String(BigInt(stored.revision) + 1n) };
+      return stored;
+    }
+    return invoke(command, args);
+  };
+  const dispose = startAttachedProjects({ document, invoke: native, CustomEvent,
     schedule: (callback) => { const id = ++sequence; timers.set(id, callback); return id; },
     cancel: (id) => timers.delete(id),
   });
@@ -348,4 +357,40 @@ test('restored stopped and unavailable projects preserve native recovery state w
   assert.equal(attachedProjectList(value)[0].recovery, 'unavailable');
   value.projects[0].recovery = 'silently-running';
   assert.throws(() => attachedProjectList(value));
+});
+
+test('restart revalidates selected file outside restored page and retains unavailable pins', async () => {
+  const selectors = [
+    { key: '12', project: id, base: operation, target: comparedTarget, after: 'notes.txt', path: 'notes.txt' },
+    { key: '13', project: 'f'.repeat(64), base: operation, target: comparedTarget, after: null, path: null },
+  ];
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_projects') return reply();
+    if (command === 'compare_attached_versions') {
+      const value = compareReply(); value.comparison.after = 'notes.txt'; value.comparison.changes = []; return value;
+    }
+    if (command === 'compare_attached_path') {
+      const value = compareReply(); value.comparison.changes = value.comparison.changes.filter((change) => change.path === 'notes.txt');
+      value.comparison.total = 1; return value;
+    }
+    if (command === 'inspect_attached_version') {
+      const value = textReply();
+      if (args.operation === comparedTarget) Object.assign(value.inspection, { operation: comparedTarget, digest: 'e'.repeat(64), bytes: 5, executable: true, text: 'after' });
+      return value;
+    }
+    throw new Error('unexpected command');
+  }, async () => ({ schema: 'mesh.desktop-pin-selectors/v1', revision: '4', pins: selectors }));
+  await settle();
+  const pins = h.projections.at(-1).pins;
+  assert.equal(pins.length, 2);
+  assert.equal(pins[0].comparison.after, 'notes.txt');
+  assert.equal(pins[0].comparison.file.path, 'notes.txt');
+  assert.equal(pins[0].comparison.file.after.text, 'after');
+  assert.equal(pins[1].comparison, null);
+  assert.deepEqual(pins[1].selector, selectors[1]);
+  assert.ok(calls.some((call) => call.command === 'compare_attached_path'));
+  assert.equal(h.projections.at(-1).pinStatus, 'saved');
+  h.dispose();
 });

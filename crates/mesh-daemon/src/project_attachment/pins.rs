@@ -39,6 +39,64 @@ pub struct AttachmentPinState {
     pub pins: Vec<AttachmentPin>,
 }
 
+impl AttachmentPinState {
+    /// Bounded native/UI selector projection; no content or authority is carried in this value.
+    pub fn to_json(&self) -> Json {
+        Json::object([
+            ("schema", Json::text("mesh.desktop-pin-selectors/v1")),
+            ("revision", Json::text(self.revision.to_string())),
+            (
+                "pins",
+                Json::Array(self.pins.iter().map(AttachmentPin::json).collect()),
+            ),
+        ])
+    }
+
+    /// Parse a bounded UI snapshot whose revision is the caller's expected native revision.
+    pub fn parse_projection(encoded: &str) -> io::Result<Self> {
+        if encoded.len() as u64 > MAX_BYTES {
+            return Err(invalid("pin projection exceeds limit"));
+        }
+        let value = Json::parse(encoded).map_err(|_| invalid("invalid pin projection"))?;
+        if !matches!(&value, Json::Object(fields) if fields.len() == 3)
+            || text(&value, "schema")? != "mesh.desktop-pin-selectors/v1"
+        {
+            return Err(invalid("invalid pin projection schema"));
+        }
+        let revision_text = text(&value, "revision")?;
+        let revision = revision_text
+            .parse::<u64>()
+            .map_err(|_| invalid("invalid pin revision"))?;
+        if revision.to_string() != revision_text {
+            return Err(invalid("noncanonical pin revision"));
+        }
+        let Some(Json::Array(entries)) = value.get("pins") else {
+            return Err(invalid("invalid pin list"));
+        };
+        if entries.len() > 8 {
+            return Err(invalid("too many pins"));
+        }
+        let pins = entries
+            .iter()
+            .map(|entry| {
+                if !matches!(entry, Json::Object(fields) if fields.len() == 6) {
+                    return Err(invalid("invalid pin fields"));
+                }
+                Ok(AttachmentPin {
+                    key: text(entry, "key")?.into(),
+                    project: text(entry, "project")?.into(),
+                    base: text(entry, "base")?.into(),
+                    target: text(entry, "target")?.into(),
+                    after: optional_text(entry, "after")?,
+                    path: optional_text(entry, "path")?,
+                })
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        validate(&pins)?;
+        Ok(Self { revision, pins })
+    }
+}
+
 impl AttachmentPin {
     fn json(&self) -> Json {
         Json::object([

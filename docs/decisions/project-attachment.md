@@ -398,7 +398,7 @@ stores at most eight ordered selectors: display key, registered project identity
 operation identities, page cursor and selected path. It stores no file bytes, rendered previews,
 credentials, approval state or claimed validity of those versions. Consumers must reverify each
 selector through native history before restoring content; unavailable history must remain unavailable.
-The current desktop pin controller is not yet wired to this persistence seam.
+The desktop pin controller now uses this seam as described below.
 
 Snapshots are bound to the retained catalog's device/inode identity and read through native directory
 authority. Parsing is bounded to 128 KiB and validates canonical fields, unique numeric display keys,
@@ -419,5 +419,26 @@ native identity protection, not a portable or signed approval format.
 Tests cover restart round-trips, stale and unchanged updates, durable removal, concurrent writers with
 one winner, field/count limits, traversal refusal, copied catalog identity, symlink/corruption refusal,
 interrupted initial staging and replaced catalog paths. This introduces an additive preferences format;
-existing registration and signed history formats are unchanged. Desktop load/save orchestration,
-selector revalidation and visible pin restoration remain unfinished, as does packaged restart proof.
+existing registration and signed history formats are unchanged. Desktop load/save orchestration and selector revalidation are described below. Packaged restart proof remains outstanding.
+
+## Desktop restoration of comparison selectors
+
+The typed native commands load and save a bounded `mesh.desktop-pin-selectors/v1` projection,
+with decimal revision and the same six selector fields. This additive wire projection does not
+change the on-disk snapshot or signed history formats. The desktop saves no preview bytes.
+On first opening the attachment panel it loads the stored selectors, then reads each exact comparison
+through native history. A selected changed path can be resolved independently of the displayed page;
+the native filtered comparison contains exactly one verified change and a total of one. File-side
+previews are then read and checked against their exact version, path and content metadata.
+
+Unavailable projects or history retain the selector as an unavailable card. They never fall back
+to current working files. Pin mutations serialize into native revision-checked snapshots, including
+an empty snapshot after closing the final pin. An uncertain save can be acknowledged on retry when
+the native snapshot equals the desired selectors. A divergent external snapshot refuses overwrite.
+The user can explicitly replace the open set with the saved set. Initial load failures never publish
+empty defaults. Closing a pin during an outstanding preview cannot recreate it.
+
+Focused native and coordinator tests cover projection bounds, independent selected-path lookup,
+restoration outside the current page, unavailable pins, close during save, uncertain acknowledgements,
+revision conflicts and corrupt initial records. These are source and native test results; packaged
+desktop restart proof, human approval and integration remain outstanding.

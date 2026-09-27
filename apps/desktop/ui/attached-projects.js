@@ -1,3 +1,4 @@
+import { createPinPersistence } from './attachment-pin-persistence.js';
 // Native attachment coordinator. React receives display data and emits bounded user intents.
 const PHASES = new Set(['starting', 'scanning', 'saving', 'waiting', 'stopping', 'stopped', 'failed']);
 const OUTCOMES = new Set(['pending', 'saved', 'unchanged', 'incomplete', 'source-unavailable', 'store-unavailable', 'save-unavailable', 'cancelled']);
@@ -107,7 +108,7 @@ export function attachedComparison(raw, id, base, target, after) {
         : change.before === null || change.after === null) throw new Error('Invalid comparison presence');
   }
   if (value.next_after !== null && (value.changes.length !== 200 || value.next_after !== value.changes.at(-1).path)) throw new Error('Invalid comparison cursor');
-  return { base, target, changes: value.changes, total: value.total, nextAfter: value.next_after, file: null };
+  return { base, target, after, changes: value.changes, total: value.total, nextAfter: value.next_after, file: null };
 }
 
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
@@ -117,7 +118,9 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let bases = {};
   let comparisons = {};
   let pins = [];
-  let nextPin = 1;
+  let nextPin = 1n;
+  let pinStatus = 'loading';
+  let pinError = '';
   let busy = false;
   let error = '';
   let mounted = false;
@@ -125,9 +128,49 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, pins, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
+  async function readComparisonFile(id, comparison, change) {
+    const read = async (side, operation) => side?.kind === 'file'
+      ? attachedText(await invoke('inspect_attached_version', { id, operation, path: change.path, after: null }),
+        id, operation, { ...side, path: change.path }) : null;
+    const [before, after] = await Promise.all([read(change.before, comparison.base), read(change.after, comparison.target)]);
+    return { path: change.path, before, after, beforeKind: change.before?.kind ?? 'absent', afterKind: change.after?.kind ?? 'absent' };
+  }
+  async function hydrate(selector) {
+    const project = projects.find((project) => project.id === selector.project);
+    const pin = { key: selector.key, project: selector.project, root: project?.root ?? selector.project, selector, comparison: null };
+    try {
+      if (!project) return pin;
+      const args = { id: selector.project, base: selector.base, target: selector.target, after: selector.after };
+      const comparison = attachedComparison(await invoke('compare_attached_versions', args), args.id, args.base, args.target, args.after);
+      if (selector.path !== null) {
+        let change = comparison.changes.find((change) => change.path === selector.path);
+        if (!change) {
+          const exact = attachedComparison(await invoke('compare_attached_path', {
+            id: args.id, base: args.base, target: args.target, path: selector.path,
+          }), args.id, args.base, args.target, null);
+          if (exact.total !== 1 || exact.changes.length !== 1 || exact.changes[0].path !== selector.path) throw new Error('Selected change mismatch');
+          change = exact.changes[0];
+        }
+        comparison.file = await readComparisonFile(args.id, comparison, change);
+      }
+      return { ...pin, comparison };
+    } catch { return pin; }
+  }
+  const persistence = createPinPersistence({
+    invoke,
+    selectors: () => pins.map((pin) => pin.selector),
+    restore: async (selectors) => {
+      const restored = [];
+      for (const selector of selectors) restored.push(await hydrate(selector));
+      if (disposed) return;
+      pins = restored;
+      for (const pin of pins) if (BigInt(pin.key) >= nextPin) nextPin = BigInt(pin.key) + 1n;
+    },
+    status: (phase, message) => { pinStatus = phase; pinError = message; publish(); },
+  });
   const planRefresh = () => {
     if (timer !== null) cancel(timer);
     timer = mounted && !disposed ? schedule(() => { timer = null; void run(); }, 2000) : null;
@@ -139,6 +182,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
     try {
       if (operation) await operation();
       projects = attachedProjectList(await invoke('attached_projects'));
+      await persistence.ensureLoaded();
       error = '';
     } catch {
       error = 'Attachment status is unavailable. Your existing tools can keep working. Retry to refresh.';
@@ -156,10 +200,21 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   function intent(event) {
     const value = event.detail;
     if (!mounted || !value || typeof value !== 'object') return;
-    if (value.type === 'close-pin' && Object.keys(value).length === 2 && typeof value.pin === 'string') {
-      pins = pins.filter((pin) => pin.key !== value.pin); publish(); return;
+    if (pinStatus !== 'loading' && value.type === 'close-pin' && Object.keys(value).length === 2 && typeof value.pin === 'string') {
+      pins = pins.filter((pin) => pin.key !== value.pin); persistence.changed(); publish(); return;
     }
     if (busy) return;
+    if (['retry-pin-save', 'reload-pins'].includes(value.type) && Object.keys(value).length === 1) {
+      void run(() => value.type === 'retry-pin-save' ? persistence.retry() : persistence.reload()); return;
+    }
+    if (value.type === 'retry-pin' && Object.keys(value).length === 2) {
+      const pinned = pins.find((pin) => pin.key === value.pin);
+      if (pinned) void run(async () => {
+        const restored = await hydrate(pinned.selector);
+        pins = pins.map((pin) => pin === pinned ? restored : pin);
+      });
+      return;
+    }
     if ('id' in value && !projects.some((project) => project.id === value.id)) return;
     if (value.type === 'refresh' && Object.keys(value).length === 1) { void run(); return; }
     if (value.type === 'choose' && Object.keys(value).length === 1) {
@@ -234,10 +289,14 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       return;
     }
     if (value.type === 'pin-comparison' && Object.keys(value).length === 4 && pins.length < 8
-      && Number.isSafeInteger(nextPin) && comparisons[value.id] && comparisons[value.id].base === value.base
+      && pinStatus !== 'loading' && !pinError && nextPin <= 18446744073709551615n && comparisons[value.id] && comparisons[value.id].base === value.base
       && comparisons[value.id].target === value.target) {
       const project = projects.find((project) => project.id === value.id);
-      pins = [...pins, { key: String(nextPin++), project: value.id, root: project.root, comparison: comparisons[value.id] }];
+      const comparison = comparisons[value.id];
+      const key = String(nextPin++);
+      const selector = { key, project: value.id, base: comparison.base, target: comparison.target, after: comparison.after, path: comparison.file?.path ?? null };
+      pins = [...pins, { key, project: value.id, root: project.root, selector, comparison }];
+      persistence.changed();
       publish(); return;
     }
     const hasPin = Object.hasOwn(value, 'pin');
@@ -246,7 +305,12 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
     const comparison = pinned ? pinned.comparison : comparisons[value.id];
     const updateComparison = (next) => {
       // A pin closed during an outstanding read must not be recreated by its response.
-      if (pinned) pins = pins.map((pin) => pin.key === pinned.key ? { ...pin, comparison: next } : pin);
+      if (pinned) {
+        if (!pins.includes(pinned)) return;
+        pins = pins.map((pin) => pin === pinned ? { ...pin, comparison: next,
+          selector: { ...pin.selector, after: next.after, path: next.file?.path ?? null } } : pin);
+        persistence.changed();
+      }
       else comparisons = { ...comparisons, [value.id]: next };
     };
     if (value.type === 'compare-page' && Object.keys(value).length === (hasPin ? 6 : 5)
@@ -284,6 +348,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   document.addEventListener('mesh:attachments-intent', intent);
   return () => {
     disposed = true;
+    persistence.dispose();
     if (timer !== null) cancel(timer);
     document.removeEventListener('mesh:attachments-visible', visible);
     document.removeEventListener('mesh:attachments-intent', intent);
