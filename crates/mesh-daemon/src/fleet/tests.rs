@@ -443,3 +443,42 @@ fn checkpoint_refuses_invalid_completion_and_stale_run_without_advancing_history
         "checkpoint-incomplete",
     );
 }
+
+#[test]
+fn durable_launch_claim_is_not_regranted_after_restart_or_to_another_host() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    send(
+        &mut runtime,
+        Command::ClaimLaunch {
+            lane: "worker".into(),
+            run: "run".into(),
+            owner: "host-one".into(),
+        },
+    );
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(
+        runtime.state().lanes["worker"].runs[0]
+            .launch_owner
+            .as_deref(),
+        Some("host-one")
+    );
+    for owner in ["host-one", "host-two"] {
+        refuses(
+            &mut runtime,
+            Command::ClaimLaunch {
+                lane: "worker".into(),
+                run: "run".into(),
+                owner: owner.into(),
+            },
+            "launch-needs-reconciliation",
+        );
+    }
+    assert!(runtime.state().lanes["worker"].runs[0]
+        .state
+        .occupies_slot());
+}

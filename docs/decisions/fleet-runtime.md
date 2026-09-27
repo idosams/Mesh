@@ -21,6 +21,29 @@ This prevents two schedulers from claiming the same transition. It does not by i
 exactly-once external process execution: dispatch intent and process reconciliation are separate
 required steps.
 
+Native provider launch commits a `claim-launch` event before starting an external process. The
+claim binds the exact current run to a fresh host-instance identity and is accepted only once while
+the run is launching. Neither the same host nor a restarted host may spawn again from that claim.
+A crash between claim and process creation deliberately requires reconciliation; a claim is not
+proof of process existence or termination. The additive event uses the existing canonical envelope;
+older decoders refuse the unknown event. Legacy dispatch records replay with no launch owner.
+
+The Unix Codex adapter accepts native-admitted executable locations, uses the lane's verified working
+folder, and forwards scoped MCP credentials only through process environment. Prompts use stdin.
+Activity retains bounded categories and a validated provider thread identifier, not raw messages,
+commands, stderr or file contents. A successful outcome requires process exit zero, an explicit
+completed turn, no protocol failure, and both output streams closed. That outcome grants no review
+approval or custody release. Direct-child termination cannot establish descendant termination.
+The native tick-driven host discovers allocated Codex lanes, dispatches their first attempts within
+the durable concurrency limit, and polls its owned processes without changing desktop selection.
+Per-host dispatch identities prevent competing hosts from sharing a run grant. The native host
+supplies a signing capability for each session; neither renderer nor agent code supplies keys.
+Terminal acknowledgment revokes that session and records execution state without releasing custody
+or approving content. Cancellation is rechecked at acknowledgment under the service lock; direct
+process termination leaves cancelled slots reserved. Failed, interrupted and unowned attempts are
+never automatically relaunched. The embedding application's tick loop, durable process reconciliation
+and process-tree cancellation remain separate work.
+
 Use WAL with FULL synchronous durability. Version the database schema explicitly; refuse unknown
 versions. Bounded reads and payloads keep a bad provider from turning fleet observation into an
 unbounded allocation. Native service code must authorize and pin the private database location

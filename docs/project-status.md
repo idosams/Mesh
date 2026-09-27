@@ -5,9 +5,11 @@ ledger, and isolated lanes opened from exact saved versions. Native-issued sessi
 MCP context, child delegation, signed private checkpoints and immutable review submission. Capture
 retains custody and durable partial progress; exact retries return the recorded outcome. An agent
 can submit a completed checkpoint while newer work continues, without approval or publication power.
-These are native/MCP integration foundations on unmerged review branches. Provider scheduling,
-existing-project attachment, live fleet UI and complete acceptance journeys remain pending migration
-and verification.
+Native Codex execution now records durable launch ownership and redacted activity. A tick-driven
+host discovers delegated lanes and dispatches them within durable limits; uncertain processes retain
+their slots and custody. These are native/MCP integration foundations on unmerged review branches.
+Existing-project attachment, live fleet UI, process-tree recovery and complete acceptance journeys
+remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

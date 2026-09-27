@@ -5,6 +5,10 @@
 //! process effects happen only after dispatch intent commits, and uncertain runs retain their slot.
 
 #[cfg(unix)]
+pub mod host;
+#[cfg(unix)]
+pub mod provider;
+#[cfg(unix)]
 pub mod service;
 mod wire;
 #[cfg(unix)]
@@ -61,6 +65,8 @@ pub struct Run {
     pub id: String,
     /// Current execution observation.
     pub state: RunState,
+    /// Native host that durably claimed the one launch attempt; not a credential or liveness proof.
+    pub launch_owner: Option<String>,
 }
 
 /// Native allocation identity, constructed from a verified lane workspace receipt.
@@ -174,6 +180,15 @@ pub struct State {
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    /// Claim a dispatch exactly once before performing its external process launch.
+    ClaimLaunch {
+        /// Exact lane.
+        lane: String,
+        /// Exact current run.
+        run: String,
+        /// Fresh native host identity, distinct across service restarts.
+        owner: String,
+    },
     /// A native review record was durably created for one completed checkpoint.
     SubmitReview {
         /// Original checkpoint identity.
@@ -416,6 +431,17 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::ClaimLaunch { lane, run, owner } => {
+                id_valid(owner)?;
+                if self.cancelled {
+                    return refuse("objective-cancelled");
+                }
+                let current = current_run(&mut self.lanes, lane, run)?;
+                if current.state != RunState::Launching || current.launch_owner.is_some() {
+                    return refuse("launch-needs-reconciliation");
+                }
+                current.launch_owner = Some(owner.clone());
+            }
             Command::SubmitReview { checkpoint, bundle } => {
                 let checkpoint = self
                     .checkpoints
@@ -664,6 +690,7 @@ impl State {
                 lane.runs.push(Run {
                     id: run.clone(),
                     state: RunState::Launching,
+                    launch_owner: None,
                 });
             }
             Command::Observe { lane, run, state } => {

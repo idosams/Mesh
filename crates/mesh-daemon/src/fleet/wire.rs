@@ -5,6 +5,14 @@ use mesh_store::RecordDigest;
 
 pub(super) fn encode(command: &Command) -> String {
     let (kind, fields) = match command {
+        Command::ClaimLaunch { lane, run, owner } => (
+            "claim-launch",
+            vec![
+                ("lane", Json::text(lane)),
+                ("run", Json::text(run)),
+                ("owner", Json::text(owner)),
+            ],
+        ),
         Command::SubmitReview { checkpoint, bundle } => (
             "submit-review",
             vec![
@@ -160,6 +168,11 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     };
     let digest = |key| RecordDigest::parse_hex(&text(key)?).map_err(|_| Error::InvalidHistory);
     let command = match json.get("kind").and_then(Json::as_text) {
+        Some("claim-launch") => Command::ClaimLaunch {
+            lane: text("lane")?,
+            run: text("run")?,
+            owner: text("owner")?,
+        },
         Some("submit-review") => Command::SubmitReview {
             checkpoint: text("checkpoint")?,
             bundle: digest("bundle")?,

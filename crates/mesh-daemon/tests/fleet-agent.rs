@@ -22,6 +22,9 @@ struct Fixture {
 }
 impl Fixture {
     fn new(name: &str) -> Self {
+        Self::with_goal(name, "Coordinate", true)
+    }
+    fn with_goal(name: &str, goal: &str, mark_running: bool) -> Self {
         let path =
             std::env::temp_dir().join(format!("mesh-fleet-agent-{name}-{}", std::process::id()));
         fs::create_dir(&path).unwrap();
@@ -87,7 +90,7 @@ impl Fixture {
             FleetService::new(runtime, allocator, BTreeSet::from(["codex".into()])).unwrap(),
         );
         let lane = service
-            .create_root("coordinator", "Coordinate", "codex", &input)
+            .create_root("coordinator", goal, "codex", &input)
             .unwrap();
         service
             .native_command(
@@ -101,16 +104,18 @@ impl Fixture {
         let credential = service
             .grant(&lane, "root-run", "actor-root", "session-root")
             .unwrap();
-        service
-            .native_command(
-                "running-root",
-                Command::Observe {
-                    lane: lane.clone(),
-                    run: "root-run".into(),
-                    state: RunState::Running,
-                },
-            )
-            .unwrap();
+        if mark_running {
+            service
+                .native_command(
+                    "running-root",
+                    Command::Observe {
+                        lane: lane.clone(),
+                        run: "root-run".into(),
+                        state: RunState::Running,
+                    },
+                )
+                .unwrap();
+        }
         desktop.register_fleet(service.clone()).unwrap();
         Self {
             path,
@@ -553,4 +558,529 @@ fn incomplete_checkpoint_cannot_be_submitted_for_review() {
             .and_then(Json::as_u64),
         Some(0)
     );
+}
+
+#[test]
+fn codex_adapter_uses_native_lane_and_never_relaunches_a_claimed_run() {
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    let f = Fixture::new("provider-launch");
+    let child = f.call("delegate", &f.delegate("provider-child")).unwrap();
+    let lane = text(&child, "id");
+    let root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
+    f.service
+        .native_command(
+            "dispatch-provider",
+            Command::Dispatch {
+                lane: lane.into(),
+                run: "provider-run".into(),
+            },
+        )
+        .unwrap();
+    let credential = f
+        .service
+        .grant(lane, "provider-run", "actor-worker", "session-worker")
+        .unwrap();
+    let executable = f.path.join("fake-codex");
+    fs::write(
+        &executable,
+        r#"#!/bin/sh
+case "$*" in *"$MESH_FLEET_CREDENTIAL"*) exit 17;; esac
+pwd > provider-working-root.txt
+cat > provider-prompt.txt
+printf 'one\n' >> provider-launch-count.txt
+printf '%s\n' '{"type":"thread.started","thread_id":"01234567-0123-0123-0123-0123456789ab"}'
+printf '{"type":"item.completed","item":{"text":"%s"}}\n' "$MESH_FLEET_CREDENTIAL"
+printf '%s\n' '{"type":"turn.completed"}'
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    let adapter = CodexAdapter::new(&executable, &executable).unwrap();
+    let mut process = f
+        .service
+        .start_codex(&credential, &adapter, &f.path.join("daemon.sock"))
+        .unwrap();
+    assert_eq!(
+        f.service
+            .start_codex(&credential, &adapter, &f.path.join("daemon.sock"))
+            .unwrap_err()
+            .code,
+        "launch-needs-reconciliation"
+    );
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let (observed, outcome) = process.poll().unwrap();
+        assert!(!format!("{observed:?}").contains(credential.transport_value()));
+        if let Some(success) = outcome {
+            assert!(success, "{observed:?}");
+            assert_eq!(observed.events, 3);
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "provider did not exit"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        fs::read_to_string(root.join("provider-working-root.txt"))
+            .unwrap()
+            .trim(),
+        root.canonicalize().unwrap().to_str().unwrap()
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("provider-launch-count.txt")).unwrap(),
+        "one\n"
+    );
+    let prompt = fs::read_to_string(root.join("provider-prompt.txt")).unwrap();
+    assert!(prompt.contains("Implement provider-child"));
+    assert!(!prompt.contains(credential.transport_value()));
+    let replay = Runtime::open(
+        FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    assert!(replay.state().lanes[lane]
+        .runs
+        .last()
+        .unwrap()
+        .launch_owner
+        .is_some());
+}
+
+/// Explicit opt-in: uses the installed provider's existing account and retains disposable evidence.
+#[test]
+#[ignore = "requires MESH_TEST_CODEX and MESH_TEST_MCP absolute executables and provider login"]
+fn actual_codex_edits_checkpoints_and_submits_a_private_review() {
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    use mesh_daemon::ipc::IpcServer;
+    let adapter = CodexAdapter::new(
+        &PathBuf::from(std::env::var_os("MESH_TEST_CODEX").expect("MESH_TEST_CODEX")),
+        &PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP")),
+    )
+    .unwrap();
+    // Preserve the workspace even on timeout/panic: process-tree termination is not yet proven.
+    let f = std::mem::ManuallyDrop::new(Fixture::new("actual-codex"));
+    let selected_before = f.desktop.workspace_state().unwrap();
+    let versions = f.context();
+    let version = versions
+        .get("workspace")
+        .unwrap()
+        .get("workspace_versions")
+        .unwrap()
+        .as_array()
+        .unwrap()[0]
+        .get("operation")
+        .unwrap()
+        .clone();
+    let child = f.call("delegate", &Json::object([
+        ("request", Json::text("actual-worker")),
+        ("provider", Json::text("codex")),
+        ("version", version),
+        ("goal", Json::text("This is a disposable integration test. Replace note.txt with exactly 'actual Codex saved result' followed by a newline. Do not create other files or delegate work. Call mesh_fleet_checkpoint with request actual-result and then mesh_fleet_submit_review with the returned checkpoint identifier. Finish only after successful review submission. Do not approve or publish.")),
+    ])).unwrap();
+    let lane = text(&child, "id");
+    let root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
+    f.service
+        .native_command(
+            "dispatch-actual",
+            Command::Dispatch {
+                lane: lane.into(),
+                run: "actual-run".into(),
+            },
+        )
+        .unwrap();
+    let credential = f
+        .service
+        .grant_with_signer(
+            lane,
+            "actual-run",
+            "actual-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x74; 32],
+            ))),
+        )
+        .unwrap();
+    let socket_dir = PathBuf::from(format!(
+        "/private/tmp/mesh-codex-ipc-{}",
+        std::process::id()
+    ));
+    fs::create_dir(&socket_dir).unwrap();
+    fs::set_permissions(&socket_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let endpoint = socket_dir.join("daemon.sock");
+    let server = IpcServer::bind(&endpoint)
+        .unwrap()
+        .spawn(f.desktop.clone())
+        .unwrap();
+    let mut process = f
+        .service
+        .start_codex(&credential, &adapter, &endpoint)
+        .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(240);
+    loop {
+        let (observation, outcome) = process.poll().unwrap();
+        if let Some(success) = outcome {
+            assert!(
+                success,
+                "provider execution failed: {observation:?}; evidence: {}",
+                f.path.display()
+            );
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = process.request_stop();
+            panic!(
+                "provider deadline exceeded; preserved evidence: {}",
+                f.path.display()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let runtime = Runtime::open(
+        FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let checkpoint = runtime
+        .state()
+        .checkpoints
+        .values()
+        .find(|c| c.lane == lane)
+        .expect("agent saved checkpoint");
+    assert!(checkpoint.result.as_ref().unwrap().complete);
+    assert!(
+        checkpoint.review.is_some(),
+        "agent submitted immutable review"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("note.txt")).unwrap(),
+        "actual Codex saved result\n"
+    );
+    let selected_after = f.desktop.workspace_state().unwrap();
+    assert_eq!(
+        selected_before, selected_after,
+        "provider must not change selected source or its shared state"
+    );
+    f.service.revoke(&credential).unwrap();
+    server.shutdown();
+    eprintln!("actual provider evidence retained at {}", f.path.display());
+}
+
+struct TestWorkerSigners;
+impl mesh_daemon::fleet::host::WorkerSignerFactory for TestWorkerSigners {
+    fn signer(
+        &self,
+        _lane: &str,
+        _run: &str,
+    ) -> Result<Arc<dyn mesh_daemon::fleet::service::CheckpointSigner>, mesh_daemon::ipc::Unavailable>
+    {
+        Ok(Arc::new(TestCheckpointSigner(
+            ed25519_dalek::SigningKey::from_bytes(&[0x75; 32]),
+        )))
+    }
+}
+
+#[test]
+fn native_host_schedules_children_within_limits_and_preserves_cancelled_slots() {
+    use mesh_daemon::fleet::host::CodexFleetHost;
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    let f = Fixture::new("host-scheduling");
+    let children: Vec<_> = ["one", "two", "three"]
+        .iter()
+        .map(|id| f.call("delegate", &f.delegate(id)).unwrap())
+        .collect();
+    let executable = f.path.join("worker");
+    fs::write(&executable, "#!/bin/sh\ncat >/dev/null\necho one >> launches\nwhile [ ! -f release ]; do sleep 0.01; done\nprintf '%s\\n' '{\"type\":\"turn.completed\"}'\n").unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    let adapter = CodexAdapter::new(&executable, &executable).unwrap();
+    let mut host = CodexFleetHost::new(
+        f.service.clone(),
+        adapter.clone(),
+        f.path.join("ipc.sock"),
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    host.tick().unwrap();
+    let state = f.service.native_state().unwrap();
+    assert_eq!(
+        state.lanes.values().filter(|l| !l.runs.is_empty()).count(),
+        3,
+        "root and two child workers fill the budget"
+    );
+    let queued = state
+        .lanes
+        .values()
+        .find(|l| l.runs.is_empty())
+        .unwrap()
+        .id
+        .clone();
+    let running = state
+        .lanes
+        .values()
+        .find(|l| l.id != f.lane && !l.runs.is_empty())
+        .unwrap()
+        .id
+        .clone();
+    // A second host cannot adopt or relaunch the two already dispatched processes.
+    let mut other = CodexFleetHost::new(
+        f.service.clone(),
+        adapter,
+        f.path.join("ipc.sock"),
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    assert!(other.tick().unwrap().is_empty());
+    let root_for = |id: &str| {
+        PathBuf::from(text(
+            children
+                .iter()
+                .find(|c| text(c, "id") == id)
+                .unwrap()
+                .get("workspace")
+                .unwrap(),
+            "root",
+        ))
+    };
+    fs::write(root_for(&running).join("release"), "release").unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        host.tick().unwrap();
+        if !f.service.native_state().unwrap().lanes[&queued]
+            .runs
+            .is_empty()
+        {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        f.service.native_state().unwrap().lanes[&running].runs[0].state,
+        RunState::Succeeded
+    );
+    assert_eq!(
+        fs::read_to_string(root_for(&running).join("launches")).unwrap(),
+        "one\n"
+    );
+    f.service
+        .native_command("cancel-host", Command::Cancel)
+        .unwrap();
+    for _ in 0..20 {
+        host.tick().unwrap();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        f.service.native_state().unwrap().lanes[&queued].runs[0].state,
+        RunState::Stopping,
+        "direct child exit cannot release a cancelled process-tree slot"
+    );
+    assert_eq!(
+        f.service.native_state().unwrap().lanes[&queued].runs.len(),
+        1
+    );
+}
+
+#[test]
+#[ignore = "requires installed provider login and MESH_TEST_CODEX/MESH_TEST_MCP"]
+fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
+    use mesh_daemon::fleet::host::CodexFleetHost;
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    use mesh_daemon::ipc::IpcServer;
+    let adapter = CodexAdapter::new(
+        &PathBuf::from(std::env::var_os("MESH_TEST_CODEX").expect("MESH_TEST_CODEX")),
+        &PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP")),
+    )
+    .unwrap();
+    let f = std::mem::ManuallyDrop::new(Fixture::with_goal("actual-fleet", "Call mesh_fleet_context. Use mesh_fleet_delegate to create exactly two child lanes with provider codex, request worker-one and worker-two, and the saved operation version from your context. For each child, set its goal to: replace note.txt with the exact text 'worker-one' or 'worker-two' respectively followed by newline, save with mesh_fleet_checkpoint, submit the returned checkpoint with mesh_fleet_submit_review, and do not delegate further. Do not edit your own workspace. After both delegations succeed, finish your task. The native host will run the children.", false));
+    let before = f.desktop.workspace_state().unwrap();
+    let credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "coordinator-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x76; 32],
+            ))),
+        )
+        .unwrap();
+    let socket_dir = PathBuf::from(format!(
+        "/private/tmp/mesh-fleet-ipc-{}",
+        std::process::id()
+    ));
+    fs::create_dir(&socket_dir).unwrap();
+    fs::set_permissions(&socket_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let endpoint = socket_dir.join("daemon.sock");
+    let server = IpcServer::bind(&endpoint)
+        .unwrap()
+        .spawn(f.desktop.clone())
+        .unwrap();
+    let mut coordinator = f
+        .service
+        .start_codex(&credential, &adapter, &endpoint)
+        .unwrap();
+    let mut host = CodexFleetHost::new(
+        f.service.clone(),
+        adapter,
+        endpoint,
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(240);
+    let mut coordinator_done = false;
+    loop {
+        host.tick().unwrap();
+        if !coordinator_done {
+            if let Some(success) = coordinator.poll().unwrap().1 {
+                assert!(success, "coordinator failed");
+                f.service.revoke(&credential).unwrap();
+                f.service
+                    .native_command(
+                        "coordinator-complete",
+                        Command::Observe {
+                            lane: f.lane.clone(),
+                            run: "root-run".into(),
+                            state: RunState::Succeeded,
+                        },
+                    )
+                    .unwrap();
+                coordinator_done = true;
+            }
+        }
+        let state = f.service.native_state().unwrap();
+        if coordinator_done
+            && state.lanes.len() == 3
+            && state.lanes.values().all(|l| {
+                l.runs
+                    .last()
+                    .is_some_and(|r| r.state == RunState::Succeeded)
+            })
+        {
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            f.service
+                .native_command("proof-timeout", Command::Cancel)
+                .unwrap();
+            let _ = coordinator.request_stop();
+            let _ = host.tick();
+            panic!(
+                "fleet timed out; evidence preserved at {}",
+                f.path.display()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let state = f.service.native_state().unwrap();
+    let mut results = Vec::new();
+    for lane in state.lanes.values().filter(|l| l.id != f.lane) {
+        assert_eq!(lane.parent.as_deref(), Some(f.lane.as_str()));
+        assert_eq!(lane.runs.len(), 1);
+        let checkpoint = state
+            .checkpoints
+            .values()
+            .find(|c| {
+                c.lane == lane.id
+                    && c.review.is_some()
+                    && c.result.as_ref().is_some_and(|r| r.complete)
+            })
+            .unwrap();
+        assert_saved_worker_review(lane, checkpoint);
+        results.push(
+            fs::read_to_string(
+                PathBuf::from(lane.workspace.as_ref().unwrap().root()).join("note.txt"),
+            )
+            .unwrap(),
+        );
+    }
+    results.sort();
+    assert_eq!(results, ["worker-one\n", "worker-two\n"]);
+    assert_eq!(f.desktop.workspace_state().unwrap(), before);
+    server.shutdown();
+    eprintln!("actual fleet evidence retained at {}", f.path.display());
+}
+
+fn assert_saved_worker_review(
+    lane: &mesh_daemon::fleet::Lane,
+    checkpoint: &mesh_daemon::fleet::Checkpoint,
+) {
+    let reader = LiveDaemon::new(StartupSummary::from(&nothing_to_recover()));
+    let saved = reader
+        .reopen_at_start(&PathBuf::from(lane.workspace.as_ref().unwrap().root()))
+        .unwrap();
+    let bundle = checkpoint.review.unwrap().to_string();
+    let version = checkpoint.result.as_ref().unwrap().version.to_string();
+    let review = saved
+        .review_items
+        .iter()
+        .find(|item| item.get("bundle").and_then(Json::as_text) == Some(bundle.as_str()))
+        .unwrap();
+    let change = review
+        .get("bundle_changes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|change| {
+            change
+                .get("path_after")
+                .and_then(Json::as_text)
+                .is_some_and(|path| path == "/note.txt")
+        })
+        .expect("exact /note.txt review entry");
+    let artifact = reader
+        .review_artifact_for_workspace(
+            &saved.root,
+            &saved.digest,
+            &saved.installation,
+            &bundle,
+            &version,
+            text(change, "object_id"),
+            "after",
+        )
+        .unwrap();
+    let working =
+        fs::read(PathBuf::from(lane.workspace.as_ref().unwrap().root()).join("note.txt")).unwrap();
+    assert_eq!(
+        artifact.bytes(),
+        working,
+        "the immutable review must contain the worker's actual result"
+    );
+}
+
+#[test]
+#[ignore = "requires MESH_TEST_REVIEW_EVIDENCE pointing to a retained disposable fleet proof"]
+fn retained_actual_fleet_reviews_reconstruct() {
+    let path = PathBuf::from(
+        std::env::var_os("MESH_TEST_REVIEW_EVIDENCE").expect("MESH_TEST_REVIEW_EVIDENCE"),
+    );
+    let runtime = Runtime::open(
+        FleetStore::open(path.join("fleet.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let state = runtime.state();
+    let children: Vec<_> = state
+        .lanes
+        .values()
+        .filter(|lane| lane.parent.is_some())
+        .collect();
+    assert_eq!(children.len(), 2);
+    let mut contents = Vec::new();
+    for lane in children {
+        let checkpoint = state
+            .checkpoints
+            .values()
+            .find(|c| c.lane == lane.id && c.review.is_some())
+            .unwrap();
+        assert_saved_worker_review(lane, checkpoint);
+        contents.push(
+            fs::read_to_string(
+                PathBuf::from(lane.workspace.as_ref().unwrap().root()).join("note.txt"),
+            )
+            .unwrap(),
+        );
+    }
+    contents.sort();
+    assert_eq!(contents, ["worker-one\n", "worker-two\n"]);
 }

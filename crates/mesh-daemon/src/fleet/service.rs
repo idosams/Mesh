@@ -142,6 +142,7 @@ pub struct FleetService {
     inner: Mutex<Inner>,
     allocator: Arc<dyn LaneAllocator>,
     providers: BTreeSet<String>,
+    host: String,
 }
 impl std::fmt::Debug for FleetService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -163,6 +164,10 @@ impl FleetService {
         {
             return Err(refusal("fleet-host-configuration"));
         }
+        let mut host = [0_u8; 32];
+        std::fs::File::open("/dev/urandom")
+            .and_then(|mut f| f.read_exact(&mut host))
+            .map_err(|_| refusal("fleet-host-identity-unavailable"))?;
         Ok(Self {
             inner: Mutex::new(Inner {
                 runtime,
@@ -171,6 +176,7 @@ impl FleetService {
             }),
             allocator,
             providers,
+            host: RecordDigest::from_bytes(host).to_string(),
         })
     }
     fn lock(&self) -> Result<MutexGuard<'_, Inner>, Unavailable> {
@@ -353,6 +359,100 @@ impl FleetService {
             .grants
             .remove(&token_key(credential.transport_value()));
         Ok(())
+    }
+
+    /// Claim and launch the configured Codex adapter for one native-issued session.
+    /// This native-only entry point cannot be reached through agent or renderer IPC.
+    /// Any uncertain launch stays claimed and requires reconciliation before another attempt.
+    pub fn start_codex(
+        &self,
+        credential: &AgentCredential,
+        adapter: &super::provider::CodexAdapter,
+        endpoint: &Path,
+    ) -> Result<super::provider::CodexProcess, Unavailable> {
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        let grant = inner
+            .grants
+            .get(&token_key(credential.transport_value()))
+            .cloned()
+            .ok_or_else(|| refusal("fleet-session-refused"))?;
+        ensure_run(&inner, &grant.lane, &grant.run)?;
+        let lane = &inner.runtime.state().lanes[&grant.lane];
+        if lane.provider != "codex" {
+            return Err(refusal("fleet-provider-mismatch"));
+        }
+        let goal = lane.goal.clone();
+        let workspace = inner
+            .workspaces
+            .get(&grant.lane)
+            .cloned()
+            .ok_or_else(|| refusal("fleet-lane-needs-reattachment"))?;
+        let state = exact_state(&workspace)?;
+        let verified = workspace
+            .daemon()
+            .verified_managed_workspace_path(&state.root, &state.digest, &state.installation)
+            .map_err(|_| refusal("fleet-lane-identity-changed"))?;
+        let _authority = workspace
+            .daemon()
+            .lock_workspace_agent_setup(
+                &state.root,
+                &state.digest,
+                &state.installation,
+                &grant.generation,
+            )
+            .map_err(|_| refusal("fleet-session-custody-changed"))?;
+        // Reject a replay before record()'s normal idempotency recovery can grant another spawn.
+        let run = inner.runtime.state().lanes[&grant.lane]
+            .runs
+            .last()
+            .ok_or_else(|| refusal("fleet-run-not-active"))?;
+        if run.launch_owner.is_some() || run.state != RunState::Launching {
+            return Err(refusal("launch-needs-reconciliation"));
+        }
+        inner
+            .runtime
+            .record(
+                &format!("launch-{}", token_key(&grant.run)),
+                super::Command::ClaimLaunch {
+                    lane: grant.lane.clone(),
+                    run: grant.run.clone(),
+                    owner: self.host.clone(),
+                },
+            )
+            .map_err(runtime_error)?;
+        verified
+            .ensure_current()
+            .map_err(|_| refusal("fleet-lane-identity-changed"))?;
+        let mut process = adapter
+            .spawn(
+                verified.path(),
+                endpoint,
+                inner.runtime.objective(),
+                credential,
+                &goal,
+            )
+            .map_err(|_| refusal("fleet-provider-launch-needs-reconciliation"))?;
+        if verified.ensure_current().is_err() {
+            process.abort_direct();
+            return Err(refusal("fleet-lane-identity-changed"));
+        }
+        if inner
+            .runtime
+            .record(
+                &format!("running-{}", token_key(&grant.run)),
+                super::Command::Observe {
+                    lane: grant.lane.clone(),
+                    run: grant.run.clone(),
+                    state: RunState::Running,
+                },
+            )
+            .is_err()
+        {
+            process.abort_direct();
+            return Err(refusal("fleet-provider-launch-needs-reconciliation"));
+        }
+        Ok(process)
     }
 
     /// Bounded agent entry point. A token binds the caller; there is no caller-supplied lane/path.
@@ -618,6 +718,53 @@ impl FleetService {
             }
             _ => Err(refusal("fleet-action-not-authorized")),
         }
+    }
+
+    /// Refresh durable native lifecycle state independently of the desktop selection.
+    pub fn native_state(&self) -> Result<super::State, Unavailable> {
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        Ok(inner.runtime.state().clone())
+    }
+
+    pub(super) fn record_provider_completion(
+        &self,
+        lane: &str,
+        run: &str,
+        success: bool,
+    ) -> Result<bool, Unavailable> {
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        let current = inner
+            .runtime
+            .state()
+            .lanes
+            .get(lane)
+            .and_then(|lane| lane.runs.last())
+            .ok_or_else(|| refusal("fleet-run-not-active"))?;
+        if current.id != run {
+            return Err(refusal("stale-run"));
+        }
+        // Direct process exit is insufficient evidence to finish a cancelled process tree.
+        if inner.runtime.state().cancelled || current.state == RunState::Stopping {
+            return Ok(false);
+        }
+        inner
+            .runtime
+            .record(
+                &format!("complete-{run}"),
+                Command::Observe {
+                    lane: lane.into(),
+                    run: run.into(),
+                    state: if success {
+                        RunState::Succeeded
+                    } else {
+                        RunState::Failed
+                    },
+                },
+            )
+            .map_err(runtime_error)?;
+        Ok(true)
     }
 
     /// Native fleet projection, including all lanes. This is not available through agent scope.
