@@ -45,7 +45,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 
 | Batch | Preserved source commit | Change | Canonical replacement |
 |---|---|---|---|
-| F01 | `c4e5b9450962b5bec818022d6e7936f2d5204b89` | feat: establish durable fleet lifecycle and isolated lane allocation | Transferred on `idosams/fleet-foundation`; PR and validation pending; not merged |
+| F01 | `c4e5b9450962b5bec818022d6e7936f2d5204b89` | feat: establish durable fleet lifecycle and isolated lane allocation | [Mesh PR #3](https://github.com/idosams/Mesh/pull/3), `c0050814fe8b0c96b3a33065d269faea6a0a07ff`; native foundation replaces runtime/ADR; stacked on #2; not merged |
 | F02 | `e1b1aeed6461af349fc943299c31376b5c358739` | feat: connect scoped agent delegation to native workspaces and MCP | Pending transfer |
 | F03 | `766852b17e8e06fbd01d5cf8b2504947fb19a280` | feat: capture private agent files under exact native custody | Pending transfer |
 | F03 | `4be9ae2f8a0de2515e10ee7fdd9be486ff8ddaa1` | feat: capture agent workspace additions with explicit partial results | Pending transfer |
