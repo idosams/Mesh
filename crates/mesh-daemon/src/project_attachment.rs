@@ -31,6 +31,7 @@ pub use background::{
 mod approval;
 mod history;
 mod inspection;
+mod integration;
 mod reviews;
 pub use history::SavedAttachmentVersion;
 

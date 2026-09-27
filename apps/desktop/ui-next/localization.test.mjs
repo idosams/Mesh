@@ -321,3 +321,33 @@ test('attached main approval renders localized availability and never enables an
   ui.setLocale('en');
   assert.match(ui.renderAttachments(), /Refresh main and approval availability/);
 });
+
+test('attached main comparison renders localized read-only conflicts and inert exact paths', async () => {
+  const id = 'a'.repeat(64), target = 'b'.repeat(64), bundle = 'c'.repeat(64), head = 'd'.repeat(64);
+  const path = 'תיקייה/<script>current</script>.txt';
+  const projection = { projects: [{ id, generation: '1', root: '/Users/משפחה/Files', phase: 'waiting',
+    outcome: 'saved', savedVersion: target, captureAgeMs: null, recovery: null }],
+    histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '',
+    busy: false, error: '', available: true,
+    approvalStates: { [id]: { available: false, enrolled: false, mainAvailable: true, main: { head, target, bundle } } },
+    integrationPreviews: { [id]: { head, target, bundle, base_head: 'e'.repeat(64), observed_digest: 'f'.repeat(64),
+      matches_base: 0, already_present: 0, preserve_current: 0, conflicts: 1, blocked: 1, not_listed: 1,
+      entries: [{ path, status: 'conflict', reason: 'contains-unobserved-entry' }] } },
+    integrationErrors: { [id]: 'A fresh working-folder comparison is unavailable. Any previous observation is retained. Refresh main and retry.' } };
+  const ui = await loadLocalization(projection);
+  for (const locale of ['en', 'he']) {
+    ui.setLocale(locale);
+    const html = ui.renderAttachments();
+    for (const label of ['Compare main with working files', 'Working folder compared with Mesh main',
+      'This directory contains entries outside the captured view, including possible ignored content.',
+      'more entries are omitted from this overview. The counts include all entries.',
+      'Read-only observation. Working files may have changed since this comparison; it is not an atomic snapshot or permission to overwrite them. Write-back is not enabled here.',
+      projection.integrationErrors[id]]) {
+      assert.ok(html.includes(ui.translate(locale, label)), label);
+      if (locale === 'he') assert.notEqual(ui.translate(locale, label), label);
+    }
+    assert.ok(html.includes('<bdi dir="ltr">תיקייה/&lt;script&gt;current&lt;/script&gt;.txt</bdi>'));
+    assert.ok(html.includes('<bdi dir="ltr">' + target + '</bdi>'));
+    assert.doesNotMatch(html, /<script>|apply-main/);
+  }
+});

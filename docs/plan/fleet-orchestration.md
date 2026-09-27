@@ -263,3 +263,8 @@ source tests cannot prove a packaged graphical journey; one machine cannot prove
 Record exact revision, commands/results, CI and merge status in PRs. Preserve all phase requirements
 until a requirement-by-requirement audit proves their outcomes on canonical Mesh. The full objective
 remains active while any requirement is missing, incomplete or unverified.
+
+Attached main comparison now observes the accepted review base, accepted result and current source.
+It classifies unchanged main paths as current work to retain, distinguishes already-present results
+and conflicts, and blocks destructive directory previews with unobserved children. The bounded
+read-only overview grants no write authority; retained integration and recovery remain required.

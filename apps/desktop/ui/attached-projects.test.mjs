@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -631,5 +631,62 @@ test('uncertain approval plus failed refresh clears authority until a new status
   h.intent({ type: 'check-approval', id }); await settle();
   assert.equal(h.projections.at(-1).approvalStates[id].available, true);
   h.intent(intent); await settle(); assert.equal(approvals, 2);
+  h.dispose();
+});
+
+const integrationReply = () => {
+  const file = { kind: 'file', bytes: 4, digest: '1'.repeat(64), executable: false };
+  return { schema: 'mesh.desktop-attachment-integration/v1', project: id, preview: {
+    schema: 'mesh.attachment-integration-preview/v1', ...acceptedMain(), base_head: '2'.repeat(64), observed_digest: '3'.repeat(64),
+    atomic_snapshot: false, write_authority: false, matches_base: 1, already_present: 0, preserve_current: 0, conflicts: 0, blocked: 0, not_listed: 0,
+    entries: [{ path: 'work.txt', status: 'matches-base', reason: null, base: file, current: file, target: { ...file, digest: '4'.repeat(64) } }],
+  } };
+};
+test('working-folder previews bind exact main, bounded counts and explicit read-only authority', () => {
+  assert.equal(attachedIntegration(integrationReply(), id, acceptedMain()).matches_base, 1);
+  for (const mutate of [
+    value => { value.project = 'f'.repeat(64); },
+    value => { value.preview.head = 'f'.repeat(64); },
+    value => { value.preview.bundle = 'f'.repeat(64); },
+    value => { value.preview.target = comparedTarget; },
+    value => { value.preview.base_head = null; },
+    value => { value.preview.write_authority = true; },
+    value => { value.preview.atomic_snapshot = true; },
+    value => { value.preview.matches_base = 0; },
+    value => { value.preview.not_listed = 1; },
+    value => { value.preview.entries[0].path = '../outside'; },
+    value => { value.preview.entries[0].status = 'safe-to-write'; },
+    value => { value.preview.entries[0].current.digest = 'unverified'; },
+    value => { value.preview.entries.push(value.preview.entries[0]); },
+  ]) { const value = integrationReply(); mutate(value); assert.throws(() => attachedIntegration(value, id, acceptedMain())); }
+});
+test('working-folder comparison stays pinned during capture and failed refresh retains the prior observation', async () => {
+  let fail = false; const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attachment_approval_status') return mainReply(acceptedMain());
+    if (command === 'preview_attached_main_integration') {
+      if (fail) throw new Error('private diagnostic');
+      return integrationReply();
+    }
+    return reply();
+  });
+  await settle(); h.intent({ type: 'compare-main', id }); await settle();
+  assert.equal(calls.some(call => call.command === 'preview_attached_main_integration'), false);
+  h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'compare-main', id }); await settle();
+  const call = calls.find(call => call.command === 'preview_attached_main_integration');
+  assert.deepEqual(call.args, { id, bundle: acceptedMain().bundle, target: operation });
+  const pinned = h.projections.at(-1).integrationPreviews[id];
+  h.intent({ type: 'refresh' }); await settle();
+  assert.equal(h.projections.at(-1).integrationPreviews[id], pinned);
+  fail = true; h.intent({ type: 'compare-main', id }); await settle();
+  assert.equal(h.projections.at(-1).integrationPreviews[id], pinned);
+  assert.match(h.projections.at(-1).integrationErrors[id], /previous observation is retained/);
+  assert.doesNotMatch(h.projections.at(-1).integrationErrors[id], /private diagnostic/);
+  const before = calls.length;
+  h.intent({ type: 'apply-main', id });
+  h.intent({ type: 'compare-main', id, path: '/outside' });
+  assert.equal(calls.length, before);
   h.dispose();
 });

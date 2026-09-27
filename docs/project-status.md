@@ -58,6 +58,10 @@ Attached-project review requests and native main approval are now transferred on
 Desktop controls can refresh verified main, set up eligible native credentials, inspect accepted
 saved content and request exact native confirmation. Working files and Git stay unchanged.
 Packaged graphical and actual human-presence acceptance remain unverified.
+A read-only attached-main comparison now classifies current changes against the exact accepted
+review and its base. Ignored children and conflicting parents block destructive previews. This is
+a bounded observation, not an atomic snapshot or permission to write. Source integration and
+recovery remain pending migration and acceptance.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

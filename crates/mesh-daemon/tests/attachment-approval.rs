@@ -73,8 +73,11 @@ impl Fixture {
         }
     }
     fn save(&self, text: &str) -> String {
-        use ed25519_dalek::{Signer as _, SigningKey};
         fs::write(self.source.join("work.txt"), text).unwrap();
+        self.capture()
+    }
+    fn capture(&self) -> String {
+        use ed25519_dalek::{Signer as _, SigningKey};
         let key = SigningKey::from_bytes(&[67; 32]);
         let input = self
             .history
@@ -454,4 +457,217 @@ fn accepted_main_resolves_its_saved_review_after_restart_and_outside_the_queue()
         .review_with_trusted_reviewers(&bundle, &target, &trust)
         .unwrap();
     assert_eq!(card.get("complete"), Some(&Json::Bool(true)));
+}
+
+fn accept(
+    f: &Fixture,
+    signer: &TestSigner,
+    trust: &TrustedReviewers,
+    target: &str,
+    challenge: u8,
+) -> String {
+    let bundle = f.request(target, trust);
+    let receipt = f.receipt(signer, trust, &bundle, target, challenge);
+    f.history
+        .approve_review(&bundle, target, &receipt, trust)
+        .unwrap();
+    bundle
+}
+fn status_at<'a>(preview: &'a Json, path: &str) -> &'a str {
+    let Json::Array(entries) = preview.get("entries").unwrap() else {
+        panic!("preview entries")
+    };
+    entries
+        .iter()
+        .find(|entry| entry.get("path") == Some(&Json::text(path)))
+        .and_then(|entry| entry.get("status"))
+        .and_then(Json::as_text)
+        .expect("path status")
+}
+
+#[test]
+fn integration_preview_preserves_divergence_and_blocks_destructive_directory_dependencies() {
+    let f = Fixture::new("integration-divergence");
+    f.git(&["init", "--quiet"]);
+    fs::write(f.source.join(".gitignore"), "secret.tmp\n").unwrap();
+    fs::write(f.source.join("untouched.txt"), "base").unwrap();
+    fs::write(f.source.join("gone.txt"), "base").unwrap();
+    fs::create_dir_all(f.source.join("outer/dir")).unwrap();
+    fs::write(f.source.join("outer/dir/child"), "base").unwrap();
+    fs::create_dir(f.source.join("stable")).unwrap();
+    fs::write(f.source.join("stable/keep"), "base").unwrap();
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    f.git(&["add", "."]);
+    fs::remove_file(f.source.join("gone.txt")).unwrap();
+    fs::remove_dir_all(f.source.join("outer")).unwrap();
+    fs::write(f.source.join("new.txt"), "approved addition").unwrap();
+    fs::write(f.source.join("stable/new"), "approved addition").unwrap();
+    fs::create_dir(f.source.join("newdir")).unwrap();
+    fs::write(f.source.join("newdir/new"), "approved addition").unwrap();
+    let target = f.save("approved change");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    let retained = f.history.inspect_text(&first, "outer/dir/child").unwrap();
+    assert_eq!(retained.get("text"), Some(&Json::text("base")));
+    assert!(f.history.inspect_text(&target, "outer/dir/child").is_err());
+    let card = f
+        .history
+        .review_with_trusted_reviewers(&bundle, &target, &trust)
+        .unwrap();
+    let Json::Array(changes) = card.get("changes").unwrap() else {
+        panic!("review changes")
+    };
+    assert!(
+        changes.iter().any(
+            |change| change.get("before") == Some(&Json::text("outer/dir/child"))
+                && change.get("after") == Some(&Json::Null)
+        ),
+        "unlinked file must be reviewed as a relative-path removal: {}",
+        card.encode()
+    );
+
+    fs::write(f.source.join("work.txt"), "live divergent work").unwrap();
+    fs::write(f.source.join("untouched.txt"), "live unrelated work").unwrap();
+    fs::write(f.source.join("gone.txt"), "base").unwrap();
+    fs::create_dir_all(f.source.join("outer/dir")).unwrap();
+    fs::write(f.source.join("outer/dir/child"), "base").unwrap();
+    fs::write(
+        f.source.join("outer/dir/secret.tmp"),
+        "ignored private work",
+    )
+    .unwrap();
+    fs::remove_dir_all(f.source.join("stable")).unwrap();
+    fs::write(f.source.join("stable"), "user replaced directory").unwrap();
+    fs::remove_dir_all(f.source.join("newdir")).unwrap();
+    let index = fs::read(f.source.join(".git/index")).unwrap();
+    let git_head = fs::read(f.source.join(".git/HEAD")).unwrap();
+    let git_status = f.git(&["status", "--porcelain=v1"]);
+    let journal = f.journal();
+    let preview = f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(status_at(&preview, "work.txt"), "conflict");
+    assert_eq!(status_at(&preview, "untouched.txt"), "preserve-current");
+    assert_eq!(status_at(&preview, "gone.txt"), "matches-base");
+    assert_eq!(status_at(&preview, "new.txt"), "already-present");
+    assert_eq!(status_at(&preview, "outer"), "conflict");
+    assert_eq!(status_at(&preview, "outer/dir"), "conflict");
+    assert_eq!(status_at(&preview, "outer/dir/child"), "blocked");
+    assert_eq!(status_at(&preview, "stable"), "preserve-current");
+    assert_eq!(status_at(&preview, "stable/new"), "blocked");
+    assert_eq!(status_at(&preview, "newdir"), "matches-base");
+    assert_eq!(status_at(&preview, "newdir/new"), "matches-base");
+    assert_eq!(preview.get("write_authority"), Some(&Json::Bool(false)));
+    assert_eq!(preview.get("atomic_snapshot"), Some(&Json::Bool(false)));
+    assert!(!preview.encode().contains("ignored private work"));
+    assert_eq!(f.journal(), journal);
+    assert_eq!(f.git(&["status", "--porcelain=v1"]), git_status);
+    assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), git_head);
+    assert_eq!(
+        fs::read_to_string(f.source.join("work.txt")).unwrap(),
+        "live divergent work"
+    );
+    assert_eq!(
+        fs::read_to_string(f.source.join("outer/dir/secret.tmp")).unwrap(),
+        "ignored private work"
+    );
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let refreshed = f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_ne!(
+        preview.get("observed_digest"),
+        refreshed.get("observed_digest")
+    );
+    assert_eq!(status_at(&refreshed, "work.txt"), "matches-base");
+    assert_eq!(
+        status_at(&preview, "work.txt"),
+        "conflict",
+        "old observation must stay fixed"
+    );
+    assert!(f
+        .history
+        .preview_main_integration(&bundle, &first, &trust, ObservationLimits::default())
+        .is_err());
+    assert!(f
+        .history
+        .preview_main_integration(
+            &bundle,
+            &target,
+            &TrustedReviewers::default(),
+            ObservationLimits::default()
+        )
+        .is_err());
+    fs::write(f.source.join(".gitignore"), "changed-policy\n").unwrap();
+    assert!(f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn integration_preview_bounds_output_and_refuses_incomplete_or_unsafe_observations() {
+    use std::os::unix::fs::symlink;
+    let f = Fixture::new("integration-bounds");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    let initial_bundle = accept(&f, &signer, &trust, &first, 1);
+    for index in 0..205 {
+        fs::write(f.source.join(format!("item-{index:03}")), "addition").unwrap();
+    }
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    for index in 0..205 {
+        fs::remove_file(f.source.join(format!("item-{index:03}"))).unwrap();
+    }
+    let preview = f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .unwrap();
+    let Json::Array(entries) = preview.get("entries").unwrap() else {
+        panic!("entries")
+    };
+    assert_eq!(entries.len(), 200);
+    assert_eq!(preview.get("not_listed"), Some(&Json::Number(5)));
+    assert_eq!(preview.get("matches_base"), Some(&Json::Number(205)));
+    assert_eq!(preview.get("conflicts"), Some(&Json::Number(0)));
+    let journal = f.journal();
+    assert!(f
+        .history
+        .preview_main_integration(
+            &initial_bundle,
+            &first,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    let small = ObservationLimits {
+        bytes: 1,
+        ..ObservationLimits::default()
+    };
+    assert!(f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, small)
+        .is_err());
+    symlink(f.root.join("outside"), f.source.join("link")).unwrap();
+    assert!(f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(f.journal(), journal);
+    fs::remove_file(f.source.join("link")).unwrap();
+    fs::rename(&f.source, f.root.join("moved-source")).unwrap();
+    fs::create_dir(&f.source).unwrap();
+    assert!(f
+        .history
+        .preview_main_integration(&bundle, &target, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(f.journal(), journal);
 }

@@ -286,14 +286,14 @@ impl ProjectAttachment {
 }
 
 #[derive(PartialEq, Eq)]
-struct ComparisonEntry {
-    kind: &'static str,
-    bytes: Option<u64>,
-    digest: Option<RecordDigest>,
-    executable: Option<bool>,
+pub(super) struct ComparisonEntry {
+    pub(super) kind: &'static str,
+    pub(super) bytes: Option<u64>,
+    pub(super) digest: Option<RecordDigest>,
+    pub(super) executable: Option<bool>,
 }
 impl ComparisonEntry {
-    fn json(&self) -> Json {
+    pub(super) fn json(&self) -> Json {
         Json::object([
             ("kind", Json::text(self.kind)),
             ("bytes", self.bytes.map_or(Json::Null, Json::Number)),
@@ -306,7 +306,7 @@ impl ComparisonEntry {
         ])
     }
 }
-fn comparison_entries(
+pub(super) fn comparison_entries(
     preview: crate::workspace::HistoricalWorkspacePreview,
 ) -> BTreeMap<String, ComparisonEntry> {
     preview

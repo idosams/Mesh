@@ -16,7 +16,10 @@ type SavedReview = { bundle: string; target: string; reviewed_head: string | nul
 type ReviewQueue = { reviews: SavedReview[]; notListed: number };
 type ApprovalState = { available: boolean; enrolled: boolean; reason: string | null; mainAvailable: boolean;
   main: { head: string; bundle: string; target: string } | null };
-type Projection = { approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+type IntegrationPreview = { head: string; bundle: string; target: string; base_head: string; observed_digest: string;
+  matches_base: number; already_present: number; preserve_current: number; conflicts: number; blocked: number; not_listed: number;
+  entries: { path: string; status: string; reason: string | null }[] };
+type Projection = { integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -107,6 +110,7 @@ export function AttachedProjects() {
             : projection.approvalStates[project.id].main ? <>
               <p className="break-all text-xs">{t("Accepted saved version:")} <bdi dir="ltr">{projection.approvalStates[project.id].main!.target}</bdi></p>
               <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "open-main", id: project.id })}>{t("Inspect Mesh main")}</Button>
+              <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "compare-main", id: project.id })}>{t("Compare main with working files")}</Button>
             </> : <p className="text-sm">{t("No version has been accepted as Mesh main yet.")}</p>}
           <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "check-approval", id: project.id })}>{t("Refresh main and approval availability")}</Button>
           {projection.approvalStates?.[project.id] && !projection.approvalStates[project.id].available && <p className="text-sm">{t("Approval unavailable:")} {t(projection.approvalStates[project.id].reason)}</p>}
@@ -114,6 +118,8 @@ export function AttachedProjects() {
             onClick={() => send({ type: "enroll-approval", id: project.id })}>{t("Set up approvals on this Mac")}</Button>}
           {projection.approvalFeedback?.[project.id] && <p role="status" className="text-sm">{t(projection.approvalFeedback[project.id])}</p>}
         </section>
+        {projection.integrationErrors?.[project.id] && <p role="alert" className="text-sm">{t(projection.integrationErrors[project.id])}</p>}
+        {projection.integrationPreviews?.[project.id] && <IntegrationPreviewCard preview={projection.integrationPreviews[project.id]} />}
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
           <p className="text-xs text-muted-foreground">{t("Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
@@ -227,5 +233,29 @@ function AttachmentReview({ project, review, disabled, approval }: { project: st
     <Button disabled={disabled || !review.complete || Boolean(review.unavailable) || !approval?.available || !approval.enrolled || !approval.mainAvailable || approval.main?.head === review.reviewed_head}
       onClick={() => send({ type: "approve-review", id: project, bundle: review.bundle, target: review.target })}>{t(approval?.main?.head === review.reviewed_head ? "This version is Mesh main" : "Approve as Mesh main…")}</Button>
     <p className="text-xs text-muted-foreground">{t("This request stays on its saved version while work continues. Change author unknown. Approval requires native confirmation and Touch ID or your Mac password. Working files and Git remain unchanged.")}</p>
+  </section>;
+}
+
+const integrationLabels: Record<string, string> = {
+  "matches-base": "Matches approved base", "already-present": "Already matches main", "preserve-current": "Keep current work",
+  conflict: "Conflict", blocked: "Blocked by a parent conflict",
+};
+const integrationReasons: Record<string, string> = {
+  "current-content-diverged": "Working content differs from both the base and main.",
+  "contains-current-work": "This directory contains current work that must be retained.",
+  "contains-unobserved-entry": "This directory contains entries outside the captured view, including possible ignored content.",
+  "parent-change-conflicts": "A parent directory must be resolved first.",
+};
+function IntegrationPreviewCard({ preview }: { preview: IntegrationPreview }) {
+  const t = useTranslation();
+  return <section aria-label={t("Working-folder comparison")} className="grid gap-2 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Working folder compared with Mesh main")}</h4>
+    <p className="break-all text-xs">{t("Accepted saved version:")} <bdi dir="ltr">{preview.target}</bdi></p>
+    <p className="text-sm">{preview.matches_base} {t("match the approved base")} · {preview.already_present} {t("already match main")} · {preview.preserve_current} {t("current changes to keep")} · {preview.conflicts} {t("conflicts")} · {preview.blocked} {t("blocked changes")}</p>
+    <ul className="max-h-64 overflow-auto text-xs">{preview.entries.map(entry => <li key={entry.path} className="break-all py-1">
+      <strong>{t(integrationLabels[entry.status])}</strong>: <bdi dir="ltr">{entry.path}</bdi>{entry.reason && <p>{t(integrationReasons[entry.reason])}</p>}
+    </li>)}</ul>
+    {preview.not_listed > 0 && <p className="text-xs">{preview.not_listed} {t("more entries are omitted from this overview. The counts include all entries.")}</p>}
+    <p className="text-xs text-muted-foreground">{t("Read-only observation. Working files may have changed since this comparison; it is not an atomic snapshot or permission to overwrite them. Write-back is not enabled here.")}</p>
   </section>;
 }

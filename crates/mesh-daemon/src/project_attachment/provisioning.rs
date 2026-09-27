@@ -337,6 +337,25 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Compare current source with the accepted review's exact base and result. This read-only
+    /// observation never authorizes writes or claims an atomic snapshot of the working folder.
+    pub fn preview_main_integration(
+        &self,
+        bundle: &str,
+        target: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        self.attachment.preview_main_integration(
+            &self.metadata,
+            self.store.clone(),
+            bundle,
+            target,
+            trusted,
+            limits,
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

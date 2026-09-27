@@ -161,7 +161,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A08 | `0823850023496505f3c45074ea972c2b36c1dbc0` | Preserve pending review bases as shared main advances | A08 prerequisite: [PR #30](https://github.com/idosams/Mesh/pull/30), replacement `9b17bf50e10f4c972dd3dae371bb691c26913c6b`, transferred before review-request admission to preserve immutable pending reviews; stacked on #29; full local gate passed (3,142 Rust tests, 13 skipped; 576 desktop tests; 44 daemon checks), all seven hosted checks passed at `a054186c4ee0828239dfa247de420507077c3b10` in run 36353559670, not merged |
 | A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | A08b: [PR #32](https://github.com/idosams/Mesh/pull/32), replacement `893dca74c13f919036397dc7cf2af6baff88c667`, remaining native exact-approval implementation transferred on #31; full gate passed (3,150 native tests, 13 skips; 580 desktop tests; 44 daemon checks); all seven hosted checks passed at `f58b2107fd3da5667c816d11a701de559d560fe9` in run 36355574791, not merged. Directory-lock prerequisite already delivered with A08a (#31), not reapplied; desktop approval controls remain a separate increment |
 | A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: [PR #33](https://github.com/idosams/Mesh/pull/33), replacement `68ab496a804204111b3087ee7c7fc9a1640adb55`, native confirmation, verified main inspection and localized controls on #32; full gate passed (3,151 native tests, one passed with a lingering-handle flag, 13 skips; 587 desktop tests; 44 daemon checks); hosted CI pending, not merged |
-| A09 | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | Pending transfer |
+| A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | Transferring on #34; validation and PR pending |
 | A09 | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | Pending transfer |
 | A09 | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Pending transfer |
 | A09 | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Pending transfer |
@@ -307,3 +307,13 @@ Hosted CI is pending; no merge is implied.
 The prerequisite [Mesh PR #33](https://github.com/idosams/Mesh/pull/33) passed all seven hosted
 checks at `f27287d4e99e6c63e2a602a83a2c1283703c601c` in run 36356728345 and is ready for required
 human review. It remains unmerged.
+
+## A09a read-only working-folder comparison
+
+Transfer source `c15c354d30178972b90bf919c051328f8ec2637b` onto canonical #34, preserving
+English/Hebrew localization and the uncertain-approval refresh regression added in #33. Native
+comparison binds the exact accepted review and original base, observes bounded current inputs, and
+reports divergence without write authority. Removed ancestors remain absent from historical review
+presentation even though retained objects still exist for recovery. Review paths are normalized to
+confined relative names. Source integration and recovery remain separate dependent increments.
+Validation and publication remain pending; no packaged attached-project acceptance or merge is claimed.

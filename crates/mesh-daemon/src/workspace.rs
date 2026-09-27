@@ -2325,7 +2325,10 @@ impl OpenWorkspace {
         Ok((bundle, verified_text, approved_state))
     }
 
-    fn review_target_for_head(&self, head: mesh_approval::HeadId) -> Result<RecordDigest, String> {
+    pub(crate) fn review_target_for_head(
+        &self,
+        head: mesh_approval::HeadId,
+    ) -> Result<RecordDigest, String> {
         let all = operation_records(&self.record_index);
         let mut matches = BTreeSet::new();
         for bundle in self.record_index.review_bundles() {
@@ -2377,12 +2380,15 @@ impl OpenWorkspace {
             if *object_id == materialized.root() || object.is_deleted() {
                 continue;
             }
+            // Unlink retains objects and their versions for historical recovery. Only objects
+            // reachable through the saved namespace belong to this version's visible review,
+            // including when an entire ancestor directory was unlinked.
+            if materialized.path_of(*object_id).is_none() {
+                continue;
+            }
             let (directory, name) = materialized
                 .binding_of(*object_id)
                 .ok_or_else(|| format!("saved object {object_id} has no exact visible binding"))?;
-            materialized
-                .path_of(*object_id)
-                .ok_or_else(|| format!("saved object {object_id} has no exact visible path"))?;
             let review_object = mesh_approval::ObjectId::from_bytes(*object_id.as_bytes());
             let review_directory = mesh_approval::ObjectId::from_bytes(*directory.as_bytes());
             let review_name =

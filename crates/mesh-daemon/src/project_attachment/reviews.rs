@@ -19,6 +19,26 @@ fn digest(value: &str) -> io::Result<RecordDigest> {
     }
     Ok(digest)
 }
+fn relative_review_path(value: Option<&Json>) -> io::Result<Json> {
+    let value = value.ok_or_else(|| invalid("missing review path"))?;
+    if value == &Json::Null {
+        return Ok(Json::Null);
+    }
+    // Review presentation paths begin at the logical workspace root, not the OS root. Attachment
+    // projections use the same relative names as saved-file inspection and never expose that slash.
+    let path = value
+        .as_text()
+        .and_then(|path| path.strip_prefix('/'))
+        .ok_or_else(|| invalid("invalid logical review path"))?;
+    if path.is_empty()
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(invalid("invalid relative review path"));
+    }
+    Ok(Json::text(path))
+}
 fn summary(item: Json) -> io::Result<Json> {
     let field = |name| {
         item.get(name)
@@ -32,20 +52,8 @@ fn summary(item: Json) -> io::Result<Json> {
         .iter()
         .map(|change| {
             Ok(Json::object([
-                (
-                    "before",
-                    change
-                        .get("path_before")
-                        .cloned()
-                        .ok_or_else(|| invalid("missing review path"))?,
-                ),
-                (
-                    "after",
-                    change
-                        .get("path_after")
-                        .cloned()
-                        .ok_or_else(|| invalid("missing review path"))?,
-                ),
+                ("before", relative_review_path(change.get("path_before"))?),
+                ("after", relative_review_path(change.get("path_after"))?),
                 (
                     "effect",
                     change

@@ -168,6 +168,37 @@ export function attachedApproval(raw, id, review) {
   return value;
 }
 
+const integrationStatuses = { 'matches-base': 'matches_base', 'already-present': 'already_present', 'preserve-current': 'preserve_current', conflict: 'conflicts', blocked: 'blocked' };
+export function attachedIntegration(raw, id, main) {
+  const outer = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const value = outer?.preview;
+  const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 300000;
+  const entry = value => value === null || (value?.kind === 'folder'
+    ? value.bytes === null && value.digest === null && value.executable === null
+    : value?.kind === 'file' && Number.isSafeInteger(value.bytes) && value.bytes >= 0
+      && reviewIdentity(value.digest) && typeof value.executable === 'boolean');
+  if (outer?.schema !== 'mesh.desktop-attachment-integration/v1' || outer.project !== id
+    || value?.schema !== 'mesh.attachment-integration-preview/v1' || value.head !== main.head
+    || value.bundle !== main.bundle || value.target !== main.target
+    || !reviewIdentity(value.base_head) || !reviewIdentity(value.observed_digest)
+    || value.atomic_snapshot !== false || value.write_authority !== false
+    || !Object.values(integrationStatuses).every(key => count(value[key])) || !count(value.not_listed)
+    || !Array.isArray(value.entries) || value.entries.length > 200) throw new Error('Invalid working-folder comparison');
+  const seen = new Set(); const shown = {};
+  for (const item of value.entries) {
+    if (!safeText(item?.path, 4096) || item.path.startsWith('/') || item.path.split('/').some(part => !part || part === '.' || part === '..')
+      || seen.has(item.path) || !Object.hasOwn(integrationStatuses, item.status)
+      || ![item.base, item.target, item.current].every(entry)
+      || (item.base === null && item.target === null && item.current === null)
+      || (item.status === 'conflict' ? !['current-content-diverged', 'contains-current-work', 'contains-unobserved-entry'].includes(item.reason)
+        : item.status === 'blocked' ? item.reason !== 'parent-change-conflicts' : item.reason !== null)) throw new Error('Invalid divergence entry');
+    seen.add(item.path); shown[item.status] = (shown[item.status] ?? 0) + 1;
+  }
+  if (Object.entries(integrationStatuses).some(([status, key]) => (shown[status] ?? 0) > value[key])
+    || Object.values(integrationStatuses).reduce((sum, key) => sum + value[key], 0) !== value.entries.length + value.not_listed) throw new Error('Invalid divergence counts');
+  return value;
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
@@ -178,6 +209,8 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let selectedReviews = {};
   let approvalStates = {};
   let approvalFeedback = {};
+  let integrationPreviews = {};
+  let integrationErrors = {};
   let pins = [];
   let nextPin = 1n;
   let pinStatus = 'loading';
@@ -189,7 +222,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
   async function readApproval(id) {
@@ -311,7 +344,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       });
       return;
     }
-    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main'].includes(value.type)
+    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main', 'compare-main'].includes(value.type)
       && !projects.some((project) => project.id === value.id)) return;
     if (value.type === 'check-approval' && Object.keys(value).length === 2) {
       void run(async () => {
@@ -329,6 +362,20 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
           await readApproval(value.id);
           approvalFeedback = { ...approvalFeedback, [value.id]: '' };
         } catch { approvalFeedback = { ...approvalFeedback, [value.id]: 'Approval setup was not confirmed. Check availability before retrying.' }; }
+      }); return;
+    }
+    if (value.type === 'compare-main' && Object.keys(value).length === 2 && approvalStates[value.id]?.main) {
+      const main = approvalStates[value.id].main;
+      void run(async () => {
+        try {
+          const preview = attachedIntegration(await invoke('preview_attached_main_integration', {
+            id: value.id, bundle: main.bundle, target: main.target,
+          }), value.id, main);
+          integrationPreviews = { ...integrationPreviews, [value.id]: preview };
+          integrationErrors = { ...integrationErrors, [value.id]: '' };
+        } catch {
+          integrationErrors = { ...integrationErrors, [value.id]: 'A fresh working-folder comparison is unavailable. Any previous observation is retained. Refresh main and retry.' };
+        }
       }); return;
     }
     if (value.type === 'open-main' && Object.keys(value).length === 2 && approvalStates[value.id]?.main) {

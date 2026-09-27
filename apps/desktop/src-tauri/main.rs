@@ -1880,6 +1880,27 @@ mod desktop {
         .encode())
     }
 
+    #[tauri::command]
+    async fn preview_attached_main_integration(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        bundle: String,
+        target: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let history = host.review_history(&id)?;
+            let preview = history.preview_main_integration(
+                &bundle, &target, &attachment_review_trust(),
+                mesh_daemon::project_attachment::ObservationLimits::default(),
+            ).map_err(|_| "Working-folder comparison is unavailable. Refresh Mesh main and retry after any ongoing file changes settle.".to_owned())?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.desktop-attachment-integration/v1")),
+                ("project", Json::text(id)), ("preview", preview),
+            ]).encode())
+        }).await.map_err(|_| "Working-folder comparison stopped".to_owned())?
+    }
+
     #[tauri::command(async)]
     fn approve_attached_review(
         app: tauri::AppHandle,
@@ -6847,6 +6868,7 @@ mod desktop {
                 inspect_attached_review,
                 attachment_approval_status,
                 approve_attached_review,
+                preview_attached_main_integration,
                 load_attachment_pins,
                 save_attachment_pins,
                 compare_attached_path,
