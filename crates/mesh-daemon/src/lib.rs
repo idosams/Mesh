@@ -116,7 +116,7 @@ pub use crate::checkpoint_runtime::{
 };
 pub use crate::checkpoint_storage::{
     save_file_version, save_file_version_with_journal, CasChunkPromoter, CasChunkPromoterError,
-    CheckpointSaveError, FileVersionCheckpointRequest, JournaledPrivateSave,
+    CheckpointSaveError, CheckpointSigner, FileVersionCheckpointRequest, JournaledPrivateSave,
     PreparedCheckpointFile,
 };
 pub use crate::crash_report::CrashReport;

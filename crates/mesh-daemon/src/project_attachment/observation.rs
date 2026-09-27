@@ -25,6 +25,21 @@ pub struct ObservationLimits {
     /// Maximum regular-file size to hash. At most 64 MiB.
     pub file_bytes: u64,
 }
+impl ObservationLimits {
+    pub(super) fn validate(self) -> io::Result<()> {
+        if self.entries == 0
+            || self.entries > 100_000
+            || self.bytes == 0
+            || self.bytes > 1024 * 1024 * 1024
+            || self.file_bytes == 0
+            || self.file_bytes > 64 * 1024 * 1024
+        {
+            return Err(invalid("invalid attachment observation budget"));
+        }
+        Ok(())
+    }
+}
+
 impl Default for ObservationLimits {
     fn default() -> Self {
         Self {
@@ -188,15 +203,7 @@ impl ProjectAttachment {
     }
 
     fn scan(&self, limits: ObservationLimits, retain_bytes: bool) -> io::Result<Scan> {
-        if limits.entries == 0
-            || limits.entries > 100_000
-            || limits.bytes == 0
-            || limits.bytes > 1024 * 1024 * 1024
-            || limits.file_bytes == 0
-            || limits.file_bytes > 64 * 1024 * 1024
-        {
-            return Err(invalid("invalid attachment observation budget"));
-        }
+        limits.validate()?;
         self.ensure_current()?;
         let filesystem = self.pinned.filesystem();
         let root_before = Stamp::from(&self.pinned.try_clone_directory()?.metadata()?);

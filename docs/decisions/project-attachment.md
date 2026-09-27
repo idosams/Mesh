@@ -1,7 +1,8 @@
 # Existing-project attachment identity
 
 Status: native registration, bounded observation, immutable capture inputs and signed external
-history commits implemented. Background capture and desktop integration remain planned.
+history commits and a native background reconciliation controller implemented. Desktop integration
+and incremental filesystem event handling remain planned.
 
 ## Decision
 
@@ -105,7 +106,8 @@ policy; changed policy refuses until a future explicit reconciliation flow. Rena
 as removal plus addition, not an inferred filesystem identity or attribution match. An unchanged
 capture returns the existing history point without invoking the signer or adding a version. Concurrent
 saves serialize in the external store; their order is commit order, not a claimed atomic ordering of
-source edits. A background observer will need its own capture scheduling and reconciliation.
+source edits. The native background controller serializes its own capture attempts and reconciles
+from complete bounded input; it does not claim event-time ordering.
 
 `saved_versions` and `saved_file` reopen the same journal/CAS history without a live-file fallback.
 They do not return a mutable workspace or any main-version/restore authority. Current entry points
@@ -114,13 +116,50 @@ rename reconciliation remain unfinished. The initial completely empty project ca
 root history point; removing all content from a previously saved project does save an empty version.
 
 This is a native library path. CLI attachment registration/observation remain separate and do not
-start saves. There is no automatic key generation, background watcher, packaged desktop save flow,
-or agent attribution in this milestone. Tests cover ordinary concurrent editing, unchanged Git
+start saves. There is no automatic key generation, CLI background command, packaged desktop save
+flow, or agent attribution in this milestone. Tests cover ordinary concurrent editing, unchanged Git
 index/HEAD, old bytes after restart, file history, no-op and concurrent saves, policy changes,
 missing journals, copied bindings and source replacement while signing.
 
-Implement incremental observation plus reconciliation
-after gaps, immutable capture under concurrent writes, and evidence-based file/session correlation.
+## Native background controller
+
+`AttachmentCaptureService::start` explicitly starts one native worker for an already registered
+project. The host supplies a `CheckpointSigner` and observation/scheduling limits. That shared native
+signing interface now lives with checkpoint storage; its former fleet-service path remains a
+compatible re-export. Everyday capture has no provider, agent credential or fleet requirement.
+No keys or service preferences are created or persisted by this controller.
+
+The worker retains the admitted project and external store descriptors throughout its lifetime.
+Both history recovery and saves use that exact store authority. It performs an initial reconciliation
+and bounded full rescans every five seconds by default, measured from the end of the prior attempt.
+Native policy may select 250 ms to five minutes. `request_capture` coalesces explicit checkpoint or
+missed-event signals into at most one pending rescan. Attempts never overlap within one controller;
+no event queue or event stream is treated as proof of complete source content. A restarted controller
+loads the existing saved point and captures edits made while stopped. This is polling reconciliation,
+not yet incremental filesystem observation, and it is not a battery or large-project performance claim.
+
+The redacted status keeps current activity separate from the last completed result. It reports the
+last acknowledged version, attempt and new-version counts, attempt duration, and monotonic ages
+within this service instance. `mesh.attachment-capture/v1` projects those values for a future native
+UI/event route, with unknown attribution and no atomic-snapshot claim. Paths, file contents and raw
+signer/IO errors are omitted. Incomplete scans and failed saves retain the prior saved identity while
+reporting the current failure; later scheduled attempts retry. Worker failure is terminal and never
+silently launches a replacement. Directory replacement is unavailable, never implicit reattachment.
+
+`request_stop` wakes an idle worker and stops future scans. A stop observed while the signer is still
+running prevents that result from entering a commit. An already-started durable write may finish;
+there is no rollback or process-interruption claim. `stop_and_join` waits for worker termination and
+returns final status. Slow external signing, filesystem I/O or store-lock waits can delay it, so the
+host must not treat a stop request as confirmed termination. Dropping the controller requests stop
+without blocking. The original project and its existing tool sessions remain untouched throughout.
+
+Native integration tests exercise periodic saves without signals, restart catch-up, incomplete
+capture and signer failure recovery, unchanged captures, signal coalescing, stopping during signing,
+and source/store replacement. They do not establish packaged desktop lifecycle behavior or sustained
+performance on representative projects.
+
+Implement incremental filesystem observations, evidence-based file/session correlation, native host
+key/lifecycle integration, and the packaged existing-project journey.
 Persist captured content and history outside the project. Present registration, catch-up, incomplete
 capture and saved versions separately. Then integrate the attachment with desktop onboarding and
 parallel review. Registration tests alone do not satisfy the full existing-project acceptance journey.

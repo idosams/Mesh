@@ -28,7 +28,7 @@ use std::io::{self, Read as _};
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
-const HISTORY: &str = "attachment-history.json";
+pub(super) const HISTORY: &str = "attachment-history.json";
 const ROOT: ObjectId = ObjectId::from_bytes([0; 16]);
 
 /// Exact native history point. This conveys no approval or authority to modify the source project.
@@ -58,11 +58,30 @@ impl ProjectAttachment {
         F: FnOnce(&SigningPayload) -> Result<Signature, E>,
         E: std::fmt::Display,
     {
+        let store = self.history_store(metadata)?;
+        self.save_capture_in_store(metadata, input, actor, sign, store)
+    }
+
+    pub(super) fn save_capture_in_store<F, E>(
+        &self,
+        metadata: &Path,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+        sign: F,
+        store: PinnedWorkspaceRoot,
+    ) -> io::Result<SavedAttachmentVersion>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
         self.ensure_current()?;
+        store.ensure_namespace_identity()?;
+        if read_receipt(&store)? != self.receipt()?.encode() {
+            return Err(invalid("history is not registered to this project"));
+        }
         if input.root() != self.root() || input.identity() != (self.device, self.inode) {
             return Err(invalid("capture belongs to a different attached project"));
         }
-        let store = self.history_store(metadata)?;
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
         let (configuration, created) =
@@ -189,6 +208,19 @@ impl ProjectAttachment {
     /// Reopen immutable history points after restart without creating a missing store or journal.
     pub fn saved_versions(&self, metadata: &Path) -> io::Result<Vec<SavedAttachmentVersion>> {
         let store = self.history_store(metadata)?;
+        self.saved_versions_in_store(metadata, store)
+    }
+
+    pub(super) fn saved_versions_in_store(
+        &self,
+        metadata: &Path,
+        store: PinnedWorkspaceRoot,
+    ) -> io::Result<Vec<SavedAttachmentVersion>> {
+        self.ensure_current()?;
+        store.ensure_namespace_identity()?;
+        if read_receipt(&store)? != self.receipt()?.encode() {
+            return Err(invalid("history is not registered to this project"));
+        }
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
         let (configuration, _) = self.history_configuration(&store, None)?;

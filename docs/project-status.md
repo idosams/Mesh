@@ -12,9 +12,11 @@ Existing-project registration now pins the original folder and keeps metadata ou
 Bounded native observation and immutable capture inputs leave source files and Git state untouched,
 without claiming custody. Native attachment history now saves captured bytes as signed versions in
 the external store and reopens exact old content after restart. Unchanged captures are no-ops;
-policy changes and ambiguous store bindings refuse. Background capture, desktop attachment flows,
-live fleet UI, process-tree recovery and complete acceptance journeys remain pending migration and
-verification.
+policy changes and ambiguous store bindings refuse. A native background controller now reconciles
+registered projects periodically, coalesces capture signals, retains saved history through incomplete
+scans or signing failures, and reports redacted capture health. It needs an explicit host signer and
+lifetime; packaged lifecycle, harness commands, desktop attachment flows, live fleet UI, process-tree
+recovery and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

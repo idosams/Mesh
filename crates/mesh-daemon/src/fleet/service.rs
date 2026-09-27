@@ -16,15 +16,9 @@ use super::{Command, Lane, RunState, Runtime};
 use crate::ipc::{Json, Unavailable, WorkspaceSummary};
 use crate::{CheckpointRuntimeParameters, ProtectedWorkspaceRoot, TrustedReviewers};
 use mesh_store::RecordDigest;
-use mesh_types::{Blake3, ContentDigest, PublicKey, Signature};
+use mesh_types::{Blake3, ContentDigest};
 
-/// Native host signing capability. Key custody stays outside the daemon and agent transport.
-pub trait CheckpointSigner: Send + Sync {
-    /// Public actor key bound to the issued session.
-    fn public_key(&self) -> PublicKey;
-    /// Sign only a canonical private ChangeSet payload. Errors must contain no secret material.
-    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<Signature, String>;
-}
+pub use crate::CheckpointSigner;
 
 /// Private allocation policy implemented by the native host, never supplied over agent IPC.
 pub trait LaneAllocator: Send + Sync {

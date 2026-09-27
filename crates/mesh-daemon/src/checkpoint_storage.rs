@@ -29,6 +29,15 @@ use crate::authenticated_changeset::{AuthenticatedChangeSet, AuthenticatedChange
 use crate::workspace::OpenWorkspace;
 use crate::{ManifestPagingError, ManifestPagingPolicy, PagedManifest};
 
+/// Native signing capability for captured private history. Key custody stays with the host.
+/// This capability grants no approval or main-version authority and requires no agent provider.
+pub trait CheckpointSigner: Send + Sync {
+    /// Public key of the actor attesting to the capture, not necessarily the original file author.
+    fn public_key(&self) -> PublicKey;
+    /// Sign a canonical private ChangeSet. Errors must contain no secret material.
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<Signature, String>;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PromotionPhase {
     Empty,
