@@ -21,7 +21,7 @@ const verbose = argv.includes("--verbose");
 const offline = argv.includes("--offline");
 const skipBuild = argv.includes("--skip-build");
 const mounted = argv.includes("--mounted");
-const EXPECTED_SURFACE_VERSION = 7;
+const EXPECTED_SURFACE_VERSION = 8;
 // Every public onboarding route names this exact proof size. Keep the count here so adding or
 // removing a check cannot silently leave one alpha promise stale while another remains correct.
 const EXPECTED_DEFAULT_CHECKS = 44;
