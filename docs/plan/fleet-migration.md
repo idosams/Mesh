@@ -38,6 +38,11 @@ For every increment record replacement commit(s), PR URL, exact local validation
 status. Source test logs are historical context; rerun the actual canonical checks. Human merge
 authorization is separate and mandatory; no self-approval or check bypass.
 
+Independent CI prerequisite: [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
+`337d2f56caa719f903c32c1170c74111c25ca328`, isolates two recovery deadline tests
+using the existing nextest scheduling policy. It changes no timer, assertion or product code.
+It is based directly on canonical main, is not included in this fleet stack, and remains unmerged.
+
 ## Preserved source commits
 
 The IDs below identify original work, not commits already delivered to canonical main. The status
@@ -47,9 +52,9 @@ column becomes the canonical PR and replacement commit mapping as each increment
 |---|---|---|---|
 | F01 | `c4e5b9450962b5bec818022d6e7936f2d5204b89` | feat: establish durable fleet lifecycle and isolated lane allocation | [Mesh PR #3](https://github.com/idosams/Mesh/pull/3), `c0050814fe8b0c96b3a33065d269faea6a0a07ff`; native foundation replaces runtime/ADR; stacked on #2; not merged |
 | F02 | `e1b1aeed6461af349fc943299c31376b5c358739` | feat: connect scoped agent delegation to native workspaces and MCP | [Mesh PR #4](https://github.com/idosams/Mesh/pull/4), `905db96883ca8989eedbddcd8650332e1d24da3c`; scoped delegation; stacked on #3; not merged |
-| F03 | `766852b17e8e06fbd01d5cf8b2504947fb19a280` | feat: capture private agent files under exact native custody | Transferred on `idosams/fleet-private-checkpoints`; validation/PR pending; stacked on #4; not merged |
-| F03 | `4be9ae2f8a0de2515e10ee7fdd9be486ff8ddaa1` | feat: capture agent workspace additions with explicit partial results | Transferred on `idosams/fleet-private-checkpoints`; validation/PR pending; stacked on #4; not merged |
-| F03 | `b0da3c728cfb84dcd1d98dbe2e214a5977016c79` | feat: expose durable signed checkpoints through scoped MCP sessions | Transferred on `idosams/fleet-private-checkpoints`; validation/PR pending; stacked on #4; not merged |
+| F03 | `766852b17e8e06fbd01d5cf8b2504947fb19a280` | feat: capture private agent files under exact native custody | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
+| F03 | `4be9ae2f8a0de2515e10ee7fdd9be486ff8ddaa1` | feat: capture agent workspace additions with explicit partial results | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
+| F03 | `b0da3c728cfb84dcd1d98dbe2e214a5977016c79` | feat: expose durable signed checkpoints through scoped MCP sessions | [Mesh PR #6](https://github.com/idosams/Mesh/pull/6), `451191520d67a35d2f66e4b5d286eb3622da3653`; private capture/checkpoints; stacked on #4; not merged |
 | F04 | `4741d895b3eb34a5f9c8d6e7a8c482c527cbc8a6` | feat: submit completed agent checkpoints as immutable reviews | Pending transfer |
 | F05 | `0d6127f1371bec3cbf150bcf2540097fbf980aad` | feat: launch scoped Codex workers with durable ownership claims | Pending transfer |
 | F05 | `ca9b48a59f14934e9b05dacef1ecbaa9c93453f3` | feat: schedule delegated Codex workers within native fleet limits | Pending transfer |
