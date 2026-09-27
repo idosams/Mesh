@@ -246,6 +246,24 @@ impl ProvisionedAttachment {
             .saved_versions_in_store(&self.metadata, self.store.clone())
     }
 
+    /// Record an exact local review request without approval or source-write authority.
+    pub fn request_review(&self, target: &str, actor: mesh_types::PublicKey) -> io::Result<Json> {
+        self.attachment
+            .request_saved_review(&self.metadata, self.store.clone(), target, actor)
+    }
+
+    /// List the bounded durable review queue; omitted cards are reported explicitly.
+    pub fn reviews(&self) -> io::Result<Json> {
+        self.attachment
+            .saved_reviews(&self.metadata, self.store.clone())
+    }
+
+    /// Read one exact durable review even when it is outside the overview page.
+    pub fn review(&self, bundle: &str, target: &str) -> io::Result<Json> {
+        self.attachment
+            .saved_review(&self.metadata, self.store.clone(), bundle, target)
+    }
+
     /// Inspect one bounded page of entries in an exact saved version, never live files.
     pub fn inspect_entries(
         &self,

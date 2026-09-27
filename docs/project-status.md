@@ -105,3 +105,12 @@ This proves explicit local capture, restart, review, and software-key publicatio
 not prove protected approval in an eligible signed build, remote collaboration, or a clean-Mac
 installation. See the [phase assessment](phase-assessment.md) for the candidate's validation status
 and the [user playbooks](user-playbooks.md) for the operational journey.
+
+### Attached saved-version review requests (unmerged development increment)
+
+Saved attachment versions can create durable local review requests through the existing native
+review engine, with exact bundle/target identity, idempotent retries against the same main base,
+a bounded request queue and direct lookup. The desktop reopens requests and inspects their saved
+result while capture continues. Unknown authorship, unavailable content and omitted entries remain
+explicit. English and Hebrew views preserve literal identities and paths. This does not yet provide
+attached-project human approval, integration or a packaged graphical acceptance result.

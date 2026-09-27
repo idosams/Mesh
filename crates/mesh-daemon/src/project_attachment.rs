@@ -30,6 +30,7 @@ pub use background::{
 
 mod history;
 mod inspection;
+mod reviews;
 pub use history::SavedAttachmentVersion;
 
 mod observation;

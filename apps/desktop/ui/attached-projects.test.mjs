@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -418,4 +418,66 @@ test('native event availability is explicit and older status falls back to perio
   assert.equal(attachedProjectList(value)[0].nativeEvents, true);
   value.projects[0].capture.native_events = 'active';
   assert.throws(() => attachedProjectList(value));
+});
+
+const reviewRecord = () => ({ bundle: '6'.repeat(64), target: operation, reviewed_head: '7'.repeat(64), presentation: '8'.repeat(64),
+  complete: true, unavailable: null, changes: [{ before: null, after: 'notes.txt', effect: 'added' }],
+  changes_not_listed: 0, operations_not_listed: 0, author_attribution: 'unknown', approval_authority: false });
+const reviewReply = () => ({ schema: 'mesh.desktop-attachment-review/v1', project: id, review: reviewRecord() });
+const reviewQueueReply = () => ({ schema: 'mesh.desktop-attachment-reviews/v1', project: id, queue: { reviews: [reviewRecord()], not_listed: 0 } });
+test('review projections bind exact identities and reject invented approval or completeness', () => {
+  assert.equal(attachedReview(reviewReply(), id, operation).bundle, '6'.repeat(64));
+  assert.equal(attachedReviews(reviewQueueReply(), id).reviews.length, 1);
+  assert.throws(() => attachedReview(reviewReply(), id, comparedTarget));
+  assert.throws(() => attachedReview(reviewReply(), 'f'.repeat(64), operation));
+  assert.throws(() => attachedReview(reviewReply(), id, operation, 'f'.repeat(64)));
+  for (const mutate of [
+    (review) => { review.approval_authority = true; },
+    (review) => { review.author_attribution = 'agent'; },
+    (review) => { review.changes_not_listed = 1; },
+    (review) => { review.changes[0].after = '../outside'; },
+    (review) => { review.presentation = null; },
+  ]) {
+    const value = reviewReply(); mutate(value.review);
+    assert.throws(() => attachedReview(value, id, operation));
+  }
+  const duplicate = reviewQueueReply(); duplicate.queue.reviews.push(reviewRecord());
+  assert.throws(() => attachedReviews(duplicate, id));
+});
+
+test('requested review stays on its saved target while capture advances and opens exact saved files', async () => {
+  const calls = []; let latest = operation;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: id, before: null, versions: [operation], next_before: null };
+    if (command === 'request_attached_review' || command === 'inspect_attached_review') return reviewReply();
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_version') return entryReply();
+    const value = reply(); value.projects[0].capture.saved_version = latest; return value;
+  });
+  await settle(); h.intent({ type: 'versions', id, before: null }); await settle();
+  h.intent({ type: 'request-review', id, target: operation }); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  latest = comparedTarget; h.intent({ type: 'refresh' }); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  h.intent({ type: 'review-files', id, bundle: '6'.repeat(64), target: operation }); await settle();
+  assert.equal(h.projections.at(-1).inspections[id].operation, operation);
+  const count = calls.length;
+  h.intent({ type: 'review-files', id, bundle: '6'.repeat(64), target: comparedTarget });
+  h.intent({ type: 'request-review', id, target: comparedTarget });
+  h.intent({ type: 'reviews', unrelated: true });
+  assert.equal(calls.length, count);
+  h.dispose();
+});
+
+test('reopened review queue can select a durable request outside the loaded version page', async () => {
+  const h = harness(async (command) => {
+    if (command === 'attached_project_reviews') return reviewQueueReply();
+    if (command === 'inspect_attached_review') return reviewReply();
+    return reply();
+  });
+  await settle(); h.intent({ type: 'reviews', id }); await settle();
+  h.intent({ type: 'open-review', id, bundle: '6'.repeat(64), target: operation }); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].presentation, '8'.repeat(64));
+  h.dispose();
 });

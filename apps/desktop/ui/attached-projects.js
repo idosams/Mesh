@@ -113,12 +113,45 @@ export function attachedComparison(raw, id, base, target, after) {
   return { base, target, after, changes: value.changes, total: value.total, nextAfter: value.next_after, file: null };
 }
 
+const reviewIdentity = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+function reviewSummary(value) {
+  const optionalIdentity = (value) => value === null || reviewIdentity(value);
+  const path = (value) => value === null || (safeText(value, 4096) && !value.startsWith('/')
+    && !value.split('/').some((part) => !part || part === '.' || part === '..'));
+  if (!reviewIdentity(value?.bundle) || !reviewIdentity(value.target)
+    || !optionalIdentity(value.reviewed_head) || !optionalIdentity(value.presentation)
+    || typeof value.complete !== 'boolean' || value.approval_authority !== false || value.author_attribution !== 'unknown'
+    || (value.unavailable !== null && !safeText(value.unavailable, 128))
+    || !Array.isArray(value.changes) || value.changes.length > 128
+    || ![value.changes_not_listed, value.operations_not_listed].every((count) => Number.isSafeInteger(count) && count >= 0)
+    || (value.complete && (value.unavailable !== null || !value.reviewed_head || !value.presentation || value.changes_not_listed || value.operations_not_listed))
+    || value.changes.some((change) => !path(change?.before) || !path(change.after)
+      || (change.before === null && change.after === null) || !safeText(change.effect, 80))) throw new Error('Invalid saved review');
+  return value;
+}
+export function attachedReview(raw, id, target, bundle = null) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.desktop-attachment-review/v1' || value.project !== id
+    || value.review?.target !== target || (bundle !== null && value.review.bundle !== bundle)) throw new Error('Review identity mismatch');
+  return reviewSummary(value.review);
+}
+export function attachedReviews(raw, id) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.desktop-attachment-reviews/v1' || value.project !== id || !Array.isArray(value.queue?.reviews)
+    || value.queue.reviews.length > 32 || !Number.isSafeInteger(value.queue.not_listed) || value.queue.not_listed < 0) throw new Error('Invalid review queue');
+  const reviews = value.queue.reviews.map(reviewSummary);
+  if (new Set(reviews.map((review) => review.bundle)).size !== reviews.length) throw new Error('Duplicate saved review');
+  return { reviews, notListed: value.queue.not_listed };
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
   let inspections = {};
   let bases = {};
   let comparisons = {};
+  let reviewQueues = {};
+  let selectedReviews = {};
   let pins = [];
   let nextPin = 1n;
   let pinStatus = 'loading';
@@ -130,7 +163,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
   async function readComparisonFile(id, comparison, change) {
@@ -243,6 +276,40 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
         histories = { ...histories, [value.id]: page };
       });
       return;
+    }
+    if (['reviews', 'request-review', 'open-review', 'review-files'].includes(value.type)
+      && !projects.some((project) => project.id === value.id)) return;
+    if (value.type === 'reviews' && Object.keys(value).length === 2) {
+      void run(async () => {
+        const queue = attachedReviews(await invoke('attached_project_reviews', { id: value.id }), value.id);
+        reviewQueues = { ...reviewQueues, [value.id]: queue };
+      }); return;
+    }
+    if (value.type === 'request-review' && Object.keys(value).length === 3 && histories[value.id]?.versions.includes(value.target)) {
+      void run(async () => {
+        const review = attachedReview(await invoke('request_attached_review', { id: value.id, target: value.target }), value.id, value.target);
+        selectedReviews = { ...selectedReviews, [value.id]: review };
+        const queue = attachedReviews(await invoke('attached_project_reviews', { id: value.id }), value.id);
+        reviewQueues = { ...reviewQueues, [value.id]: queue };
+      }); return;
+    }
+    if (value.type === 'open-review' && Object.keys(value).length === 4
+      && reviewQueues[value.id]?.reviews.some((review) => review.bundle === value.bundle && review.target === value.target)) {
+      void run(async () => {
+        const review = attachedReview(await invoke('inspect_attached_review', {
+          id: value.id, bundle: value.bundle, target: value.target,
+        }), value.id, value.target, value.bundle);
+        selectedReviews = { ...selectedReviews, [value.id]: review };
+      }); return;
+    }
+    if (value.type === 'review-files' && Object.keys(value).length === 4
+      && selectedReviews[value.id]?.bundle === value.bundle && selectedReviews[value.id]?.target === value.target) {
+      void run(async () => {
+        const inspected = attachedEntries(await invoke('inspect_attached_version', {
+          id: value.id, operation: value.target, path: null, after: null,
+        }), value.id, value.target, null);
+        inspections = { ...inspections, [value.id]: inspected };
+      }); return;
     }
     if (value.type === 'inspect' && Object.keys(value).length === 3
       && histories[value.id]?.versions.includes(value.operation)) {

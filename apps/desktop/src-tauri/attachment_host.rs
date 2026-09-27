@@ -279,6 +279,58 @@ impl AttachmentHost {
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
 
+    fn review_history(&self, id: &str) -> Result<ProvisionedAttachment, String> {
+        self.state
+            .lock()
+            .map_err(|_| UNAVAILABLE)?
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open in this desktop session")?
+            .history
+            .clone()
+            .ok_or("Saved history is unavailable".into())
+    }
+
+    pub fn request_review(&self, id: &str, target: &str) -> Result<String, String> {
+        let history = self.review_history(id)?;
+        let actor = NativeCaptureSigner::generate()?.public_key();
+        let review = history
+            .request_review(target, actor)
+            .map_err(|_| "The exact saved review could not be recorded")?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-review/v1")),
+            ("project", Json::text(id)),
+            ("review", review),
+        ])
+        .encode())
+    }
+
+    pub fn reviews(&self, id: &str) -> Result<String, String> {
+        let queue = self
+            .review_history(id)?
+            .reviews()
+            .map_err(|_| "Saved reviews are unavailable")?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-reviews/v1")),
+            ("project", Json::text(id)),
+            ("queue", queue),
+        ])
+        .encode())
+    }
+
+    pub fn review(&self, id: &str, bundle: &str, target: &str) -> Result<String, String> {
+        let review = self
+            .review_history(id)?
+            .review(bundle, target)
+            .map_err(|_| "The exact saved review is unavailable")?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-review/v1")),
+            ("project", Json::text(id)),
+            ("review", review),
+        ])
+        .encode())
+    }
+
     pub fn load_pins(&self) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         self.initialize(&mut state, false)?;

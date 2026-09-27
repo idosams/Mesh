@@ -1202,3 +1202,160 @@ fn corrupt_or_linked_detachment_records_are_preserved_and_never_treated_as_attac
     assert!(storage.set_detached(history.id(), false).is_err());
     assert!(outside.exists());
 }
+
+#[test]
+fn attached_review_requests_pin_old_versions_survive_restart_and_retry_without_duplication() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("review-requests");
+    fs::write(f.source.join("work"), "first saved content").unwrap();
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let history = storage.provision(&f.source).unwrap();
+    let save = || {
+        let input = history
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        save_attached(history.project(), history.metadata_path(), &input)
+            .unwrap()
+            .operation()
+            .to_string()
+    };
+    let first = save();
+    fs::write(f.source.join("work"), "newer working content").unwrap();
+    let second = save();
+    let actor = mesh_types::PublicKey::from_bytes([3; 32]);
+    let requested = history.request_review(&first, actor).unwrap();
+    assert_eq!(requested.get("target"), Some(&Json::text(&first)));
+    assert_eq!(requested.get("complete"), Some(&Json::Bool(true)));
+    assert_eq!(
+        requested.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        requested.get("author_attribution"),
+        Some(&Json::text("unknown"))
+    );
+    let bundle = requested
+        .get("bundle")
+        .unwrap()
+        .as_text()
+        .unwrap()
+        .to_owned();
+    let journal = history.metadata_path().join(mesh_daemon::RECORD_FILE_NAME);
+    let recorded = fs::read(&journal).unwrap();
+    assert_eq!(
+        history
+            .request_review(&first, mesh_types::PublicKey::from_bytes([4; 32]))
+            .unwrap(),
+        requested
+    );
+    assert_eq!(fs::read(&journal).unwrap(), recorded);
+    let reopened = AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .reopen(history.id())
+        .unwrap();
+    assert_eq!(reopened.review(&bundle, &first).unwrap(), requested);
+    assert!(reopened.review(&bundle, &second).is_err());
+    assert!(reopened.request_review(&"f".repeat(64), actor).is_err());
+    assert_eq!(fs::read(&journal).unwrap(), recorded);
+    storage.set_detached(history.id(), true).unwrap();
+    let another = reopened.request_review(&second, actor).unwrap();
+    assert_ne!(another.get("bundle"), requested.get("bundle"));
+    let queue = reopened.reviews().unwrap();
+    let Json::Array(items) = queue.get("reviews").unwrap() else {
+        panic!("reviews");
+    };
+    assert_eq!(items.len(), 2);
+    assert_eq!(queue.get("not_listed"), Some(&Json::Number(0)));
+    assert_eq!(reopened.review(&bundle, &first).unwrap(), requested);
+    assert_eq!(
+        fs::read_to_string(f.source.join("work")).unwrap(),
+        "newer working content"
+    );
+}
+
+#[test]
+fn concurrent_attached_review_requests_have_one_durable_result() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("review-concurrent");
+    fs::write(f.source.join("work"), "saved").unwrap();
+    let history = AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .provision(&f.source)
+        .unwrap();
+    let input = history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let target = save_attached(history.project(), history.metadata_path(), &input)
+        .unwrap()
+        .operation()
+        .to_string();
+    let threads: Vec<_> = (0..4)
+        .map(|index| {
+            let history = history.clone();
+            let target = target.clone();
+            std::thread::spawn(move || {
+                history
+                    .request_review(&target, mesh_types::PublicKey::from_bytes([index; 32]))
+                    .unwrap()
+            })
+        })
+        .collect();
+    let results: Vec<_> = threads
+        .into_iter()
+        .map(|thread| thread.join().unwrap())
+        .collect();
+    assert!(results.iter().all(|result| result == &results[0]));
+    let queue = history.reviews().unwrap();
+    let Json::Array(items) = queue.get("reviews").unwrap() else {
+        panic!("reviews");
+    };
+    assert_eq!(items.len(), 1);
+}
+
+#[test]
+fn an_attached_review_outside_the_overview_bound_remains_directly_reviewable() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("review-page-bound");
+    let history = AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .provision(&f.source)
+        .unwrap();
+    let actor = mesh_types::PublicKey::from_bytes([5; 32]);
+    let mut reviews = Vec::new();
+    for number in 0..33 {
+        fs::write(f.source.join("work"), format!("saved {number}")).unwrap();
+        let input = history
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let target = save_attached(history.project(), history.metadata_path(), &input)
+            .unwrap()
+            .operation()
+            .to_string();
+        reviews.push(history.request_review(&target, actor).unwrap());
+    }
+    let queue = history.reviews().unwrap();
+    let Json::Array(items) = queue.get("reviews").unwrap() else {
+        panic!("reviews");
+    };
+    assert_eq!(items.len(), 32);
+    assert_eq!(queue.get("not_listed"), Some(&Json::Number(1)));
+    let omitted = reviews
+        .iter()
+        .find(|review| {
+            !items
+                .iter()
+                .any(|item| item.get("bundle") == review.get("bundle"))
+        })
+        .unwrap();
+    let bundle = omitted.get("bundle").unwrap().as_text().unwrap();
+    let target = omitted.get("target").unwrap().as_text().unwrap();
+    assert_eq!(&history.review(bundle, target).unwrap(), omitted);
+    assert_eq!(&history.request_review(target, actor).unwrap(), omitted);
+    fs::rename(history.metadata_path(), f.root.join("old-history")).unwrap();
+    fs::create_dir(history.metadata_path()).unwrap();
+    assert!(history.request_review(target, actor).is_err());
+    assert_eq!(fs::read_dir(history.metadata_path()).unwrap().count(), 0);
+}

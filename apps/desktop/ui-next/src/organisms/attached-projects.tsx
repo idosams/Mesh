@@ -11,7 +11,10 @@ type Change = { path: string; change: string; before: Omit<SavedEntry, "path"> |
 type Comparison = { base: string; target: string; changes: Change[]; total: number; nextAfter: string | null;
   file: { path: string; before: SavedFile | null; after: SavedFile | null; beforeKind: string; afterKind: string } | null };
 type PinnedComparison = { key: string; project: string; root: string; comparison: Comparison | null; selector: { base: string; target: string } };
-type Projection = { pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+type SavedReview = { bundle: string; target: string; reviewed_head: string | null; presentation: string | null; complete: boolean; unavailable: string | null;
+  changes: { before: string | null; after: string | null; effect: string }[]; changes_not_listed: number; operations_not_listed: number };
+type ReviewQueue = { reviews: SavedReview[]; notListed: number };
+type Projection = { reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -84,6 +87,8 @@ export function AttachedProjects() {
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
             onClick={() => send({ type: "versions", id: project.id, before: null })}>{t("Show latest versions")}</Button>
+          <Button variant="secondary" disabled={disabled || !project.savedVersion}
+            onClick={() => send({ type: "reviews", id: project.id })}>{t("Show review requests")}</Button>
           <Button variant="secondary" disabled={disabled || project.detached || terminal || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: "capture" })}>{t("Capture now")}</Button>
           <Button variant="secondary" disabled={disabled || project.detached || project.phase === "stopping"}
@@ -94,12 +99,15 @@ export function AttachedProjects() {
         {project.detached && <p className="text-xs text-muted-foreground">{t("Capture is disabled. Your files, Git workflow and saved history are retained. Reattach, then resume capture when ready.")}</p>}
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
+          <p className="text-xs text-muted-foreground">{t("Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
           <p className="break-all text-xs text-muted-foreground">{projection.bases[project.id] && <>{t("Selected comparison base:")} <bdi dir="ltr">{projection.bases[project.id]}</bdi></>}</p>
           <ol className="max-h-64 overflow-auto text-xs">
             {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><button className="text-left underline" disabled={disabled}
               onClick={() => send({ type: "inspect", id: project.id, operation: version })}><bdi dir="ltr">{version}</bdi></button>
               <div className="mt-1 flex gap-3"><button className="underline" disabled={disabled}
                 onClick={() => send({ type: "set-base", id: project.id, operation: version })}>{t("Use as base")}</button>
+              <button className="underline" disabled={disabled}
+                onClick={() => send({ type: "request-review", id: project.id, target: version })}>{t("Request review")}</button>
               <button className="underline" disabled={disabled || !projection.bases[project.id]}
                 onClick={() => send({ type: "compare", id: project.id, target: version })}>{t("Compare with base")}</button></div></li>)}
           </ol>
@@ -107,6 +115,14 @@ export function AttachedProjects() {
             onClick={() => send({ type: "versions", id: project.id, before: projection.histories[project.id].nextBefore })}>{t("Older versions")}</Button>}
           <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues.")}</p>
         </section>}
+        {projection.reviewQueues?.[project.id] && <section aria-label={t("Saved review requests")} className="grid gap-2">
+          <h4 className="text-sm font-semibold">{t("Saved review requests")}</h4>
+          {projection.reviewQueues[project.id].reviews.length === 0 && <p className="text-sm">{t("No review requests recorded.")}</p>}
+          {projection.reviewQueues[project.id].reviews.map((review) => <button key={review.bundle} className="break-all text-left text-xs underline" disabled={disabled}
+            onClick={() => send({ type: "open-review", id: project.id, bundle: review.bundle, target: review.target })}>{t("Open review")} <bdi dir="ltr">{review.bundle}</bdi></button>)}
+          {projection.reviewQueues[project.id].notListed > 0 && <p className="text-xs">{projection.reviewQueues[project.id].notListed} {t("more requests are outside this page. Request review from a saved version to reopen its exact request.")}</p>}
+        </section>}
+        {projection.selectedReviews?.[project.id] && <AttachmentReview project={project.id} review={projection.selectedReviews[project.id]} disabled={disabled} />}
         {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} canPin={projection.pins.length < 8 && projection.pinStatus !== "loading" && !projection.pinError} />}
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
@@ -173,5 +189,24 @@ function ComparisonSide({ label, file, kind }: { label: string; file: SavedFile 
   return <section className="min-w-0" aria-label={t(label)}><h5 className="text-sm font-medium">{t(label)}</h5>
     {file?.state === "text" ? <pre dir="ltr" className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{file.text}</pre>
       : <p className="text-sm text-muted-foreground">{t(!file ? kind === "absent" ? "Absent in this version" : "Folder" : file.state === "binary" ? "Binary file; no text preview" : "File exceeds the 256 KiB preview limit")}</p>}
+  </section>;
+}
+
+function AttachmentReview({ project, review, disabled }: { project: string; review: SavedReview; disabled: boolean }) {
+  const t = useTranslation();
+  return <section aria-label={t("Selected saved review")} className="grid gap-2 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Review request recorded")}</h4>
+    <p className="break-all text-xs">{t("Bundle:")} <bdi dir="ltr">{review.bundle}</bdi></p>
+    <p className="break-all text-xs">{t("Saved version:")} <bdi dir="ltr">{review.target}</bdi></p>
+    <p className="break-all text-xs">{t("Presentation:")} {review.presentation ? <bdi dir="ltr">{review.presentation}</bdi> : t("Unavailable")}</p>
+    <p className="text-sm">{t(review.unavailable ? "Review content is unavailable; the request is retained."
+      : review.complete ? "Saved content verified for this request." : "This overview is incomplete; it cannot stand in for complete review.")}</p>
+    <ul className="max-h-64 overflow-auto text-xs">{review.changes.map((change, index) => <li key={index} className="break-all py-1">
+      <bdi dir="ltr">{change.effect}: {change.before && change.after && change.before !== change.after ? change.before + " → " + change.after : change.after ?? change.before}</bdi>
+    </li>)}</ul>
+    {(review.changes_not_listed > 0 || review.operations_not_listed > 0) && <p className="text-xs">{review.changes_not_listed} {t("changes and")} {review.operations_not_listed} {t("operations omitted from this overview.")}</p>}
+    <Button variant="secondary" disabled={disabled || Boolean(review.unavailable)}
+      onClick={() => send({ type: "review-files", id: project, bundle: review.bundle, target: review.target })}>{t("Inspect saved result")}</Button>
+    <p className="text-xs text-muted-foreground">{t("This request stays on its saved version while work continues. Change author unknown. Approval and main-version integration are not available here yet.")}</p>
   </section>;
 }

@@ -243,3 +243,36 @@ test('native event and periodic fallback status are localized and absent for sto
     else assert.doesNotMatch(html, /התראות על שינויי קבצים פעילות|שינויים בקבצים נבדקים באופן תקופתי/);
   }
 });
+
+
+test('saved review requests render translated bounds and preserve inert exact identities and paths', async () => {
+  const id = 'a'.repeat(64), target = 'b'.repeat(64), bundle = 'c'.repeat(64);
+  const review = { bundle, target, reviewed_head: 'd'.repeat(64), presentation: 'e'.repeat(64),
+    complete: false, unavailable: null, changes_not_listed: 2, operations_not_listed: 3,
+    changes: [{ before: null, after: '<script>bad</script>.txt', effect: 'added' }] };
+  const projection = { projects: [{ detached: true, recovery: null, id, generation: '1',
+    root: '/Users/משפחה/Files', phase: 'stopped', outcome: 'saved', savedVersion: target, captureAgeMs: null }],
+    histories: { [id]: { versions: [target], nextBefore: null } }, reviewQueues: { [id]: { reviews: [review], notListed: 4 } },
+    selectedReviews: { [id]: review }, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved',
+    pinError: '', busy: false, error: '', available: true };
+  const ui = await loadLocalization(projection);
+  ui.setLocale('he');
+  const html = ui.renderAttachments();
+  for (const label of ['Show review requests', 'Request review', 'Saved review requests', 'Selected saved review',
+    'Review request recorded', 'This overview is incomplete; it cannot stand in for complete review.', 'Inspect saved result']) {
+    assert.notEqual(ui.translate('he', label), label);
+    assert.ok(html.includes(ui.translate('he', label)), label);
+  }
+  assert.ok(html.includes('<bdi dir="ltr">' + bundle + '</bdi>'));
+  assert.ok(html.includes('<bdi dir="ltr">added: &lt;script&gt;bad&lt;/script&gt;.txt</bdi>'));
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /2 שינויים ועוד 3 פעולות הושמטו/);
+  assert.match(html, /4 בקשות נוספות/);
+  assert.doesNotMatch(html, /Saved content verified for this request/);
+  ui.setLocale('en');
+  assert.match(ui.renderAttachments(), /Review request recorded/);
+  const unavailable = await loadLocalization({ ...projection, selectedReviews: { [id]: { ...review, unavailable: 'missing-content', presentation: null } } });
+  const missing = unavailable.renderAttachments();
+  assert.match(missing, /Review content is unavailable; the request is retained/);
+  assert.match(missing, /<button[^>]*disabled=""[^>]*>Inspect saved result<\/button>/);
+});

@@ -2622,6 +2622,12 @@ impl OpenWorkspace {
         })
     }
 
+    /// Read one durable review independently of the bounded overview page.
+    pub(crate) fn recorded_review_item(&self, bundle: RecordDigest) -> Option<crate::ipc::Json> {
+        self.review(&bundle)
+            .map(|review| self.review_item(bundle, review, true))
+    }
+
     fn review_item(
         &self,
         bundle: RecordDigest,

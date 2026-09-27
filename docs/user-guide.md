@@ -168,3 +168,16 @@ follow the [user playbooks](user-playbooks.md).
 
 For known limitations or to verify whether a capability has landed since this guide was updated,
 check [Project status](project-status.md).
+
+## Request review of an attached version (development builds)
+
+In the unmerged review-request increment, open **Show latest versions** and choose **Request review**
+on the saved version you want reviewed. Mesh records an exact request against its accepted main
+(or the empty starting state before the first approval), without changing your working folder.
+Use **Show review requests** and **Open review** to return to it after other edits or a restart.
+**Inspect saved result** opens that request's saved files rather than the newest capture.
+
+The queue shows up to 32 requests and reports omitted requests. A saved-version request can reopen
+its exact current-base request beyond that overview. A selected request remains fixed while capture
+continues. Incomplete or unavailable content is labeled; a path overview alone is not complete review.
+Change authorship remains unknown. Approval and main-version integration are separate pending steps.

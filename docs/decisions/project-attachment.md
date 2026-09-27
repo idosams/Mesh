@@ -563,3 +563,36 @@ review presentation and context, then refuses the stale receipt without appendin
 reorders the pending request after the accepted approvals and checks a contradictory receipt. Tests
 use fixture credentials, not native human presence. This prerequisite is transferred before the
 attached-project review-request UI; that UI and its approval journey remain separate increments.
+
+## Durable review requests from attachment history
+
+An attached saved version can now be requested for local review through the existing native
+publication-review engine. The operation checks exact attachment/store identity and history binding,
+requires the target in that project's saved history, reconstructs its immutable causal closure, and
+appends the existing `ReviewRecord` to the existing journal under the history lock. Acknowledgement
+reopens durable history and requires the exact bundle/target record. Repeating the request, including
+from a different fresh local opener identity, returns the same deterministic bundle without another
+record. Concurrent requests serialize. This changes neither registration nor journal formats.
+
+Review submission is available while capture is stopped or detached and never writes the source
+folder, switches desktop workspace selection, signs approval or advances main. The native opener
+identity records a local request; it does not attribute the observed edits to that person or agent.
+The attachment projection explicitly reports unknown change authorship and no approval authority.
+It omits the core review's capture-actor author field to avoid presenting an observation signer as
+the author of the files.
+
+The desktop can request review from a saved-version page, list up to 32 durable requests with an
+explicit omitted count, select an exact bundle/target, and inspect that target's saved files.
+A direct native lookup resolves any recorded request independently of the overview bound; requesting
+a saved target again also reopens its request. Selected reviews do not follow later capture updates.
+The overview carries the verified presentation identity, at most 128 changed-path summaries,
+omitted-operation/change counts and explicit unavailable/incomplete status. It is not a complete
+review or an approval surface merely because it lists paths.
+
+Tests cover historical requests after newer saves, restart, concurrent/idempotent submissions,
+detached access, cross-target refusal, requests outside the overview cap, replaced-store refusal,
+and renderer routing that cannot substitute newer capture state. The prerequisite review-base fix preserves already-recorded pending reviews across main advances
+and restart. A new request is computed against the current accepted main; reopening an existing
+bundle retains its original base. Attachment approval/integration and packaged graphical proof
+remain unfinished. No broader parallel
+publication or dependency-closure guarantee is claimed by this request-queue step.

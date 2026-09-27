@@ -833,6 +833,42 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn request_attached_review(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        target: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.request_review(&id, &target))
+            .await
+            .map_err(|_| "Review request stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn attached_project_reviews(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.reviews(&id))
+            .await
+            .map_err(|_| "Review listing stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn inspect_attached_review(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        bundle: String,
+        target: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.review(&id, &bundle, &target))
+            .await
+            .map_err(|_| "Review inspection stopped".to_owned())?
+    }
+
+    #[tauri::command]
     async fn load_attachment_pins(host: State<'_, Arc<AttachmentHost>>) -> Result<String, String> {
         let host = Arc::clone(host.inner());
         tauri::async_runtime::spawn_blocking(move || host.load_pins())
@@ -6713,6 +6749,9 @@ mod desktop {
                 attached_project_versions,
                 inspect_attached_version,
                 compare_attached_versions,
+                request_attached_review,
+                attached_project_reviews,
+                inspect_attached_review,
                 load_attachment_pins,
                 save_attachment_pins,
                 compare_attached_path,
