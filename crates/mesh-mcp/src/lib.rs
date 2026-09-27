@@ -1,8 +1,8 @@
 //! A deliberately small MCP bridge to the local Mesh daemon.
 //!
-//! This first production surface is read-only. It exposes the daemon's already-authenticated
-//! `workspace.state` projection and does not claim file reads, changes, checkpoints, publication,
-//! or approval authority.
+//! Default mode exposes the read-only `workspace.state` projection. Native-issued fleet mode
+//! exposes bounded context, child delegation and observation. Neither mode grants approval or
+//! publication authority; fleet credentials never appear in model tool arguments.
 
 use json::Json;
 use std::io::{BufRead, Write};
@@ -23,7 +23,7 @@ const DAEMON_CHUNK_DATA_BYTES: usize = 30_000;
 const DAEMON_WORKSPACE_STATE_REPLY_TIMEOUT: std::time::Duration =
     std::time::Duration::from_secs(5 * 60);
 
-/// The only tool this bounded server publishes.
+/// The read-only tool published in default, unscoped mode.
 pub const WORKSPACE_STATE_TOOL: &str = "mesh_workspace_state";
 
 const SESSION_INSTRUCTIONS: &str = "Call mesh_workspace_state before editing. Work only in the \
@@ -52,6 +52,14 @@ const SUPPORTED_PROTOCOLS: &[&str] = &["2024-11-05", "2025-03-26", "2025-06-18"]
 pub trait WorkspaceStateProvider {
     /// Return the exact JSON object produced by `workspace.state`.
     fn workspace_state(&self) -> Result<Json, String>;
+    /// Whether the native launcher supplied a scoped fleet session.
+    fn fleet_enabled(&self) -> bool {
+        false
+    }
+    /// Execute a bounded fleet action. Credentials are held by the bridge, never tool arguments.
+    fn fleet_call(&self, _action: &str, _arguments: &Json) -> Result<Json, String> {
+        Err("This Mesh bridge has no fleet session".into())
+    }
 }
 
 /// The exact workspace identity an agent session was opened against.
@@ -209,12 +217,19 @@ fn dispatch(
         return None;
     }
     match method {
-        "initialize" => initialize(request, id, initialized),
+        "initialize" => initialize(request, id, initialized, provider.fleet_enabled()),
         "notifications/initialized" => None,
         "ping" if *initialized => Some(rpc_result(id, Json::empty_object())),
         "tools/list" if *initialized => Some(rpc_result(
             id,
-            Json::object([("tools", Json::Array(vec![tool_description()]))]),
+            Json::object([(
+                "tools",
+                Json::Array(if provider.fleet_enabled() {
+                    fleet_tools()
+                } else {
+                    vec![tool_description()]
+                }),
+            )]),
         )),
         "tools/call" if *initialized => call_tool(request, id, provider),
         _ if !*initialized => Some(rpc_error(id, -32002, "server is not initialized")),
@@ -222,7 +237,7 @@ fn dispatch(
     }
 }
 
-fn initialize(request: &Json, id: Json, initialized: &mut bool) -> Option<Json> {
+fn initialize(request: &Json, id: Json, initialized: &mut bool, fleet: bool) -> Option<Json> {
     if *initialized {
         return Some(rpc_error(id, -32600, "server is already initialized"));
     }
@@ -249,7 +264,14 @@ fn initialize(request: &Json, id: Json, initialized: &mut bool) -> Option<Json> 
                     ("version", Json::text(env!("CARGO_PKG_VERSION"))),
                 ]),
             ),
-            ("instructions", Json::text(SESSION_INSTRUCTIONS)),
+            (
+                "instructions",
+                Json::text(if fleet {
+                    FLEET_INSTRUCTIONS
+                } else {
+                    SESSION_INSTRUCTIONS
+                }),
+            ),
         ]),
     ))
 }
@@ -259,6 +281,14 @@ fn call_tool(request: &Json, id: Json, provider: &dyn WorkspaceStateProvider) ->
     let name = params
         .and_then(|params| params.get("name"))
         .and_then(Json::as_text);
+    if provider.fleet_enabled() {
+        return Some(fleet_tool_call(
+            id,
+            name,
+            params.and_then(|p| p.get("arguments")),
+            provider,
+        ));
+    }
     if name != Some(WORKSPACE_STATE_TOOL) {
         return Some(rpc_error(id, -32602, "unknown Mesh tool"));
     }
@@ -294,6 +324,120 @@ fn call_tool(request: &Json, id: Json, provider: &dyn WorkspaceStateProvider) ->
         ]),
     };
     Some(rpc_result(id, result))
+}
+
+const FLEET_INSTRUCTIONS: &str = "Call mesh_fleet_context first. It identifies your exact lane, run and native working folder. Work only there. You can delegate private child lanes from one of your saved workspace_versions with mesh_fleet_delegate, then observe them with mesh_fleet_children. Use a stable request identity when retrying delegation. This session cannot approve shared state, choose output paths, or grant authority to another lane.";
+
+fn fleet_tools() -> Vec<Json> {
+    [
+        (
+            "mesh_fleet_context",
+            "Inspect this agent's bound lane and saved versions",
+            &[][..],
+        ),
+        (
+            "mesh_fleet_children",
+            "Observe this lane's direct children",
+            &[][..],
+        ),
+        (
+            "mesh_fleet_delegate",
+            "Create an isolated child lane from an exact saved version",
+            &["request", "goal", "provider", "version"][..],
+        ),
+    ]
+    .into_iter()
+    .map(|(name, description, fields)| {
+        Json::object([
+            ("name", Json::text(name)),
+            ("description", Json::text(description)),
+            (
+                "inputSchema",
+                Json::object([
+                    ("type", Json::text("object")),
+                    (
+                        "properties",
+                        Json::object(
+                            fields
+                                .iter()
+                                .map(|key| (*key, Json::object([("type", Json::text("string"))]))),
+                        ),
+                    ),
+                    (
+                        "required",
+                        Json::Array(fields.iter().map(|key| Json::text(*key)).collect()),
+                    ),
+                    ("additionalProperties", Json::Bool(false)),
+                ]),
+            ),
+            (
+                "outputSchema",
+                Json::object([("type", Json::text("object"))]),
+            ),
+            (
+                "annotations",
+                Json::object([
+                    ("readOnlyHint", Json::Bool(fields.is_empty())),
+                    ("destructiveHint", Json::Bool(false)),
+                    ("idempotentHint", Json::Bool(true)),
+                    ("openWorldHint", Json::Bool(false)),
+                ]),
+            ),
+        ])
+    })
+    .collect()
+}
+fn fleet_tool_call(
+    id: Json,
+    name: Option<&str>,
+    arguments: Option<&Json>,
+    provider: &dyn WorkspaceStateProvider,
+) -> Json {
+    let (action, expected): (&str, &[&str]) = match name {
+        Some("mesh_fleet_context") => ("context", &[]),
+        Some("mesh_fleet_children") => ("children", &[]),
+        Some("mesh_fleet_delegate") => ("delegate", &["request", "goal", "provider", "version"]),
+        _ => return rpc_error(id, -32602, "unknown Mesh fleet tool"),
+    };
+    let empty = Json::empty_object();
+    let arguments = arguments.unwrap_or(&empty);
+    let Json::Object(fields) = arguments else {
+        return rpc_error(id, -32602, "invalid fleet arguments");
+    };
+    if fields.len() != expected.len()
+        || fields
+            .iter()
+            .any(|(key, value)| !expected.contains(&key.as_str()) || value.as_text().is_none())
+    {
+        return rpc_error(id, -32602, "invalid fleet arguments");
+    }
+    let result = match provider.fleet_call(action, arguments) {
+        Ok(value) => Json::object([
+            (
+                "content",
+                Json::Array(vec![Json::object([
+                    ("type", Json::text("text")),
+                    (
+                        "text",
+                        Json::text("Mesh verified this fleet action within your lane session."),
+                    ),
+                ])]),
+            ),
+            ("structuredContent", value),
+            ("isError", Json::Bool(false)),
+        ]),
+        Err(problem) => Json::object([
+            (
+                "content",
+                Json::Array(vec![Json::object([
+                    ("type", Json::text("text")),
+                    ("text", Json::text(problem)),
+                ])]),
+            ),
+            ("isError", Json::Bool(true)),
+        ]),
+    };
+    rpc_result(id, result)
 }
 
 fn tool_description() -> Json {
@@ -364,19 +508,58 @@ fn response_bound_error() -> String {
 }
 
 /// A provider that reconnects to the local Mesh daemon for every tool call.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DaemonWorkspaceState {
     endpoint: PathBuf,
     expected: Option<ExpectedWorkspace>,
+    fleet: Option<FleetSession>,
+}
+
+#[derive(Clone)]
+struct FleetSession {
+    objective: String,
+    credential: String,
+}
+impl std::fmt::Debug for DaemonWorkspaceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DaemonWorkspaceState")
+            .field("endpoint", &self.endpoint)
+            .field("expected", &self.expected)
+            .field("fleet_session", &self.fleet.is_some())
+            .finish()
+    }
 }
 
 impl DaemonWorkspaceState {
+    /// Construct a scoped bridge using native launcher configuration, never model tool arguments.
+    pub fn fleet(endpoint: PathBuf, objective: String, credential: String) -> Result<Self, String> {
+        if objective.is_empty()
+            || objective.len() > 128
+            || !objective
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
+            || credential.len() != 64
+            || !credential.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err("Invalid native fleet session configuration".into());
+        }
+        Ok(Self {
+            endpoint,
+            expected: None,
+            fleet: Some(FleetSession {
+                objective,
+                credential,
+            }),
+        })
+    }
+
     /// Bind the provider to one local Unix socket path.
     #[must_use]
     pub fn new(endpoint: PathBuf) -> Self {
         Self {
             endpoint,
             expected: None,
+            fleet: None,
         }
     }
 
@@ -386,13 +569,19 @@ impl DaemonWorkspaceState {
         Self {
             endpoint,
             expected: Some(expected),
+            fleet: None,
         }
     }
 }
 
 #[cfg(unix)]
-impl WorkspaceStateProvider for DaemonWorkspaceState {
-    fn workspace_state(&self) -> Result<Json, String> {
+impl DaemonWorkspaceState {
+    fn daemon_call(
+        &self,
+        method: &str,
+        params: &Json,
+        minimum_version: u64,
+    ) -> Result<Json, String> {
         use std::io::{BufReader, Read};
         use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
         use std::os::unix::net::UnixStream;
@@ -534,7 +723,7 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
             .try_clone()
             .map_err(|error| format!("could not use the Mesh daemon connection: {error}"))?;
         let mut reader = BufReader::new(stream);
-        writeln!(writer, "{{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2,3,4,5,6,7],\"session\":\"mesh-mcp\"}}")
+        writeln!(writer, "{{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2,3,4,5,6,7,8],\"session\":\"mesh-mcp\"}}")
             .and_then(|()| writer.flush())
             .map_err(|error| format!("could not greet the Mesh daemon: {error}"))?;
         let welcome = read_daemon_message(&mut reader)?;
@@ -547,8 +736,8 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
         let version = welcome
             .get("version")
             .and_then(Json::as_u64)
-            .filter(|version| (2..=7).contains(version))
-            .ok_or("Mesh negotiated no workspace.state-capable IPC version")?;
+            .filter(|version| (minimum_version..=8).contains(version))
+            .ok_or("Mesh negotiated no IPC version supporting the requested tool")?;
         if welcome
             .get("surface_version")
             .and_then(Json::as_u64)
@@ -556,7 +745,14 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
         {
             return Err("Mesh returned an inconsistent IPC surface version".to_owned());
         }
-        writeln!(writer, "{{\"t\":\"call\",\"id\":2,\"method\":\"workspace.state\",\"version\":{version},\"params\":{{}}}}")
+        let call = Json::object([
+            ("t", Json::text("call")),
+            ("id", Json::Number(2)),
+            ("method", Json::text(method)),
+            ("version", Json::Number(version)),
+            ("params", params.clone()),
+        ]);
+        writeln!(writer, "{}", call.encode())
             .and_then(|()| writer.flush())
             .map_err(|error| format!("could not request Mesh workspace state: {error}"))?;
         let answer = read_daemon_message(&mut reader)?;
@@ -572,8 +768,10 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
                     .ok_or_else(|| {
                         "Mesh returned workspace state in an invalid shape".to_owned()
                     })?;
-                if let Some(expected) = &self.expected {
-                    expected.verify(&state)?;
+                if method == "workspace.state" {
+                    if let Some(expected) = &self.expected {
+                        expected.verify(&state)?;
+                    }
                 }
                 Ok(state)
             }
@@ -590,9 +788,46 @@ impl WorkspaceStateProvider for DaemonWorkspaceState {
 }
 
 #[cfg(not(unix))]
+impl DaemonWorkspaceState {
+    fn daemon_call(
+        &self,
+        _method: &str,
+        _params: &Json,
+        _minimum_version: u64,
+    ) -> Result<Json, String> {
+        Err("the alpha Mesh MCP bridge currently requires a Unix local socket".to_owned())
+    }
+}
+
 impl WorkspaceStateProvider for DaemonWorkspaceState {
     fn workspace_state(&self) -> Result<Json, String> {
-        Err("the alpha Mesh MCP bridge currently requires a Unix local socket".to_owned())
+        if self.fleet.is_some() {
+            self.fleet_call("context", &Json::empty_object())?
+                .get("workspace")
+                .cloned()
+                .ok_or_else(|| "Fleet context omitted its workspace".into())
+        } else {
+            self.daemon_call("workspace.state", &Json::empty_object(), 2)
+        }
+    }
+    fn fleet_enabled(&self) -> bool {
+        self.fleet.is_some()
+    }
+    fn fleet_call(&self, action: &str, arguments: &Json) -> Result<Json, String> {
+        let session = self
+            .fleet
+            .as_ref()
+            .ok_or("This Mesh bridge has no fleet session")?;
+        self.daemon_call(
+            "fleet.agent.call",
+            &Json::object([
+                ("objective", Json::text(&session.objective)),
+                ("credential", Json::text(&session.credential)),
+                ("action", Json::text(action)),
+                ("arguments", arguments.clone()),
+            ]),
+            8,
+        )
     }
 }
 

@@ -437,6 +437,12 @@ fn scratch_folder(name: &str) -> PathBuf {
 /// every one rather than stopping at a missing field.
 fn parameters_for(method: &str, folder: &std::path::Path) -> Json {
     match method {
+        "fleet.agent.call" => Json::object([
+            ("objective", Json::text("unconfigured")),
+            ("credential", Json::text("00".repeat(32))),
+            ("action", Json::text("context")),
+            ("arguments", Json::empty_object()),
+        ]),
         "workspace.open" => Json::object([("path", Json::text(folder.display().to_string()))]),
         "review.open" => Json::object([
             ("bundle", Json::text("09".repeat(32))),
@@ -508,7 +514,8 @@ fn a_client_negotiates_and_then_calls_every_catalogue_method() {
                 );
             }
             DaemonMessage::Failed { code, .. }
-                if (entry.name == "review.open" && code == "publication-target-absent")
+                if (entry.name == "fleet.agent.call" && code == "fleet-session-refused")
+                    || (entry.name == "review.open" && code == "publication-target-absent")
                     || (entry.name == "review.open-current"
                         && code == "publication-review-not-computable")
                     || (entry.name == "review.approve" && code == "publication-trust-absent")

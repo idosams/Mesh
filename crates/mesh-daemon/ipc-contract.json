@@ -1,7 +1,7 @@
 {
   "$comment": "The local IPC contract between the Mesh desktop application and the Mesh daemon, published by the daemon because the daemon owns the surface (task 01KZC2NJ6WEZ0ZHP6Z03FJGVF3, `## Scope`). ONE file, read by both implementations, so that neither can drift without a test going red: `crates/mesh-daemon/tests/ipc.rs` checks the Rust side against it and `apps/desktop/src/ipc/contract.test.ts` checks the TypeScript side. `vectors` are exact wire lines: each side decodes one, re-encodes it, and compares BYTE FOR BYTE. That is what makes `deterministic encoding` a measurement rather than a claim. This is NOT the canonical signed encoding of plan §4 — that is CBOR and it lives in `mesh-types`. Nothing on this socket is signed.",
   "protocol": "mesh-ipc",
-  "surface_version": 7,
+  "surface_version": 8,
   "supported_versions": [
     1,
     2,
@@ -9,7 +9,8 @@
     4,
     5,
     6,
-    7
+    7,
+    8
   ],
   "framing": {
     "kind": "newline-delimited-json",
@@ -411,6 +412,11 @@
       "name": "performance.counters",
       "since": 4,
       "summary": "read every live performance counter and its collection conditions"
+    },
+    {
+      "name": "fleet.agent.call",
+      "since": 8,
+      "summary": "inspect or delegate private lanes within a native-issued agent session"
     }
   ],
   "vectors": [

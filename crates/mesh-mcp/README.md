@@ -1,7 +1,7 @@
 # Mesh MCP alpha bridge
 
 `mesh-mcp` lets an agent inspect the workspace currently open in the local Mesh app. It is a
-newline-delimited stdio MCP server with one tool:
+newline-delimited stdio MCP server. Its default, unscoped mode has one read-only tool:
 
 - `mesh_workspace_state` returns the verified `workspace.state` projection, including the native
   working root, durable versions, native untracked files, reviews, and explicit `not_yet` gaps.
@@ -44,3 +44,27 @@ args = ["--endpoint", "/absolute/private/runtime/daemon.sock"]
 
 The socket must be real (not a symlink), inside a real owner-only directory, and owned by the same
 user as that directory. Daemon failures become visible tool errors rather than empty state.
+
+## Scoped fleet integration (development)
+
+A native fleet host can launch this same binary with `MESH_FLEET_OBJECTIVE` and
+`MESH_FLEET_CREDENTIAL` in its private process environment. Both must be present. Do not put the
+credential in a prompt, command-line argument, workspace file or support log. This is a native
+integration surface; the desktop does not yet expose a complete fleet launch journey.
+
+In this mode the bridge advertises three tools:
+
+- `mesh_fleet_context`: the bound objective, actor, session, run, lane and exact workspace.
+- `mesh_fleet_delegate`: allocate a child from one of that lane's saved versions, with a stable
+  request identity, goal and configured provider. Destinations are chosen by native code.
+- `mesh_fleet_children`: observe only that lane's direct children.
+
+The native host checks the current run and exact custody generation on every call. Rotation,
+revocation, cancellation, terminal runs and a service restart invalidate credentials. Repeated
+identical delegation returns the same child; reusing a request for different work fails. Delegated
+lanes retain durable actor/session/run attribution. Tokens never enter the control ledger.
+
+Fleet mode requires IPC surface 8 and refuses an older daemon before sending credentials. Default
+workspace mode remains compatible with earlier supported surfaces. Child allocation is real native
+version reconstruction, but scheduling providers, saving their output, and opening review from this
+MCP surface are subsequent integration work. These tools cannot approve or publish shared state.

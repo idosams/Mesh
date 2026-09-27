@@ -1,5 +1,5 @@
 //! Versioned deterministic command encoding. Unknown fields/versions refuse during replay.
-use super::{Command, Error, Limits, RunState, WorkspaceBinding};
+use super::{AgentOrigin, Command, Error, Limits, RunState, WorkspaceBinding};
 use crate::ipc::Json;
 use mesh_store::RecordDigest;
 
@@ -32,6 +32,27 @@ pub(super) fn encode(command: &Command) -> String {
                 ("goal", Json::text(goal)),
                 ("provider", Json::text(provider)),
                 ("base", Json::text(base.to_string())),
+            ],
+        ),
+        Command::Delegate {
+            id,
+            parent,
+            goal,
+            provider,
+            base,
+            origin,
+        } => (
+            "delegate",
+            vec![
+                ("id", Json::text(id)),
+                ("parent", Json::text(parent)),
+                ("goal", Json::text(goal)),
+                ("provider", Json::text(provider)),
+                ("base", Json::text(base.to_string())),
+                ("actor", Json::text(&origin.actor)),
+                ("session", Json::text(&origin.session)),
+                ("run", Json::text(&origin.run)),
+                ("generation", Json::text(&origin.generation)),
             ],
         ),
         Command::BindWorkspace { lane, binding } => (
@@ -118,6 +139,19 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
             provider: text("provider")?,
             base: digest("base")?,
         },
+        Some("delegate") => Command::Delegate {
+            id: text("id")?,
+            parent: text("parent")?,
+            goal: text("goal")?,
+            provider: text("provider")?,
+            base: digest("base")?,
+            origin: AgentOrigin {
+                actor: text("actor")?,
+                session: text("session")?,
+                run: text("run")?,
+                generation: text("generation")?,
+            },
+        },
         Some("bind-workspace") => Command::BindWorkspace {
             lane: text("lane")?,
             binding: WorkspaceBinding {
@@ -150,7 +184,7 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     }
     Ok(command)
 }
-fn state_word(state: RunState) -> &'static str {
+pub(super) fn state_word(state: RunState) -> &'static str {
     match state {
         RunState::Launching => "launching",
         RunState::Running => "running",

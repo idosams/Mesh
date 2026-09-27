@@ -1925,6 +1925,10 @@ dependencies = [
 [[package]]
 name = "mesh-mcp"
 version = "0.0.0"
+dependencies = [
+ "mesh-daemon",
+ "mesh-store",
+]
 
 [[package]]
 name = "mesh-operations"

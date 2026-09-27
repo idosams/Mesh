@@ -14,3 +14,8 @@ workspace = true
 [[bin]]
 name = "mesh-mcp"
 path = "src/main.rs"
+
+# End-to-end tests run the actual MCP binary against the native fleet host.
+[dev-dependencies]
+mesh-daemon = { path = "../mesh-daemon", version = "=0.0.0" }
+mesh-store = { path = "../mesh-store", version = "=0.0.0" }

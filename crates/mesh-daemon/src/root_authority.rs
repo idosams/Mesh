@@ -209,6 +209,14 @@ impl PinnedWorkspaceRoot {
         Ok((metadata.dev(), metadata.ino()))
     }
 
+    /// Require the caller's admitted parent object before any descendant creation.
+    pub(crate) fn ensure_protected_identity(
+        &self,
+        expected: ProtectedWorkspaceRoot,
+    ) -> io::Result<()> {
+        self.ensure_identity(expected.device, expected.inode)
+    }
+
     /// Force the retained directory entry set to durable storage.
     pub(crate) fn sync(&self) -> io::Result<()> {
         self.directory.sync_all()

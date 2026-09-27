@@ -22,6 +22,8 @@ export type MethodEntry = {
   readonly summary: string;
   /** Whether an interrupted call may be sent again without duplicating an effect. */
   readonly retryAfterDisconnect: boolean;
+  /** Agent bridge transport only; never queue credentials through the desktop client. */
+  readonly agentOnly?: true;
   /** Fail-closed proof for a method whose result has security- or precision-critical structure. */
   readonly validateResult?: (value: WireObject) => void;
 };
@@ -121,6 +123,13 @@ export const METHODS: readonly MethodEntry[] = [
     summary: 'read every live performance counter and its collection conditions',
     retryAfterDisconnect: true,
     validateResult: validateCounterResult,
+  },
+  {
+    name: 'fleet.agent.call',
+    since: 8,
+    summary: 'inspect or delegate private lanes within a native-issued agent session',
+    retryAfterDisconnect: false,
+    agentOnly: true,
   },
 ];
 

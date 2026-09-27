@@ -228,6 +228,10 @@ export class DaemonConnection {
         reject(new WireError('unknown-method', `\`${method}\` is not on the Mesh service surface`));
         return;
       }
+      if (methodEntry(method)?.agentOnly) {
+        reject(new WireError('agent-transport-required', 'This operation requires a native-issued agent session through the agent bridge.'));
+        return;
+      }
       if (this.#state === 'unusable') {
         reject(new WireError(this.#unusableCode, this.#unusableSentence));
         return;

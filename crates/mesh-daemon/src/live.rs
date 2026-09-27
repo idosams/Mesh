@@ -699,6 +699,7 @@ impl TemporaryHistoricalExport {
     fn create_root(
         destination: &Path,
         protected_roots: &[crate::ProtectedWorkspaceRoot],
+        expected_parent: Option<crate::ProtectedWorkspaceRoot>,
     ) -> Result<Self, Unavailable> {
         let destination = if destination.is_absolute() {
             destination.to_path_buf()
@@ -713,6 +714,11 @@ impl TemporaryHistoricalExport {
             .to_path_buf();
         let pinned_parent = PinnedWorkspaceRoot::open(parent.clone())
             .map_err(|_| workspace_version_refusal("workspace-version-destination-invalid"))?;
+        if let Some(expected) = expected_parent {
+            pinned_parent
+                .ensure_protected_identity(expected)
+                .map_err(|_| workspace_version_refusal("workspace-version-parent-changed"))?;
+        }
         for protected in protected_roots {
             if pinned_parent
                 .is_within(*protected)
@@ -760,8 +766,9 @@ impl TemporaryHistoricalExport {
         source: &OpenWorkspace,
         snapshot: &HistoricalWorkspacePreview,
         protected_roots: &[crate::ProtectedWorkspaceRoot],
+        expected_parent: Option<crate::ProtectedWorkspaceRoot>,
     ) -> Result<Self, Unavailable> {
-        let export = Self::create_root(destination, protected_roots)?;
+        let export = Self::create_root(destination, protected_roots, expected_parent)?;
         export.write_streaming(source, snapshot)?;
         Ok(export)
     }
@@ -771,7 +778,7 @@ impl TemporaryHistoricalExport {
         destination: &Path,
         snapshot: &HistoricalWorkspaceSnapshot,
     ) -> Result<Self, Unavailable> {
-        let export = Self::create_root(destination, &[])?;
+        let export = Self::create_root(destination, &[], None)?;
         export.write(snapshot)?;
         Ok(export)
     }
@@ -1430,6 +1437,7 @@ pub struct WorkspaceVersionForkRequest<'a> {
     expected_installation: &'a str,
     origin_target: Option<&'a Path>,
     protected_roots: &'a [crate::ProtectedWorkspaceRoot],
+    expected_destination_parent: Option<crate::ProtectedWorkspaceRoot>,
 }
 
 impl<'a> WorkspaceVersionForkRequest<'a> {
@@ -1451,6 +1459,7 @@ impl<'a> WorkspaceVersionForkRequest<'a> {
             expected_installation,
             origin_target,
             protected_roots: &[],
+            expected_destination_parent: None,
         }
     }
 
@@ -1458,6 +1467,12 @@ impl<'a> WorkspaceVersionForkRequest<'a> {
     #[must_use]
     pub const fn protecting(mut self, roots: &'a [crate::ProtectedWorkspaceRoot]) -> Self {
         self.protected_roots = roots;
+        self
+    }
+    /// Bind creation to an admitted native parent identity, independent of its mutable pathname.
+    #[must_use]
+    pub const fn within_parent(mut self, parent: crate::ProtectedWorkspaceRoot) -> Self {
+        self.expected_destination_parent = Some(parent);
         self
     }
 }
@@ -1599,6 +1614,7 @@ fn local_version_id(workspace: &[u8], object: &[u8], manifest: &[u8], path: &str
 /// A daemon with a real workspace behind it.
 #[derive(Debug)]
 pub struct LiveDaemon {
+    fleet: Mutex<std::collections::BTreeMap<String, Arc<crate::fleet::service::FleetService>>>,
     open: Arc<Mutex<Option<OpenWorkspace>>>,
     feed: Arc<EventFeed>,
     startup: Mutex<StartupSummary>,
@@ -2080,6 +2096,25 @@ fn preserve_legacy_checkpoint_before_index_repair(root: &Path) -> Result<(), Str
 }
 
 impl LiveDaemon {
+    /// Register a native-created fleet host. Agent IPC cannot install or replace hosts.
+    pub fn register_fleet(
+        &self,
+        service: Arc<crate::fleet::service::FleetService>,
+    ) -> Result<(), Unavailable> {
+        let objective = service.objective()?;
+        let mut hosts = self.fleet.lock().map_err(|_| {
+            Unavailable::new("fleet-host-needs-recovery", "Fleet routing needs recovery.")
+        })?;
+        if hosts.contains_key(&objective) || hosts.len() >= 16 {
+            return Err(Unavailable::new(
+                "fleet-host-registration-refused",
+                "This fleet is already registered or the host limit was reached.",
+            ));
+        }
+        hosts.insert(objective, service);
+        Ok(())
+    }
+
     fn lock_current_managed_workspace_mutation(
         &self,
     ) -> Result<ManagedWorkspaceMutationAuthority<'_>, ManagedTextFileError> {
@@ -2194,6 +2229,7 @@ impl LiveDaemon {
         checkpoint: LiveCheckpointRuntime,
     ) -> Self {
         let daemon = Self {
+            fleet: Mutex::new(std::collections::BTreeMap::new()),
             open: Arc::new(Mutex::new(None)),
             feed: Arc::new(EventFeed::new()),
             startup: Mutex::new(startup),
@@ -8186,6 +8222,7 @@ impl LiveDaemon {
             expected_installation,
             origin_target,
             protected_roots,
+            expected_destination_parent,
         } = request;
         let operation = RecordDigest::parse_hex(operation)
             .map_err(|_| workspace_version_refusal("workspace-version-invalid"))?;
@@ -8281,14 +8318,16 @@ impl LiveDaemon {
                 open,
                 &snapshot,
                 protected_roots,
+                expected_destination_parent,
             )?;
             (snapshot, source_ordinal, inherited_origin, export)
         };
 
-        let prepared = crate::PreparedFolderImport::prepare_presented_outside(
+        let prepared = crate::PreparedFolderImport::prepare_presented_with_parent(
             export.path(),
             Path::new(destination),
             protected_roots,
+            expected_destination_parent,
         )
         .map_err(|error| match error {
             crate::FolderImportError::DestinationInsideProtectedRoot { .. } => Unavailable::new(
@@ -8816,6 +8855,27 @@ impl LiveDaemon {
 }
 
 impl Operations for LiveDaemon {
+    fn fleet_agent_call(
+        &self,
+        objective: &str,
+        credential: &str,
+        action: &str,
+        arguments: &crate::ipc::Json,
+    ) -> Result<crate::ipc::Json, Unavailable> {
+        let service = self
+            .fleet
+            .lock()
+            .map_err(|_| {
+                Unavailable::new("fleet-host-needs-recovery", "Fleet routing needs recovery.")
+            })?
+            .get(objective)
+            .cloned()
+            .ok_or_else(|| {
+                Unavailable::new("fleet-session-refused", "The fleet session is unavailable.")
+            })?;
+        service.agent_call(credential, action, arguments)
+    }
+
     fn serving(&self) -> bool {
         // The daemon serves whether or not a workspace is open: a person whose workspace is
         // damaged needs the surface that can tell them so to still be answering.

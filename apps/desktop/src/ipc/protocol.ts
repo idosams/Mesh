@@ -22,7 +22,7 @@
 export const PROTOCOL = 'mesh-ipc';
 
 /** Every surface version this client can speak, newest last. */
-export const CLIENT_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+export const CLIENT_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /** The largest line either end will accept, newline included. */
 export const MAX_LINE_BYTES = 65536;

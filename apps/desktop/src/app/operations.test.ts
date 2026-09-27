@@ -1,9 +1,9 @@
 // "Every UI operation maps to a versioned IPC call."
 //
 // Checked in both directions, because one direction alone leaves half the sentence untested: an
-// operation with no method is an interface offering something that cannot happen, and a method
-// with no operation is a surface wider than the interface needs, which is the shape a plausible
-// stub takes.
+// operation with no method is an interface offering something that cannot happen. Every desktop
+// method needs an operation. Agent-only methods must instead be refused by this client; the real
+// native MCP process integration tests exercise their dedicated transport.
 
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
@@ -43,11 +43,24 @@ describe('the operation catalogue', () => {
     }
   });
 
-  it('reaches every method on the surface, so nothing sits there unused', () => {
+  it('reaches every desktop method and exposes no agent credential transport', () => {
     const called = new Set(UI_OPERATIONS.map((operation) => operation.method));
     for (const entry of METHODS) {
+      if (entry.agentOnly) {
+        assert.equal(called.has(entry.name), false, 'agent transport must not become a UI operation');
+        continue;
+      }
       assert.ok(called.has(entry.name), `no operation calls \`${entry.name}\``);
     }
+  });
+
+  it('refuses the exact agent-only surface before queuing or opening a connection', async () => {
+    const agentMethods = METHODS.filter((entry) => entry.agentOnly).map((entry) => entry.name);
+    assert.deepEqual(agentMethods, ['fleet.agent.call']);
+    const connection = new DaemonConnection({ endpoint: '/nowhere/daemon.sock', session: 'desktop-01' });
+    await assert.rejects(connection.call('fleet.agent.call', { credential: 'must-not-be-queued' }),
+      (error: unknown) => error instanceof Error && 'code' in error && error.code === 'agent-transport-required');
+    assert.equal(connection.state, 'idle');
   });
 
   it('has unique identifiers', () => {

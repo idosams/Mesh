@@ -1,4 +1,4 @@
-//! The local stdio entry point for the read-only Mesh MCP bridge.
+//! Local stdio entry point for default workspace inspection or native-scoped fleet tools.
 
 use mesh_mcp::{serve, DaemonWorkspaceState};
 use std::env;
@@ -29,7 +29,19 @@ fn run() -> Result<(), String> {
     }
     let environment: Vec<(String, String)> = env::vars().collect();
     let endpoint = endpoint_from(&args, &environment)?;
-    let provider = DaemonWorkspaceState::new(endpoint);
+    let objective = env::var("MESH_FLEET_OBJECTIVE").ok();
+    let credential = env::var("MESH_FLEET_CREDENTIAL").ok();
+    let provider = match (objective, credential) {
+        (Some(objective), Some(credential)) => {
+            DaemonWorkspaceState::fleet(endpoint, objective, credential)?
+        }
+        (None, None) => DaemonWorkspaceState::new(endpoint),
+        _ => {
+            return Err(
+                "The native fleet objective and credential must be supplied together".into(),
+            )
+        }
+    };
     serve(
         BufReader::new(io::stdin().lock()),
         io::stdout().lock(),

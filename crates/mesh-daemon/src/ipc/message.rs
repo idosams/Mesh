@@ -37,12 +37,13 @@ pub const PROTOCOL: &str = "mesh-ipc";
 /// Version 6 adds daemon-computed first-publication reviews with no caller-supplied bundle ID.
 /// Version 7 adds bounded multi-frame replies while retaining the per-line denial-of-service
 /// bound.
+/// Version 8 adds scoped fleet agent calls; it does not broaden ordinary IPC session authority.
 /// Older clients never negotiate the newer calls, and every earlier method keeps its existing
 /// meaning.
-pub const SURFACE_VERSION: u32 = 7;
+pub const SURFACE_VERSION: u32 = 8;
 
 /// Every surface version this daemon can still speak, newest last.
-pub const SUPPORTED_VERSIONS: &[u32] = &[1, 2, 3, 4, 5, 6, 7];
+pub const SUPPORTED_VERSIONS: &[u32] = &[1, 2, 3, 4, 5, 6, 7, 8];
 
 /// The largest line the reader will accept, newline included.
 pub const MAX_LINE_BYTES: usize = 65_536;

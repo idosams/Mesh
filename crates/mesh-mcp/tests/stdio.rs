@@ -47,7 +47,7 @@ fn fake_daemon(socket: &Path) -> thread::JoinHandle<()> {
         reader.read_line(&mut line).expect("read hello");
         assert_eq!(
             line,
-            "{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2,3,4,5,6,7],\"session\":\"mesh-mcp\"}\n"
+            "{\"t\":\"hello\",\"id\":1,\"protocol\":\"mesh-ipc\",\"versions\":[1,2,3,4,5,6,7,8],\"session\":\"mesh-mcp\"}\n"
         );
         writer
             .write_all(b"{\"t\":\"welcome\",\"id\":1,\"version\":7,\"session\":\"mesh-mcp\",\"resumed\":false,\"surface_version\":7}\n")
@@ -142,4 +142,36 @@ fn endpoint_symlink_is_refused_before_connect() {
         .workspace_state()
         .expect_err("symlink must be rejected");
     assert!(problem.contains("real Unix socket"), "{problem}");
+}
+
+#[test]
+fn fleet_session_refuses_an_older_daemon_before_sending_its_credential() {
+    let scratch = Scratch::new("fleet-old");
+    let socket = scratch.0.join("daemon.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let daemon = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut writer = stream;
+        let mut hello = String::new();
+        reader.read_line(&mut hello).unwrap();
+        assert!(!hello.contains("credential"));
+        writer.write_all(b"{\"t\":\"welcome\",\"id\":1,\"version\":7,\"session\":\"mesh-mcp\",\"resumed\":false,\"surface_version\":7}\n").unwrap();
+        let mut next = String::new();
+        assert_eq!(
+            reader.read_line(&mut next).unwrap(),
+            0,
+            "no fleet command may be sent after a downgrade"
+        );
+    });
+    let token = "ab".repeat(32);
+    let provider = DaemonWorkspaceState::fleet(socket, "objective".into(), token.clone()).unwrap();
+    assert!(!format!("{provider:?}").contains(&token));
+    assert!(provider
+        .fleet_call("context", &Json::empty_object())
+        .is_err());
+    daemon.join().unwrap();
 }

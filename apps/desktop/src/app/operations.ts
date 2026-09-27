@@ -7,9 +7,9 @@
 //
 //  - every operation here names a method in `src/ipc/methods.ts` at a version that method exists
 //    at — so nothing the interface offers is unimplemented;
-//  - every method in that catalogue is reached by at least one operation here — so the surface is
-//    no wider than the interface needs it to be, and a method nobody calls cannot sit there
-//    looking supported.
+//  - every desktop method in that catalogue is reached by at least one operation here;
+//  - agent-only transport is absent from UI operations and refused by the desktop connection.
+//    Its dedicated native MCP transport is covered by process integration tests.
 //
 // # There is no second path
 //

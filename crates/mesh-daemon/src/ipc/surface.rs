@@ -140,6 +140,11 @@ pub const METHODS: &[Method] = &[
         since: 4,
         summary: "read every live performance counter and its collection conditions",
     },
+    Method {
+        name: "fleet.agent.call",
+        since: 8,
+        summary: "inspect or delegate private lanes within a native-issued agent session",
+    },
 ];
 
 /// The catalogue entry for `name`, when there is one.
@@ -170,6 +175,21 @@ pub fn negotiate(client_versions: &[u32]) -> Option<u32> {
 /// on. It does not answer zero, and it does not answer an empty list, because both of those read
 /// like a workspace that happens to be empty.
 pub trait Operations: Send + Sync {
+    /// Scoped fleet tools. Ordinary IPC session names do not confer fleet authority.
+    fn fleet_agent_call(
+        &self,
+        objective: &str,
+        credential: &str,
+        action: &str,
+        arguments: &Json,
+    ) -> Result<Json, Unavailable> {
+        let _ = (objective, credential, action, arguments);
+        Err(Unavailable::new(
+            "fleet-not-served",
+            "This service has no fleet host.",
+        ))
+    }
+
     /// Whether the daemon is serving requests at all.
     fn serving(&self) -> bool;
 
@@ -1051,6 +1071,24 @@ impl Conversation {
                     Err(unavailable) => unavailable.as_failure(id),
                 }
             }
+            "fleet.agent.call" => {
+                let Some(objective) = params.get("objective").and_then(Json::as_text) else {
+                    return required(id, "fleet-objective-required");
+                };
+                let Some(credential) = params.get("credential").and_then(Json::as_text) else {
+                    return required(id, "fleet-credential-required");
+                };
+                let Some(action) = params.get("action").and_then(Json::as_text) else {
+                    return required(id, "fleet-action-required");
+                };
+                let Some(arguments) = params.get("arguments") else {
+                    return required(id, "fleet-arguments-required");
+                };
+                match operations.fleet_agent_call(objective, credential, action, arguments) {
+                    Ok(value) => DaemonMessage::Result { id, value },
+                    Err(unavailable) => unavailable.as_failure(id),
+                }
+            }
             "workspace.version.fork" => {
                 let Some(operation) = params.get("operation").and_then(Json::as_text) else {
                     return required(id, "workspace-version-required");
@@ -1296,7 +1334,9 @@ mod tests {
         assert_eq!(negotiate(&[1, 2]), Some(2));
         assert_eq!(negotiate(&[1, 2, 3]), Some(3));
         assert_eq!(negotiate(&[3, 4]), Some(4));
-        assert_eq!(negotiate(&[7, 8]), Some(7), "never a version we lack");
+        assert_eq!(negotiate(&[7, 8]), Some(8));
+        assert_eq!(negotiate(&[8, 9]), Some(8), "never a version we lack");
+        assert_eq!(negotiate(&[9]), None);
         assert_eq!(negotiate(&[5]), Some(5));
         assert_eq!(negotiate(&[]), None);
     }

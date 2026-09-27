@@ -41,3 +41,26 @@ independent service context, so UI navigation cannot redirect an agent.
 Explicit pinned private dependencies require a charter amendment and dependency-aware review before
 exposure. Agents never acquire protected shared-state advancement authority. Ordinary folder
 isolation must not be described as an OS process sandbox.
+
+## Local agent session boundary
+
+The native host issues random 256-bit bearer credentials for one objective/lane/run/actor/session.
+Only a digest is retained in the in-memory grant registry. Raw credentials are passed to the MCP
+bridge through native process configuration, never model tool arguments, command-line flags,
+control events or Debug output. IPC session names remain correlation hints, not authorization.
+
+Every call checks current run status and workspace custody generation. Accepting delegation holds
+the exact native custody guard while committing the attributed command; subsequent folder creation
+completes that accepted operation. Replay rechecks that the parent run was active at acceptance.
+The new `delegate` command retains actor/session/run/generation attribution and no secret. It is an
+additive event kind under the existing envelope; older decoders refuse it instead of ignoring it.
+
+IPC surface 8 adds `fleet.agent.call` without changing older methods. Unscoped MCP retains its
+read-only behavior. Scoped MCP refuses version downgrade before sending a credential. Tokens expire
+on service restart; native process/custody reconciliation must precede future reauthorization.
+Credential revocation alone does not assert process termination or release native custody.
+
+Allocation uses service-generated identities and descriptor-pinned parent creation. Both temporary
+export and final import verify the admitted parent object before writing. An occupied reservation
+or ambiguous allocation is preserved and reported for recovery, never deleted or silently reused.
+This does not claim operating-system isolation from every other process owned by the same user.

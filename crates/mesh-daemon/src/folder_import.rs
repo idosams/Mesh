@@ -403,7 +403,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, &[])
+        Self::prepare_presented_inner(source, storage_root, false, &[], None)
     }
 
     /// Copy into a new presented store only when its pinned parent remains outside every exact
@@ -413,7 +413,7 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, protected)
+        Self::prepare_presented_inner(source, storage_root, false, protected, None)
     }
 
     /// Copy only the user content of an exact zero-history workspace into a presented folder.
@@ -421,7 +421,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, &[])
+        Self::prepare_presented_inner(source, storage_root, true, &[], None)
     }
 
     /// Copy an admitted zero-history workspace while keeping the new store outside every exact
@@ -431,7 +431,17 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, protected)
+        Self::prepare_presented_inner(source, storage_root, true, protected, None)
+    }
+
+    /// Require the native caller's retained destination parent before creating any entry.
+    pub(crate) fn prepare_presented_with_parent(
+        source: &Path,
+        storage_root: &Path,
+        protected: &[ProtectedWorkspaceRoot],
+        expected_parent: Option<ProtectedWorkspaceRoot>,
+    ) -> Result<Self, FolderImportError> {
+        Self::prepare_presented_inner(source, storage_root, false, protected, expected_parent)
     }
 
     fn prepare_presented_inner(
@@ -439,6 +449,7 @@ impl PreparedFolderImport {
         storage_root: &Path,
         source_private_fence: bool,
         protected: &[ProtectedWorkspaceRoot],
+        expected_parent: Option<ProtectedWorkspaceRoot>,
     ) -> Result<Self, FolderImportError> {
         let source = validated_source(source)?;
         let storage_root = absolute_destination(storage_root)?;
@@ -450,6 +461,13 @@ impl PreparedFolderImport {
             .to_path_buf();
         let pinned_parent = PinnedWorkspaceRoot::open(parent.clone())
             .map_err(|error| FolderImportError::io("pin destination parent", &parent, error))?;
+        if let Some(expected) = expected_parent {
+            pinned_parent
+                .ensure_protected_identity(expected)
+                .map_err(|error| {
+                    FolderImportError::io("verify admitted destination parent", &parent, error)
+                })?;
+        }
         if protected
             .iter()
             .copied()

@@ -50,6 +50,24 @@ impl LaneWorkspace {
         reviewers: TrustedReviewers,
         checkpoint: CheckpointRuntimeParameters,
     ) -> Result<Self, Unavailable> {
+        Self::fork_inner(
+            input,
+            destination,
+            protected_roots,
+            reviewers,
+            checkpoint,
+            None,
+        )
+    }
+
+    pub(super) fn fork_inner(
+        input: &VersionInput,
+        destination: &Path,
+        protected_roots: &[crate::ProtectedWorkspaceRoot],
+        reviewers: TrustedReviewers,
+        checkpoint: CheckpointRuntimeParameters,
+        parent: Option<crate::ProtectedWorkspaceRoot>,
+    ) -> Result<Self, Unavailable> {
         let daemon = Arc::new(
             LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
                 StartupSummary::from(&nothing_to_recover()),
@@ -88,6 +106,11 @@ impl LaneWorkspace {
             None,
         )
         .protecting(protected_roots);
+        let request = if let Some(parent) = parent {
+            request.within_parent(parent)
+        } else {
+            request
+        };
         let receipt = daemon.fork_workspace_version_protected(request)?;
         let state = daemon.workspace_state()?;
         let binding = super::WorkspaceBinding {

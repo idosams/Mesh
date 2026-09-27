@@ -4,6 +4,9 @@ Canonical fleet migration F01 adds the native durable objective/lane/run control
 SQLite event ledger with transactional retries and revision checks, and isolated lane allocation
 from exact saved versions. This is a library foundation: scoped agent tools, providers, attachment,
 live fleet UI and the complete acceptance journeys remain pending migration and verification.
+F02 adds native-issued, revocable agent sessions and MCP context, child observation and delegation.
+Agents can request child lanes from their own saved versions; native code chooses and pins destinations.
+Provider scheduling, output capture and complete desktop fleet journeys remain pending.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

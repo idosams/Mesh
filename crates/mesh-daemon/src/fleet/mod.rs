@@ -4,6 +4,8 @@
 //! must authenticate/authorize commands and verify versions before admitting them here. External
 //! process effects happen only after dispatch intent commits, and uncertain runs retain their slot.
 
+#[cfg(unix)]
+pub mod service;
 mod wire;
 #[cfg(unix)]
 pub mod workspace;
@@ -84,6 +86,19 @@ impl WorkspaceBinding {
     }
 }
 
+/// Durable attribution for one accepted agent delegation; contains no credential.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentOrigin {
+    /// Native-issued actor identity.
+    pub actor: String,
+    /// Native-issued session identity.
+    pub session: String,
+    /// Exact parent run that accepted the work.
+    pub run: String,
+    /// Native workspace custody generation at acceptance.
+    pub generation: String,
+}
+
 /// Persistent work stream, surviving replacement of an agent process.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lane {
@@ -91,6 +106,8 @@ pub struct Lane {
     pub id: String,
     /// Optional parent lane.
     pub parent: Option<String>,
+    /// Agent identity responsible for delegation, absent for native-created root lanes.
+    pub created_by: Option<AgentOrigin>,
     /// Work requested of this lane.
     pub goal: String,
     /// Configured adapter identity.
@@ -144,6 +161,21 @@ pub enum Command {
         provider: String,
         /// Exact immutable input version.
         base: RecordDigest,
+    },
+    /// Delegate from a current parent run, retaining exact actor/session attribution.
+    Delegate {
+        /// New lane identity.
+        id: String,
+        /// Parent lane whose authority was checked.
+        parent: String,
+        /// Work requested from the child.
+        goal: String,
+        /// Native-authorized provider.
+        provider: String,
+        /// Exact saved input version.
+        base: RecordDigest,
+        /// Native-issued session provenance.
+        origin: AgentOrigin,
     },
     /// Bind native allocation after verifying its receipt; no worker may start before this commits.
     BindWorkspace {
@@ -223,6 +255,23 @@ impl Runtime {
         };
         runtime.refresh()?;
         Ok(runtime)
+    }
+
+    /// Objective identity for native session scoping.
+    pub fn objective(&self) -> &str {
+        &self.objective
+    }
+
+    /// Native orchestration helper: recover an identical command or submit at the latest revision.
+    /// A competing writer still causes a typed stale-revision refusal.
+    pub fn record(&mut self, request: &str, command: Command) -> Result<FleetEvent, Error> {
+        self.refresh()?;
+        let expected = self
+            .store
+            .request(&self.objective, request)?
+            .map(|event| event.revision - 1)
+            .unwrap_or(self.state.revision);
+        self.submit(expected, request, command)
     }
 
     /// Current projection. Refresh before making a decision if another service can write.
@@ -347,6 +396,7 @@ impl State {
                     Lane {
                         id: id.clone(),
                         parent: parent.clone(),
+                        created_by: None,
                         goal: goal.clone(),
                         provider: provider.clone(),
                         base: *base,
@@ -356,6 +406,46 @@ impl State {
                         saved: None,
                     },
                 );
+            }
+            Command::Delegate {
+                id,
+                parent,
+                goal,
+                provider,
+                base,
+                origin,
+            } => {
+                id_valid(&origin.actor)?;
+                id_valid(&origin.session)?;
+                if origin.generation.len() != 32
+                    || !origin.generation.bytes().all(|b| b.is_ascii_hexdigit())
+                {
+                    return refuse("invalid-agent-generation");
+                }
+                let run = self
+                    .lanes
+                    .get(parent)
+                    .and_then(|lane| lane.runs.last())
+                    .ok_or(Error::Refused("parent-run-missing"))?;
+                if run.id != origin.run
+                    || !matches!(
+                        run.state,
+                        RunState::Launching | RunState::Running | RunState::Waiting
+                    )
+                {
+                    return refuse("parent-run-not-active");
+                }
+                self.apply(&Command::CreateLane {
+                    id: id.clone(),
+                    parent: Some(parent.clone()),
+                    goal: goal.clone(),
+                    provider: provider.clone(),
+                    base: *base,
+                })?;
+                self.lanes
+                    .get_mut(id)
+                    .ok_or(Error::InvalidHistory)?
+                    .created_by = Some(origin.clone());
             }
             Command::BindWorkspace { lane, binding } => {
                 for value in [&binding.root, &binding.digest, &binding.installation] {

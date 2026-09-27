@@ -198,3 +198,39 @@ fn missing_source_is_not_recreated_as_an_empty_workspace() {
     assert!(fork(&input, &fixture.0.join("child.mesh")).is_err());
     assert!(!missing.exists());
 }
+
+#[test]
+fn replaced_allocation_parent_is_refused_before_writing_into_the_replacement() {
+    let fixture = Fixture::new("parent-replaced");
+    let (daemon, input) = fixture.source();
+    let parent = fixture.0.join("allocation");
+    fs::create_dir(&parent).unwrap();
+    let identity = mesh_daemon::ProtectedWorkspaceRoot::inspect(&parent).unwrap();
+    fs::rename(&parent, fixture.0.join("preserved-allocation")).unwrap();
+    fs::create_dir(&parent).unwrap();
+    let destination = parent.join("child.mesh");
+    let version = input.version.to_string();
+    let request = mesh_daemon::WorkspaceVersionForkRequest::new(
+        &version,
+        destination.to_str().unwrap(),
+        &input.root,
+        &input.digest,
+        &input.installation,
+        None,
+    )
+    .within_parent(identity);
+    assert_eq!(
+        daemon
+            .fork_workspace_version_protected(request)
+            .unwrap_err()
+            .code,
+        "workspace-version-parent-changed"
+    );
+    assert_eq!(fs::read_dir(&parent).unwrap().count(), 0);
+    assert_eq!(
+        fs::read_dir(fixture.0.join("preserved-allocation"))
+            .unwrap()
+            .count(),
+        0
+    );
+}
