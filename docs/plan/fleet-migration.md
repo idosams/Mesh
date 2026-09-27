@@ -159,8 +159,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A07 | `f99295541624f312172947ec75458dd6ae01bcb3` | Wake attached project capture from native macOS filesystem events | A07b: [PR #29](https://github.com/idosams/Mesh/pull/29), native filesystem-event wakeups with periodic fallback and localized status; replacement `c80c9fab57a19f10589bdb8bd9cf6cbdebb5f9e4`, stacked on #28; full local gate passed (3,141 Rust, 576 desktop, 44 daemon checks) and packaged event capture passed; initial post-sign identity-check failure retained; all seven hosted checks passed at `052e0d24254ce7066b433997c2c50c524e4640d4` in run 36352654983, not merged |
 | A08 | `e320c5c928ad01af204570566f546daf8a76a045` | Record exact review requests from attached project history | A08a: [PR #31](https://github.com/idosams/Mesh/pull/31), native durable requests, exact desktop reopen and localized saved-result inspection; implementation `129966e4d669ee969fa80312baabc814e3f02442`; includes the directory-lock prerequisite from `60b9234ee123d242980f472a2558766f0b62659f`; stacked on #30; corrected full gate passed (3,146 Rust tests, 13 skipped; 580 desktop tests; 44 daemon checks); all seven hosted checks passed at `2f0e92c49a86f659995a0e526766eec020de4de7` in run 36354651857, not merged |
 | A08 | `0823850023496505f3c45074ea972c2b36c1dbc0` | Preserve pending review bases as shared main advances | A08 prerequisite: [PR #30](https://github.com/idosams/Mesh/pull/30), replacement `9b17bf50e10f4c972dd3dae371bb691c26913c6b`, transferred before review-request admission to preserve immutable pending reviews; stacked on #29; full local gate passed (3,142 Rust tests, 13 skipped; 576 desktop tests; 44 daemon checks), all seven hosted checks passed at `a054186c4ee0828239dfa247de420507077c3b10` in run 36353559670, not merged |
-| A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | A08b: [PR #32](https://github.com/idosams/Mesh/pull/32), replacement `893dca74c13f919036397dc7cf2af6baff88c667`, remaining native exact-approval implementation transferred on #31; full gate passed (3,150 native tests, 13 skips; 580 desktop tests; 44 daemon checks); hosted CI pending, not merged. Directory-lock prerequisite already delivered with A08a (#31), not reapplied; desktop approval controls remain a separate increment |
-| A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: native confirmation, verified main inspection and localized controls transferred on #32; validation and PR publication pending, not merged |
+| A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | A08b: [PR #32](https://github.com/idosams/Mesh/pull/32), replacement `893dca74c13f919036397dc7cf2af6baff88c667`, remaining native exact-approval implementation transferred on #31; full gate passed (3,150 native tests, 13 skips; 580 desktop tests; 44 daemon checks); all seven hosted checks passed at `f58b2107fd3da5667c816d11a701de559d560fe9` in run 36355574791, not merged. Directory-lock prerequisite already delivered with A08a (#31), not reapplied; desktop approval controls remain a separate increment |
+| A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: replacement `68ab496a804204111b3087ee7c7fc9a1640adb55`, native confirmation, verified main inspection and localized controls on #32; full gate passed (3,151 native tests, one passed with a lingering-handle flag, 13 skips; 587 desktop tests; 44 daemon checks); PR publication pending, not merged |
 | A09 | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | Pending transfer |
 | A09 | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | Pending transfer |
 | A09 | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Pending transfer |
@@ -260,3 +260,22 @@ approval run and full gate had no such flag. Preserve the original focused log. 
 challenge-reuse guard caused the test to fail journal preservation before append; the implementation
 was restored byte-for-byte. A different approval ceremony also refuses retry without changing history.
 These fixture-credential tests do not prove native human presence or packaged graphical acceptance.
+
+## A08c validation and remaining acceptance
+
+The desktop confirmation increment passed its full canonical gate at
+`68ab496a804204111b3087ee7c7fc9a1640adb55`: 3,151 native tests, 587 desktop tests and 44 real-daemon
+checks; 13 platform/provider tests were skipped. The runner flagged the passing detachment/restart
+case for a lingering handle. Its unchanged focused recheck passed in 2.081s with no such flag;
+the full-run caveat remains retained.
+Five focused native approval tests, 28 coordinator tests and 107 UI tests passed. The new rendered
+approval-state test fails against the unchanged parent and passes with the localized controls.
+
+A read-only host check found zero valid code-signing identities. Actual Secure Enclave presence
+acceptance therefore needs an eligible signed-build environment; the requested choice remains
+pending. Unavailable-build behavior can be verified locally but cannot replace successful real
+approval acceptance. The existing rendered-app verifier also still asserts IPC surface 7 while
+the daemon exposes surface 8 and retains protocol 7 compatibility. Its pinned source assertion
+must be reconciled and an actual packaged run completed before current graphical-proof claims.
+These remain part of the full objective; working-folder integration and the rest of the fleet plan
+are not removed from scope.
