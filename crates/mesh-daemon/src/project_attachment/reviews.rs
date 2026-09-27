@@ -3,6 +3,7 @@ use super::{history::verify_history_binding, invalid, read_receipt, ProjectAttac
 use crate::ipc::Json;
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
+use crate::TrustedReviewers;
 use mesh_store::{RecordDigest, ReviewRecord, StoredRecord};
 use mesh_types::{Blake3, PublicKey};
 use std::io;
@@ -73,10 +74,11 @@ fn summary(item: Json) -> io::Result<Json> {
     ]))
 }
 impl ProjectAttachment {
-    fn with_review_history<T>(
+    pub(super) fn with_review_history<T>(
         &self,
         metadata: &Path,
         store: PinnedWorkspaceRoot,
+        trusted: &TrustedReviewers,
         action: impl FnOnce(&mut OpenWorkspace, &PinnedWorkspaceRoot) -> io::Result<T>,
     ) -> io::Result<T> {
         self.ensure_current()?;
@@ -87,8 +89,13 @@ impl ProjectAttachment {
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
         let (configuration, _) = self.history_configuration(&store, None)?;
-        let mut workspace =
-            OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
+        let mut workspace = OpenWorkspace::open_attachment_store_with_trusted_reviewers(
+            metadata,
+            store.clone(),
+            false,
+            trusted,
+        )
+        .map_err(error)?;
         verify_history_binding(&workspace, &configuration)?;
         let result = action(&mut workspace, &store)?;
         store.ensure_namespace_identity()?;
@@ -102,9 +109,10 @@ impl ProjectAttachment {
         store: PinnedWorkspaceRoot,
         target: &str,
         actor: PublicKey,
+        trusted: &TrustedReviewers,
     ) -> io::Result<Json> {
         let target = digest(target)?;
-        self.with_review_history(metadata, store, |workspace, store| {
+        self.with_review_history(metadata, store, trusted, |workspace, store| {
             if !workspace
                 .workspace_versions()
                 .iter()
@@ -112,6 +120,7 @@ impl ProjectAttachment {
             {
                 return Err(invalid("review target does not belong to this project"));
             }
+            super::approval::main_head(workspace)?;
             let bundle = workspace
                 .saved_publication_review_bundle(target)
                 .map_err(error)?;
@@ -129,8 +138,13 @@ impl ProjectAttachment {
                 }))?;
             }
             // Acknowledgement is based on reopened durable truth, including for idempotent retries.
-            let reopened = OpenWorkspace::open_attachment_store(metadata, store.clone(), false)
-                .map_err(error)?;
+            let reopened = OpenWorkspace::open_attachment_store_with_trusted_reviewers(
+                metadata,
+                store.clone(),
+                false,
+                trusted,
+            )
+            .map_err(error)?;
             let record = reopened
                 .review(&bundle)
                 .ok_or_else(|| invalid("review was not retained"))?;
@@ -149,8 +163,9 @@ impl ProjectAttachment {
         &self,
         metadata: &Path,
         store: PinnedWorkspaceRoot,
+        trusted: &TrustedReviewers,
     ) -> io::Result<Json> {
-        self.with_review_history(metadata, store, |workspace, _| {
+        self.with_review_history(metadata, store, trusted, |workspace, _| {
             let (items, omitted) = workspace.review_items(None);
             Ok(Json::object([
                 (
@@ -173,10 +188,11 @@ impl ProjectAttachment {
         store: PinnedWorkspaceRoot,
         bundle: &str,
         target: &str,
+        trusted: &TrustedReviewers,
     ) -> io::Result<Json> {
         let bundle = digest(bundle)?;
         let target = digest(target)?;
-        self.with_review_history(metadata, store, |workspace, _| {
+        self.with_review_history(metadata, store, trusted, |workspace, _| {
             let record = workspace
                 .review(&bundle)
                 .ok_or_else(|| invalid("review unavailable"))?;

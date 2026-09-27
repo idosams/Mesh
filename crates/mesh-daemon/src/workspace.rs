@@ -1241,10 +1241,24 @@ impl OpenWorkspace {
         pinned: PinnedWorkspaceRoot,
         create_missing: bool,
     ) -> Result<Self, OpenFailure> {
+        Self::open_attachment_store_with_trusted_reviewers(
+            metadata,
+            pinned,
+            create_missing,
+            &crate::TrustedReviewers::default(),
+        )
+    }
+
+    pub(crate) fn open_attachment_store_with_trusted_reviewers(
+        metadata: &Path,
+        pinned: PinnedWorkspaceRoot,
+        create_missing: bool,
+        trusted: &crate::TrustedReviewers,
+    ) -> Result<Self, OpenFailure> {
         Self::open_layout_inner(
             metadata,
             Some(metadata),
-            &crate::TrustedReviewers::default(),
+            trusted,
             create_missing,
             Some((pinned.clone(), pinned)),
             false,
@@ -1971,6 +1985,25 @@ impl OpenWorkspace {
             }
         }
         Ok(found)
+    }
+
+    /// Refuse challenge reuse before append, rather than poisoning a previously valid main.
+    pub(crate) fn approval_challenge_used(&self, challenge: &[u8; 32]) -> Result<bool, String> {
+        for bundle in self.record_index.review_bundles() {
+            for approval in self
+                .record_index
+                .approvals_for_bundle(&bundle)
+                .filter(|approval| approval.verdict == ReviewVerdict::Approved)
+            {
+                let bytes = self.approval_receipt(approval.approval)?;
+                let receipt = mesh_approval::HumanApprovalReceipt::from_canonical_bytes(&bytes)
+                    .map_err(|error| error.to_string())?;
+                if receipt.draft().expected().challenge() == challenge {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Recompute the exact v1 human-approval context for one durable review record.

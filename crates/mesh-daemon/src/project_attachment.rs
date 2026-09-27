@@ -28,6 +28,7 @@ pub use background::{
     AttachmentCaptureService, CaptureOutcome, CapturePhase, CaptureSchedule, CaptureStatus,
 };
 
+mod approval;
 mod history;
 mod inspection;
 mod reviews;

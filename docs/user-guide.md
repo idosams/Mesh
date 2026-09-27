@@ -181,3 +181,12 @@ The queue shows up to 32 requests and reports omitted requests. A saved-version 
 its exact current-base request beyond that overview. A selected request remains fixed while capture
 continues. Incomplete or unavailable content is labeled; a path overview alone is not complete review.
 Change authorship remains unknown. Approval and main-version integration are separate pending steps.
+
+## Accepted main for attached projects (native development API)
+
+The unmerged native approval increment can accept an exact saved review as Mesh main, even while your
+editor or harness continues producing newer changes. Acceptance records the reviewed saved content
+in Mesh history; it does not replace your working files or change Git. A review prepared before main
+advances must be prepared again against the new main before approval. Returning to an old review is
+still supported for inspection. Desktop approval controls and applying accepted content to the working
+folder are not delivered by this native API increment.

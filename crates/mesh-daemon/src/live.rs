@@ -353,6 +353,21 @@ impl DurableHumanApproval {
 }
 
 impl HumanApprovalPreview {
+    pub(crate) fn from_record(
+        workspace: &OpenWorkspace,
+        review: &mesh_store::ReviewRecord,
+    ) -> Result<Self, String> {
+        let (context, change_summary, presentation_digest, review_bundle, approved_state) =
+            workspace.human_approval_preview(review)?;
+        Ok(Self {
+            context,
+            change_summary,
+            presentation_digest,
+            review_bundle,
+            approved_state,
+        })
+    }
+
     /// Exact fields that the native receipt statement will bind.
     #[must_use]
     pub const fn context(&self) -> &mesh_approval::HumanApprovalContext {

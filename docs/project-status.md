@@ -114,3 +114,12 @@ a bounded request queue and direct lookup. The desktop reopens requests and insp
 result while capture continues. Unknown authorship, unavailable content and omitted entries remain
 explicit. English and Hebrew views preserve literal identities and paths. This does not yet provide
 attached-project human approval, integration or a packaged graphical acceptance result.
+
+### Attached Mesh main approval (unmerged native increment)
+
+Native APIs can prepare an exact saved-review preview and apply a trusted human receipt to external
+Mesh main while ordinary editing and capture continue. They retain identical-receipt retry, refuse
+stale/foreign/reused authority before journal mutation, and revalidate current main under independent
+custody. The source folder and Git state remain untouched. Verification uses fixture credentials;
+this is not native human-presence or packaged graphical approval proof. Desktop approval controls and
+source integration are still separate pending increments.

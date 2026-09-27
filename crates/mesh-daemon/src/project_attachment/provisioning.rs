@@ -246,22 +246,106 @@ impl ProvisionedAttachment {
             .saved_versions_in_store(&self.metadata, self.store.clone())
     }
 
-    /// Record an exact local review request without approval or source-write authority.
+    /// Record a review before any shared main exists; no approval or source-write authority.
     pub fn request_review(&self, target: &str, actor: mesh_types::PublicKey) -> io::Result<Json> {
-        self.attachment
-            .request_saved_review(&self.metadata, self.store.clone(), target, actor)
+        self.request_review_with_trusted_reviewers(
+            target,
+            actor,
+            &crate::TrustedReviewers::default(),
+        )
     }
 
-    /// List the bounded durable review queue; omitted cards are reported explicitly.
+    /// Record an exact review against verified main using native reviewer configuration.
+    pub fn request_review_with_trusted_reviewers(
+        &self,
+        target: &str,
+        actor: mesh_types::PublicKey,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.attachment.request_saved_review(
+            &self.metadata,
+            self.store.clone(),
+            target,
+            actor,
+            trusted,
+        )
+    }
+
+    /// List the bounded review queue without claiming approval authority.
     pub fn reviews(&self) -> io::Result<Json> {
-        self.attachment
-            .saved_reviews(&self.metadata, self.store.clone())
+        self.reviews_with_trusted_reviewers(&crate::TrustedReviewers::default())
     }
 
-    /// Read one exact durable review even when it is outside the overview page.
-    pub fn review(&self, bundle: &str, target: &str) -> io::Result<Json> {
+    /// List review content against verified publication history; omitted cards remain explicit.
+    pub fn reviews_with_trusted_reviewers(
+        &self,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
         self.attachment
-            .saved_review(&self.metadata, self.store.clone(), bundle, target)
+            .saved_reviews(&self.metadata, self.store.clone(), trusted)
+    }
+
+    /// Read one exact durable review even outside the overview page, without approval authority.
+    pub fn review(&self, bundle: &str, target: &str) -> io::Result<Json> {
+        self.review_with_trusted_reviewers(bundle, target, &crate::TrustedReviewers::default())
+    }
+
+    /// Read exact review content with native trust for its historical base.
+    pub fn review_with_trusted_reviewers(
+        &self,
+        bundle: &str,
+        target: &str,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.attachment
+            .saved_review(&self.metadata, self.store.clone(), bundle, target, trusted)
+    }
+
+    /// Verify accepted Mesh main independently of the mutable source folder.
+    pub fn main_version(
+        &self,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Option<mesh_approval::HeadId>> {
+        self.attachment.with_review_history(
+            &self.metadata,
+            self.store.clone(),
+            trusted,
+            |workspace, _| super::approval::main_head(workspace),
+        )
+    }
+
+    /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
+    pub fn approval_preview(
+        &self,
+        bundle: &str,
+        target: &str,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<crate::HumanApprovalPreview> {
+        self.attachment.prepare_approval(
+            &self.metadata,
+            self.store.clone(),
+            bundle,
+            target,
+            trusted,
+        )
+    }
+
+    /// Verify an exact human receipt and advance only Mesh main, never source files or Git.
+    pub fn approve_review(
+        &self,
+        bundle: &str,
+        target: &str,
+        receipt: &[u8],
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<mesh_approval::HeadId> {
+        self.attachment.approve_saved_review(
+            &self.metadata,
+            self.store.clone(),
+            bundle,
+            target,
+            receipt,
+            trusted,
+        )
     }
 
     /// Inspect one bounded page of entries in an exact saved version, never live files.

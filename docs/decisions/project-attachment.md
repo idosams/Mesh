@@ -602,3 +602,27 @@ in the subsequent approval source commit. Cloned pinned roots retain the same di
 must acquire flock through separately opened file descriptions; a duplicated descriptor inherits
 lock ownership. The native cloned-root regression checks that a concurrent contender cannot enter
 until the first guard is released. Directory identity is still rechecked after the wait.
+
+## Native approval of attached Mesh main
+
+The A08b native increment prepares an exact human-approval preview from a recorded review and
+verifies a canonical receipt against that same context, credential, challenge and current main.
+Human confirmation and signing occur outside the history lock; receipt application reopens the
+verified store under independent custody before checking the main predecessor again. A newer capture
+or unsaved editor change cannot substitute content into the receipt. Only external Mesh main advances;
+source bytes, open editor handles, Git index and HEAD remain unchanged.
+
+A lost response can be retried only with the identical retained receipt while that result remains
+current main. A different ceremony, an older approved result, an empty or reused challenge, a foreign
+project, unknown credential, changed store/source identity or malformed receipt refuses. Challenge
+reuse is rejected before append, preserving the existing accepted main. Concurrent approvals of the
+same predecessor serialize so exactly one can advance. Retained approval records that cannot be
+verified mean unavailable authority, never a fresh empty starting state. Review requests after the
+first approval therefore require configured native reviewer trust; existing no-trust wrappers refuse
+to construct new requests against an invented genesis.
+
+The existing receipt and journal formats remain unchanged. The directory-lock prerequisite from the
+same source commit was already transferred in A08a. Tests use fixture P-256 credentials to exercise
+receipt verification and durable replay; they do not prove native human presence. Desktop confirmation,
+provider-backed signing, graphical acceptance and applying accepted results to source files remain
+separate pending work.
