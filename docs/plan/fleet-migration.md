@@ -97,6 +97,29 @@ The full combined local gate passed: 3,128 Rust tests (13 skipped), 558 desktop 
 daemon checks. All seven hosted checks passed in run 36345404405 on `8331980e4093018b909328eba6316877405137fd`.
 No product latency or packaged proof is implied; human review and merge remain outstanding.
 
+## Move-settling validation correction
+
+[Mesh PR #21](https://github.com/idosams/Mesh/pull/21) passed six hosted jobs but failed the existing
+`a_newer_os_change_during_move_settling_stays_working` case on macOS (3,127 passed, one failed,
+13 skipped). Its observer could replace the file after the 50 ms settling window; its 15 ms sleep
+did not establish ordering. The failed log remains retained. This does not establish a pinning defect.
+
+[Mesh PR #23](https://github.com/idosams/Mesh/pull/23), `1911af5902149ea9ef730a8ae3cea31964d7b666`,
+relocates that regression into the native unit suite and uses a test-only thread-local hook after
+real durable move persistence and before settling. All original outcome assertions and timer values
+remain, with additional hook-execution and durable-operation assertions. Temporarily disabling the
+native moved-entry stability predicate makes the regression fail; the restored test passed 20 repeats.
+All seven source hosted checks passed in run 36347562369. Production builds contain no hook,
+and the total test count is retained. No retry, skip or product
+latency claim is added.
+
+This separate validation increment transfers #23 onto #22 before further feature migration. It is
+additional canonical verification work, not another transferred commit from the preserved 87. Its
+full combined gate and hosted CI must be checked on this base; original PRs and histories remain
+preserved, and duplicate corrections must be reconciled before main integration. Replacement
+`3e0e81c` passed the full combined gate with exit 0: 3,131 Rust tests (13 skipped), 564 desktop tests
+and 44 real daemon checks. Hosted CI and PR publication are pending; no merge is implied.
+
 ## Preserved source commits
 
 The IDs below identify original work, not commits already delivered to canonical main. The status
@@ -127,7 +150,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A05 | `d52640a58edc6fb2b9ab07dd59ddbcb087c31499` | feat: inspect immutable attached-project files in desktop | [Mesh PR #18](https://github.com/idosams/Mesh/pull/18), `493927c7461f5beeff1ae686c0e8d0b4cce43d5f`; localized exact saved-file inspection; stacked on #17; not merged |
 | A05 | `923187d270568917c7805435b3e3020ab353d51c` | feat: compare exact attached-project versions with pinned previews | [Mesh PR #19](https://github.com/idosams/Mesh/pull/19), `8c4884efdbe7bd34d3f05079193324df1a5e534c`; exact localized comparison; canonical historical-path handling retained; stacked on #18; not merged |
 | A05 | `9a68afb42be45259902fa5061970d297223c7eae` | feat: pin independent attached-project comparisons side by side | [Mesh PR #21](https://github.com/idosams/Mesh/pull/21), `548fc7b1c488dc9f123a5aee7195e9eaa8f74831`; independent localized pins, stacked on #20; full local gate passed (3,128 Rust, 563 desktop, 44 daemon checks); hosted CI: six jobs pass, macOS move-settling regression fails (run 36346038402); not merged |
-| A06 | `894127b78ba9d1c4104b013fd3c3e31dce15a504` | feat: restore registered attachment projects stopped after restart | [Mesh PR #22](https://github.com/idosams/Mesh/pull/22), `397b98b0d3c22814c4f3b569d575e1b02de6ab66`; native catalog and stopped restart recovery; stacked on #21; full local gate passed (3,131 Rust, 564 desktop, 44 daemon checks); hosted CI pending, not merged |
+| A06 | `894127b78ba9d1c4104b013fd3c3e31dce15a504` | feat: restore registered attachment projects stopped after restart | [Mesh PR #22](https://github.com/idosams/Mesh/pull/22), `397b98b0d3c22814c4f3b569d575e1b02de6ab66`; native catalog and stopped restart recovery; stacked on #21; full local gate passed (3,131 Rust, 564 desktop, 44 daemon checks); all seven hosted checks pass (run 36346924533); not merged |
 | A06 | `d2d9e8c5ca43e592dd5eaeaa889fe21e067c3cec` | feat: persist native comparison pin selectors with revision checks | Pending transfer |
 | A06 | `db065842401b6743d4b44f6f71517306be09d33e` | Restore attached project comparison pins through native history | Pending transfer |
 | A06 | `ba65636e1a097a5491172226859c6d61994d8539` | Persist project detachment while retaining history and ordinary workflow | Pending transfer |
