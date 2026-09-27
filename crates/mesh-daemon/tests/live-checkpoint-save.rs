@@ -40,6 +40,19 @@ fn startup() -> StartupSummary {
     StartupSummary::from(&nothing_to_recover())
 }
 
+// Failure-only evidence from this synthetic fixture. Keep the diagnostic limited to the
+// scheduler instead of printing unrelated workspace state, and do not acquire new authority.
+fn worker_diagnostic(daemon: &LiveDaemon) -> String {
+    let diagnostic = format!("{daemon:?}");
+    let scheduler = diagnostic
+        .split_once(", checkpoint_idle: ")
+        .and_then(|(_, tail)| tail.split_once(", workspace_open: "))
+        .map_or("scheduler debug state unavailable", |(scheduler, _)| {
+            scheduler
+        });
+    format!("observed_at={:?}; {scheduler}", std::time::Instant::now())
+}
+
 fn parameters() -> CheckpointRuntimeParameters {
     CheckpointRuntimeParameters {
         idle_interval: Some(Duration::from_millis(8)),
@@ -606,7 +619,8 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; conditions={:?}",
+            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; worker={}; conditions={:?}",
+            worker_diagnostic(&daemon),
             daemon.workspace_state().map(|state| state.conditions.iter().map(|condition| condition.code().to_owned()).collect::<Vec<_>>())
         );
         std::thread::sleep(Duration::from_millis(2));
@@ -984,8 +998,9 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; conditions={:?}",
+            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; worker={}; conditions={:?}",
             daemon.checkpoint_snapshot(),
+            worker_diagnostic(&daemon),
             state.conditions.iter().map(|condition| condition.code()).collect::<Vec<_>>()
         );
         std::thread::sleep(Duration::from_millis(2));
