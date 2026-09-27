@@ -531,3 +531,14 @@ interval and observe nested edits, atomic replacement and root-change refusal wi
 deadline, proving the wakeup path rather than the fallback timer. Separate disabled-signal tests
 verify periodic capture and restart catch-up. This does not establish a four-worker latency target or
 the packaged graphical journey.
+
+
+Canonical packaged verification at `c80c9fab57a19f10589bdb8bd9cf6cbdebb5f9e4` passed the capture
+journey with three saved versions, an active native stream and one callback batch after the edit.
+The observed total was 19,749 ms, not an event-latency benchmark. Executable SHA-256:
+`7db038cb9bbbb012a70f41efd8f9910af8f57862b3e316e0004ec1e3d980ed77`. Strict seal and native build
+identity checks passed before and after the journey. Fixture registration used development meshctl.
+The build wrapper's first post-sign identity check ended without a normal exit code; the unchanged
+executable subsequently reported the correct revision within the same timeout and completed the
+entire proof. The initial failure log is retained and its cause is not established. No timeout or
+check was weakened. This is packaged executable evidence, not graphical acceptance.
