@@ -2,7 +2,7 @@ import { useTranslation } from "../lib/localization";
 import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
-type Project = { id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
+type Project = { recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
 type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null; digest: string | null; executable: boolean | null };
 type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
 type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
@@ -69,8 +69,8 @@ export function AttachedProjects() {
       const terminal = project.phase === "stopped" || project.phase === "failed";
       return <article key={project.id} className="grid gap-2 rounded-lg border border-border p-4">
         <p className="break-all text-sm font-medium"><bdi dir="ltr">{project.root}</bdi></p>
-        <p className="text-sm">{t(projection.error ? "Status may be out of date" : phases[project.phase])} · {t(outcomes[project.outcome])}</p>
-        <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t("No saved version yet")}</p>
+        <p className="text-sm">{t(projection.error ? "Status may be out of date" : phases[project.phase])} · {t(project.recovery === "restored-stopped" ? "Saved history restored; resume when ready" : project.recovery === "unavailable" ? "Project or history needs reconciliation" : outcomes[project.outcome])}</p>
+        <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t(project.recovery === "unavailable" ? "Saved version unavailable until history is verified" : "No saved version yet")}</p>
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
@@ -78,7 +78,7 @@ export function AttachedProjects() {
           <Button variant="secondary" disabled={disabled || terminal || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: "capture" })}>{t("Capture now")}</Button>
           <Button variant="secondary" disabled={disabled || project.phase === "stopping"}
-            onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: terminal ? "resume" : "stop" })}>{t(terminal ? "Resume capture" : "Stop capture")}</Button>
+            onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: terminal ? "resume" : "stop" })}>{t(terminal ? project.recovery === "unavailable" ? "Retry capture" : "Resume capture" : "Stop capture")}</Button>
         </div>
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
@@ -99,7 +99,7 @@ export function AttachedProjects() {
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
-    <p className="text-xs text-muted-foreground">{t("After reopening Mesh, attach the same project to resume capture. Saved history is retained.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")}</p>
   </section>;
 }
 

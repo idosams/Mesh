@@ -15,6 +15,7 @@ export function attachedProjectList(raw) {
       || !/^[a-f0-9]{64}$/.test(project.id) || ids.has(project.id)
       || !/^[1-9][0-9]{0,19}$/.test(project.generation ?? '')
       || !safeText(project.root, 4096) || !project.root.startsWith('/')
+      || ![undefined, null, 'restored-stopped', 'unavailable'].includes(project.recovery)
       || capture?.schema !== 'mesh.attachment-capture/v1'
       || !PHASES.has(capture.phase) || !OUTCOMES.has(capture.last_outcome)
       || capture.attribution !== 'unknown' || capture.atomic_snapshot !== false
@@ -26,7 +27,7 @@ export function attachedProjectList(raw) {
     ids.add(project.id);
     return Object.freeze({ id: project.id, generation: project.generation, root: project.root,
       phase: capture.phase, outcome: capture.last_outcome, savedVersion: capture.saved_version,
-      captureAgeMs: capture.last_complete_capture_age_ms });
+      captureAgeMs: capture.last_complete_capture_age_ms, recovery: project.recovery ?? null });
   });
 }
 

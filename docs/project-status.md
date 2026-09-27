@@ -22,8 +22,9 @@ retained source/store authority directly to capture; partial or replaced stores 
 attachment controls now select or type an existing project path, show native capture health, and
 request capture, stop or resume using exact session generations. The attachment and separate-copy
 flows retain English/Hebrew localization. Latest and older saved-version pages now remain fixed while
-new captures continue; native history reads reject replaced storage and foreign cursors. Session lists
-reset on quit; saved history remains. Exact saved-file inspection now pages through directories and
+new captures continue; native history reads reject replaced storage and foreign cursors. Registered projects now return stopped after restart through native catalog discovery. Missing or
+replaced sources/history remain visible as unavailable; explicit resume revalidates identity and
+catches up edits made while Mesh was closed. Saved history remains. Exact saved-file inspection now pages through directories and
 files and previews bounded saved text without consulting live file contents. Binary and oversized
 files have explicit unavailable states, and paths/content stay literal in the localized UI. Exact
 saved-version comparisons now report path, content and executable-mode changes with fixed before/after

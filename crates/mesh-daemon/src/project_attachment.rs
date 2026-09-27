@@ -17,7 +17,7 @@ const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
 
 mod provisioning;
-pub use provisioning::{AttachmentStorage, ProvisionedAttachment};
+pub use provisioning::{AttachmentStorage, ProvisionedAttachment, RegisteredAttachment};
 
 mod background;
 pub use background::{
@@ -77,7 +77,10 @@ impl ProjectAttachment {
     /// Reopen an existing registration and verify the named folder still has its admitted identity.
     /// Missing source folders are never recreated or silently rebound to a replacement.
     pub fn reopen(metadata: &Path) -> io::Result<Self> {
-        let store = pin_absolute_directory(metadata)?;
+        Self::reopen_store(metadata, pin_absolute_directory(metadata)?)
+    }
+
+    fn reopen_store(metadata: &Path, store: PinnedWorkspaceRoot) -> io::Result<Self> {
         let encoded = read_receipt(&store)?;
         let receipt = Json::parse(&encoded).map_err(|_| invalid("invalid attachment receipt"))?;
         if receipt.get("schema").and_then(Json::as_text) != Some(SCHEMA) {

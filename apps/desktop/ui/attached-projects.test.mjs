@@ -332,3 +332,20 @@ test('pins from different projects cannot be redirected through another project 
   h.intent({ type: 'compare-file', id: otherId, base: operation, target: comparedTarget, path: 'notes.txt', pin: pins[0].key });
   assert.equal(calls.length, count); h.dispose();
 });
+
+
+test('restored stopped and unavailable projects preserve native recovery state without claiming current capture', () => {
+  const value = reply();
+  value.projects[0].recovery = 'restored-stopped';
+  value.projects[0].capture.phase = 'stopped';
+  value.projects[0].capture.last_outcome = 'pending';
+  value.projects[0].capture.last_complete_capture_age_ms = null;
+  const restored = attachedProjectList(value)[0];
+  assert.equal(restored.recovery, 'restored-stopped');
+  assert.equal(restored.savedVersion, 'b'.repeat(64));
+  assert.equal(restored.captureAgeMs, null);
+  value.projects[0].recovery = 'unavailable'; value.projects[0].capture.saved_version = null;
+  assert.equal(attachedProjectList(value)[0].recovery, 'unavailable');
+  value.projects[0].recovery = 'silently-running';
+  assert.throws(() => attachedProjectList(value));
+});

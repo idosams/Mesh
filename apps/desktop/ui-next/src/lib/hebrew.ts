@@ -1,5 +1,10 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Saved history restored; resume when ready":"ההיסטוריה השמורה שוחזרה; אפשר לחדש את הלכידה כשמוכנים",
+"Project or history needs reconciliation":"יש לאמת מחדש את הפרויקט או ההיסטוריה",
+"Saved version unavailable until history is verified":"הגרסה השמורה אינה זמינה עד לאימות ההיסטוריה",
+"Retry capture":"ניסיון לכידה נוסף",
+"Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.":"הפרויקטים הרשומים חוזרים כשפותחים את Mesh. פרויקטים ששוחזרו נשארים עצורים עד לחידוש הלכידה.",
 "Pinned comparisons":"השוואות נעוצות",
 "Close comparison":"סגירת השוואה",
 "Pin comparison alongside others":"נעיצת השוואה לצד השוואות אחרות",

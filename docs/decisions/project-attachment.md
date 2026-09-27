@@ -230,9 +230,10 @@ The controller bounds its session list to 32 projects. Stop is a request, not a 
 status reports the native worker's actual phase. No operation switches the selected managed workspace,
 reconfigures a harness, writes project files, or grants approval authority.
 
-The session registry is currently in memory. Saved registrations/history survive, and explicit
-reattachment recovers them; persistent project listing, restart preferences, detached/offline browsing,
-packaged lifecycle proof remain unfinished; UI/history presentation is described below. Dropping the host
+The live worker registry is in memory. Native catalog discovery now restores persistent project
+listing from the existing receipts, with workers stopped as described below. Automatic resume
+preferences, detached/offline history browsing and packaged lifecycle proof remain unfinished;
+UI/history presentation is described below. Dropping the host
 requests its workers to stop through their existing controller lifecycle; graceful process shutdown
 is not yet a verified desktop guarantee. Tests cover eight concurrent requests sharing one worker,
 stop/reselect/resume, stale controls, source replacement refusal and linked storage refusal. These are
@@ -253,10 +254,10 @@ operations, and stops scheduling when unmounted. Failed refresh retains the last
 identity, labels status as potentially stale and disables control intents until refresh succeeds.
 Picker cancellation does not attach a project. Native capture continues independently of UI polling.
 
-This panel explains session-only listing and retained history. Its presentation follows the canonical
+This panel describes stopped recovery and retained history. Its presentation follows the canonical
 English/Hebrew preference, while paths and saved identities remain literal and left-to-right.
-It is source-integrated graphical UI, not yet a packaged runtime proof. Persistent catalog,
-restart preferences, approval/integration, signed parallel review and the full packaged journey remain
+It is source-integrated graphical UI, not yet a packaged runtime proof. Automatic resume preferences,
+approval/integration, signed parallel review and the full packaged journey remain
 required before the attachment product loop is complete.
 
 ## Saved-version list in the attachment panel
@@ -358,3 +359,33 @@ redirect another project's pin. Pins survive leaving/returning to the mounted pa
 session, but are not yet persisted across desktop restart. These are pinned inspection/comparison
 views; human approval, dependency-aware review bundles and integration are still required for the full
 parallel review journey. Packaged rendering/runtime proof remains outstanding.
+
+## Persistent project discovery and stopped desktop recovery
+
+The native catalog now discovers registrations from the existing `project-<receipt digest>` child
+directories. It bounds enumeration to 256 root entries and validates each recognized name, retained
+real child directory, bounded canonical receipt and full receipt digest. Discovery can report the
+registered root even while the source is offline, without recreating it. Invalid, linked, partial or
+modified registration evidence is preserved and returns an explicit catalog error; it is not silently
+omitted from an apparently complete list. Discovery changes no receipt or history format.
+
+`AttachmentStorage::reopen(id)` admits only an existing catalog child, verifies its receipt identity,
+and rechecks the original source's recorded native identity. It never provisions an alternative root.
+The desktop lazily restores up to 32 projects when the list is requested, without generating keys or
+starting capture workers. Verified history restores the latest saved identity. A source or history
+that cannot be verified remains listed with an unavailable recovery state; a missing saved identity
+in that state is not presented as proof that no history exists. Read-only discovery does not create
+an absent storage root.
+
+All recovered projects start stopped, including ones that were running when the desktop quit.
+Explicit resume reuses retained authority or reopens the exact registered identity after an offline
+folder returns, creates a new capture session, and reconciles edits made while Mesh was closed.
+A replacement folder at the same pathname is refused. This preserves stop intent without introducing
+an implicit autorun policy; automatic resume preferences remain unfinished. Pins and their navigation
+remain session-only. Missing or corrupt history is not repaired or replaced as a side effect of discovery.
+
+Tests exercise disk-backed rediscovery, no worker on restart, last saved identity recovery, refusal
+of capture-before-resume, catch-up after resume, offline listing, replacement refusal, recovery when
+the original folder returns, linked stores, malformed receipts and preserved partial provisioning.
+The UI distinguishes restored-stopped projects from unavailable history. These are native and source-UI
+proofs; packaged restart and durable pin restoration remain required.

@@ -66,6 +66,14 @@ hosted run 36342433986 passed six jobs but failed the existing persistence-deadl
 macOS before reaching the corrected stability test (1,345 passed, one failed, 10 skipped).
 The correction in #5 is separate and not included in #16.
 
+The main-first delivery path now consolidates the same three CI corrections in [Mesh PR #5](https://github.com/idosams/Mesh/pull/5)
+at `eec4448f45b63547e684f5a0c987ceefe5911d15`. It preserves the original #14 and #16 branches and
+replaces their final patches with `c28264c` and `eec4448` respectively. Its full local main-based gate
+passed (3,037 Rust tests, 543 desktop tests, 44 daemon checks). The six-file stable patch ID
+`2c000b0a68b4d03e57e214331ba2ba4cbe739cf1` matches #20. All seven hosted checks passed in run 36346243491. Human review must pass before
+main integration, then feature dependencies must be reconciled and tested in order; do not blindly
+merge duplicate corrections. No correction has yet merged.
+
 ## Validation prerequisite transfer
 
 The current validation increment combines the final patches from #5 (`ba211c7c4ea11305fcbaacd34e689cfdb71481d7`),
@@ -118,8 +126,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A05 | `29caceb1bfcb353abe1a6d8927adc8a05fa7c3ca` | feat: browse exact attached-project version history pages | [Mesh PR #17](https://github.com/idosams/Mesh/pull/17), `c7a7b557a326d4754597649e9317e65e5fc02236`; localized stable version pages; stacked on #15; not merged |
 | A05 | `d52640a58edc6fb2b9ab07dd59ddbcb087c31499` | feat: inspect immutable attached-project files in desktop | [Mesh PR #18](https://github.com/idosams/Mesh/pull/18), `493927c7461f5beeff1ae686c0e8d0b4cce43d5f`; localized exact saved-file inspection; stacked on #17; not merged |
 | A05 | `923187d270568917c7805435b3e3020ab353d51c` | feat: compare exact attached-project versions with pinned previews | [Mesh PR #19](https://github.com/idosams/Mesh/pull/19), `8c4884efdbe7bd34d3f05079193324df1a5e534c`; exact localized comparison; canonical historical-path handling retained; stacked on #18; not merged |
-| A05 | `9a68afb42be45259902fa5061970d297223c7eae` | feat: pin independent attached-project comparisons side by side | [Mesh PR #21](https://github.com/idosams/Mesh/pull/21), `548fc7b1c488dc9f123a5aee7195e9eaa8f74831`; independent localized pins, stacked on #20; full local gate passed (3,128 Rust, 563 desktop, 44 daemon checks); hosted CI pending, not merged |
-| A06 | `894127b78ba9d1c4104b013fd3c3e31dce15a504` | feat: restore registered attachment projects stopped after restart | Pending transfer |
+| A05 | `9a68afb42be45259902fa5061970d297223c7eae` | feat: pin independent attached-project comparisons side by side | [Mesh PR #21](https://github.com/idosams/Mesh/pull/21), `548fc7b1c488dc9f123a5aee7195e9eaa8f74831`; independent localized pins, stacked on #20; full local gate passed (3,128 Rust, 563 desktop, 44 daemon checks); hosted CI: six jobs pass, macOS move-settling regression fails (run 36346038402); not merged |
+| A06 | `894127b78ba9d1c4104b013fd3c3e31dce15a504` | feat: restore registered attachment projects stopped after restart | A06a: native catalog and stopped restart recovery; stacked on #21; full local gate passed (3,131 Rust, 564 desktop, 44 daemon checks); PR publication pending, not merged |
 | A06 | `d2d9e8c5ca43e592dd5eaeaa889fe21e067c3cec` | feat: persist native comparison pin selectors with revision checks | Pending transfer |
 | A06 | `db065842401b6743d4b44f6f71517306be09d33e` | Restore attached project comparison pins through native history | Pending transfer |
 | A06 | `ba65636e1a097a5491172226859c6d61994d8539` | Persist project detachment while retaining history and ordinary workflow | Pending transfer |

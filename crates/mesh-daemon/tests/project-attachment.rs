@@ -916,3 +916,47 @@ fn saved_comparison_tracks_content_modes_types_and_pinned_pages() {
         .compare_versions(&base, &"f".repeat(64), None)
         .is_err());
 }
+
+#[test]
+fn catalog_discovers_offline_registrations_without_adopting_replacements() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("catalog-offline");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let project = storage.provision(&f.source).unwrap();
+    let id = project.id().to_owned();
+    fs::rename(&f.source, f.root.join("original")).unwrap();
+    let found = storage.registrations().unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].id(), id);
+    assert_eq!(found[0].root(), project.project().root());
+    assert!(storage.reopen(&id).is_err());
+    fs::create_dir(&f.source).unwrap();
+    assert!(storage.reopen(&id).is_err());
+    assert!(fs::read_dir(&f.source).unwrap().next().is_none());
+    fs::remove_dir(&f.source).unwrap();
+    fs::rename(f.root.join("original"), &f.source).unwrap();
+    assert_eq!(storage.reopen(&id).unwrap().id(), id);
+    assert!(storage.reopen("../project").is_err());
+    fs::rename(project.metadata_path(), f.root.join("old-store")).unwrap();
+    symlink(&f.source, project.metadata_path()).unwrap();
+    assert!(storage.registrations().is_err());
+    assert!(storage.reopen(&id).is_err());
+}
+
+#[test]
+fn catalog_preserves_partial_and_modified_registration_evidence() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("catalog-damage");
+    let storage = AttachmentStorage::open(&f.metadata).unwrap();
+    let project = storage.provision(&f.source).unwrap();
+    let receipt = project.metadata_path().join("attachment.json");
+    let original = fs::read(&receipt).unwrap();
+    fs::write(&receipt, b"{}").unwrap();
+    assert!(storage.registrations().is_err());
+    assert_eq!(fs::read(&receipt).unwrap(), b"{}");
+    fs::write(&receipt, original).unwrap();
+    assert_eq!(storage.registrations().unwrap().len(), 1);
+    fs::remove_file(&receipt).unwrap();
+    assert!(storage.registrations().is_err());
+    assert!(!receipt.exists());
+}

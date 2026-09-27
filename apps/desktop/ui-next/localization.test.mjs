@@ -129,6 +129,7 @@ test('existing-project attachment stays localized beside the copy flow and keeps
   const html = ui.renderImport(model);
   assert.match(html, /aria-label="פרויקטים מחוברים"/);
   assert.match(html, /חיבור פרויקט קיים/);
+  assert.match(html, /פרויקטים ששוחזרו נשארים עצורים עד לחידוש הלכידה/);
   assert.match(html, /יצירת עותק עבודה/);
   assert.match(html, /dir="ltr"[^>]*value="\/Users\/משפחה\/Files"/);
   ui.setLocale('en');

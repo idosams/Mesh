@@ -79,7 +79,10 @@ to eight comparisons open across projects. Each pin has its own page and selecte
 the same version pair twice to inspect different files. Close a pin to free a slot. Pins survive
 navigation within this desktop session but reset when Mesh quits. This view does not approve or apply changes. **Stop capture** and **Resume
 capture** control the session without changing the original project's files. After restarting this
-development build, attach the same project again to access its retained history.
+development build, registered projects return with capture stopped and their saved history available.
+Choose **Resume capture** when ready to capture changes made while Mesh was closed. If the original
+project or history is unavailable, Mesh keeps the registration visible and requires the exact original
+folder and history before retrying; a replacement folder at the same path is not adopted.
 
 ## The six words Mesh shows people
 
