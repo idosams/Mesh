@@ -202,7 +202,7 @@ explicit recovery. Registration and signed-history formats remain unchanged.
 
 The parent must be outside the original project, and its retained identity must still agree with its
 pathname before provisioning. Source and store identity checks surround allocation. The resulting
-`ProvisionedAttachment` transfers both retained descriptors directly into `start_capture`, without
+`ProvisionedAttachment` shares both retained descriptors directly with `start_capture`, without
 reopening and adopting a replacement store between allocation and background startup. Repeated
 provisioning of the same admitted source recovers the same location. Source rename or replacement
 is not an automatic history migration. The native host remains responsible for maintaining the
@@ -258,3 +258,26 @@ English/Hebrew preference, while paths and saved identities remain literal and l
 It is source-integrated graphical UI, not yet a packaged runtime proof. Persistent catalog,
 restart preferences, version navigation, pinned parallel review and the full packaged journey remain
 required before the attachment product loop is complete.
+
+## Saved-version list in the attachment panel
+
+`ProvisionedAttachment` now retains clonable native directory authority for both capture and history
+reads. `saved_versions()` uses that exact retained store, rather than reopening a renderer-supplied
+path. The desktop keeps this history handle after launching capture. Resume now uses the same handle,
+so a replaced project cannot cause resume to allocate another registration before refusing.
+
+The read-only `attached_project_versions(id, before)` command verifies the saved journal and returns
+up to 50 immutable operation identities, newest first. The optional cursor must be an actual version
+of that project's verified history. A page reports the exact project and input cursor plus its next
+cursor. Adding newer captures does not shift an older page anchored to an existing identity. Storage
+replacement and invalid cursors refuse; neither falls back to live source content. Journal verification
+currently reconstructs the full history before slicing a bounded response, so this is not a large-history
+performance claim.
+
+The attachment panel exposes latest and older version pages. The coordinator validates identities,
+project binding and cursor continuity. Labels follow the English/Hebrew preference and exact
+version IDs remain left-to-right. A normal status refresh never replaces the explicit history
+page. The UI currently displays saved identities; file previews, comparisons, approval and parallel
+review still require implementation. Native tests save more than one page, continue saving, verify
+cursor stability and refuse replaced history storage. UI tests cover malformed pages and preserving
+a loaded page while the live saved-version status advances. Packaged runtime verification is pending.

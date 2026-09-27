@@ -48,6 +48,13 @@ managed-edit stability test failed, so overall CI remains unresolved. The macOS 
 failures without retrying or skipping tests. [Mesh PR #14](https://github.com/idosams/Mesh/pull/14),
 `d1e6567cb9141646501fa8a1724bfbf997e8e576`, synchronizes a counter test so its writer cannot finish
 before its reader starts. That test passed hosted CI, whose later recovery test still failed.
+[Mesh PR #16](https://github.com/idosams/Mesh/pull/16),
+`b1cd55675b4d503a822ca25bdea366e2bc58f59f`, replaces an unsynchronized editor sleep with a direct
+configured minimum-wait assertion. Its full local gate passed, and a temporary old-50-ms mutation
+failed the corrected test at 74.709 ms against the configured 250 ms. Production code is unchanged;
+hosted run 36342433986 passed six jobs but failed the existing persistence-deadline test on
+macOS before reaching the corrected stability test (1,345 passed, one failed, 10 skipped).
+The correction in #5 is separate and not included in #16.
 
 ## Preserved source commits
 
@@ -75,7 +82,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A03 | `f8ec9022b9dbe6a44b6a8fa8894758e6962b1a62` | feat: provision native external attachment history storage | [Mesh PR #13](https://github.com/idosams/Mesh/pull/13), `5f4fe06673e476223ad53edad515b7f4d411521b`; A03c native storage provisioning; stacked on #12; not merged |
 | A04 | `76f453c67687525a88dd63171530e63a722eaead` | feat: add native desktop attachment session controls | [Mesh PR #15](https://github.com/idosams/Mesh/pull/15), `e2cf7a29922e772d4f4de41ad9429e1879c3a65e`; localized desktop attachment controls; stacked on #13; not merged |
 | A04 | `367e86a1b933d167083a0cb396e62b0ac3695710` | feat: connect existing-project attachment controls to desktop UI | [Mesh PR #15](https://github.com/idosams/Mesh/pull/15), `e2cf7a29922e772d4f4de41ad9429e1879c3a65e`; localized desktop attachment controls; stacked on #13; not merged |
-| A05 | `29caceb1bfcb353abe1a6d8927adc8a05fa7c3ca` | feat: browse exact attached-project version history pages | Pending transfer |
+| A05 | `29caceb1bfcb353abe1a6d8927adc8a05fa7c3ca` | feat: browse exact attached-project version history pages | A05a transfer in this branch; localized stable version pages; stacked on #15; not merged |
 | A05 | `d52640a58edc6fb2b9ab07dd59ddbcb087c31499` | feat: inspect immutable attached-project files in desktop | Pending transfer |
 | A05 | `923187d270568917c7805435b3e3020ab353d51c` | feat: compare exact attached-project versions with pinned previews | Pending transfer |
 | A05 | `9a68afb42be45259902fa5061970d297223c7eae` | feat: pin independent attached-project comparisons side by side | Pending transfer |

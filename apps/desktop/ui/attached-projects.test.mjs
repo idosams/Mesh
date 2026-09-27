@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -30,6 +30,7 @@ test('attachment projection rejects ambiguous identities and invented attributio
   for (const mutate of [
     (value) => value.projects.push(value.projects[0]),
     (value) => { value.projects[0].generation = '01'; },
+    (value) => { value.projects[0].generation = 1; },
     (value) => { value.projects[0].root = '/project\nother'; },
     (value) => { value.projects[0].capture.attribution = 'agent'; },
     (value) => { value.projects[0].capture.atomic_snapshot = true; },
@@ -87,4 +88,33 @@ test('picker cancellation does not attach and requests serialize while picker is
   assert.equal(h.timers.size, 1);
   h.emit('mesh:attachments-visible', false);
   assert.equal(h.timers.size, 0); h.dispose();
+});
+
+
+test('version pages bind project and cursor and reject malformed identities', () => {
+  const page = { schema: 'mesh.attachment-versions/v1', project: id, before: null,
+    versions: ['b'.repeat(64)], next_before: null };
+  assert.deepEqual(attachedVersionPage(page, id, null).versions, page.versions);
+  assert.throws(() => attachedVersionPage(page, 'c'.repeat(64), null));
+  assert.throws(() => attachedVersionPage(page, id, 'c'.repeat(64)));
+  assert.throws(() => attachedVersionPage({ ...page, next_before: page.versions[0] }, id, null));
+  assert.throws(() => attachedVersionPage({ ...page, versions: ['arbitrary'] }, id, null));
+});
+test('status refresh preserves the explicitly loaded immutable version page', async () => {
+  let saved = 'b'.repeat(64);
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1',
+      project: id, before: null, versions: [saved], next_before: null };
+    const value = reply(); value.projects[0].capture.saved_version = saved; return value;
+  });
+  await settle(); h.intent({ type: 'versions', id, before: null }); await settle();
+  saved = 'c'.repeat(64); h.intent({ type: 'refresh' }); await settle();
+  assert.equal(h.projections.at(-1).projects[0].savedVersion, saved);
+  assert.deepEqual(h.projections.at(-1).histories[id].versions, ['b'.repeat(64)]);
+  const count = calls.length;
+  h.intent({ type: 'versions', id, before: 'd'.repeat(64) });
+  assert.equal(calls.length, count);
+  h.dispose();
 });

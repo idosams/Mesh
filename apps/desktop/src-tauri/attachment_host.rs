@@ -4,6 +4,7 @@ use crate::attachment_capture::NativeCaptureSigner;
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
     AttachmentCaptureService, AttachmentStorage, CapturePhase, CaptureSchedule,
+    ProvisionedAttachment,
 };
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
@@ -28,6 +29,7 @@ struct Project {
     source: PathBuf,
     generation: u64,
     service: AttachmentCaptureService,
+    history: ProvisionedAttachment,
 }
 impl Project {
     fn projection(&self, id: &str) -> Json {
@@ -88,6 +90,7 @@ impl AttachmentHost {
             source,
             generation,
             service,
+            history: provisioned,
         };
         let response = project.projection(&id).encode();
         state.projects.insert(id, project);
@@ -107,6 +110,54 @@ impl AttachmentHost {
                         .map(|(id, project)| project.projection(id))
                         .collect(),
                 ),
+            ),
+        ])
+        .encode())
+    }
+
+    pub fn versions(&self, id: &str, before: Option<&str>) -> Result<String, String> {
+        // Retain authority, then release the registry lock before journal verification or disk IO.
+        let history = self
+            .state
+            .lock()
+            .map_err(|_| UNAVAILABLE)?
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open in this desktop session")?
+            .history
+            .clone();
+        let versions = history
+            .saved_versions()
+            .map_err(|_| "Saved attachment history is unavailable")?;
+        let end = match before {
+            None => versions.len(),
+            Some(cursor) => versions
+                .iter()
+                .position(|version| version.operation().to_string() == cursor)
+                .ok_or("The version cursor does not belong to this project")?,
+        };
+        let start = end.saturating_sub(50);
+        let page = &versions[start..end];
+        Ok(Json::object([
+            ("schema", Json::text("mesh.attachment-versions/v1")),
+            ("project", Json::text(id)),
+            ("before", before.map_or(Json::Null, Json::text)),
+            (
+                "versions",
+                Json::Array(
+                    page.iter()
+                        .rev()
+                        .map(|version| Json::text(version.operation().to_string()))
+                        .collect(),
+                ),
+            ),
+            (
+                "next_before",
+                if start > 0 {
+                    Json::text(versions[start].operation().to_string())
+                } else {
+                    Json::Null
+                },
             ),
         ])
         .encode())
@@ -136,17 +187,9 @@ impl AttachmentHost {
                     return Err("Wait for capture to stop before resuming".into());
                 }
                 let source = project.source.clone();
-                let provisioned = state
-                    .storage
-                    .as_ref()
-                    .ok_or(UNAVAILABLE)?
-                    .provision(&source)
-                    .map_err(|_| UNAVAILABLE)?;
-                if provisioned.id() != id {
-                    return Err("The project identity changed; reconcile it before resuming".into());
-                }
+                let history = project.history.clone();
                 let next = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
-                let service = provisioned
+                let service = history
                     .start_capture(NativeCaptureSigner::generate()?, CaptureSchedule::default())
                     .map_err(|_| UNAVAILABLE)?;
                 state.generation = next;
@@ -156,6 +199,7 @@ impl AttachmentHost {
                         source,
                         generation: next,
                         service,
+                        history,
                     },
                 );
             }
@@ -290,6 +334,70 @@ mod tests {
         let host = AttachmentHost::new(&root);
         assert!(host.attach(&source).is_err());
         assert!(fs::read_dir(&source).unwrap().next().is_none());
+        drop(host);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn version_pages_are_exact_and_preserve_cursor_while_new_work_is_saved() {
+        use mesh_daemon::project_attachment::ObservationLimits;
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-history-pages-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "initial").unwrap();
+        let host = AttachmentHost::new(&root);
+        let response = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = response.get("id").unwrap().as_text().unwrap();
+        let generation = response.get("generation").unwrap().as_text().unwrap();
+        host.control(id, generation, "stop").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let history = loop {
+            let state = host.state.lock().unwrap();
+            let project = &state.projects[id];
+            let status = project.service.status();
+            if status.phase == CapturePhase::Stopped {
+                break project.history.clone();
+            }
+            assert!(Instant::now() < deadline);
+            project
+                .service
+                .wait_for_update(status.revision, Duration::from_millis(50));
+        };
+        let signer = NativeCaptureSigner::generate().unwrap();
+        let save = |text: &str| {
+            fs::write(source.join("work"), text).unwrap();
+            let input = history
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            history
+                .project()
+                .save_capture(
+                    history.metadata_path(),
+                    &input,
+                    signer.public_key(),
+                    |payload| signer.sign(payload),
+                )
+                .unwrap()
+        };
+        for number in 0..52 {
+            save(&format!("version {number}"));
+        }
+        let page = Json::parse(&host.versions(id, None).unwrap()).unwrap();
+        let cursor = page.get("next_before").unwrap().as_text().unwrap();
+        let older = host.versions(id, Some(cursor)).unwrap();
+        let new = save("newer live work");
+        assert_eq!(older, host.versions(id, Some(cursor)).unwrap());
+        assert_ne!(
+            page,
+            Json::parse(&host.versions(id, None).unwrap()).unwrap()
+        );
+        assert!(!page.encode().contains(&new.operation().to_string()));
+        assert!(host.versions(id, Some(&"f".repeat(64))).is_err());
+        fs::rename(history.metadata_path(), root.join("old-history")).unwrap();
+        fs::create_dir(history.metadata_path()).unwrap();
+        assert!(host.versions(id, None).is_err());
         drop(host);
         fs::remove_dir_all(root).unwrap();
     }

@@ -31,6 +31,7 @@ mod observation;
 pub use observation::{CapturedFileInput, CapturedProjectInput, ObservationLimits};
 
 /// An admitted existing folder. It remains writable by the user's ordinary tools.
+#[derive(Clone)]
 pub struct ProjectAttachment {
     root: PathBuf,
     pinned: PinnedWorkspaceRoot,

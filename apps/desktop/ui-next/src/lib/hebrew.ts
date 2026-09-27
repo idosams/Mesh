@@ -1,5 +1,10 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Show latest versions":"הצגת הגרסאות האחרונות",
+"Saved versions for":"גרסאות שמורות עבור",
+"Saved versions · newest first":"גרסאות שמורות · החדשות תחילה",
+"Older versions":"גרסאות קודמות",
+"This history page stays fixed while capture continues. File previews and review are not available here yet.":"עמוד ההיסטוריה נשאר קבוע בזמן שהלכידה נמשכת. תצוגה מקדימה של קבצים וסקירה אינן זמינות כאן עדיין.",
 "Separate workspace":"סביבת עבודה נפרדת",
 "Create a working copy":"יצירת עותק עבודה",
 "Attached projects":"פרויקטים מחוברים",

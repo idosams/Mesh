@@ -11,7 +11,8 @@ export function attachedProjectList(raw) {
   const ids = new Set();
   return value.projects.map((project) => {
     const capture = project?.capture;
-    if (!/^[a-f0-9]{64}$/.test(project?.id ?? '') || ids.has(project.id)
+    if (typeof project?.id !== 'string' || typeof project.generation !== 'string'
+      || !/^[a-f0-9]{64}$/.test(project.id) || ids.has(project.id)
       || !/^[1-9][0-9]{0,19}$/.test(project.generation ?? '')
       || !safeText(project.root, 4096) || !project.root.startsWith('/')
       || capture?.schema !== 'mesh.attachment-capture/v1'
@@ -29,8 +30,22 @@ export function attachedProjectList(raw) {
   });
 }
 
+export function attachedVersionPage(raw, id, before) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.attachment-versions/v1' || value.project !== id || value.before !== before
+    || !Array.isArray(value.versions) || value.versions.length > 50
+    || value.versions.some((version) => typeof version !== 'string' || !/^[a-f0-9]{64}$/.test(version))
+    || new Set(value.versions).size !== value.versions.length
+    || value.versions.includes(before)
+    || (value.next_before !== null && (value.versions.length !== 50 || value.next_before !== value.versions.at(-1)))) {
+    throw new Error('Invalid attachment version page');
+  }
+  return Object.freeze({ versions: Object.freeze([...value.versions]), nextBefore: value.next_before });
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
+  let histories = {};
   let busy = false;
   let error = '';
   let mounted = false;
@@ -38,7 +53,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, busy, error, available: typeof invoke === 'function' },
     }));
   };
   const planRefresh = () => {
@@ -82,6 +97,17 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
     if (value.type === 'attach' && Object.keys(value).length === 2
       && safeText(value.source, 4096) && value.source.startsWith('/')) {
       void run(() => invoke('attach_existing_project', { source: value.source }));
+      return;
+    }
+    if (value.type === 'versions' && Object.keys(value).length === 3
+      && projects.some((project) => project.id === value.id)
+      && (value.before === null || (typeof value.before === 'string' && value.before === histories[value.id]?.nextBefore))) {
+      void run(async () => {
+        const page = attachedVersionPage(await invoke('attached_project_versions', {
+          id: value.id, before: value.before,
+        }), value.id, value.before);
+        histories = { ...histories, [value.id]: page };
+      });
       return;
     }
     if (error || value.type !== 'control' || Object.keys(value).length !== 4

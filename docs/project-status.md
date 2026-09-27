@@ -21,8 +21,10 @@ provisioning now creates a private per-project store under a host-owned external
 retained source/store authority directly to capture; partial or replaced stores refuse. Desktop
 attachment controls now select or type an existing project path, show native capture health, and
 request capture, stop or resume using exact session generations. The attachment and separate-copy
-flows retain English/Hebrew localization. Session lists reset on quit; saved history remains.
-Packaged lifecycle, attachment version browsing and review, live fleet UI, process-tree recovery
+flows retain English/Hebrew localization. Latest and older saved-version pages now remain fixed while
+new captures continue; native history reads reject replaced storage and foreign cursors. Session lists
+reset on quit; saved history remains. Packaged lifecycle, attached-file previews, comparison and
+review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 

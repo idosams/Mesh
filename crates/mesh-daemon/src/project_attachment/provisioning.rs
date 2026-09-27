@@ -20,6 +20,7 @@ pub struct AttachmentStorage {
 }
 
 /// A registered project and its exact native store authority, ready for capture.
+#[derive(Clone)]
 pub struct ProvisionedAttachment {
     attachment: ProjectAttachment,
     metadata: PathBuf,
@@ -97,16 +98,22 @@ impl ProvisionedAttachment {
         &self.attachment
     }
 
-    /// Transfer the admitted source and store descriptors directly to the capture worker.
+    /// Read exact saved versions through the store admitted during provisioning.
+    pub fn saved_versions(&self) -> io::Result<Vec<super::SavedAttachmentVersion>> {
+        self.attachment
+            .saved_versions_in_store(&self.metadata, self.store.clone())
+    }
+
+    /// Share the admitted source and store descriptors directly with the capture worker.
     pub fn start_capture(
-        self,
+        &self,
         signer: Arc<dyn CheckpointSigner>,
         schedule: CaptureSchedule,
     ) -> io::Result<AttachmentCaptureService> {
         AttachmentCaptureService::start_pinned(
             &self.metadata,
-            self.attachment,
-            self.store,
+            self.attachment.clone(),
+            self.store.clone(),
             signer,
             schedule,
         )

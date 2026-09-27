@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
 type Project = { id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
-type Projection = { projects: Project[]; busy: boolean; error: string; available: boolean };
-const empty: Projection = { projects: [], busy: false, error: "", available: false };
-const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
+type VersionPage = { versions: string[]; nextBefore: string | null };
+type Projection = { histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+const empty: Projection = { histories: {}, projects: [], busy: false, error: "", available: false };
+const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
   starting: "Starting capture", scanning: "Checking changes", saving: "Saving a version",
   waiting: "Watching for changes", stopping: "Stopping capture", stopped: "Capture stopped", failed: "Capture needs attention",
@@ -56,11 +57,22 @@ export function AttachedProjects() {
         <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t("No saved version yet")}</p>
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" disabled={disabled || !project.savedVersion}
+            onClick={() => send({ type: "versions", id: project.id, before: null })}>{t("Show latest versions")}</Button>
           <Button variant="secondary" disabled={disabled || terminal || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: "capture" })}>{t("Capture now")}</Button>
           <Button variant="secondary" disabled={disabled || project.phase === "stopping"}
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: terminal ? "resume" : "stop" })}>{t(terminal ? "Resume capture" : "Stop capture")}</Button>
         </div>
+        {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
+          <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
+          <ol className="max-h-64 overflow-auto text-xs">
+            {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><bdi dir="ltr">{version}</bdi></li>)}
+          </ol>
+          {projection.histories[project.id].nextBefore && <Button variant="secondary" disabled={disabled}
+            onClick={() => send({ type: "versions", id: project.id, before: projection.histories[project.id].nextBefore })}>{t("Older versions")}</Button>}
+          <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues. File previews and review are not available here yet.")}</p>
+        </section>}
       </article>;
     })}
     <p className="text-xs text-muted-foreground">{t("After reopening Mesh, attach the same project to resume capture. Saved history is retained.")}</p>
