@@ -161,11 +161,11 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A08 | `0823850023496505f3c45074ea972c2b36c1dbc0` | Preserve pending review bases as shared main advances | A08 prerequisite: [PR #30](https://github.com/idosams/Mesh/pull/30), replacement `9b17bf50e10f4c972dd3dae371bb691c26913c6b`, transferred before review-request admission to preserve immutable pending reviews; stacked on #29; full local gate passed (3,142 Rust tests, 13 skipped; 576 desktop tests; 44 daemon checks), all seven hosted checks passed at `a054186c4ee0828239dfa247de420507077c3b10` in run 36353559670, not merged |
 | A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | A08b: [PR #32](https://github.com/idosams/Mesh/pull/32), replacement `893dca74c13f919036397dc7cf2af6baff88c667`, remaining native exact-approval implementation transferred on #31; full gate passed (3,150 native tests, 13 skips; 580 desktop tests; 44 daemon checks); all seven hosted checks passed at `f58b2107fd3da5667c816d11a701de559d560fe9` in run 36355574791, not merged. Directory-lock prerequisite already delivered with A08a (#31), not reapplied; desktop approval controls remain a separate increment |
 | A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: [PR #33](https://github.com/idosams/Mesh/pull/33), replacement `68ab496a804204111b3087ee7c7fc9a1640adb55`, native confirmation, verified main inspection and localized controls on #32; full gate passed (3,151 native tests, one passed with a lingering-handle flag, 13 skips; 587 desktop tests; 44 daemon checks); hosted CI pending, not merged |
-| A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | Transferring on #34; validation and PR pending |
-| A09 | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | Pending transfer |
+| A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | [Mesh PR #35](https://github.com/idosams/Mesh/pull/35), `3119b8b6233d17309d283d30d6aa855c2a14b8ce`; stacked on #34; not merged |
+| A09b | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | Transferring on #35; includes allocation fix below; validation and PR pending |
 | A09 | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Pending transfer |
 | A09 | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Pending transfer |
-| A09 | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Pending transfer |
+| A09b prerequisite | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Moving into A09b to avoid the known metadata-copy defect; do not apply twice |
 | A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Pending transfer |
 | L01 | `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` | Open attached saved versions as independent work lanes | Pending transfer |
 | L01 | `c728c41c9831e636a6bdfbb9b0212739ad6ba974` | Connect attached saved versions to managed fleet lanes | Pending transfer |
@@ -302,7 +302,8 @@ The prior sealed bundle was preserved and its executable hash compared before re
 This managed-workspace journey does not verify the new attached-project controls or actual Secure
 Enclave presence. The bundle truthfully reports approval unavailable without validated Apple identity.
 [Mesh PR #34](https://github.com/idosams/Mesh/pull/34) publishes this correction, stacked on #33.
-Hosted CI is pending; no merge is implied.
+All seven hosted checks passed at `ab5907c182d910661929c97fdded64f320b7ed9f` in run
+36357973889; ready for required human review, unmerged.
 
 The prerequisite [Mesh PR #33](https://github.com/idosams/Mesh/pull/33) passed all seven hosted
 checks at `f27287d4e99e6c63e2a602a83a2c1283703c601c` in run 36356728345 and is ready for required
@@ -316,4 +317,30 @@ comparison binds the exact accepted review and original base, observes bounded c
 reports divergence without write authority. Removed ancestors remain absent from historical review
 presentation even though retained objects still exist for recovery. Review paths are normalized to
 confined relative names. Source integration and recovery remain separate dependent increments.
-Validation and publication remain pending; no packaged attached-project acceptance or merge is claimed.
+[Mesh PR #35](https://github.com/idosams/Mesh/pull/35) publishes replacement
+`3119b8b6233d17309d283d30d6aa855c2a14b8ce`. All seven hosted checks passed in run 36358370954.
+All seven native attachment approval/comparison tests, 30 coordinator tests and 108 UI tests passed.
+The new localized rendering regression failed against the unchanged parent, and disabling the native
+directory safeguard caused the expected conflict regression to fail. Both implementations were
+restored byte-for-byte. The first full local gate stopped after an existing version-page test's
+capture-stop wait exceeded ten seconds: 1,796 native tests passed, one failed, 1,356 were not run,
+and 13 were skipped. Desktop and real-daemon gates were not reached. The unchanged focused test
+passed in 6.179s, but the cause remains unproven and the original failure log is retained. A full
+unchanged recheck exited zero at `3119b8b6233d17309d283d30d6aa855c2a14b8ce`: 3,153 native tests,
+590 desktop tests and 44 real-daemon checks; 13 platform/provider skips. One passing sequence test
+was flagged for a lingering process handle. Neither this passing recheck nor green hosted CI erases
+the first capture-stop timeout; its cause remains unresolved.
+No packaged attached-project acceptance or merge is claimed.
+
+## A09b retained replacement and metadata prerequisite
+
+The regular-file transaction source `38d0a9386e3fef2c3670ff371533e204e1bc76e3` is transferring
+on canonical #35. Its later allocation-identity correction
+`633af5ca9d81e6c71532b24332fe4310dac0899d` accompanies this foundation rather than introducing
+a known broad-metadata-copy defect first. This is native-only preparation/application, not a
+desktop confirmation or recovery browser. The unchanged parent full recheck has completed; its failure and passing evidence are retained above.
+Nine native retained-replacement/metadata tests and both approved-file integration tests passed.
+The original broad metadata copy failed the allocation-identity regression by transplanting its
+source creation timestamp; the corrected implementation was restored byte-for-byte. All nine restored
+replacement tests and all nine attachment approval/comparison/integration tests passed.
+Full canonical validation and publication remain pending.

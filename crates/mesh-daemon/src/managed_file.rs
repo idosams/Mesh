@@ -34,6 +34,8 @@ pub const LOCAL_EDIT_IDLE_MILLIS: u64 = 50;
 
 static TEMPORARY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+pub(crate) mod retained_replacement;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ManagedDirectoryIdentity {
     device: u64,

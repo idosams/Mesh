@@ -356,6 +356,31 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Stage one approved regular-file replacement in native-configured external recovery storage.
+    /// This changes no source files. Applying the returned single-use proposal is a separate,
+    /// explicit native operation; no agent tool or renderer command exposes it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_main_file_integration(
+        &self,
+        bundle: &str,
+        target: &str,
+        relative: &str,
+        recovery_root: &Path,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedMainFileIntegration> {
+        super::writeback::prepare(
+            self.clone(),
+            self.store.clone(),
+            bundle,
+            target,
+            relative,
+            recovery_root,
+            trusted,
+            limits,
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

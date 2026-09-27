@@ -671,3 +671,167 @@ fn integration_preview_bounds_output_and_refuses_incomplete_or_unsafe_observatio
         .is_err());
     assert_eq!(f.journal(), journal);
 }
+
+fn recovery_root(f: &Fixture) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt as _;
+    let root = f.root.join("recovery");
+    fs::create_dir(&root).unwrap();
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    root
+}
+
+#[test]
+fn approved_file_integration_retains_late_editor_writes_and_exact_receipts() {
+    use std::os::unix::fs::MetadataExt as _;
+    let f = Fixture::new("retained-file");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("first");
+    accept(&f, &signer, &trust, &first, 1);
+    let second = f.save("approved second");
+    let bundle = accept(&f, &signer, &trust, &second, 2);
+    fs::write(f.source.join("work.txt"), b"first").unwrap();
+    fs::write(f.source.join("unrelated.txt"), b"current work").unwrap();
+    f.git(&["init", "--quiet"]);
+    f.git(&["add", "."]);
+    let index = fs::read(f.source.join(".git/index")).unwrap();
+    let head = fs::read(f.source.join(".git/HEAD")).unwrap();
+    let journal = f.journal();
+    let root = recovery_root(&f);
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    let original_inode = editor.metadata().unwrap().ino();
+    let prepared = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &second,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let recovery = prepared.recovery_path().to_owned();
+    let proposal = prepared.proposal().clone();
+    assert_eq!(proposal.get("automatic_replay"), Some(&Json::Bool(false)));
+    assert_eq!(proposal.get("bundle"), Some(&Json::text(&bundle)));
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"first");
+    assert_eq!(
+        fs::read(recovery.join("exchange")).unwrap(),
+        b"approved second"
+    );
+    assert_eq!(
+        fs::read_to_string(recovery.join("prepared.json")).unwrap(),
+        proposal.encode()
+    );
+    let result = prepared.apply(&trust).unwrap();
+    assert_eq!(result.get("status"), Some(&Json::text("applied-observed")));
+    editor.write_all(b" + late editor work").unwrap();
+    editor.sync_all().unwrap();
+    assert_eq!(
+        fs::metadata(recovery.join("exchange")).unwrap().ino(),
+        original_inode
+    );
+    assert_eq!(
+        fs::read(recovery.join("exchange")).unwrap(),
+        b"first + late editor work"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"approved second"
+    );
+    assert_eq!(
+        fs::read(f.source.join("unrelated.txt")).unwrap(),
+        b"current work"
+    );
+    assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), head);
+    assert_eq!(f.journal(), journal);
+    assert_eq!(
+        fs::read_to_string(recovery.join("observed.json")).unwrap(),
+        result.encode()
+    );
+    // Restart can recover both durable receipts and the displaced inode without replaying apply.
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    assert_eq!(
+        reopened.accepted_main(&trust).unwrap(),
+        f.history.accepted_main(&trust).unwrap()
+    );
+    assert_eq!(
+        fs::read(recovery.join("exchange")).unwrap(),
+        b"first + late editor work"
+    );
+}
+
+#[test]
+fn file_integration_revalidates_trust_main_source_exclusions_and_preparation() {
+    let f = Fixture::new("retained-refusal");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let second = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &second, 2);
+    let root = recovery_root(&f);
+    let prepare = || {
+        f.history.prepare_main_file_integration(
+            &bundle,
+            &second,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+    };
+    assert!(prepare().is_err()); // Already-present content is not a base-matching replacement.
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    assert!(f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &second,
+            "../work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    assert!(f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &second,
+            "work.txt",
+            &f.source,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    let prepared = prepare().unwrap();
+    assert!(prepared.apply(&TrustedReviewers::default()).is_err());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    let prepared = prepare().unwrap();
+    fs::write(f.source.join("work.txt"), b"new live edits").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"new live edits"
+    );
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let prepared = prepare().unwrap();
+    fs::write(prepared.recovery_path().join("prepared.json"), b"{}").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    let prepared = prepare().unwrap();
+    fs::write(f.source.join(".meshignore"), b"work.txt\n").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    fs::remove_file(f.source.join(".meshignore")).unwrap();
+    let prepared = prepare().unwrap();
+    let third = f.save("new main");
+    accept(&f, &signer, &trust, &third, 3);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+}

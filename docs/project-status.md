@@ -62,6 +62,10 @@ A read-only attached-main comparison now classifies current changes against the 
 review and its base. Ignored children and conflicting parents block destructive previews. This is
 a bounded observation, not an atomic snapshot or permission to write. Source integration and
 recovery remain pending migration and acceptance.
+Native-only regular-file integration now retains the displaced inode during a guarded atomic
+exchange, preserving late writes through existing editor handles. Staged and observed receipts
+record uncertainty without replay or automatic cleanup. This unmerged foundation exposes no desktop
+or agent apply command; confirmation, restart recovery and full integration remain unfinished.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

@@ -268,3 +268,9 @@ Attached main comparison now observes the accepted review base, accepted result 
 It classifies unchanged main paths as current work to retain, distinguishes already-present results
 and conflicts, and blocks destructive directory previews with unobserved children. The bounded
 read-only overview grants no write authority; retained integration and recovery remain required.
+
+Native attached-file integration now prepares a single-use regular-file proposal from exact accepted
+main and an unchanged approved base. Explicit trusted-native apply atomically exchanges names and
+retains the displaced inode for late editor writes. Metadata copying preserves allocation identity.
+No desktop, agent, MCP or CLI apply surface is added. Restart inspection, restoration, grouped
+integration, actual native confirmation and packaged graphical acceptance remain required.

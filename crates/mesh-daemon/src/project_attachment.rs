@@ -1,8 +1,9 @@
-//! Persistent, non-exclusive attachment to an existing project. No project files are written.
+//! Persistent, non-exclusive attachment to an existing project. Observation never writes source.
 //!
 //! The native caller chooses a private metadata directory outside the source project. This record
 //! establishes observation identity only. Explicit signed saves use external history and grant no
-//! source custody, approval or write-back authority.
+//! source custody, approval or write-back authority. Explicit native integration is a separate
+//! single-use operation over already-approved content and retained recovery material.
 
 use std::fs;
 use std::io::{self, Read as _};
@@ -32,6 +33,8 @@ mod approval;
 mod history;
 mod inspection;
 mod integration;
+mod writeback;
+pub use writeback::PreparedMainFileIntegration;
 mod reviews;
 pub use history::SavedAttachmentVersion;
 
