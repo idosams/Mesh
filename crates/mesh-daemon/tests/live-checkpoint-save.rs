@@ -934,6 +934,30 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
     };
     let daemon = LiveDaemon::with_checkpoint_runtime(startup(), runtime).expect("config");
     daemon.open_at_start(&root).expect("workspace");
+    // Arm before save launches the detached worker. Installing a trigger after save races
+    // the 40 ms recovery timer: a slow CREATE TRIGGER can otherwise miss the write entirely.
+    // Admit exactly the initial observation, then refuse every subsequent state persistence.
+    let mut database =
+        Sqlite::open(root.join(".mesh").join(RECOVERY_DATABASE_FILE_NAME)).expect("sqlite");
+    database
+        .execute_batch(&format!(
+            "CREATE TABLE test_maximum_recovery_writes (count INTEGER NOT NULL);
+             INSERT INTO test_maximum_recovery_writes VALUES (0);
+             CREATE TRIGGER refuse_maximum_recovery
+             BEFORE INSERT ON {table}
+             WHEN (SELECT count FROM test_maximum_recovery_writes) >= 1
+             BEGIN SELECT RAISE(ABORT, 'planted maximum recovery failure'); END;
+             CREATE TRIGGER count_initial_observation
+             AFTER INSERT ON {table}
+             BEGIN UPDATE test_maximum_recovery_writes SET count = count + 1; END;
+             CREATE TRIGGER count_initial_observation_update
+             AFTER UPDATE ON {table}
+             BEGIN UPDATE test_maximum_recovery_writes SET count = count + 1; END;",
+            table = SqliteRecoveryState::table_name(),
+        ))
+        .expect("failure injection before worker launch");
+    drop(database);
+
     daemon
         .save_file_version(
             RecoverySequence::new(1).expect("sequence"),
@@ -944,18 +968,6 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
             &CanonicalHead,
         )
         .expect("durable save");
-
-    let mut database =
-        Sqlite::open(root.join(".mesh").join(RECOVERY_DATABASE_FILE_NAME)).expect("sqlite");
-    database
-        .execute_batch(&format!(
-            "CREATE TRIGGER refuse_maximum_recovery
-             BEFORE INSERT ON {}
-             BEGIN SELECT RAISE(ABORT, 'planted maximum recovery failure'); END;",
-            SqliteRecoveryState::table_name(),
-        ))
-        .expect("failure injection");
-    drop(database);
 
     let deadline = std::time::Instant::now() + Duration::from_millis(150);
     loop {
