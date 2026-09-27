@@ -7,8 +7,11 @@ type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null;
 type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
 type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
 type VersionPage = { versions: string[]; nextBefore: string | null };
-type Projection = { inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
-const empty: Projection = { inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
+type Change = { path: string; change: string; before: Omit<SavedEntry, "path"> | null; after: Omit<SavedEntry, "path"> | null };
+type Comparison = { base: string; target: string; changes: Change[]; total: number; nextAfter: string | null;
+  file: { path: string; before: SavedFile | null; after: SavedFile | null; beforeKind: string; afterKind: string } | null };
+type Projection = { bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+const empty: Projection = { bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
   starting: "Starting capture", scanning: "Checking changes", saving: "Saving a version",
@@ -69,14 +72,20 @@ export function AttachedProjects() {
         </div>
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
+          <p className="break-all text-xs text-muted-foreground">{projection.bases[project.id] && <>{t("Selected comparison base:")} <bdi dir="ltr">{projection.bases[project.id]}</bdi></>}</p>
           <ol className="max-h-64 overflow-auto text-xs">
             {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><button className="text-left underline" disabled={disabled}
-              onClick={() => send({ type: "inspect", id: project.id, operation: version })}><bdi dir="ltr">{version}</bdi></button></li>)}
+              onClick={() => send({ type: "inspect", id: project.id, operation: version })}><bdi dir="ltr">{version}</bdi></button>
+              <div className="mt-1 flex gap-3"><button className="underline" disabled={disabled}
+                onClick={() => send({ type: "set-base", id: project.id, operation: version })}>{t("Use as base")}</button>
+              <button className="underline" disabled={disabled || !projection.bases[project.id]}
+                onClick={() => send({ type: "compare", id: project.id, target: version })}>{t("Compare with base")}</button></div></li>)}
           </ol>
           {projection.histories[project.id].nextBefore && <Button variant="secondary" disabled={disabled}
             onClick={() => send({ type: "versions", id: project.id, before: projection.histories[project.id].nextBefore })}>{t("Older versions")}</Button>}
           <p className="text-xs text-muted-foreground">{t("This history page stays fixed while capture continues.")}</p>
         </section>}
+        {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} />}
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
@@ -104,5 +113,41 @@ function SavedInspection({ project, inspection, disabled }: { project: string; i
         : <p className="text-sm text-muted-foreground">{t(inspection.file.state === "binary" ? "Binary file. Text preview is unavailable." : "This file exceeds the 256 KiB text preview limit.")}</p>}
     </div>}
     <p className="text-xs text-muted-foreground">{t("Read-only saved content. Edits in your working folder do not change this view.")}</p>
+  </section>;
+}
+
+function SavedComparison({ project, comparison, disabled }: { project: string; comparison: Comparison; disabled: boolean }) {
+  const t = useTranslation();
+  const labels: Record<string, string> = { added: "Added", removed: "Removed", modified: "Content changed", "mode-changed": "Executable mode changed", "type-changed": "File/folder type changed" };
+  const describe = (side: Change["before"]) => side?.kind === "file"
+    ? <>{side.bytes} {t("Bytes")}, {t(side.executable ? "Executable" : "Not executable")}</>
+    : t(side ? "Folder" : "Absent in this version");
+  return <section aria-label={t("Saved version comparison")} className="grid gap-3 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Compare saved versions")} · {comparison.total} {t("changed paths")}</h4>
+    <p className="break-all text-xs text-muted-foreground">{t("Base:")} <bdi dir="ltr">{comparison.base}</bdi></p>
+    <p className="break-all text-xs text-muted-foreground">{t("Compared version:")} <bdi dir="ltr">{comparison.target}</bdi></p>
+    <ul className="max-h-64 overflow-auto text-sm">{comparison.changes.map((change) => <li key={change.path} className="py-1">
+      <button className="break-all text-left underline" disabled={disabled}
+        onClick={() => send({ type: "compare-file", id: project, base: comparison.base, target: comparison.target, path: change.path })}>{t(labels[change.change])} · <bdi dir="ltr">{change.path}</bdi></button>
+      <span className="block text-xs text-muted-foreground">{t("Before")}: {describe(change.before)} · {t("After")}: {describe(change.after)}</span>
+    </li>)}</ul>
+    {comparison.total === 0 && <p className="text-sm">{t("These versions have the same paths, content and executable modes.")}</p>}
+    {comparison.nextAfter && <Button variant="secondary" disabled={disabled}
+      onClick={() => send({ type: "compare-page", id: project, base: comparison.base, target: comparison.target, after: comparison.nextAfter })}>{t("More changes")}</Button>}
+    {comparison.file && <div className="grid gap-3">
+      <p className="break-all text-sm font-medium"><bdi dir="ltr">{comparison.file.path}</bdi></p>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ComparisonSide label="Before" file={comparison.file.before} kind={comparison.file.beforeKind} />
+        <ComparisonSide label="After" file={comparison.file.after} kind={comparison.file.afterKind} />
+      </div>
+    </div>}
+    <p className="text-xs text-muted-foreground">{t("This comparison stays on these saved versions while work continues. It does not approve or apply changes.")}</p>
+  </section>;
+}
+function ComparisonSide({ label, file, kind }: { label: string; file: SavedFile | null; kind: string }) {
+  const t = useTranslation();
+  return <section className="min-w-0" aria-label={t(label)}><h5 className="text-sm font-medium">{t(label)}</h5>
+    {file?.state === "text" ? <pre dir="ltr" className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{file.text}</pre>
+      : <p className="text-sm text-muted-foreground">{t(!file ? kind === "absent" ? "Absent in this version" : "Folder" : file.state === "binary" ? "Binary file; no text preview" : "File exceeds the 256 KiB preview limit")}</p>}
   </section>;
 }

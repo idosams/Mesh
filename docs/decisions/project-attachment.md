@@ -278,7 +278,7 @@ The attachment panel exposes latest and older version pages. The coordinator val
 project binding and cursor continuity. Labels follow the English/Hebrew preference and exact
 version IDs remain left-to-right. A normal status refresh never replaces the explicit history
 page. The UI lists saved identities and now exposes the saved-file inspection described below;
-comparisons, approval and parallel review still require implementation. Native tests save more
+the comparison path is described below; approval and parallel review remain pending. Native tests save more
 than one page, continue saving, verify
 cursor stability and refuse replaced history storage. UI tests cover malformed pages and preserving
 a loaded page while the live saved-version status advances. Packaged runtime verification is pending.
@@ -309,3 +309,30 @@ after external edits, binary preview after live deletion, large-file limits, abs
 paths/cursors and replaced storage. Coordinator tests bind responses to content metadata and preserve
 selected text while the latest capture advances. Comparison, parallel pinned review and packaged proof
 remain outstanding.
+
+## Comparison of saved attachment versions
+
+`compare_versions(base, target, after)` verifies both exact identities in the same admitted history
+under one native store lock. It materializes each saved version, verifies its manifests, and compares
+reachable paths by kind, content digest/size and executable metadata. Changes are added, removed,
+modified, mode-changed or type-changed. A content-and-mode change is modified with both exact side
+metadata included. This path comparison reports renames as removal/addition and does not infer author,
+rename intent, acceptance or merge safety. Empty directories participate in the comparison.
+
+The response includes both identities, total changed-path count and at most 200 changes. Cursors must
+name a changed path in that exact comparison. New captures leave existing comparison pages unchanged.
+Canonical alpha.5 already skips retained unlinked objects when building its visible path map; these
+objects are valid causal history after removal/replacement. Complete materialization, unique reachable
+paths, every visible entry's object binding and manifest verification remain required. The migrated comparison
+regression covers this behavior; no replacement of the canonical path-resolution implementation
+or its instrumentation is required.
+
+The desktop exposes a typed `compare_attached_versions` command. Users select a saved base and then a
+saved target; the panel keeps the open comparison pair separate from the next selected base. Selecting
+a changed path reads exact saved file previews for each present file side, checked against that side's
+digest, size and executable metadata. Missing sides, folders, binary content and oversized previews
+have explicit states. These are bounded whole-file before/after previews, not line-level diff hunks.
+The view does not approve or apply content. Capture refresh, version-list paging and next-base selection
+do not replace an open comparison. Tests exercise incorrect tuple/metadata rejection and both previews
+remaining pinned while the latest capture and next selected base change. Parallel pinned reviews,
+main-version approval/integration and packaged user-journey proof remain required.

@@ -80,10 +80,41 @@ export function attachedText(raw, id, operation, entry) {
   return value;
 }
 
+export function attachedComparison(raw, id, base, target, after) {
+  const envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const value = envelope?.comparison;
+  if (envelope?.project !== id || value?.schema !== 'mesh.attachment-comparison/v1'
+    || value.base !== base || value.target !== target || value.after !== after
+    || !Array.isArray(value.changes) || value.changes.length > 200
+    || !Number.isSafeInteger(value.total) || value.total < value.changes.length) throw new Error('Invalid saved comparison');
+  const paths = new Set();
+  for (const change of value.changes) {
+    if (!safeText(change?.path, 4096) || change.path.startsWith('/')
+      || change.path.split('/').some((part) => !part || part === '.' || part === '..')
+      || paths.has(change.path) || change.path === after
+      || !['added', 'removed', 'modified', 'mode-changed', 'type-changed'].includes(change.change)) throw new Error('Invalid comparison change');
+    paths.add(change.path);
+    for (const side of [change.before, change.after]) {
+      if (side === null) continue;
+      if (!side || !['file', 'folder'].includes(side.kind)
+        || (side.kind === 'folder' && (side.bytes !== null || side.digest !== null || side.executable !== null))
+        || (side.kind === 'file' && (!Number.isSafeInteger(side.bytes) || side.bytes < 0
+          || typeof side.digest !== 'string' || !/^[a-f0-9]{64}$/.test(side.digest) || typeof side.executable !== 'boolean'))) throw new Error('Invalid comparison side');
+    }
+    if (change.change === 'added' ? change.before !== null || change.after === null
+      : change.change === 'removed' ? change.before === null || change.after !== null
+        : change.before === null || change.after === null) throw new Error('Invalid comparison presence');
+  }
+  if (value.next_after !== null && (value.changes.length !== 200 || value.next_after !== value.changes.at(-1).path)) throw new Error('Invalid comparison cursor');
+  return { base, target, changes: value.changes, total: value.total, nextAfter: value.next_after, file: null };
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
   let inspections = {};
+  let bases = {};
+  let comparisons = {};
   let busy = false;
   let error = '';
   let mounted = false;
@@ -91,7 +122,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, busy, error, available: typeof invoke === 'function' },
     }));
   };
   const planRefresh = () => {
@@ -122,6 +153,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   function intent(event) {
     const value = event.detail;
     if (!mounted || busy || !value || typeof value !== 'object') return;
+    if ('id' in value && !projects.some((project) => project.id === value.id)) return;
     if (value.type === 'refresh' && Object.keys(value).length === 1) { void run(); return; }
     if (value.type === 'choose' && Object.keys(value).length === 1) {
       void run(async () => {
@@ -177,6 +209,47 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
           id: value.id, operation: value.operation, path: value.path, after: null,
         }), value.id, value.operation, entry);
         inspections = { ...inspections, [value.id]: { ...selected, file } };
+      });
+      return;
+    }
+    if (value.type === 'set-base' && Object.keys(value).length === 3 && histories[value.id]?.versions.includes(value.operation)) {
+      bases = { ...bases, [value.id]: value.operation }; publish(); return;
+    }
+    if (value.type === 'compare' && Object.keys(value).length === 3 && bases[value.id]
+      && histories[value.id]?.versions.includes(value.target)) {
+      const base = bases[value.id];
+      void run(async () => {
+        const comparison = attachedComparison(await invoke('compare_attached_versions', {
+          id: value.id, base, target: value.target, after: null,
+        }), value.id, base, value.target, null);
+        comparisons = { ...comparisons, [value.id]: comparison };
+      });
+      return;
+    }
+    const comparison = comparisons[value.id];
+    if (value.type === 'compare-page' && Object.keys(value).length === 5
+      && comparison && comparison.base === value.base && comparison.target === value.target
+      && typeof value.after === 'string' && comparison.nextAfter === value.after) {
+      void run(async () => {
+        const page = attachedComparison(await invoke('compare_attached_versions', {
+          id: value.id, base: value.base, target: value.target, after: value.after,
+        }), value.id, value.base, value.target, value.after);
+        comparisons = { ...comparisons, [value.id]: { ...page, file: comparison.file } };
+      });
+      return;
+    }
+    if (value.type === 'compare-file' && Object.keys(value).length === 5
+      && comparison && comparison.base === value.base && comparison.target === value.target) {
+      const change = comparison.changes.find((change) => change.path === value.path);
+      if (!change) return;
+      void run(async () => {
+        const read = async (side, operation) => side?.kind === 'file'
+          ? attachedText(await invoke('inspect_attached_version', { id: value.id, operation, path: value.path, after: null }),
+            value.id, operation, { ...side, path: value.path }) : null;
+        const [before, after] = await Promise.all([read(change.before, value.base), read(change.after, value.target)]);
+        comparisons = { ...comparisons, [value.id]: { ...comparison, file: {
+          path: value.path, before, after, beforeKind: change.before?.kind ?? 'absent', afterKind: change.after?.kind ?? 'absent',
+        } } };
       });
       return;
     }

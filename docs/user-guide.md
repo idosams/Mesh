@@ -71,7 +71,10 @@ its packaged UI acceptance is complete.
    the preview; select another saved version or file to change it.
 
 Text previews are read-only and limited to 256 KiB. Binary and larger files show why text is
-unavailable. This view does not compare or approve versions yet. **Stop capture** and **Resume
+unavailable. To compare saved versions, choose **Use as base** on one version and **Compare with base** on
+another. Select a changed path to see its saved before/after contents. The open comparison stays
+fixed when capture advances or you choose the next comparison base. Missing files, folders and
+unavailable text previews have explicit states. This view does not approve or apply changes. **Stop capture** and **Resume
 capture** control the session without changing the original project's files. After restarting this
 development build, attach the same project again to access its retained history.
 

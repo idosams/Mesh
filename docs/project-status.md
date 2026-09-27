@@ -25,8 +25,10 @@ flows retain English/Hebrew localization. Latest and older saved-version pages n
 new captures continue; native history reads reject replaced storage and foreign cursors. Session lists
 reset on quit; saved history remains. Exact saved-file inspection now pages through directories and
 files and previews bounded saved text without consulting live file contents. Binary and oversized
-files have explicit unavailable states, and paths/content stay literal in the localized UI. Packaged
-lifecycle, comparison and review, live fleet UI, process-tree recovery
+files have explicit unavailable states, and paths/content stay literal in the localized UI. Exact
+saved-version comparisons now report path, content and executable-mode changes with fixed before/after
+previews. Selecting a new comparison base does not change an already open comparison. Packaged
+lifecycle and review, live fleet UI, process-tree recovery
 and complete acceptance journeys remain pending migration and verification.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 

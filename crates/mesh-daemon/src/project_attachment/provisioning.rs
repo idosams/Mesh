@@ -120,6 +120,17 @@ impl ProvisionedAttachment {
             .inspect_text(&self.metadata, self.store.clone(), operation, path)
     }
 
+    /// Compare exact saved versions by path, content and executable metadata, with bounded paging.
+    pub fn compare_versions(
+        &self,
+        base: &str,
+        target: &str,
+        after: Option<&str>,
+    ) -> io::Result<crate::ipc::Json> {
+        self.attachment
+            .compare_saved(&self.metadata, self.store.clone(), base, target, after)
+    }
+
     /// Share the admitted source and store descriptors directly with the capture worker.
     pub fn start_capture(
         &self,

@@ -814,6 +814,22 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn compare_attached_versions(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        base: String,
+        target: String,
+        after: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.compare(&id, &base, &target, after.as_deref())
+        })
+        .await
+        .map_err(|_| "Saved version comparison is unavailable".to_owned())?
+    }
+
+    #[tauri::command]
     async fn control_attached_project(
         host: State<'_, Arc<AttachmentHost>>,
         id: String,
@@ -6658,6 +6674,7 @@ mod desktop {
                 attached_projects,
                 attached_project_versions,
                 inspect_attached_version,
+                compare_attached_versions,
                 control_attached_project,
                 recent_workspace_status,
                 renderer_proof_configuration,

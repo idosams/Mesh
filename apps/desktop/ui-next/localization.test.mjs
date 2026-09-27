@@ -12,14 +12,15 @@ async function loadLocalization() {
     import { LanguagePicker } from './src/organisms/language-picker';
     import { ArtifactContentChanges } from './src/organisms/artifact-review';
     import { ImportWorkbench } from './src/organisms/import-workbench';
-    import { SavedInspection } from './src/organisms/attached-projects';
+    import { SavedInspection, SavedComparison } from './src/organisms/attached-projects';
     export * from './src/lib/localization';
     export const renderNavigation = () => renderToStaticMarkup(<ProductionNavigation activePage="files" workspaceReady={true} nativeChangeCount={0} onNavigate={() => {}} />);
     export const renderPicker = () => renderToStaticMarkup(<LanguagePicker />);
     export const renderSections = (comparison) => renderToStaticMarkup(<ArtifactContentChanges change={{diffHunks: [], beforeLabel: 'Before', afterLabel: 'After', beforeValues: [], afterValues: []}} layout="inline" comparison={comparison} />);
+    export const renderSavedComparison = (comparison) => renderToStaticMarkup(<SavedComparison project="project" comparison={comparison} disabled={false} />);
     export const renderSavedInspection = (inspection) => renderToStaticMarkup(<SavedInspection project="project" inspection={inspection} disabled={false} />);
     export const renderImport = (model) => renderToStaticMarkup(<ImportWorkbench model={model} onIntent={() => {}} />);
-  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { SavedInspection };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
+  `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { SavedInspection, SavedComparison };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
   const module = { exports: {} };
   Function('require', 'module', 'exports', result.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
   return module.exports;
@@ -155,4 +156,28 @@ test('saved attachment inspection localizes controls while preserving literal pa
   assert.match(ui.renderSavedInspection(inspection), /קובץ בינארי/);
   ui.setLocale('en');
   assert.match(ui.renderSavedInspection(inspection), /Binary file. Text preview is unavailable/);
+});
+
+test('saved comparison localizes both sides without translating or interpreting saved content', async () => {
+  const ui = await loadLocalization();
+  ui.setLocale('he');
+  const side = { kind: 'file', bytes: 5, digest: 'd'.repeat(64), executable: false };
+  const comparison = { base: 'a'.repeat(64), target: 'b'.repeat(64), total: 1, nextAfter: null,
+    changes: [{ path: 'Review/שלום.txt', change: 'modified', before: side, after: { ...side, executable: true } }],
+    file: { path: 'Review/שלום.txt', beforeKind: 'file', afterKind: 'file',
+      before: { state: 'text', text: 'Files <script>before</script>' },
+      after: { state: 'text', text: 'Review <script>after</script>' } } };
+  const html = ui.renderSavedComparison(comparison);
+  assert.match(html, /aria-label="השוואת גרסאות שמורות"/);
+  assert.match(html, /התוכן השתנה/);
+  assert.match(html, /<bdi dir="ltr">Review\/שלום.txt<\/bdi>/);
+  assert.match(html, /Files &lt;script&gt;before&lt;\/script&gt;/);
+  assert.match(html, /Review &lt;script&gt;after&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.ok(html.includes(comparison.base) && html.includes(comparison.target));
+  comparison.file.after = null;
+  comparison.file.afterKind = 'absent';
+  assert.match(ui.renderSavedComparison(comparison), /אינו קיים בגרסה זו/);
+  ui.setLocale('en');
+  assert.match(ui.renderSavedComparison(comparison), /Absent in this version/);
 });

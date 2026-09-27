@@ -5,6 +5,7 @@ use crate::ipc::Json;
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
 use mesh_store::RecordDigest;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::Path;
 
@@ -47,6 +48,107 @@ impl ProjectAttachment {
         store.ensure_namespace_identity()?;
         self.ensure_current()?;
         Ok(result)
+    }
+
+    pub(super) fn compare_saved(
+        &self,
+        metadata: &Path,
+        store: PinnedWorkspaceRoot,
+        base: &str,
+        target: &str,
+        after: Option<&str>,
+    ) -> io::Result<Json> {
+        self.inspect_saved(metadata, store, base, |workspace, base_digest| {
+            let target_digest = RecordDigest::parse_hex(target).map_err(error)?;
+            if target_digest.to_string() != target
+                || !workspace
+                    .workspace_versions()
+                    .iter()
+                    .any(|version| version.operation() == target_digest)
+            {
+                return Err(invalid(
+                    "comparison target does not belong to attachment history",
+                ));
+            }
+            let before = comparison_entries(
+                workspace
+                    .historical_workspace_preview(base_digest)
+                    .map_err(error)?,
+            );
+            let after_entries = comparison_entries(
+                workspace
+                    .historical_workspace_preview(target_digest)
+                    .map_err(error)?,
+            );
+            let paths: BTreeSet<_> = before.keys().chain(after_entries.keys()).collect();
+            let changes: Vec<_> = paths
+                .into_iter()
+                .filter_map(|path| {
+                    let old = before.get(path);
+                    let new = after_entries.get(path);
+                    if old == new {
+                        return None;
+                    }
+                    let kind = match (old, new) {
+                        (None, Some(_)) => "added",
+                        (Some(_), None) => "removed",
+                        (Some(old), Some(new)) if old.kind != new.kind => "type-changed",
+                        (Some(old), Some(new))
+                            if old.digest == new.digest && old.bytes == new.bytes =>
+                        {
+                            "mode-changed"
+                        }
+                        _ => "modified",
+                    };
+                    Some((
+                        path,
+                        Json::object([
+                            ("path", Json::text(path)),
+                            ("change", Json::text(kind)),
+                            ("before", old.map_or(Json::Null, ComparisonEntry::json)),
+                            ("after", new.map_or(Json::Null, ComparisonEntry::json)),
+                        ]),
+                    ))
+                })
+                .collect();
+            let start = match after {
+                None => 0,
+                Some(cursor) => {
+                    changes
+                        .iter()
+                        .position(|entry| entry.0 == cursor)
+                        .ok_or_else(|| {
+                            invalid("comparison cursor does not identify a changed path")
+                        })?
+                        + 1
+                }
+            };
+            let end = (start + PAGE_SIZE).min(changes.len());
+            Ok(Json::object([
+                ("schema", Json::text("mesh.attachment-comparison/v1")),
+                ("base", Json::text(base)),
+                ("target", Json::text(target)),
+                ("after", after.map_or(Json::Null, Json::text)),
+                ("total", Json::Number(changes.len() as u64)),
+                (
+                    "changes",
+                    Json::Array(
+                        changes[start..end]
+                            .iter()
+                            .map(|entry| entry.1.clone())
+                            .collect(),
+                    ),
+                ),
+                (
+                    "next_after",
+                    if end < changes.len() {
+                        Json::text(changes[end - 1].0)
+                    } else {
+                        Json::Null
+                    },
+                ),
+            ]))
+        })
     }
 
     pub(super) fn inspect_entries(
@@ -163,4 +265,56 @@ impl ProjectAttachment {
             ]))
         })
     }
+}
+
+#[derive(PartialEq, Eq)]
+struct ComparisonEntry {
+    kind: &'static str,
+    bytes: Option<u64>,
+    digest: Option<RecordDigest>,
+    executable: Option<bool>,
+}
+impl ComparisonEntry {
+    fn json(&self) -> Json {
+        Json::object([
+            ("kind", Json::text(self.kind)),
+            ("bytes", self.bytes.map_or(Json::Null, Json::Number)),
+            (
+                "digest",
+                self.digest
+                    .map_or(Json::Null, |digest| Json::text(digest.to_string())),
+            ),
+            ("executable", self.executable.map_or(Json::Null, Json::Bool)),
+        ])
+    }
+}
+fn comparison_entries(
+    preview: crate::workspace::HistoricalWorkspacePreview,
+) -> BTreeMap<String, ComparisonEntry> {
+    preview
+        .directories
+        .into_iter()
+        .map(|entry| {
+            (
+                entry.path,
+                ComparisonEntry {
+                    kind: "folder",
+                    bytes: None,
+                    digest: None,
+                    executable: None,
+                },
+            )
+        })
+        .chain(preview.files.into_iter().map(|entry| {
+            (
+                entry.path,
+                ComparisonEntry {
+                    kind: "file",
+                    bytes: Some(entry.byte_length),
+                    digest: Some(entry.content_digest),
+                    executable: Some(entry.executable),
+                },
+            )
+        }))
+        .collect()
 }

@@ -819,3 +819,100 @@ fn saved_inspection_is_paged_exact_and_never_reads_current_source_content() {
     fs::create_dir(history.metadata_path()).unwrap();
     assert!(history.inspect_text(&saved, "file-000").is_err());
 }
+
+#[test]
+fn saved_comparison_tracks_content_modes_types_and_pinned_pages() {
+    use mesh_daemon::project_attachment::AttachmentStorage;
+    let f = Fixture::new("comparison");
+    for path in ["stable", "content", "mode", "removed", "type"] {
+        fs::write(f.source.join(path), "before").unwrap();
+        fs::set_permissions(f.source.join(path), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let history = AttachmentStorage::open(&f.metadata)
+        .unwrap()
+        .provision(&f.source)
+        .unwrap();
+    let save = || {
+        let input = history
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        save_attached(history.project(), history.metadata_path(), &input)
+            .unwrap()
+            .operation()
+            .to_string()
+    };
+    let base = save();
+    fs::write(f.source.join("content"), "after").unwrap();
+    fs::set_permissions(f.source.join("mode"), fs::Permissions::from_mode(0o700)).unwrap();
+    fs::rename(f.source.join("removed"), f.source.join("added")).unwrap();
+    fs::remove_file(f.source.join("type")).unwrap();
+    fs::create_dir(f.source.join("type")).unwrap();
+    for number in 0..201 {
+        fs::write(f.source.join(format!("new-{number:03}")), b"\0\xff").unwrap();
+    }
+    let target = save();
+    history.inspect_entries(&target, None).unwrap();
+    assert_eq!(
+        history
+            .inspect_text(&target, "content")
+            .unwrap()
+            .get("text")
+            .and_then(Json::as_text),
+        Some("after")
+    );
+    let first = history.compare_versions(&base, &target, None).unwrap();
+    let cursor = first.get("next_after").unwrap().as_text().unwrap();
+    let second = history
+        .compare_versions(&base, &target, Some(cursor))
+        .unwrap();
+    let Json::Array(first_changes) = first.get("changes").unwrap() else {
+        panic!("changes");
+    };
+    let Json::Array(second_changes) = second.get("changes").unwrap() else {
+        panic!("changes");
+    };
+    assert_eq!(first_changes.len(), 200);
+    let changes: Vec<_> = first_changes.iter().chain(second_changes.iter()).collect();
+    for (path, kind) in [
+        ("content", "modified"),
+        ("mode", "mode-changed"),
+        ("removed", "removed"),
+        ("added", "added"),
+        ("type", "type-changed"),
+    ] {
+        let change = changes
+            .iter()
+            .find(|change| change.get("path").and_then(Json::as_text) == Some(path))
+            .unwrap();
+        assert_eq!(change.get("change").and_then(Json::as_text), Some(kind));
+    }
+    assert!(!changes
+        .iter()
+        .any(|change| change.get("path").and_then(Json::as_text) == Some("stable")));
+    assert_eq!(
+        history
+            .compare_versions(&base, &base, None)
+            .unwrap()
+            .get("total"),
+        Some(&Json::Number(0))
+    );
+    fs::write(f.source.join("content"), "still newer work").unwrap();
+    save();
+    assert_eq!(
+        history.compare_versions(&base, &target, None).unwrap(),
+        first
+    );
+    assert_eq!(
+        history
+            .compare_versions(&base, &target, Some(cursor))
+            .unwrap(),
+        second
+    );
+    assert!(history
+        .compare_versions(&base, &target, Some("stable"))
+        .is_err());
+    assert!(history
+        .compare_versions(&base, &"f".repeat(64), None)
+        .is_err());
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -170,4 +170,55 @@ test('unselected saved-file intents cannot dereference or invoke an absent inspe
   await settle();
   assert.equal(calls.length, count);
   h.dispose();
+});
+
+const comparedTarget = 'c'.repeat(64);
+const compareReply = () => ({ project: id, comparison: { schema: 'mesh.attachment-comparison/v1',
+  base: operation, target: comparedTarget, after: null, total: 1, next_after: null,
+  changes: [{ path: 'notes.txt', change: 'modified',
+    before: { kind: 'file', bytes: 5, digest: 'd'.repeat(64), executable: false },
+    after: { kind: 'file', bytes: 5, digest: 'e'.repeat(64), executable: true } }],
+} });
+test('comparison projection binds both saved versions and requires valid side metadata', () => {
+  assert.equal(attachedComparison(compareReply(), id, operation, comparedTarget, null).total, 1);
+  assert.throws(() => attachedComparison(compareReply(), id, comparedTarget, operation, null));
+  const bad = compareReply(); bad.comparison.changes[0].after.digest = 'wrong';
+  assert.throws(() => attachedComparison(bad, id, operation, comparedTarget, null));
+  const absent = compareReply(); absent.comparison.changes[0].before = null;
+  assert.throws(() => attachedComparison(absent, id, operation, comparedTarget, null));
+  const cursor = compareReply(); cursor.comparison.next_after = 'notes.txt';
+  assert.throws(() => attachedComparison(cursor, id, operation, comparedTarget, null));
+});
+test('comparison previews retain both exact sides while capture and next-base selection change', async () => {
+  let live = comparedTarget; const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: id,
+      before: null, versions: [comparedTarget, operation], next_before: null };
+    if (command === 'compare_attached_versions') return compareReply();
+    if (command === 'inspect_attached_version') {
+      const value = textReply();
+      if (args.operation === comparedTarget) Object.assign(value.inspection, { operation: comparedTarget,
+        digest: 'e'.repeat(64), executable: true, text: 'after' });
+      return value;
+    }
+    const value = reply(); value.projects[0].capture.saved_version = live; return value;
+  });
+  await settle(); h.intent({ type: 'versions', id, before: null }); await settle();
+  h.intent({ type: 'set-base', id, operation });
+  h.intent({ type: 'compare', id, target: comparedTarget }); await settle();
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'notes.txt' }); await settle();
+  live = 'f'.repeat(64); h.intent({ type: 'refresh' }); await settle();
+  h.intent({ type: 'set-base', id, operation: comparedTarget });
+  const projection = h.projections.at(-1);
+  assert.equal(projection.bases[id], comparedTarget);
+  assert.equal(projection.comparisons[id].base, operation);
+  assert.equal(projection.comparisons[id].target, comparedTarget);
+  assert.equal(projection.comparisons[id].file.before.text, 'saved');
+  assert.equal(projection.comparisons[id].file.after.text, 'after');
+  const count = calls.length;
+  h.intent({ type: 'compare-file', id, base: operation, target: live, path: 'notes.txt' });
+  h.intent({ type: 'inspect', id: '__proto__', operation });
+  h.intent({ type: 'set-base', id: 'constructor', operation });
+  assert.equal(calls.length, count); h.dispose();
 });

@@ -190,6 +190,28 @@ impl AttachmentHost {
         Ok(Json::object([("project", Json::text(id)), ("inspection", inspection)]).encode())
     }
 
+    pub fn compare(
+        &self,
+        id: &str,
+        base: &str,
+        target: &str,
+        after: Option<&str>,
+    ) -> Result<String, String> {
+        let history = self
+            .state
+            .lock()
+            .map_err(|_| UNAVAILABLE)?
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open in this desktop session")?
+            .history
+            .clone();
+        let comparison = history
+            .compare_versions(base, target, after)
+            .map_err(|_| "The exact saved versions could not be compared")?;
+        Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
+    }
+
     pub fn control(&self, id: &str, generation: &str, action: &str) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         let project = state
