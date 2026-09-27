@@ -38,8 +38,9 @@ For every increment record replacement commit(s), PR URL, exact local validation
 status. Source test logs are historical context; rerun the actual canonical checks. Human merge
 authorization is separate and mandatory; no self-approval or check bypass.
 
-Independent CI corrections are based directly on canonical main, are not included in this fleet
-stack, and remain unmerged. [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
+The following CI corrections were originally published independently against canonical main and
+remain unmerged. The validation increment stacked on #19 now transfers their final patches into
+this fleet stack; it does not merge, close or rewrite their original PRs. [Mesh PR #5](https://github.com/idosams/Mesh/pull/5),
 `ba211c7c4ea11305fcbaacd34e689cfdb71481d7`, tests the unchanged recovery deadline calculation with
 an exact clock, synchronizes the persistence-refusal fixture, and gives real-worker observations an
 explicit scheduling budget. Hosted measurements showed a requested 19.915 ms wait had not resumed
@@ -55,6 +56,25 @@ failed the corrected test at 74.709 ms against the configured 250 ms. Production
 hosted run 36342433986 passed six jobs but failed the existing persistence-deadline test on
 macOS before reaching the corrected stability test (1,345 passed, one failed, 10 skipped).
 The correction in #5 is separate and not included in #16.
+
+## Validation prerequisite transfer
+
+The current validation increment combines the final patches from #5 (`ba211c7c4ea11305fcbaacd34e689cfdb71481d7`),
+#14 (`d1e6567cb9141646501fa8a1724bfbf997e8e576`) and #16 (`b1cd55675b4d503a822ca25bdea366e2bc58f59f`).
+Its actual base is `idosams/attached-version-comparison` (#19). This is a separate prerequisite before
+further feature migration, not an approval or merged delivery. The original independent PRs and their
+failed-run evidence remain available. These three corrections are additional canonical work and are
+not counted as transfers of the 87 preserved fleet commits.
+
+Product timer defaults and calculations remain unchanged; the worker uses the same calculation
+extracted for exact-clock tests. Real-worker test observation budgets are now explicit rather than
+assuming the host schedules a 20/40 ms wake within 150 ms. The persistence-failure trigger is armed
+before the worker starts. Counter readers synchronize with the writer, and managed stability checks
+the configured minimum wait directly while retaining separate external-edit coverage. macOS CI
+collects every failure without retries or skips, and still fails for any failed test. None of these
+changes establishes a product latency, packaged lifecycle or remote-execution claim.
+
+Validation replacement and PR: pending publication of this increment; not merged.
 
 ## Preserved source commits
 
