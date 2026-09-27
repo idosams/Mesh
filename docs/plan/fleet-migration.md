@@ -21,9 +21,9 @@ that increment forward as fully verified. Original logs and the unfinished work 
 
 ## PR sequence and replacement accounting
 
-1. Canonical repository guard, shared agent guidance and this ledger. This replaces the guidance
+1. Canonical repository guard, shared agent guidance and this ledger: [Mesh PR #2](https://github.com/idosams/Mesh/pull/2), replacement `c36fafa1aa3ec6994d482a8eedba470bd0718b6b`, open and unmerged. This replaces the guidance
    portion of source commit `c4e5b9450962b5bec818022d6e7936f2d5204b89`, not its runtime implementation.
-2. A separate documentation-only Mesh-internal deprecation PR. No deletion, archival or settings change.
+2. Documentation-only [Mesh-internal PR #1488](https://github.com/idosams/Mesh-internal/pull/1488), replacement `99b55d6907b2d36b4196bd2971e9ba6cfa1bd970`, open and unmerged. No deletion, archival or settings change.
 3. Transfer the batches below in dependency order onto canonical history. Each coherent increment
    gets a pushed branch and PR before the next substantial increment begins. Split a batch further
    when its actual diff is too large for focused review. Adjacent documentation-only source commits
@@ -45,7 +45,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 
 | Batch | Preserved source commit | Change | Canonical replacement |
 |---|---|---|---|
-| F01 | `c4e5b9450962b5bec818022d6e7936f2d5204b89` | feat: establish durable fleet lifecycle and isolated lane allocation | Pending transfer |
+| F01 | `c4e5b9450962b5bec818022d6e7936f2d5204b89` | feat: establish durable fleet lifecycle and isolated lane allocation | Transferred on `idosams/fleet-foundation`; PR and validation pending; not merged |
 | F02 | `e1b1aeed6461af349fc943299c31376b5c358739` | feat: connect scoped agent delegation to native workspaces and MCP | Pending transfer |
 | F03 | `766852b17e8e06fbd01d5cf8b2504947fb19a280` | feat: capture private agent files under exact native custody | Pending transfer |
 | F03 | `4be9ae2f8a0de2515e10ee7fdd9be486ff8ddaa1` | feat: capture agent workspace additions with explicit partial results | Pending transfer |

@@ -85,6 +85,7 @@ pub mod counters;
 mod crash_report;
 mod exclusions;
 pub mod fallback;
+pub mod fleet;
 mod folder_import;
 // The folder-watching fallback backend. `cfg(unix)` because an object identity here is the device
 // and inode the kernel reports; `ipc::server` is gated the same way.

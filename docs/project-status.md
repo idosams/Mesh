@@ -1,5 +1,11 @@
 # Project status
 
+Canonical fleet migration F01 adds the native durable objective/lane/run control model, a separate
+SQLite event ledger with transactional retries and revision checks, and isolated lane allocation
+from exact saved versions. This is a library foundation: scoped agent tools, providers, attachment,
+live fleet UI and the complete acceptance journeys remain pending migration and verification.
+See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
+
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac
 running the local daemon and desktop application against a disposable or backed-up project.
 

@@ -70,6 +70,7 @@ mod collect;
 mod commit;
 mod digest;
 mod exclusion;
+pub mod fleet;
 mod ids;
 mod index;
 mod migration;

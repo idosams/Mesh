@@ -1,0 +1,472 @@
+//! Durable fleet control events, separate from the reconstructable workspace index.
+//!
+//! The caller authorizes the private database location and command before calling this module.
+//! A committed append is a scheduling decision, not proof that an external worker was launched.
+
+use std::path::Path;
+
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+const APPLICATION_ID: i64 = 0x4d_46_4c_54;
+const SCHEMA_VERSION: i64 = 1;
+/// Maximum metadata payload; file contents and credentials do not belong in this ledger.
+pub const MAX_FLEET_EVENT_BYTES: usize = 65_536;
+/// Maximum number of records returned by one replay page.
+pub const MAX_FLEET_EVENT_PAGE: usize = 256;
+
+/// An immutable command/event accepted for an objective stream.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FleetEvent {
+    /// Objective identity, scoped by the service before storage access.
+    pub stream: String,
+    /// One-based contiguous revision within the stream.
+    pub revision: u64,
+    /// Client request identity, unique within this stream.
+    pub request: String,
+    /// Versioned control metadata, interpreted by the daemon.
+    pub payload: String,
+}
+
+/// Failure to read or atomically advance the control ledger.
+#[derive(Debug)]
+pub enum FleetStoreError {
+    /// A bounded identity, payload, revision or page argument was invalid.
+    InvalidInput,
+    /// Another writer advanced the stream; reload before deciding again.
+    StaleRevision {
+        /// Actual committed revision.
+        actual: u64,
+    },
+    /// A request identity was reused for a different command or expected revision.
+    RequestConflict,
+    /// The file belongs to another application or uses an unsupported schema.
+    UnsupportedSchema,
+    /// SQLite refused an operation. The transaction was not acknowledged.
+    Database(rusqlite::Error),
+}
+
+impl std::fmt::Display for FleetStoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInput => f.write_str("invalid fleet ledger input"),
+            Self::StaleRevision { actual } => write!(f, "fleet revision changed to {actual}"),
+            Self::RequestConflict => f.write_str("fleet request identity was reused"),
+            Self::UnsupportedSchema => f.write_str("unsupported fleet ledger schema"),
+            Self::Database(error) => write!(f, "fleet ledger database operation failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for FleetStoreError {}
+impl From<rusqlite::Error> for FleetStoreError {
+    fn from(value: rusqlite::Error) -> Self {
+        Self::Database(value)
+    }
+}
+
+/// SQLite-backed ordered event streams with transactional idempotency and revision checks.
+///
+/// Open only at a service-authorized private location. This type does not authenticate callers
+/// or defend an arbitrary user-supplied path against substitution.
+#[derive(Debug)]
+pub struct FleetStore {
+    connection: Connection,
+}
+
+impl FleetStore {
+    /// Open or initialize a fleet ledger. Unknown formats are never migrated implicitly.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, FleetStoreError> {
+        let path = path.as_ref();
+        // Relative SQLite names can select temporary or URI-backed in-memory databases. A
+        // durable control ledger requires an absolute native filename selected by the service.
+        if !path.is_absolute() {
+            return Err(FleetStoreError::InvalidInput);
+        }
+        let mut connection = Connection::open(path)?;
+        connection.busy_timeout(std::time::Duration::from_secs(5))?;
+        // Check identity before changing the file's persistent journal mode.
+        {
+            let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let version: i64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
+            let app: i64 = tx.pragma_query_value(None, "application_id", |r| r.get(0))?;
+            let tables: i64 = tx.query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
+                [],
+                |r| r.get(0),
+            )?;
+            if version == 0 && app == 0 && tables == 0 {
+                tx.execute_batch(
+                    "CREATE TABLE fleet_events (
+                        stream TEXT NOT NULL,
+                        revision INTEGER NOT NULL CHECK(revision > 0),
+                        request TEXT NOT NULL,
+                        payload TEXT NOT NULL,
+                        PRIMARY KEY(stream, revision),
+                        UNIQUE(stream, request)
+                    ) STRICT;",
+                )?;
+                tx.pragma_update(None, "application_id", APPLICATION_ID)?;
+                tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            } else if version != SCHEMA_VERSION || app != APPLICATION_ID {
+                return Err(FleetStoreError::UnsupportedSchema);
+            }
+            tx.commit()?;
+        }
+        let mode: String = connection.pragma_query_value(None, "journal_mode", |r| r.get(0))?;
+        if mode != "wal" {
+            connection.pragma_update(None, "journal_mode", "WAL")?;
+        }
+        connection.pragma_update(None, "synchronous", "FULL")?;
+        Ok(Self { connection })
+    }
+
+    /// Current committed revision, or zero for an objective with no events.
+    pub fn revision(&self, stream: &str) -> Result<u64, FleetStoreError> {
+        valid_id(stream)?;
+        let revision: u64 = self.connection.query_row(
+            "SELECT coalesce(max(revision), 0) FROM fleet_events WHERE stream = ?1",
+            [stream],
+            |r| r.get(0),
+        )?;
+        Ok(revision)
+    }
+
+    /// Find an already committed request before validating a retry against newer state.
+    pub fn request(
+        &self,
+        stream: &str,
+        request: &str,
+    ) -> Result<Option<FleetEvent>, FleetStoreError> {
+        valid_id(stream)?;
+        valid_id(request)?;
+        self.connection
+            .query_row(
+                "SELECT revision, payload FROM fleet_events WHERE stream = ?1 AND request = ?2",
+                params![stream, request],
+                |r| {
+                    Ok(FleetEvent {
+                        stream: stream.to_owned(),
+                        revision: r.get(0)?,
+                        request: request.to_owned(),
+                        payload: r.get(1)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    /// Append exactly once at `expected_revision`, or return the identical earlier append.
+    ///
+    /// Request lookup, revision comparison and insert share one writer transaction. A response
+    /// lost after commit can be recovered with the original arguments, even after later appends.
+    pub fn append(
+        &mut self,
+        stream: &str,
+        expected_revision: u64,
+        request: &str,
+        payload: &str,
+    ) -> Result<FleetEvent, FleetStoreError> {
+        valid_id(stream)?;
+        valid_id(request)?;
+        if payload.is_empty()
+            || payload.len() > MAX_FLEET_EVENT_BYTES
+            || expected_revision >= i64::MAX as u64
+        {
+            return Err(FleetStoreError::InvalidInput);
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<(u64, String)> = tx
+            .query_row(
+                "SELECT revision, payload FROM fleet_events WHERE stream = ?1 AND request = ?2",
+                params![stream, request],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        if let Some((revision, saved)) = existing {
+            if revision != expected_revision + 1 || saved != payload {
+                return Err(FleetStoreError::RequestConflict);
+            }
+            return Ok(FleetEvent {
+                stream: stream.to_owned(),
+                revision,
+                request: request.to_owned(),
+                payload: saved,
+            });
+        }
+        let actual: u64 = tx.query_row(
+            "SELECT coalesce(max(revision), 0) FROM fleet_events WHERE stream = ?1",
+            [stream],
+            |r| r.get(0),
+        )?;
+        if actual != expected_revision {
+            return Err(FleetStoreError::StaleRevision { actual });
+        }
+        let revision = actual + 1;
+        tx.execute(
+            "INSERT INTO fleet_events(stream, revision, request, payload) VALUES (?1, ?2, ?3, ?4)",
+            params![stream, revision, request, payload],
+        )?;
+        tx.commit()?;
+        Ok(FleetEvent {
+            stream: stream.to_owned(),
+            revision,
+            request: request.to_owned(),
+            payload: payload.to_owned(),
+        })
+    }
+
+    /// Read a bounded ordered page after the supplied cursor. Events are never consumed by reads.
+    pub fn events(
+        &self,
+        stream: &str,
+        after: u64,
+        limit: usize,
+    ) -> Result<Vec<FleetEvent>, FleetStoreError> {
+        valid_id(stream)?;
+        if after > i64::MAX as u64 || limit == 0 || limit > MAX_FLEET_EVENT_PAGE {
+            return Err(FleetStoreError::InvalidInput);
+        }
+        let mut statement = self.connection.prepare(
+            "SELECT revision, request, payload FROM fleet_events
+             WHERE stream = ?1 AND revision > ?2 ORDER BY revision LIMIT ?3",
+        )?;
+        let records = statement.query_map(params![stream, after, limit as u64], |r| {
+            Ok(FleetEvent {
+                stream: stream.to_owned(),
+                revision: r.get(0)?,
+                request: r.get(1)?,
+                payload: r.get(2)?,
+            })
+        })?;
+        records.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+}
+
+fn valid_id(id: &str) -> Result<(), FleetStoreError> {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
+    {
+        Err(FleetStoreError::InvalidInput)
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Barrier,
+    };
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    struct Directory(std::path::PathBuf);
+    impl Directory {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "mesh-fleet-store-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+        fn db(&self) -> std::path::PathBuf {
+            self.0.join("fleet.sqlite")
+        }
+    }
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn lost_reply_replays_original_after_restart_and_later_commands() {
+        let dir = Directory::new();
+        let first = {
+            let mut store = FleetStore::open(dir.db()).unwrap();
+            let first = store
+                .append("objective", 0, "request-1", "create-lane")
+                .unwrap();
+            store
+                .append("objective", 1, "request-2", "queue-run")
+                .unwrap();
+            first
+        };
+        let mut reopened = FleetStore::open(dir.db()).unwrap();
+        assert_eq!(
+            reopened
+                .append("objective", 0, "request-1", "create-lane")
+                .unwrap(),
+            first
+        );
+        assert_eq!(reopened.revision("objective").unwrap(), 2);
+        assert_eq!(reopened.events("objective", 0, 1).unwrap(), vec![first]);
+        assert_eq!(
+            reopened.events("objective", 1, 1).unwrap()[0].payload,
+            "queue-run"
+        );
+    }
+
+    #[test]
+    fn changed_retry_and_stale_writer_never_append() {
+        let dir = Directory::new();
+        let mut store = FleetStore::open(dir.db()).unwrap();
+        store.append("o", 0, "r", "one").unwrap();
+        assert!(matches!(
+            store.append("o", 0, "r", "two"),
+            Err(FleetStoreError::RequestConflict)
+        ));
+        assert!(matches!(
+            store.append("o", 1, "r", "one"),
+            Err(FleetStoreError::RequestConflict)
+        ));
+        assert!(matches!(
+            store.append("o", 0, "another", "one"),
+            Err(FleetStoreError::StaleRevision { actual: 1 })
+        ));
+        assert_eq!(store.revision("o").unwrap(), 1);
+        store.append("other-objective", 0, "r", "one").unwrap();
+    }
+
+    #[test]
+    fn concurrent_schedulers_cannot_both_claim_the_same_revision() {
+        let dir = Directory::new();
+        let a = FleetStore::open(dir.db()).unwrap();
+        let b = FleetStore::open(dir.db()).unwrap();
+        let barrier = Arc::new(Barrier::new(2));
+        let handles: Vec<_> = [a, b]
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut store)| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    store.append("o", 0, &format!("request-{i}"), "dispatch")
+                })
+            })
+            .collect();
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|r| matches!(r, Err(FleetStoreError::StaleRevision { actual: 1 })))
+                .count(),
+            1
+        );
+        assert_eq!(
+            FleetStore::open(dir.db()).unwrap().revision("o").unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn unknown_schema_and_unrelated_database_are_preserved() {
+        let dir = Directory::new();
+        let connection = Connection::open(dir.db()).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE unrelated(value TEXT); INSERT INTO unrelated VALUES ('keep');",
+            )
+            .unwrap();
+        assert!(matches!(
+            FleetStore::open(dir.db()),
+            Err(FleetStoreError::UnsupportedSchema)
+        ));
+        assert_eq!(
+            connection
+                .query_row("SELECT value FROM unrelated", [], |r| r.get::<_, String>(0))
+                .unwrap(),
+            "keep"
+        );
+        let other = dir.0.join("future.sqlite");
+        drop(FleetStore::open(&other).unwrap());
+        let future = Connection::open(&other).unwrap();
+        future.pragma_update(None, "user_version", 99).unwrap();
+        assert!(matches!(
+            FleetStore::open(&other),
+            Err(FleetStoreError::UnsupportedSchema)
+        ));
+    }
+
+    #[test]
+    fn bounds_reject_before_any_state_change() {
+        let dir = Directory::new();
+        for path in [
+            "",
+            ":memory:",
+            "file::memory:?cache=shared",
+            "relative.sqlite",
+        ] {
+            assert!(matches!(
+                FleetStore::open(path),
+                Err(FleetStoreError::InvalidInput)
+            ));
+        }
+        let mut store = FleetStore::open(dir.db()).unwrap();
+        for id in ["", "bad/identity", "contains space"] {
+            assert!(matches!(
+                store.append(id, 0, "r", "p"),
+                Err(FleetStoreError::InvalidInput)
+            ));
+        }
+        assert!(matches!(
+            store.append("o", 0, "r", &"x".repeat(MAX_FLEET_EVENT_BYTES + 1)),
+            Err(FleetStoreError::InvalidInput)
+        ));
+        assert!(matches!(
+            store.append("o", u64::MAX, "r", "p"),
+            Err(FleetStoreError::InvalidInput)
+        ));
+        assert!(matches!(
+            store.events("o", 0, MAX_FLEET_EVENT_PAGE + 1),
+            Err(FleetStoreError::InvalidInput)
+        ));
+        assert_eq!(store.revision("o").unwrap(), 0);
+    }
+    #[test]
+    fn abrupt_process_exit_preserves_acknowledged_events_and_rolls_back_partial_append() {
+        let dir = Directory::new();
+        for mode in ["committed", "uncommitted"] {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "fleet::tests::crash_writer_helper",
+                    "--nocapture",
+                ])
+                .env("MESH_FLEET_TEST_DB", dir.db())
+                .env("MESH_FLEET_TEST_EXIT", mode)
+                .status()
+                .unwrap();
+            assert_eq!(status.code(), Some(86));
+            let store = FleetStore::open(dir.db()).unwrap();
+            assert_eq!(store.revision("o").unwrap(), 1);
+            assert_eq!(store.events("o", 0, 2).unwrap()[0].payload, "acknowledged");
+        }
+    }
+
+    #[test]
+    fn crash_writer_helper() {
+        let Some(path) = std::env::var_os("MESH_FLEET_TEST_DB") else {
+            return;
+        };
+        let mut store = FleetStore::open(std::path::PathBuf::from(path)).unwrap();
+        if std::env::var("MESH_FLEET_TEST_EXIT").unwrap() == "committed" {
+            store.append("o", 0, "committed", "acknowledged").unwrap();
+        } else {
+            store.connection.execute_batch(
+                "BEGIN IMMEDIATE; INSERT INTO fleet_events VALUES ('o', 2, 'partial', 'never acknowledged');"
+            ).unwrap();
+        }
+        // No unwinding, transaction drop, or Connection drop: exercise SQLite crash recovery.
+        std::process::exit(86);
+    }
+}
