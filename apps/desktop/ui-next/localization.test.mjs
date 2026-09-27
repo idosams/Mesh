@@ -17,7 +17,7 @@ async function loadLocalization() {
     export const renderNavigation = () => renderToStaticMarkup(<ProductionNavigation activePage="files" workspaceReady={true} nativeChangeCount={0} onNavigate={() => {}} />);
     export const renderPicker = () => renderToStaticMarkup(<LanguagePicker />);
     export const renderSections = (comparison) => renderToStaticMarkup(<ArtifactContentChanges change={{diffHunks: [], beforeLabel: 'Before', afterLabel: 'After', beforeValues: [], afterValues: []}} layout="inline" comparison={comparison} />);
-    export const renderSavedComparison = (comparison) => renderToStaticMarkup(<SavedComparison project="project" comparison={comparison} disabled={false} />);
+    export const renderSavedComparison = (comparison, props = {}) => renderToStaticMarkup(<SavedComparison project="project" comparison={comparison} disabled={false} {...props} />);
     export const renderSavedInspection = (inspection) => renderToStaticMarkup(<SavedInspection project="project" inspection={inspection} disabled={false} />);
     export const renderImport = (model) => renderToStaticMarkup(<ImportWorkbench model={model} onIntent={() => {}} />);
   `, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx' }, bundle: true, platform: 'node', format: 'cjs', packages: 'external', write: false, plugins: [{ name: 'expose-section-view-for-regression', setup(builder) { builder.onLoad({ filter: /attached-projects\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { SavedInspection, SavedComparison };', loader: 'tsx' })); builder.onLoad({ filter: /artifact-review\.tsx$/ }, ({ path }) => ({ contents: readFileSync(path, 'utf8') + '\nexport { ArtifactContentChanges };', loader: 'tsx' })); } }] });
@@ -180,4 +180,22 @@ test('saved comparison localizes both sides without translating or interpreting 
   assert.match(ui.renderSavedComparison(comparison), /אינו קיים בגרסה זו/);
   ui.setLocale('en');
   assert.match(ui.renderSavedComparison(comparison), /Absent in this version/);
+});
+
+
+test('comparison pin controls localize capacity and pinned views cannot recursively pin', async () => {
+  const ui = await loadLocalization();
+  const comparison = { base: 'a'.repeat(64), target: 'b'.repeat(64), total: 0, nextAfter: null, changes: [], file: null };
+  ui.setLocale('he');
+  const available = ui.renderSavedComparison(comparison, { canPin: true });
+  assert.match(available, /נעיצת השוואה לצד השוואות אחרות/);
+  assert.doesNotMatch(available, / disabled=""/);
+  const full = ui.renderSavedComparison(comparison);
+  assert.match(full, /שמונה השוואות נעוצות/);
+  assert.match(full, / disabled=""/);
+  const pinned = ui.renderSavedComparison(comparison, { pinKey: '17', canPin: true });
+  assert.doesNotMatch(pinned, /נעיצת השוואה|שמונה השוואות/);
+  assert.ok(pinned.includes(comparison.base) && pinned.includes(comparison.target));
+  ui.setLocale('en');
+  assert.match(ui.renderSavedComparison(comparison, { canPin: true }), /Pin comparison alongside others/);
 });

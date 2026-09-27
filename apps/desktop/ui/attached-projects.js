@@ -115,6 +115,8 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let inspections = {};
   let bases = {};
   let comparisons = {};
+  let pins = [];
+  let nextPin = 1;
   let busy = false;
   let error = '';
   let mounted = false;
@@ -122,7 +124,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, pins, busy, error, available: typeof invoke === 'function' },
     }));
   };
   const planRefresh = () => {
@@ -152,7 +154,11 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   }
   function intent(event) {
     const value = event.detail;
-    if (!mounted || busy || !value || typeof value !== 'object') return;
+    if (!mounted || !value || typeof value !== 'object') return;
+    if (value.type === 'close-pin' && Object.keys(value).length === 2 && typeof value.pin === 'string') {
+      pins = pins.filter((pin) => pin.key !== value.pin); publish(); return;
+    }
+    if (busy) return;
     if ('id' in value && !projects.some((project) => project.id === value.id)) return;
     if (value.type === 'refresh' && Object.keys(value).length === 1) { void run(); return; }
     if (value.type === 'choose' && Object.keys(value).length === 1) {
@@ -226,19 +232,34 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       });
       return;
     }
-    const comparison = comparisons[value.id];
-    if (value.type === 'compare-page' && Object.keys(value).length === 5
+    if (value.type === 'pin-comparison' && Object.keys(value).length === 4 && pins.length < 8
+      && Number.isSafeInteger(nextPin) && comparisons[value.id] && comparisons[value.id].base === value.base
+      && comparisons[value.id].target === value.target) {
+      const project = projects.find((project) => project.id === value.id);
+      pins = [...pins, { key: String(nextPin++), project: value.id, root: project.root, comparison: comparisons[value.id] }];
+      publish(); return;
+    }
+    const hasPin = Object.hasOwn(value, 'pin');
+    const pinned = hasPin ? pins.find((pin) => pin.key === value.pin && pin.project === value.id) : null;
+    if (hasPin && !pinned) return;
+    const comparison = pinned ? pinned.comparison : comparisons[value.id];
+    const updateComparison = (next) => {
+      // A pin closed during an outstanding read must not be recreated by its response.
+      if (pinned) pins = pins.map((pin) => pin.key === pinned.key ? { ...pin, comparison: next } : pin);
+      else comparisons = { ...comparisons, [value.id]: next };
+    };
+    if (value.type === 'compare-page' && Object.keys(value).length === (hasPin ? 6 : 5)
       && comparison && comparison.base === value.base && comparison.target === value.target
       && typeof value.after === 'string' && comparison.nextAfter === value.after) {
       void run(async () => {
         const page = attachedComparison(await invoke('compare_attached_versions', {
           id: value.id, base: value.base, target: value.target, after: value.after,
         }), value.id, value.base, value.target, value.after);
-        comparisons = { ...comparisons, [value.id]: { ...page, file: comparison.file } };
+        updateComparison({ ...page, file: comparison.file });
       });
       return;
     }
-    if (value.type === 'compare-file' && Object.keys(value).length === 5
+    if (value.type === 'compare-file' && Object.keys(value).length === (hasPin ? 6 : 5)
       && comparison && comparison.base === value.base && comparison.target === value.target) {
       const change = comparison.changes.find((change) => change.path === value.path);
       if (!change) return;
@@ -247,9 +268,9 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
           ? attachedText(await invoke('inspect_attached_version', { id: value.id, operation, path: value.path, after: null }),
             value.id, operation, { ...side, path: value.path }) : null;
         const [before, after] = await Promise.all([read(change.before, value.base), read(change.after, value.target)]);
-        comparisons = { ...comparisons, [value.id]: { ...comparison, file: {
+        updateComparison({ ...comparison, file: {
           path: value.path, before, after, beforeKind: change.before?.kind ?? 'absent', afterKind: change.after?.kind ?? 'absent',
-        } } };
+        } });
       });
       return;
     }

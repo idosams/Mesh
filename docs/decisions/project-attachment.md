@@ -232,7 +232,7 @@ reconfigures a harness, writes project files, or grants approval authority.
 
 The session registry is currently in memory. Saved registrations/history survive, and explicit
 reattachment recovers them; persistent project listing, restart preferences, detached/offline browsing,
-UI wiring, history presentation and packaged lifecycle proof remain unfinished. Dropping the host
+packaged lifecycle proof remain unfinished; UI/history presentation is described below. Dropping the host
 requests its workers to stop through their existing controller lifecycle; graceful process shutdown
 is not yet a verified desktop guarantee. Tests cover eight concurrent requests sharing one worker,
 stop/reselect/resume, stale controls, source replacement refusal and linked storage refusal. These are
@@ -256,7 +256,7 @@ Picker cancellation does not attach a project. Native capture continues independ
 This panel explains session-only listing and retained history. Its presentation follows the canonical
 English/Hebrew preference, while paths and saved identities remain literal and left-to-right.
 It is source-integrated graphical UI, not yet a packaged runtime proof. Persistent catalog,
-restart preferences, version navigation, pinned parallel review and the full packaged journey remain
+restart preferences, approval/integration, signed parallel review and the full packaged journey remain
 required before the attachment product loop is complete.
 
 ## Saved-version list in the attachment panel
@@ -336,3 +336,25 @@ The view does not approve or apply content. Capture refresh, version-list paging
 do not replace an open comparison. Tests exercise incorrect tuple/metadata rejection and both previews
 remaining pinned while the latest capture and next selected base change. Parallel pinned reviews,
 main-version approval/integration and packaged user-journey proof remain required.
+
+## Independent pinned comparison views
+
+The attachment panel can pin up to eight comparison views across attached projects, including
+multiple views of the same pair with different file selections. Every pin captures the verified
+project handle, base/target identities, current page and selected saved previews. Pins use distinct
+monotonic session identifiers and appear in a responsive side-by-side grid. Subsequent comparison
+selection, next-base selection and capture/status refresh do not replace their contents.
+
+Pin paging and file selection are routed through the pin's own project and exact saved pair. Updating
+one pin replaces only that pin's display state; siblings and the active comparison keep independent
+pages and selections. A stale, closed or cross-project pin control cannot issue a native read. Closing
+a pin is local UI state and remains available during a read; a late response cannot recreate the pin.
+The eight-pin limit bounds retained preview data, and closed identifiers are not reused in the session.
+No pin itself carries approval or source-write authority: native reads still verify exact history.
+
+Tests cover independent file selections, independent paging, capture and next-comparison updates,
+closing during two outstanding before/after reads, limits, non-reused pin identifiers and attempts to
+redirect another project's pin. Pins survive leaving/returning to the mounted panel in the same shell
+session, but are not yet persisted across desktop restart. These are pinned inspection/comparison
+views; human approval, dependency-aware review bundles and integration are still required for the full
+parallel review journey. Packaged rendering/runtime proof remains outstanding.

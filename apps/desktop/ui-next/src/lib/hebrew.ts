@@ -1,5 +1,10 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Pinned comparisons":"השוואות נעוצות",
+"Close comparison":"סגירת השוואה",
+"Pin comparison alongside others":"נעיצת השוואה לצד השוואות אחרות",
+"Eight comparisons pinned; close one to add another":"שמונה השוואות נעוצות; סגרו אחת כדי להוסיף אחרת",
+"Each pin keeps its own version pair, page and file selection. Pins are retained during this desktop session.":"כל השוואה נעוצה שומרת על זוג הגרסאות, העמוד ובחירת הקובץ שלה. ההשוואות הנעוצות נשמרות במהלך הפעלה זו של היישום.",
 "Selected comparison base:":"הבסיס שנבחר להשוואה:",
 "Use as base":"בחירה כבסיס",
 "Compare with base":"השוואה לבסיס",

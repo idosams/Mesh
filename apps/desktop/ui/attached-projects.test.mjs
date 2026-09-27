@@ -222,3 +222,113 @@ test('comparison previews retain both exact sides while capture and next-base se
   h.intent({ type: 'set-base', id: 'constructor', operation });
   assert.equal(calls.length, count); h.dispose();
 });
+
+async function comparisonHarness(overrides = {}) {
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (overrides[command]) return overrides[command](args);
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: id,
+      before: null, versions: ['f'.repeat(64), comparedTarget, operation], next_before: null };
+    if (command === 'compare_attached_versions') {
+      const value = compareReply();
+      value.comparison.base = args.base; value.comparison.target = args.target;
+      value.comparison.changes.push({ ...value.comparison.changes[0], path: 'other.txt' });
+      value.comparison.total = 2; return value;
+    }
+    if (command === 'inspect_attached_version') {
+      const value = textReply(); value.inspection.path = args.path;
+      if (args.operation === comparedTarget) Object.assign(value.inspection, { operation: comparedTarget,
+        digest: 'e'.repeat(64), executable: true, text: 'after' });
+      return value;
+    }
+    return reply();
+  });
+  await settle(); h.intent({ type: 'versions', id, before: null }); await settle();
+  h.intent({ type: 'set-base', id, operation });
+  h.intent({ type: 'compare', id, target: comparedTarget }); await settle();
+  return { ...h, calls, pin: () => h.intent({ type: 'pin-comparison', id, base: operation, target: comparedTarget }) };
+}
+test('two pins retain independent file selections when the active comparison and capture change', async () => {
+  const h = await comparisonHarness(); h.pin(); h.pin();
+  const [one, two] = h.projections.at(-1).pins;
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'notes.txt', pin: one.key }); await settle();
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'other.txt', pin: two.key }); await settle();
+  h.intent({ type: 'set-base', id, operation: comparedTarget });
+  h.intent({ type: 'compare', id, target: 'f'.repeat(64) }); await settle();
+  h.intent({ type: 'refresh' }); await settle();
+  const state = h.projections.at(-1);
+  assert.equal(state.comparisons[id].target, 'f'.repeat(64));
+  assert.equal(state.pins[0].comparison.target, comparedTarget);
+  assert.equal(state.pins[0].comparison.file.path, 'notes.txt');
+  assert.equal(state.pins[1].comparison.file.path, 'other.txt');
+  assert.equal(state.pins[0].comparison.file.before.text, 'saved');
+  assert.equal(state.pins[1].comparison.file.after.text, 'after');
+  const count = h.calls.length;
+  h.intent({ type: 'compare-file', id, base: comparedTarget, target: 'f'.repeat(64), path: 'notes.txt', pin: one.key });
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'notes.txt', pin: 'missing' });
+  assert.equal(h.calls.length, count); h.dispose();
+});
+test('paging a pin leaves sibling and active comparison pages unchanged', async () => {
+  const h = await comparisonHarness({ compare_attached_versions: (args) => {
+    const value = compareReply(); value.comparison.after = args.after; value.comparison.total = 201;
+    value.comparison.changes = args.after === null
+      ? Array.from({ length: 200 }, (_, index) => ({ ...value.comparison.changes[0], path: `file-${String(index).padStart(3, '0')}` }))
+      : [{ ...value.comparison.changes[0], path: 'file-200' }];
+    value.comparison.next_after = args.after === null ? 'file-199' : null; return value;
+  } });
+  h.pin(); h.pin(); const [one, two] = h.projections.at(-1).pins;
+  h.intent({ type: 'compare-page', id, base: operation, target: comparedTarget, after: 'file-199', pin: one.key }); await settle();
+  const state = h.projections.at(-1);
+  assert.equal(state.pins[0].comparison.changes[0].path, 'file-200');
+  assert.equal(state.pins[1].key, two.key);
+  assert.equal(state.pins[1].comparison.changes[0].path, 'file-000');
+  assert.equal(state.comparisons[id].changes[0].path, 'file-000'); h.dispose();
+});
+test('closed pins cannot reappear after outstanding previews, and pin identities are never reused', async () => {
+  const pending = [];
+  const h = await comparisonHarness({ inspect_attached_version: (args) => new Promise((resolve) => pending.push({ args, resolve })) });
+  for (let index = 0; index < 9; index += 1) h.pin();
+  assert.equal(h.projections.at(-1).pins.length, 8);
+  const closed = h.projections.at(-1).pins[0].key;
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'notes.txt', pin: closed });
+  assert.equal(pending.length, 2);
+  h.intent({ type: 'close-pin', pin: closed });
+  for (const { args, resolve } of pending) {
+    const value = textReply();
+    if (args.operation === comparedTarget) Object.assign(value.inspection, { operation: comparedTarget,
+      digest: 'e'.repeat(64), executable: true, text: 'after' });
+    resolve(value);
+  }
+  await settle();
+  assert.equal(h.projections.at(-1).pins.length, 7);
+  assert.ok(h.projections.at(-1).pins.every((pin) => pin.key !== closed));
+  h.pin(); assert.equal(h.projections.at(-1).pins.length, 8);
+  assert.ok(h.projections.at(-1).pins.every((pin) => pin.key !== closed));
+  const count = h.calls.length;
+  h.intent({ type: 'compare-file', id, base: operation, target: comparedTarget, path: 'notes.txt', pin: closed });
+  assert.equal(h.calls.length, count); h.dispose();
+});
+
+test('pins from different projects cannot be redirected through another project handle', async () => {
+  const otherId = '9'.repeat(64); const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: args.id,
+      before: null, versions: [comparedTarget, operation], next_before: null };
+    if (command === 'compare_attached_versions') return { ...compareReply(), project: args.id };
+    const value = reply(); value.projects.push({ ...value.projects[0], id: otherId, root: '/other/project' }); return value;
+  });
+  await settle();
+  for (const project of [id, otherId]) {
+    h.intent({ type: 'versions', id: project, before: null }); await settle();
+    h.intent({ type: 'set-base', id: project, operation });
+    h.intent({ type: 'compare', id: project, target: comparedTarget }); await settle();
+    h.intent({ type: 'pin-comparison', id: project, base: operation, target: comparedTarget });
+  }
+  const pins = h.projections.at(-1).pins;
+  assert.deepEqual(pins.map((pin) => pin.root), ['/original/project', '/other/project']);
+  const count = calls.length;
+  h.intent({ type: 'compare-file', id: otherId, base: operation, target: comparedTarget, path: 'notes.txt', pin: pins[0].key });
+  assert.equal(calls.length, count); h.dispose();
+});

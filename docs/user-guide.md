@@ -74,7 +74,10 @@ Text previews are read-only and limited to 256 KiB. Binary and larger files show
 unavailable. To compare saved versions, choose **Use as base** on one version and **Compare with base** on
 another. Select a changed path to see its saved before/after contents. The open comparison stays
 fixed when capture advances or you choose the next comparison base. Missing files, folders and
-unavailable text previews have explicit states. This view does not approve or apply changes. **Stop capture** and **Resume
+unavailable text previews have explicit states. Choose **Pin comparison alongside others** to keep up
+to eight comparisons open across projects. Each pin has its own page and selected file; you can pin
+the same version pair twice to inspect different files. Close a pin to free a slot. Pins survive
+navigation within this desktop session but reset when Mesh quits. This view does not approve or apply changes. **Stop capture** and **Resume
 capture** control the session without changing the original project's files. After restarting this
 development build, attach the same project again to access its retained history.
 
