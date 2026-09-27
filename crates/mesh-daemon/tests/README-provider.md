@@ -63,3 +63,18 @@ cargo test -p mesh-daemon --test fleet-agent retained_actual -- --ignored --noca
 The real test drives ticks from native test code. It does not prove the desktop's scheduling loop,
 live fleet UI, parallel human approval, persisted process recovery or remote workers. Agent completion
 and recorded review do not advance the main version.
+
+## Canonical migration verification
+
+On 2026-09-27, canonical Mesh revision `bc85196b5c2f2c447cdcb93e40c8e8e58307ca4f`
+([PR #8](https://github.com/idosams/Mesh/pull/8)) passed the real coordinator/two-worker test with
+`codex-cli 0.155.0-alpha.16` in 48.90 seconds. The native host scheduled both delegated lanes; each
+produced its expected distinct file, complete signed checkpoint and immutable review. The source
+workspace projection remained unchanged. Independent saved-review readers reconstructed both artifacts
+in the test, and the retained-evidence test passed again after the provider run ended.
+
+The ordinary canonical gate also passed: 3,085 Rust tests (13 skipped), 544 desktop tests and 44 real
+daemon checks. The skipped provider checks are separate from the successful explicit coordinator
+proof. This verifies native scheduling and provider/MCP integration on disposable data, not packaged
+UI, human approval, process-tree reconciliation, a second provider or remote execution. The PR remains
+unmerged until separately authorized; local evidence does not replace hosted checks or human review.
