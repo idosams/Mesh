@@ -1764,3 +1764,21 @@ Conflict resolution preserves the canonical separate escaped project/root labels
 and all existing confirmation tests. The new tree test also covers misleading
 newlines and non-Latin folder identity. Native focused/failing-before/full tests
 remain pending behind the preserved run; no actual OS dialog proof is claimed.
+
+## I04e localized directory recovery
+
+Completes source `c711c6531220f61bfe5e9994f12df19c4450bd2c` accounting on
+PR #96 at `62de5dfaa3b441f90770594de2a91bfe539c7c36`: four renderer paths
+transferred here; native paths were split across #93–#96. The three source
+documentation changes are reconciled across these increments and this ledger,
+retained-replacement decision, fleet plan and project status. Historical source
+3,304 Rust/678 desktop tests and 14 Rust skips do not validate this canonical tree.
+
+Typed directory observations validate identity, bounds and no-authority flags.
+The localized view shows source/stage entries, empty folders and changed parent
+facts without retained-file restoration. Hebrew and literal identifiers remain;
+updated safety-copy assertions accompany the changed presentation. Controller
+tests: 48 pass. Removing the write-authority refusal makes the directory regression
+fail; restoring it returns all 48 to passing. TypeScript and all 28 rendering/localization tests pass; full desktop, native and
+packaged proof remain pending. Directory removal/type
+replacement, large/binary confirmation and the full fleet acceptance remain open.

@@ -762,3 +762,10 @@ and no-replace installation; uncertainty never triggers replay. Existing desktop
 confirmation refuses these groups pending complete-tree presentation. Directory
 removal/type replacement, large/binary confirmation and packaged graphical proof
 remain unfinished; this native increment does not complete directory acceptance.
+
+The localized directory recovery view now presents bounded source/stage trees and
+parent identity/policy changes, retaining English/Hebrew and literal paths without
+restoration authority for additions. Native directory source transfer is complete
+across the staged PRs; native runtime, complete packaged confirmation/recovery,
+directory removal/type replacement and full provider/remote acceptance remain
+required. Published source increments do not establish merged delivery.

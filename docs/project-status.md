@@ -665,3 +665,11 @@ directories and exact frozen text. It refuses incomplete, mismatched, binary or
 oversized presentations and retains literal project/folder labels. Native tests
 are transferred pending execution. Localized recovery and actual packaged dialog
 acceptance remain outstanding.
+
+### Localized directory recovery (unmerged increment)
+
+Directory group recovery now displays bounded observed source/stage entries and
+changed parent identity/permissions in English and Hebrew. Directory additions
+never offer retained-file restoration. All 48 controller tests pass; removing the
+write-authority refusal makes its regression fail. TypeScript and all 28 rendering/localization tests pass. Full desktop, native and
+packaged graphical acceptance remain pending.

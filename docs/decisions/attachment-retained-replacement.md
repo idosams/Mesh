@@ -690,3 +690,19 @@ group. Project and folder labels stay separately escaped. The native operation
 still revalidates after consent; the renderer cannot supply write authority.
 Localized directory recovery display and packaged graphical approval remain
 pending. Source confirmation regressions are present, awaiting native execution.
+
+### Localized directory recovery presentation
+
+The renderer accepts bounded typed directory observations within verified groups,
+displays source/stage entries including empty directories, and distinguishes
+changed parent identity and permissions. Directory additions never gain retained
+file restoration or cleanup authority. English/Hebrew labels preserve literal
+left-to-right paths; incomplete observations remain explicit. Native confirmation
+handles complete frozen tree text, while the renderer only presents facts.
+Standalone directory preparations still require exact native inspection; normal
+desktop creation is discoverable through group catalogue references.
+
+The source directory feature is fully accounted for across #93–#97, but source
+transfer is not acceptance. Directory removal/type replacement, larger/binary
+confirmation and packaged graphical approval/recovery remain unfinished. Historical
+source gate counts are recorded only as provenance in the migration ledger.

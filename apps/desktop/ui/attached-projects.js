@@ -220,6 +220,8 @@ export function attachedIntegration(raw, id, main) {
 }
 
 const recoveryTransaction = value => typeof value === 'string' && /^(integration|restoration)-[0-9a-f]{32}$/.test(value);
+const directoryTransaction = value => typeof value === 'string' && /^directory-[0-9a-f]{32}$/.test(value);
+const groupMemberTransaction = value => recoveryTransaction(value) || directoryTransaction(value);
 const groupIdentity = value => typeof value === 'string' && /^integration-group-[0-9a-f]{32}$/.test(value);
 const recoveryStatuses = new Set(['group-reference', 'prepared-arrangement', 'applied-arrangement', 'changed-files', 'identity-mismatch', 'incomplete-observation', 'invalid-outcome', 'contradictory-outcome', 'invalid-receipt', 'unverified-history', 'unavailable-directory', 'unrecognized-directory-entry']);
 export function attachedRecovery(raw, id, transaction = null, group = null) {
@@ -273,6 +275,40 @@ export function attachedFileChange(raw, id, restoration, group = null) {
   return { transaction: value.transaction, status: outcome.status, creation };
 }
 
+function attachedDirectoryRecovery(value, id, transaction, group) {
+  const path = value => safeText(value, 4096) && !value.startsWith('/') && value.split('/').every(part => part && part !== '.' && part !== '..');
+  const nullableBool = value => value === null || typeof value === 'boolean';
+  const statuses = ['prepared-arrangement', 'applied-arrangement', 'changed-entries', 'incomplete-observation', 'source-parent-changed', 'parent-policy-changed', 'invalid-outcome', 'contradictory-outcome'];
+  if (value?.schema !== 'mesh.attachment-directory-addition-recovery/v1' || value.project !== id || value.transaction !== transaction
+    || !directoryTransaction(transaction) || !path(value.path) || !statuses.includes(value.status)
+    || !['observation_final', 'automatic_replay', 'write_authority', 'cleanup_authority'].every(key => value[key] === false)
+    || !nullableBool(value.parent_identity_matches) || !nullableBool(value.parent_policy_matches)
+    || !Number.isSafeInteger(value.live_content_budget_remaining) || value.live_content_budget_remaining < 0
+    || !['absent', 'invalid', 'applied-observed', 'reconciliation-required'].includes(value.recorded_outcome)) throw new Error('Invalid directory recovery');
+  const tree = observation => {
+    if (!['absent', 'observed', 'unavailable'].includes(observation?.state)) throw new Error('Invalid directory observation');
+    if (observation.state !== 'observed') {
+      if (observation.tree !== null) throw new Error('Unexpected directory content');
+      return { state: observation.state, entries: [] };
+    }
+    if (!Array.isArray(observation.tree) || !observation.tree.length || observation.tree.length > 64) throw new Error('Invalid directory entries');
+    const seen = new Set();
+    const entries = observation.tree.map((entry, index) => {
+      const directory = entry?.kind === 'directory';
+      if (!['directory', 'file'].includes(entry?.kind) || (index === 0 ? entry.path !== '' || !directory : !path(entry.path))
+        || seen.has(entry.path) || !safeText(entry.installation, 128) || !reviewIdentity(entry.metadata)
+        || !Number.isSafeInteger(entry.mode) || entry.mode < (directory ? 0o040000 : 0o100000) || entry.mode > (directory ? 0o047777 : 0o107777)
+        || (directory ? entry.digest !== null || entry.bytes !== null : !reviewIdentity(entry.digest) || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0)) throw new Error('Invalid directory entry');
+      seen.add(entry.path);
+      return { path: entry.path, kind: entry.kind, bytes: entry.bytes, digest: entry.digest };
+    });
+    return { state: observation.state, entries };
+  };
+  return { group, transaction, status: value.status, attention: !['prepared-arrangement', 'applied-arrangement'].includes(value.status),
+    path: value.path, operation: 'add-directory', retainedAvailable: false, recordedOutcome: value.recorded_outcome,
+    sourceTree: tree(value.source), stagedTree: tree(value.stage), parentIdentityMatches: value.parent_identity_matches, parentPolicyMatches: value.parent_policy_matches };
+}
+
 export function attachedGroupChange(raw, id) {
   const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const outcome = value?.outcome;
@@ -282,7 +318,7 @@ export function attachedGroupChange(raw, id) {
     || outcome.automatic_replay !== false || outcome.displaced_files_retained !== true
     || !Array.isArray(outcome.members) || !outcome.members.length || outcome.members.length > 64
     || new Set(outcome.members.map(item => item.transaction)).size !== outcome.members.length
-    || outcome.members.some(item => !recoveryTransaction(item.transaction) || !['applied-observed', 'reconciliation-required', 'not-attempted'].includes(item.status))
+    || outcome.members.some(item => !groupMemberTransaction(item.transaction) || !['applied-observed', 'reconciliation-required', 'not-attempted'].includes(item.status))
     || (outcome.status === 'applied-observed' && outcome.members.some(item => item.status !== 'applied-observed'))) throw new Error('Invalid group outcome');
   return { group: value.group, status: outcome.status, members: outcome.members.map(item => ({ transaction: item.transaction, status: item.status })) };
 }
@@ -292,8 +328,10 @@ export function attachedGroupRecovery(raw, id, group) {
     || !reviewIdentity(value.proposal_digest) || value.automatic_replay !== false || value.write_authority !== false
     || value.observations_are_atomic !== false || value.already_present_is_preparation_evidence !== true
     || !Array.isArray(value.members) || !value.members.length || !Array.isArray(value.already_present) || value.members.length + value.already_present.length > 64) throw new Error('Invalid group recovery');
-  if (value.members.some(member => !recoveryTransaction(member?.transaction))) throw new Error('Invalid group member');
-  const entries = value.members.map(member => attachedRecovery({ schema: 'mesh.desktop-attachment-recovery/v1', project: id, group, recovery: member.recovery }, id, member.transaction, group).entries[0]);
+  if (value.members.some(member => !groupMemberTransaction(member?.transaction))) throw new Error('Invalid group member');
+  const entries = value.members.map(member => directoryTransaction(member.transaction)
+    ? attachedDirectoryRecovery(member.recovery, id, member.transaction, group)
+    : attachedRecovery({ schema: 'mesh.desktop-attachment-recovery/v1', project: id, group, recovery: member.recovery }, id, member.transaction, group).entries[0]);
   const paths = value.already_present;
   if (new Set(entries.map(entry => entry.transaction)).size !== entries.length || new Set(paths).size !== paths.length
     || paths.some(path => !safeText(path, 4096) || path.startsWith('/') || path.split('/').some(part => !part || part === '.' || part === '..'))) throw new Error('Invalid group membership');

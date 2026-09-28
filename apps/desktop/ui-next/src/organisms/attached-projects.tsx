@@ -20,7 +20,8 @@ type ApprovalState = { available: boolean; enrolled: boolean; reason: string | n
 type IntegrationPreview = { head: string; bundle: string; target: string; base_head: string; observed_digest: string;
   matches_base: number; already_present: number; preserve_current: number; conflicts: number; blocked: number; not_listed: number;
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
-type RecoveryEntry = { group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
+type DirectoryObservation = { state: string; entries: { path: string; kind: string; bytes: number | null; digest: string | null }[] };
+type RecoveryEntry = { sourceTree?: DirectoryObservation; stagedTree?: DirectoryObservation; parentIdentityMatches?: boolean | null; parentPolicyMatches?: boolean | null; group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
 type Recovery = { entries: RecoveryEntry[]; more: boolean };
 type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; moreRestorations?: boolean;
   execution?: { status: string; attempts: {transaction: string; status: string}[]; outcome: GroupOutcome | null } | null };
@@ -289,13 +290,14 @@ export function IntegrationPreviewCard({ project, preview, disabled }: { project
         onClick={() => send({ type: "apply-main-file", id: project, path: entry.path })}>{t("Review applying this file")}</Button>}
     </li>)}</ul>
     {preview.not_listed > 0 && <p className="text-xs">{preview.not_listed} {t("more entries are omitted from this overview. The counts include all entries.")}</p>}
-    <p className="text-xs text-muted-foreground">{t("Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create, replace and remove regular files. Directory changes and incomplete or oversized text confirmations remain unavailable.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create complete new folders and create, replace or remove regular files. Removing folders, changing between files and folders, and incomplete or oversized text confirmations remain unavailable.")}</p>
   </section>;
 }
 
 const recoveryLabels: Record<string, string> = {
   "group-reference": "Group reference · inspect to verify its members",
   "prepared-arrangement": "Prepared content is retained", "applied-arrangement": "Installed and retained files match the recorded arrangement",
+  "changed-entries": "Directory contents changed since preparation", "source-parent-changed": "The containing folder was replaced", "parent-policy-changed": "The containing folder permissions changed",
   "changed-files": "Files changed since the recorded operation", "identity-mismatch": "File identity changed",
   "incomplete-observation": "Files could not be fully checked", "invalid-outcome": "Outcome record needs attention",
   "contradictory-outcome": "Recorded outcome conflicts with current files", "invalid-receipt": "Recovery record needs attention",
@@ -313,6 +315,15 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
     <p className="break-all text-sm font-medium">{entry.path ? <bdi dir="ltr">{entry.path}</bdi> : t("File details unavailable")}</p>
     <p className="text-sm">{t(recoveryLabels[entry.status])}{entry.attention ? <> · {t("Needs attention")}</> : ""}</p>
     <p className="break-all text-xs">{t("Recovery reference:")} {entry.transaction ? <bdi dir="ltr">{entry.transaction}</bdi> : t("Unavailable")}</p>
+    {entry.operation === "add-directory" && <div className="grid gap-2 text-xs">
+      <p>{t("New directory tree. No existing work was displaced by this operation; these observations never authorize replay or removal.")}</p>
+      {entry.parentIdentityMatches === false && <p role="alert">{t("The containing folder no longer has its recorded identity.")}</p>}
+      {entry.parentPolicyMatches === false && <p role="alert">{t("The containing folder permissions differ from preparation.")}</p>}
+      {([["Working tree", entry.sourceTree], ["Prepared tree", entry.stagedTree]] as const).map(([label, tree]) => <details key={label}>
+        <summary>{t(label)}: {tree?.state === "observed" ? <>{tree.entries.length} {t("entries observed")}</> : tree?.state === "absent" ? t("absent") : t("unavailable")}</summary>
+        <ul>{tree?.entries.map(item => <li key={item.path} className="break-all">{item.path ? <bdi dir="ltr">{item.path}</bdi> : t("(tree root)")} · {item.kind === "directory" ? t("Folder") : <>{item.bytes} {t("bytes")}</>}</li>)}</ul>
+      </details>)}
+    </div>}
     {entry.operation === "restore-retained" && <p className="text-xs">{t("Restored private work; this does not approve it as Mesh main.")}</p>}
     {entry.recordedOutcome === "absent" && <p className="text-xs">{t("No outcome was recorded. This does not prove that the working file was unchanged.")}</p>}
     {entry.status === "group-reference" && <Button variant="secondary" disabled={disabled}
@@ -336,7 +347,7 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
       <p className="break-all text-xs"><bdi dir="ltr">{groupOutcome.group}</bdi></p>
       <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-group", id: project, group: groupOutcome.group })}>{t("Inspect group outcome")}</Button></div>}
     {group && <div aria-label={t("Group recovery")}><p className="break-all text-sm">{t("Recovery group:")} <bdi dir="ltr">{group.group}</bdi></p>
-      <p className="text-xs">{t("These are separate file observations, not an atomic snapshot. Nothing is retried automatically.")}</p>
+      <p className="text-xs">{t("These are separate file and directory observations, not an atomic snapshot. Nothing is retried automatically.")}</p>
       <div aria-label={t("Saved group execution")} className="grid gap-2 py-2">
         <p className="text-sm font-medium">{t("Saved group execution")}</p>
         {!group.execution && <p className="text-xs">{t("Saved execution evidence is unavailable in this view.")}</p>}

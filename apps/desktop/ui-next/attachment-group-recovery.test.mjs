@@ -39,7 +39,8 @@ test("unavailable group inspection disables restoration and complete-group appli
     project: "project", disabled: true, preview: {target: "saved", matches_base: 1, already_present: 0, preserve_current: 0, conflicts: 0, blocked: 0, entries: [], not_listed: 0},
   }));
   assert.match(preview, /disabled=""[^>]*>Review applying accepted changes/);
-  assert.ok(preview.includes("Directory changes"));
+  assert.ok(preview.includes("create complete new folders"));
+  assert.ok(preview.includes("Removing folders, changing between files and folders"));
 });
 
 
@@ -105,4 +106,40 @@ test("Hebrew saved execution keeps literal paths and translates uncertainty with
       assert.ok(!html.includes("Execution records"));
     }
   } finally { setLocale("en"); }
+});
+
+test('new directory recovery renders nested and empty entries without a restore action', () => {
+  const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+    project: 'a'.repeat(64), disabled: false, detached: false,
+    group: { group: `integration-group-${'b'.repeat(32)}`, alreadyPresent: [], entries: [{
+      transaction: `directory-${'c'.repeat(32)}`, status: 'source-parent-changed', attention: true,
+      path: 'new', operation: 'add-directory', retainedAvailable: false, recordedOutcome: 'applied-observed',
+      parentIdentityMatches: false, parentPolicyMatches: true,
+      sourceTree: { state: 'observed', entries: [{ path: '', kind: 'directory', bytes: null, digest: null }, { path: 'sub/empty', kind: 'directory', bytes: null, digest: null }, { path: 'sub/file', kind: 'file', bytes: 8, digest: 'a'.repeat(64) }] },
+      stagedTree: { state: 'absent', entries: [] },
+    }] },
+  }));
+  for (const text of ['New directory tree', 'containing folder no longer has its recorded identity', '3 entries observed', 'sub/empty', 'sub/file', '8 bytes', 'Prepared tree: absent']) assert.ok(html.includes(text), text);
+  assert.ok(!html.includes('Review restoring retained file'));
+});
+
+test('Hebrew directory observations preserve literal nested paths without restoration authority', () => {
+  setLocale('he');
+  try {
+    const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+      project: 'project', disabled: false, detached: false,
+      group: { group, alreadyPresent: [], entries: [{
+        transaction: `directory-${'d'.repeat(32)}`, path: 'שם/NEW', status: 'source-parent-changed', attention: true,
+        operation: 'add-directory', retainedAvailable: false, recordedOutcome: 'absent', parentIdentityMatches: false,
+        sourceTree: { state: 'observed', entries: [{path: '', kind: 'directory'}, {path: 'שם/FILE.txt', kind: 'file', bytes: 8}] },
+        stagedTree: { state: 'absent', entries: [] },
+      }] },
+    }));
+    assert.ok(html.includes('עץ תיקיות חדש'));
+    assert.ok(html.includes('זהות התיקייה המכילה'));
+    assert.ok(html.includes('<bdi dir="ltr">שם/FILE.txt</bdi>'));
+    assert.ok(html.includes('העץ שהוכן: חסר'));
+    assert.ok(!html.includes('New directory tree'));
+    assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
+  } finally { setLocale('en'); }
 });

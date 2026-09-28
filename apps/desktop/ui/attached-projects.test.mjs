@@ -1139,3 +1139,40 @@ test('a fresh controller reopens durable group execution without applying or res
   assert.ok(!calls.some(call => /apply_|restore_/.test(call.command)));
   h.dispose();
 });
+
+test('directory group observations retain complete bounded trees without offering restoration', () => {
+  const tx = `directory-${'e'.repeat(32)}`;
+  const directory = path => ({ path, kind: 'directory', installation: 'native-directory', mode: 0o040700, metadata: 'a'.repeat(64), digest: null, bytes: null });
+  const value = groupRecoveryReply();
+  value.members.push({ transaction: tx, recovery: {
+    schema: 'mesh.attachment-directory-addition-recovery/v1', project: id, transaction: tx, path: 'new', status: 'applied-arrangement', recorded_outcome: 'applied-observed',
+    source: { state: 'observed', tree: [directory(''), directory('empty'), { path: 'file', kind: 'file', installation: 'native-file', mode: 0o100600, metadata: 'b'.repeat(64), digest: 'c'.repeat(64), bytes: 8 }] },
+    stage: { state: 'absent', tree: null }, parent_identity_matches: true, parent_policy_matches: true, live_content_budget_remaining: 100,
+    observation_final: false, automatic_replay: false, write_authority: false, cleanup_authority: false,
+  } });
+  const parsed = attachedGroupRecovery(value, id, groupId);
+  assert.equal(parsed.entries[1].retainedAvailable, false);
+  assert.equal(parsed.entries[1].operation, 'add-directory');
+  assert.deepEqual(parsed.entries[1].sourceTree.entries.map(item => item.path), ['', 'empty', 'file']);
+  assert.equal(parsed.entries[1].stagedTree.state, 'absent');
+  for (const mutate of [
+    entry => { entry.write_authority = true; },
+    entry => { entry.project = 'f'.repeat(64); },
+    entry => { entry.transaction = transaction; },
+    entry => { entry.source.tree[1].path = '../escape'; },
+    entry => { entry.source.tree[1].path = ''; },
+    entry => { entry.source.tree[2].digest = null; },
+    entry => { entry.source.tree[2].mode = 0o040700; },
+    entry => { entry.stage.tree = []; },
+    entry => { entry.source.tree = Array(65).fill(directory('')); },
+    entry => { entry.parent_identity_matches = 'yes'; },
+    entry => { entry.live_content_budget_remaining = -1; },
+  ]) {
+    const changed = structuredClone(value); mutate(changed.members[1].recovery);
+    assert.throws(() => attachedGroupRecovery(changed, id, groupId));
+  }
+  const outcome = groupChangeReply(); outcome.outcome.members[0].transaction = tx;
+  assert.equal(attachedGroupChange(outcome, id).members[0].transaction, tx);
+  // Directory references never acquire the existing retained-file restoration path.
+  assert.throws(() => attachedRecovery(recoveryReply(), id, tx, groupId));
+});
