@@ -373,14 +373,22 @@ must refuse before confirmation without state changes. Native/full local executi
 confirmation remain pending; this source implementation is not merged or packaged acceptance.
 
 
-Native fleet-to-project review preparation now verifies directly attached root input correspondence
-across independent object IDs. It returns bounded mapping evidence and the observed verified project
-main without creating a candidate, changing source files or advancing main. Source tests cover import
-identity, complete inventory/metadata mismatches, changes and pagination, foreign projects, continued
-capture and history-only restart. Delegated lineage, candidate import, UI, approval and grouped
-integration remain incomplete; this source API is not a packaged user journey.
+Native fleet-to-project review preparation now verifies root and delegated input ancestry across
+independent object IDs. It returns original-to-final mapping evidence, exact ancestor input/output
+versions and observed verified project main without creating a candidate or advancing main. Unit
+coverage includes three generations and ancestor deletion/recreation. Native tests cover supported
+edits/additions, exact parent-version selection, replaced-ancestor refusal and history-only restart.
+Missing managed files still require explicit entry resolution and cannot produce a complete agent
+checkpoint or submitted review. Candidate import, private dependency graphs, UI, approval, grouped
+integration and explicit agent deletion resolution remain incomplete. This source API is not a
+packaged user journey.
 
 The canonical correspondence increment adds same-path replacement and ambiguous inventory regressions.
 Repository/docs/license/storage and formatting checks pass locally; native execution and the full
 local gate remain pending behind preserved verification. Hosted tests must verify this revision.
 No migration PR is merged and no candidate or packaged integration is claimed.
+
+The canonical delegated-ancestry transfer retains the earlier replacement and ambiguous-inventory
+regressions and adds a net-change regression for reverted ancestor work. Local repository/docs/license/
+storage and formatting checks pass. Native execution, the full local gate and packaged acceptance
+remain pending; no migration PR is merged.

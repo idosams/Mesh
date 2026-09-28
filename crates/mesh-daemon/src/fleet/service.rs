@@ -288,7 +288,7 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
-    /// Verify an attached root result's original project correspondence without execution adoption.
+    /// Verify a result's original project correspondence through its input ancestry without execution adoption.
     pub fn saved_project_mapping(
         &self,
         selection: &SavedReviewSelection,
@@ -1436,9 +1436,8 @@ impl FleetService {
         ]))
     }
 
-    /// Prepare exact object correspondence for an attached root result and its original project.
-    /// Descendant lanes require transitive input mapping and are deliberately not inferred here.
-    /// The returned main is an observation, not a reservation or authority to integrate.
+    /// Verify every recorded input boundary from the original project through a delegated result.
+    /// All ancestry changes remain visible. This read neither approves dependencies nor reserves main.
     pub fn saved_project_mapping(
         &self,
         selection: &SavedReviewSelection,
@@ -1447,51 +1446,94 @@ impl FleetService {
         after: Option<&str>,
     ) -> Result<Json, Unavailable> {
         let state = self.native_state()?;
-        let lane = state
-            .lanes
-            .get(&selection.lane)
-            .filter(|lane| {
-                lane.parent.is_none() && lane.source_project.as_deref() == Some(source.id())
-            })
+        saved_review_binding_from_state(&state, selection)?;
+        let lineage = super::project_mapping::lineage(
+            &state,
+            &selection.lane,
+            selection.version,
+            source.id(),
+        )
+        .map_err(|_| refusal("fleet-project-lineage-unavailable"))?;
+        // Keep every retained history guard until the entire chain has been read and revalidated.
+        // Opening these readers does not adopt live worker handles or hold their daemon locks.
+        let histories = lineage
+            .iter()
+            .map(|step| self.allocator.reopen_history(&step.lane, &step.binding))
+            .collect::<Result<Vec<_>, _>>()?;
+        let leaf = histories
+            .last()
             .ok_or_else(|| refusal("fleet-project-lineage-unavailable"))?;
-        let expected = lane
-            .workspace
-            .as_ref()
-            .ok_or_else(|| refusal("fleet-project-input-unbound"))?;
-        let mapped = self.with_saved_review(selection, |open, binding| {
-            if binding != expected {
-                return Err(refusal("fleet-project-input-changed"));
-            }
-            let starting = binding
-                .starting_version()
-                .ok_or_else(|| refusal("fleet-starting-version-unbound"))?;
-            source
-                .with_fleet_input(binding.source_version, trusted, |project, main| {
-                    let preview = |open: &crate::workspace::OpenWorkspace, version| {
-                        open.historical_workspace_preview(version)
-                            .map_err(|error| std::io::Error::other(error.to_string()))
-                    };
-                    let correspondence = super::project_mapping::mapping(
-                        preview(project, binding.source_version)?,
-                        preview(open, starting)?,
-                        preview(open, selection.version)?,
-                        after,
-                    )?;
-                    Ok(Json::object([
-                        ("source_project", Json::text(source.id())),
+        leaf.open
+            .review(&selection.bundle)
+            .filter(|review| review.subject_operation == selection.version)
+            .ok_or_else(|| refusal("fleet-review-not-recorded"))?;
+        let root = &lineage[0];
+        let mapped = source
+            .with_fleet_input(root.binding.source_version, trusted, |project, main| {
+                let preview = |open: &crate::workspace::OpenWorkspace, version| {
+                    open.historical_workspace_preview(version)
+                        .map_err(|error| std::io::Error::other(error.to_string()))
+                };
+                let mut snapshots = Vec::new();
+                let mut inputs = Vec::new();
+                for (step, history) in lineage.iter().zip(&histories) {
+                    history
+                        .verify()
+                        .map_err(|_| std::io::Error::other("lineage history changed"))?;
+                    let starting = step
+                        .binding
+                        .starting_version()
+                        .ok_or_else(|| std::io::Error::other("unbound input"))?;
+                    snapshots.push((
+                        preview(&history.open, starting)?,
+                        preview(&history.open, step.result)?,
+                    ));
+                    inputs.push(Json::object([
+                        ("lane", Json::text(&step.lane)),
                         (
                             "source_version",
-                            Json::text(binding.source_version.to_string()),
+                            Json::text(step.binding.source_version.to_string()),
                         ),
                         ("starting_version", Json::text(starting.to_string())),
-                        ("observed_main", main),
-                        ("correspondence", correspondence),
-                    ]))
-                })
-                .map_err(|_| refusal("fleet-project-mapping-unavailable"))
-        })?;
+                        ("result_version", Json::text(step.result.to_string())),
+                    ]));
+                }
+                let correspondence = super::project_mapping::mapping_chain(
+                    preview(project, root.binding.source_version)?,
+                    snapshots,
+                    after,
+                )?;
+                Ok(Json::object([
+                    ("source_project", Json::text(source.id())),
+                    (
+                        "source_version",
+                        Json::text(root.binding.source_version.to_string()),
+                    ),
+                    ("lineage", Json::Array(inputs)),
+                    ("scope", Json::text("recorded-input-ancestry")),
+                    ("observed_main", main),
+                    ("correspondence", correspondence),
+                ]))
+            })
+            .map_err(|_| refusal("fleet-project-mapping-unavailable"))?;
+        for history in &histories {
+            history.verify()?;
+        }
+        let current = self.native_state()?;
+        saved_review_binding_from_state(&current, selection)?;
+        if super::project_mapping::lineage(
+            &current,
+            &selection.lane,
+            selection.version,
+            source.id(),
+        )
+        .map_err(|_| refusal("fleet-project-lineage-unavailable"))?
+            != lineage
+        {
+            return Err(refusal("fleet-project-lineage-changed"));
+        }
         Ok(Json::object([
-            ("schema", Json::text("mesh.fleet-project-mapping/v1")),
+            ("schema", Json::text("mesh.fleet-project-mapping/v2")),
             ("objective", Json::text(self.objective()?)),
             ("selection", selection.to_json()),
             ("mapping", mapped),
@@ -1655,9 +1697,14 @@ fn saved_review_binding<'a>(
     inner: &'a Inner,
     selection: &SavedReviewSelection,
 ) -> Result<&'a super::WorkspaceBinding, Unavailable> {
-    let checkpoint = inner
-        .runtime
-        .state()
+    saved_review_binding_from_state(inner.runtime.state(), selection)
+}
+
+fn saved_review_binding_from_state<'a>(
+    state: &'a super::State,
+    selection: &SavedReviewSelection,
+) -> Result<&'a super::WorkspaceBinding, Unavailable> {
+    let checkpoint = state
         .checkpoints
         .get(&selection.checkpoint)
         .filter(|checkpoint| {
@@ -1669,9 +1716,7 @@ fn saved_review_binding<'a>(
                     .is_some_and(|result| result.complete && result.version == selection.version)
         })
         .ok_or_else(|| refusal("fleet-review-selection-mismatch"))?;
-    inner
-        .runtime
-        .state()
+    state
         .lanes
         .get(&checkpoint.lane)
         .and_then(|lane| lane.workspace.as_ref())

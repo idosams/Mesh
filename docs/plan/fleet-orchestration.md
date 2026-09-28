@@ -428,9 +428,11 @@ remain required for the full review and orchestration journey.
 
 ### Original-project correspondence preparation
 
-A native read-only boundary now verifies directly attached root results against the entire exact
-source input and returns paginated object correspondence plus observed verified main. Original live
-edits and later captures remain untouched and do not replace the saved input. This is a prerequisite
-for original-main review, not completion: delegated ancestry, candidate import/provenance, dependency
-closure, desktop presentation, exact approval and grouped integration remain required. See the
-original-project correspondence decision in `docs/decisions/fleet-runtime.md`.
+A native read-only boundary now verifies root and delegated result ancestry against the entire exact
+source input at each import boundary. It returns paginated original-to-final object correspondence,
+explicit saved ancestor versions and observed verified main. Original live edits and later captures
+remain untouched; later parent work does not enter an already-created child. Candidate import and
+provenance, private dependency closure/rejection propagation, desktop presentation, exact approval
+and grouped integration remain required. Native tests also expose the existing missing-entry
+checkpoint refusal: explicit agent deletion resolution must land before that capture journey can
+be called complete. See the original-project correspondence decision in `docs/decisions/fleet-runtime.md`.

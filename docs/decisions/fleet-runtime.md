@@ -458,25 +458,40 @@ main approval are separate required evidence; native callback fixtures do not pr
 
 ## Original-project correspondence preparation
 
-`FleetService::saved_project_mapping` and its history-only wrapper verify the boundary between an
-attached root lane's saved local import and the exact original project version. Native retained
-project identity, recorded source-project correlation, starting-version binding and exact saved-review
-selection are all required. The complete immutable inventories must match by path, entry type,
-content digest, length and executable bit before any object correspondence is returned. Independent
-workspace object IDs and manifest IDs are not assumed to be interchangeable. Result objects retain
-their local identity through moves; new objects have no original object and deleted objects have no
-result. Every changed object is paged in stable local-object order, with 200 entries per page.
+`FleetService::saved_project_mapping` and its history-only wrapper verify the entire recorded input
+ancestry from an attached root through the selected delegated result. Each step binds the lane,
+source version, local initial import and exact output version used by the next child; the final step
+binds the recorded review selection. Cycles, missing or foreign projects, inconsistent bases/depths,
+unbound legacy imports and more than the authorized depth (at most 33 lanes) refuse. Every retained
+history reader is verified before and after the operation, and the recorded lineage is rechecked
+against fresh runtime state. Reading does not adopt worker handles or hold their daemon locks.
 
-The closed native projection `mesh.fleet-project-mapping/v1` carries the exact source project/input,
-local starting version, result selector, correspondence page and observed verified main. Main and
-source input are read under one retained attachment-history lock; main is an observation, never a
-reservation. New private captures and live edits are not used as the original input. The projection
-creates no version, review, approval, source write or worker adoption. No persisted format changes.
+At every import boundary, complete immutable inventories must match by path, type, content digest,
+length and executable bit. Independent object IDs and manifest IDs are not interchangeable. Original
+object identities flow through local edits and remap at verified imports. The final comparison is
+against the original project input, including ancestor additions, moves and deletions. A deleted
+object recreated at the same path has a distinct identity. Changes made by a parent after delegation
+cannot replace the exact saved parent version used by the child. Intermediate versions are explicit
+in the returned lineage; they are not human-approved merely because the final result references them.
 
-This is the first original-project review-preparation boundary, not complete integration. Directly
-attached roots are supported; delegated lanes refuse until transitive ancestry correspondence is
-implemented. Results still need dependency closure, a source-history candidate with explicit
-provenance, exact human approval and divergence-safe grouped write-back. The native reader has no
-desktop command or agent tool yet. Source tests cover complete-inventory mismatch, metadata/type
-changes, distinct identities, moves/additions/deletions, pagination, foreign projects, newer captures,
-restart and unavailable original roots. No packaged graphical or integration claim follows.
+The closed native projection is now `mesh.fleet-project-mapping/v2`. It carries the original source
+project/input, ordered lineage, observed verified main, and paginated correspondence in stable
+`correspondence-id` order (200 rows per page). Rows use `source:<original-object>` for source changes
+and `result:<final-object>` for additions. A deletion can have no final lane object, so v1's local-only
+object ordering is intentionally replaced. There are no renderer consumers or persisted mapping
+records to migrate. Existing fleet ledger and workspace encodings remain unchanged.
+
+Main and the source input are read under one attachment-history lock. Main is an observation, never
+a reservation. New source captures and live edits do not replace the saved input. This projection
+creates no version, review, approval, source write or worker adoption. Its scope is recorded single-
+parent input ancestry; separately authorized private dependency graphs, rejection propagation and
+publication validation still require implementation.
+
+This remains native review preparation, not integration. A source-history candidate with explicit
+provenance, desktop presentation, exact human approval and divergence-safe grouped write-back are
+still required. Unit tests cover three generations, ancestor deletion/recreation, complete input
+mismatches, graph validation and pagination. The native delegation journey proves edits/additions,
+exact parent-version selection, replaced-ancestor refusal and history-only restart. It explicitly
+verifies that a missing managed file still produces an incomplete checkpoint which cannot be
+submitted. Explicit agent deletion resolution remains unfinished; synthetic saved deletion mapping
+is not proof of that capture capability. No packaged graphical or integration claim follows.

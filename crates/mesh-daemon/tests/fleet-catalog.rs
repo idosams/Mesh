@@ -524,3 +524,199 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
     );
     assert_eq!(restored.snapshot().unwrap(), before);
 }
+
+#[test]
+fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
+    use mesh_daemon::fleet::service::{AgentCredential, SavedReviewSelection};
+    use std::sync::Arc;
+    let mut f = Fixture::new("project-lineage");
+    fs::write(f.source.join("obsolete.txt"), "original content\n").unwrap();
+    let captured = f
+        .history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let key = SigningKey::from_bytes(&[61; 32]);
+    f.request.version = f
+        .history
+        .project()
+        .save_capture(
+            f.history.metadata_path(),
+            &captured,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                Ok::<_, String>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap()
+        .operation();
+    let catalog = f.open().unwrap();
+    let service = catalog.create_attached(&f.history, &f.request).unwrap();
+    let objective = service.objective().unwrap();
+    let state = service.native_state().unwrap();
+    let root_lane = state.lanes.keys().next().unwrap().clone();
+    let root = PathBuf::from(state.lanes[&root_lane].workspace.as_ref().unwrap().root());
+    let start = |lane: &str, run: &str| {
+        service
+            .native_command(
+                &format!("dispatch-{run}"),
+                Command::Dispatch {
+                    lane: lane.into(),
+                    run: run.into(),
+                },
+            )
+            .unwrap();
+        service
+            .grant_with_signer(
+                lane,
+                run,
+                &format!("session-{run}"),
+                Arc::new(HistorySigner(SigningKey::from_bytes(&[63; 32]))),
+            )
+            .unwrap()
+    };
+    let save = |lane: &str, credential: &AgentCredential, request: &str| {
+        let saved = service
+            .agent_call(
+                credential.transport_value(),
+                "checkpoint",
+                &Json::object([("request", Json::text(request))]),
+            )
+            .unwrap();
+        assert_eq!(
+            saved.get("complete"),
+            Some(&Json::Bool(true)),
+            "{request}: {}",
+            saved.encode()
+        );
+        let review = service
+            .agent_call(
+                credential.transport_value(),
+                "submit_review",
+                &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+            )
+            .unwrap();
+        (
+            SavedReviewSelection::new(
+                lane,
+                text(&saved, "checkpoint"),
+                text(&saved, "version"),
+                text(&review, "bundle"),
+            )
+            .unwrap(),
+            saved,
+        )
+    };
+    let parent_credential = start(&root_lane, "parent-run");
+    fs::write(root.join("work.txt"), "parent result\n").unwrap();
+    fs::write(root.join("upstream.txt"), "inherited addition\n").unwrap();
+    fs::remove_file(root.join("obsolete.txt")).unwrap();
+    // Missing managed entries are currently an explicit resolution boundary, not inferred deletion.
+    // Preserve that refusal; this native journey proves supported edits/additions. The pure mapping
+    // tests separately exercise already-recorded ancestor deletions and recreation identities.
+    let incomplete = service
+        .agent_call(
+            parent_credential.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("missing-entry"))]),
+        )
+        .unwrap();
+    assert_eq!(incomplete.get("complete"), Some(&Json::Bool(false)));
+    assert_eq!(
+        incomplete.get("issue"),
+        Some(&Json::text("checkpoint-entry-resolution-required"))
+    );
+    assert!(service
+        .agent_call(
+            parent_credential.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", incomplete.get("checkpoint").unwrap().clone())])
+        )
+        .is_err());
+    fs::write(root.join("obsolete.txt"), "original content\n").unwrap();
+    let (_, parent_result) = save(&root_lane, &parent_credential, "parent-result");
+    let child = service
+        .agent_call(
+            parent_credential.transport_value(),
+            "delegate",
+            &Json::object([
+                ("request", Json::text("child")),
+                ("goal", Json::text("Revise inherited work")),
+                ("provider", Json::text("codex")),
+                ("version", parent_result.get("version").unwrap().clone()),
+            ]),
+        )
+        .unwrap();
+    let child_lane = text(&child, "id");
+    let child_root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
+    let child_credential = start(child_lane, "child-run");
+    fs::write(child_root.join("work.txt"), "child result\n").unwrap();
+    let (selection, _) = save(child_lane, &child_credential, "child-result");
+    // Later parent work must not replace the exact parent version used by the delegation.
+    fs::write(root.join("unrelated-later.txt"), "not inherited\n").unwrap();
+    save(&root_lane, &parent_credential, "later-parent-result");
+    fs::write(f.source.join("work.txt"), "ongoing ordinary work\n").unwrap();
+    let before = service.native_state().unwrap();
+    let mapping = service
+        .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+        .unwrap();
+    assert_eq!(service.native_state().unwrap(), before);
+    assert_eq!(text(&mapping, "schema"), "mesh.fleet-project-mapping/v2");
+    let result = mapping.get("mapping").unwrap();
+    let lineage = result.get("lineage").unwrap().as_array().unwrap();
+    assert_eq!(lineage.len(), 2);
+    assert_eq!(
+        lineage[0].get("result_version"),
+        parent_result.get("version")
+    );
+    assert_eq!(
+        lineage[1].get("source_version"),
+        parent_result.get("version")
+    );
+    let changes = result
+        .get("correspondence")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(changes.len(), 2);
+    assert!(changes
+        .iter()
+        .any(|row| row.get("result").and_then(|v| v.get("path"))
+            == Some(&Json::text("upstream.txt"))
+            && row.get("source") == Some(&Json::Null)));
+    assert!(!mapping.encode().contains("unrelated-later.txt"));
+    let moved = root.with_extension("temporarily-moved");
+    fs::rename(&root, &moved).unwrap();
+    fs::create_dir(&root).unwrap();
+    let refused = service
+        .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+        .is_err();
+    fs::remove_dir(&root).unwrap();
+    fs::rename(&moved, &root).unwrap();
+    assert!(refused, "a replaced ancestor must refuse the whole mapping");
+    drop(service);
+    drop(catalog);
+    let reopened = f.open().unwrap();
+    let history = reopened.history(&objective).unwrap();
+    let before = reopened.snapshot().unwrap();
+    assert_eq!(
+        history
+            .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+            .unwrap(),
+        mapping
+    );
+    assert_eq!(reopened.snapshot().unwrap(), before);
+    assert!(reopened.current_service(&objective).is_err());
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"ongoing ordinary work\n"
+    );
+    assert_eq!(
+        fs::read(f.source.join("obsolete.txt")).unwrap(),
+        b"original content\n"
+    );
+}
