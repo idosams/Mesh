@@ -288,6 +288,18 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Recover an existing exact staged candidate without creating content or adopting workers.
+    pub fn inspect_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .inspect_project_candidate(selection, source, trusted, request, expected_main)
+    }
     /// Verify a result's original project correspondence through its input ancestry without execution adoption.
     pub fn saved_project_mapping(
         &self,
@@ -1541,6 +1553,112 @@ impl FleetService {
         ]))
     }
 
+    /// Stage exact candidate content outside the original project's capture history and files.
+    /// Native callers choose a stable request and the main head observed during preparation.
+    /// This does not create a project review, import operations, approve, or write back files.
+    pub fn stage_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        self.project_candidate(selection, source, trusted, request, expected_main, true)
+    }
+
+    /// Inspect only an existing, complete candidate. Missing or partial content is never repaired.
+    pub fn inspect_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        self.project_candidate(selection, source, trusted, request, expected_main, false)
+    }
+
+    fn project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        create: bool,
+    ) -> Result<Json, Unavailable> {
+        if let Some(head) = expected_main {
+            if RecordDigest::parse_hex(head)
+                .ok()
+                .is_none_or(|parsed| parsed.to_string() != head)
+            {
+                return Err(refusal("fleet-candidate-main-invalid"));
+            }
+        }
+        let mapping = self.saved_project_mapping(selection, source, trusted, None)?;
+        let state = self.native_state()?;
+        let binding = saved_review_binding_from_state(&state, selection)?;
+        let origin = &state.checkpoints[&selection.checkpoint].origin;
+        let objective = self.objective()?;
+        let provenance =
+            candidate_provenance(&objective, selection, &mapping, origin, expected_main)?;
+        let main_matches = |mapping: &Json| {
+            mapping
+                .get("mapping")
+                .and_then(|value| value.get("observed_main"))
+                .and_then(|value| value.get("head"))
+                .and_then(Json::as_text)
+                == expected_main
+        };
+        let history = self.allocator.reopen_history(&selection.lane, binding)?;
+        history.verify()?;
+        let snapshot = history
+            .open
+            .historical_workspace_preview(selection.version)
+            .map_err(|_| refusal("fleet-candidate-content-unavailable"))?;
+        let result = source
+            .stage_fleet_candidate(
+                request,
+                &provenance,
+                &history.open,
+                &snapshot,
+                if create {
+                    crate::project_attachment::CandidateAdmission::Stage {
+                        main_matches: main_matches(&mapping),
+                    }
+                } else {
+                    crate::project_attachment::CandidateAdmission::Inspect
+                },
+                || {
+                    history
+                        .verify()
+                        .map_err(|_| std::io::Error::other("candidate history changed"))?;
+                    let current = self
+                        .saved_project_mapping(selection, source, trusted, None)
+                        .map_err(|_| std::io::Error::other("candidate lineage unavailable"))?;
+                    let same = candidate_provenance(
+                        &objective,
+                        selection,
+                        &current,
+                        origin,
+                        expected_main,
+                    )
+                    .map_err(|_| std::io::Error::other("candidate provenance unavailable"))?
+                        == provenance;
+                    if !same || !main_matches(&current) {
+                        return Err(std::io::Error::other(
+                            "candidate input or main changed during preparation",
+                        ));
+                    }
+                    Ok(())
+                },
+            )
+            .map_err(|_| refusal("fleet-candidate-staging-unavailable"))?;
+        history.verify()?;
+        Ok(result)
+    }
+
     /// Read an exact historical artifact; object identity and side select content, never a path.
     pub fn saved_review_artifact(
         &self,
@@ -1698,6 +1816,47 @@ fn saved_review_binding<'a>(
     selection: &SavedReviewSelection,
 ) -> Result<&'a super::WorkspaceBinding, Unavailable> {
     saved_review_binding_from_state(inner.runtime.state(), selection)
+}
+
+fn candidate_provenance(
+    objective: &str,
+    selection: &SavedReviewSelection,
+    mapping: &Json,
+    origin: &super::AgentOrigin,
+    expected_main: Option<&str>,
+) -> Result<Json, Unavailable> {
+    let mapping = mapping
+        .get("mapping")
+        .ok_or_else(|| refusal("fleet-candidate-mapping-unavailable"))?;
+    let field = |name| {
+        mapping
+            .get(name)
+            .cloned()
+            .ok_or_else(|| refusal("fleet-candidate-mapping-unavailable"))
+    };
+    Ok(Json::object([
+        ("schema", Json::text("mesh.fleet-candidate-provenance/v1")),
+        ("objective", Json::text(objective)),
+        ("selection", selection.to_json()),
+        ("source_project", field("source_project")?),
+        ("source_version", field("source_version")?),
+        ("lineage", field("lineage")?),
+        (
+            "expected_main",
+            expected_main.map_or(Json::Null, Json::text),
+        ),
+        (
+            "origin",
+            Json::object([
+                ("actor", Json::text(&origin.actor)),
+                ("session", Json::text(&origin.session)),
+                ("run", Json::text(&origin.run)),
+                ("generation", Json::text(&origin.generation)),
+            ]),
+        ),
+        ("attribution", Json::text("recorded-agent-checkpoint")),
+        ("approval_authority", Json::Bool(false)),
+    ]))
 }
 
 fn saved_review_binding_from_state<'a>(

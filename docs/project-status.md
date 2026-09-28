@@ -392,3 +392,17 @@ The canonical delegated-ancestry transfer retains the earlier replacement and am
 regressions and adds a net-change regression for reverted ancestor work. Local repository/docs/license/
 storage and formatting checks pass. Native execution, the full local gate and packaged acceptance
 remain pending; no migration PR is merged.
+
+
+Native fleet candidate staging now copies exact saved results into external project metadata with
+recorded ancestry, checkpoint attribution, expected main, a content manifest and a durable ready
+receipt. Source tests verify retries, restart inspection, stale/conflicting inputs, interrupted or
+altered candidates, capacity limits and unchanged source capture history/main. This is not yet an
+original-project review or operation import; it has no desktop controls, agent tool, signed approval
+or grouped integration. Inspection requires the original root and retained source/lane history;
+standalone offline verification, discovery and partial-candidate reconciliation remain unavailable.
+
+The canonical candidate-staging transfer retains all previous lineage and decision corrections and
+adds refusal checks for changed provenance and executable permissions without repair or receipt
+replacement. Local repository/docs/license/storage/format checks pass. Native/full local and packaged
+validation remain pending; migration PRs remain unmerged.

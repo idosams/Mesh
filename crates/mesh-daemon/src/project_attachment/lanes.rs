@@ -250,7 +250,7 @@ impl AttachmentStorage {
     }
 }
 
-fn check_budget(
+pub(super) fn check_budget(
     snapshot: &crate::workspace::HistoricalWorkspacePreview,
     limits: ObservationLimits,
 ) -> io::Result<()> {
@@ -274,7 +274,7 @@ fn check_budget(
     Ok(())
 }
 
-fn materialize(
+pub(super) fn materialize(
     workspace: &crate::workspace::OpenWorkspace,
     snapshot: &crate::workspace::HistoricalWorkspacePreview,
     files: &PinnedWorkspaceRoot,
@@ -307,6 +307,17 @@ fn materialize(
             change(path);
         }
     });
+    verify_materialized(snapshot, files, limits)?;
+    files.sync()?;
+    files.ensure_namespace_identity()?;
+    Ok(())
+}
+
+pub(super) fn verify_materialized(
+    snapshot: &crate::workspace::HistoricalWorkspacePreview,
+    files: &PinnedWorkspaceRoot,
+    limits: ObservationLimits,
+) -> io::Result<()> {
     let expected: BTreeMap<_, _> = snapshot
         .directories
         .iter()
@@ -330,7 +341,6 @@ fn materialize(
             return Err(invalid("lane content changed during allocation"));
         }
     }
-    files.sync()?;
     files.ensure_namespace_identity()?;
     Ok(())
 }

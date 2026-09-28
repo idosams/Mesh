@@ -436,3 +436,14 @@ provenance, private dependency closure/rejection propagation, desktop presentati
 and grouped integration remain required. Native tests also expose the existing missing-entry
 checkpoint refusal: explicit agent deletion resolution must land before that capture journey can
 be called complete. See the original-project correspondence decision in `docs/decisions/fleet-runtime.md`.
+
+
+### Durable fleet candidate staging
+
+Native preparation now retains exact result content and ancestry in a create-only external project
+candidate with a fixed expected main. Exact retries and history-only receipt inspection preserve
+source files/captures and do not adopt workers. Partial or altered candidates refuse without repair.
+This is a durable staging boundary, not the completed original-main loop: source-history operation
+import, exact project review, dependency validation, UI, human approval and grouped integration remain
+required. Standalone offline candidate verification/discovery and partial-allocation reconciliation
+are also outstanding. See the candidate staging decision for supported limits and evidence scope.

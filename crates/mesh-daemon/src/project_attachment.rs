@@ -27,10 +27,12 @@ mod provisioning;
 pub use provisioning::{AttachmentStorage, ProvisionedAttachment, RegisteredAttachment};
 
 mod background;
+mod candidates;
 pub use background::{
     AttachmentCaptureService, CaptureOutcome, CapturePhase, CaptureSchedule, CaptureStatus,
     NativeSignalState,
 };
+pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
 mod history;

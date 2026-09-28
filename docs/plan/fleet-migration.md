@@ -189,8 +189,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | R03 | `367ec923ba6e1bcd3d15d62429ddec7ca49bda06` | feat(fleet): link proposed saved results to review change requests | [Mesh PR #60](https://github.com/idosams/Mesh/pull/60), `dc315053ac01b86cc5125155644a4f726a2be2b6`; proposed results; stacked on #59; not merged |
 | R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | [Mesh PR #61](https://github.com/idosams/Mesh/pull/61), `3fbc74fe2c5ba8e86d0686807687394bf0b97ae1`; reversible decisions; stacked on #60; not merged |
 | C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | [Mesh PR #62](https://github.com/idosams/Mesh/pull/62), `d68ea27f6876f3a206d23ec564e706d7098dd45a`; original input correspondence; stacked on corrected #61; not merged |
-| C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | This increment, C01b; delegated input ancestry; stacked on published #62; not merged |
-| C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | Pending transfer |
+| C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | [Mesh PR #63](https://github.com/idosams/Mesh/pull/63), `a9bc1c78f486cdfc55a0c9e5985feddf4ca8aaf7`; exact delegated ancestry; stacked on #62; not merged |
+| C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | This increment, C01c; durable candidate staging; stacked on published #63; not merged |
 | C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | Pending transfer |
 | C02 | `2263d5db328d3aab957218642c61e3e3b94d6047` | feat(desktop): expose fixed fleet project candidate reviews | Pending transfer |
 | C02 | `c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b` | feat(desktop): pin project comparisons with durable preparation inputs | Pending transfer |
@@ -1011,3 +1011,37 @@ Candidate staging, fixed-main review, approval and grouped integration, remainin
 second-provider/four-worker/remote/packaged acceptance, named human review, eventual merges and final
 combined-main testing remain required. Original histories, dirty work and active verification remain
 preserved.
+
+## C01c exact project candidate staging
+
+Preserved source `0f79d16c0456d83e707e6652e8bd4e3774683eea` transfers onto published #63 at
+`a9bc1c78f486cdfc55a0c9e5985feddf4ca8aaf7`. Native staging copies a selected saved result into
+private external project metadata, separate from ordinary files and capture history. Intent binds the
+request, project, exact selector, complete content manifest, recorded ancestry/agent attribution and
+expected main. Retained directory identities, copied bytes and metadata, lineage and main are checked
+before a durable ready receipt; copying and revalidation occur outside the short admission lock.
+
+Completed exact retries recover the original receipt, even after main changes, without asserting
+current approval eligibility. Different input or modified retained content refuses. Partial candidates
+are preserved and never repaired by retry. History-only inspection creates nothing and requires the
+original project and source/lane histories. No automatic discovery, cleanup or reconciliation is added.
+Limits remain 128 retained allocations including partial ones, 10,000 entries, 64 MiB total and 8 MiB
+per file. Existing capture/fleet formats are unchanged; new candidate formats are versioned v1 and
+older code has no candidate reader. No source-history import, project review, approval or write-back.
+
+Source native tests cover exact historical bytes despite later edits, stale main, conflicting retry,
+restart inspection, unchanged capture history/main, interrupted verification, concurrent edits,
+manifest corruption, replaced file directories and capacity. Added canonical regression assertions
+verify that changed provenance cannot overwrite intent/ready receipts and executable-mode substitution
+refuses while preserving both modified evidence and original ready receipt. Prior mapping and decision
+corrections remain in the base.
+
+Local repository (7 tests), documentation (106 documents), license/self-test, storage/self-test,
+formatting and whitespace checks pass. Native/failing-before/full local execution remains queued
+behind preserved #44 verification; hosted tests must validate this exact revision. #61 and #62 have
+six passing checks with macOS pending, while #63 has five passing checks and native jobs running.
+No native local, packaged, approval or merged-delivery claim follows.
+
+Fixed-main project review, UI, private dependency validation, human approval and grouped integration,
+remaining recovery/acceptance phases, required human reviews, eventual merges and final combined-main
+testing remain part of the goal. Original work and active verification remain preserved.

@@ -698,6 +698,107 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     fs::remove_dir(&root).unwrap();
     fs::rename(&moved, &root).unwrap();
     assert!(refused, "a replaced ancestor must refuse the whole mapping");
+    let candidate_request = "b".repeat(32);
+    let candidate_root = f.history.metadata_path().join("fleet-candidates");
+    let versions_before = f
+        .history
+        .project()
+        .saved_versions(f.history.metadata_path())
+        .unwrap();
+    assert!(service
+        .inspect_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None
+        )
+        .is_err());
+    assert!(
+        !candidate_root.exists(),
+        "inspection cannot create candidate storage"
+    );
+    assert!(service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            Some(&"0".repeat(64))
+        )
+        .is_err());
+    assert!(
+        !candidate_root.exists(),
+        "stale main cannot start a candidate"
+    );
+    fs::write(
+        child_root.join("work.txt"),
+        "later uncheckpointed child work\n",
+    )
+    .unwrap();
+    let candidate = service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+        )
+        .unwrap();
+    let retained = candidate_root.join(text(&candidate, "candidate"));
+    assert_eq!(
+        fs::read(retained.join("files/work.txt")).unwrap(),
+        b"child result\n"
+    );
+    assert_eq!(
+        fs::read(retained.join("files/upstream.txt")).unwrap(),
+        b"inherited addition\n"
+    );
+    assert!(!retained.join("files/unrelated-later.txt").exists());
+    assert_eq!(text(&candidate, "state"), "staged");
+    assert_eq!(
+        candidate.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        candidate.get("provenance").unwrap().get("lineage"),
+        result.get("lineage")
+    );
+    assert_eq!(
+        service
+            .stage_project_candidate(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None
+            )
+            .unwrap(),
+        candidate
+    );
+    assert!(service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            Some(&"0".repeat(64))
+        )
+        .is_err());
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 1);
+    assert_eq!(
+        f.history
+            .project()
+            .saved_versions(f.history.metadata_path())
+            .unwrap(),
+        versions_before
+    );
+    assert_eq!(
+        f.history
+            .accepted_main(&TrustedReviewers::default())
+            .unwrap(),
+        Json::Null
+    );
     drop(service);
     drop(catalog);
     let reopened = f.open().unwrap();
@@ -711,6 +812,54 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     );
     assert_eq!(reopened.snapshot().unwrap(), before);
     assert!(reopened.current_service(&objective).is_err());
+    assert_eq!(
+        history
+            .inspect_project_candidate(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None
+            )
+            .unwrap(),
+        candidate
+    );
+    assert!(history
+        .inspect_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &"c".repeat(32),
+            None
+        )
+        .is_err());
+    assert_eq!(fs::read_dir(&candidate_root).unwrap().count(), 1);
+    fs::write(
+        retained.join("files/work.txt"),
+        "changed retained candidate\n",
+    )
+    .unwrap();
+    assert!(history
+        .inspect_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None
+        )
+        .is_err());
+    assert_eq!(
+        fs::read(retained.join("files/work.txt")).unwrap(),
+        b"changed retained candidate\n"
+    );
+    assert_eq!(
+        f.history
+            .project()
+            .saved_versions(f.history.metadata_path())
+            .unwrap(),
+        versions_before
+    );
+    assert_eq!(reopened.snapshot().unwrap(), before);
     assert_eq!(
         fs::read(f.source.join("work.txt")).unwrap(),
         b"ongoing ordinary work\n"

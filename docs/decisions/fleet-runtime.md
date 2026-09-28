@@ -495,3 +495,47 @@ exact parent-version selection, replaced-ancestor refusal and history-only resta
 verifies that a missing managed file still produces an incomplete checkpoint which cannot be
 submitted. Explicit agent deletion resolution remains unfinished; synthetic saved deletion mapping
 is not proof of that capture capability. No packaged graphical or integration claim follows.
+
+
+## Durable candidate staging before project review
+
+`FleetService::stage_project_candidate` accepts an exact saved review, original native attachment,
+32-character stable request and expected project main head (or genesis). It verifies recorded ancestry
+and retains the selected immutable content in `fleet-candidates/candidate-<digest>` under the external
+project metadata store. The original project files, capture journal, private capture head, review queue
+and accepted main are not modified. The operation is native-only; no renderer command or agent tool is
+exposed. This is candidate staging, not source-history operation import or project review creation.
+
+Each create-only allocation records canonical intent, provenance, a complete content manifest and a
+separate ready receipt. Provenance includes the original project/version, fleet objective, exact
+review selector, all recorded input versions, expected main and the recorded checkpoint actor/session/
+run/generation. These are verifiable references to existing native history, not a standalone signed
+approval or an assertion that all inherited work was authored by the final agent. The manifest binds
+saved object identities, paths, entry types, content digests, lengths and executable bits. File copying
+uses retained historical content and verifies the entire resulting inventory; live working bytes
+cannot replace the selected result.
+
+Admission and initial intent use the existing native metadata lock. Content copying and lineage/main
+revalidation run outside that lock, so source capture is not locked for the whole copy. A ready receipt
+is written only after fresh native checks and copied-content revalidation. Native namespace identity
+and complete content are checked again for acknowledgment. Existing requests compare exact intent and
+retained content; different input refuses. A completed exact receipt can be recovered after main moves,
+without restaging or treating the candidate as eligible for approval. An incomplete allocation is
+retained and refused, including on retry; no automatic cleanup, repair, overwrite or duplicate copy.
+
+The history-only `inspect_project_candidate` path can recover only an existing complete candidate.
+It creates no candidate directories, starts no workers and never repairs missing or altered bytes.
+Inspection still requires verifiable source and lane histories and the original project root; standalone
+offline candidate verification and discovery are not implemented. Current limits are 128 retained
+allocations per project (including incomplete ones), 10,000 entries, 64 MiB total and 8 MiB per file.
+Exceeding a limit preserves existing data and refuses the new allocation.
+
+New external formats are `mesh.fleet-candidate-intent/v1`, `mesh.fleet-candidate-provenance/v1`,
+`mesh.fleet-candidate-content/v1`, `mesh.fleet-candidate-ready/v1` and the native receipt projection
+`mesh.fleet-project-candidate/v1`. Existing fleet events, capture journals, pin selectors and workspace
+formats are unchanged. Older code has no candidate reader and does not interpret these directories as
+captured work or approval. Source tests cover exact saved bytes despite later edits, lost-reply retry,
+stale main, conflicting requests, restart inspection, source-history preservation, interrupted
+revalidation, concurrent retained edits, changed manifests, replaced files directories and capacity.
+Creating an original-project review against its exact main base, importing operations with correct
+provenance, private dependency validation, UI, human approval and grouped write-back remain required.
