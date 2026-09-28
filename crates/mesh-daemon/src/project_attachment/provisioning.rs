@@ -381,6 +381,26 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Inspect retained integration evidence after restart without replay, cleanup or writes.
+    /// A selected transaction bypasses the bounded directory overview. The native host supplies
+    /// the external recovery root; its pathname never comes from renderer or agent authority.
+    pub fn inspect_integration_recovery(
+        &self,
+        recovery_root: &Path,
+        transaction: Option<&str>,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        super::recovery::inspect_recovery(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

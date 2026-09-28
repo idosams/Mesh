@@ -274,3 +274,9 @@ main and an unchanged approved base. Explicit trusted-native apply atomically ex
 retains the displaced inode for late editor writes. Metadata copying preserves allocation identity.
 No desktop, agent, MCP or CLI apply surface is added. Restart inspection, restoration, grouped
 integration, actual native confirmation and packaged graphical acceptance remain required.
+
+Read-only native restart inspection now binds recovery receipts to exact trusted history and current
+file identities, distinguishes prepared/applied arrangements from changed or incomplete observations,
+and retains explicit missing or contradictory outcomes. Bounded catalogues expose an overflow flag
+and direct transaction lookup. No receipt grants replay, cleanup or source-write authority. Human
+restoration, graphical recovery and killed-process campaigns remain required.

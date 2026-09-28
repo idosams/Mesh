@@ -410,6 +410,13 @@ impl PinnedRootFs {
         openat(&parent, &leaf, OPEN_INSPECT_FLAGS, 0)
     }
 
+    /// Retain the exact parent alongside the nonblocking entry for recovery identity comparison.
+    pub(crate) fn inspect_entry_with_parent(&self, path: &Path) -> io::Result<(File, File)> {
+        let (parent, leaf) = self.parent_and_leaf(path)?;
+        let file = openat(&parent, &leaf, OPEN_INSPECT_FLAGS, 0)?;
+        Ok((parent, file))
+    }
+
     /// Enumerate one exact directory below the retained root descriptor.
     ///
     /// The directory stream owns a duplicate of the already verified descriptor, so enumeration
@@ -436,6 +443,19 @@ impl PinnedRootFs {
         }
         names.sort();
         Ok(names)
+    }
+
+    /// Read only a bounded prefix for a diagnostic overview. Unlike complete inventory, this
+    /// explicitly returns whether another entry exists; callers must not claim an exact count.
+    pub(crate) fn read_directory_prefix(
+        &self,
+        path: &Path,
+        limit: usize,
+    ) -> io::Result<(Vec<OsString>, bool)> {
+        let directory = self.open_directory_components(&self.relative(path)?)?;
+        let (mut names, more) = read_directory_descriptor_prefix(&directory, limit)?;
+        names.sort();
+        Ok((names, more))
     }
 
     /// Create and durably populate one file beneath the retained root descriptor.
@@ -561,8 +581,23 @@ struct NativeDirent {
     name: [std::os::raw::c_char; 256],
 }
 
-#[allow(unsafe_code)]
 fn read_directory_descriptor(directory: &File, limit: usize) -> io::Result<Vec<OsString>> {
+    let (names, more) = read_directory_descriptor_prefix(directory, limit)?;
+    if more {
+        Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "directory entry limit exceeded",
+        ))
+    } else {
+        Ok(names)
+    }
+}
+
+#[allow(unsafe_code)]
+fn read_directory_descriptor_prefix(
+    directory: &File,
+    limit: usize,
+) -> io::Result<(Vec<OsString>, bool)> {
     unsafe extern "C" {
         fn fdopendir(descriptor: i32) -> *mut std::ffi::c_void;
         fn readdir(stream: *mut std::ffi::c_void) -> *mut NativeDirent;
@@ -611,7 +646,7 @@ fn read_directory_descriptor(directory: &File, limit: usize) -> io::Result<Vec<O
                 // SAFETY: same live thread-local cell set immediately before readdir.
                 let errno = unsafe { *errno_location() };
                 return if errno == 0 {
-                    Ok(names)
+                    Ok((names, false))
                 } else {
                     Err(io::Error::from_raw_os_error(errno))
                 };
@@ -623,10 +658,7 @@ fn read_directory_descriptor(directory: &File, limit: usize) -> io::Result<Vec<O
                 continue;
             }
             if names.len() == limit {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "directory entry limit exceeded",
-                ));
+                return Ok((names, true));
             }
             names.push(OsString::from_vec(bytes.to_vec()));
         }
@@ -749,6 +781,34 @@ mod tests {
                 std::fs::copy(entry.path(), target).expect("copy file");
             }
         }
+    }
+
+    #[test]
+    fn partial_overview_does_not_relax_complete_inventory_or_share_its_cursor() {
+        let selected = scratch("partial-directory-read");
+        for name in ["one", "two", "three"] {
+            std::fs::write(selected.join(name), b"").unwrap();
+        }
+        let root = PinnedWorkspaceRoot::open(selected.clone()).unwrap();
+        let filesystem = root.filesystem();
+        for _ in 0..2 {
+            let (names, more) = filesystem.read_directory_prefix(Path::new(""), 2).unwrap();
+            assert_eq!(names.len(), 2);
+            assert!(more);
+            assert!(filesystem
+                .read_directory_names_bounded(Path::new(""), 2)
+                .is_err());
+            let (all, more) = filesystem.read_directory_prefix(Path::new(""), 3).unwrap();
+            assert_eq!(all.len(), 3);
+            assert!(!more);
+            assert_eq!(
+                filesystem
+                    .read_directory_names_bounded(Path::new(""), 3)
+                    .unwrap(),
+                all
+            );
+        }
+        std::fs::remove_dir_all(selected).unwrap();
     }
 
     #[test]

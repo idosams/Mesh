@@ -835,3 +835,301 @@ fn file_integration_revalidates_trust_main_source_exclusions_and_preparation() {
     assert!(prepared.apply(&trust).is_err());
     assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
 }
+
+fn recovery_entry(value: &Json) -> &Json {
+    value
+        .get("entries")
+        .and_then(Json::as_array)
+        .unwrap()
+        .first()
+        .unwrap()
+}
+fn recovery_status(value: &Json) -> &str {
+    recovery_entry(value)
+        .get("status")
+        .and_then(Json::as_text)
+        .unwrap()
+}
+fn replace_json(value: &Json, field: &str, replacement: Json) -> Json {
+    let mut value = value.clone();
+    let Json::Object(fields) = &mut value else {
+        panic!("object")
+    };
+    fields.iter_mut().find(|(key, _)| key == field).unwrap().1 = replacement;
+    value
+}
+
+#[test]
+fn recovery_inspection_tracks_restart_arrangements_and_late_work_after_main_advances() {
+    let f = Fixture::new("recovery-arrangements");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    let prepared = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let id = path.file_name().unwrap().to_str().unwrap();
+    let inspect = || {
+        f.storage
+            .reopen(f.history.id())
+            .unwrap()
+            .inspect_integration_recovery(&root, Some(id), &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    let journal = f.journal();
+    assert_eq!(recovery_status(&inspect()), "prepared-arrangement");
+    assert_eq!(f.journal(), journal);
+    prepared.apply(&trust).unwrap();
+    assert_eq!(recovery_status(&inspect()), "applied-arrangement");
+    let outcome = fs::read(path.join("observed.json")).unwrap();
+    fs::remove_file(path.join("observed.json")).unwrap();
+    let lost_reply = inspect();
+    assert_eq!(recovery_status(&lost_reply), "applied-arrangement");
+    assert_eq!(
+        recovery_entry(&lost_reply).get("attention_required"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        recovery_entry(&lost_reply)
+            .get("details")
+            .unwrap()
+            .get("recorded_outcome"),
+        Some(&Json::text("absent"))
+    );
+    fs::write(path.join("observed.json"), &outcome).unwrap();
+    editor.write_all(b" + late editor work").unwrap();
+    editor.sync_all().unwrap();
+    assert_eq!(recovery_status(&inspect()), "changed-files");
+    let third = f.save("new accepted main");
+    accept(&f, &signer, &trust, &third, 3);
+    let journal = f.journal();
+    let historical = inspect();
+    assert_eq!(recovery_status(&historical), "changed-files");
+    assert_eq!(
+        recovery_entry(&historical)
+            .get("details")
+            .unwrap()
+            .get("is_current_main"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        fs::read(path.join("exchange")).unwrap(),
+        b"base + late editor work"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"new accepted main"
+    );
+    assert_eq!(f.journal(), journal);
+    assert_eq!(fs::read(path.join("observed.json")).unwrap(), outcome);
+    assert_eq!(historical.get("automatic_replay"), Some(&Json::Bool(false)));
+    assert_eq!(
+        recovery_entry(&historical).get("cleanup_authority"),
+        Some(&Json::Bool(false))
+    );
+}
+
+#[test]
+fn recovery_inspection_refuses_tampering_and_untrusted_receipts_without_reading_claimed_files() {
+    let f = Fixture::new("recovery-tampering");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let id = path.file_name().unwrap().to_str().unwrap();
+    let proposal = prepared.proposal().clone();
+    drop(prepared);
+    let inspect = |trust: &TrustedReviewers| {
+        f.history
+            .inspect_integration_recovery(&root, Some(id), trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(
+        recovery_status(&inspect(&TrustedReviewers::default())),
+        "unverified-history"
+    );
+    for (field, value, status) in [
+        (
+            "schema",
+            Json::text("mesh.attachment-file-integration/v2"),
+            "invalid-receipt",
+        ),
+        ("path", Json::text("../outside"), "invalid-receipt"),
+        (
+            "source_file",
+            Json::text(format!(
+                "{}:{}:{}",
+                "0".repeat(16),
+                "0".repeat(16),
+                "é".repeat(17)
+            )),
+            "invalid-receipt",
+        ),
+        ("store_inode", Json::text("0".repeat(16)), "invalid-receipt"),
+        (
+            "source_digest",
+            Json::text("f".repeat(64)),
+            "unverified-history",
+        ),
+        (
+            "installed_digest",
+            Json::text("f".repeat(64)),
+            "unverified-history",
+        ),
+        ("automatic_replay", Json::Bool(true), "invalid-receipt"),
+    ] {
+        fs::write(
+            path.join("prepared.json"),
+            replace_json(&proposal, field, value).encode(),
+        )
+        .unwrap();
+        let report = inspect(&trust);
+        assert_eq!(recovery_status(&report), status, "{field}");
+        assert_eq!(
+            report.get("live_content_budget_remaining"),
+            Some(&Json::Number(ObservationLimits::default().bytes))
+        );
+    }
+    let mut unknown = proposal.clone();
+    let Json::Object(fields) = &mut unknown else {
+        panic!("object")
+    };
+    fields.push(("extra".to_owned(), Json::Bool(true)));
+    fs::write(path.join("prepared.json"), unknown.encode()).unwrap();
+    assert_eq!(recovery_status(&inspect(&trust)), "invalid-receipt");
+    fs::write(path.join("prepared.json"), proposal.encode()).unwrap();
+    fs::write(path.join("observed.json"), "{").unwrap();
+    assert_eq!(recovery_status(&inspect(&trust)), "invalid-outcome");
+    fs::remove_file(path.join("observed.json")).unwrap();
+    assert_eq!(recovery_status(&inspect(&trust)), "prepared-arrangement");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    assert_eq!(fs::read(path.join("exchange")).unwrap(), b"approved");
+    // A byte-identical new source inode must not inherit the receipt's source identity.
+    fs::rename(f.source.join("work.txt"), f.source.join("old.txt")).unwrap();
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    assert_eq!(recovery_status(&inspect(&trust)), "identity-mismatch");
+}
+
+#[test]
+fn recovery_catalog_bounds_work_and_preserves_unsafe_or_incomplete_entries() {
+    use std::os::unix::fs::symlink;
+    let f = Fixture::new("recovery-bounds");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let id = path.file_name().unwrap().to_str().unwrap();
+    drop(prepared);
+    for index in 0..34 {
+        fs::create_dir(root.join(format!("integration-{index:032x}"))).unwrap();
+    }
+    let catalog = f
+        .history
+        .inspect_integration_recovery(&root, None, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        catalog.get("entries").unwrap().as_array().unwrap().len(),
+        32
+    );
+    assert_eq!(catalog.get("more"), Some(&Json::Bool(true)));
+    let inspect = |limits| {
+        f.history
+            .inspect_integration_recovery(&root, Some(id), &trust, limits)
+            .unwrap()
+    };
+    assert_eq!(
+        recovery_status(&inspect(ObservationLimits::default())),
+        "prepared-arrangement"
+    );
+    assert_eq!(
+        recovery_status(&inspect(ObservationLimits {
+            bytes: 1,
+            ..ObservationLimits::default()
+        })),
+        "incomplete-observation"
+    );
+    fs::rename(path.join("exchange"), path.join("original-exchange")).unwrap();
+    symlink(f.source.join("work.txt"), path.join("exchange")).unwrap();
+    assert_eq!(
+        recovery_status(&inspect(ObservationLimits::default())),
+        "incomplete-observation"
+    );
+    assert!(fs::symlink_metadata(path.join("exchange"))
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    fs::remove_file(path.join("exchange")).unwrap();
+    assert!(std::process::Command::new("mkfifo")
+        .arg(path.join("exchange"))
+        .status()
+        .unwrap()
+        .success());
+    assert_eq!(
+        recovery_status(&inspect(ObservationLimits::default())),
+        "incomplete-observation"
+    );
+    assert_eq!(
+        fs::read(path.join("original-exchange")).unwrap(),
+        b"approved"
+    );
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    assert!(f
+        .history
+        .inspect_integration_recovery(
+            &root,
+            Some("../outside"),
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+}

@@ -66,6 +66,10 @@ Native-only regular-file integration now retains the displaced inode during a gu
 exchange, preserving late writes through existing editor handles. Staged and observed receipts
 record uncertainty without replay or automatic cleanup. This unmerged foundation exposes no desktop
 or agent apply command; confirmation, restart recovery and full integration remain unfinished.
+Native restart inspection now verifies retained transaction receipts against accepted history and
+observes source/recovery files under bounded reads. Missing outcomes, later edits and identity
+substitution remain explicit; no inspection replays writes or grants cleanup authority. Restoration
+and graphical recovery acceptance are still pending.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

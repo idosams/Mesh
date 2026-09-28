@@ -1932,6 +1932,11 @@ impl OpenWorkspace {
         self.shared_version.head()
     }
 
+    /// Only heads admitted by the trusted approval fold, not merely a stored signed envelope.
+    pub(crate) fn has_verified_shared_head(&self, head: mesh_approval::HeadId) -> bool {
+        self.shared_history.contains(&head)
+    }
+
     /// Whether the immutable record fold contains this exact operation.
     #[must_use]
     pub fn has_operation(&self, id: &RecordDigest) -> bool {

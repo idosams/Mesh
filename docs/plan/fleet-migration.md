@@ -24,6 +24,9 @@ that increment forward as fully verified. Original logs and the unfinished work 
 1. Canonical repository guard, shared agent guidance and this ledger: [Mesh PR #2](https://github.com/idosams/Mesh/pull/2), replacement `c36fafa1aa3ec6994d482a8eedba470bd0718b6b`, open and unmerged. This replaces the guidance
    portion of source commit `c4e5b9450962b5bec818022d6e7936f2d5204b89`, not its runtime implementation.
 2. Documentation-only [Mesh-internal PR #1488](https://github.com/idosams/Mesh-internal/pull/1488), replacement `99b55d6907b2d36b4196bd2971e9ba6cfa1bd970`, open and unmerged. No deletion, archival or settings change.
+   Hosted run 36334032094 did not start its jobs: GitHub reports failed account payments or a
+   spending-limit restriction. Human reviews are absent. This deprecation delivery remains blocked
+   on those external requirements; no billing or repository setting changes are authorized.
 3. Transfer the batches below in dependency order onto canonical history. Each coherent increment
    gets a pushed branch and PR before the next substantial increment begins. Split a batch further
    when its actual diff is too large for focused review. Adjacent documentation-only source commits
@@ -162,10 +165,10 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A08 | `60b9234ee123d242980f472a2558766f0b62659f` | Add exact human approval for attached project main | A08b: [PR #32](https://github.com/idosams/Mesh/pull/32), replacement `893dca74c13f919036397dc7cf2af6baff88c667`, remaining native exact-approval implementation transferred on #31; full gate passed (3,150 native tests, 13 skips; 580 desktop tests; 44 daemon checks); all seven hosted checks passed at `f58b2107fd3da5667c816d11a701de559d560fe9` in run 36355574791, not merged. Directory-lock prerequisite already delivered with A08a (#31), not reapplied; desktop approval controls remain a separate increment |
 | A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: [PR #33](https://github.com/idosams/Mesh/pull/33), replacement `68ab496a804204111b3087ee7c7fc9a1640adb55`, native confirmation, verified main inspection and localized controls on #32; full gate passed (3,151 native tests, one passed with a lingering-handle flag, 13 skips; 587 desktop tests; 44 daemon checks); hosted CI pending, not merged |
 | A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | [Mesh PR #35](https://github.com/idosams/Mesh/pull/35), `3119b8b6233d17309d283d30d6aa855c2a14b8ce`; stacked on #34; not merged |
-| A09b | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | Transferring on #35; includes allocation fix below; validation and PR pending |
-| A09 | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Pending transfer |
+| A09b | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; stacked on #35; all seven hosted checks pass in run 36359358791; initial and unchanged local gates failed native startup waits; not merged |
+| A09c | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Transferring on #36; validation and PR pending |
 | A09 | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Pending transfer |
-| A09b prerequisite | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Moving into A09b to avoid the known metadata-copy defect; do not apply twice |
+| A09b prerequisite | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Included in [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; do not apply twice |
 | A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Pending transfer |
 | L01 | `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` | Open attached saved versions as independent work lanes | Pending transfer |
 | L01 | `c728c41c9831e636a6bdfbb9b0212739ad6ba974` | Connect attached saved versions to managed fleet lanes | Pending transfer |
@@ -329,7 +332,9 @@ passed in 6.179s, but the cause remains unproven and the original failure log is
 unchanged recheck exited zero at `3119b8b6233d17309d283d30d6aa855c2a14b8ce`: 3,153 native tests,
 590 desktop tests and 44 real-daemon checks; 13 platform/provider skips. One passing sequence test
 was flagged for a lingering process handle. Neither this passing recheck nor green hosted CI erases
-the first capture-stop timeout; its cause remains unresolved.
+the first capture-stop timeout; its cause remains unresolved and is tracked in
+[Mesh issue #37](https://github.com/idosams/Mesh/issues/37). Resolving this repeated failure remains
+part of the combined-main completion audit.
 No packaged attached-project acceptance or merge is claimed.
 
 ## A09b retained replacement and metadata prerequisite
@@ -344,3 +349,31 @@ The original broad metadata copy failed the allocation-identity regression by tr
 source creation timestamp; the corrected implementation was restored byte-for-byte. All nine restored
 replacement tests and all nine attachment approval/comparison/integration tests passed.
 Full canonical validation and publication remain pending.
+
+## A09c recovery inspection
+
+The read-only restart inspection source `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` transfers
+on published #36, preserving its allocation-identity correction and canonical history. Receipt
+verification, bounded live observations and explicit uncertainty grant no write, replay or cleanup
+authority. Complete directory inventories retain overflow refusal; a separate diagnostic prefix
+reports an honest overflow flag. Original source checkouts remain preserved. The parent initial and
+unchanged full gates failed during native startup; focused recovery validation began only after
+that verification ended. The directory-prefix regression and all three recovery integration tests passed. Temporarily
+removing trusted-history verification made the refusal regression fail with prepared-arrangement
+instead of unverified-history; source was restored byte-for-byte and all twelve attachment
+approval/integration/recovery tests passed in 7.10s. Documentation checks passed. Full validation
+and publication remain pending.
+
+## A09b initial local full-gate failure
+
+At `c7843205da566684a9541010e03e1a49148e442c`, the initial full gate failed the existing
+`native_root_change_wakes_capture_without_adopting_the_replacement` case after 8.069s. Its status
+was still Starting, revision zero, with no native events or capture attempts; the test had not yet
+performed the root replacement. The run passed 1,295 native tests, failed one, left 1,868 unrun
+after fail-fast and skipped 13. Desktop and daemon gates were not reached. There was no concurrent
+native build. Hosted CI passed the same revision; this does not establish the local failure cause.
+The original log is retained. The unchanged focused recheck passed in 1.575s, but the complete
+unchanged recheck also failed: both native-event cases remained Starting at revision zero before
+any capture attempt (8.054s and 8.056s). It passed 1,292 tests, failed two, left 1,870 unrun and
+skipped 13; desktop and daemon gates were not reached. Neither focused nor hosted passes resolve
+[issue #37](https://github.com/idosams/Mesh/issues/37) or establish a passing combined gate.

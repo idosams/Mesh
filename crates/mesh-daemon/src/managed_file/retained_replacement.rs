@@ -7,6 +7,91 @@ const EXCHANGE: &str = "exchange";
 mod metadata;
 use metadata::{copy_metadata, metadata_digest};
 
+/// Bounded live recovery evidence. This is not a write/replay capability or an atomic snapshot.
+pub(crate) struct RetainedFileObservation {
+    pub(crate) parent: String,
+    pub(crate) installation: String,
+    pub(crate) digest: String,
+    pub(crate) mode: u32,
+    pub(crate) metadata: String,
+    pub(crate) bytes: u64,
+}
+
+pub(crate) fn observe_file(
+    root: &PinnedWorkspaceRoot,
+    relative: &Path,
+    limit: u64,
+) -> io::Result<RetainedFileObservation> {
+    use mesh_types::DigestHasher as _;
+    root.ensure_namespace_identity()?;
+    let (parent, file) = root.filesystem().inspect_entry_with_parent(relative)?;
+    let before = file.metadata()?;
+    if !before.is_file() || before.len() > limit {
+        return Err(io::Error::other(
+            "recovery entry is unsupported or exceeds budget",
+        ));
+    }
+    let identity = managed_file_identity(&file, &before)?;
+    let native_metadata = metadata_digest(&file)?;
+    let mut hasher = mesh_types::Blake3::hasher();
+    let mut reader = (&file).take(limit.saturating_add(1));
+    let mut buffer = [0u8; 65536];
+    let mut length = 0u64;
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        length += read as u64;
+        if length > limit {
+            return Err(io::Error::other("recovery file grew beyond budget"));
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let (current_parent, current) = root.filesystem().inspect_entry_with_parent(relative)?;
+    let latest = current.metadata()?;
+    let parent_metadata = parent.metadata()?;
+    let same_stat = |a: &fs::Metadata, b: &fs::Metadata| {
+        (
+            a.dev(),
+            a.ino(),
+            a.mode(),
+            a.len(),
+            a.ctime(),
+            a.ctime_nsec(),
+        ) == (
+            b.dev(),
+            b.ino(),
+            b.mode(),
+            b.len(),
+            b.ctime(),
+            b.ctime_nsec(),
+        )
+    };
+    if length != before.len()
+        || !same_stat(&before, &file.metadata()?)
+        || !same_stat(&before, &latest)
+        || managed_file_identity(&current, &latest)? != identity
+        || parent_metadata.dev() != current_parent.metadata()?.dev()
+        || parent_metadata.ino() != current_parent.metadata()?.ino()
+    {
+        return Err(io::Error::other("recovery file changed during observation"));
+    }
+    root.ensure_namespace_identity()?;
+    Ok(RetainedFileObservation {
+        parent: ManagedDirectoryIdentity {
+            device: parent_metadata.dev(),
+            inode: parent_metadata.ino(),
+        }
+        .token(),
+        installation: identity.token(),
+        digest: hasher.finalize().to_string(),
+        mode: before.mode(),
+        metadata: native_metadata,
+        bytes: length,
+    })
+}
+
 /// Single-use in-process authority. Dropping it deliberately preserves staged recovery material.
 pub(crate) struct RetainedReplacement {
     target: ManagedReplacementTarget,

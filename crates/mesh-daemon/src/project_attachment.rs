@@ -33,6 +33,7 @@ mod approval;
 mod history;
 mod inspection;
 mod integration;
+mod recovery;
 mod writeback;
 pub use writeback::PreparedMainFileIntegration;
 mod reviews;
