@@ -140,7 +140,7 @@ impl RetainedAddition {
             stage.set_permissions(fs::Permissions::from_mode(effective_mode))?;
             (policy, parent_mode)
         } else {
-            metadata::inherit_new_file(&parent_directory, &stage, effective_mode)?
+            metadata::inherit_new_entry(&parent_directory, &stage, effective_mode)?
         };
         stage.sync_all()?;
         let mode = stage.metadata()?.mode();

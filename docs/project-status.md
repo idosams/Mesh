@@ -640,3 +640,10 @@ umask handling, create-only behavior and namespace checks. Existing private
 allocation behavior remains. Regressions for modes, preserved children, invalid
 names and replaced parents are transferred pending native execution. Directory
 integration and complete-tree native confirmation remain following increments.
+
+### Directory destination permissions (unmerged foundation)
+
+Private staging can now inherit directory-specific macOS ACL propagation and
+Linux destination group/setgid behavior without creating a probe in the user
+folder. Linux default ACLs and extended attributes remain refused. Platform
+regressions are added; local native execution and subtree integration are pending.

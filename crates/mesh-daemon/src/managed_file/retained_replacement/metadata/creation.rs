@@ -1,4 +1,4 @@
-//! Destination-based new-file permissions, without creating a probe in the user's folder.
+//! Destination-based new-entry permissions, without creating a probe in the user's folder.
 use super::metadata_digest;
 use std::fs::{File, Permissions};
 use std::io;
@@ -6,17 +6,26 @@ use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 
 /// Return the exact parent policy used to configure a fresh privately staged file. Re-reading
 /// this policy at every apply boundary prevents a changed ACL/group from inheriting stale consent.
-pub(crate) fn inherit_new_file(
+pub(crate) fn inherit_new_entry(
     parent: &File,
     staged: &File,
     mode: u32,
 ) -> io::Result<(String, u32)> {
     let before = parent.metadata()?;
-    if !before.is_dir() || mode & !0o755 != 0 {
-        return Err(io::Error::other("invalid new-file permission input"));
+    let entry = staged.metadata()?;
+    let directory = entry.is_dir();
+    if !before.is_dir()
+        || (!directory && !entry.is_file())
+        || mode & !(if directory { 0o777 } else { 0o755 }) != 0
+    {
+        return Err(io::Error::other("invalid new-entry permission input"));
     }
     let policy = metadata_digest(parent)?;
-    configure(parent, staged)?;
+    configure(parent, staged, directory)?;
+    // Linux propagates the parent setgid bit onto newly created directories. Preserve that
+    // destination behavior even though allocation took place under a different private parent.
+    #[cfg(target_os = "linux")]
+    let mode = mode | if directory { before.mode() & 0o2000 } else { 0 };
     staged.set_permissions(Permissions::from_mode(mode))?;
     if metadata_digest(parent)? != policy || parent.metadata()?.mode() != before.mode() {
         return Err(io::Error::other(
@@ -28,7 +37,7 @@ pub(crate) fn inherit_new_file(
 
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)]
-fn configure(parent: &File, staged: &File) -> io::Result<()> {
+fn configure(parent: &File, staged: &File, directory: bool) -> io::Result<()> {
     use std::ffi::c_void;
     use std::os::fd::AsRawFd as _;
     type Acl = *mut c_void;
@@ -111,7 +120,9 @@ fn configure(parent: &File, staged: &File) -> io::Result<()> {
             if flags.is_null() {
                 return Err(io::Error::other("missing ACL flags"));
             }
-            match unsafe { acl_get_flag_np(flags, FILE_INHERIT) } {
+            match unsafe {
+                acl_get_flag_np(flags, if directory { DIR_INHERIT } else { FILE_INHERIT })
+            } {
                 0 => continue,
                 1 => {}
                 _ => return Err(io::Error::last_os_error()),
@@ -128,8 +139,18 @@ fn configure(parent: &File, staged: &File) -> io::Result<()> {
             if flags.is_null() {
                 return Err(io::Error::other("missing inherited ACL flags"));
             }
-            for flag in [FILE_INHERIT, DIR_INHERIT, LIMIT_INHERIT, ONLY_INHERIT] {
-                check(unsafe { acl_delete_flag_np(flags, flag) })?;
+            let limited = match unsafe { acl_get_flag_np(flags, LIMIT_INHERIT) } {
+                0 => false,
+                1 => true,
+                _ => return Err(io::Error::last_os_error()),
+            };
+            // A directory carries inheritable rules forward unless propagation was limited.
+            // The inherited rule applies to the new entry itself, so only-inherit is cleared.
+            check(unsafe { acl_delete_flag_np(flags, ONLY_INHERIT) })?;
+            if !directory || limited {
+                for flag in [FILE_INHERIT, DIR_INHERIT, LIMIT_INHERIT] {
+                    check(unsafe { acl_delete_flag_np(flags, flag) })?;
+                }
             }
             check(unsafe { acl_add_flag_np(flags, INHERITED) })?;
         }
@@ -140,7 +161,7 @@ fn configure(parent: &File, staged: &File) -> io::Result<()> {
 
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
-fn configure(parent: &File, staged: &File) -> io::Result<()> {
+fn configure(parent: &File, staged: &File, _directory: bool) -> io::Result<()> {
     use std::os::fd::AsRawFd as _;
     unsafe extern "C" {
         fn getegid() -> u32;
@@ -164,9 +185,9 @@ fn configure(parent: &File, staged: &File) -> io::Result<()> {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-fn configure(_parent: &File, _staged: &File) -> io::Result<()> {
+fn configure(_parent: &File, _staged: &File, _directory: bool) -> io::Result<()> {
     Err(io::Error::other(
-        "new-file permission inheritance is unavailable",
+        "new-entry permission inheritance is unavailable",
     ))
 }
 
@@ -233,7 +254,7 @@ mod tests {
                     .unwrap();
                 let parent_before = metadata_digest(&parent).unwrap();
                 let source_entries = fs::read_dir(&f.source).unwrap().count();
-                let (policy, _) = inherit_new_file(&parent, &staged, mode).unwrap();
+                let (policy, _) = inherit_new_entry(&parent, &staged, mode).unwrap();
                 assert_eq!(policy, parent_before);
                 assert_eq!(metadata_digest(&parent).unwrap(), parent_before);
                 assert_eq!(fs::read_dir(&f.source).unwrap().count(), source_entries);
@@ -248,6 +269,133 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn directory_inheritance_and_descendant_propagation_match_kernel_creation() {
+        use crate::root_authority::PinnedWorkspaceRoot;
+        use std::ffi::OsStr;
+        let policies: &[&[&str]] = &[
+            &[],
+            &["everyone allow readattr,file_inherit"],
+            &["everyone allow readattr,directory_inherit"],
+            &["everyone allow readattr,file_inherit,directory_inherit,only_inherit"],
+            &["everyone allow readattr,file_inherit,directory_inherit,only_inherit,limit_inherit"],
+            &[
+                "everyone allow readattr,file_inherit,directory_inherit",
+                "everyone allow readextattr,directory_inherit,limit_inherit",
+                "everyone allow readsecurity,file_inherit,only_inherit",
+            ],
+        ];
+        for rules in policies {
+            let f = Fixture::new();
+            for rule in *rules {
+                acl(&f.source, rule);
+            }
+            // An unrelated staging ACL must not leak into the future destination tree.
+            acl(
+                &f.recovery,
+                "everyone allow writeextattr,directory_inherit,file_inherit",
+            );
+            fs::create_dir(f.source.join("reference")).unwrap();
+            let reference = File::open(f.source.join("reference")).unwrap();
+            let parent = File::open(&f.source).unwrap();
+            let staging = PinnedWorkspaceRoot::open(f.recovery.clone())
+                .unwrap()
+                .create_child_directory_with_mode(OsStr::new("stage"), 0o777)
+                .unwrap();
+            let staged = staging.try_clone_directory().unwrap();
+            let mode = staged.metadata().unwrap().mode() & 0o777;
+            let parent_policy = metadata_digest(&parent).unwrap();
+            let entries = fs::read_dir(&f.source).unwrap().count();
+            inherit_new_entry(&parent, &staged, mode).unwrap();
+            assert_eq!(metadata_digest(&parent).unwrap(), parent_policy);
+            assert_eq!(fs::read_dir(&f.source).unwrap().count(), entries);
+            assert_eq!(
+                staged.metadata().unwrap().mode(),
+                reference.metadata().unwrap().mode()
+            );
+            assert_eq!(
+                metadata_digest(&staged).unwrap(),
+                metadata_digest(&reference).unwrap(),
+                "{rules:?}"
+            );
+            // Let the kernel create children below both roots. This distinguishes propagated
+            // directory ACLs from file-only inheritance and limited one-generation rules.
+            for name in ["child", "child/grandchild"] {
+                fs::create_dir(f.source.join("reference").join(name)).unwrap();
+                fs::create_dir(f.recovery.join("stage").join(name)).unwrap();
+                let expected = File::open(f.source.join("reference").join(name)).unwrap();
+                let actual = File::open(f.recovery.join("stage").join(name)).unwrap();
+                assert_eq!(
+                    metadata_digest(&actual).unwrap(),
+                    metadata_digest(&expected).unwrap(),
+                    "{rules:?}: {name}"
+                );
+            }
+            for name in ["file", "child/file", "child/grandchild/file"] {
+                let create = |path| {
+                    OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create_new(true)
+                        .open(path)
+                        .unwrap()
+                };
+                let expected = create(f.source.join("reference").join(name));
+                let actual = create(f.recovery.join("stage").join(name));
+                assert_eq!(
+                    metadata_digest(&actual).unwrap(),
+                    metadata_digest(&expected).unwrap(),
+                    "{rules:?}: {name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn directory_group_and_deny_entry_match_native_creation() {
+        use crate::root_authority::PinnedWorkspaceRoot;
+        use std::ffi::OsStr;
+        let f = Fixture::new();
+        let groups = Command::new("/usr/bin/id").arg("-G").output().unwrap();
+        assert!(groups.status.success());
+        let original = fs::metadata(&f.source).unwrap().gid();
+        if let Some(group) = String::from_utf8(groups.stdout)
+            .unwrap()
+            .split_whitespace()
+            .filter_map(|value| value.parse::<u32>().ok())
+            .find(|group| *group != original)
+        {
+            assert!(Command::new("/usr/bin/chgrp")
+                .arg(group.to_string())
+                .arg(&f.source)
+                .status()
+                .unwrap()
+                .success());
+        }
+        acl(
+            &f.source,
+            "everyone deny writeextattr,directory_inherit,only_inherit,limit_inherit",
+        );
+        fs::create_dir(f.source.join("reference")).unwrap();
+        let reference = File::open(f.source.join("reference")).unwrap();
+        let parent = File::open(&f.source).unwrap();
+        let stage = PinnedWorkspaceRoot::open(f.recovery.clone())
+            .unwrap()
+            .create_child_directory_with_mode(OsStr::new("stage"), 0o777)
+            .unwrap();
+        let staged = stage.try_clone_directory().unwrap();
+        let mode = staged.metadata().unwrap().mode() & 0o777;
+        inherit_new_entry(&parent, &staged, mode).unwrap();
+        assert_eq!(
+            staged.metadata().unwrap().gid(),
+            parent.metadata().unwrap().gid()
+        );
+        assert_eq!(
+            metadata_digest(&staged).unwrap(),
+            metadata_digest(&reference).unwrap()
+        );
     }
 
     #[test]
@@ -282,7 +430,7 @@ mod tests {
             .create_new(true)
             .open(f.recovery.join("stage"))
             .unwrap();
-        inherit_new_file(&parent, &staged, 0o644).unwrap();
+        inherit_new_entry(&parent, &staged, 0o644).unwrap();
         assert_eq!(
             staged.metadata().unwrap().gid(),
             reference.metadata().unwrap().gid()
@@ -291,5 +439,49 @@ mod tests {
             staged.metadata().unwrap().gid(),
             parent.metadata().unwrap().gid()
         );
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_directory_tests {
+    use super::*;
+    use crate::managed_file::retained_replacement::tests::Fixture;
+    use std::fs;
+    use std::os::unix::fs::DirBuilderExt as _;
+
+    #[test]
+    fn directory_group_and_setgid_match_kernel_creation_without_changing_parent() {
+        for parent_mode in [0o750, 0o2750] {
+            let f = Fixture::new();
+            fs::set_permissions(&f.source, Permissions::from_mode(parent_mode)).unwrap();
+            fs::DirBuilder::new()
+                .mode(0o777)
+                .create(f.source.join("reference"))
+                .unwrap();
+            fs::DirBuilder::new()
+                .mode(0o777)
+                .create(f.recovery.join("stage"))
+                .unwrap();
+            let parent = File::open(&f.source).unwrap();
+            let reference = File::open(f.source.join("reference")).unwrap();
+            let staged = File::open(f.recovery.join("stage")).unwrap();
+            let mode = staged.metadata().unwrap().mode() & 0o777;
+            let policy = metadata_digest(&parent).unwrap();
+            let entries = fs::read_dir(&f.source).unwrap().count();
+            inherit_new_entry(&parent, &staged, mode).unwrap();
+            assert_eq!(
+                staged.metadata().unwrap().mode(),
+                reference.metadata().unwrap().mode()
+            );
+            assert_eq!(
+                staged.metadata().unwrap().gid(),
+                reference.metadata().unwrap().gid()
+            );
+            assert_eq!(metadata_digest(&parent).unwrap(), policy);
+            assert_eq!(fs::read_dir(&f.source).unwrap().count(), entries);
+            let before = staged.metadata().unwrap().mode();
+            assert!(inherit_new_entry(&parent, &staged, 0o4777).is_err());
+            assert_eq!(staged.metadata().unwrap().mode(), before);
+        }
     }
 }

@@ -625,3 +625,15 @@ existing children and revalidates the pinned parent namespace. Existing private
 child creation retains its 0700 request. This primitive alone does not expose
 directory integration, approval, replay or deletion authority; the tree executor
 and end-to-end confirmation are separate increments. Runtime validation is pending.
+
+### Destination permissions for staged directories
+
+New-entry permission inheritance now distinguishes regular files and directories.
+On macOS it selects directory-inheritable rules, preserves descendant inheritance
+unless limited, clears only-inherit on the new entry and removes unrelated staging
+ACLs. On Linux it preserves destination group/setgid behavior; default ACLs and
+extended attributes remain unsupported and refuse. Parent metadata is checked
+before and after configuration. No probe is created in the user folder and the
+process umask is unchanged. Kernel-comparison regressions are present for both
+platforms, pending native execution. Directory installation remains a following
+increment; no additional approval or write command is exposed here.

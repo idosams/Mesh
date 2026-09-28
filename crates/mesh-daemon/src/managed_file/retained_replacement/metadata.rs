@@ -6,7 +6,7 @@ use std::os::unix::fs::MetadataExt as _;
 use std::os::unix::io::AsRawFd as _;
 
 mod creation;
-pub(super) use creation::inherit_new_file;
+pub(super) use creation::inherit_new_entry;
 
 const LIMIT: usize = 1024 * 1024;
 fn problem() -> io::Error {

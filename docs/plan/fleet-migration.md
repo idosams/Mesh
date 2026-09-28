@@ -1707,3 +1707,21 @@ rejects traversal/special modes and refuses a replaced parent. Native focused,
 failing-before and full execution remain queued behind the preserved canonical
 run; structural checks are not runtime proof. No durable formats or public write
 commands change in this foundation.
+
+## I04b directory destination permissions
+
+Partially transfers three more paths from source
+`c711c6531220f61bfe5e9994f12df19c4450bd2c` onto PR #93 at
+`c4b12ffc29c5ffc106fe89b0d2a4fec8ca6c88c0`: retained replacement addition,
+metadata exports and metadata creation. Root authority is in #93. The remaining
+tree primitive, daemon executor/group recovery, desktop confirmation/renderer and
+source documentation accounting remain separate increments.
+
+New-entry inheritance distinguishes directories from regular files, carries
+macOS inheritable ACL rules to descendants with limited-propagation handling,
+clears unrelated staging ACLs and retains Linux destination setgid semantics.
+Existing file behavior and permission limits remain. Linux default ACLs/xattrs
+remain explicitly unsupported and refuse. Source macOS tests compare kernel
+creation, descendants, group and deny entries; an additional Linux regression
+compares modes/group/setgid, unchanged parent and invalid-mode refusal. Native
+focused/failing-before/full execution remains pending behind the preserved run.
