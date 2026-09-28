@@ -317,8 +317,11 @@ fn a_caller_cannot_fabricate_the_idle_interval() {
 fn repeated_saves_share_one_resettable_idle_worker() {
     let root = scratch("coalesced-idle-worker");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(80)),
+        idle_interval: Some(Duration::from_secs(2)),
         ..parameters()
     };
     let daemon = LiveDaemon::with_checkpoint_runtime(startup(), runtime).expect("config");
@@ -350,7 +353,7 @@ fn repeated_saves_share_one_resettable_idle_worker() {
         "one pending extent must not create another detached sleeper"
     );
 
-    let recovery_deadline = std::time::Instant::now() + Duration::from_millis(70);
+    let recovery_deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint snapshot");
         if snapshot
@@ -362,12 +365,12 @@ fn repeated_saves_share_one_resettable_idle_worker() {
         }
         assert!(
             std::time::Instant::now() < recovery_deadline,
-            "the coalesced worker preserved an old extent or missed the maximum interval"
+            "the coalesced worker preserved an old extent or missed the maximum interval; snapshot={snapshot:?}",
         );
         std::thread::sleep(Duration::from_millis(2));
     }
 
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    let deadline = std::time::Instant::now() + Duration::from_secs(4);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint snapshot");
         if snapshot
@@ -576,8 +579,11 @@ fn maximum_byte_bound_preserves_recovery_before_the_idle_boundary() {
 fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
     let root = scratch("automatic-time-recovery");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(200)),
+        idle_interval: Some(Duration::from_secs(2)),
         maximum_uncheckpointed_bytes: Some(u64::MAX),
         maximum_uncheckpointed_interval: Some(Duration::from_millis(20)),
     };
@@ -595,7 +601,7 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         )
         .expect("durable save");
 
-    let deadline = std::time::Instant::now() + Duration::from_millis(150);
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let snapshot = daemon.checkpoint_snapshot().expect("checkpoint state");
         if snapshot.latest_recovery().is_some() {
@@ -606,7 +612,8 @@ fn maximum_time_bound_preserves_recovery_before_the_idle_boundary() {
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the time bound elapsed without automatic recovery preservation"
+            "the time bound elapsed without automatic recovery preservation; snapshot={snapshot:?}; conditions={:?}",
+            daemon.workspace_state().map(|state| state.conditions.iter().map(|condition| condition.code().to_owned()).collect::<Vec<_>>())
         );
         std::thread::sleep(Duration::from_millis(2));
     }
@@ -927,13 +934,40 @@ fn review_open_refuses_an_already_preserved_pending_prefix_without_a_second_writ
 fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention() {
     let root = scratch("automatic-time-recovery-refusal");
     let _ = fs::remove_dir_all(&root);
+    // Exact 20/40 ms deadline selection is covered by scheduler clock tests. Hosted macOS
+    // has delayed a requested 19.9 ms condvar wait past 155 ms. Keep a separate, bounded
+    // observation window and idle-phase margin here; still require recovery before settlement.
     let runtime = CheckpointRuntimeParameters {
-        idle_interval: Some(Duration::from_millis(200)),
+        idle_interval: Some(Duration::from_secs(2)),
         maximum_uncheckpointed_bytes: Some(u64::MAX),
         maximum_uncheckpointed_interval: Some(Duration::from_millis(40)),
     };
     let daemon = LiveDaemon::with_checkpoint_runtime(startup(), runtime).expect("config");
     daemon.open_at_start(&root).expect("workspace");
+    // Arm before save launches the detached worker. Installing a trigger after save races
+    // the 40 ms recovery timer: a slow CREATE TRIGGER can otherwise miss the write entirely.
+    // Admit exactly the initial observation, then refuse every subsequent state persistence.
+    let mut database =
+        Sqlite::open(root.join(".mesh").join(RECOVERY_DATABASE_FILE_NAME)).expect("sqlite");
+    database
+        .execute_batch(&format!(
+            "CREATE TABLE test_maximum_recovery_writes (count INTEGER NOT NULL);
+             INSERT INTO test_maximum_recovery_writes VALUES (0);
+             CREATE TRIGGER refuse_maximum_recovery
+             BEFORE INSERT ON {table}
+             WHEN (SELECT count FROM test_maximum_recovery_writes) >= 1
+             BEGIN SELECT RAISE(ABORT, 'planted maximum recovery failure'); END;
+             CREATE TRIGGER count_initial_observation
+             AFTER INSERT ON {table}
+             BEGIN UPDATE test_maximum_recovery_writes SET count = count + 1; END;
+             CREATE TRIGGER count_initial_observation_update
+             AFTER UPDATE ON {table}
+             BEGIN UPDATE test_maximum_recovery_writes SET count = count + 1; END;",
+            table = SqliteRecoveryState::table_name(),
+        ))
+        .expect("failure injection before worker launch");
+    drop(database);
+
     daemon
         .save_file_version(
             RecoverySequence::new(1).expect("sequence"),
@@ -945,19 +979,7 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         )
         .expect("durable save");
 
-    let mut database =
-        Sqlite::open(root.join(".mesh").join(RECOVERY_DATABASE_FILE_NAME)).expect("sqlite");
-    database
-        .execute_batch(&format!(
-            "CREATE TRIGGER refuse_maximum_recovery
-             BEFORE INSERT ON {}
-             BEGIN SELECT RAISE(ABORT, 'planted maximum recovery failure'); END;",
-            SqliteRecoveryState::table_name(),
-        ))
-        .expect("failure injection");
-    drop(database);
-
-    let deadline = std::time::Instant::now() + Duration::from_millis(150);
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         let state = daemon
             .workspace_state()
@@ -971,7 +993,9 @@ fn maximum_time_persistence_failure_keeps_the_window_open_and_surfaces_attention
         }
         assert!(
             std::time::Instant::now() < deadline,
-            "the detached maximum-recovery refusal was not surfaced"
+            "the detached maximum-recovery refusal was not surfaced; snapshot={:?}; conditions={:?}",
+            daemon.checkpoint_snapshot(),
+            state.conditions.iter().map(|condition| condition.code()).collect::<Vec<_>>()
         );
         std::thread::sleep(Duration::from_millis(2));
     }
