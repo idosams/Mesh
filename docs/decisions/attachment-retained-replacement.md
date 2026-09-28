@@ -1,8 +1,9 @@
-# Retained recovery for attached-file replacement
+# Retained recovery for attached-file integration
 
-Status: native regular-file integration, restart inspection and retained-file restoration implemented;
-desktop source now connects single-file text confirmation and recovery inspection; additions/removals,
-grouped integration and packaged graphical proof are unfinished.
+Status: native regular-file replacement/removal groups, restart inspection and retained-file
+replacement restoration implemented; desktop source connects single-file text confirmation and
+recovery inspection. Additions, directory changes, absent-path restoration, the grouped desktop
+journey and packaged graphical proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
 ## Decision and reason
@@ -82,7 +83,7 @@ live files and the history journal while changing only the explicitly selected a
 Native restart inspection now classifies retained artifacts without replaying writes.
 
 Still required: packaged native confirmation and desktop recovery proof, crash-process campaigns,
-retention that does not discard live descriptors' work, grouped additions/deletions and dependency
+retention that does not discard live descriptors' work, grouped additions/directory changes and dependency
 handling, external-volume UX, Linux
 metadata preservation, and revision-bound packaged graphical proof. No general integration or
 packaged user-presence claim follows from these native tests.
@@ -240,11 +241,12 @@ The native receipt/observation format itself is unchanged.
 ## Accepted-review replacement groups
 
 The native `prepare_main_integration` operation now selects all changed paths in one accepted review.
-This executor supports regular-file replacements only. An addition, removal, directory change,
+The initial executor supported regular-file replacements; the removal extension is described below.
+An unsupported addition, directory change,
 conflict, exclusion, unavailable member or group budget overflow refuses the complete group. It never
 silently reduces the accepted result to a supported subset. Up to 64 changed files and the configured
 aggregate byte budget are admitted. Already-present accepted files are recorded and not rewritten;
-unrelated current work is preserved. Add/remove/directory executors and desktop group confirmation
+unrelated current work is preserved. Addition/directory executors and desktop group confirmation
 remain unfinished, so this does not complete general integration.
 
 Preparation first derives a complete plan from trusted accepted history and a fresh bounded source
@@ -282,7 +284,7 @@ preservation, refusal of mixed unsupported changes before staging, restart inspe
 membership. A deterministic mid-apply test changes the second of three files after the first exchange:
 apply stops, retains the completed member and every stage, preserves the new user content and leaves
 the final member untouched. Restart inspection does not replay the partial group. Desktop confirmation,
-add/remove/directory support and packaged graphical proof remain required for the full journey.
+addition/directory support and packaged graphical proof remain required for the full journey.
 
 
 The original group and capture-reuse source commits report 3,252 and 3,254 Rust tests respectively
@@ -313,3 +315,49 @@ work proportional to the group; broader performance measurement remains required
 
 Canonical focused, failing-before and full native verification remains pending. No packaged
 graphical or wall-clock performance claim is made.
+
+## Retained regular-file removals in accepted groups
+
+The native group executor now admits regular-file removal alongside replacement. The complete
+accepted review must still contain only supported changes; additions and directory changes refuse
+before staging. An already-absent removed path counts as present only after successfully opening its
+confined parent and observing leaf absence twice under the same parent identity. Missing parents,
+symlinks, inaccessible entries and failed reads never establish absence. This remains a bounded live
+observation, not an atomic project snapshot.
+
+Each removal retains an `integration-<32 lowercase hex>` transaction with an explicit new
+`mesh.attachment-file-removal/v1` preparation schema. It uses the existing ordered preparation keys,
+with `installed_file`, `installed_digest` and `installed_mode` set to JSON null. All source, parent,
+metadata, approval, exclusion and storage identities remain mandatory. Verified history must contain
+the exact source file in the accepted base and no entry at that path in the accepted result. Older
+readers reject the unknown schema or absent installed facts; existing replacement and restoration
+schemas are unchanged. The result schema is `mesh.attachment-file-removal-result/v1`, with the same
+proposal digest, status, retention and nonfinal-observation fields as replacement outcomes.
+
+Preparation does not alter source files or create a replacement stage. Native apply rechecks source
+identity, content, mode, metadata and the vacant private recovery destination, then performs a
+same-volume descriptor-relative no-replace rename into `exchange`. Both source and recovery directory
+barriers are attempted. The retained file and the absent original name under the exact source parent
+must match before reporting `applied-observed`. A writer can replace the source between verification
+and rename; any unexpected displaced inode is retained and reported as requiring reconciliation.
+There is no automatic unlink, rollback, retry or cleanup. An editor can keep writing its open handle
+into the retained file after success; a recreated source path remains independent user work.
+
+Recovery recognizes explicit removal receipts and separately reports confirmed source absence.
+It does not infer absence from a null content observation. Missing outcomes remain uncertain;
+changed retained bytes, recreated files, insufficient read budgets and replaced parents do not
+become successful deletion evidence. Group restart inspection keeps its complete membership and
+approval verification. The single-file preparation API remains replacement-only so its existing
+desktop confirmation cannot silently change meaning. Future group confirmation can distinguish
+removal from an empty replacement through `removes_path()` and the explicit receipt schema.
+
+Native tests cover mixed accepted groups, already-absent paths, late editor writes, changed or
+substituted sources, occupied recovery destinations, failed durability barriers, missing parents,
+receipt tampering, lost outcomes and stopping later members after a concurrent edit. Restoring into
+an absent source path, additions, directory changes, desktop group confirmation/recovery and packaged
+graphical proof remain unfinished.
+
+The original removal source reports 3,264 Rust tests (14 skipped) and 666 desktop tests. These
+historical results do not validate the canonical transfer. Local native focused, failing-before and
+full verification remains queued behind the preserved run. Packaged graphical confirmation and
+platform-backed human-presence acceptance remain outstanding.

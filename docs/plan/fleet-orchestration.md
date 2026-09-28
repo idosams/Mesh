@@ -673,12 +673,19 @@ approval or publication. Current canonical runtime and packaged verification rem
 Native accepted-review grouping now stages and preflights every regular-file replacement, preserves
 already-present and unrelated source work, records each attempt and retains partial outcomes without
 automatic rollback. Recovery inspection rederives full review membership and verifies each retained
-member. Unsupported additions/removals/directory changes refuse the entire group before source writes.
+member. Unsupported additions/directory changes refuse the entire group before source writes.
 This is the replacement executor foundation; the other entry executors, complete native desktop
 confirmation, grouped recovery UI and packaged proof remain required.
 
 
 Group preparation now reuses a verified project capture, preserving targeted file/metadata and ignore
-policy checks at each member boundary. Native tests bound full captures to three for preparation and
-two for apply for both 2-file and 24-file groups. Large-project timing, the other entry executors and
+policy checks at each member boundary. Transferred tests assert at most three full captures for preparation and
+two for apply for both 2-file and 24-file groups; canonical execution remains pending. Large-project timing, the other entry executors and
 the grouped desktop journey remain required.
+
+Accepted-review groups now include regular-file removal with durable retained inodes and explicit
+removal receipts. Source absence requires exact confined-parent evidence; read failures never count
+as applied deletions. Transferred tests cover mixed groups, late editor writes, interrupted member
+sequences, occupied recovery names and restart inspection without replay; canonical execution is pending. Single-file desktop
+preparation remains replacement-only pending complete group confirmation. Addition/directory
+executors, absent-path restoration, group recovery UI and packaged graphical proof remain required.

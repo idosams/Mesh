@@ -31,7 +31,7 @@ struct Plan {
 }
 
 /// Native-only single-use group. Every changed path in the accepted review must be accounted for.
-/// This initial executor supports regular-file replacements; additions, removals and directory
+/// This executor supports regular-file replacement and removal; additions and directory
 /// changes refuse the whole group before staging. Applying never claims filesystem-wide atomicity.
 pub struct PreparedMainIntegration {
     history: ProvisionedAttachment,
@@ -98,18 +98,32 @@ fn plan(
             continue;
         }
         let (a, b) = match (a, b) {
-            (Some(a), Some(b)) if a.kind == "file" && b.kind == "file" => (a, b),
-            _ => return Err(invalid("group contains an addition, deletion or directory change requiring another executor")),
+            (Some(a), b) if a.kind == "file" && b.is_none_or(|b| b.kind == "file") => (a, b),
+            _ => {
+                return Err(invalid(
+                    "group contains an addition or directory change requiring another executor",
+                ))
+            }
         };
         if result.ready.len() + result.present.len() >= MAX_FILES {
             return Err(invalid("integration group exceeds file limit"));
         }
         bytes = bytes
             .checked_add(a.bytes.unwrap_or(u64::MAX))
-            .and_then(|n| n.checked_add(b.bytes.unwrap_or(u64::MAX)))
+            .and_then(|n| n.checked_add(b.map_or(0, |b| b.bytes.unwrap_or(u64::MAX))))
             .ok_or_else(|| invalid("group byte budget overflow"))?;
         if bytes > limits.bytes {
             return Err(invalid("integration group exceeds byte limit"));
+        }
+        if b.is_none()
+            && crate::managed_file::retained_replacement::absent_parent(
+                &history.project().pinned,
+                Path::new(path),
+            )?
+            .is_some()
+        {
+            result.present.push(path.clone());
+            continue;
         }
         let current = captured
             .files()
@@ -123,7 +137,7 @@ fn plan(
                 && entry.executable == Some(current.executable())
                 && entry.bytes == Some(current.bytes().len() as u64)
         };
-        if matches(b) {
+        if b.is_some_and(matches) {
             result.present.push(path.clone());
         } else if matches(a) {
             result.ready.push(path.clone());
@@ -185,6 +199,7 @@ pub(super) fn prepare(
             for relative in &planned.ready {
                 files.push(super::writeback::prepare_captured(
                     &history, workspace, store, bundle, target, relative, &path, limits, &captured,
+                    true,
                 )?);
             }
             Ok(files)

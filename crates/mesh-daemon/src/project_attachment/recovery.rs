@@ -2,7 +2,9 @@
 use super::inspection::comparison_entries;
 use super::{external_store, invalid, ObservationLimits, ProvisionedAttachment};
 use crate::ipc::Json;
-use crate::managed_file::retained_replacement::{observe_file, RetainedFileObservation};
+use crate::managed_file::retained_replacement::{
+    absent_parent, observe_file, RetainedFileObservation,
+};
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
 use crate::TrustedReviewers;
@@ -75,9 +77,14 @@ const RESTORE_KEYS: &[&str] = &[
 pub(super) fn is_restoration(value: &Json) -> bool {
     value.get("schema") == Some(&Json::text("mesh.attachment-file-restoration/v1"))
 }
+pub(super) fn is_removal(value: &Json) -> bool {
+    value.get("schema") == Some(&Json::text("mesh.attachment-file-removal/v1"))
+}
 pub(super) fn result_schema(value: &Json) -> &'static str {
     if is_restoration(value) {
         "mesh.attachment-file-restoration-result/v1"
+    } else if is_removal(value) {
+        "mesh.attachment-file-removal-result/v1"
     } else {
         "mesh.attachment-file-integration-result/v1"
     }
@@ -128,12 +135,15 @@ pub(super) fn validate_receipt(
         return Err(invalid("expected recovery object"));
     };
     let restoring = is_restoration(value);
+    let removing = is_removal(value);
     let extra = if restoring { RESTORE_KEYS } else { &[] };
     if !fields
         .iter()
         .map(|(key, _)| key.as_str())
         .eq(KEYS.iter().chain(extra).copied())
-        || (!restoring && text(value, "schema")? != "mesh.attachment-file-integration/v1")
+        || (!restoring
+            && !removing
+            && text(value, "schema")? != "mesh.attachment-file-integration/v1")
         || text(value, "project")? != history.id()
         || value.get("attachment") != Some(&history.project().receipt()?)
         || value.get("automatic_replay") != Some(&Json::Bool(false))
@@ -149,14 +159,27 @@ pub(super) fn validate_receipt(
         "native_metadata_digest",
         "exclusions",
     ] {
+        if removing && key == "installed_digest" {
+            continue;
+        }
         digest(text(value, key)?)?;
     }
     for key in ["source_file", "installed_file"] {
+        if removing && key == "installed_file" {
+            continue;
+        }
         if !file_identity(text(value, key)?) {
             return Err(invalid("invalid recovery file identity"));
         }
     }
-    if text(value, "source_file")? == text(value, "installed_file")? {
+    if removing
+        && ["installed_file", "installed_digest", "installed_mode"]
+            .into_iter()
+            .any(|key| value.get(key) != Some(&Json::Null))
+    {
+        return Err(invalid("removal cannot install a file"));
+    }
+    if !removing && text(value, "source_file")? == text(value, "installed_file")? {
         return Err(invalid("recovery identities overlap"));
     }
     let parent: Vec<_> = text(value, "source_parent")?.split(':').collect();
@@ -181,7 +204,11 @@ pub(super) fn validate_receipt(
         }
     }
     let source_mode = number(value, "source_mode")?;
-    let installed_mode = number(value, "installed_mode")?;
+    let installed_mode = if removing {
+        source_mode
+    } else {
+        number(value, "installed_mode")?
+    };
     if [source_mode, installed_mode]
         .into_iter()
         .any(|mode| mode & !0o100777 != 0 || mode & 0o100000 == 0)
@@ -271,15 +298,18 @@ pub(super) fn verify_history(
         .get(path)
         .filter(|entry| entry.kind == "file")
         .ok_or_else(|| invalid("base file unavailable"))?;
-    let new = after
-        .get(path)
-        .filter(|entry| entry.kind == "file")
-        .ok_or_else(|| invalid("approved file unavailable"))?;
-    if old == new
+    let valid_result = if is_removal(value) {
+        !after.contains_key(path)
+    } else if let Some(new) = after.get(path).filter(|entry| entry.kind == "file") {
+        old != new
+            && new.digest == Some(digest(text(value, "installed_digest")?)?)
+            && new.executable == Some(number(value, "installed_mode")? & 0o111 != 0)
+    } else {
+        false
+    };
+    if !valid_result
         || old.digest != Some(digest(text(value, "source_digest")?)?)
-        || new.digest != Some(digest(text(value, "installed_digest")?)?)
         || old.executable != Some(number(value, "source_mode")? & 0o111 != 0)
-        || new.executable != Some(number(value, "installed_mode")? & 0o111 != 0)
     {
         return Err(invalid("recovery content does not match approved history"));
     }
@@ -411,13 +441,34 @@ fn inspect(
     };
     // Validation above established exact types. This code only compares observations; it never
     // turns a matching byte digest or an old success receipt into permission to mutate.
-    let source = observe(
-        &history.project().pinned,
-        Path::new(text(&value, "path").unwrap()),
-        limits,
-        remaining,
-    );
-    let retained = observe(&recovery, Path::new("exchange"), limits, remaining);
+    let removing = is_removal(&value);
+    let source_absent = removing
+        .then(|| {
+            absent_parent(
+                &history.project().pinned,
+                Path::new(text(&value, "path").unwrap()),
+            )
+            .ok()
+            .flatten()
+        })
+        .flatten();
+    let retained_absent = removing
+        && absent_parent(&recovery, Path::new("exchange")).is_ok_and(|parent| parent.is_some());
+    let source = if source_absent.is_some() {
+        None
+    } else {
+        observe(
+            &history.project().pinned,
+            Path::new(text(&value, "path").unwrap()),
+            limits,
+            remaining,
+        )
+    };
+    let retained = if retained_absent {
+        None
+    } else {
+        observe(&recovery, Path::new("exchange"), limits, remaining)
+    };
     let matching = |item: &RetainedFileObservation, prefix: &str| {
         item.installation == text(&value, &format!("{prefix}_file")).unwrap()
             && item.digest == text(&value, &format!("{prefix}_digest")).unwrap()
@@ -435,6 +486,38 @@ fn inspect(
     };
     let status = if outcome == "invalid" {
         "invalid-outcome"
+    } else if removing {
+        if source_absent
+            .as_deref()
+            .is_some_and(|parent| parent != text(&value, "source_parent").unwrap())
+            || source
+                .as_ref()
+                .is_some_and(|item| item.parent != text(&value, "source_parent").unwrap())
+        {
+            "identity-mismatch"
+        } else if let Some(retained) = &retained {
+            if retained.installation != text(&value, "source_file").unwrap() {
+                "identity-mismatch"
+            } else if source_absent.is_some() {
+                if matching(retained, "source") {
+                    "applied-arrangement"
+                } else {
+                    "changed-files"
+                }
+            } else if source.is_some() {
+                "changed-files"
+            } else {
+                "incomplete-observation"
+            }
+        } else if retained_absent && source.as_ref().is_some_and(|item| matching(item, "source")) {
+            if outcome == "absent" {
+                "prepared-arrangement"
+            } else {
+                "contradictory-outcome"
+            }
+        } else {
+            "incomplete-observation"
+        }
     } else if let (Some(source), Some(retained)) = (&source, &retained) {
         if source.parent != text(&value, "source_parent").unwrap() {
             "identity-mismatch"
@@ -459,38 +542,46 @@ fn inspect(
     if recovery.ensure_namespace_identity().is_err() {
         return report(id, "unavailable-directory", Json::Null);
     }
-    report(
-        id,
-        status,
-        Json::object([
-            (
-                "operation",
-                Json::text(if is_restoration(&value) {
-                    "restore-retained"
-                } else {
-                    "apply-approved"
-                }),
+    let mut details = Json::object([
+        (
+            "operation",
+            Json::text(if is_restoration(&value) {
+                "restore-retained"
+            } else if removing {
+                "remove-approved"
+            } else {
+                "apply-approved"
+            }),
+        ),
+        (
+            "content_is_approved_main",
+            Json::Bool(!is_restoration(&value)),
+        ),
+        ("path", value.get("path").unwrap().clone()),
+        ("approved_head", value.get("head").unwrap().clone()),
+        (
+            "is_current_main",
+            Json::Bool(
+                workspace
+                    .shared_version()
+                    .is_some_and(|head| head.to_string() == text(&value, "head").unwrap()),
             ),
-            (
-                "content_is_approved_main",
-                Json::Bool(!is_restoration(&value)),
-            ),
-            ("path", value.get("path").unwrap().clone()),
-            ("approved_head", value.get("head").unwrap().clone()),
-            (
-                "is_current_main",
-                Json::Bool(
-                    workspace
-                        .shared_version()
-                        .is_some_and(|head| head.to_string() == text(&value, "head").unwrap()),
-                ),
-            ),
-            ("recorded_outcome", Json::text(outcome)),
-            ("source", evidence(&source)),
-            ("retained", evidence(&retained)),
-            ("current_exclusions_checked", Json::Bool(false)),
-        ]),
-    )
+        ),
+        ("recorded_outcome", Json::text(outcome)),
+        ("source", evidence(&source)),
+        ("retained", evidence(&retained)),
+        ("current_exclusions_checked", Json::Bool(false)),
+    ]);
+    if removing {
+        if let Json::Object(fields) = &mut details {
+            fields.push((
+                "source_absent_parent".into(),
+                source_absent.map_or(Json::Null, Json::text),
+            ));
+            fields.push(("retained_absent".into(), Json::Bool(retained_absent)));
+        }
+    }
+    report(id, status, details)
 }
 
 pub(super) fn inspect_recovery(

@@ -1475,3 +1475,24 @@ Transferred regressions compare capture counts for 2- and 24-member groups and s
 when ignore rules change after the first member. Local native focused/failing-before/full execution
 is queued behind the preserved full run. Source-reported 3,254 Rust/666 desktop results are historical
 only. Scan-count bounds are not measured latency or packaged acceptance.
+
+
+## I02a retained regular-file removals
+
+Transfers source `319a4cd7a0d093689e6aa2d4f168830376a01337` onto PR #82 at
+`5f124dc2ac496e9c8e3e66353018e4498b41b8a0`. Accepted groups can remove a regular file by
+moving its inode into private same-filesystem recovery without overwriting a destination. Open
+editors retain their inode; later writes and recreated source paths are preserved. Every supported
+member is preflighted, and partial outcomes remain explicit without automatic rollback or replay.
+Absence requires an exact confined parent; missing parents and symlink failures are not absence.
+
+New versioned removal receipts have null installed-file fields and bind accepted history, original
+identity, metadata and recovery. Existing replacement/restoration formats and full-mode validation
+remain intact; older readers must refuse unknown removal receipts. Standalone replacement does not
+gain removal authority. Additions, directories, restoration into absence and desktop group flows
+remain separate increments.
+
+Transferred tests cover late editor writes, changed sources, occupied recovery, rename races,
+substituted inodes, failed directory flushes, missing/replaced parents, mixed groups and restart
+inspection. Local native focused/failing-before/full verification is queued behind the preserved
+run. Source-reported 3,264 Rust/666 desktop results are historical only, not canonical acceptance.

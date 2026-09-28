@@ -5,7 +5,9 @@ use crate::root_authority::PinnedWorkspaceRoot;
 const EXCHANGE: &str = "exchange";
 
 mod metadata;
+mod removal;
 use metadata::{copy_metadata, metadata_digest};
+pub(crate) use removal::{absent_parent, RetainedRemoval};
 
 /// Bounded live recovery evidence. This is not a write/replay capability or an atomic snapshot.
 #[derive(PartialEq, Eq)]
@@ -392,13 +394,13 @@ impl RetainedReplacement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    struct Fixture {
-        root: PathBuf,
-        source: PathBuf,
-        recovery: PathBuf,
+    pub(super) struct Fixture {
+        pub(super) root: PathBuf,
+        pub(super) source: PathBuf,
+        pub(super) recovery: PathBuf,
     }
     impl Fixture {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             let root = std::env::temp_dir().join(format!(
                 "mesh-retained-{}-{}",
                 std::process::id(),

@@ -545,16 +545,25 @@ be imported as actual source-project deletions. Ordinary approval contexts rejec
 identities. Transferred tests cover later edits, retained-history reopen, source preservation and
 approval refusal; canonical native and packaged execution remains pending.
 
-Native integration can now prepare a complete accepted-review group of regular-file replacements.
+Native integration can now prepare a complete accepted-review group of regular-file replacements
+and removals.
 All members are preflighted before writing; changed or uncertain members stop further work, and each
 attempt retains recovery evidence. Already-present files are not rewritten. A read-only group inspector
-verifies complete accepted-review membership and individual retained transactions. Additions, deletions
+verifies complete accepted-review membership and individual retained transactions. Additions
 and directory changes refuse the whole group; their executors, desktop group confirmation/recovery
 and packaged graphical proof remain unfinished.
 
 
 Replacement groups now reuse one complete captured input for member staging and check current ignore
-rules without rescanning unrelated project content at each member boundary. Native tests cover
+rules without rescanning unrelated project content at each member boundary. Transferred tests cover
 2-file/24-file groups with constant full-capture budgets, unchanged unrelated content, changed-policy
-refusal and mid-apply edit preservation. This is scan-count evidence; no large-project latency claim
+refusal and mid-apply edit preservation. Canonical execution remains pending; no large-project latency claim
 or completed desktop group workflow follows from it.
+
+Native accepted-review groups now support retained regular-file removal alongside replacement.
+Removed inodes remain named in private recovery storage for late editor writes. Recovery distinguishes
+confirmed leaf absence from unreadable content or missing parents, verifies the removal against
+accepted history and never replays it. Transferred mixed-group and race/restart tests cover this path;
+canonical native execution remains pending.
+Existing single-file desktop preparation remains replacement-only. Additions, directory changes,
+restoration into absent paths and the complete grouped desktop/packaged journey remain unfinished.

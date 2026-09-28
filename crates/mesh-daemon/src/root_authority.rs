@@ -451,6 +451,21 @@ impl PinnedRootFs {
         Ok((parent, file))
     }
 
+    /// Absence is established only for the leaf, after successfully opening its confined parent.
+    /// Unreadable entries, missing parents and symlink errors remain errors, not absent files.
+    pub(crate) fn inspect_optional_entry_with_parent(
+        &self,
+        path: &Path,
+    ) -> io::Result<(File, Option<File>)> {
+        let (parent, leaf) = self.parent_and_leaf(path)?;
+        let entry = match openat(&parent, &leaf, OPEN_INSPECT_FLAGS, 0) {
+            Ok(file) => Some(file),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        Ok((parent, entry))
+    }
+
     /// Enumerate one exact directory below the retained root descriptor.
     ///
     /// The directory stream owns a duplicate of the already verified descriptor, so enumeration

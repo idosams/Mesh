@@ -2,7 +2,9 @@
 use super::inspection::comparison_entries;
 use super::{external_store, invalid, ObservationLimits, ProvisionedAttachment};
 use crate::ipc::Json;
-use crate::managed_file::retained_replacement::{read_target, RetainedReplacement};
+use crate::managed_file::retained_replacement::{
+    read_target, RetainedRemoval, RetainedReplacement,
+};
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
 use crate::TrustedReviewers;
@@ -22,12 +24,49 @@ pub struct PreparedMainFileIntegration {
     recovery: PinnedWorkspaceRoot,
     recovery_path: PathBuf,
     receipt: Json,
-    replacement: RetainedReplacement,
+    replacement: PreparedFileChange,
     limits: ObservationLimits,
     bundle: String,
     target: String,
     head: String,
     exclusions: String,
+}
+
+enum PreparedFileChange {
+    Replace(RetainedReplacement),
+    Remove(RetainedRemoval),
+}
+impl PreparedFileChange {
+    fn current_bytes(&self) -> &[u8] {
+        match self {
+            Self::Replace(v) => v.current_bytes(),
+            Self::Remove(v) => v.current_bytes(),
+        }
+    }
+    fn replacement_bytes(&self) -> &[u8] {
+        match self {
+            Self::Replace(v) => v.replacement_bytes(),
+            Self::Remove(_) => &[],
+        }
+    }
+    fn validate(&self) -> io::Result<()> {
+        match self {
+            Self::Replace(v) => v.validate(),
+            Self::Remove(v) => v.validate(),
+        }
+    }
+    fn apply(self) -> io::Result<bool> {
+        match self {
+            Self::Replace(v) => v.apply(),
+            Self::Remove(v) => v.apply(),
+        }
+    }
+}
+struct ApprovedChange {
+    head: String,
+    proposed: Option<(Vec<u8>, bool)>,
+    base_digest: String,
+    base_executable: bool,
 }
 
 fn error(value: impl std::fmt::Display) -> io::Error {
@@ -42,7 +81,8 @@ fn approved_file(
     target: &str,
     relative: &str,
     maximum_bytes: u64,
-) -> io::Result<(String, Vec<u8>, bool, String, bool)> {
+    allow_removal: bool,
+) -> io::Result<ApprovedChange> {
     let head = super::approval::main_head(workspace)?
         .ok_or_else(|| invalid("Mesh main has no approved version"))?;
     let review = workspace
@@ -75,29 +115,33 @@ fn approved_file(
         .get(relative)
         .filter(|entry| entry.kind == "file")
         .ok_or_else(|| invalid("replacement base is not a saved regular file"))?;
-    let after = proposed
-        .get(relative)
-        .filter(|entry| entry.kind == "file")
-        .ok_or_else(|| invalid("replacement result is not a saved regular file"))?;
-    if before == after || after.bytes.is_none_or(|size| size > maximum_bytes) {
-        return Err(invalid("replacement is unchanged or exceeds its budget"));
-    }
-    let file = workspace
-        .historical_workspace_file(review.subject_operation, relative)
-        .map_err(error)?
-        .ok_or_else(|| invalid("approved file unavailable"))?;
-    Ok((
-        head.to_string(),
-        file.bytes,
-        file.executable,
-        before
+    let after = proposed.get(relative);
+    let proposed = match after {
+        None if allow_removal => None,
+        Some(after)
+            if after.kind == "file"
+                && before != after
+                && after.bytes.is_some_and(|size| size <= maximum_bytes) =>
+        {
+            let file = workspace
+                .historical_workspace_file(review.subject_operation, relative)
+                .map_err(error)?
+                .ok_or_else(|| invalid("approved file unavailable"))?;
+            Some((file.bytes, file.executable))
+        }
+        _ => return Err(invalid("unsupported or unchanged approved file result")),
+    };
+    Ok(ApprovedChange {
+        head: head.to_string(),
+        proposed,
+        base_digest: before
             .digest
             .ok_or_else(|| invalid("base digest unavailable"))?
             .to_string(),
-        before
+        base_executable: before
             .executable
             .ok_or_else(|| invalid("base mode unavailable"))?,
-    ))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -135,6 +179,7 @@ pub(super) fn prepare(
                 recovery_root,
                 limits,
                 &capture,
+                false,
             )
         },
     )
@@ -153,6 +198,7 @@ pub(super) fn prepare_captured(
     recovery_root: &Path,
     limits: ObservationLimits,
     capture: &super::CapturedProjectInput,
+    allow_removal: bool,
 ) -> io::Result<PreparedMainFileIntegration> {
     limits.validate()?;
     if capture.root() != history.project().root()
@@ -167,8 +213,21 @@ pub(super) fn prepare_captured(
             "capture or exclusion policy changed before staging",
         ));
     }
-    let (head, proposed, executable, base_digest, base_executable) =
-        approved_file(workspace, bundle, target, relative, limits.file_bytes)?;
+    let ApprovedChange {
+        head,
+        proposed,
+        base_digest,
+        base_executable,
+    } = approved_file(
+        workspace,
+        bundle,
+        target,
+        relative,
+        limits.file_bytes,
+        allow_removal,
+    )?;
+    let removing = proposed.is_none();
+    let (proposed, executable) = proposed.unwrap_or_default();
     history
         .project()
         .history_configuration(store, Some(capture.exclusion_digest()))?;
@@ -215,56 +274,91 @@ pub(super) fn prepare_captured(
     let mode = source.mode_with_executable(executable);
     let exclusions = capture.exclusion_digest().to_string();
     let mut receipt = Json::Null;
-    let replacement = RetainedReplacement::prepare(
-        source,
-        expected,
-        proposed.clone(),
-        mode,
-        recovery.clone(),
-        |installed, metadata_digest| {
-            receipt = Json::object([
-                ("schema", Json::text("mesh.attachment-file-integration/v1")),
-                ("project", Json::text(history.id())),
-                ("attachment", history.project().receipt()?),
-                ("head", Json::text(&head)),
-                ("bundle", Json::text(bundle)),
-                ("target", Json::text(target)),
-                ("path", Json::text(relative)),
-                ("source_parent", Json::text(&source_parent)),
-                ("source_file", Json::text(&source_file)),
-                ("source_digest", Json::text(&base_digest)),
-                ("native_metadata_digest", Json::text(metadata_digest)),
-                ("source_executable", Json::Bool(base_executable)),
-                ("source_mode", Json::Number(u64::from(source_mode))),
-                (
-                    "store_device",
-                    Json::text(format!("{:016x}", store.identity()?.0)),
-                ),
-                (
-                    "store_inode",
-                    Json::text(format!("{:016x}", store.identity()?.1)),
-                ),
-                ("installed_file", Json::text(installed.token())),
-                ("installed_digest", Json::text(digest(&proposed))),
-                ("installed_mode", Json::Number(u64::from(mode))),
-                ("exclusions", Json::text(&exclusions)),
-                (
-                    "recovery_device",
-                    Json::text(format!("{:016x}", recovery_identity.0)),
-                ),
-                (
-                    "recovery_inode",
-                    Json::text(format!("{:016x}", recovery_identity.1)),
-                ),
-                ("automatic_replay", Json::Bool(false)),
-            ]);
-            recovery.filesystem().write_new_file(
-                Path::new("prepared.json"),
-                receipt.encode().as_bytes(),
-                fs::Permissions::from_mode(0o600),
-            )
-        },
-    )?;
+    let mut record = |installed: Option<crate::managed_file::ManagedFileIdentity>,
+                      metadata_digest: &str| {
+        receipt = Json::object([
+            (
+                "schema",
+                Json::text(if removing {
+                    "mesh.attachment-file-removal/v1"
+                } else {
+                    "mesh.attachment-file-integration/v1"
+                }),
+            ),
+            ("project", Json::text(history.id())),
+            ("attachment", history.project().receipt()?),
+            ("head", Json::text(&head)),
+            ("bundle", Json::text(bundle)),
+            ("target", Json::text(target)),
+            ("path", Json::text(relative)),
+            ("source_parent", Json::text(&source_parent)),
+            ("source_file", Json::text(&source_file)),
+            ("source_digest", Json::text(&base_digest)),
+            ("native_metadata_digest", Json::text(metadata_digest)),
+            ("source_executable", Json::Bool(base_executable)),
+            ("source_mode", Json::Number(u64::from(source_mode))),
+            (
+                "store_device",
+                Json::text(format!("{:016x}", store.identity()?.0)),
+            ),
+            (
+                "store_inode",
+                Json::text(format!("{:016x}", store.identity()?.1)),
+            ),
+            (
+                "installed_file",
+                installed.map_or(Json::Null, |id| Json::text(id.token())),
+            ),
+            (
+                "installed_digest",
+                if removing {
+                    Json::Null
+                } else {
+                    Json::text(digest(&proposed))
+                },
+            ),
+            (
+                "installed_mode",
+                if removing {
+                    Json::Null
+                } else {
+                    Json::Number(u64::from(mode))
+                },
+            ),
+            ("exclusions", Json::text(&exclusions)),
+            (
+                "recovery_device",
+                Json::text(format!("{:016x}", recovery_identity.0)),
+            ),
+            (
+                "recovery_inode",
+                Json::text(format!("{:016x}", recovery_identity.1)),
+            ),
+            ("automatic_replay", Json::Bool(false)),
+        ]);
+        recovery.filesystem().write_new_file(
+            Path::new("prepared.json"),
+            receipt.encode().as_bytes(),
+            fs::Permissions::from_mode(0o600),
+        )
+    };
+    let replacement = if removing {
+        PreparedFileChange::Remove(RetainedRemoval::prepare(
+            source,
+            expected,
+            recovery.clone(),
+            |metadata| record(None, metadata),
+        )?)
+    } else {
+        PreparedFileChange::Replace(RetainedReplacement::prepare(
+            source,
+            expected,
+            proposed.clone(),
+            mode,
+            recovery.clone(),
+            |installed, metadata| record(Some(installed), metadata),
+        )?)
+    };
     Ok(PreparedMainFileIntegration {
         history: history.clone(),
         store: store.clone(),
@@ -286,7 +380,13 @@ impl PreparedMainFileIntegration {
         self.replacement.current_bytes()
     }
 
-    /// Frozen approved bytes presented by the native confirmation host.
+    /// Whether the approved result removes the path rather than replacing it with empty content.
+    pub fn removes_path(&self) -> bool {
+        matches!(self.replacement, PreparedFileChange::Remove(_))
+    }
+
+    /// Frozen approved bytes presented by the native confirmation host. Removals return no bytes;
+    /// the host must also inspect removes_path() when presenting the operation.
     pub fn proposed_content(&self) -> &[u8] {
         self.replacement.replacement_bytes()
     }
@@ -369,7 +469,7 @@ impl PreparedMainFileIntegration {
         let result = Json::object([
             (
                 "schema",
-                Json::text("mesh.attachment-file-integration-result/v1"),
+                Json::text(super::recovery::result_schema(&self.receipt)),
             ),
             (
                 "proposal_digest",

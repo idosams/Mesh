@@ -1654,3 +1654,187 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
     assert_eq!(fs::read_dir(root).unwrap().count(), count);
     assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
 }
+
+#[test]
+fn integration_group_removes_approved_file_retains_editor_work_and_inspects_restart() {
+    use std::io::Write as _;
+    let f = Fixture::new("group-removal");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("old.txt"), "old base").unwrap();
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::remove_file(f.source.join("old.txt")).unwrap();
+    let target = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("old.txt"), "old base").unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let root = recovery_root(&f);
+    assert!(f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "old.txt",
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let group_path = prepared.recovery_path().to_owned();
+    let group = group_path.file_name().unwrap().to_str().unwrap();
+    let removal = prepared.files().find(|file| file.removes_path()).unwrap();
+    assert_eq!(removal.current_content(), b"old base");
+    assert_eq!(removal.proposed_content(), b"");
+    assert_eq!(
+        removal.proposal().get("schema"),
+        Some(&Json::text("mesh.attachment-file-removal/v1"))
+    );
+    assert_eq!(removal.proposal().get("installed_file"), Some(&Json::Null));
+    let transaction = removal
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let retained = removal.recovery_path().join("exchange");
+    let inspect_status = |history: &ProvisionedAttachment, limits| {
+        let result = history
+            .inspect_integration_recovery(&group_path, Some(&transaction), &trust, limits)
+            .unwrap();
+        result.get("entries").unwrap().as_array().unwrap()[0]
+            .get("status")
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(
+        inspect_status(&f.history, ObservationLimits::default()),
+        Json::text("prepared-arrangement")
+    );
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("old.txt"))
+        .unwrap();
+    let journal = f.journal();
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert!(!f.source.join("old.txt").exists());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    assert_eq!(
+        inspect_status(&reopened, ObservationLimits::default()),
+        Json::text("applied-arrangement")
+    );
+    let small = ObservationLimits {
+        file_bytes: 1,
+        ..ObservationLimits::default()
+    };
+    assert_eq!(
+        inspect_status(&reopened, small),
+        Json::text("incomplete-observation")
+    );
+    assert_eq!(
+        reopened
+            .inspect_main_integration_group(&root, group, &trust, ObservationLimits::default())
+            .unwrap()
+            .get("automatic_replay"),
+        Some(&Json::Bool(false))
+    );
+    // An outcome is evidence only: losing it never replays the removal, and malformed receipts
+    // cannot reinterpret absence as an empty replacement or inherit an installed file identity.
+    let receipt_path = group_path.join(&transaction).join("prepared.json");
+    let original_receipt = fs::read_to_string(&receipt_path).unwrap();
+    let receipt = Json::parse(&original_receipt).unwrap();
+    fs::write(
+        &receipt_path,
+        replace_json(
+            &receipt,
+            "installed_file",
+            receipt.get("source_file").unwrap().clone(),
+        )
+        .encode(),
+    )
+    .unwrap();
+    assert_eq!(
+        inspect_status(&reopened, ObservationLimits::default()),
+        Json::text("invalid-receipt")
+    );
+    fs::write(&receipt_path, original_receipt).unwrap();
+    fs::remove_file(group_path.join(&transaction).join("observed.json")).unwrap();
+    assert_eq!(
+        inspect_status(&reopened, ObservationLimits::default()),
+        Json::text("applied-arrangement")
+    );
+    assert!(!f.source.join("old.txt").exists());
+    editor.write_all(b" late work").unwrap();
+    editor.sync_all().unwrap();
+    assert_eq!(fs::read(&retained).unwrap(), b"old base late work");
+    assert_eq!(
+        inspect_status(&reopened, ObservationLimits::default()),
+        Json::text("changed-files")
+    );
+    fs::write(f.source.join("old.txt"), "recreated user work").unwrap();
+    assert_eq!(
+        inspect_status(&reopened, ObservationLimits::default()),
+        Json::text("changed-files")
+    );
+    assert_eq!(
+        fs::read(f.source.join("old.txt")).unwrap(),
+        b"recreated user work"
+    );
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn integration_group_already_absent_removal_is_not_confused_with_empty_or_missing_parent() {
+    let f = Fixture::new("group-already-removed");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::create_dir(f.source.join("nested")).unwrap();
+    fs::write(f.source.join("nested/old.txt"), "old").unwrap();
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::remove_file(f.source.join("nested/old.txt")).unwrap();
+    let target = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let root = recovery_root(&f);
+    let prepare = || {
+        f.history.prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+    };
+    let prepared = prepare().unwrap();
+    assert_eq!(prepared.files().count(), 1);
+    assert_eq!(
+        prepared.proposal().get("already_present"),
+        Some(&Json::Array(vec![Json::text("nested/old.txt")]))
+    );
+    fs::write(f.source.join("nested/old.txt"), "").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert!(prepare().is_err());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    fs::remove_file(f.source.join("nested/old.txt")).unwrap();
+    fs::remove_dir(f.source.join("nested")).unwrap();
+    assert!(prepare().is_err());
+    fs::create_dir(f.source.join("nested")).unwrap();
+    prepare().unwrap().apply(&trust).unwrap();
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+}
