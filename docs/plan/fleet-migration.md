@@ -2373,3 +2373,14 @@ roots refuse. Conflicting declarations cannot be hidden by directory creation. N
 historical preview cover the empty-root journal. Local and hosted verification are pending.
 After this prerequisite merges, #128 will receive related main history by ordinary merge and adopt
 the declaration only for empty imports. No old histories or published commits will be rewritten.
+
+### R12 stacked empty-tree correction
+
+The published prerequisite #129 at `26bf82174b12309199382870d1b08c9481c937c8` was merged
+normally into #128 at `78cad259a76ce2f14670e4a712286346224d883a`, preserving both histories
+and both provenance entries above. #128 is stacked on #129 while its independent checks finish;
+it will return to main after the prerequisite merges. Empty ingestion now emits the explicit root
+operation, and its retained regression additionally reopens the native saved history. The original
+#128 macOS run passed 3,420 tests with one empty-tree failure and 16 skips; Linux stopped at the
+same failure after 1,016 passes. Those logs remain retained. Corrected exact-head validation is
+pending, not reported as passing. No preserved source commits are replaced or rewritten.

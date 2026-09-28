@@ -2251,6 +2251,12 @@ fn ingest_private_workspace(
         });
     }
 
+    // An empty received tree still needs a durable, explicit root identity.
+    // Ordinary user imports refuse empty trees before reaching ingestion.
+    if operations.is_empty() {
+        operations.push(Operation::InitializeWorkspace { root_id: root });
+    }
+
     let workspace_id = WorkspaceId::from_bytes(import_id16(b"workspace", imported.summary.digest));
     let actor_bytes = *Blake3::digest_bytes(b"mesh.local-folder-import.actor/1").as_bytes();
     let actor_id = ActorId::from_bytes(actor_bytes);

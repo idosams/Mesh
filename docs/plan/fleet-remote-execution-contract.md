@@ -234,12 +234,10 @@ and initial operation. Native verification checks saved content, original input,
 physical custody. Existing intent/destination state is preserved and refuses another initialization.
 This path grants no process launch, restart adoption or protected-main authority.
 
-This increment is not ready to merge: the empty-tree regression currently fails. The existing
-materializer discovers a root from directory references in operations; an empty import has no such
-reference. Empty received inputs require an explicit durable root initialization representation,
-with canonical encoding, rejection and replay tests, before this path can claim a saved initial
-version for every valid input. Do not remove the regression, synthesize placeholder project files,
-or label zero-history state as a saved version. Ordinary user imports retain their existing
-no-importable-entries refusal. The remote native route must validate exact saved content after
-initialization, including the empty case. No remote execution or second-machine claim follows from
-the passing nonempty initialization tests.
+Empty received inputs now emit the explicit `InitializeWorkspace` operation from prerequisite
+[#129](https://github.com/idosams/Mesh/pull/129). This records a real initial version without
+placeholder project files. The retained empty-tree regression also reopens the native workspace and
+checks its saved initial operation. Ordinary user imports retain their no-importable-entries refusal.
+Exact-head checks for this integration are pending; it is not ready to merge until all pass.
+The original draft failure logs are preserved. No process execution or second-machine claim follows
+from workspace initialization alone.

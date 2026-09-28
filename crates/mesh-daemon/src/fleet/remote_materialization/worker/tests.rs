@@ -202,6 +202,19 @@ fn empty_received_tree_still_has_an_independent_initial_operation() {
         workspace.binding().starting_version().unwrap(),
         manifest(true).input()
     );
+    let initial = workspace.binding().starting_version().unwrap();
+    let root = PathBuf::from(workspace.binding().root());
+    drop(workspace);
+    let daemon = LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+        StartupSummary::from(&nothing_to_recover()),
+        TrustedReviewers::default(),
+        CheckpointRuntimeParameters::selected_defaults(),
+    )
+    .unwrap();
+    daemon.reopen_at_start(&root).unwrap();
+    let state = daemon.workspace_state().unwrap();
+    assert_eq!(state.workspace_versions.len(), 1);
+    assert_eq!(state.workspace_versions[0].operation(), initial);
 }
 
 #[test]

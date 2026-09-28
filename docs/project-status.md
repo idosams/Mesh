@@ -128,6 +128,6 @@ establish remote transport or execution readiness.
 ## Empty worker workspace prerequisite
 
 A dedicated protocol increment adds an explicit immutable root declaration for empty saved trees.
-It does not yet enable received-worker initialization: [draft #128](https://github.com/idosams/Mesh/pull/128)
-retains that integration and its known empty-tree failure. Validation and delivery are tracked in the
+The corrected [draft #128](https://github.com/idosams/Mesh/pull/128) uses the declaration
+for empty received-worker initialization; its exact-head validation is pending. Delivery is tracked in the
 [delivery ledger](plan/fleet-migration.md#r12-prerequisite-explicit-workspace-root-declaration).
