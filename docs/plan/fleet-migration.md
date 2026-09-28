@@ -23,8 +23,8 @@ protected Mesh main's native human-presence approval or complete any product acc
   Linux took 6m32s and macOS 7m35s. Its complete local gate is still running on the same revision:
   repository/docs/license/storage/format/lint checks passed and native compilation completed.
   All native tests, desktop checks and the daemon demonstration have not yet completed in that run.
-- The new [combined-main run](https://github.com/idosams/Mesh/actions/runs/36466394886) was queued
-  at this checkpoint. Intermediate main-push runs were superseded by subsequent main pushes under
+- The [combined-main run](https://github.com/idosams/Mesh/actions/runs/36466394886) passed all seven
+  checks. Intermediate main-push runs were superseded by subsequent main pushes under
   existing CI concurrency settings. Their cancellation is not a passing result; successful exact-head
   PR checks were independently verified before every merge.
 - The earlier full #70 local run failed a native filesystem-event test. The preserved full #102

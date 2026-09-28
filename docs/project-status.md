@@ -102,7 +102,7 @@ desktop/React and real daemon checks. The daemon demonstration can also run inde
 node examples/local-daemon-demo.mjs
 ```
 
-The demonstration's 44 checks cover explicit local capture, restart, review and software-key
+The local demo should print 44 passing checks. These cover explicit local capture, restart, review and software-key
 publication refusal. They do not prove signed approval, remote execution or a clean-Mac installation.
 See the [user guide](user-guide.md), [architecture](architecture.md),
 [public-alpha guide](launch/public-alpha.md), [phase assessment](phase-assessment.md),
