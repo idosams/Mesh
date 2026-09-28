@@ -338,10 +338,10 @@ test('attached main comparison renders localized read-only conflicts and inert e
   for (const locale of ['en', 'he']) {
     ui.setLocale(locale);
     const html = ui.renderAttachments();
-    for (const label of ['Compare main with working files', 'Working folder compared with Mesh main',
+    for (const label of ['Compare main with working files', 'Working folder compared with Mesh main', 'Review applying accepted changes',
       'This directory contains entries outside the captured view, including possible ignored content.',
       'more entries are omitted from this overview. The counts include all entries.',
-      'Working files may have changed since this comparison. Applying a file requires a fresh native check and complete text confirmation. Diverged files, additions, deletions and grouped changes are unavailable.',
+      'Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create, replace and remove regular files. Directory changes and incomplete or oversized text confirmations remain unavailable.',
       projection.integrationErrors[id]]) {
       assert.ok(html.includes(ui.translate(locale, label)), label);
       if (locale === 'he') assert.notEqual(ui.translate(locale, label), label);
@@ -419,7 +419,7 @@ test('attached recovery localizes uncertainty while retaining literal file and t
       'No outcome was recorded. This does not prove that the working file was unchanged.',
       'Refresh retained files', 'Last observed recovery entries', 'Exact recovery reference', 'Inspect exact recovery',
       'Selected recovery · last observed', 'More entries exist outside this bounded overview. Use an exact recovery reference to inspect one.',
-      'Restoring requires native confirmation. The current working file is retained in a new recovery entry, which can be restored separately to undo the change.',
+      'Restoring requires native confirmation. An existing current file is retained in a new recovery entry. Restoring an absent path creates a new file and keeps the original retained file available.',
       'File details unavailable', 'Unavailable', ...states.map(([, label]) => label),
       projection.recoveryErrors[id], projection.fileChangeFeedback[id]]) {
       assert.ok(html.includes(ui.translate(locale, label)), label);

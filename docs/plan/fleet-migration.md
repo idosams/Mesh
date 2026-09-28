@@ -1626,3 +1626,18 @@ Source path accounting is complete; runtime acceptance, issue #37 and the full f
 No production watcher behavior or deadline changes. The test adjustment still requires real native
 registration and new callback evidence before the five-minute fallback, with the existing bounded
 waits. Local native focused/failing-before/full execution is queued behind the preserved run.
+
+## I03e canonical localization regression correction
+
+Hosted PR #88 run 36444262284 failed desktop-and-docs: two localization assertions still expected
+replacement-only wording that the grouped application/absent restoration feature intentionally replaced.
+The renderer test stage passed 152 cases and failed those two. This correction updates the expected
+safety text to complete native group checks, directory/preview limitations and absent-path restoration,
+and explicitly requires the translated group application label. Both English/Hebrew translation,
+literal path/identity, inert script text and disabled-control assertions remain intact.
+
+This is new canonical correction work on PR #89 at
+`50f5e73bb1b666e40e304b5c78c758fddfa761e2`, not another source-commit transfer. The failing
+parent revisions and their local running verification remain preserved. Focused localization/group
+rendering execution is running on this corrected tree; hosted and full acceptance must be refreshed.
+No product behavior, permissions or verification threshold is changed by the test correction.
