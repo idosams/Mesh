@@ -449,3 +449,15 @@ goals and exhausted-revision refusal. Local type/build, 147 render and 550 deskt
 coordinator/localization regressions fail before their changes and pass after restoration. Native/full
 local and packaged graphical verification remain pending. Published migration is not merged delivery;
 required review, ordered merges and combined-main verification remain outstanding.
+
+
+Native historical operation preparation now validates a proposal against one saved predecessor
+without absorbing later journal branches. Signed journal regression tests cover independent trees,
+explicit removal, actor-sequence refusal, policy changes and unchanged ordinary files/main. This
+read-only foundation does not enable source candidate import: durable capture-line separation,
+provenance-bound import receipts, signable review and integration remain outstanding.
+
+Canonical historical-authoring transfer adds partial-plan and oversized-plan refusal coverage with
+unchanged durable history and repeatable context across restart. Repository/docs/license/storage and
+format checks pass. Native/full local execution and packaged acceptance remain pending; no migration
+PR is merged and combined-main verification remains required.

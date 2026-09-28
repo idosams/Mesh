@@ -615,3 +615,30 @@ formats are unchanged. Native migration/restart/refusal tests, coordinator persi
 React static rendering cover this increment. Packaged graphical interaction remains unverified;
 source-history operation import, signable candidate review, dependency validation, human approval
 and original-project integration still require implementation.
+
+
+### Historical authoring boundary for candidate import
+
+`OpenWorkspace::prepare_historical_operations` now checks an explicit native operation proposal
+against one saved predecessor and its causal closure. Its sole parent, derived base head and clock
+come from that history, rather than the current union of journal tips. The current indexed policy
+epoch still applies. A native actor whose latest recorded operation lies outside that closure is
+refused, preventing sequence forks and accidental inclusion of unrelated work. Empty/oversized
+plans, incomplete history, invalid operations and replaced workspace identity also refuse.
+
+The opaque returned plan retains the exact operations and authoring context; its JSON is bounded
+context metadata, not a signable review or append capability. Writers must reopen current journal
+truth under custody and compare a freshly derived plan before signing/append. Ordinary managed
+writes keep their existing all-tip behavior. The native regression uses actual signed journal
+appends to prove that a later branch and a proposal based on an older version retain independent
+saved trees (including explicit removal), while original ordinary files and protected main remain
+unchanged. Reused actors outside ancestry refuse; a later policy epoch changes the plan while its
+historical base and clock remain fixed.
+
+This is the import foundation, not an enabled source-project importer. Before enabling candidate
+append, attachment observation needs an explicit durable capture-line cursor with interrupted-append
+recovery; choosing the latest operation or filtering by signer would mix candidate history into
+ongoing capture. The importer must then compile retained content through original-object
+correspondence, bind source provenance and an exact retry receipt, use a separate native signing
+identity, and create the signable project review. Approval, dependency closure and guarded original
+folder application remain required. No desktop command or agent capability can append this plan.

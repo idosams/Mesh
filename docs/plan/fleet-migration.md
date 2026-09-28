@@ -1143,3 +1143,30 @@ Next increments retain exact human approval and original-main integration, follo
 recovery/provider/four-worker/remote/packaged acceptance. Required human review, eventual ordered
 merges and final testing of combined canonical main remain completion requirements. Existing work
 and running verification remain preserved.
+
+## C03a exact saved-history operation preparation
+
+C02c is published as #67 at `b9b0bd37ee0002555ba5582736beb418c15c137f`, replacing
+`c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b`. Its local 697 desktop tests pass; hosted CI is
+running. #65 and #66 now both have all seven hosted checks passing, including native macOS.
+All remain unmerged and required human review remains outstanding.
+
+Preserved source `3aef42a9373ff0ebb84fd482819d39536b022ab2` transfers onto published #67.
+The native read-only planner derives one exact saved predecessor's causal closure, base and clock,
+while respecting the current policy epoch. An actor advanced outside that ancestry refuses rather
+than forking its sequence or absorbing unrelated work. Operations validate against a temporary
+historical materialization. The opaque plan reserves no identity/sequence, writes no journal, grants
+no approval and cannot apply working files; a future writer must rederive under custody before append.
+Ordinary managed authoring retains its all-tip behavior.
+
+Transferred signed-journal coverage proves independent saved trees, explicit removal, later-branch
+exclusion, actor refusal, policy invalidation and changed-root refusal, with ordinary files/main
+unchanged. Added canonical refusal coverage applies a valid prefix followed by an invalid operation,
+rejects 100,001 operations, and verifies unchanged durable bytes, saved paths and exact repeatable
+plan across reopen. This is the authoring foundation; capture-line separation and provenance-bound
+candidate compilation/import remain subsequent increments.
+
+Local repository (7 tests), docs (106 documents), license/storage self-tests, formatting and whitespace
+checks pass. Native focused/failing-before/full local execution is pending behind preserved #44 full
+verification; hosted CI must validate the new exact head. No packaged or integrated delivery claim
+follows. The complete fleet plan, human review, ordered merges and combined-main tests remain required.

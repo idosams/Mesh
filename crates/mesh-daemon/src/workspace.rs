@@ -596,6 +596,60 @@ pub(crate) struct ManagedAuthoringBasis {
     pub hybrid_logical_time: Hlc,
 }
 
+/// A checked operation proposal against one exact saved history point.
+/// This value is neither a signed ChangeSet nor permission to append, approve or apply files.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HistoricalOperationPlan {
+    target: RecordDigest,
+    basis: ManagedAuthoringBasis,
+    operations: Vec<Operation>,
+}
+impl HistoricalOperationPlan {
+    /// Exact saved predecessor. Later journal branches are not part of this proposal.
+    #[must_use]
+    pub const fn target(&self) -> RecordDigest {
+        self.target
+    }
+
+    /// Native operation vocabulary checked against the selected historical materialization.
+    #[must_use]
+    pub fn operations(&self) -> &[Operation] {
+        &self.operations
+    }
+
+    /// Bounded context metadata only; no saved file bytes or signing authority.
+    #[must_use]
+    pub fn context(&self) -> crate::ipc::Json {
+        use crate::ipc::Json;
+        Json::object([
+            ("schema", Json::text("mesh.historical-operation-plan/v1")),
+            ("target", Json::text(self.target.to_string())),
+            ("workspace", Json::text(self.basis.workspace_id.to_string())),
+            ("actor", Json::text(self.basis.actor_id.to_string())),
+            ("session", Json::text(self.basis.session_id.to_string())),
+            (
+                "actor_sequence",
+                Json::text(self.basis.actor_sequence.value().to_string()),
+            ),
+            ("base_head", Json::text(self.basis.base_head.to_string())),
+            (
+                "policy_epoch",
+                Json::text(self.basis.policy_epoch.value().to_string()),
+            ),
+            (
+                "clock_millis",
+                Json::text(self.basis.hybrid_logical_time.physical_millis().to_string()),
+            ),
+            (
+                "clock_counter",
+                Json::Number(u64::from(self.basis.hybrid_logical_time.logical())),
+            ),
+            ("operations", Json::Number(self.operations.len() as u64)),
+            ("approval_authority", Json::Bool(false)),
+        ])
+    }
+}
+
 /// Exact existing entry identity and binding resolved from complete durable materialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ManagedEntryBasis {
@@ -3574,6 +3628,30 @@ impl OpenWorkspace {
                 .collect(),
         );
 
+        let base_head = HeadId::parse(
+            self.private_version
+                .version()
+                .ok_or_else(|| "the workspace has no derived private head".to_owned())?,
+        )
+        .map_err(|error| format!("the derived private head is malformed: {error}"))?;
+
+        self.authoring_basis_for_history(
+            actor_public_key,
+            workspace_id,
+            &ready,
+            causal_parents,
+            base_head,
+        )
+    }
+
+    fn authoring_basis_for_history(
+        &self,
+        actor_public_key: PublicKey,
+        workspace_id: WorkspaceId,
+        ready: &[RecordDigest],
+        causal_parents: CausalParents,
+        base_head: HeadId,
+    ) -> Result<ManagedAuthoringBasis, String> {
         let actor = RecordDigest::from_bytes(*actor_public_key.as_bytes());
         let actor_head = self.record_index.actor_head(&actor);
         let actor_sequence = match actor_head {
@@ -3617,13 +3695,6 @@ impl OpenWorkspace {
                 0,
             ),
         };
-        let base_head = HeadId::parse(
-            self.private_version
-                .version()
-                .ok_or_else(|| "the workspace has no derived private head".to_owned())?,
-        )
-        .map_err(|error| format!("the derived private head is malformed: {error}"))?;
-
         Ok(ManagedAuthoringBasis {
             workspace_id,
             actor_id: ActorId::from_bytes(*actor_public_key.as_bytes()),
@@ -3638,6 +3709,70 @@ impl OpenWorkspace {
                     .ok_or_else(|| "the workspace has no policy epoch".to_owned())?,
             ),
             hybrid_logical_time: Hlc::new(physical_millis, logical),
+        })
+    }
+
+    /// Check a native proposal using only one exact saved predecessor and its causal history.
+    ///
+    /// The current policy epoch still applies. An actor whose latest durable operation is outside
+    /// the selected history must use a separate native identity, rather than fork its sequence or
+    /// silently pull unrelated work into the proposal. The returned plan is read-only. A future
+    /// writer must reopen the current journal under custody, then rederive and compare the plan
+    /// immediately before append. This read does not reserve an actor sequence or policy epoch.
+    ///
+    /// # Errors
+    /// Refuses incomplete history, changed physical identity, interrupted mutations, exhausted
+    /// clocks/sequences, an actor outside the selected ancestry, or invalid proposed operations.
+    pub fn prepare_historical_operations(
+        &self,
+        target: RecordDigest,
+        actor_public_key: PublicKey,
+        operations: &[Operation],
+    ) -> Result<HistoricalOperationPlan, String> {
+        self.ensure_physical_root()
+            .map_err(|error| error.to_string())?;
+        if self.managed_mutation_recovery_needed() {
+            return Err("an interrupted local file change needs reconciliation".into());
+        }
+        if operations.is_empty() || operations.len() > 100_000 {
+            return Err("historical operation plan is empty or exceeds its limit".into());
+        }
+        let ready = self.record_index.causally_ready_operations();
+        if !ready.contains(&target) {
+            return Err("historical predecessor is not causally complete".into());
+        }
+        let selected = causal_operation_closure(&operation_records(&self.record_index), target)?;
+        if self
+            .record_index
+            .actor_head(&RecordDigest::from_bytes(*actor_public_key.as_bytes()))
+            .is_some_and(|head| !selected.contains_key(&head.id))
+        {
+            return Err("the authoring actor has advanced outside this saved history".into());
+        }
+        let selected_ids = selected.keys().copied().collect::<Vec<_>>();
+        let workspace = self.workspace_id_for_operations(&selected_ids)?;
+        let head = review_head_for_records(&selected)?;
+        let basis = self.authoring_basis_for_history(
+            actor_public_key,
+            workspace,
+            &selected_ids,
+            CausalParents::after(ChangeSetId::from_bytes(*target.as_bytes()), Vec::new()),
+            HeadId::from_bytes(*head.as_bytes()),
+        )?;
+        let (mut state, _) = self
+            .historical_workspace_materialization(target)
+            .map_err(|error| format!("historical materialization is unavailable: {error:?}"))?;
+        let validation_change = mesh_materializer::ChangeSetId::from_bytes([0xA5; 32]);
+        for operation in operations {
+            mesh_materializer::apply_operation(&mut state, validation_change, operation)
+                .map_err(|error| format!("historical operation was refused: {error}"))?;
+        }
+        self.ensure_physical_root()
+            .map_err(|error| error.to_string())?;
+        Ok(HistoricalOperationPlan {
+            target,
+            basis,
+            operations: operations.to_vec(),
         })
     }
 
@@ -6253,3 +6388,6 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 }
+
+#[cfg(test)]
+mod historical_authoring_tests;
