@@ -1,4 +1,4 @@
-//! Native Codex process adapter. Prompt and credentials never enter command-line arguments.
+//! Native provider process adapters. Prompt and credentials never enter command-line arguments.
 //!
 //! This adapter reports process/protocol facts, not approval, publication or filesystem custody.
 //! Restart reconciliation and process-tree cancellation remain host responsibilities.
@@ -27,6 +27,51 @@ pub mod protocol;
 /// Compatibility name for existing Codex host consumers.
 pub use protocol::ProviderObservation as CodexObservation;
 use protocol::ProviderProtocol;
+mod claude;
+pub use claude::ClaudeAdapter;
+
+/// Explicitly admitted native executable configuration. Never deserialized from IPC.
+#[derive(Clone, Debug)]
+pub enum NativeAdapter {
+    /// Codex exec integration.
+    Codex(CodexAdapter),
+    /// Claude Code print integration.
+    Claude(ClaudeAdapter),
+}
+impl From<CodexAdapter> for NativeAdapter {
+    fn from(adapter: CodexAdapter) -> Self {
+        Self::Codex(adapter)
+    }
+}
+impl From<ClaudeAdapter> for NativeAdapter {
+    fn from(adapter: ClaudeAdapter) -> Self {
+        Self::Claude(adapter)
+    }
+}
+impl NativeAdapter {
+    /// Stable provider identity used to match a durably allocated lane before claiming launch.
+    pub fn provider(&self) -> &'static str {
+        match self {
+            Self::Codex(_) => "codex",
+            Self::Claude(_) => "claude",
+        }
+    }
+    pub(super) fn spawn(
+        &self,
+        root: &Path,
+        endpoint: &Path,
+        objective: &str,
+        credential: &AgentCredential,
+        goal: &str,
+    ) -> io::Result<NativeProcess> {
+        match self {
+            Self::Codex(adapter) => adapter.spawn(root, endpoint, objective, credential, goal),
+            Self::Claude(adapter) => adapter.spawn(root, endpoint, objective, credential, goal),
+        }
+    }
+}
+/// Compatibility name for callers of the original Codex adapter.
+pub type CodexProcess = NativeProcess;
 
 #[derive(Default)]
 struct Output {
@@ -35,14 +80,14 @@ struct Output {
 }
 
 /// A currently owned OS process. Dropping it does not assert termination or release custody.
-pub struct CodexProcess {
+pub struct NativeProcess {
     child: Child,
     output: Arc<Mutex<Output>>,
     exit: Option<ExitStatus>,
 }
-impl std::fmt::Debug for CodexProcess {
+impl std::fmt::Debug for NativeProcess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodexProcess")
+        f.debug_struct("NativeProcess")
             .field("pid", &self.child.id())
             .finish_non_exhaustive()
     }
@@ -137,38 +182,46 @@ impl CodexAdapter {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        let mut child = command.spawn()?;
-        let output = Arc::new(Mutex::new(Output::default()));
-        // Drain both pipes before feeding input, so startup diagnostics cannot block the writer.
-        let stdout = child.stdout.take().expect("piped stdout");
-        let stderr = child.stderr.take().expect("piped stderr");
-        let out = output.clone();
-        thread::spawn(move || consume(stdout, out, false));
-        let err = output.clone();
-        thread::spawn(move || consume(stderr, err, true));
-        let mut input = child.stdin.take().expect("piped stdin");
-        let prompt = format!("Work only in this assigned Mesh lane. Call mesh_fleet_context before editing. Use mesh_fleet_checkpoint to save your result, then mesh_fleet_submit_review for a complete checkpoint. Never approve or publish shared state. Do not print environment credentials.\n\n{goal}\n");
-        if input
-            .write_all(prompt.as_bytes())
-            .and_then(|()| input.flush())
-            .is_err()
-        {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(io::Error::new(
-                io::ErrorKind::BrokenPipe,
-                "provider input was not accepted",
-            ));
-        }
-        drop(input);
-        Ok(CodexProcess {
-            child,
-            output,
-            exit: None,
-        })
+        spawn_configured(command, goal, ProviderProtocol::Codex)
     }
 }
-impl CodexProcess {
+fn spawn_configured(
+    mut command: Command,
+    goal: &str,
+    protocol: ProviderProtocol,
+) -> io::Result<NativeProcess> {
+    let mut child = command.spawn()?;
+    let output = Arc::new(Mutex::new(Output::default()));
+    // Drain both pipes before feeding input, so startup diagnostics cannot block the writer.
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let out = output.clone();
+    thread::spawn(move || consume_protocol(stdout, out, false, protocol));
+    let err = output.clone();
+    thread::spawn(move || consume_protocol(stderr, err, true, protocol));
+    let mut input = child.stdin.take().expect("piped stdin");
+    let prompt = format!("Work only in this assigned Mesh lane. Call mesh_fleet_context before editing. Use mesh_fleet_checkpoint to save your result, then mesh_fleet_submit_review for a complete checkpoint. Never approve or publish shared state. Do not print environment credentials.\n\n{goal}\n");
+    if input
+        .write_all(prompt.as_bytes())
+        .and_then(|()| input.flush())
+        .is_err()
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "provider input was not accepted",
+        ));
+    }
+    drop(input);
+    Ok(NativeProcess {
+        child,
+        output,
+        exit: None,
+    })
+}
+
+impl NativeProcess {
     /// Live process identity for native reconciliation metadata; not identity proof by itself.
     pub fn pid(&self) -> u32 {
         self.child.id()
@@ -217,7 +270,16 @@ fn executable_path(path: &Path) -> io::Result<PathBuf> {
     }
     Ok(path)
 }
+#[cfg(test)]
 fn consume(reader: impl io::Read, output: Arc<Mutex<Output>>, stderr: bool) {
+    consume_protocol(reader, output, stderr, ProviderProtocol::Codex);
+}
+fn consume_protocol(
+    reader: impl io::Read,
+    output: Arc<Mutex<Output>>,
+    stderr: bool,
+    protocol: ProviderProtocol,
+) {
     let mut reader = BufReader::new(reader);
     loop {
         // take() bounds allocation before read_until(), including malformed unterminated output.
@@ -243,7 +305,7 @@ fn consume(reader: impl io::Read, output: Arc<Mutex<Output>>, stderr: bool) {
             state.observation.stderr_lines = state.observation.stderr_lines.saturating_add(1);
             continue;
         }
-        ProviderProtocol::Codex.observe(&line, &mut state.observation);
+        protocol.observe(&line, &mut state.observation);
     }
     let mut state = output
         .lock()

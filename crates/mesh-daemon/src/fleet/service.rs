@@ -716,6 +716,27 @@ impl FleetService {
         adapter: &super::provider::CodexAdapter,
         endpoint: &Path,
     ) -> Result<super::provider::CodexProcess, Unavailable> {
+        self.start_provider(credential, &adapter.clone().into(), endpoint)
+    }
+
+    /// Claim and launch Claude through the same durable ownership and custody boundary as Codex.
+    pub fn start_claude(
+        &self,
+        credential: &AgentCredential,
+        adapter: &super::provider::ClaudeAdapter,
+        endpoint: &Path,
+    ) -> Result<super::provider::NativeProcess, Unavailable> {
+        self.start_provider(credential, &adapter.clone().into(), endpoint)
+    }
+
+    /// Launch a natively admitted provider matching the exact lane's provider identity.
+    /// Process creation occurs only after durable ownership and workspace custody validation.
+    pub fn start_provider(
+        &self,
+        credential: &AgentCredential,
+        adapter: &super::provider::NativeAdapter,
+        endpoint: &Path,
+    ) -> Result<super::provider::NativeProcess, Unavailable> {
         let mut inner = self.lock()?;
         inner.runtime.refresh().map_err(runtime_error)?;
         let grant = inner
@@ -725,7 +746,7 @@ impl FleetService {
             .ok_or_else(|| refusal("fleet-session-refused"))?;
         ensure_run(&inner, &grant.lane, &grant.run)?;
         let lane = &inner.runtime.state().lanes[&grant.lane];
-        if lane.provider != "codex" {
+        if lane.provider != adapter.provider() {
             return Err(refusal("fleet-provider-mismatch"));
         }
         let goal = lane.goal.clone();

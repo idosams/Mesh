@@ -25,6 +25,14 @@ impl Fixture {
         Self::with_goal(name, "Coordinate", true)
     }
     fn with_goal(name: &str, goal: &str, mark_running: bool) -> Self {
+        Self::with_providers(name, goal, mark_running, BTreeSet::from(["codex".into()]))
+    }
+    fn with_providers(
+        name: &str,
+        goal: &str,
+        mark_running: bool,
+        providers: BTreeSet<String>,
+    ) -> Self {
         let path =
             std::env::temp_dir().join(format!("mesh-fleet-agent-{name}-{}", std::process::id()));
         fs::create_dir(&path).unwrap();
@@ -86,9 +94,7 @@ impl Fixture {
             NativeLaneAllocator::open(&allocation, TrustedReviewers::default(), parameters, vec![])
                 .unwrap(),
         );
-        let service = Arc::new(
-            FleetService::new(runtime, allocator, BTreeSet::from(["codex".into()])).unwrap(),
-        );
+        let service = Arc::new(FleetService::new(runtime, allocator, providers).unwrap());
         let lane = service
             .create_root("coordinator", goal, "codex", &input)
             .unwrap();
@@ -570,14 +576,42 @@ fn codex_adapter_selects_the_explicit_packaged_fleet_bridge_mode() {
     codex_adapter_journey(true);
 }
 
+#[test]
+fn claude_adapter_uses_the_same_native_claim_and_custody_boundary() {
+    provider_adapter_journey(false, true, false);
+}
+#[test]
+fn claude_adapter_selects_the_packaged_mesh_bridge() {
+    provider_adapter_journey(true, true, false);
+}
+#[test]
+fn claude_error_result_cannot_succeed_even_when_the_process_exits_zero() {
+    provider_adapter_journey(false, true, true);
+}
 fn codex_adapter_journey(packaged: bool) {
-    use mesh_daemon::fleet::provider::CodexAdapter;
-    let f = Fixture::new(if packaged {
-        "provider-packaged"
-    } else {
-        "provider-launch"
-    });
-    let child = f.call("delegate", &f.delegate("provider-child")).unwrap();
+    provider_adapter_journey(packaged, false, false);
+}
+fn provider_adapter_journey(packaged: bool, claude: bool, failed: bool) {
+    use mesh_daemon::fleet::provider::{ClaudeAdapter, CodexAdapter, NativeAdapter};
+    let name = format!("provider-{packaged}-{claude}-{failed}");
+    let f = Fixture::with_providers(
+        &name,
+        "Coordinate",
+        true,
+        BTreeSet::from(["codex".into(), "claude".into()]),
+    );
+    let mut delegation = f.delegate("provider-child");
+    if claude {
+        let Json::Object(fields) = &mut delegation else {
+            unreachable!()
+        };
+        fields
+            .iter_mut()
+            .find(|(key, _)| key == "provider")
+            .unwrap()
+            .1 = Json::text("claude");
+    }
+    let child = f.call("delegate", &delegation).unwrap();
     let lane = text(&child, "id");
     let root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
     f.service
@@ -593,45 +627,77 @@ fn codex_adapter_journey(packaged: bool) {
         .service
         .grant(lane, "provider-run", "actor-worker", "session-worker")
         .unwrap();
-    let executable = f.path.join("fake-codex");
-    fs::write(
-        &executable,
-        r#"#!/bin/sh
+    let executable = f.path.join("fake-provider");
+    let common = r#"#!/bin/sh
 case "$*" in *"$MESH_FLEET_CREDENTIAL"*) exit 17;; esac
 printf '%s\n' "$@" > provider-args.txt
 pwd > provider-working-root.txt
 cat > provider-prompt.txt
 printf 'one\n' >> provider-launch-count.txt
-printf '%s\n' '{"type":"thread.started","thread_id":"01234567-0123-0123-0123-0123456789ab"}'
+"#;
+    let output = if !claude {
+        r#"printf '%s\n' '{"type":"thread.started","thread_id":"01234567-0123-0123-0123-0123456789ab"}'
 printf '{"type":"item.completed","item":{"text":"%s"}}\n' "$MESH_FLEET_CREDENTIAL"
 printf '%s\n' '{"type":"turn.completed"}'
-"#,
-    )
-    .unwrap();
+"#
+    } else if failed {
+        r#"printf '%s\n' '{"type":"system","subtype":"init","session_id":"01234567-0123-0123-0123-0123456789ab"}'
+printf '{"type":"assistant","error":"authentication_failed","message":"%s"}\n' "$MESH_FLEET_CREDENTIAL"
+printf '%s\n' '{"type":"result","subtype":"success","is_error":true,"total_cost_usd":0.002}'
+"#
+    } else {
+        r#"printf '%s\n' '{"type":"system","subtype":"init","session_id":"01234567-0123-0123-0123-0123456789ab"}'
+printf '{"type":"assistant","message":"%s"}\n' "$MESH_FLEET_CREDENTIAL"
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.002}'
+"#
+    };
+    fs::write(&executable, format!("{common}{output}")).unwrap();
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
-    let adapter = if packaged {
+    let codex = if packaged {
         CodexAdapter::with_desktop_bridge(&executable, &executable)
     } else {
         CodexAdapter::new(&executable, &executable)
     }
     .unwrap();
-    let mut process = f
-        .service
-        .start_codex(&credential, &adapter, &f.path.join("daemon.sock"))
-        .unwrap();
-    assert_eq!(
-        f.service
-            .start_codex(&credential, &adapter, &f.path.join("daemon.sock"))
-            .unwrap_err()
-            .code,
-        "launch-needs-reconciliation"
-    );
+    let adapter: NativeAdapter = if claude {
+        if packaged {
+            ClaudeAdapter::with_desktop_bridge(&executable, &executable)
+        } else {
+            ClaudeAdapter::new(&executable, &executable)
+        }
+        .unwrap()
+        .into()
+    } else {
+        codex.clone().into()
+    };
+    let endpoint = f.path.join("daemon.sock");
+    if claude {
+        assert_eq!(
+            f.service
+                .start_codex(&credential, &codex, &endpoint)
+                .unwrap_err()
+                .code,
+            "fleet-provider-mismatch"
+        );
+        assert!(f.service.native_state().unwrap().lanes[lane]
+            .runs
+            .last()
+            .unwrap()
+            .launch_owner
+            .is_none());
+    }
+    let launch = || match &adapter {
+        NativeAdapter::Claude(adapter) => f.service.start_claude(&credential, adapter, &endpoint),
+        NativeAdapter::Codex(adapter) => f.service.start_codex(&credential, adapter, &endpoint),
+    };
+    let mut process = launch().unwrap();
+    assert_eq!(launch().unwrap_err().code, "launch-needs-reconciliation");
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
         let (observed, outcome) = process.poll().unwrap();
         assert!(!format!("{observed:?}").contains(credential.transport_value()));
         if let Some(success) = outcome {
-            assert!(success, "{observed:?}");
+            assert_eq!(success, !failed, "{observed:?}");
             assert_eq!(observed.events, 3);
             break;
         }
@@ -654,6 +720,57 @@ printf '%s\n' '{"type":"turn.completed"}'
     let arguments = fs::read_to_string(root.join("provider-args.txt")).unwrap();
     assert_eq!(arguments.contains("--mesh-fleet-mcp"), packaged);
     assert!(!arguments.contains(credential.transport_value()));
+    if claude {
+        let args: Vec<_> = arguments.lines().collect();
+        let value = |flag| args[args.iter().position(|arg| *arg == flag).unwrap() + 1];
+        assert_eq!(value("--setting-sources"), "");
+        assert_eq!(value("--permission-mode"), "dontAsk");
+        assert_eq!(value("--tools"), "Bash");
+        assert_eq!(value("--allowedTools"), "mcp__mesh__*");
+        for flag in [
+            "--strict-mcp-config",
+            "--disable-slash-commands",
+            "--no-session-persistence",
+        ] {
+            assert!(args.contains(&flag));
+        }
+        for flag in [
+            "--bare",
+            "--safe-mode",
+            "--dangerously-skip-permissions",
+            "--allow-dangerously-skip-permissions",
+        ] {
+            assert!(!args.contains(&flag));
+        }
+        let settings = Json::parse(value("--settings")).unwrap();
+        assert_eq!(
+            settings.get("disableAllHooks").and_then(Json::as_bool),
+            Some(true)
+        );
+        let sandbox = settings.get("sandbox").unwrap();
+        for flag in ["enabled", "failIfUnavailable", "autoAllowBashIfSandboxed"] {
+            assert_eq!(sandbox.get(flag).and_then(Json::as_bool), Some(true));
+        }
+        assert_eq!(
+            sandbox
+                .get("allowUnsandboxedCommands")
+                .and_then(Json::as_bool),
+            Some(false)
+        );
+        assert!(sandbox
+            .get("excludedCommands")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let config = Json::parse(value("--mcp-config")).unwrap();
+        let server = config.get("mcpServers").unwrap().get("mesh").unwrap();
+        assert_eq!(text(server, "command"), executable.to_str().unwrap());
+        assert_eq!(
+            text(server.get("env").unwrap(), "MESH_FLEET_CREDENTIAL"),
+            "${MESH_FLEET_CREDENTIAL}"
+        );
+    }
     let prompt = fs::read_to_string(root.join("provider-prompt.txt")).unwrap();
     assert!(prompt.contains("Implement provider-child"));
     assert!(!prompt.contains(credential.transport_value()));
@@ -674,15 +791,38 @@ printf '%s\n' '{"type":"turn.completed"}'
 #[test]
 #[ignore = "requires MESH_TEST_CODEX and MESH_TEST_MCP absolute executables and provider login"]
 fn actual_codex_edits_checkpoints_and_submits_a_private_review() {
-    use mesh_daemon::fleet::provider::CodexAdapter;
+    actual_provider_journey(false);
+}
+
+/// Explicit opt-in; authentication and sandbox prerequisites must be available on this host.
+#[test]
+#[ignore = "requires MESH_TEST_CLAUDE and MESH_TEST_MCP absolute executables and provider login"]
+fn actual_claude_edits_checkpoints_and_submits_a_private_review() {
+    actual_provider_journey(true);
+}
+fn actual_provider_journey(claude: bool) {
+    use mesh_daemon::fleet::provider::{ClaudeAdapter, CodexAdapter, NativeAdapter};
     use mesh_daemon::ipc::IpcServer;
-    let adapter = CodexAdapter::new(
-        &PathBuf::from(std::env::var_os("MESH_TEST_CODEX").expect("MESH_TEST_CODEX")),
-        &PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP")),
-    )
-    .unwrap();
-    // Preserve the workspace even on timeout/panic: process-tree termination is not yet proven.
-    let f = std::mem::ManuallyDrop::new(Fixture::new("actual-codex"));
+    let provider = if claude { "claude" } else { "codex" };
+    let variable = if claude {
+        "MESH_TEST_CLAUDE"
+    } else {
+        "MESH_TEST_CODEX"
+    };
+    let executable = PathBuf::from(std::env::var_os(variable).expect("provider executable"));
+    let bridge = PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP"));
+    let adapter: NativeAdapter = if claude {
+        ClaudeAdapter::new(&executable, &bridge).unwrap().into()
+    } else {
+        CodexAdapter::new(&executable, &bridge).unwrap().into()
+    };
+    // Preserve evidence even after failures: direct process stop does not prove descendant exit.
+    let f = std::mem::ManuallyDrop::new(Fixture::with_providers(
+        &format!("actual-{provider}"),
+        "Coordinate",
+        true,
+        BTreeSet::from(["codex".into(), "claude".into()]),
+    ));
     let selected_before = f.desktop.workspace_state().unwrap();
     let versions = f.context();
     let version = versions
@@ -697,9 +837,9 @@ fn actual_codex_edits_checkpoints_and_submits_a_private_review() {
         .clone();
     let child = f.call("delegate", &Json::object([
         ("request", Json::text("actual-worker")),
-        ("provider", Json::text("codex")),
+        ("provider", Json::text(provider)),
         ("version", version),
-        ("goal", Json::text("This is a disposable integration test. Replace note.txt with exactly 'actual Codex saved result' followed by a newline. Do not create other files or delegate work. Call mesh_fleet_checkpoint with request actual-result and then mesh_fleet_submit_review with the returned checkpoint identifier. Finish only after successful review submission. Do not approve or publish.")),
+        ("goal", Json::text("This is a disposable integration test. Replace note.txt with exactly 'actual provider saved result' followed by a newline. Do not create other files or delegate work. Call mesh_fleet_checkpoint with request actual-result and then mesh_fleet_submit_review with the returned checkpoint identifier. Finish only after successful review submission. Do not approve or publish.")),
     ])).unwrap();
     let lane = text(&child, "id");
     let root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
@@ -736,7 +876,7 @@ fn actual_codex_edits_checkpoints_and_submits_a_private_review() {
         .unwrap();
     let mut process = f
         .service
-        .start_codex(&credential, &adapter, &endpoint)
+        .start_provider(&credential, &adapter, &endpoint)
         .unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(240);
     loop {
@@ -776,7 +916,7 @@ fn actual_codex_edits_checkpoints_and_submits_a_private_review() {
     );
     assert_eq!(
         fs::read_to_string(root.join("note.txt")).unwrap(),
-        "actual Codex saved result\n"
+        "actual provider saved result\n"
     );
     let selected_after = f.desktop.workspace_state().unwrap();
     assert_eq!(
@@ -799,6 +939,86 @@ impl mesh_daemon::fleet::host::WorkerSignerFactory for TestWorkerSigners {
         Ok(Arc::new(TestCheckpointSigner(
             ed25519_dalek::SigningKey::from_bytes(&[0x75; 32]),
         )))
+    }
+}
+
+#[test]
+fn native_hosts_select_their_provider_and_share_the_objective_budget() {
+    use mesh_daemon::fleet::host::NativeFleetHost;
+    use mesh_daemon::fleet::provider::{ClaudeAdapter, CodexAdapter};
+    let f = Fixture::with_providers(
+        "mixed-provider-hosts",
+        "Coordinate",
+        true,
+        BTreeSet::from(["codex".into(), "claude".into()]),
+    );
+    let codex = f.call("delegate", &f.delegate("codex-child")).unwrap();
+    let mut args = f.delegate("claude-child");
+    let Json::Object(fields) = &mut args else {
+        unreachable!()
+    };
+    fields
+        .iter_mut()
+        .find(|(key, _)| key == "provider")
+        .unwrap()
+        .1 = Json::text("claude");
+    let claude = f.call("delegate", &args).unwrap();
+    let executable = f.path.join("mixed-worker");
+    fs::write(
+        &executable,
+        r#"#!/bin/sh
+cat >/dev/null
+case "$1" in
+exec) printf '%s\n' '{"type":"turn.completed"}';;
+--print) printf '%s\n' '{"type":"result","subtype":"success","is_error":false}';;
+*) exit 17;;
+esac
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut claude_host = NativeFleetHost::new(
+        f.service.clone(),
+        ClaudeAdapter::new(&executable, &executable).unwrap(),
+        f.path.join("ipc.sock"),
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    claude_host.tick().unwrap();
+    let state = f.service.native_state().unwrap();
+    assert!(state.lanes[text(&codex, "id")].runs.is_empty());
+    assert_eq!(state.lanes[text(&claude, "id")].runs.len(), 1);
+    let mut codex_host = NativeFleetHost::new(
+        f.service.clone(),
+        CodexAdapter::new(&executable, &executable).unwrap(),
+        f.path.join("ipc.sock"),
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    codex_host.tick().unwrap();
+    let state = f.service.native_state().unwrap();
+    assert_eq!(
+        state
+            .lanes
+            .values()
+            .flat_map(|lane| &lane.runs)
+            .filter(|run| run.state.occupies_slot())
+            .count(),
+        3
+    );
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        claude_host.poll_owned().unwrap();
+        codex_host.poll_owned().unwrap();
+        let state = f.service.native_state().unwrap();
+        if [&claude, &codex]
+            .iter()
+            .all(|child| state.lanes[text(child, "id")].runs[0].state == RunState::Succeeded)
+        {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
     }
 }
 

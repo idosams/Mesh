@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use super::provider::{CodexAdapter, CodexObservation, CodexProcess};
+use super::provider::{protocol::ProviderObservation, NativeAdapter, NativeProcess};
 use super::service::{AgentCredential, CheckpointSigner, FleetService};
 use super::{Command, RunState};
 use crate::ipc::Unavailable;
@@ -31,7 +31,7 @@ pub struct WorkerObservation {
     /// Time these process facts were polled; no background freshness is implied.
     pub observed_at: SystemTime,
     /// Redacted protocol activity.
-    pub activity: CodexObservation,
+    pub activity: ProviderObservation,
     /// Direct process/protocol outcome, not approval or proof of descendant termination.
     pub outcome: Option<bool>,
 }
@@ -39,27 +39,30 @@ pub struct WorkerObservation {
 struct Worker {
     run: String,
     credential: AgentCredential,
-    process: CodexProcess,
+    process: NativeProcess,
     stop_requested: bool,
     acknowledged: bool,
 }
 
-/// Automatically dispatches first attempts for allocated Codex lanes, including delegated children.
+/// Automatically dispatches first attempts for lanes matching its admitted provider, including delegated children.
 /// A new host never adopts uncertain runs from an earlier host or silently retries failed work.
-pub struct CodexFleetHost {
+pub struct NativeFleetHost {
     service: Arc<FleetService>,
-    adapter: CodexAdapter,
+    adapter: NativeAdapter,
     endpoint: PathBuf,
     signers: Arc<dyn WorkerSignerFactory>,
     identity: String,
     workers: BTreeMap<String, Worker>,
 }
 
-impl CodexFleetHost {
+/// Compatibility name for the original host; native callers may admit either supported provider.
+pub type CodexFleetHost = NativeFleetHost;
+
+impl NativeFleetHost {
     /// Compose trusted native dependencies; starting work requires an explicit subsequent tick.
     pub fn new(
         service: Arc<FleetService>,
-        adapter: CodexAdapter,
+        adapter: impl Into<NativeAdapter>,
         endpoint: PathBuf,
         signers: Arc<dyn WorkerSignerFactory>,
     ) -> Result<Self, Unavailable> {
@@ -73,7 +76,7 @@ impl CodexFleetHost {
         let identity = bytes.iter().map(|b| format!("{b:02x}")).collect();
         Ok(Self {
             service,
-            adapter,
+            adapter: adapter.into(),
             endpoint,
             signers,
             identity,
@@ -152,7 +155,9 @@ impl CodexFleetHost {
             .lanes
             .values()
             .filter(|lane| {
-                lane.provider == "codex" && lane.workspace.is_some() && lane.runs.is_empty()
+                lane.provider == self.adapter.provider()
+                    && lane.workspace.is_some()
+                    && lane.runs.is_empty()
             })
             .take(limit.saturating_sub(occupied) as usize)
         {
@@ -173,18 +178,19 @@ impl CodexFleetHost {
             let credential = self
                 .service
                 .grant_with_signer(&lane.id, &run, &run, signer)?;
-            let process = match self
-                .service
-                .start_codex(&credential, &self.adapter, &self.endpoint)
-            {
-                Ok(process) => process,
-                Err(error) => {
-                    // A failed launch may have crossed the external-effect boundary. Preserve its
-                    // durable claim and custody, but never leave a failed session authorized.
-                    let _ = self.service.revoke(&credential);
-                    return Err(error);
-                }
-            };
+            let process =
+                match self
+                    .service
+                    .start_provider(&credential, &self.adapter, &self.endpoint)
+                {
+                    Ok(process) => process,
+                    Err(error) => {
+                        // A failed launch may have crossed the external-effect boundary. Preserve its
+                        // durable claim and custody, but never leave a failed session authorized.
+                        let _ = self.service.revoke(&credential);
+                        return Err(error);
+                    }
+                };
             self.workers.insert(
                 lane.id.clone(),
                 Worker {

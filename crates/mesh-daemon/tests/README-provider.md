@@ -122,8 +122,8 @@ renderer commands, establish process-tree shutdown, or prove graphical interacti
 ## Shared stream protocol boundary
 
 `fleet::provider::protocol` decodes external provider events separately from Mesh
-IPC. Codex's live pipe reader uses it; Claude stream-json decoding is covered by
-protocol fixtures but has no process adapter yet. Provider fractional cost/usage
+IPC. Both native adapters use it; Claude stream-json decoding also has
+protocol fixtures for error-dominant completion. Provider fractional cost/usage
 values are accepted and redacted. Duplicate keys, oversized/deep events, malformed
 identity and identity replacement fail closed. An assistant error or Claude
 `is_error=true` is failure even when the result subtype says `success`; a later
@@ -134,3 +134,48 @@ closure, a completed turn and no protocol failure. No protocol event grants
 checkpoint, review, custody release or shared-main authority. New conformance tests
 live beside the shared decoder and run in the daemon unit suite. Live Claude
 launch/configuration/custody tests and successful authenticated runs remain required.
+
+## Native Claude adapter and mixed-provider hosts
+
+`ClaudeAdapter::new` and `with_desktop_bridge` admit explicit native executable
+paths. `FleetService::start_claude` and `start_provider` reuse the existing durable
+claim, provider matching, workspace identity and session custody checks.
+`NativeFleetHost` dispatches only lanes matching its admitted adapter; separately
+configured Codex and Claude hosts share the same objective's durable concurrency
+budget. `CodexFleetHost` and `CodexProcess` remain compatibility names. The desktop
+provider-selection flow still requires integration before this native API is a
+user-facing second-provider feature.
+
+The fixed Claude command uses print stream-json, stdin task delivery, environment
+credentials and a strict Mesh-only MCP configuration. It disables ordinary setting
+sources, skills and non-managed hooks; uses `dontAsk`; exposes sandboxed Bash for
+file work; and requests enabled/fail-if-unavailable sandboxing with no unsandboxed
+fallback. It does not use bare mode, safe mode, or permission-bypass flags.
+Existing provider authentication stays provider-owned. Managed provider policy
+remains authoritative, including managed hooks/exclusions: this adapter is not an
+OS sandbox for the Claude executable itself. Native admission must use an installed
+CLI supporting these options. Local option discovery used Claude Code 2.1.220;
+actual sandbox/tool/bridge behavior remains part of the required live acceptance.
+See the official [CLI reference](https://code.claude.com/docs/en/cli-reference),
+[settings reference](https://code.claude.com/docs/en/settings-reference), and
+[MCP configuration](https://code.claude.com/docs/en/mcp).
+
+The fixture suite covers both providers' exact native working directory, private
+stdin goal, absence of credential bytes in argv/observations, single durable launch,
+provider mismatch refusal before claim, packaged bridge selection, and Claude's
+error-dominant result despite exit zero. A mixed-host case verifies provider
+selection and shared concurrency. Fixture success is not a real provider result.
+
+The opt-in live journey uses the same actual edit/checkpoint/review assertions as
+Codex and retains evidence on failure:
+
+```sh
+cargo build -p mesh-mcp
+MESH_TEST_CLAUDE=/absolute/path/to/claude \
+MESH_TEST_MCP=/absolute/path/to/target/debug/mesh-mcp \
+cargo test -p mesh-daemon --test fleet-agent actual_claude -- --ignored --nocapture
+```
+
+No successful live Claude journey is claimed. Authentication previously returned
+`authentication_failed`; local sign-in refresh is pending. Do not retry that probe
+as a substitute for completing this full journey once authentication is available.

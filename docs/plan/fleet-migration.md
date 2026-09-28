@@ -1973,3 +1973,28 @@ native run. Full canonical validation, mutation evidence and live Claude executi
 remain pending. The #107 hosted checks all pass, but its local desktop build is
 still waiting in native module loading. No source or branch result substitutes
 for the full acceptance journeys and merged combined-main checks.
+
+## I08b native Claude launch and provider-aware scheduling
+
+New canonical implementation based on #108 at
+`6e4f5c64569bfc97f9a1384a4124819fd87f2a5d`; no preserved source commit is replaced.
+Adds an explicitly admitted Claude adapter and a shared native process driver.
+Provider selection feeds the existing durable claim/custody/identity checks before
+spawn. Existing Codex APIs remain compatible. Native hosts dispatch their own
+provider's lanes while sharing objective limits, without adopting uncertain runs.
+
+The Claude command has fixed Mesh MCP/sandbox configuration, private stdin task,
+environment credential references, and no permission bypass. Managed CLI policy
+remains authoritative; actual installed-provider sandbox and bridge behavior must
+be proven by live acceptance. Desktop provider selection remains follow-up work.
+Fixture conformance now covers Claude and mixed-provider scheduling. An ignored
+live Claude journey requires an actual file edit, signed checkpoint and immutable
+review through the real bridge; it is not an authentication-only probe.
+
+Adapter source compilation passes in a byte-matched isolated harness; this does
+not validate the service/host integration. Repository/docs/license/storage/format
+checks pass. Full native fixture tests, failure-injection evidence, npm validation
+and live Claude acceptance remain pending. Existing #102/#107 verification runs
+are preserved; no new large target is built while the shared native target is in
+use and local disk headroom is limited. Hosted canonical checks remain mandatory
+before merge, alongside the unresolved native and packaged acceptance gates.
