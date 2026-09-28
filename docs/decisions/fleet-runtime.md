@@ -577,3 +577,14 @@ untrusted reviewer refusal, bounded pagination/text and no source-history mutati
 do not prove graphical user presence. The digest cannot be used as a source approval bundle. Source-
 history operation import, signable review creation, private dependency validation, desktop presentation,
 human approval and grouped integration remain required.
+
+
+Desktop candidate command boundary: the native host now exposes original-project mapping, exact
+candidate preparation and fixed candidate comparison. Project selectors resolve only to registered
+native history; the fleet service verifies source provenance. Completed requests can be recovered
+after restart through read-only fleet history before current execution ownership is required for
+new preparation. Changed inputs, unrelated projects and unavailable bases refuse; no command
+imports operations, approves results, advances main, applies source files or adopts workers.
+A native desktop test exercises real capture, signed agent checkpoint, review, staging, exact retry,
+wrong-project refusal and restart recovery with later live edits preserved. Renderer controls,
+durable pending request inputs, packaged invocation and graphical proof remain unfinished.

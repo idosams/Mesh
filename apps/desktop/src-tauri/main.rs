@@ -846,6 +846,118 @@ mod desktop {
 
     #[allow(clippy::too_many_arguments)]
     #[tauri::command]
+    async fn fleet_project_mapping(
+        host: State<'_, Arc<AttachmentHost>>,
+        project: String,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        after: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.fleet_project_mapping(
+                &project,
+                &objective,
+                &selection,
+                &attachment_review_trust(),
+                after.as_deref(),
+            )
+        })
+        .await
+        .map_err(|_| {
+            "Project candidate operation did not finish; keep its exact inputs for retry".to_owned()
+        })?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn prepare_fleet_project_candidate(
+        host: State<'_, Arc<AttachmentHost>>,
+        project: String,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        expected_main: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.prepare_fleet_candidate(
+                &project,
+                &objective,
+                &selection,
+                &attachment_review_trust(),
+                &request,
+                expected_main.as_deref(),
+            )
+        })
+        .await
+        .map_err(|_| {
+            "Project candidate operation did not finish; keep its exact inputs for retry".to_owned()
+        })?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn review_fleet_project_candidate(
+        host: State<'_, Arc<AttachmentHost>>,
+        project: String,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        expected_main: Option<String>,
+        after: Option<String>,
+        selected: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.review_fleet_candidate(
+                &project,
+                &objective,
+                &selection,
+                &attachment_review_trust(),
+                &request,
+                expected_main.as_deref(),
+                (after.as_deref(), selected.as_deref()),
+            )
+        })
+        .await
+        .map_err(|_| {
+            "Project candidate operation did not finish; keep its exact inputs for retry".to_owned()
+        })?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
     async fn request_fleet_review_changes(
         host: State<'_, Arc<AttachmentHost>>,
         objective: String,
@@ -7349,6 +7461,9 @@ mod desktop {
                 fleet_activity,
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
+                fleet_project_mapping,
+                prepare_fleet_project_candidate,
+                review_fleet_project_candidate,
                 render_fleet_review_artifact,
                 request_fleet_review_changes,
                 decide_fleet_review_change,

@@ -418,3 +418,19 @@ UI/artifacts, dependency validation, human approval and integration remain unfin
 The canonical fixed-main review transfer preserves earlier candidate and ancestry regressions and
 adds exact text-limit and invalid UTF-8 coverage. Local repository/docs/license/storage/format checks
 pass. Native/full local and packaged validation remain pending; no migration PR is merged.
+
+
+Desktop candidate command boundary: the native host now exposes original-project mapping, exact
+candidate preparation and fixed candidate comparison. Project selectors resolve only to registered
+native history; the fleet service verifies source provenance. Completed requests can be recovered
+after restart through read-only fleet history before current execution ownership is required for
+new preparation. Changed inputs, unrelated projects and unavailable bases refuse; no command
+imports operations, approves results, advances main, applies source files or adopts workers.
+A native desktop test exercises real capture, signed agent checkpoint, review, staging, exact retry,
+wrong-project refusal and restart recovery with later live edits preserved. Renderer controls,
+durable pending request inputs, packaged invocation and graphical proof remain unfinished.
+
+The canonical native desktop route transfer adds substituted checkpoint/version/bundle refusal
+coverage across mapping, preparation and review, preserving exact receipt recovery afterward. Local
+repository/docs/license/storage/format checks pass. Native host/full local and packaged verification
+remain pending; visible candidate panels follow separately and migration PRs remain unmerged.

@@ -336,6 +336,71 @@ impl AttachmentHost {
         }
     }
 
+    /// Verify the original project and read its observed main before choosing a fixed candidate base.
+    pub fn fleet_project_mapping(
+        &self,
+        project: &str,
+        objective: &str,
+        selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+        trusted: &mesh_daemon::TrustedReviewers,
+        after: Option<&str>,
+    ) -> Result<String, String> {
+        let source = self.review_history(project)?;
+        self.fleet_history(objective)?
+            .saved_project_mapping(selection, &source, trusted, after)
+            .map(|value| value.encode())
+            .map_err(|_| "The saved result could not be matched to this project".into())
+    }
+
+    /// Recover an exact completed request before requiring current execution ownership for creation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_fleet_candidate(
+        &self,
+        project: &str,
+        objective: &str,
+        selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+        trusted: &mesh_daemon::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<String, String> {
+        let source = self.review_history(project)?;
+        if let Ok(receipt) = self.fleet_history(objective)?.inspect_project_candidate(
+            selection,
+            &source,
+            trusted,
+            request,
+            expected_main,
+        ) {
+            return Ok(receipt.encode());
+        }
+        // Stage itself refuses conflicting or partial receipts; this fallback never repairs them.
+        self.current_fleet(objective)?
+            .stage_project_candidate(selection, &source, trusted, request, expected_main)
+            .map(|value| value.encode())
+            .map_err(|_| {
+                "The exact project candidate could not be prepared; retain the request for retry"
+                    .into()
+            })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn review_fleet_candidate(
+        &self,
+        project: &str,
+        objective: &str,
+        selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+        trusted: &mesh_daemon::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        page: (Option<&str>, Option<&str>),
+    ) -> Result<String, String> {
+        let source = self.review_history(project)?;
+        self.fleet_history(objective)?
+            .review_project_candidate(selection, &source, trusted, request, expected_main, page)
+            .map(|value| value.encode())
+            .map_err(|_| "The fixed project comparison could not be verified".into())
+    }
+
     pub fn fleets(&self) -> Result<String, String> {
         #[cfg(target_os = "macos")]
         {
@@ -1454,6 +1519,232 @@ mod tests {
             "normal tools continue"
         );
         drop(host);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn project_candidate_routes_keep_exact_inputs_and_recover_without_worker_adoption() {
+        use mesh_daemon::fleet::{service::SavedReviewSelection, Command};
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-candidate-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "original").unwrap();
+        let host = AttachmentHost::new(&root);
+        let attached = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = attached.get("id").unwrap().as_text().unwrap();
+        let version = wait_for_project(&host, id, |status| status.saved_version.is_some())
+            .saved_version
+            .unwrap()
+            .operation()
+            .to_string();
+        host.provision_fleet(
+            id,
+            &"a".repeat(32),
+            "Review candidate",
+            &version,
+            r#"{"lanes":4,"concurrency":2,"depth":1,"retries":1}"#,
+        )
+        .unwrap();
+        let catalog = Json::parse(&host.fleets().unwrap()).unwrap();
+        let objective = catalog.get("fleets").unwrap().as_array().unwrap()[0]
+            .get("objective")
+            .unwrap()
+            .as_text()
+            .unwrap();
+        let service = host.current_fleet(objective).unwrap();
+        let state = service.native_state().unwrap();
+        let lane = state.lanes.keys().next().unwrap();
+        let working = PathBuf::from(state.lanes[lane].workspace.as_ref().unwrap().root());
+        service
+            .native_command(
+                "dispatch",
+                Command::Dispatch {
+                    lane: lane.clone(),
+                    run: "run".into(),
+                },
+            )
+            .unwrap();
+        let agent = service
+            .grant_with_signer(
+                lane,
+                "run",
+                "session",
+                NativeCaptureSigner::generate().unwrap(),
+            )
+            .unwrap();
+        fs::write(working.join("work"), "proposed result").unwrap();
+        let saved = service
+            .agent_call(
+                agent.transport_value(),
+                "checkpoint",
+                &Json::object([("request", Json::text("save"))]),
+            )
+            .unwrap();
+        let reviewed = service
+            .agent_call(
+                agent.transport_value(),
+                "submit_review",
+                &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+            )
+            .unwrap();
+        let selection = SavedReviewSelection::new(
+            lane,
+            saved.get("checkpoint").unwrap().as_text().unwrap(),
+            saved.get("version").unwrap().as_text().unwrap(),
+            reviewed.get("bundle").unwrap().as_text().unwrap(),
+        )
+        .unwrap();
+        let trust = mesh_daemon::TrustedReviewers::default();
+        let request = "b".repeat(32);
+        let versions = host.versions(id, None).unwrap();
+        assert!(host
+            .review_fleet_candidate(
+                id,
+                objective,
+                &selection,
+                &trust,
+                &request,
+                None,
+                (None, None)
+            )
+            .is_err());
+        let mapping = Json::parse(
+            &host
+                .fleet_project_mapping(id, objective, &selection, &trust, None)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            mapping.get("mapping").unwrap().get("observed_main"),
+            Some(&Json::Null)
+        );
+        assert!(host
+            .prepare_fleet_candidate(
+                id,
+                objective,
+                &selection,
+                &trust,
+                &request,
+                Some(&"c".repeat(64))
+            )
+            .is_err());
+        let receipt = host
+            .prepare_fleet_candidate(id, objective, &selection, &trust, &request, None)
+            .unwrap();
+        let original_checkpoint = saved.get("checkpoint").unwrap().as_text().unwrap();
+        let original_version = saved.get("version").unwrap().as_text().unwrap();
+        let original_bundle = reviewed.get("bundle").unwrap().as_text().unwrap();
+        let substituted = "0".repeat(64);
+        for (checkpoint, version, bundle) in [
+            ("wrong-checkpoint", original_version, original_bundle),
+            (original_checkpoint, substituted.as_str(), original_bundle),
+            (original_checkpoint, original_version, substituted.as_str()),
+        ] {
+            let wrong = SavedReviewSelection::new(lane, checkpoint, version, bundle).unwrap();
+            assert!(host
+                .fleet_project_mapping(id, objective, &wrong, &trust, None)
+                .is_err());
+            assert!(host
+                .prepare_fleet_candidate(id, objective, &wrong, &trust, &request, None)
+                .is_err());
+            assert!(host
+                .review_fleet_candidate(id, objective, &wrong, &trust, &request, None, (None, None))
+                .is_err());
+            assert_eq!(host.versions(id, None).unwrap(), versions);
+        }
+        assert_eq!(
+            host.prepare_fleet_candidate(id, objective, &selection, &trust, &request, None)
+                .unwrap(),
+            receipt
+        );
+        let review = host
+            .review_fleet_candidate(
+                id,
+                objective,
+                &selection,
+                &trust,
+                &request,
+                None,
+                (None, Some("work")),
+            )
+            .unwrap();
+        assert!(review.contains("proposed result"));
+        assert_eq!(
+            host.prepare_fleet_candidate(id, objective, &selection, &trust, &request, None)
+                .unwrap(),
+            receipt
+        );
+        assert!(host
+            .review_fleet_candidate(
+                id,
+                objective,
+                &selection,
+                &trust,
+                &request,
+                None,
+                (Some("work"), Some("work"))
+            )
+            .is_err());
+        assert_eq!(host.versions(id, None).unwrap(), versions);
+        let other = root.join("other");
+        fs::create_dir(&other).unwrap();
+        fs::write(other.join("work"), "unrelated").unwrap();
+        let other_attached = Json::parse(&host.attach(&other).unwrap()).unwrap();
+        let other_id = other_attached.get("id").unwrap().as_text().unwrap();
+        wait_for_project(&host, other_id, |status| status.saved_version.is_some());
+        assert!(host
+            .prepare_fleet_candidate(other_id, objective, &selection, &trust, &request, None)
+            .is_err());
+        assert!(host
+            .review_fleet_candidate(
+                other_id,
+                objective,
+                &selection,
+                &trust,
+                &request,
+                None,
+                (None, None)
+            )
+            .is_err());
+        fs::write(working.join("work"), "later live work").unwrap();
+        drop(service);
+        drop(host);
+        let reopened = AttachmentHost::new(&root);
+        reopened.projects().unwrap();
+        assert!(reopened.current_fleet(objective).is_err());
+        assert_eq!(
+            reopened
+                .prepare_fleet_candidate(id, objective, &selection, &trust, &request, None)
+                .unwrap(),
+            receipt
+        );
+        assert_eq!(
+            reopened
+                .review_fleet_candidate(
+                    id,
+                    objective,
+                    &selection,
+                    &trust,
+                    &request,
+                    None,
+                    (None, Some("work"))
+                )
+                .unwrap(),
+            review
+        );
+        assert!(reopened
+            .prepare_fleet_candidate(id, objective, &selection, &trust, &"d".repeat(32), None)
+            .is_err());
+        assert!(reopened.current_fleet(objective).is_err());
+        assert_eq!(fs::read_to_string(source.join("work")).unwrap(), "original");
+        assert_eq!(
+            fs::read_to_string(working.join("work")).unwrap(),
+            "later live work"
+        );
+        drop(reopened);
         fs::remove_dir_all(root).unwrap();
     }
 

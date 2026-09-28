@@ -191,8 +191,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | [Mesh PR #62](https://github.com/idosams/Mesh/pull/62), `d68ea27f6876f3a206d23ec564e706d7098dd45a`; original input correspondence; stacked on corrected #61; not merged |
 | C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | [Mesh PR #63](https://github.com/idosams/Mesh/pull/63), `a9bc1c78f486cdfc55a0c9e5985feddf4ca8aaf7`; exact delegated ancestry; stacked on #62; not merged |
 | C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | [Mesh PR #64](https://github.com/idosams/Mesh/pull/64), `7d2afb61254ef46c691f760ff66a6ed0d52f7ad4`; exact external candidate staging; stacked on #63; not merged |
-| C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | This increment, C02a; whole-project review against fixed main; stacked on published #64; not merged |
-| C02 | `2263d5db328d3aab957218642c61e3e3b94d6047` | feat(desktop): expose fixed fleet project candidate reviews | Pending transfer |
+| C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | [Mesh PR #65](https://github.com/idosams/Mesh/pull/65), `de5e2f03e68a4d056d99551c1c9e52316c46201d`; fixed-main candidate review; stacked on #64; not merged |
+| C02 | `2263d5db328d3aab957218642c61e3e3b94d6047` | feat(desktop): expose fixed fleet project candidate reviews | This increment, C02b; native desktop mapping/preparation/review routes; stacked on published #65; not merged |
 | C02 | `c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b` | feat(desktop): pin project comparisons with durable preparation inputs | Pending transfer |
 | C03 | `3aef42a9373ff0ebb84fd482819d39536b022ab2` | feat(history): prepare operations against exact saved ancestry | Pending transfer |
 | C03 | `d3b34517d6f9f390f2834a141717254861bc5358` | Keep attachment captures independent of candidate branches | Pending transfer |
@@ -1079,3 +1079,36 @@ Desktop review controls and durable preparation pins are next. Exact human appro
 integration and remaining recovery/provider/four-worker/remote/packaged acceptance, required reviews,
 eventual merges and final combined-main verification remain in scope. Original work and running
 verification are preserved.
+
+## C02b native desktop candidate routes
+
+Preserved source `2263d5db328d3aab957218642c61e3e3b94d6047` transfers onto published #65 at
+`de5e2f03e68a4d056d99551c1c9e52316c46201d`. Three asynchronous desktop commands delegate
+mapping, exact preparation and fixed-main review to the native attachment host on blocking workers.
+The caller supplies explicit project/objective/selection identities; native readers verify them and
+load native reviewer trust. No arbitrary path or selected-workspace fallback grants access.
+
+Preparation first recovers an exact completed receipt through history-only inspection. New staging
+requires current fleet ownership; restored fleets cannot create candidates or acquire worker custody.
+Conflicting and partial receipts remain refused, not repaired by fallback. Review stays read-only and
+project capture continues independently. These are command/host foundations; visible renderer panels
+and durable preparation pins follow in the next increment. No persisted format changes or approval.
+
+Transferred macOS host coverage exercises missing candidate and stale-main refusal, exact retry,
+foreign project, invalid page/file selection, unchanged history, restart receipt recovery and fixed
+comparison without adoption, and refusal to stage a new request after restart. Added canonical cases
+substitute checkpoint/version/bundle across all three routes, require refusal and unchanged project
+versions, then recover the original exact receipt. IDs are read from public fixture receipts; no
+private selection fields or production accessors are exposed.
+
+Local repository (7 tests), docs (106 documents), license/self-test, storage/self-test, formatting and
+whitespace checks pass. Native host/failing-before/full local execution remains queued behind
+preserved #44 verification; hosted macOS must validate this exact revision. #63 passed all seven
+checks (3,028 Linux and 3,244 macOS tests, four separate renderer tests); #64 has six passing checks
+with macOS pending and #65 has five passing checks with native jobs running. No packaged/graphical
+or merged-delivery claim follows.
+
+Visible desktop candidate review, durable pins, exact human approval/integration and remaining
+recovery/provider/four-worker/remote/packaged acceptance, required human reviews, eventual merges and
+final combined-main testing remain part of the goal. Original work and active verification remain
+preserved.
