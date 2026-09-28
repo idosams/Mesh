@@ -46,6 +46,16 @@ impl FleetProviderPolicy {
     pub fn providers(&self) -> impl Iterator<Item = &str> {
         self.providers.iter().map(String::as_str)
     }
+    /// Public native facts for an allocation receipt or catalogue view, with no executable authority.
+    pub fn to_json(&self) -> Json {
+        Json::object([
+            ("coordinator", Json::text(self.coordinator())),
+            (
+                "providers",
+                Json::Array(self.providers().map(Json::text).collect()),
+            ),
+        ])
+    }
     pub(super) fn legacy(&self) -> bool {
         self == &Self::default()
     }

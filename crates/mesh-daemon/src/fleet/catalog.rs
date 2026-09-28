@@ -479,6 +479,14 @@ impl NativeFleetDirectory {
                 ("objective", Json::text(id)),
                 ("state", snapshot.unwrap_or(Json::Null)),
                 (
+                    "policy",
+                    if available {
+                        entry.map_or(Json::Null, |entry| entry.policy.to_json())
+                    } else {
+                        Json::Null
+                    },
+                ),
+                (
                     "ownership",
                     Json::text(match entry.filter(|_| available) {
                         Some(entry) if !entry.restored => "current-host",

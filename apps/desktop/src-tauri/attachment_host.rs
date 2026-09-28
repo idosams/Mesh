@@ -576,6 +576,18 @@ impl AttachmentHost {
         version: &str,
         limits_json: &str,
     ) -> Result<String, String> {
+        self.provision_fleet_with_policy(id, request, goal, version, limits_json, None)
+    }
+
+    pub fn provision_fleet_with_policy(
+        &self,
+        id: &str,
+        request: &str,
+        goal: &str,
+        version: &str,
+        limits_json: &str,
+        policy_json: Option<&str>,
+    ) -> Result<String, String> {
         #[cfg(target_os = "macos")]
         {
             if limits_json.len() > 256 {
@@ -610,20 +622,66 @@ impl AttachmentHost {
                 },
             )
             .map_err(|_| "Invalid fleet request")?;
+            let policy = match policy_json {
+                None => mesh_daemon::fleet::catalog::FleetProviderPolicy::default(),
+                Some(raw) => {
+                    if raw.len() > 256 {
+                        return Err("Invalid fleet providers".into());
+                    }
+                    let value = Json::parse(raw).map_err(|_| "Invalid fleet providers")?;
+                    let Json::Object(fields) = &value else {
+                        return Err("Invalid fleet providers".into());
+                    };
+                    if fields.len() != 2
+                        || fields
+                            .iter()
+                            .any(|(key, _)| !["coordinator", "providers"].contains(&key.as_str()))
+                    {
+                        return Err("Invalid fleet providers".into());
+                    }
+                    let coordinator = value
+                        .get("coordinator")
+                        .and_then(Json::as_text)
+                        .ok_or("Invalid fleet providers")?;
+                    let providers = value
+                        .get("providers")
+                        .and_then(Json::as_array)
+                        .ok_or("Invalid fleet providers")?;
+                    if providers.len() > 2 {
+                        return Err("Invalid fleet providers".into());
+                    }
+                    let providers = providers
+                        .iter()
+                        .map(|value| {
+                            value
+                                .as_text()
+                                .map(str::to_owned)
+                                .ok_or("Invalid fleet providers")
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    mesh_daemon::fleet::catalog::FleetProviderPolicy::new(coordinator, &providers)
+                        .map_err(|_| "Invalid fleet providers")?
+                }
+            };
             let source = self.review_history(id)?;
             self.with_fleets(true, |directory| {
-                let service = directory.ok_or("Fleet storage is unavailable")?.create_attached(&source, &input)
+                let service = directory.ok_or("Fleet storage is unavailable")?.create_attached_with_providers(&source, &input, &policy)
                     .map_err(|_| "Fleet allocation could not be confirmed. Retained work requires reconciliation before a different attempt.")?;
                 let objective = service.objective().map_err(|_| "Fleet identity is unavailable")?;
-                Ok(Json::object([
-                    ("schema",Json::text("mesh.desktop-attached-fleet/v1")), ("project",Json::text(id)),
+                let mut receipt = Json::object([
+                    ("schema",Json::text(if policy_json.is_some() { "mesh.desktop-attached-fleet/v2" } else { "mesh.desktop-attached-fleet/v1" })), ("project",Json::text(id)),
                     ("request",Json::text(request)), ("objective",Json::text(objective)), ("started",Json::Bool(false)),
-                ]).encode())
+                ]);
+                if policy_json.is_some() {
+                    let Json::Object(fields) = &mut receipt else { unreachable!() };
+                    fields.push(("policy".into(), policy.to_json()));
+                }
+                Ok(receipt.encode())
             })
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = (id, request, goal, version, limits_json);
+            let _ = (id, request, goal, version, limits_json, policy_json);
             Err("Native fleet storage is unavailable on this platform".into())
         }
     }
@@ -2119,8 +2177,28 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn fleet_provisioning_preserves_capture_and_reopens_only_as_unattached() {
-        let root =
-            std::env::temp_dir().join(format!("mesh-desktop-fleet-catalog-{}", std::process::id()));
+        fleet_provisioning_journey("legacy", None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn fleet_provider_policy_receipts_bind_closed_input_and_exact_retries() {
+        fleet_provisioning_journey(
+            "claude",
+            Some(r#"{"coordinator":"claude","providers":["claude"]}"#),
+        );
+        fleet_provisioning_journey(
+            "mixed",
+            Some(r#"{"coordinator":"claude","providers":["codex","claude"]}"#),
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    fn fleet_provisioning_journey(name: &str, policy: Option<&str>) {
+        let root = std::env::temp_dir().join(format!(
+            "mesh-desktop-fleet-catalog-{name}-{}",
+            std::process::id()
+        ));
         fs::create_dir(&root).unwrap();
         let source = root.join("source");
         fs::create_dir(&source).unwrap();
@@ -2157,18 +2235,82 @@ mod tests {
             )
             .is_err());
         assert!(!root.join("fleets").exists());
+        for invalid in [
+            r#"{"coordinator":"claude","providers":[]}"#,
+            r#"{"coordinator":"claude","providers":["codex"]}"#,
+            r#"{"coordinator":"claude","providers":["claude","claude"]}"#,
+            r#"{"coordinator":"other","providers":["other"]}"#,
+            r#"{"coordinator":"claude","providers":["claude"],"path":"/outside"}"#,
+            r#"{"coordinator":"claude","providers":["claude"],"providers":["codex"]}"#,
+        ] {
+            assert!(host
+                .provision_fleet_with_policy(
+                    id,
+                    &request,
+                    "Coordinate",
+                    &saved,
+                    limits,
+                    Some(invalid)
+                )
+                .is_err());
+            assert!(!root.join("fleets").exists());
+        }
         let allocated = host
-            .provision_fleet(id, &request, "Coordinate", &saved, limits)
+            .provision_fleet_with_policy(id, &request, "Coordinate", &saved, limits, policy)
             .unwrap();
         assert_eq!(
             Json::parse(&allocated).unwrap().get("started"),
             Some(&Json::Bool(false))
         );
         assert_eq!(
-            host.provision_fleet(id, &request, "Coordinate", &saved, limits)
+            host.provision_fleet_with_policy(id, &request, "Coordinate", &saved, limits, policy)
                 .unwrap(),
             allocated
         );
+        let receipt = Json::parse(&allocated).unwrap();
+        assert_eq!(
+            receipt.get("schema"),
+            Some(&Json::text(if policy.is_some() {
+                "mesh.desktop-attached-fleet/v2"
+            } else {
+                "mesh.desktop-attached-fleet/v1"
+            }))
+        );
+        if let Some(policy) = policy {
+            let requested = Json::parse(policy).unwrap();
+            let returned = receipt.get("policy").unwrap();
+            assert_eq!(returned.get("coordinator"), requested.get("coordinator"));
+            let mut providers: Vec<_> = requested
+                .get("providers")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|value| value.as_text().unwrap())
+                .collect();
+            providers.sort();
+            assert_eq!(
+                returned.get("providers"),
+                Some(&Json::Array(
+                    providers.into_iter().map(Json::text).collect()
+                ))
+            );
+            assert!(host
+                .provision_fleet(id, &request, "Coordinate", &saved, limits)
+                .is_err());
+        } else {
+            assert!(receipt.get("policy").is_none());
+            assert!(host
+                .provision_fleet_with_policy(
+                    id,
+                    &request,
+                    "Coordinate",
+                    &saved,
+                    limits,
+                    Some(r#"{"coordinator":"claude","providers":["claude"]}"#)
+                )
+                .is_err());
+        }
         assert_eq!(
             host.state.lock().unwrap().projects[id]
                 .generation

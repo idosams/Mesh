@@ -194,4 +194,21 @@ against the receipt and restores observation only. Old software cannot execute a
 v2 allocation by treating it as a v1 Codex allocation: the schema/receipt byte
 comparison refuses it. `admitted_providers` exposes immutable native configuration
 for constructing all required hosts before dispatch; it is not an agent command.
-These native policy APIs still need desktop selector/receipt integration.
+These native policy APIs still need visible desktop selector integration.
+
+## Desktop native execution boundary
+
+The desktop Start command resolves and admits every provider in the saved policy
+before handing the complete adapter set to its application-owned loop. Missing or
+duplicate adapters refuse before any worker starts. The loop observes all providers,
+suspends further dispatch after a provider error, and applies cancellation across
+the entire objective. It neither adopts old workers nor releases uncertain custody.
+
+The native provisioning command accepts optional `policyJson` containing exactly
+`coordinator` and `providers`. Omission preserves the legacy Codex request/response.
+Explicit policy gets a `mesh.desktop-attached-fleet/v2` response with canonical
+`policy`; native catalogue rows also include policy facts, null when unavailable.
+This backend is ready for selector/controller integration, which is still required.
+Executable discovery uses native installation locations and canonicalizes Claude's
+usual installation symlink. Account login and actual sandbox/bridge operation remain
+part of live acceptance, not facts inferred from an executable's presence.

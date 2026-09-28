@@ -2,13 +2,13 @@
 //! Errors suspend dispatch; polling/cancellation retain the same owned handles. No automatic adoption.
 
 use crate::attachment_capture::NativeCaptureSigner;
-use mesh_daemon::fleet::host::{CodexFleetHost, WorkerObservation, WorkerSignerFactory};
-use mesh_daemon::fleet::provider::CodexAdapter;
+use mesh_daemon::fleet::host::{NativeFleetHost, WorkerObservation, WorkerSignerFactory};
+use mesh_daemon::fleet::provider::NativeAdapter;
 use mesh_daemon::fleet::service::{CheckpointSigner, FleetService};
 use mesh_daemon::fleet::Command;
 use mesh_daemon::ipc::{Json, Unavailable};
 use mesh_daemon::LiveDaemon;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -53,9 +53,15 @@ impl FleetHosts {
         &self,
         service: Arc<FleetService>,
         daemon: &LiveDaemon,
-        adapter: CodexAdapter,
+        adapters: Vec<NativeAdapter>,
         endpoint: PathBuf,
     ) -> Result<(), String> {
+        let supplied: BTreeSet<_> = adapters.iter().map(NativeAdapter::provider).collect();
+        if supplied.len() != adapters.len()
+            || supplied.iter().copied().ne(service.admitted_providers())
+        {
+            return Err(UNAVAILABLE.into());
+        }
         let objective = service.objective().map_err(|_| UNAVAILABLE)?;
         let mut held = self.0.lock().map_err(|_| UNAVAILABLE)?;
         if let Some(existing) = held.get(&objective) {
@@ -73,13 +79,20 @@ impl FleetHosts {
         {
             return Err(UNAVAILABLE.into());
         }
-        let host = CodexFleetHost::new(
-            service.clone(),
-            adapter,
-            endpoint,
-            Arc::new(NativeWorkerSigners),
-        )
-        .map_err(|_| UNAVAILABLE)?;
+        // Construct every provider host before registration or any worker tick. Missing,
+        // duplicate or unsupported adapters cannot leave a partially started fleet.
+        let hosts = adapters
+            .into_iter()
+            .map(|adapter| {
+                NativeFleetHost::new(
+                    service.clone(),
+                    adapter,
+                    endpoint.clone(),
+                    Arc::new(NativeWorkerSigners),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| UNAVAILABLE)?;
         // Exact-instance registration is retryable if thread creation fails before any launch.
         // A different service can never replace an existing route for this objective.
         daemon
@@ -91,7 +104,7 @@ impl FleetHosts {
         let owned = service.clone();
         let thread = thread::Builder::new()
             .name("mesh-fleet".into())
-            .spawn(move || run(host, owned, observed, receiver))
+            .spawn(move || run(hosts, owned, observed, receiver))
             .map_err(|_| UNAVAILABLE)?;
         held.insert(
             objective,
@@ -160,32 +173,42 @@ impl FleetHosts {
 }
 
 fn run(
-    mut host: CodexFleetHost,
+    mut hosts: Vec<NativeFleetHost>,
     service: Arc<FleetService>,
     progress: Arc<Mutex<Progress>>,
     wake: mpsc::Receiver<()>,
 ) {
     let mut attention = false;
     loop {
-        let result = if attention {
-            host.poll_owned()
-        } else {
-            host.tick()
-        };
+        let mut observations = Vec::new();
+        let mut failed = false;
+        for host in &mut hosts {
+            let result = if attention {
+                host.poll_owned()
+            } else {
+                host.tick()
+            };
+            match result {
+                Ok(mut values) => observations.append(&mut values),
+                Err(_) => {
+                    attention = true;
+                    failed = true;
+                }
+            }
+        }
         let Ok(mut held) = progress.lock() else {
             let _ = service.native_command("desktop-owner-lost", Command::Cancel);
-            let _ = host.poll_owned();
+            for host in &mut hosts {
+                let _ = host.poll_owned();
+            }
             return;
         };
-        match result {
-            Ok(observations) => {
-                held.observations = observations;
-                held.observed_at = Some(SystemTime::now());
-            }
-            Err(_) => {
-                attention = true;
-                held.attention = true;
-            }
+        if failed {
+            // Retain the preceding complete observation set when any provider cannot be read.
+            held.attention = true;
+        } else {
+            held.observations = observations;
+            held.observed_at = Some(SystemTime::now());
         }
         drop(held);
         match wake.recv_timeout(INTERVAL) {
@@ -193,7 +216,9 @@ fn run(
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 // Best effort on graceful owner drop. Uncertain exits are deliberately retained.
                 let _ = service.native_command("desktop-owner-lost", Command::Cancel);
-                let _ = host.poll_owned();
+                for host in &mut hosts {
+                    let _ = host.poll_owned();
+                }
                 return;
             }
         }
@@ -232,7 +257,10 @@ fn observation(value: &WorkerObservation) -> Json {
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
-    use mesh_daemon::fleet::catalog::{AttachedFleetRequest, NativeFleetDirectory};
+    use mesh_daemon::fleet::catalog::{
+        AttachedFleetRequest, FleetProviderPolicy, NativeFleetDirectory,
+    };
+    use mesh_daemon::fleet::provider::{ClaudeAdapter, CodexAdapter};
     use mesh_daemon::fleet::{Limits, RunState};
     use mesh_daemon::ipc::{nothing_to_recover, Operations as _, StartupSummary};
     use mesh_daemon::project_attachment::{
@@ -254,6 +282,9 @@ mod tests {
     }
     impl Fixture {
         fn new(name: &str) -> Self {
+            Self::with_policy(name, &FleetProviderPolicy::default())
+        }
+        fn with_policy(name: &str, policy: &FleetProviderPolicy) -> Self {
             let root = std::env::temp_dir().join(format!(
                 "mesh-desktop-fleet-host-{name}-{}",
                 std::process::id()
@@ -306,7 +337,9 @@ mod tests {
                     retries: 0,
                 },
             };
-            let service = catalog.create_attached(&history, &request).unwrap();
+            let service = catalog
+                .create_attached_with_providers(&history, &request, policy)
+                .unwrap();
             let daemon = LiveDaemon::with_checkpoint_runtime(
                 StartupSummary::from(&nothing_to_recover()),
                 parameters,
@@ -324,7 +357,7 @@ mod tests {
                 )
                 .unwrap();
             let executable = root.join("provider");
-            fs::write(&executable, "#!/bin/sh\ncat >/dev/null\necho launch >> launches\nwhile [ ! -f release ]; do sleep 0.02; done\nprintf '%s\\n' '{\"type\":\"turn.completed\"}'\n").unwrap();
+            fs::write(&executable, "#!/bin/sh\ncat >/dev/null\necho launch >> launches\nwhile [ ! -f release ]; do sleep 0.02; done\ncase \"$1\" in exec) printf '%s\\n' '{\"type\":\"turn.completed\"}';; --print) printf '%s\\n' '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false}';; *) exit 17;; esac\n").unwrap();
             fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
             let adapter = CodexAdapter::with_desktop_bridge(&executable, &executable).unwrap();
             Self {
@@ -341,7 +374,7 @@ mod tests {
             hosts.start(
                 self.service.clone(),
                 &self.daemon,
-                self.adapter.clone(),
+                vec![self.adapter.clone().into()],
                 self.root.join("ipc.sock"),
             )
         }
@@ -391,6 +424,79 @@ mod tests {
             drop(running.wake);
             running.thread.join().unwrap();
         }
+    }
+
+    #[test]
+    fn all_admitted_providers_are_required_before_any_app_worker_starts() {
+        let policy =
+            FleetProviderPolicy::new("claude", &["codex".into(), "claude".into()]).unwrap();
+        let f = Fixture::with_policy("mixed-providers", &policy);
+        let selected = f.daemon.workspace_state().unwrap();
+        let hosts = FleetHosts::default();
+        let executable = f.root.join("provider");
+        let claude = ClaudeAdapter::with_desktop_bridge(&executable, &executable).unwrap();
+        for adapters in [
+            vec![],
+            vec![f.adapter.clone().into()],
+            vec![claude.clone().into()],
+            vec![
+                f.adapter.clone().into(),
+                f.adapter.clone().into(),
+                claude.clone().into(),
+            ],
+        ] {
+            assert!(hosts
+                .start(
+                    f.service.clone(),
+                    &f.daemon,
+                    adapters,
+                    f.root.join("ipc.sock")
+                )
+                .is_err());
+            assert!(hosts.0.lock().unwrap().is_empty());
+            assert!(f
+                .service
+                .native_state()
+                .unwrap()
+                .lanes
+                .values()
+                .all(|lane| lane.runs.is_empty()));
+            assert!(!f.working().join("launches").exists());
+        }
+        let adapters = vec![f.adapter.clone().into(), claude.into()];
+        hosts
+            .start(
+                f.service.clone(),
+                &f.daemon,
+                adapters.clone(),
+                f.root.join("ipc.sock"),
+            )
+            .unwrap();
+        hosts
+            .start(
+                f.service.clone(),
+                &f.daemon,
+                adapters,
+                f.root.join("ipc.sock"),
+            )
+            .unwrap();
+        wait(|| {
+            fs::read_to_string(f.working().join("launches")).is_ok_and(|text| text == "launch\n")
+        });
+        fs::write(f.working().join("release"), "release").unwrap();
+        wait(|| {
+            status(&hosts)
+                .get("workers")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|worker| worker.get("outcome") == Some(&Json::Bool(true)))
+        });
+        assert_eq!(f.daemon.workspace_state().unwrap(), selected);
+        assert_eq!(fs::read(f.root.join("source/work")).unwrap(), b"original");
+        hosts.stop(&f.service).unwrap();
+        shutdown(hosts);
     }
 
     #[test]
@@ -526,7 +632,7 @@ mod tests {
             .start(
                 second.clone(),
                 &f.daemon,
-                f.adapter.clone(),
+                vec![f.adapter.clone().into()],
                 f.root.join("ipc.sock"),
             )
             .unwrap();

@@ -1247,13 +1247,32 @@ mod desktop {
         let endpoint = runtime.endpoint.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let service = host.current_fleet(&objective)?;
-            let provider = codex_cli_path().ok_or("An installed Codex provider is required")?;
             let bridge =
                 std::env::current_exe().map_err(|_| "The Mesh executable is unavailable")?;
-            let adapter =
-                mesh_daemon::fleet::provider::CodexAdapter::with_desktop_bridge(&provider, &bridge)
-                    .map_err(|_| "The installed provider could not be admitted")?;
-            hosts.start(service, &daemon, adapter, endpoint)?;
+            let adapters = service
+                .admitted_providers()
+                .map(|provider| {
+                    use mesh_daemon::fleet::provider::{
+                        ClaudeAdapter, CodexAdapter, NativeAdapter,
+                    };
+                    match provider {
+                        "codex" => CodexAdapter::with_desktop_bridge(
+                            &codex_cli_path().ok_or("An installed Codex provider is required")?,
+                            &bridge,
+                        )
+                        .map(NativeAdapter::from)
+                        .map_err(|_| "The installed Codex provider could not be admitted"),
+                        "claude" => ClaudeAdapter::with_desktop_bridge(
+                            &claude_cli_path().ok_or("An installed Claude provider is required")?,
+                            &bridge,
+                        )
+                        .map(NativeAdapter::from)
+                        .map_err(|_| "The installed Claude provider could not be admitted"),
+                        _ => Err("The saved provider policy is unsupported"),
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            hosts.start(service, &daemon, adapters, endpoint)?;
             hosts.snapshot()
         })
         .await
@@ -1284,10 +1303,19 @@ mod desktop {
         goal: String,
         version: String,
         limits_json: String,
+        policy_json: Option<String>,
     ) -> Result<String, String> {
         let host = Arc::clone(host.inner());
-        tauri::async_runtime::spawn_blocking(move || {
-            host.provision_fleet(&id, &request, &goal, &version, &limits_json)
+        tauri::async_runtime::spawn_blocking(move || match policy_json.as_deref() {
+            Some(policy) => host.provision_fleet_with_policy(
+                &id,
+                &request,
+                &goal,
+                &version,
+                &limits_json,
+                Some(policy),
+            ),
+            None => host.provision_fleet(&id, &request, &goal, &version, &limits_json),
         })
         .await
         .map_err(|_| "Fleet provisioning did not finish".to_owned())?
@@ -3729,6 +3757,29 @@ mod desktop {
             "Codex did not finish accepting this workspace. Open the exact workspace path in Codex manually or try again.",
             "The Codex launcher result was unavailable",
         )
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn claude_cli_path() -> Option<PathBuf> {
+        None
+    }
+
+    #[cfg(target_os = "macos")]
+    fn claude_cli_path() -> Option<PathBuf> {
+        let mut candidates = Vec::new();
+        if let Some(home) = std::env::var_os("HOME") {
+            candidates.push(PathBuf::from(home).join(".local/bin/claude"));
+        }
+        candidates.extend([
+            PathBuf::from("/opt/homebrew/bin/claude"),
+            PathBuf::from("/usr/local/bin/claude"),
+        ]);
+        // Claude's native installation commonly uses a versioned symlink. Resolve it natively;
+        // the adapter still verifies that the resolved absolute path is an executable file.
+        candidates
+            .into_iter()
+            .filter_map(|path| path.canonicalize().ok())
+            .find(|path| path.is_file())
     }
 
     #[cfg(not(target_os = "macos"))]

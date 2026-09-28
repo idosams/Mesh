@@ -2023,3 +2023,29 @@ full catalogue execution and canonical npm validation remain pending. Repository
 docs, license, storage and formatting checks pass. Desktop input/receipt controls
 and configuration of all admitted worker hosts follow in the next increment; this
 native persistence change alone does not expose provider choice in the UI.
+
+## I08d desktop native provider composition and receipts
+
+New canonical implementation based on #110 at
+`6dcff52b999ce4a7fa032edabeb6410eed5a424f`; no preserved source commit is replaced.
+Desktop execution now admits all executables named by the saved policy before
+registering an objective or starting any worker. The application owns one loop
+containing the provider-specific native hosts, sharing cancellation, latched errors,
+observations and the objective's durable limits. Missing/duplicate configurations
+refuse without partial start. Native lookup supports the normal Claude installation
+symlink; executable paths and credentials never come from renderer input.
+
+Provisioning accepts optional closed provider JSON. Legacy requests retain v1
+response compatibility; explicit choices receive `mesh.desktop-attached-fleet/v2`
+with the exact canonical policy. Catalogue rows add the verified policy for current
+and restored fleets, or null when unavailable, so the UI can show permitted usage
+before Start. Invalid or conflicting provider inputs do not provision new storage.
+Visible selector/controller integration remains the next increment.
+
+Native tests cover complete provider admission before launch, a Claude coordinator
+with both providers configured, idempotent start, exact provisioning receipts,
+unknown/duplicate/injected inputs, legacy compatibility and restart without adoption.
+Repository/docs/license/storage/format checks pass. Full desktop validation is
+running; native integration and combined npm validation remain pending. The corrected
+#109 now passes all seven hosted checks; #110 native checks are still pending.
+No successful authenticated Claude, multi-machine or packaged acceptance is claimed.

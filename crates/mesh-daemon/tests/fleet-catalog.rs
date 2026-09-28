@@ -199,6 +199,7 @@ fn provider_policy_binds_retries_receipts_and_restart_without_adoption() {
         drop(catalog);
         let reopened = f.open().unwrap();
         let restored = reopened.snapshot().unwrap();
+        assert_eq!(rows(&restored)[0].get("policy"), Some(&policy.to_json()));
         assert_eq!(
             text(&rows(&restored)[0], "ownership"),
             "restored-unattached"
