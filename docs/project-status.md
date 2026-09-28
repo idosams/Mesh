@@ -175,8 +175,8 @@ The native fleet service now accepts exact saved versions of retained attached p
 root-lane inputs. It creates additional workspaces without relocating or taking custody of the
 original project, persists source-project correlation, and carries that correlation through normal
 scoped delegation. Native tests verify frozen content, continuing editor writes, retries, replay,
-partial-allocation preservation and source-overlap refusal. This is not yet exposed through desktop
-fleet controls. Retained staging, interrupted allocation/context recovery, original-main integration,
+partial-allocation preservation and source-overlap refusal. Native desktop commands now expose
+provisioning and execution; graphical fleet controls remain unfinished. Retained staging, interrupted allocation/context recovery, original-main integration,
 real-provider validation of this entry point and packaged graphical proof remain incomplete.
 
 
@@ -184,13 +184,24 @@ The desktop source also includes an explicit fleet MCP entry point, and the nati
 select it with a fixed argument prefix. A complete scoped session is required; selected-workspace
 inspection remains a separate mode. Native tests cover closed parsing, forwarding and credential
 omission. A revision-bound packaged bridge test is available for attached input, delegation,
-checkpoint/review retry and revocation. Desktop scheduling, live controls and graphical fleet proof
-remain incomplete; this entry point alone does not launch a fleet.
+checkpoint/review retry and revocation. Desktop scheduling is now connected below. Live graphical
+controls and packaged fleet proof remain incomplete; the bridge mode alone does not launch a fleet.
 
 macOS native fleet storage now retains a bounded objective catalogue with one host lease, exact
 allocation receipts and guarded ledger access. Reopening a missing or empty ledger cannot silently
 initialize new history. Saved fleet facts remain discoverable while source projects are offline;
 restored services are explicitly unattached and cannot recreate previously allocated contexts.
 Desktop native commands can provision a fleet from an attached version and read its catalogue while
-ordinary source capture continues. They do not yet start workers or provide fleet UI controls.
-Context/process reconciliation, scheduling and graphical verification remain incomplete.
+ordinary source capture continues. They can now start workers through the native commands described below; fleet UI controls remain unfinished.
+Context/process reconciliation and graphical verification remain incomplete.
+
+
+Desktop native fleet commands now explicitly start and stop current-session objectives, register scoped
+IPC routing and run app-owned scheduling loops. The app chooses the installed Codex executable and
+its own packaged bridge; the renderer cannot supply a process command. Timed activity snapshots contain
+redacted execution facts. Duplicate starts keep one loop, restored fleets refuse execution, and launch
+errors suspend new dispatch while owned-process observation continues. Cancellation retains uncertain
+process-tree slots and custody. Native fixture tests cover these cases and unchanged original work and
+desktop selection. No new real-provider, graphical fleet or packaged scheduling proof is claimed for
+this increment. UI controls, exact review presentation, process/context recovery and full shutdown
+reconciliation remain open.

@@ -84,7 +84,8 @@ unmerged until separately authorized; local evidence does not replace hosted che
 
 The desktop executable now includes the scoped fleet MCP mode. A native desktop host can construct
 `CodexAdapter::with_desktop_bridge(provider, desktop_executable)` without requiring a separately
-installed development `mesh-mcp` binary. Application scheduling and live fleet UI remain unfinished.
+installed development `mesh-mcp` binary. Native desktop scheduling is now connected; live fleet UI
+and packaged scheduling proof remain unfinished.
 
 After building a clean revision-bound local app, verify its bundle using
 `apps/desktop/scripts/verify-local-app.mjs --app <app-path> --revision <exact-revision>` before and
@@ -105,3 +106,15 @@ credentials. Original source edits and the desktop-selected workspace remain unc
 fleet arguments and incomplete environment credentials exit before graphical startup and do not
 print the test credential. No real model is launched, no provider usage is consumed, and no shared
 main is approved. This is packaged non-graphical bridge evidence, not an end-to-end desktop fleet.
+
+
+## Desktop native scheduling fixture
+
+`cargo test -p mesh-desktop fleet_host::tests` runs the actual application-owned scheduling loop with
+an inert local provider fixture and native software session signers. It verifies duplicate start,
+redacted live observation, stop-before-start, direct-child cancellation with reserved custody,
+owner-drop cancellation, preserved source/selection and suspended dispatch after launch failure.
+The daemon host test additionally proves observation-only ticks do not dispatch queued children even
+when a slot opens. Catalogue tests refuse execution lookup for reconstructed services; IPC registration
+tests permit only exact-instance retries. These tests do not consume model usage, exercise Tauri's
+renderer commands, establish process-tree shutdown, or prove graphical interaction.

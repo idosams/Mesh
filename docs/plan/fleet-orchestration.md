@@ -189,8 +189,8 @@ Native allocation records source project/version ancestry and supports completed
 overwriting subsequent work. Desktop source shows these manual/harness lines with independent capture,
 versions and comparison controls, while the original project/session stays in place. No provider is
 required and no authorship is inferred. This is source-level progress on the work-centered overview;
-desktop fleet scheduling, project-main integration, incomplete-allocation reconciliation and packaged
-graphical verification remain required. See [the lane decision](../decisions/attachment-version-lanes.md).
+graphical fleet controls, project-main integration, incomplete-allocation reconciliation and packaged
+graphical verification remain required. Native desktop scheduling is connected below. See [the lane decision](../decisions/attachment-version-lanes.md).
 
 ## Phase 2: durable orchestration
 
@@ -304,19 +304,29 @@ Native attachment-to-fleet bridge: exact saved attachment versions can now alloc
 lanes through `FleetService::create_root_from_attachment`. Source project correlation persists and
 follows delegated children. Existing source folders and ordinary capture remain independent;
 managed sessions still use exact custody grants. Native tests verify allocation, delegation,
-correlation replay and preservation on retry/refusal. Desktop hosting/controls, real-provider proof
-of this attached entry point, allocation reconciliation and project-main integration remain open.
+correlation replay and preservation on retry/refusal. Native desktop hosting is connected below;
+graphical controls, real-provider proof of this attached entry point, allocation reconciliation and
+project-main integration remain open.
 
 
 Packaged fleet execution dependency: desktop source now exposes an explicit scoped MCP mode and
 `CodexAdapter::with_desktop_bridge` selects it without a development bridge installation. Exact-build
 context and fail-closed session parsing have source coverage, with an opt-in packaged attached-input
-journey. The next host work still includes native provider admission, durable objective discovery,
-application-lifetime scheduling, process reconciliation and live lane/review presentation.
+journey. Native provider admission, durable discovery and app-owned scheduling are now connected
+below. Process reconciliation and live lane/review presentation remain open.
 
 Native durable discovery is now implemented on macOS: a retained catalogue lease, create-only
 allocation receipts, guarded ledger reopen, and explicit `restored-unattached` state preserve fleet
 facts without assuming worker ownership. Desktop native provisioning and catalogue commands are
 connected; provisioning reports no worker started and keeps source capture running. Restart and
-substitution tests cover the boundary. Application provider admission, fleet IPC registration,
-scheduling, live UI, process/context reconciliation and packaged graphical verification remain open.
+substitution tests cover the boundary. The native execution loop is connected below; live UI,
+process/context reconciliation and packaged graphical verification remain open.
+
+
+Native desktop execution is now connected: current-host-only catalogue admission, native installed
+provider selection, exact-instance IPC routing, app-owned scheduling loops, explicit start/stop and
+redacted activity snapshots. A fault suspends dispatch without replacing owned handles; cancelled and
+restored objectives cannot silently relaunch. Native fixture-process tests cover lifecycle behavior.
+Next: connect provisioning and activity to the real fleet presentation, add independent immutable lane
+review readers, and prove the packaged graphical journey. Process-tree/context reconciliation remains
+required; this increment does not complete the local fleet phase.

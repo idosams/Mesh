@@ -17,6 +17,8 @@ mod attachment_capture;
 #[cfg(unix)]
 mod attachment_host;
 mod attachment_recovery;
+#[cfg(unix)]
+mod fleet_host;
 
 #[cfg(unix)]
 mod artifact_preview;
@@ -795,6 +797,55 @@ mod desktop {
         tauri::async_runtime::spawn_blocking(move || host.fleets())
             .await
             .map_err(|_| "Fleet status is unavailable".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn fleet_activity(
+        hosts: State<'_, Arc<crate::fleet_host::FleetHosts>>,
+    ) -> Result<String, String> {
+        hosts.snapshot()
+    }
+
+    #[tauri::command]
+    async fn start_attached_fleet(
+        host: State<'_, Arc<AttachmentHost>>,
+        hosts: State<'_, Arc<crate::fleet_host::FleetHosts>>,
+        runtime: State<'_, DesktopRuntime>,
+        objective: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        let hosts = Arc::clone(hosts.inner());
+        let daemon = runtime.daemon.clone();
+        let endpoint = runtime.endpoint.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let service = host.current_fleet(&objective)?;
+            let provider = codex_cli_path().ok_or("An installed Codex provider is required")?;
+            let bridge =
+                std::env::current_exe().map_err(|_| "The Mesh executable is unavailable")?;
+            let adapter =
+                mesh_daemon::fleet::provider::CodexAdapter::with_desktop_bridge(&provider, &bridge)
+                    .map_err(|_| "The installed provider could not be admitted")?;
+            hosts.start(service, &daemon, adapter, endpoint)?;
+            hosts.snapshot()
+        })
+        .await
+        .map_err(|_| "Fleet start needs reconciliation".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn stop_attached_fleet(
+        host: State<'_, Arc<AttachmentHost>>,
+        hosts: State<'_, Arc<crate::fleet_host::FleetHosts>>,
+        objective: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        let hosts = Arc::clone(hosts.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            hosts.stop(&host.current_fleet(&objective)?)?;
+            hosts.snapshot()
+        })
+        .await
+        .map_err(|_| "Fleet stop needs reconciliation".to_owned())?
     }
 
     #[tauri::command]
@@ -3018,6 +3069,11 @@ mod desktop {
             "Codex did not finish accepting this workspace. Open the exact workspace path in Codex manually or try again.",
             "The Codex launcher result was unavailable",
         )
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn codex_cli_path() -> Option<PathBuf> {
+        None
     }
 
     #[cfg(target_os = "macos")]
@@ -7025,6 +7081,9 @@ mod desktop {
                 attached_projects,
                 attached_fleets,
                 provision_attached_fleet,
+                fleet_activity,
+                start_attached_fleet,
+                stop_attached_fleet,
                 attached_project_versions,
                 inspect_attached_version,
                 compare_attached_versions,
@@ -7176,6 +7235,7 @@ mod desktop {
                 let version_workspaces = VersionWorkspaceDirectory::new(&app_data_dir);
                 let native_capture = NativeCapturePreference::new(&app_data_dir);
                 app.manage(Arc::new(AttachmentHost::new(&app_data_dir)));
+                app.manage(Arc::new(crate::fleet_host::FleetHosts::default()));
                 let recent = RecentWorkspace::new(app_data_dir);
                 let recent_status =
                     reopen_remembered_workspace(&daemon, &recent, &active_workspace);

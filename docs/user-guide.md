@@ -268,3 +268,11 @@ the original project is offline. A restored record reports that its working cont
 it does not mean its former agents have stopped, restarted or been adopted. Missing or changed
 storage is retained and shown as unavailable. Provisioning creates the fleet record and managed input
 without starting a worker. Desktop scheduling and live fleet controls follow separately.
+
+The subsequent desktop scheduling increment adds native start, stop and activity commands for fleets
+created by the current app session. It uses the installed Codex provider and Mesh's own scoped bridge.
+Repeated start keeps the existing loop. A launch or polling fault requires attention and prevents new
+dispatch; recorded observations keep their timestamps. Stop requests cancellation, but does not prove
+all descendant processes have exited or release uncertain work. Restored fleets remain unavailable
+for execution until reconciliation. Graphical controls and packaged scheduling acceptance are separate
+from these development commands.

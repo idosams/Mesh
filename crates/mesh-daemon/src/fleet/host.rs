@@ -84,6 +84,19 @@ impl CodexFleetHost {
     /// Poll owned workers and dispatch eligible lanes within the durable concurrency budget.
     /// The caller schedules ticks. Failure retains all owned handles and durable launch intent.
     pub fn tick(&mut self) -> Result<Vec<WorkerObservation>, Unavailable> {
+        self.tick_with_dispatch(true)
+    }
+
+    /// Continue observation and cancellation after a host error without starting more workers.
+    /// Existing handles and uncertain attempts remain owned; this is not restart reconciliation.
+    pub fn poll_owned(&mut self) -> Result<Vec<WorkerObservation>, Unavailable> {
+        self.tick_with_dispatch(false)
+    }
+
+    fn tick_with_dispatch(
+        &mut self,
+        dispatch: bool,
+    ) -> Result<Vec<WorkerObservation>, Unavailable> {
         let state = self.service.native_state()?;
         let mut observations = Vec::with_capacity(self.workers.len());
         for (lane, worker) in &mut self.workers {
@@ -121,7 +134,7 @@ impl CodexFleetHost {
         }
         // Refresh after terminal acknowledgments, so freed slots are usable in the same tick.
         let state = self.service.native_state()?;
-        if state.cancelled {
+        if state.cancelled || !dispatch {
             return Ok(observations);
         }
         let limit = state
@@ -160,9 +173,18 @@ impl CodexFleetHost {
             let credential = self
                 .service
                 .grant_with_signer(&lane.id, &run, &run, signer)?;
-            let process = self
+            let process = match self
                 .service
-                .start_codex(&credential, &self.adapter, &self.endpoint)?;
+                .start_codex(&credential, &self.adapter, &self.endpoint)
+            {
+                Ok(process) => process,
+                Err(error) => {
+                    // A failed launch may have crossed the external-effect boundary. Preserve its
+                    // durable claim and custody, but never leave a failed session authorized.
+                    let _ = self.service.revoke(&credential);
+                    return Err(error);
+                }
+            };
             self.workers.insert(
                 lane.id.clone(),
                 Worker {

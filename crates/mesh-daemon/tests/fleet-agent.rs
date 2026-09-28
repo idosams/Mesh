@@ -866,6 +866,20 @@ fn native_host_schedules_children_within_limits_and_preserves_cancelled_slots() 
     fs::write(root_for(&running).join("release"), "release").unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
+        host.poll_owned().unwrap();
+        if f.service.native_state().unwrap().lanes[&running].runs[0].state == RunState::Succeeded {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        f.service.native_state().unwrap().lanes[&queued]
+            .runs
+            .is_empty(),
+        "observation-only ticks cannot dispatch queued work even when a slot opens"
+    );
+    loop {
         host.tick().unwrap();
         if !f.service.native_state().unwrap().lanes[&queued]
             .runs
@@ -1105,4 +1119,51 @@ fn retained_actual_fleet_reviews_reconstruct() {
     }
     contents.sort();
     assert_eq!(contents, ["worker-one\n", "worker-two\n"]);
+}
+
+#[test]
+fn native_fleet_registration_retries_only_the_exact_service_instance() {
+    let f = Fixture::new("registration");
+    f.desktop.register_fleet(f.service.clone()).unwrap();
+    let allocation = f.path.join("other-allocations");
+    fs::create_dir(&allocation).unwrap();
+    fs::set_permissions(&allocation, fs::Permissions::from_mode(0o700)).unwrap();
+    let allocator = Arc::new(
+        NativeLaneAllocator::open(
+            &allocation,
+            TrustedReviewers::default(),
+            CheckpointRuntimeParameters {
+                idle_interval: Some(Duration::from_millis(10)),
+                maximum_uncheckpointed_bytes: Some(65536),
+                maximum_uncheckpointed_interval: Some(Duration::from_secs(60)),
+            },
+            vec![],
+        )
+        .unwrap(),
+    );
+    let mut runtime = Runtime::open(
+        FleetStore::open(f.path.join("other.sqlite")).unwrap(),
+        &f.service.objective().unwrap(),
+    )
+    .unwrap();
+    runtime
+        .record(
+            "start",
+            Command::Start {
+                goal: "Replacement".into(),
+                limits: Limits {
+                    lanes: 1,
+                    concurrency: 1,
+                    depth: 0,
+                    retries: 0,
+                },
+            },
+        )
+        .unwrap();
+    let replacement =
+        Arc::new(FleetService::new(runtime, allocator, BTreeSet::from(["codex".into()])).unwrap());
+    assert!(f.desktop.register_fleet(replacement).is_err());
+    assert!(f
+        .call("context", &Json::object([] as [(&str, Json); 0]))
+        .is_ok());
 }

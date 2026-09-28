@@ -294,6 +294,27 @@ impl AttachmentHost {
         action(held.as_ref())
     }
 
+    #[cfg(not(target_os = "macos"))]
+    pub fn current_fleet(
+        &self,
+        _objective: &str,
+    ) -> Result<std::sync::Arc<mesh_daemon::fleet::service::FleetService>, String> {
+        Err("Native fleet execution is unavailable on this platform".into())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn current_fleet(
+        &self,
+        objective: &str,
+    ) -> Result<std::sync::Arc<mesh_daemon::fleet::service::FleetService>, String> {
+        self.with_fleets(false, |directory| {
+            directory
+                .ok_or("Fleet is not available in this app session")?
+                .current_service(objective)
+                .map_err(|_| "Fleet needs recovery before execution".into())
+        })
+    }
+
     pub fn fleets(&self) -> Result<String, String> {
         #[cfg(target_os = "macos")]
         {
@@ -1411,9 +1432,13 @@ mod tests {
             .unwrap()
             .iter()
             .all(|lane| lane.get("run") == Some(&Json::Null)));
+        let objective = row.get("objective").unwrap().as_text().unwrap();
+        assert!(host.current_fleet(objective).is_ok());
         drop(host);
         let reopened = AttachmentHost::new(&root);
+        assert!(reopened.current_fleet(objective).is_err());
         let after = Json::parse(&reopened.fleets().unwrap()).unwrap();
+        assert!(reopened.current_fleet(objective).is_err());
         let recovered = &after.get("fleets").unwrap().as_array().unwrap()[0];
         assert_eq!(recovered.get("state"), row.get("state"));
         assert_eq!(

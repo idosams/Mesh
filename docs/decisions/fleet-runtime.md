@@ -41,7 +41,7 @@ supplies a signing capability for each session; neither renderer nor agent code 
 Terminal acknowledgment revokes that session and records execution state without releasing custody
 or approving content. Cancellation is rechecked at acknowledgment under the service lock; direct
 process termination leaves cancelled slots reserved. Failed, interrupted and unowned attempts are
-never automatically relaunched. The embedding application's tick loop, durable process reconciliation
+never automatically relaunched. The desktop now embeds a native scheduling loop; durable process reconciliation
 and process-tree cancellation remain separate work.
 
 Use WAL with FULL synchronous durability. Version the database schema explicitly; refuse unknown
@@ -160,8 +160,8 @@ Fleet context from the packaged bridge includes its embedded build revision and 
 reserved-field collisions refuse rather than replacing native context. Other scoped results retain
 their original identities and encodings.
 
-The packaged bridge is an execution dependency for desktop fleet hosting, not a claim that the
-application has a live scheduling loop or fleet controls. An opt-in native IPC test exercises the
+The packaged bridge is an execution dependency for desktop fleet hosting. Its bridge test alone
+does not prove the application's scheduling loop or graphical fleet controls. An opt-in native IPC test exercises the
 actual packaged executable from attached saved input, delegation, signed capture, pinned review,
 retry and revocation. It requires an exact expected build revision and verifies unchanged source
 work and desktop selection. That test does not launch a model or prove graphical interaction.
@@ -201,7 +201,40 @@ allocation recovery, context reattachment and process-tree reconciliation remain
 
 The native desktop host exposes `attached_fleets` and `provision_attached_fleet`. Reading an absent
 catalogue does not create storage. Provisioning reports `started: false`, preserves the original
-capture session and exposes no publication authority. Provider admission, IPC registration, scheduling
-and UI controls remain to be connected. Tests cover guarded rollback, source preservation, restart
+capture session and exposes no publication authority. Native execution is connected as described
+below; graphical controls remain to be connected. Tests cover guarded rollback, source preservation, restart
 without source access, owner exclusion, missing/empty ledgers, replaced directories, linked databases,
 receipt changes and closed desktop limits. Packaged graphical discovery is not yet verified.
+
+
+## Desktop scheduling ownership
+
+The native `start_attached_fleet` command accepts only a catalogue objective identity. The catalogue
+returns services allocated by the current instance after rechecking storage authority; reconstructed
+`restored-unattached` entries never grant execution authority. The app chooses Codex from its existing
+native installed-application locations and uses its own executable's fixed fleet MCP mode. No renderer
+path, generic command, credential, signing key or selected-workspace mutation enters this operation.
+
+The application owns at most sixteen explicitly started objective loops. Each loop uses the existing
+native concurrency/launch guards and 250 ms waits between ticks. Exact-instance IPC registration is
+idempotent, while a different service with the same objective cannot replace a route. A repeated start
+retains the original loop and handles; it never clears a fault or launches a second attempt. New loops
+refuse cancelled objectives and any prior attempts. Thread-creation failure before dispatch permits
+retry; process launch failure retains its durable intent and revokes the failed session.
+
+Any tick error latches `needs-attention` and disables further dispatch for that loop. Observation and
+cancellation continue through the retained host's `poll_owned`, including after slots become free.
+No new host is substituted to recover from an error. Native `fleet_activity` returns a bounded
+`mesh.desktop-fleet-activity/v1` projection with objective, status, stop request, observation times and
+redacted per-worker facts. A failed poll preserves the old observations and their old times. Activity
+is execution evidence, never authenticated file authorship or main approval. These timestamps are
+wall-clock observations, not monotonic duration measurements.
+
+`stop_attached_fleet` durably records a stable cancellation before waking the loop. It also works
+before start. Direct-child stop requests leave process-tree slots and workspace custody reserved.
+Dropping the app's loop owner requests best-effort cancellation; abrupt exit, an unavailable ledger,
+blocked launch or surviving descendants still requires reconciliation. No graceful-shutdown or full
+process-tree termination guarantee is claimed. The source project and selected desktop workspace stay
+independent. Native fixture-process tests cover duplicate start, continued observation, stop-before-start,
+owner loss, launch failure and fault-latched queued work. Graphical control wiring and packaged live
+scheduling proof remain unfinished.

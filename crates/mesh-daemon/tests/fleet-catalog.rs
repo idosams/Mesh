@@ -103,6 +103,11 @@ fn catalogue_restarts_with_uncertain_runs_visible_and_no_automatic_reattachment(
     let catalog = f.open().unwrap();
     let service = catalog.create_attached(&f.history, &f.request).unwrap();
     let id = service.objective().unwrap();
+    assert!(std::sync::Arc::ptr_eq(
+        &service,
+        &catalog.current_service(&id).unwrap()
+    ));
+    assert!(catalog.current_service("unknown").is_err());
     let state = service.native_state().unwrap();
     let lane = state.lanes.keys().next().unwrap().clone();
     let working = PathBuf::from(state.lanes[&lane].workspace.as_ref().unwrap().root());
@@ -134,7 +139,9 @@ fn catalogue_restarts_with_uncertain_runs_visible_and_no_automatic_reattachment(
     drop(service);
     fs::rename(&f.source, f.root.join("offline-source")).unwrap();
     let reopened = f.open().unwrap();
+    assert!(reopened.current_service(&id).is_err());
     let after = reopened.snapshot().unwrap();
+    assert!(reopened.current_service(&id).is_err());
     assert_eq!(rows(&after)[0].get("state"), rows(&before)[0].get("state"));
     assert_eq!(text(&rows(&after)[0], "ownership"), "restored-unattached");
     assert_eq!(text(&rows(&after)[0], "objective"), id);

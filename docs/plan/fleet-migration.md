@@ -564,3 +564,25 @@ named human review and packaged acceptance before delivery. The separate schedul
 increments remain `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` and
 `c7922b3d74cae8715066e2868533ba714d67ddb0`. All later fleet phases, merged delivery and combined-main
 verification remain required. Original work and histories are preserved.
+
+## L02b application-owned scheduling and activity
+
+Preserved source `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` transfers on #47 at
+`046ba075efc9290f9402ca2f3e4269610d1053fb`. Native desktop start/stop accepts a current catalogue
+objective, chooses the admitted provider and its own fixed bridge, registers only the exact service
+instance and retains one scheduling loop. Restored services cannot execute. Faults stop further
+dispatch while the same owned handles remain observable/cancellable; uncertain slots and custody
+are retained. Activity timestamps remain observation facts, not authorship or latency measurements.
+
+The transfer preserves canonical status and all previous corrections, including guarded storage
+and the postcommit uncertain-acknowledgment regression. Native fixtures cover duplicate start,
+stop-before-start, exact-instance routing, observer-only ticks after slots free, launch failure,
+continued polling after a latched fault and owner-loss cancellation. These fixtures do not prove
+real-provider desktop scheduling or whole process-tree termination. Local native/failing-before/full
+execution remains queued behind the preserved #44 full gate. Hosted checks and exact-revision
+packaged scheduling evidence must be recorded before claiming acceptance.
+
+The graphical control increment remains preserved source
+`c7922b3d74cae8715066e2868533ba714d67ddb0`, followed by the remaining review/integration/recovery
+phases. Original source work, logs and histories are preserved. Every PR remains unmerged until
+required review/checks pass, and final combined-main plus full fleet acceptance remain required.

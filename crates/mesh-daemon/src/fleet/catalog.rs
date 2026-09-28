@@ -371,6 +371,20 @@ impl NativeFleetDirectory {
         .map_err(|_| unavailable())
     }
 
+    /// Return only a service allocated by this catalogue instance. Discovery after restart is
+    /// observation, not permission to adopt a workspace or launch its saved attempts.
+    pub fn current_service(&self, objective: &str) -> io::Result<Arc<FleetService>> {
+        self.owner.check()?;
+        let held = self.fleets.lock().map_err(|_| unavailable())?;
+        let entry = held
+            .get(objective)
+            .filter(|entry| !entry.restored)
+            .ok_or_else(unavailable)?;
+        entry.service.native_state().map_err(|_| unavailable())?;
+        self.owner.check()?;
+        Ok(entry.service.clone())
+    }
+
     /// Recover bounded saved facts without requiring source projects online or launching workers.
     /// Unreadable/incomplete entries stay visible; restored lanes have no adopted live context.
     pub fn snapshot(&self) -> io::Result<Json> {

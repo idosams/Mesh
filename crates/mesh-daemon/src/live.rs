@@ -2233,6 +2233,12 @@ impl LiveDaemon {
         let mut hosts = self.fleet.lock().map_err(|_| {
             Unavailable::new("fleet-host-needs-recovery", "Fleet routing needs recovery.")
         })?;
+        if hosts
+            .get(&objective)
+            .is_some_and(|registered| Arc::ptr_eq(registered, &service))
+        {
+            return Ok(());
+        }
         if hosts.contains_key(&objective) || hosts.len() >= 16 {
             return Err(Unavailable::new(
                 "fleet-host-registration-refused",
