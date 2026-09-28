@@ -39,9 +39,9 @@ test("unavailable group inspection disables restoration and complete-group appli
     project: "project", disabled: true, preview: {target: "saved", matches_base: 1, already_present: 0, preserve_current: 0, conflicts: 0, blocked: 0, entries: [], not_listed: 0},
   }));
   assert.match(preview, /disabled=""[^>]*>Review applying accepted changes/);
-  assert.ok(preview.includes("create complete new folders"));
-  assert.ok(preview.includes("move removed folders to recovery"));
-  assert.ok(preview.includes("Changing between files and folders"));
+  assert.ok(preview.includes("retain removed folders"));
+  assert.ok(preview.includes("convert files and folders"));
+  assert.ok(preview.includes("Incomplete or oversized"));
 });
 
 
@@ -175,5 +175,43 @@ test('Hebrew removal recovery keeps late-work paths literal and offers no file r
     assert.ok(html.includes('<bdi dir="ltr">שם/LATE.txt</bdi>'));
     assert.ok(!html.includes('Directory removal retains'));
     assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
+  } finally { setLocale('en'); }
+});
+
+
+test('conversion recovery displays the original type and a retained root file without file restoration', () => {
+  const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+    project: 'a'.repeat(64), disabled: false, detached: false,
+    group: { group: `integration-group-${'b'.repeat(32)}`, alreadyPresent: [], entries: [{
+      transaction: `directory-${'c'.repeat(32)}`, status: 'applied-arrangement', attention: false,
+      path: 'entry', operation: 'convert-entry', conversionFrom: 'file', conversionTo: 'directory', retainedAvailable: false, recordedOutcome: 'applied-observed',
+      sourceTree: { state: 'observed', entries: [{ path: '', kind: 'directory', bytes: null, digest: null }] },
+      stagedTree: { state: 'observed', entries: [{ path: '', kind: 'file', bytes: 4, digest: 'a'.repeat(64) }] },
+    }] },
+  }));
+  for (const text of ['File to folder', 'original entry and open handles remain in recovery', 'Retained entry: 1 entries observed', '4 bytes']) assert.ok(html.includes(text), text);
+  assert.ok(!html.includes('Review restoring retained file'));
+});
+
+test('Hebrew conversion directions preserve literal retained paths without file restoration', () => {
+  setLocale('he');
+  try {
+    for (const [from, to, label] of [['file', 'directory', 'מקובץ לתיקייה'], ['directory', 'file', 'מתיקייה לקובץ']]) {
+      const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+        project: 'project', disabled: false, detached: false,
+        group: { group, alreadyPresent: [], entries: [{
+          transaction: `directory-${'c'.repeat(32)}`, path: 'שם/ENTRY', status: 'applied-arrangement',
+          attention: false, operation: 'convert-entry', conversionFrom: from, conversionTo: to,
+          retainedAvailable: false, recordedOutcome: 'applied-observed',
+          sourceTree: {state: 'observed', entries: [{path: '', kind: to, bytes: to === 'file' ? 4 : null}]},
+          stagedTree: {state: 'observed', entries: [{path: '', kind: from, bytes: from === 'file' ? 4 : null},
+            ...(from === 'directory' ? [{path: 'שם/LATE.txt', kind: 'file', bytes: 8}] : [])]},
+        }] },
+      }));
+      for (const text of [label, 'הפריט המקורי והידיות הפתוחות', 'הפריט שנשמר', '<bdi dir="ltr">שם/ENTRY</bdi>']) assert.ok(html.includes(text), text);
+      if (from === 'directory') assert.ok(html.includes('<bdi dir="ltr">שם/LATE.txt</bdi>'));
+      assert.ok(!html.includes('The original entry'));
+      assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
+    }
   } finally { setLocale('en'); }
 });

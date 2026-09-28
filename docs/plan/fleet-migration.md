@@ -1850,3 +1850,23 @@ binary or oversized sides refuse. Conflict resolution preserves canonical root
 arguments and escaped project/folder tests; conversion tests additionally use a
 misleading newline/non-Latin folder. Native focused/failing-before/full tests
 remain queued behind preserved verification; packaged dialog proof is pending.
+
+## I06c localized conversion recovery
+
+Completes source `6ec9c8ccf9e273de25d1a84c323c0cd4f3f4b821` accounting:
+seven daemon paths are in #100, native confirmation in #101, and the remaining
+four renderer paths are reconciled here onto #101 at
+`cdb7e6153208ab1ad7b3b46e7819a640fc4c4861`. The three source documents are
+reconciled into the retained-replacement decision, product status and fleet plan;
+the source's historical 3,318 Rust/680 desktop checks with 14 skips are not
+canonical runtime evidence.
+
+Recovery validates both conversion directions, permits a complete root-file
+observation, and keeps conversion references out of ordinary file restoration.
+English/Hebrew presentation preserves literal paths and labels retained original
+objects. All 48 controller tests pass; removing direction validation makes its
+regression fail, and restoration returns all 48 to passing. TypeScript and all
+32 rendering/localization tests pass. Full canonical validation is still required:
+the previous main #70 run failed native watcher registration (issue #37), with
+1,274 passes, one failure, 14 skips and 1,982 tests unrun. Its logs remain preserved;
+this increment does not resolve that failure or establish packaged acceptance.

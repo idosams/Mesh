@@ -787,3 +787,10 @@ using a preserving exchange and exact two-sided evidence. Group v4 expands both
 sides for complete review coverage. Desktop confirmation still refuses conversion
 receipts pending complete presentation; localized recovery, whole-entry restoration
 and native/packaged acceptance remain required.
+
+The conversion source is now reconciled across #100, #101 and its localized
+recovery follow-up: both complete sides are native-owned, while desktop recovery
+shows direction and retained entries without restoration authority. This completes
+source transfer only. The failing native watcher registration, whole-entry
+restoration, combined-main testing and all provider/remote/packaged acceptance
+requirements remain open.

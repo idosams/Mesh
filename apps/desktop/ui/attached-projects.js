@@ -279,12 +279,14 @@ function attachedDirectoryRecovery(value, id, transaction, group) {
   const path = value => safeText(value, 4096) && !value.startsWith('/') && value.split('/').every(part => part && part !== '.' && part !== '..');
   const nullableBool = value => value === null || typeof value === 'boolean';
   const statuses = ['prepared-arrangement', 'applied-arrangement', 'changed-entries', 'incomplete-observation', 'source-parent-changed', 'parent-policy-changed', 'invalid-outcome', 'contradictory-outcome'];
-  if (!['mesh.attachment-directory-addition-recovery/v1', 'mesh.attachment-directory-removal-recovery/v1'].includes(value?.schema) || value.project !== id || value.transaction !== transaction
+  if (!['mesh.attachment-directory-addition-recovery/v1', 'mesh.attachment-directory-removal-recovery/v1', 'mesh.attachment-entry-conversion-recovery/v1'].includes(value?.schema) || value.project !== id || value.transaction !== transaction
     || !directoryTransaction(transaction) || !path(value.path) || !statuses.includes(value.status)
     || !['observation_final', 'automatic_replay', 'write_authority', 'cleanup_authority'].every(key => value[key] === false)
     || !nullableBool(value.parent_identity_matches) || !nullableBool(value.parent_policy_matches)
     || !Number.isSafeInteger(value.live_content_budget_remaining) || value.live_content_budget_remaining < 0
     || !['absent', 'invalid', 'applied-observed', 'reconciliation-required'].includes(value.recorded_outcome)) throw new Error('Invalid directory recovery');
+  const converted = value.schema === 'mesh.attachment-entry-conversion-recovery/v1';
+  if (converted && ![['file', 'directory'], ['directory', 'file']].some(([before, after]) => value.before_kind === before && value.after_kind === after)) throw new Error('Invalid conversion direction');
   const tree = observation => {
     if (!['absent', 'observed', 'unavailable'].includes(observation?.state)) throw new Error('Invalid directory observation');
     if (observation.state !== 'observed') {
@@ -295,7 +297,7 @@ function attachedDirectoryRecovery(value, id, transaction, group) {
     const seen = new Set();
     const entries = observation.tree.map((entry, index) => {
       const directory = entry?.kind === 'directory';
-      if (!['directory', 'file'].includes(entry?.kind) || (index === 0 ? entry.path !== '' || !directory : !path(entry.path))
+      if (!['directory', 'file'].includes(entry?.kind) || (index === 0 ? entry.path !== '' || (!directory && !converted) : !path(entry.path))
         || seen.has(entry.path) || !safeText(entry.installation, 128) || !reviewIdentity(entry.metadata)
         || !Number.isSafeInteger(entry.mode) || entry.mode < (directory ? 0o040000 : 0o100000) || entry.mode > (directory ? 0o047777 : 0o107777)
         || (directory ? entry.digest !== null || entry.bytes !== null : !reviewIdentity(entry.digest) || !Number.isSafeInteger(entry.bytes) || entry.bytes < 0)) throw new Error('Invalid directory entry');
@@ -305,7 +307,8 @@ function attachedDirectoryRecovery(value, id, transaction, group) {
     return { state: observation.state, entries };
   };
   return { group, transaction, status: value.status, attention: !['prepared-arrangement', 'applied-arrangement'].includes(value.status),
-    path: value.path, operation: value.schema === 'mesh.attachment-directory-removal-recovery/v1' ? 'remove-directory' : 'add-directory', retainedAvailable: false, recordedOutcome: value.recorded_outcome,
+    path: value.path, operation: converted ? 'convert-entry' : value.schema === 'mesh.attachment-directory-removal-recovery/v1' ? 'remove-directory' : 'add-directory', retainedAvailable: false, recordedOutcome: value.recorded_outcome,
+    conversionFrom: converted ? value.before_kind : null, conversionTo: converted ? value.after_kind : null,
     sourceTree: tree(value.source), stagedTree: tree(value.stage), parentIdentityMatches: value.parent_identity_matches, parentPolicyMatches: value.parent_policy_matches };
 }
 

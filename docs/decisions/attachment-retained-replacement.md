@@ -800,3 +800,19 @@ shared root paths once and preserves execution order. Native authority is still
 revalidated after consent. Separate escaped project/folder identity is preserved.
 Localized recovery and packaged graphical proof remain pending; transferred native
 confirmation regressions do not establish that an actual OS dialog was exercised.
+
+## Conversion recovery presentation in canonical Mesh
+
+The localized desktop parser accepts `mesh.attachment-entry-conversion-recovery/v1`
+only for file-to-directory or directory-to-file direction. An observed root may be
+a regular file for that schema; directory addition/removal retain their directory
+root requirement. Observations remain bounded and validate paths, identities,
+permissions and file digests. Neither direction grants write, replay, cleanup or
+ordinary retained-file restoration authority.
+
+The view presents working and retained entries, including an original root file,
+with localized direction and literal paths. It explains that original objects and
+open handles remain in recovery. These changes reconcile the remaining source
+conversion documentation without adopting its historical test counts as canonical
+proof. Whole-entry restoration and packaged graphical confirmation/recovery still
+require separate implementation and acceptance.

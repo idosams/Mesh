@@ -706,3 +706,13 @@ confirmation with exact frozen content and empty directories. It refuses incompl
 or unrenderable sides and retains literal project/folder identity. Native runtime
 checks, localized conversion recovery, whole-entry restoration and packaged
 graphical acceptance remain unfinished.
+
+### Localized conversion recovery (unmerged increment)
+
+The recovery view now distinguishes file-to-folder and folder-to-file conversions,
+shows retained root files and nested entries, and presents English/Hebrew labels
+with literal paths. It offers no ordinary file-restoration action for conversions.
+Controller direction-refusal, TypeScript and focused rendering checks pass.
+Combined native verification remains blocked by issue #37's registration failure;
+whole-entry restoration, real-provider/remote acceptance and packaged graphical
+proof remain unfinished. Published PRs are not merged delivery.

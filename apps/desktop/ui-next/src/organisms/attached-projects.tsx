@@ -21,7 +21,7 @@ type IntegrationPreview = { head: string; bundle: string; target: string; base_h
   matches_base: number; already_present: number; preserve_current: number; conflicts: number; blocked: number; not_listed: number;
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
 type DirectoryObservation = { state: string; entries: { path: string; kind: string; bytes: number | null; digest: string | null }[] };
-type RecoveryEntry = { sourceTree?: DirectoryObservation; stagedTree?: DirectoryObservation; parentIdentityMatches?: boolean | null; parentPolicyMatches?: boolean | null; group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
+type RecoveryEntry = { conversionFrom?: string | null; conversionTo?: string | null; sourceTree?: DirectoryObservation; stagedTree?: DirectoryObservation; parentIdentityMatches?: boolean | null; parentPolicyMatches?: boolean | null; group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
 type Recovery = { entries: RecoveryEntry[]; more: boolean };
 type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; moreRestorations?: boolean;
   execution?: { status: string; attempts: {transaction: string; status: string}[]; outcome: GroupOutcome | null } | null };
@@ -290,7 +290,7 @@ export function IntegrationPreviewCard({ project, preview, disabled }: { project
         onClick={() => send({ type: "apply-main-file", id: project, path: entry.path })}>{t("Review applying this file")}</Button>}
     </li>)}</ul>
     {preview.not_listed > 0 && <p className="text-xs">{preview.not_listed} {t("more entries are omitted from this overview. The counts include all entries.")}</p>}
-    <p className="text-xs text-muted-foreground">{t("Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create complete new folders, move removed folders to recovery, and create, replace or remove regular files. Changing between files and folders and incomplete or oversized text confirmations remain unavailable.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create folders, retain removed folders, convert files and folders, and change regular files. Incomplete or oversized text confirmations remain unavailable.")}</p>
   </section>;
 }
 
@@ -315,11 +315,11 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
     <p className="break-all text-sm font-medium">{entry.path ? <bdi dir="ltr">{entry.path}</bdi> : t("File details unavailable")}</p>
     <p className="text-sm">{t(recoveryLabels[entry.status])}{entry.attention ? <> · {t("Needs attention")}</> : ""}</p>
     <p className="break-all text-xs">{t("Recovery reference:")} {entry.transaction ? <bdi dir="ltr">{entry.transaction}</bdi> : t("Unavailable")}</p>
-    {["add-directory", "remove-directory"].includes(entry.operation ?? "") && <div className="grid gap-2 text-xs">
-      <p>{entry.operation === "remove-directory" ? t("Directory removal retains the complete original tree. Open file and directory handles may still be writing there. These observations never authorize replay, cleanup or automatic restoration.") : t("New directory tree. No existing work was displaced by this operation; these observations never authorize replay or removal.")}</p>
+    {["add-directory", "remove-directory", "convert-entry"].includes(entry.operation ?? "") && <div className="grid gap-2 text-xs">
+      <p>{entry.operation === "convert-entry" ? <>{t(entry.conversionFrom === "directory" ? "Folder to file" : "File to folder")}. {t("The original entry and open handles remain in recovery. These observations never authorize replay, cleanup or automatic restoration.")}</> : entry.operation === "remove-directory" ? t("Directory removal retains the complete original tree. Open file and directory handles may still be writing there. These observations never authorize replay, cleanup or automatic restoration.") : t("New directory tree. No existing work was displaced by this operation; these observations never authorize replay or removal.")}</p>
       {entry.parentIdentityMatches === false && <p role="alert">{t("The containing folder no longer has its recorded identity.")}</p>}
       {entry.parentPolicyMatches === false && <p role="alert">{t("The containing folder permissions differ from preparation.")}</p>}
-      {([["Working tree", entry.sourceTree], [entry.operation === "remove-directory" ? "Retained tree" : "Prepared tree", entry.stagedTree]] as const).map(([label, tree]) => <details key={label}>
+      {([["Working tree", entry.sourceTree], [entry.operation === "convert-entry" ? "Retained entry" : entry.operation === "remove-directory" ? "Retained tree" : "Prepared tree", entry.stagedTree]] as const).map(([label, tree]) => <details key={label}>
         <summary>{t(label)}: {tree?.state === "observed" ? <>{tree.entries.length} {t("entries observed")}</> : tree?.state === "absent" ? t("absent") : t("unavailable")}</summary>
         <ul>{tree?.entries.map(item => <li key={item.path} className="break-all">{item.path ? <bdi dir="ltr">{item.path}</bdi> : t("(tree root)")} · {item.kind === "directory" ? t("Folder") : <>{item.bytes} {t("bytes")}</>}</li>)}</ul>
       </details>)}
