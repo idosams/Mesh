@@ -454,3 +454,29 @@ verifies; a closed panel ignores late replies. Pending desktop operations remain
 Tests cover cancellation, competing confirmation, stale revisions, reversible replay, root relocation
 during confirmation, agent denial and old-receipt recovery. Packaged graphical confirmation and signed
 main approval are separate required evidence; native callback fixtures do not prove user presence.
+
+
+## Original-project correspondence preparation
+
+`FleetService::saved_project_mapping` and its history-only wrapper verify the boundary between an
+attached root lane's saved local import and the exact original project version. Native retained
+project identity, recorded source-project correlation, starting-version binding and exact saved-review
+selection are all required. The complete immutable inventories must match by path, entry type,
+content digest, length and executable bit before any object correspondence is returned. Independent
+workspace object IDs and manifest IDs are not assumed to be interchangeable. Result objects retain
+their local identity through moves; new objects have no original object and deleted objects have no
+result. Every changed object is paged in stable local-object order, with 200 entries per page.
+
+The closed native projection `mesh.fleet-project-mapping/v1` carries the exact source project/input,
+local starting version, result selector, correspondence page and observed verified main. Main and
+source input are read under one retained attachment-history lock; main is an observation, never a
+reservation. New private captures and live edits are not used as the original input. The projection
+creates no version, review, approval, source write or worker adoption. No persisted format changes.
+
+This is the first original-project review-preparation boundary, not complete integration. Directly
+attached roots are supported; delegated lanes refuse until transitive ancestry correspondence is
+implemented. Results still need dependency closure, a source-history candidate with explicit
+provenance, exact human approval and divergence-safe grouped write-back. The native reader has no
+desktop command or agent tool yet. Source tests cover complete-inventory mismatch, metadata/type
+changes, distinct identities, moves/additions/deletions, pagination, foreign projects, newer captures,
+restart and unavailable original roots. No packaged graphical or integration claim follows.

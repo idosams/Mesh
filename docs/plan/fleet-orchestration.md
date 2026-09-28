@@ -424,3 +424,13 @@ fixed and agents retain no decision or publication authority. Native replay/race
 desktop retry/current-state presentation cover this work-status foundation. Packaged graphical
 confirmation, automatic worker wakeup, durable pending UI operations and original-main integration
 remain required for the full review and orchestration journey.
+
+
+### Original-project correspondence preparation
+
+A native read-only boundary now verifies directly attached root results against the entire exact
+source input and returns paginated object correspondence plus observed verified main. Original live
+edits and later captures remain untouched and do not replace the saved input. This is a prerequisite
+for original-main review, not completion: delegated ancestry, candidate import/provenance, dependency
+closure, desktop presentation, exact approval and grouped integration remain required. See the
+original-project correspondence decision in `docs/decisions/fleet-runtime.md`.

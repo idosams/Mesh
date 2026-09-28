@@ -11,6 +11,8 @@ pub(crate) mod comparison;
 #[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
+mod project_mapping;
+#[cfg(unix)]
 pub mod provider;
 #[cfg(unix)]
 pub mod service;

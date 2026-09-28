@@ -288,6 +288,17 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Verify an attached root result's original project correspondence without execution adoption.
+    pub fn saved_project_mapping(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        after: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .saved_project_mapping(selection, source, trusted, after)
+    }
     /// List durable saved-result identities.
     pub fn saved_reviews(&self, lane: &str, after: Option<&str>) -> Result<Json, Unavailable> {
         self.0.saved_reviews(lane, after)
@@ -1421,6 +1432,69 @@ impl FleetService {
             ("objective", Json::text(self.objective()?)),
             ("selection", selection.to_json()),
             ("input", comparison),
+            ("approval_authority", Json::Bool(false)),
+        ]))
+    }
+
+    /// Prepare exact object correspondence for an attached root result and its original project.
+    /// Descendant lanes require transitive input mapping and are deliberately not inferred here.
+    /// The returned main is an observation, not a reservation or authority to integrate.
+    pub fn saved_project_mapping(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        after: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        let state = self.native_state()?;
+        let lane = state
+            .lanes
+            .get(&selection.lane)
+            .filter(|lane| {
+                lane.parent.is_none() && lane.source_project.as_deref() == Some(source.id())
+            })
+            .ok_or_else(|| refusal("fleet-project-lineage-unavailable"))?;
+        let expected = lane
+            .workspace
+            .as_ref()
+            .ok_or_else(|| refusal("fleet-project-input-unbound"))?;
+        let mapped = self.with_saved_review(selection, |open, binding| {
+            if binding != expected {
+                return Err(refusal("fleet-project-input-changed"));
+            }
+            let starting = binding
+                .starting_version()
+                .ok_or_else(|| refusal("fleet-starting-version-unbound"))?;
+            source
+                .with_fleet_input(binding.source_version, trusted, |project, main| {
+                    let preview = |open: &crate::workspace::OpenWorkspace, version| {
+                        open.historical_workspace_preview(version)
+                            .map_err(|error| std::io::Error::other(error.to_string()))
+                    };
+                    let correspondence = super::project_mapping::mapping(
+                        preview(project, binding.source_version)?,
+                        preview(open, starting)?,
+                        preview(open, selection.version)?,
+                        after,
+                    )?;
+                    Ok(Json::object([
+                        ("source_project", Json::text(source.id())),
+                        (
+                            "source_version",
+                            Json::text(binding.source_version.to_string()),
+                        ),
+                        ("starting_version", Json::text(starting.to_string())),
+                        ("observed_main", main),
+                        ("correspondence", correspondence),
+                    ]))
+                })
+                .map_err(|_| refusal("fleet-project-mapping-unavailable"))
+        })?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.fleet-project-mapping/v1")),
+            ("objective", Json::text(self.objective()?)),
+            ("selection", selection.to_json()),
+            ("mapping", mapped),
             ("approval_authority", Json::Bool(false)),
         ]))
     }

@@ -187,8 +187,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | R02 | `e961781d941c938de408b38866c4b43cee36f7fe` | feat(desktop): preview exact saved artifacts in parallel fleet reviews | Pending transfer |
 | R03 | `76d24877696474f2383429ca0b80c8eeab3ba3f4` | feat(fleet): record exact review change requests for originating lanes | [Mesh PR #59](https://github.com/idosams/Mesh/pull/59), `27ce54b6912dd2da9aafae628cadfec52537e30e`; exact feedback; stacked on #58; not merged |
 | R03 | `367ec923ba6e1bcd3d15d62429ddec7ca49bda06` | feat(fleet): link proposed saved results to review change requests | [Mesh PR #60](https://github.com/idosams/Mesh/pull/60), `dc315053ac01b86cc5125155644a4f726a2be2b6`; proposed results; stacked on #59; not merged |
-| R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | This increment, R03c; native-confirmed reversible decisions; stacked on published #60; not merged |
-| C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | Pending transfer |
+| R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | [Mesh PR #61](https://github.com/idosams/Mesh/pull/61), `3fbc74fe2c5ba8e86d0686807687394bf0b97ae1`; reversible decisions; stacked on #60; not merged |
+| C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | This increment, C01a; exact root-project input correspondence; stacked on published #61; not merged |
 | C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | Pending transfer |
 | C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | Pending transfer |
 | C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | Pending transfer |
@@ -944,3 +944,36 @@ integration regression accessed private selection fields. The regression now use
 checkpoint/review receipts, as the existing fixture does. Selection encapsulation and every refusal
 assertion remain unchanged; no production API is widened. The failed log is retained. Formatting and
 whitespace checks pass; hosted/native execution must validate the corrected revision.
+
+## C01a original-project input correspondence
+
+Preserved source `302f6cbb0a795b9743ef6c72447d803cdc7860ab` transfers onto corrected published #61 at
+`ec99692f61bba6f9f8cc72297e79fa0302a3bd3f`. Native review preparation verifies the complete
+immutable input inventory across the original project and a directly attached root lane. Paths, entry
+types, content digests, byte lengths and executable bits must agree; independent object and manifest
+identities are not equated. Changes map local objects back to original objects, preserving moves,
+deletions and additions. Stable pagination returns at most 200 changed objects with an exact cursor.
+
+The projection reads original input and verified main under one retained attachment-history lock.
+Observed main is not reserved. Continued manual edits and later captures do not substitute a newer
+input. Foreign projects, missing roots, unbound starting versions and unsupported delegated ancestry
+refuse. History-only reads do not adopt workers. This creates no candidates, versions, reviews or
+approval authority, changes no persisted format, and exposes no desktop or agent action yet.
+
+Transferred native tests cover full inventory/metadata equality, distinct identities, changed objects,
+pagination, foreign projects, newer captures, offline originals and history-only restart. Canonical
+regressions additionally require a same-path replacement to remain a deletion plus a new object and
+reject duplicate paths or object identities in each of the three inventories. Local repository,
+documentation (106 documents), license/self-test, storage/self-test, formatting and whitespace checks
+pass. Native tests, native failing-before proof and full local verification remain pending behind the
+preserved #44 run; this exact revision requires hosted checks. These checks do not prove packaged
+behavior, write-back or end-to-end integration.
+
+Next: delegated ancestry, staged project candidates, fixed-main review and approval/integration, then
+remaining recovery and acceptance phases. Named human review, eventual merges and final combined-main
+tests remain mandatory. Original histories, dirty work and running verification are preserved.
+
+The first local C01a commit `3002f2df104e5079c0e87d99995afb89de7761d4` and its worktree remain
+preserved. Delivery uses a fresh worktree on corrected #61 so the original private-field test compile
+failure is not inherited. Source implementation and correspondence regressions are unchanged; the
+corrected parent test and its failure record are retained. No history was rewritten.

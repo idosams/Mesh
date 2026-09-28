@@ -371,3 +371,16 @@ interface type/build plus 145 interface and 541 desktop tests pass; mutation che
 localized decisions and the previous coordinator route. Added native selection-substitution cases
 must refuse before confirmation without state changes. Native/full local execution and packaged
 confirmation remain pending; this source implementation is not merged or packaged acceptance.
+
+
+Native fleet-to-project review preparation now verifies directly attached root input correspondence
+across independent object IDs. It returns bounded mapping evidence and the observed verified project
+main without creating a candidate, changing source files or advancing main. Source tests cover import
+identity, complete inventory/metadata mismatches, changes and pagination, foreign projects, continued
+capture and history-only restart. Delegated lineage, candidate import, UI, approval and grouped
+integration remain incomplete; this source API is not a packaged user journey.
+
+The canonical correspondence increment adds same-path replacement and ambiguous inventory regressions.
+Repository/docs/license/storage and formatting checks pass locally; native execution and the full
+local gate remain pending behind preserved verification. Hosted tests must verify this revision.
+No migration PR is merged and no candidate or packaged integration is claimed.

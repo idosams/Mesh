@@ -336,6 +336,45 @@ fn materialize(
 }
 
 impl ProvisionedAttachment {
+    /// Inspect the exact attached input and verified main under one retained history lock.
+    /// This exposes no source bytes, mutation or approval authority to fleet callers.
+    pub(crate) fn with_fleet_input<T>(
+        &self,
+        version: mesh_store::RecordDigest,
+        trusted: &crate::TrustedReviewers,
+        read: impl FnOnce(&crate::workspace::OpenWorkspace, Json) -> io::Result<T>,
+    ) -> io::Result<T> {
+        self.attachment.with_review_history(
+            self.metadata_path(),
+            self.store.clone(),
+            trusted,
+            |workspace, _| {
+                if !workspace
+                    .workspace_versions()
+                    .iter()
+                    .any(|v| v.operation() == version)
+                {
+                    return Err(invalid("fleet input is not an attached project version"));
+                }
+                let main = match super::approval::main_head(workspace)? {
+                    None => Json::Null,
+                    Some(head) => {
+                        let review = workspace
+                            .accepted_main_review()
+                            .map_err(failure)?
+                            .ok_or_else(|| invalid("verified main review unavailable"))?;
+                        Json::object([
+                            ("head", Json::text(head.to_string())),
+                            ("bundle", Json::text(review.bundle.to_string())),
+                            ("target", Json::text(review.subject_operation.to_string())),
+                        ])
+                    }
+                };
+                read(workspace, main)
+            },
+        )
+    }
+
     pub(crate) fn validate_lane_version(&self, version: &str) -> io::Result<()> {
         self.attachment.inspect_saved(
             self.metadata_path(),

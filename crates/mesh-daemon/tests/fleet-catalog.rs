@@ -412,6 +412,64 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
         )
         .unwrap();
     let activity = service.saved_review_change_activity(&selection).unwrap();
+    let mapping = service
+        .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+        .unwrap();
+    let correspondence = mapping.get("mapping").unwrap();
+    assert_eq!(
+        correspondence.get("source_project"),
+        Some(&Json::text(f.history.id()))
+    );
+    assert_eq!(
+        correspondence.get("source_version"),
+        Some(&Json::text(f.request.version.to_string()))
+    );
+    assert_eq!(correspondence.get("observed_main"), Some(&Json::Null));
+    assert_eq!(
+        correspondence.get("correspondence").unwrap().get("total"),
+        Some(&Json::Number(1))
+    );
+    let foreign = Fixture::new("mapping-foreign");
+    assert!(service
+        .saved_project_mapping(
+            &selection,
+            &foreign.history,
+            &TrustedReviewers::default(),
+            None
+        )
+        .is_err());
+    fs::write(
+        f.source.join("work.txt"),
+        "ordinary source work continues\n",
+    )
+    .unwrap();
+    let capture = f
+        .history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let key = SigningKey::from_bytes(&[61; 32]);
+    let later_source = f
+        .history
+        .project()
+        .save_capture(
+            f.history.metadata_path(),
+            &capture,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                Ok::<_, String>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert_ne!(later_source.operation(), f.request.version);
+    assert_eq!(
+        service
+            .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+            .unwrap(),
+        mapping
+    );
     let expected = service.saved_review(&selection).unwrap();
     let input = service
         .saved_starting_comparison(&selection, None, None)
@@ -450,4 +508,19 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
     );
     assert_eq!(fs::read_dir(&f.catalog).unwrap().count(), 1);
     assert!(restored.history("unknown").is_err());
+    assert!(history
+        .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+        .is_err());
+    fs::rename(f.root.join("offline-original"), &f.source).unwrap();
+    assert_eq!(
+        history
+            .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
+            .unwrap(),
+        mapping
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"ordinary source work continues\n"
+    );
+    assert_eq!(restored.snapshot().unwrap(), before);
 }
