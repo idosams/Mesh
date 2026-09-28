@@ -1112,3 +1112,34 @@ Visible desktop candidate review, durable pins, exact human approval/integration
 recovery/provider/four-worker/remote/packaged acceptance, required human reviews, eventual merges and
 final combined-main testing remain part of the goal. Original work and active verification remain
 preserved.
+
+## C02c project comparison panels and durable preparation inputs
+
+Preserved source `c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b` transfers onto published #66 at
+`9a9bf400bbd929c76d23cba910979162f10266b5`. Each pinned result can prepare and inspect a fixed
+whole-project comparison, with separate pagination, selected text, exact identity and stale-main
+observations. The coordinator persists project/request/expected-main before preparation. Retries
+reuse those inputs; reopening only reads saved candidates and never stages or adopts workers.
+Late responses cannot recreate closed or replaced pins. Native replies remain strictly bound to the
+project, result, ancestry, candidate receipt and fixed comparison; inspection grants no approval.
+
+Fleet pins use v2 with optional candidate selectors. v1 navigation loads without inventing a request,
+and migrates only on changed save. Old binaries refuse v2. Existing count/byte bounds and revision
+checks remain; the canonical exhausted-revision refusal regression is preserved. Desktop envelopes
+bind each response to its exact command inputs.
+
+Canonical localization and nullable lane goals are preserved. Hebrew controls and notices translate,
+while paths, identifiers and saved text remain raw with explicit direction. Added rendering coverage
+checks stale-main notices, disabled retries during persistence failure, and retained verified content.
+
+Local UI type/build and 147 render tests pass; all 550 desktop coordinator/script tests pass. Repository
+7 tests, docs 106 documents, license/storage self-tests, vocabulary, formatting and whitespace pass.
+Regressions fail with the source English-only panel and with the parent coordinator, then all 34
+focused tests pass after exact restoration. Native/full local execution remains queued behind the
+preserved #44 run; hosted CI must validate this exact head. #64 has all seven checks passing; #65 and
+#66 have six passing with macOS pending. All migration PRs remain unmerged.
+
+Next increments retain exact human approval and original-main integration, followed by remaining
+recovery/provider/four-worker/remote/packaged acceptance. Required human review, eventual ordered
+merges and final testing of combined canonical main remain completion requirements. Existing work
+and running verification remain preserved.

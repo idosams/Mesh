@@ -1,3 +1,4 @@
+import { projectMappingMain, projectCandidateReceipt, projectCandidateReview } from './fleet-project-comparison.js';
 import { reviewChangeMessage, reviewChangeReceipt, reviewDecisionReceipt, savedReviewChangeActivity } from './fleet-review-changes.js';
 import { loadFleetArtifact } from './fleet-artifact-preview.js';
 import { reviewArtifactKind } from './review-artifact-validation.js';
@@ -73,6 +74,7 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
       for (const pin of pins) {
         void loadPin(pin);
         if (pin.view.input_open) void restoreInput(pin);
+        if (pin.view.candidate) void candidateRequest(pin);
       }
     },
     status(phase, message) {
@@ -132,6 +134,49 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     if (nextPin > 18446744073709551615n) { notice = 'Review display keys are exhausted.'; publish(); return; }
     const pin = { view: defaultFleetView(), key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };
     pins = [...pins, pin]; notice = ''; persist(); void loadPin(pin);
+  }
+  const currentCandidate = (pin, operation) => !disposed && pins.find(value => value.selection === pin.selection && value.candidate === operation);
+  function candidateState(pin, operation, patch) {
+    pins = pins.map(value => value.selection === pin.selection && value.candidate === operation ? { ...value, candidate: { ...operation, ...patch } } : value);
+    publish();
+  }
+  async function candidateRequest(pin, prepare = false, after = null, selected = null) {
+    if (disposed || pin.candidate?.loading || (prepare && (!persistenceEnabled || !editable))) return;
+    let pending = pin.view.candidate;
+    if (!pending && !prepare) return;
+    const operation = { ...pin.candidate, loading: true, error: '', attemptedPrepare: prepare, requestedAfter: after, requestedPath: selected,
+      page: pin.candidate?.page ?? null, file: pin.candidate?.file ?? null };
+    pins = pins.map(value => value.selection === pin.selection ? { ...value, candidate: operation } : value); publish();
+    try {
+      if (!pending) {
+        const project = laneFor(pin.selection.objective, pin.selection.lane)?.sourceProject;
+        if (!digest(project)) throw new Error('Original project unavailable');
+        const expected_main = projectMappingMain(await invoke('fleet_project_mapping', { ...pin.selection, project, after: null }), pin, project);
+        if (!currentCandidate(pin, operation)) return;
+        const request = requestId();
+        if (typeof request !== 'string' || !/^[a-f0-9]{32}$/.test(request)) throw new Error('Invalid request');
+        pending = { project, request, expected_main };
+        // Persist these exact inputs before any allocation. No retry selects a newer main.
+        pins = pins.map(value => value.selection === pin.selection ? { ...value, view: { ...value.view, candidate: pending } } : value);
+        persist(); publish();
+      }
+      const args = { ...pin.selection, project: pending.project, request: pending.request, expectedMain: pending.expected_main };
+      let receipt = pin.candidate?.receipt ?? null;
+      if (prepare) {
+        if (!await storage.confirmed()) throw new Error('Preparation inputs are not durably saved');
+        if (!currentCandidate(pin, operation)) return;
+        receipt = projectCandidateReceipt(await invoke('prepare_fleet_project_candidate', args), pin, pending);
+        if (!currentCandidate(pin, operation)) return;
+      }
+      const comparison = projectCandidateReview(await invoke('review_fleet_project_candidate', { ...args, after, selected }), pin, pending,
+        after, selected, operation.fixed ?? operation.page, receipt);
+      if (currentCandidate(pin, operation)) candidateState(pin, operation, { loading: false, receipt, fixed: comparison,
+        ...(selected === null ? { page: comparison } : { file: comparison.changes[0] }) });
+    } catch {
+      if (currentCandidate(pin, operation)) candidateState(pin, operation, { loading: false,
+        error: prepare ? 'Preparation is unconfirmed. Keep the saved request and retry its exact inputs. Resolve any saved-selection error first.'
+          : 'This fixed comparison is unavailable. Its saved inputs and any previously verified content are retained. Preparing missing content requires an explicit retry.' });
+    }
   }
   async function loadChanges(pin, reloadDecision = false) {
     if (pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding) return;
@@ -224,17 +269,27 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     publish();
   }
   return {
-    snapshot: () => ({ reviewQueues: queues, reviewPins: pins, reviewNotice: notice, reviewPersistence: { ...persistenceState, editable, busy: controlBusy } }),
+    snapshot: () => ({ reviewQueues: queues, reviewPins: pins.map(pin => ({ ...pin, projectSource: pin.view.candidate?.project ?? laneFor(pin.selection.objective, pin.selection.lane)?.sourceProject ?? null, candidateEnabled: persistenceEnabled && editable })), reviewNotice: notice, reviewPersistence: { ...persistenceState, editable, busy: controlBusy } }),
     loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return storage.ensureLoaded(); } },
     dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
+      if (!['candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry', 'reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
         notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (['candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry'].includes(value.type)) {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (!pin || pin.candidate?.loading) return true;
+        if (value.type === 'candidate-prepare' && fields === 'pin,type') void candidateRequest(pin, true);
+        if (value.type === 'candidate-read' && fields === 'pin,type') void candidateRequest(pin);
+        if (value.type === 'candidate-retry' && fields === 'pin,type' && pin.candidate?.error) void candidateRequest(pin, Boolean(pin.candidate.attemptedPrepare), pin.candidate.requestedAfter, pin.candidate.requestedPath);
+        if (value.type === 'candidate-page' && fields === 'after,pin,type' && typeof value.after === 'string' && value.after === pin.candidate?.page?.nextAfter) void candidateRequest(pin, false, value.after);
+        if (value.type === 'candidate-file' && fields === 'path,pin,type' && pin.candidate?.page?.changes.some(change => change.path === value.path)) void candidateRequest(pin, false, null, value.path);
+        return true;
       }
       if (['retry-review-decision', 'reload-review-decision'].includes(value.type) && fields === 'pin,type') {
         const pin = pins.find(pin => pin.key === value.pin);

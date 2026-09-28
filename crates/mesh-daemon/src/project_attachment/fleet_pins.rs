@@ -44,6 +44,41 @@ pub struct FleetPin {
     pub review_object: Option<String>,
     /// Whether the starting-version comparison was opened.
     pub input_open: bool,
+    /// Exact preparation request, retained before dispatch; no execution or approval authority.
+    pub candidate: Option<FleetCandidatePin>,
+}
+
+/// Durable input selectors for one fixed project comparison. Content is always reverified.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FleetCandidatePin {
+    /// Registered original project identity.
+    pub project: String,
+    /// Idempotent preparation request.
+    pub request: String,
+    /// Fixed main head; absent means genesis, never latest.
+    pub expected_main: Option<String>,
+}
+impl FleetCandidatePin {
+    fn parse(value: &Json) -> io::Result<Self> {
+        if !matches!(value, Json::Object(fields) if fields.len() == 3) {
+            return Err(invalid("invalid candidate pin fields"));
+        }
+        Ok(Self {
+            project: text(value, "project")?.into(),
+            request: text(value, "request")?.into(),
+            expected_main: optional_text(value, "expected_main")?,
+        })
+    }
+    fn json(&self) -> Json {
+        Json::object([
+            ("project", Json::text(&self.project)),
+            ("request", Json::text(&self.request)),
+            (
+                "expected_main",
+                self.expected_main.as_deref().map_or(Json::Null, Json::text),
+            ),
+        ])
+    }
 }
 
 /// A durable bounded snapshot with a compare-and-swap revision.
@@ -59,7 +94,7 @@ impl FleetPinState {
     /// Bounded native/UI selector projection; no content or authority is carried in this value.
     pub fn to_json(&self) -> Json {
         Json::object([
-            ("schema", Json::text("mesh.desktop-fleet-pin-selectors/v1")),
+            ("schema", Json::text("mesh.desktop-fleet-pin-selectors/v2")),
             ("revision", Json::text(self.revision.to_string())),
             (
                 "pins",
@@ -75,7 +110,11 @@ impl FleetPinState {
         }
         let value = Json::parse(encoded).map_err(|_| invalid("invalid pin projection"))?;
         if !matches!(&value, Json::Object(fields) if fields.len() == 3)
-            || text(&value, "schema")? != "mesh.desktop-fleet-pin-selectors/v1"
+            || ![
+                "mesh.desktop-fleet-pin-selectors/v1",
+                "mesh.desktop-fleet-pin-selectors/v2",
+            ]
+            .contains(&text(&value, "schema")?)
         {
             return Err(invalid("invalid pin projection schema"));
         }
@@ -94,7 +133,7 @@ impl FleetPinState {
         }
         let pins = entries
             .iter()
-            .map(FleetPin::parse)
+            .map(|entry| FleetPin::parse(entry, text(&value, "schema")?.ends_with("/v1")))
             .collect::<io::Result<Vec<_>>>()?;
         validate(&pins)?;
         Ok(Self { revision, pins })
@@ -102,11 +141,20 @@ impl FleetPinState {
 }
 
 impl FleetPin {
-    fn parse(entry: &Json) -> io::Result<Self> {
-        if !matches!(entry, Json::Object(fields) if fields.len() == 14) {
+    fn parse(entry: &Json, legacy: bool) -> io::Result<Self> {
+        if !matches!(entry, Json::Object(fields) if fields.len() == if legacy { 14 } else { 15 }) {
             return Err(invalid("invalid fleet pin fields"));
         }
         Ok(Self {
+            candidate: if legacy {
+                None
+            } else {
+                match entry.get("candidate") {
+                    Some(Json::Null) => None,
+                    Some(value) => Some(FleetCandidatePin::parse(value)?),
+                    None => return Err(invalid("missing candidate pin")),
+                }
+            },
             key: text(entry, "key")?.into(),
             objective: text(entry, "objective")?.into(),
             lane: text(entry, "lane")?.into(),
@@ -127,7 +175,10 @@ impl FleetPin {
         })
     }
     fn json(&self) -> Json {
-        Json::object([
+        self.json_version(false)
+    }
+    fn json_version(&self, legacy: bool) -> Json {
+        let value = Json::object([
             ("key", Json::text(&self.key)),
             ("objective", Json::text(&self.objective)),
             ("lane", Json::text(&self.lane)),
@@ -151,7 +202,20 @@ impl FleetPin {
                 self.review_object.as_deref().map_or(Json::Null, Json::text),
             ),
             ("input_open", Json::Bool(self.input_open)),
-        ])
+        ]);
+        if legacy {
+            return value;
+        }
+        let Json::Object(mut fields) = value else {
+            unreachable!()
+        };
+        fields.push((
+            "candidate".into(),
+            self.candidate
+                .as_ref()
+                .map_or(Json::Null, FleetCandidatePin::json),
+        ));
+        Json::Object(fields)
     }
 }
 fn valid_object(value: &str) -> bool {
@@ -171,6 +235,16 @@ fn validate(pins: &[FleetPin]) -> io::Result<()> {
             .key
             .parse::<u64>()
             .map_err(|_| invalid("invalid fleet pin key"))?;
+        if pin.candidate.as_ref().is_some_and(|candidate| {
+            !super::provisioning::valid_id(&candidate.project)
+                || !valid_object(&candidate.request)
+                || candidate
+                    .expected_main
+                    .as_ref()
+                    .is_some_and(|head| !super::provisioning::valid_id(head))
+        }) {
+            return Err(invalid("invalid candidate selectors"));
+        }
         if key == 0
             || key.to_string() != pin.key
             || !keys.insert(&pin.key)
@@ -260,7 +334,7 @@ impl AttachmentStorage {
                 .ok_or_else(|| invalid("pin revision exhausted"))?,
             pins,
         };
-        let bytes = self.fleet_pin_record(&next)?.encode();
+        let bytes = self.fleet_pin_record(&next, false)?.encode();
         if bytes.len() as u64 > MAX_BYTES {
             return Err(invalid("pin snapshot exceeds limit"));
         }
@@ -282,16 +356,29 @@ impl AttachmentStorage {
         Ok(next)
     }
 
-    fn fleet_pin_record(&self, state: &FleetPinState) -> io::Result<Json> {
+    fn fleet_pin_record(&self, state: &FleetPinState, legacy: bool) -> io::Result<Json> {
         let (device, inode) = self.pinned.identity()?;
         Ok(Json::object([
-            ("schema", Json::text("mesh.fleet-pins/v1")),
+            (
+                "schema",
+                Json::text(if legacy {
+                    "mesh.fleet-pins/v1"
+                } else {
+                    "mesh.fleet-pins/v2"
+                }),
+            ),
             ("catalog_device", Json::text(format!("{device:016x}"))),
             ("catalog_inode", Json::text(format!("{inode:016x}"))),
             ("revision", Json::text(state.revision.to_string())),
             (
                 "pins",
-                Json::Array(state.pins.iter().map(FleetPin::json).collect()),
+                Json::Array(
+                    state
+                        .pins
+                        .iter()
+                        .map(|pin| pin.json_version(legacy))
+                        .collect(),
+                ),
             ),
         ]))
     }
@@ -332,6 +419,11 @@ impl AttachmentStorage {
         }
         let encoded = String::from_utf8(bytes).map_err(|_| invalid("pin snapshot is not UTF-8"))?;
         let record = Json::parse(&encoded).map_err(|_| invalid("invalid pin snapshot"))?;
+        let legacy = match text(&record, "schema")? {
+            "mesh.fleet-pins/v1" => true,
+            "mesh.fleet-pins/v2" => false,
+            _ => return Err(invalid("unknown fleet pin schema")),
+        };
         let revision = text(&record, "revision")?
             .parse::<u64>()
             .map_err(|_| invalid("invalid pin revision"))?;
@@ -346,11 +438,11 @@ impl AttachmentStorage {
         }
         let pins = entries
             .iter()
-            .map(FleetPin::parse)
+            .map(|entry| FleetPin::parse(entry, legacy))
             .collect::<io::Result<Vec<_>>>()?;
         validate(&pins)?;
         let state = FleetPinState { revision, pins };
-        if self.fleet_pin_record(&state)?.encode() != encoded {
+        if self.fleet_pin_record(&state, legacy)?.encode() != encoded {
             return Err(invalid("pin snapshot identity or schema changed"));
         }
         self.pinned.ensure_namespace_identity()?;

@@ -363,6 +363,21 @@ impl AttachmentHost {
         request: &str,
         expected_main: Option<&str>,
     ) -> Result<String, String> {
+        let envelope = |value| {
+            Json::object([
+                ("schema", Json::text("mesh.desktop-fleet-candidate/v1")),
+                ("project", Json::text(project)),
+                ("objective", Json::text(objective)),
+                ("selection", selection.to_json()),
+                ("request", Json::text(request)),
+                (
+                    "expected_main",
+                    expected_main.map_or(Json::Null, Json::text),
+                ),
+                ("result", value),
+            ])
+            .encode()
+        };
         let source = self.review_history(project)?;
         if let Ok(receipt) = self.fleet_history(objective)?.inspect_project_candidate(
             selection,
@@ -371,12 +386,12 @@ impl AttachmentHost {
             request,
             expected_main,
         ) {
-            return Ok(receipt.encode());
+            return Ok(envelope(receipt));
         }
         // Stage itself refuses conflicting or partial receipts; this fallback never repairs them.
         self.current_fleet(objective)?
             .stage_project_candidate(selection, &source, trusted, request, expected_main)
-            .map(|value| value.encode())
+            .map(envelope)
             .map_err(|_| {
                 "The exact project candidate could not be prepared; retain the request for retry"
                     .into()
@@ -394,10 +409,28 @@ impl AttachmentHost {
         expected_main: Option<&str>,
         page: (Option<&str>, Option<&str>),
     ) -> Result<String, String> {
+        let envelope = |value| {
+            Json::object([
+                (
+                    "schema",
+                    Json::text("mesh.desktop-fleet-candidate-review/v1"),
+                ),
+                ("project", Json::text(project)),
+                ("objective", Json::text(objective)),
+                ("selection", selection.to_json()),
+                ("request", Json::text(request)),
+                (
+                    "expected_main",
+                    expected_main.map_or(Json::Null, Json::text),
+                ),
+                ("result", value),
+            ])
+            .encode()
+        };
         let source = self.review_history(project)?;
         self.fleet_history(objective)?
             .review_project_candidate(selection, &source, trusted, request, expected_main, page)
-            .map(|value| value.encode())
+            .map(envelope)
             .map_err(|_| "The fixed project comparison could not be verified".into())
     }
 
@@ -983,6 +1016,7 @@ mod tests {
         let snapshot = FleetPinState {
             revision: 0,
             pins: vec![FleetPin {
+                candidate: None,
                 key: "1".into(),
                 objective: format!("fleet-{}", "a".repeat(64)),
                 lane: "worker".into(),

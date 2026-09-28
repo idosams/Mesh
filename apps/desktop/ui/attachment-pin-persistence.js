@@ -68,12 +68,16 @@ export function createPinPersistence({ invoke, selectors, restore, status, parse
   return {
     ensureLoaded() { if (!attempted) active = load(); return active; },
     changed() { dirty = true; if (!saving) active = drain(); },
+    async confirmed() {
+      await active;
+      return ready && !saving && !dirty && !failed && !disposed && same(acknowledged, parseSnapshot({ schema, revision, pins: selectors() }).pins);
+    },
     async retry() {
       await active;
       if (!ready || disposed) { if (!disposed) active = load(); return active; }
       try {
         const stored = parseSnapshot(await invoke(loadCommand));
-        if (same(stored.pins, selectors())) {
+        if (same(stored.pins, parseSnapshot({ schema, revision, pins: selectors() }).pins)) {
           revision = stored.revision; acknowledged = stored.pins; dirty = false; failed = false; report('saved'); return;
         }
         if (!same(stored.pins, acknowledged)) throw new Error('Concurrent pin change');

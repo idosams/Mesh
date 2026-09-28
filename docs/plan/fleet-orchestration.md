@@ -469,3 +469,30 @@ imports operations, approves results, advances main, applies source files or ado
 A native desktop test exercises real capture, signed agent checkpoint, review, staging, exact retry,
 wrong-project refusal and restart recovery with later live edits preserved. Renderer controls,
 durable pending request inputs, packaged invocation and graphical proof remain unfinished.
+
+
+### Desktop fixed project comparisons and durable preparation inputs
+
+Pinned fleet reviews now expose a whole-project content comparison against the main observed when
+preparation begins. Each panel owns independent pagination, selected saved text, exact retry and
+stale-main observations. The native desktop envelopes bind the request, project, objective and
+saved selection to the daemon receipt or review. Presentation rejects substituted identities,
+malformed lineage, changed immutable context, unsafe/oversized text and inconsistent pages.
+
+Before dispatching preparation, the coordinator waits for native durable acknowledgement of the
+project/request/expected-main selectors. A failed or uncertain save prevents allocation until the
+same selectors are confirmed. Preparation retries retain those inputs; they never discover a newer
+main implicitly. Restart only reads existing comparisons, and missing candidates remain visible
+with an explicit preparation retry. Closed/reloaded panels ignore late replies. Closing a panel
+removes its saved navigation selector; it does not cancel a dispatched native operation or delete
+retained candidate content. Pending feedback and decision operations remain session-only.
+
+Fleet pin storage and projections now write v2 with an optional three-field candidate selector.
+Readers accept exact v1 records as candidate-free navigation without rewriting on load; a subsequent
+changed save writes v2 atomically under the existing revision and directory identity checks. Older
+binaries reject v2 rather than dropping pending inputs. No content or approval authority is stored
+in selectors, and the input comparison/review mode fields remain unchanged. Existing attachment pin
+formats are unchanged. Native migration/restart/refusal tests, coordinator persistence/race tests and
+React static rendering cover this increment. Packaged graphical interaction remains unverified;
+source-history operation import, signable candidate review, dependency validation, human approval
+and original-project integration still require implementation.

@@ -5,7 +5,7 @@ const id = 'a'.repeat(64), version = 'b'.repeat(64), objective = `fleet-${'c'.re
 const catalogue = () => ({ schema: 'mesh.native-fleets/v1', fleets: [{ objective, ownership: 'current-host', state: {
   objective, revision: 3, cancelled: false, lanes: [{ id: lane, parent: null, source_project: id, goal: 'Coordinate', provider: 'codex', base: version, allocated: true, workspace: { root: '/native/lane', installation: 'native-installation' }, run: null }],
 } }] });
-const savedPins = () => ({ schema: 'mesh.desktop-fleet-pin-selectors/v1', revision: '0', pins: [] });
+const savedPins = () => ({ schema: 'mesh.desktop-fleet-pin-selectors/v2', revision: '0', pins: [] });
 const activity = () => ({ schema: 'mesh.desktop-fleet-activity/v1', fleets: [] });
 const live = () => ({ objective, status: 'monitoring', stop_requested: false, observed_at: '1000', workers: [{ lane, run: 'run-one', observed_at: '1000', thread: null, activity: 'working', events: '2', stderr_lines: '0', turn_completed: false, failed: false, streams_closed: false, outcome: null }] });
 class CustomEvent extends Event { constructor(type, init = {}) { super(type); this.detail = init.detail; } }

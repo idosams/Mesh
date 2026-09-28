@@ -24,6 +24,7 @@ impl Drop for Fixture {
 }
 fn pin(key: &str) -> FleetPin {
     FleetPin {
+        candidate: None,
         key: key.into(),
         objective: format!("fleet-{}", "a".repeat(64)),
         lane: "worker".into(),
@@ -218,4 +219,62 @@ fn exhausted_revision_preserves_the_acknowledged_snapshot_and_never_stages_a_rep
     assert_eq!(fs::read_to_string(&record).unwrap(), exhausted);
     assert!(!f.0.join("desktop-fleet-pins.pending").exists());
     assert_eq!(f.open().load_fleet_pins().unwrap(), saved);
+}
+
+#[test]
+fn legacy_pins_migrate_only_on_change_and_candidate_inputs_survive_restart() {
+    use mesh_daemon::project_attachment::FleetCandidatePin;
+    let f = Fixture::new("candidate-migration");
+    let store = f.open();
+    let saved = store.save_fleet_pins(0, vec![pin("1")]).unwrap();
+    let record = f.0.join("desktop-fleet-pins.json");
+    let legacy = fs::read_to_string(&record)
+        .unwrap()
+        .replace("mesh.fleet-pins/v2", "mesh.fleet-pins/v1")
+        .replace(",\"candidate\":null", "");
+    fs::write(&record, &legacy).unwrap();
+    assert_eq!(store.load_fleet_pins().unwrap(), saved);
+    assert_eq!(fs::read_to_string(&record).unwrap(), legacy);
+    let old_projection = saved
+        .to_json()
+        .encode()
+        .replace(
+            "mesh.desktop-fleet-pin-selectors/v2",
+            "mesh.desktop-fleet-pin-selectors/v1",
+        )
+        .replace(",\"candidate\":null", "");
+    assert_eq!(
+        FleetPinState::parse_projection(&old_projection).unwrap(),
+        saved
+    );
+    let mut pending = pin("1");
+    pending.candidate = Some(FleetCandidatePin {
+        project: "1".repeat(64),
+        request: "2".repeat(32),
+        expected_main: Some("3".repeat(64)),
+    });
+    let stored = store.save_fleet_pins(1, vec![pending.clone()]).unwrap();
+    assert_eq!(f.open().load_fleet_pins().unwrap(), stored);
+    assert!(fs::read_to_string(&record)
+        .unwrap()
+        .contains("mesh.fleet-pins/v2"));
+    assert!(store.save_fleet_pins(1, vec![pin("1")]).is_err());
+    for mutate in [
+        (|p: &mut FleetCandidatePin| p.project = "../source".into()) as fn(&mut FleetCandidatePin),
+        |p| p.request = "1".repeat(64),
+        |p| p.expected_main = Some("latest".into()),
+    ] {
+        let mut invalid = pending.clone();
+        mutate(invalid.candidate.as_mut().unwrap());
+        assert!(store.save_fleet_pins(2, vec![invalid]).is_err());
+    }
+    let encoded = stored.to_json().encode();
+    assert!(FleetPinState::parse_projection(
+        &encoded.replace("\"candidate\":{", "\"candidate\":{\"content\":\"secret\",")
+    )
+    .is_err());
+    assert!(
+        FleetPinState::parse_projection(&encoded.replace("selectors/v2", "selectors/v1")).is_err()
+    );
+    assert_eq!(f.open().load_fleet_pins().unwrap(), stored);
 }

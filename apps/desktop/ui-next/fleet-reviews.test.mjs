@@ -343,3 +343,45 @@ test('Hebrew request decisions retain raw feedback and disable new choices durin
     assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון נוסף לאותה החלטה<\/button>/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('project comparison displays fixed main, stale observations and escaped saved content independently', () => {
+  const first = pin(); first.candidateEnabled = true; first.projectSource = '9'.repeat(64);
+  first.view = { candidate: { project: first.projectSource, request: 'a'.repeat(32), expected_main: 'b'.repeat(64) } };
+  const page = { review: 'c'.repeat(64), baseIsCurrent: false, observedMain: { head: 'd'.repeat(64) }, context: { base_head: first.view.candidate.expected_main, target_version: first.selection.version }, total: 1, nextAfter: null,
+    changes: [{ path: '<changed>.txt', effect: 'added', before: null, after: { kind: 'file', path: '<changed>.txt', digest: 'e'.repeat(64), bytes: 16, executable: false, state: 'text', text: '<script>x</script>' } }] };
+  first.candidate = { loading: false, error: '', page, fixed: page, file: page.changes[0] };
+  const second = { ...pin(), key: '2', candidateEnabled: true, projectSource: first.projectSource };
+  const html = render({ pins: [first, second], notice: '' });
+  assert.equal((html.match(/aria-label="Fixed project comparison"/g) ?? []).length, 2);
+  assert.match(html, /Main has advanced/); assert.match(html, /Fixed main: <bdi dir="ltr">bbbbb/);
+  assert.match(html, /&lt;changed&gt;.txt/); assert.match(html, /&lt;script&gt;x&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /Prepare comparison with current main/); assert.match(html, /Read fixed comparison from first page/);
+  assert.match(html, /do not approve changes, advance main, or replace working files/);
+});
+
+test('Hebrew project comparisons preserve raw paths and text and disable preparation while saving', () => {
+  const value = pin(); value.candidateEnabled = true; value.projectSource = '9'.repeat(64);
+  value.view = { candidate: { project: value.projectSource, request: 'a'.repeat(32), expected_main: 'b'.repeat(64) } };
+  const change = { path: 'Fixed project main', effect: 'added', before: null, after: { kind: 'file', path: 'Fixed project main', digest: 'e'.repeat(64), bytes: 18, executable: false, state: 'text', text: 'Fixed project main' } };
+  const page = { review: 'c'.repeat(64), baseIsCurrent: false, observedMain: {head:'d'.repeat(64)}, context:{base_head:value.view.candidate.expected_main,target_version:value.selection.version},total:1,nextAfter:null,changes:[change] };
+  value.candidate = { loading:false,error:'',page,fixed:page,file:change };
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /aria-label="השוואת פרויקט קבועה"/);
+    assert.match(html, /הגרסה הראשית התקדמה/);
+    assert.match(html, /<bdi dir="ltr">Fixed project main<\/bdi>/);
+    assert.match(html, /<pre dir="ltr"[^>]*>Fixed project main<\/pre>/);
+    assert.match(html, /גרסה ראשית קבועה: <bdi dir="ltr">bbbb/);
+    assert.match(html, /אינה מפעילה עובדים מחדש/);
+    value.candidate.page = null;
+    value.candidate.error = 'Preparation is unconfirmed. Keep the saved request and retry its exact inputs. Resolve any saved-selection error first.';
+    value.candidateEnabled = false;
+    html = render({pins:[value],notice:''});
+    assert.match(html, /ההכנה לא אומתה/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון הכנה נוסף עם אותם נתונים בדיוק<\/button>/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון נוסף לבקשת ההשוואה האחרונה<\/button>/);
+    assert.match(html, /התוכן המוצג למטה הוא התוצאה הקודמת שאומתה/);
+    assert.match(html, /<pre dir="ltr"[^>]*>Fixed project main<\/pre>/);
+  } finally { module.exports.setLocale('en'); }
+});

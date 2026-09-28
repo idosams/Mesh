@@ -434,3 +434,18 @@ The canonical native desktop route transfer adds substituted checkpoint/version/
 coverage across mapping, preparation and review, preserving exact receipt recovery afterward. Local
 repository/docs/license/storage/format checks pass. Native host/full local and packaged verification
 remain pending; visible candidate panels follow separately and migration PRs remain unmerged.
+
+
+Desktop source now shows each pinned fleet result against a fixed original-project main, with
+independent paths/text, exact retries and a separate stale-main observation. Preparation first saves
+its exact project/request/main selectors durably; restart reads existing candidates without worker
+adoption or implicit staging. Fleet pin v2 accepts v1 navigation and migrates on a changed save;
+older binaries refuse v2. Native, coordinator and static-render tests cover this connection. Actual
+packaged graphical proof remains outstanding, as do candidate operation import, signable review,
+human approval and integration. Pending feedback/decision requests still need durable recovery.
+
+Canonical comparison-panel transfer preserves Hebrew localization, raw saved content, nullable lane
+goals and exhausted-revision refusal. Local type/build, 147 render and 550 desktop tests pass;
+coordinator/localization regressions fail before their changes and pass after restoration. Native/full
+local and packaged graphical verification remain pending. Published migration is not merged delivery;
+required review, ordered merges and combined-main verification remain outstanding.

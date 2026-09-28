@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fleetPinSnapshot, createFleetPinPersistence } from './fleet-pin-persistence.js';
 import { createFleetReviews } from './fleet-reviews.js';
-const schema = 'mesh.desktop-fleet-pin-selectors/v1';
-const pin = () => ({ key: '1', objective: `fleet-${'a'.repeat(64)}`, lane: 'worker', checkpoint: 'checkpoint', version: 'b'.repeat(64), bundle: 'c'.repeat(64), source_version: 'd'.repeat(64), input_after: null, input_object: 'e'.repeat(32), input_open: true, input_layout: 'split', review_object: 'f'.repeat(32), review_mode: 'content', review_layout: 'inline' });
+const schema = 'mesh.desktop-fleet-pin-selectors/v2';
+const pin = () => ({ candidate: null, key: '1', objective: `fleet-${'a'.repeat(64)}`, lane: 'worker', checkpoint: 'checkpoint', version: 'b'.repeat(64), bundle: 'c'.repeat(64), source_version: 'd'.repeat(64), input_after: null, input_object: 'e'.repeat(32), input_open: true, input_layout: 'split', review_object: 'f'.repeat(32), review_mode: 'content', review_layout: 'inline' });
 const snapshot = (pins = [], revision = '0') => ({ schema, revision, pins });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function storeHarness(invoke) {
