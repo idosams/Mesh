@@ -173,9 +173,9 @@ fn some_actor(rng: &mut Rng) -> ActorId {
 /// One operation, drawn from the whole vocabulary with the weights below.
 ///
 /// The weights bias towards the verbs that build state — a corpus of nothing but deletions would
-/// spend its whole run on an empty workspace — while keeping every one of the eighteen reachable.
+/// spend its whole run on an empty workspace — while keeping every one of the nineteen reachable.
 fn some_operation(rng: &mut Rng, shadow: &mut Shadow) -> Operation {
-    match rng.below(100) {
+    match rng.below(102) {
         0..=9 => {
             let object_id = shadow
                 .take_unminted(rng)
@@ -306,6 +306,8 @@ fn some_operation(rng: &mut Rng, shadow: &mut Shadow) -> Operation {
             outcome: ValidationOutcome::ALL[rng.below(4) as usize],
             evidence: ContentHash::from_bytes([rng.byte(); 32]),
         },
+        100 => Operation::InitializeWorkspace { root_id: root() },
+        101 => Operation::InitializeWorkspace { root_id: object(1) },
         _ => Operation::AdvanceCanonicalHead {
             from_head: some_head(rng),
             to_head: some_head(rng),

@@ -2,7 +2,7 @@
 //!
 //! # Three sentences this crate is built around
 //!
-//! **An operation is a meaningful transition, not a syscall.** Plan §4.3's eighteen verbs are the
+//! **An operation is a meaningful transition, not a syscall.** Plan §4.3's nineteen verbs are the
 //! whole vocabulary, and a raw `write()` is not one of them: raw writes are accumulated locally by
 //! [`WriteCoalescer`] and replaced by one [`Operation::WriteFileVersion`] naming content that is
 //! already content-addressed. No type here carries file bytes.
@@ -59,7 +59,7 @@
 //! };
 //!
 //! // Eighteen verbs, each with a published schema and a domain tag.
-//! assert_eq!(OperationKind::ALL.len(), 18);
+//! assert_eq!(OperationKind::ALL.len(), 19);
 //! assert_eq!(OperationKind::MoveEntry.domain(), "mesh.v0.op.move-entry");
 //!
 //! // Every one of them round-trips through the canonical encoding.

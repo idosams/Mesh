@@ -1,6 +1,6 @@
 //! The vocabulary is plan §4.3's, and every member round-trips through the canonical encoding.
 //!
-//! The first test reads the plan. That is the difference between "eighteen operations" as a number
+//! The first test reads the plan. That is the difference between "nineteen operations" as a number
 //! somebody typed into an array and as a fact about the document the programme is executing: a
 //! member renamed here, or added here, or dropped from the plan, turns this red. It is the
 //! mechanical half of this task's rule that **adding an operation is a protocol change**.
@@ -42,8 +42,8 @@ fn the_vocabulary_is_the_one_the_plan_lists_in_the_order_it_lists_them() {
     let expected = plan_vocabulary();
     assert_eq!(
         expected.len(),
-        18,
-        "plan §4.3 no longer lists eighteen operations: {expected:?}"
+        19,
+        "plan §4.3 no longer lists nineteen operations: {expected:?}"
     );
     let declared: Vec<String> = OperationKind::ALL
         .iter()
@@ -334,4 +334,32 @@ fn an_enumerated_field_reaches_the_bytes() {
     };
     assert_ne!(encode_canonical(&one), encode_canonical(&other));
     assert_eq!(decode_operation(&encode_canonical(&one)).unwrap(), one);
+}
+
+#[test]
+fn workspace_root_matches_the_published_schema_and_vector() {
+    let schema = common::parse_json(&read_repo_file("protocol/schemas/workspace-root-v0.json"));
+    let vector = common::parse_json(&read_repo_file(
+        "protocol/test-vectors/v0/workspace-root.json",
+    ));
+    assert_eq!(
+        schema.field("record").as_str(),
+        "mesh.v0.op.initialize-workspace"
+    );
+    let operation = Operation::InitializeWorkspace {
+        root_id: mesh_operations::ObjectId::from_bytes([0x17; 16]),
+    };
+    let encoded = encode_canonical(&operation);
+    let hex: String = encoded.iter().map(|byte| format!("{byte:02x}")).collect();
+    assert_eq!(hex, vector.field("canonical_encoding_hex").as_str());
+    assert_eq!(
+        vector.field("input").field("root_id").as_str(),
+        "1717171717171717171717171717171717"
+    );
+    assert_eq!(decode_operation(&encoded).unwrap(), operation);
+    let fields = schema.field("schema").field("fields").as_array();
+    assert_eq!(fields.len(), 1);
+    assert_eq!(fields[0].field("name").as_str(), "root_id");
+    assert_eq!(fields[0].field("type").as_str(), "bytes");
+    assert_eq!(fields[0].field("byte_length"), &common::Json::Number(16.0));
 }

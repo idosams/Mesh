@@ -269,6 +269,16 @@ impl Oracle {
         operation: &Operation,
     ) -> Result<Effect, Rejection> {
         match operation {
+            Operation::InitializeWorkspace { root_id } => {
+                if *root_id != self.root {
+                    Err(Rejection::RootIdentityMismatch {
+                        expected: self.root,
+                        declared: *root_id,
+                    })
+                } else {
+                    Ok(Effect::AlreadyInEffect)
+                }
+            }
             Operation::CreateFile { object_id } => {
                 self.mint(*object_id, ObjectKind::File, changeset)
             }
@@ -874,6 +884,7 @@ pub fn materialize(root: ObjectId, set: &[AppliedChangeSet]) -> Snapshot {
 /// the oracle's rendering does not borrow the implementation's answer.
 fn kind_of(operation: &Operation) -> OperationKind {
     match operation {
+        Operation::InitializeWorkspace { .. } => OperationKind::InitializeWorkspace,
         Operation::CreateFile { .. } => OperationKind::CreateFile,
         Operation::CreateDirectory { .. } => OperationKind::CreateDirectory,
         Operation::WriteFileVersion { .. } => OperationKind::WriteFileVersion,

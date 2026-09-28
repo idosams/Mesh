@@ -46,6 +46,13 @@ pub enum Effect {
 /// two implementations can be localised to an identifier rather than to a boolean.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Rejection {
+    /// A declaration disagrees with the immutable workspace root.
+    RootIdentityMismatch {
+        /// The materialized workspace root.
+        expected: ObjectId,
+        /// The root named by the declaration.
+        declared: ObjectId,
+    },
     /// The operation named an object that has not been created.
     UnknownObject {
         /// The object.
@@ -167,6 +174,10 @@ pub enum Rejection {
 impl fmt::Display for Rejection {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::RootIdentityMismatch { expected, declared } => write!(
+                formatter,
+                "declared root {declared} differs from workspace root {expected}"
+            ),
             Self::UnknownObject { object } => write!(formatter, "no object {object}"),
             Self::ObjectAlreadyExists { object } => write!(formatter, "object {object} exists"),
             Self::NotADirectory { object } => write!(formatter, "object {object} is a file"),
@@ -348,6 +359,10 @@ mod tests {
         let head = HeadId::from_bytes([3; 32]);
         let name = NormalizedName::new("report.md").unwrap();
         let rejections = [
+            Rejection::RootIdentityMismatch {
+                expected: object,
+                declared: ObjectId::from_bytes([2; 16]),
+            },
             Rejection::UnknownObject { object },
             Rejection::ObjectAlreadyExists { object },
             Rejection::NotADirectory { object },
@@ -411,6 +426,6 @@ mod tests {
                 );
             }
         }
-        assert_eq!(rejections.len(), 18);
+        assert_eq!(rejections.len(), 19);
     }
 }

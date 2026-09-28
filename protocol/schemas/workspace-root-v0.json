@@ -1,0 +1,16 @@
+{
+  "schema_format": "mesh-record-schema/0",
+  "record": "mesh.v0.op.initialize-workspace",
+  "summary": "Declare immutable workspace root; never clear state or grant publication authority.",
+  "schema": {
+    "domain_tag": "mesh.v0.op.initialize-workspace",
+    "fields": [
+      {
+        "name": "root_id",
+        "type": "bytes",
+        "byte_length": 16
+      }
+    ]
+  },
+  "compatibility": "Additive operation vocabulary extension. Older operation readers reject this unknown domain. Existing operation encodings are unchanged."
+}

@@ -38,6 +38,7 @@ const DEFAULT_SEEDS: u64 = 4_000;
 /// A `match` rather than a `Debug` prefix, so a new variant is a compile error here.
 fn shape_of(rejection: &Rejection) -> &'static str {
     match rejection {
+        Rejection::RootIdentityMismatch { .. } => "RootIdentityMismatch",
         Rejection::UnknownObject { .. } => "UnknownObject",
         Rejection::ObjectAlreadyExists { .. } => "ObjectAlreadyExists",
         Rejection::NotADirectory { .. } => "NotADirectory",
@@ -110,8 +111,8 @@ fn the_oracle_and_the_implementation_agree_over_the_corpus() {
     );
     assert_eq!(
         shapes.len(),
-        18,
-        "the corpus reached only {} of the eighteen refusal shapes: {shapes:?}",
+        19,
+        "the corpus reached only {} of the nineteen refusal shapes: {shapes:?}",
         shapes.len()
     );
     eprintln!(

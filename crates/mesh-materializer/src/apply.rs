@@ -200,6 +200,16 @@ pub fn apply_operation(
     operation: &Operation,
 ) -> Result<Effect, Rejection> {
     match operation {
+        Operation::InitializeWorkspace { root_id } => {
+            if *root_id == state.root() {
+                Ok(Effect::AlreadyInEffect)
+            } else {
+                Err(Rejection::RootIdentityMismatch {
+                    expected: state.root(),
+                    declared: *root_id,
+                })
+            }
+        }
         Operation::CreateFile { object_id } => mint(state, *object_id, ObjectKind::File, changeset),
         Operation::CreateDirectory { object_id } => {
             mint(state, *object_id, ObjectKind::Directory, changeset)

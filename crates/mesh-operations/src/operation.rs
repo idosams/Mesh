@@ -1,4 +1,4 @@
-//! The operation vocabulary: plan §4.3's eighteen verbs, and nothing else.
+//! The operation vocabulary: plan §4.3's nineteen verbs, and nothing else.
 //!
 //! # What an operation is, and what it is deliberately not
 //!
@@ -265,7 +265,7 @@ impl PreservedEntry {
 /// Which member of the vocabulary an operation is.
 ///
 /// The order is plan §4.3's order, and `tests/vocabulary_matches_the_plan.rs` reads that section
-/// out of `docs/plan/execution-plan.md` and requires the eighteen names to match it exactly, in
+/// out of `docs/plan/execution-plan.md` and requires the nineteen names to match it exactly, in
 /// order. A member added here without a plan change turns that test red, which is the mechanical
 /// half of this crate's rule that *adding an operation is a protocol change*.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -306,11 +306,13 @@ pub enum OperationKind {
     RecordValidation,
     /// Move the protected shared version, under an approval envelope.
     AdvanceCanonicalHead,
+    /// Declare the immutable root identity, including for an empty workspace.
+    InitializeWorkspace,
 }
 
 impl OperationKind {
     /// Every member, in plan §4.3 order.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::CreateFile,
         Self::CreateDirectory,
         Self::WriteFileVersion,
@@ -329,12 +331,14 @@ impl OperationKind {
         Self::CreateReviewBundle,
         Self::RecordValidation,
         Self::AdvanceCanonicalHead,
+        Self::InitializeWorkspace,
     ];
 
     /// The name plan §4.3 gives this member.
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
+            Self::InitializeWorkspace => "InitializeWorkspace",
             Self::CreateFile => "CreateFile",
             Self::CreateDirectory => "CreateDirectory",
             Self::WriteFileVersion => "WriteFileVersion",
@@ -554,6 +558,11 @@ pub enum Operation {
         /// The approval envelope authorising it.
         approval_id: ApprovalId,
     },
+    /// Declare the workspace root without creating, clearing or resetting state.
+    InitializeWorkspace {
+        /// The immutable root identity.
+        root_id: ObjectId,
+    },
 }
 
 impl Operation {
@@ -561,6 +570,7 @@ impl Operation {
     #[must_use]
     pub const fn kind(&self) -> OperationKind {
         match self {
+            Self::InitializeWorkspace { .. } => OperationKind::InitializeWorkspace,
             Self::CreateFile { .. } => OperationKind::CreateFile,
             Self::CreateDirectory { .. } => OperationKind::CreateDirectory,
             Self::WriteFileVersion { .. } => OperationKind::WriteFileVersion,
@@ -624,20 +634,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_vocabulary_has_exactly_eighteen_members_and_no_duplicate_name() {
-        assert_eq!(OperationKind::ALL.len(), 18);
+    fn the_vocabulary_has_exactly_nineteen_members_and_no_duplicate_name() {
+        assert_eq!(OperationKind::ALL.len(), 19);
         let mut names: Vec<&str> = OperationKind::ALL
             .iter()
             .map(OperationKind::as_str)
             .collect();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 18);
+        assert_eq!(names.len(), 19);
     }
 
     #[test]
     fn every_member_of_all_reports_itself_as_its_own_kind() {
-        // `kind()` is eighteen hand-written arms and a transposed pair would be invisible to a
+        // `kind()` is nineteen hand-written arms and a transposed pair would be invisible to a
         // round-trip test, because both directions would agree on the wrong answer.
         let samples = crate::corpus::one_of_every_operation();
         assert_eq!(samples.len(), OperationKind::ALL.len());
