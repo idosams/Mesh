@@ -20,6 +20,9 @@ use mesh_types::{Blake3, ContentDigest};
 
 pub use crate::CheckpointSigner;
 
+mod received;
+pub(in crate::fleet) use received::received_clock;
+
 /// Private allocation policy implemented by the native host, never supplied over agent IPC.
 pub trait LaneAllocator: Send + Sync {
     /// Create a folder for a service-generated lane identity and verified immutable source.
@@ -239,6 +242,7 @@ struct Inner {
     runtime: Runtime,
     workspaces: BTreeMap<String, Arc<LaneWorkspace>>,
     grants: BTreeMap<String, Grant>,
+    received: Option<received::ReceivedSession>,
 }
 /// A pinned saved result. Native readers verify every member against durable checkpoint history.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -440,7 +444,7 @@ impl FleetHistory {
 
 /// One objective's native host. All mutation methods other than `agent_call` are native-only APIs.
 pub struct FleetService {
-    inner: Mutex<Inner>,
+    inner: Arc<Mutex<Inner>>,
     allocator: Arc<dyn LaneAllocator>,
     providers: BTreeSet<String>,
     host: String,
@@ -470,20 +474,26 @@ impl FleetService {
             .and_then(|mut f| f.read_exact(&mut host))
             .map_err(|_| refusal("fleet-host-identity-unavailable"))?;
         Ok(Self {
-            inner: Mutex::new(Inner {
+            inner: Arc::new(Mutex::new(Inner {
                 runtime,
                 workspaces: BTreeMap::new(),
                 grants: BTreeMap::new(),
-            }),
+                received: None,
+            })),
             allocator,
             providers,
             host: RecordDigest::from_bytes(host).to_string(),
         })
     }
     fn lock(&self) -> Result<MutexGuard<'_, Inner>, Unavailable> {
-        self.inner
+        let inner = self
+            .inner
             .lock()
-            .map_err(|_| refusal("fleet-host-needs-recovery"))
+            .map_err(|_| refusal("fleet-host-needs-recovery"))?;
+        if let Some(received) = &inner.received {
+            received.verify(&inner.runtime)?;
+        }
+        Ok(inner)
     }
 
     /// Immutable native provider policy. Reading it admits no executable or agent session.
@@ -672,6 +682,9 @@ impl FleetService {
         let mut inner = self.lock()?;
         inner.runtime.refresh().map_err(runtime_error)?;
         ensure_run(&inner, lane, run)?;
+        if let Some(received) = &inner.received {
+            received.verify_run(lane, run)?;
+        }
         let workspace = inner
             .workspaces
             .get(lane)
@@ -803,6 +816,16 @@ impl FleetService {
         verified
             .ensure_current()
             .map_err(|_| refusal("fleet-lane-identity-changed"))?;
+        // Recheck the native clock at the external-effect boundary, not only at session creation.
+        if let Some(received) = &inner.received {
+            received.verify_launch(
+                &inner.runtime,
+                &grant.lane,
+                &grant.run,
+                adapter.provider(),
+                received_clock()?,
+            )?;
+        }
         let mut process = adapter
             .spawn(
                 verified.path(),
@@ -812,6 +835,11 @@ impl FleetService {
                 &goal,
             )
             .map_err(|_| refusal("fleet-provider-launch-needs-reconciliation"))?;
+        if inner.received.is_some() {
+            // A caller dropping its service handle must not release the remote ledger/workspace
+            // while the returned process handle is still owned. This creates no process adoption.
+            process.retain_authority(self.inner.clone());
+        }
         if verified.ensure_current().is_err() {
             process.abort_direct();
             return Err(refusal("fleet-lane-identity-changed"));

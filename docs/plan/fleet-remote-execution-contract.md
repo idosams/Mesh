@@ -261,3 +261,24 @@ can manufacture another reservation or release the concurrency slot.
 
 Provider/session composition, independent supervisor lifetime, process acknowledgment, terminal
 reconciliation, signed results and actual authenticated second-machine operation remain required.
+
+## Received native session composition
+
+The original reservation can now be consumed into one existing `FleetService`, with a distinct
+execution stream in the same guarded worker ledger. No caller-supplied database or replacement
+runtime is admitted by this constructor. It refuses preexisting execution history instead of
+recovering permission to launch. Partial setup remains durable and needs reconciliation.
+
+The service retains the original received workspace, daemon and input/initialization evidence.
+Its sole lane binds the source input to the actual independent worker initial operation, using
+the immutable admitted task/provider and original lane/run. Local limits are one lane and one
+attempt, with no child delegation or retries: remote workers cannot create a second global budget.
+Credentials and launch use the existing native custody and provider path. Retained intent, exact
+attempt/provider and the native clock are checked immediately before spawn. Expired leases refuse
+launch but do not erase already owned observation or historical evidence.
+
+A returned native process retains the session resources even if its caller drops the service
+handle. Dropping a process handle still does not establish descendant termination or free the
+remote admission slot. The embedding native supervisor must retain and poll its handles, bind the
+scoped MCP endpoint, and provide independent broker lifetime. That supervisor and transport wiring
+remain unfinished; this native composition alone does not expose remote execution to a peer.

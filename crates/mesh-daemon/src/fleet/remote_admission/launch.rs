@@ -44,6 +44,78 @@ pub struct RemoteLaunchReservation {
     receipt: RemoteLaunchReceipt,
 }
 impl RemoteLaunchReservation {
+    /// Consume original launch ownership into one native service session. The session retains the
+    /// same guarded ledger and received workspace; this does not start a provider or expose IPC.
+    pub fn into_native_session(
+        self,
+    ) -> Result<crate::fleet::service::FleetService, crate::ipc::Unavailable> {
+        let now = crate::fleet::service::received_clock()?;
+        self.verify(now).map_err(|_| {
+            crate::ipc::Unavailable::new(
+                "remote-session-reservation-refused",
+                "The original worker launch reservation is unavailable.",
+            )
+        })?;
+        let admission = self
+            .registry
+            .store
+            .request(
+                &self.registry.stream,
+                &self.receipt.admission.work.assignment.id,
+            )
+            .map_err(|_| {
+                crate::ipc::Unavailable::new(
+                    "remote-session-ledger-unavailable",
+                    "The worker ledger is unavailable.",
+                )
+            })?
+            .ok_or_else(|| {
+                crate::ipc::Unavailable::new(
+                    "remote-session-ledger-unavailable",
+                    "The worker admission is unavailable.",
+                )
+            })?;
+        let stream = self
+            .registry
+            .launch_stream(&self.receipt.admission.work.assignment.id);
+        let launch = self
+            .registry
+            .store
+            .request(&stream, "launch")
+            .map_err(|_| {
+                crate::ipc::Unavailable::new(
+                    "remote-session-ledger-unavailable",
+                    "The worker ledger is unavailable.",
+                )
+            })?
+            .ok_or_else(|| {
+                crate::ipc::Unavailable::new(
+                    "remote-session-ledger-unavailable",
+                    "The worker launch intent is unavailable.",
+                )
+            })?;
+        if self.registry.decode(&admission).ok().as_ref() != Some(&self.receipt.admission)
+            || self
+                .registry
+                .decode_launch(&self.receipt.admission, &launch)
+                .ok()
+                .as_ref()
+                != Some(&self.receipt)
+        {
+            return Err(crate::ipc::Unavailable::new(
+                "remote-session-intent-changed",
+                "The retained worker intent changed.",
+            ));
+        }
+        crate::fleet::service::FleetService::from_received_parts(
+            self.registry.store,
+            self.workspace,
+            self.receipt,
+            admission,
+            launch,
+        )
+    }
+
     /// Durable evidence; never another reservation.
     pub fn receipt(&self) -> &RemoteLaunchReceipt {
         &self.receipt
@@ -259,4 +331,4 @@ fn validate(receipt: &RemoteLaunchReceipt) -> Result<(), Error> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;

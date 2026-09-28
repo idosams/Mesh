@@ -309,6 +309,6 @@ impl RemoteAdmissionRegistry {
 mod tests;
 
 #[cfg(unix)]
-mod launch;
+pub(in crate::fleet) mod launch;
 #[cfg(unix)]
 pub use launch::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};

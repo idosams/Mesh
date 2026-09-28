@@ -84,6 +84,7 @@ pub struct NativeProcess {
     child: Child,
     output: Arc<Mutex<Output>>,
     exit: Option<ExitStatus>,
+    authority: Option<Arc<dyn Send + Sync>>,
 }
 impl std::fmt::Debug for NativeProcess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -218,10 +219,16 @@ fn spawn_configured(
         child,
         output,
         exit: None,
+        authority: None,
     })
 }
 
 impl NativeProcess {
+    pub(super) fn retain_authority(&mut self, authority: Arc<dyn Send + Sync>) {
+        debug_assert!(self.authority.is_none());
+        self.authority = Some(authority);
+    }
+
     /// Live process identity for native reconciliation metadata; not identity proof by itself.
     pub fn pid(&self) -> u32 {
         self.child.id()

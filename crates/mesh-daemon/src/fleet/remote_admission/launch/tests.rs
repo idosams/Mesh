@@ -11,9 +11,9 @@ use std::sync::{
 
 const ALLOCATION: &str = "0123456789abcdef0123456789abcdef";
 static NEXT: AtomicU64 = AtomicU64::new(0);
-struct Fixture(PathBuf);
+pub(in crate::fleet) struct Fixture(pub(in crate::fleet) PathBuf);
 impl Fixture {
-    fn new() -> Self {
+    pub(in crate::fleet) fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
             "mesh-launch-ownership-{}-{}",
             std::process::id(),
@@ -37,6 +37,13 @@ impl Fixture {
         }
     }
     fn workspace(&self, registry: &mut RemoteAdmissionRegistry) -> ReceivedWorkerWorkspace {
+        self.workspace_for(registry, work())
+    }
+    fn workspace_for(
+        &self,
+        registry: &mut RemoteAdmissionRegistry,
+        work: RemoteWork,
+    ) -> ReceivedWorkerWorkspace {
         let destination = RemoteInputDestination::admit(
             &self.0.join("store"),
             ProtectedWorkspaceRoot::inspect(&self.0.join("store")).unwrap(),
@@ -46,9 +53,9 @@ impl Fixture {
         )
         .unwrap();
         let mut receiver =
-            NativeRemoteInputReceiver::new(&destination, manifest(), &work().assignment).unwrap();
+            NativeRemoteInputReceiver::new(&destination, manifest(), &work.assignment).unwrap();
         let RemoteAdmissionOutcome::Reserved(input) =
-            registry.reserve(work(), ALLOCATION, 100).unwrap()
+            registry.reserve(work, ALLOCATION, 100).unwrap()
         else {
             panic!("fixture needs original admission");
         };
@@ -60,6 +67,24 @@ impl Fixture {
                 CheckpointRuntimeParameters::selected_defaults(),
             )
             .unwrap()
+    }
+    pub(in crate::fleet) fn session_reservation(&self) -> Box<RemoteLaunchReservation> {
+        self.session_reservation_with(self.registry())
+    }
+    pub(in crate::fleet) fn session_reservation_with(
+        &self,
+        mut registry: RemoteAdmissionRegistry,
+    ) -> Box<RemoteLaunchReservation> {
+        let now = crate::fleet::service::received_clock().unwrap();
+        let mut work = work();
+        work.assignment.lease_until_ms = now + 120_000;
+        let workspace = self.workspace_for(&mut registry, work);
+        let RemoteLaunchOutcome::Reserved(reservation) =
+            registry.reserve_launch(workspace, "codex", now).unwrap()
+        else {
+            panic!("expected original reservation");
+        };
+        reservation
     }
 }
 impl Drop for Fixture {

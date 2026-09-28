@@ -72,6 +72,16 @@ pub struct LaneWorkspace {
     binding: super::WorkspaceBinding,
 }
 impl LaneWorkspace {
+    /// Borrow the daemon and binding only while the containing native service retains the complete
+    /// received allocation and ledger authority. No import, fork, path admission or launch occurs.
+    pub(super) fn from_received(workspace: &super::ReceivedWorkerWorkspace) -> Self {
+        Self {
+            daemon: workspace.daemon().clone(),
+            receipt: workspace.receipt().clone(),
+            binding: workspace.binding().clone(),
+        }
+    }
+
     /// Create an independent folder using the existing exact-version native transaction.
     ///
     /// `destination` and `protected_roots` are service-owned path decisions, never agent or

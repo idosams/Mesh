@@ -2418,3 +2418,36 @@ This increment does not start a provider, issue agent credentials, adopt an old 
 capacity or authenticate a network connection. The next composition must connect retained ownership
 to native session/custody admission and supervised process lifetime, then implement terminal/result
 reconciliation and authenticated transport. Full second-machine and packaged acceptance remain open.
+
+### R13 delivered evidence
+
+[#130](https://github.com/idosams/Mesh/pull/130) merged at
+`486b0e0bcc2889e46b33739d9d0a55fc21c102e8` after all seven exact-head checks passed.
+Linux passed 3,184 tests; macOS passed 3,437 plus four renderer tests and the real daemon demo.
+The initial macOS draft failed its new post-commit authority-loss fixture because it passed the
+OS `/var` alias to an opener that requires a native-resolved path. The correction resolves only
+the fixture parent; the production no-follow guard and final database-entry check remain unchanged.
+Earlier failed logs and unfinished local verification remain preserved, not reported as passing.
+
+## R14 received native session
+
+New canonical implementation on merged #130; no preserved source commits are replaced.
+The original launch reservation is consumed into a separate execution stream in the same guarded
+worker ledger. The existing native service binds the original source input, independent worker
+initial operation, immutable goal/provider and exact lane/run. It retains the received allocation
+and daemon rather than creating another workspace or claiming shared ancestry.
+
+This execution session is restricted to one lane, one concurrent attempt, zero delegation depth and
+zero retries. The coordinator retains global scheduling authority. Existing custody, credentials,
+provider admission and durable launch checks apply. The native clock and retained admission/intent
+are rechecked at the pre-spawn boundary. The returned process handle retains the service resources,
+so dropping a caller's service handle cannot release the worker ledger/workspace prematurely.
+Post-launch observation and retained history do not acquire an expiry-based retry permission.
+
+Regression coverage includes exact version/daemon binding, coordinator budget refusal, stale lease
+and mismatched attempt/provider refusal, changed input and launch history, native directory ownership
+and actual process composition with a deterministic provider fixture. Validation is in progress;
+the fixture is not evidence of a real provider, authenticated transport or second-machine operation.
+No persisted record schema changes: the separate session stream uses existing fleet commands.
+Independent supervisor/broker lifetime, scoped MCP integration, durable remote acknowledgment/results,
+terminal reconciliation, authenticated transport and actual remote acceptance remain required.

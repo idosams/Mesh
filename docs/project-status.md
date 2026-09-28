@@ -132,8 +132,13 @@ establish remote transport or execution readiness.
 passing. Received trees, including empty trees, now initialize independent native history with
 an explicit durable source-to-worker mapping. This does not claim a remote provider ran.
 
-The next increment records durable launch ownership and retains the worker ledger and workspace
-for native supervisor composition. Its validation is in progress. It adds no network authentication,
-process adoption, automatic retries or protected-main authority. Delivery evidence and remaining
-work are tracked in the [ledger](plan/fleet-migration.md#r13-durable-remote-launch-ownership) and
+[PR #130](https://github.com/idosams/Mesh/pull/130) merged durable launch ownership at
+`486b0e0bcc2889e46b33739d9d0a55fc21c102e8`, with all seven exact-head checks passing.
+The next increment consumes that original ownership into the existing native service and provider
+launch path, retaining the same ledger and initialized workspace. It restricts the local execution
+session to the assigned lane/run and checks the lease immediately before spawn. Its regression and
+CI validation are in progress. It adds no network authentication, process adoption, automatic retries
+or protected-main authority. Independent supervisor/broker lifetime and actual remote operation remain
+unfinished. Delivery evidence and remaining work are tracked in the
+[ledger](plan/fleet-migration.md#r14-received-native-session) and
 [remote execution contract](plan/fleet-remote-execution-contract.md).
