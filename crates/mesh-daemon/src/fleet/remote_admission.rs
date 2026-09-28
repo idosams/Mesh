@@ -231,27 +231,14 @@ impl RemoteAdmissionRegistry {
         Ok(())
     }
     fn encode(&self, work: &RemoteWork, allocation: &str) -> String {
-        let a = &work.assignment;
-        Json::object([
-            ("schema", Json::text("mesh.remote-admission/v1")),
-            ("coordinator", Json::text(&self.coordinator)),
-            ("worker", Json::text(&self.worker)),
-            ("objective", Json::text(&self.objective)),
-            ("lanes", Json::Number(self.limits.lanes)),
-            ("concurrency", Json::Number(self.limits.concurrency)),
-            ("depth", Json::Number(self.limits.depth)),
-            ("retries", Json::Number(self.limits.retries)),
-            ("lane", Json::text(&work.lane)),
-            ("run", Json::text(&work.run)),
-            ("provider", Json::text(&work.provider)),
-            ("goal", Json::text(&work.goal)),
-            ("assignment", Json::text(&a.id)),
-            ("input", Json::text(a.input.to_string())),
-            ("bundle", Json::text(a.bundle.to_string())),
-            ("lease_sequence", Json::Number(a.lease_sequence)),
-            ("lease_until_ms", Json::Number(a.lease_until_ms)),
-            ("allocation", Json::text(allocation)),
-        ])
+        admission_json(
+            &self.coordinator,
+            &self.worker,
+            &self.objective,
+            &self.limits,
+            work,
+            allocation,
+        )
         .encode()
     }
     fn decode(&self, event: &FleetEvent) -> Result<RemoteAdmissionReceipt, Error> {
@@ -312,3 +299,40 @@ mod tests;
 pub(in crate::fleet) mod launch;
 #[cfg(unix)]
 pub use launch::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
+
+// Shared exact admission encoding for durable records and coordinator proof comparison.
+fn admission_json(
+    coordinator: &str,
+    worker: &str,
+    objective: &str,
+    limits: &Limits,
+    work: &RemoteWork,
+    allocation: &str,
+) -> Json {
+    let a = &work.assignment;
+    Json::object([
+        ("schema", Json::text("mesh.remote-admission/v1")),
+        ("coordinator", Json::text(coordinator)),
+        ("worker", Json::text(worker)),
+        ("objective", Json::text(objective)),
+        ("lanes", Json::Number(limits.lanes)),
+        ("concurrency", Json::Number(limits.concurrency)),
+        ("depth", Json::Number(limits.depth)),
+        ("retries", Json::Number(limits.retries)),
+        ("lane", Json::text(&work.lane)),
+        ("run", Json::text(&work.run)),
+        ("provider", Json::text(&work.provider)),
+        ("goal", Json::text(&work.goal)),
+        ("assignment", Json::text(&a.id)),
+        ("input", Json::text(a.input.to_string())),
+        ("bundle", Json::text(a.bundle.to_string())),
+        ("lease_sequence", Json::Number(a.lease_sequence)),
+        ("lease_until_ms", Json::Number(a.lease_until_ms)),
+        ("allocation", Json::text(allocation)),
+    ])
+}
+
+#[cfg(unix)]
+mod authentication;
+#[cfg(unix)]
+pub use authentication::{RemoteAdmissionChallenge, RemoteAdmissionProof};

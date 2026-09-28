@@ -25,6 +25,8 @@ mod file_deletions;
 pub mod provider;
 mod remote;
 mod remote_admission;
+#[cfg(unix)]
+pub use remote_admission::{RemoteAdmissionChallenge, RemoteAdmissionProof};
 pub use remote_admission::{
     RemoteAdmissionOutcome, RemoteAdmissionReceipt, RemoteAdmissionRegistry,
     RemoteInputReservation, RemoteWork,

@@ -138,10 +138,16 @@ an explicit durable source-to-worker mapping. This does not claim a remote provi
 `227f3ad1e3f6bb65a4a2b40b276075157bdf0c81`, with all seven checks passing. It consumes original ownership into the existing native service and provider
 launch path, retaining the same ledger and initialized workspace. It restricts the local execution
 session to the assigned lane/run and checks the lease immediately before spawn.
-The next worker-host increment owns that process, native signing sessions and an actual local IPC
-endpoint restricted to scoped fleet calls. Polling does not dispatch another attempt; connection loss
-does not drop the host. Validation is in progress. It adds no network authentication, process adoption,
-automatic retries or protected-main authority. The resident worker entry point, authenticated broker
-transport and actual second-machine operation remain unfinished. Delivery evidence and remaining work
-are tracked in the [ledger](plan/fleet-migration.md#r15-received-worker-host) and
-[remote execution contract](plan/fleet-remote-execution-contract.md).
+[PR #132](https://github.com/idosams/Mesh/pull/132) merged the worker host at
+`d5bc096fc7684d1849c12b7fe804b35430d28e58`; all seven exact-head checks and combined-main checks
+passed. The host owns that process, native signing sessions and a local endpoint restricted to
+scoped fleet calls. Polling does not dispatch another attempt; connection loss does not drop the host.
+Local provider startup remains under investigation in [#133](https://github.com/idosams/Mesh/issues/133).
+
+The next increment adds coordinator identity verification before worker admission. Signing bytes
+must match an already-claimed native attempt; a short-lived worker challenge binds the full task,
+keys, versions, limits and lease. A valid signature still cannot override capacity or recreate a
+reservation. Validation is in progress. The resident worker entry point, authenticated broker,
+result/reconnect protocol and actual second-machine operation remain unfinished. Delivery evidence
+is tracked in the [ledger](plan/fleet-migration.md#r16-coordinator-proof-before-receiving-admission)
+and [remote execution contract](plan/fleet-remote-execution-contract.md).

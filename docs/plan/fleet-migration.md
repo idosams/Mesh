@@ -2483,3 +2483,33 @@ Validation is in progress. This is local native composition, not authenticated r
 real-provider acceptance run. The resident worker must retain/poll this host independently of its
 broker. A deployed worker entry point, bounded broker frames, bidirectional authentication, durable
 remote result envelopes/reconnect and actual second-machine proof remain required.
+
+
+### R15 delivered evidence
+
+[#132](https://github.com/idosams/Mesh/pull/132) merged at
+`d5bc096fc7684d1849c12b7fe804b35430d28e58` after all seven exact-head checks passed.
+Linux passed 3,192 tests; macOS passed 3,446 plus four renderer tests and the real daemon demo.
+Combined-main run 36489497880 also passed. Local socket restrictions and a separate local provider
+startup delay are preserved as failed local evidence in [#133](https://github.com/idosams/Mesh/issues/133).
+Hosted success does not establish packaged acceptance or resolve that local failure.
+
+## R16 coordinator proof before receiving admission
+
+New canonical implementation on merged #132; no preserved source commits are replaced.
+A worker-held, single-use challenge binds the complete existing admission body to a native random
+nonce and a window of at most 30 seconds, bounded by the assignment lease. Worker configuration
+supplies the expected coordinator key. Verification consumes the challenge and invokes the existing
+atomic reservation path; a repeated authentic request returns retained facts, not another grant.
+
+The coordinator derives signing bytes only from an already-claimed current remote attempt in its
+native runtime. Exact task/provider, objective, keys, input/bundle, limits, assignment and lease must
+match. The worker's allocation token is bounded native metadata, never a transmitted filesystem path.
+Unclaimed/cancelled attempts, altered fields, unknown fields, wrong signers/domains/nonces, expiry,
+capacity exhaustion and changed ledger authority refuse without granting another reservation.
+
+The additive canonical control body is `mesh.remote-admission-challenge/v1`, at most 65,536 bytes;
+its signature domain is `mesh.v1.fleet-coordinator-admission-proof`. Existing durable admission bytes
+are unchanged. This is a native signing/verification boundary, not a deployed authenticated broker,
+key provisioning or a persisted remote certificate. Status/reconnect authorization and result delivery
+remain separate work. Validation is in progress; actual second-machine acceptance remains open.

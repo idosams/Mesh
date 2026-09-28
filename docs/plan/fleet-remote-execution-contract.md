@@ -301,3 +301,32 @@ This handle is owned and polled by the resident native worker, independently of 
 connections. It is not itself a deployed worker daemon, an authenticated peer endpoint or a durable
 remote acknowledgment/result protocol. Those integrations remain required before remote capability
 can be exposed to users. The deterministic process/socket/signing tests prove local composition only.
+
+
+## Coordinator proof before admission
+
+The receiving registry can issue a single-use native challenge before reserving capacity or files.
+Its nonce comes from native entropy. Its canonical `mesh.remote-admission-challenge/v1` body binds
+the complete unchanged `mesh.remote-admission/v1` admission record, nonce and issue/expiry times.
+The window is at most 30 seconds and cannot exceed the initial assignment lease. Both peers must
+have sufficiently aligned native clocks; rollback, future issue times and expiry refuse.
+
+The coordinator compares the challenge with its current native runtime before deriving signing
+bytes. The existing worker proof must already have claimed that exact remote attempt. The attempt
+must remain launching, uncancelled and bound to its configured worker and source input. The full
+expected body comes from native task/provider, objective, limits, assignment and configured keys;
+peer-selected task data cannot become signing authority. A dedicated signature domain separates this
+proof from worker-assignment proofs. This API returns bytes to the native signer, never private keys.
+
+The worker verifies against its independently configured coordinator key, then executes its existing
+atomic reservation checks. Ledger authority and capacity remain decisive. A fresh valid proof after
+a lost acknowledgment returns retained admission facts, never another reservation. The in-memory
+challenge owns the original registry and cannot be reconstructed from received facts after restart.
+
+The control body is bounded to 65,536 bytes and rejects noncanonical or unknown outer fields;
+unknown/altered admission fields refuse at the native signing boundary. Transports must bound frame
+allocation before parsing. Durable admission encoding is unchanged; the challenge/signature is not
+a persisted certificate. No generic signing, network exposure or peer-selected path is introduced.
+The future broker must use this boundary rather than directly invoking native reservation. Initial
+admission authentication does not implement renewed leases, authenticated saved-status recovery,
+remote acknowledgments/results, key provisioning or actual second-machine acceptance.
