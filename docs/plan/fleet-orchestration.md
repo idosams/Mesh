@@ -393,3 +393,12 @@ reads for retained owners while start/stop remain unavailable. Pending work and 
 unchanged during inspection, and missing history is not initialized. Native and renderer tests cover
 these boundaries; packaged graphical restart proof, worker recovery and original-main integration remain
 phase exit requirements. Legacy bindings expose recorded reviews but cannot guess a starting-version base.
+
+Fleet saved artifact previews are now connected in desktop source. Each pinned recorded review can
+request bounded native image, PDF-page and Office previews from authenticated historical bytes,
+including restored fleet history. Responses bind objective, lane, checkpoint, review, object, side,
+version and content digest; each panel owns independent transient request state. Saved selectors
+contain no rendered content. Unsupported formats retain metadata, failures remain retryable, and
+closed panels ignore late replies. Existing native rendering and presentation validation are shared
+with workspace reviews. This grants no approval, export, execution or original-project integration
+authority. Packaged graphical verification remains outstanding.

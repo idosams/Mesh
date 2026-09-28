@@ -100,3 +100,30 @@ test('two input comparisons retain independent selected objects and do not block
   h.calls[3].resolve(comparisonReply()); await settle(); assert.equal(h.snapshot().reviewPins[0].input.file, null);
   h.dispose();
 });
+
+const imageChange = () => ({ object_id: '7'.repeat(32), path_before: null, path_after: 'image.png', before: null,
+  after: { kind: 'binary', version_id: '8'.repeat(64), content_digest: '9'.repeat(64) } });
+function imageResult(n) { const value = result(n); value.review.bundle_changes = [imageChange()]; return value; }
+function imagePreview(n) { const { objective: id, ...selected } = selection(n); return { schema: 'mesh.fleet-artifact-preview/v1', objective: id, selection: selected, object: imageChange().object_id,
+  preview: { renderer: 'macos-imageio-thumbnail-v1', scope: 'representative-preview', side: 'after', ...imageChange().after, kind: 'image',
+    image_data_url: 'data:image/png;base64,AAAA', text_source: null, text_lines: null, text_sections: null, text_truncated: false, page_number: null, page_count: null, rendering_authorizes_approval: false } }; }
+const previewIntent = pin => ({ type: 'artifact-preview', pin, object: imageChange().object_id, page: '1' });
+test('artifact panels render concurrently and closing one ignores its late reply', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page([row(1), row(2)])); await settle();
+  h.pin(1); h.pin(2); h.calls[1].resolve(imageResult(1)); h.calls[2].resolve(imageResult(2)); await settle();
+  h.handle(previewIntent('1')); h.handle(previewIntent('2')); h.handle(previewIntent('1'));
+  assert.equal(h.calls.length, 5); assert.equal(h.calls[3].command, 'render_fleet_review_artifact');
+  h.calls[4].resolve(imagePreview(2)); await settle();
+  assert.equal(h.snapshot().reviewPins[0].artifact.loading, true); assert.equal(h.snapshot().reviewPins[1].artifact.envelope.after.versionId, '8'.repeat(64));
+  h.handle({ type: 'close-review', pin: '1' }); h.calls[3].resolve(imagePreview(1)); await settle();
+  assert.equal(h.snapshot().reviewPins.length, 1); assert.equal(h.snapshot().reviewPins[0].key, '2');
+});
+test('artifact selection is bounded and failures remain retryable without exposing native diagnostics', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(imageResult(1)); await settle();
+  for (const patch of [{ object: 'unknown' }, { page: '65' }, { page: '2' }, { path: '/tmp' }]) h.handle({ ...previewIntent('1'), ...patch });
+  assert.equal(h.calls.length, 2);
+  h.handle(previewIntent('1')); h.calls[2].reject(new Error('private native path')); await settle();
+  assert.equal(h.snapshot().reviewPins[0].artifact.envelope, null); assert.doesNotMatch(h.snapshot().reviewPins[0].artifact.error, /private native/);
+  h.handle(previewIntent('1')); h.calls[3].resolve(imagePreview(1)); await settle();
+  assert.equal(h.snapshot().reviewPins[0].artifact.loading, false); assert.ok(h.snapshot().reviewPins[0].artifact.envelope);
+});

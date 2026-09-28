@@ -319,7 +319,11 @@ previously verified content and can retry the same request.
 
 Expand **Recorded review against its original review base** to inspect the existing review bundle.
 That base can differ from the lane's starting version. Both comparisons remain pinned while agents
-work. Artifact rendering, main approval and integration are not yet connected. Incomplete content
+work. Supported images, PDF pages and Office documents can request a native preview of the exact
+saved bytes. Each panel renders independently; PDF navigation is bounded to the first 64 pages, and
+Office previews are representative thumbnails with bounded extracted text when available. Unsupported
+formats retain metadata. Rendered content is temporary and is not included in saved pin preferences.
+Main approval and integration are not yet connected. Incomplete content
 and omitted changes are labeled explicitly. Exact pin selections, selected objects, pages and comparison
 layouts are saved outside the project. Reopening the view reloads those selections and rechecks content
 through native history. Failed saves retain local selections and expose retry or explicit reload;

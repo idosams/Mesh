@@ -844,6 +844,57 @@ mod desktop {
         .map_err(|_| "Saved fleet review could not be loaded".to_owned())?
     }
 
+    // Only exact saved identities cross this boundary. Neither paths nor execution authority
+    // are accepted, and restored history uses the same authenticated artifact reader.
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn render_fleet_review_artifact(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        object_id: String,
+        side: String,
+        page_number: Option<usize>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            let artifact = host
+                .fleet_history(&objective)?
+                .saved_review_artifact(&selection, &object_id, &side)
+                .map_err(|_| "The exact saved artifact is unavailable")?;
+            let rendered = render_artifact(artifact.path(), artifact.bytes(), page_number)
+                .map_err(|error| error.to_string())?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.fleet-artifact-preview/v1")),
+                ("objective", Json::text(objective)),
+                ("selection", selection.to_json()),
+                ("object", Json::text(object_id)),
+                (
+                    "preview",
+                    rendered_artifact_json(
+                        &rendered,
+                        &side,
+                        &artifact.version().to_string(),
+                        &artifact.digest().to_string(),
+                    ),
+                ),
+            ])
+            .encode())
+        })
+        .await
+        .map_err(|_| "Saved artifact rendering did not finish".to_owned())?
+    }
+
     // Tauri binds the exact selection and bounded comparison selectors as named arguments.
     #[allow(clippy::too_many_arguments)]
     #[tauri::command]
@@ -1580,6 +1631,15 @@ mod desktop {
         .await
         .map_err(|_| "The local artifact preview stopped unexpectedly".to_owned())?
         .map_err(|error| error.to_string())?;
+        Ok(rendered_artifact_json(&rendered, &side, &version, &digest).encode())
+    }
+
+    fn rendered_artifact_json(
+        rendered: &crate::artifact_preview::ArtifactPreview,
+        side: &str,
+        version: &str,
+        digest: &str,
+    ) -> Json {
         let (text_source, text_lines, text_sections, text_truncated) =
             rendered.text.as_ref().map_or(
                 (Json::Null, Json::Null, Json::Null, Json::Bool(false)),
@@ -1603,7 +1663,7 @@ mod desktop {
                     )
                 },
             );
-        Ok(Json::object([
+        Json::object([
             ("renderer", Json::text(rendered.renderer.label())),
             ("scope", Json::text(rendered.renderer.scope())),
             ("kind", Json::text(rendered.kind.label())),
@@ -1635,7 +1695,6 @@ mod desktop {
             ),
             ("rendering_authorizes_approval", Json::Bool(false)),
         ])
-        .encode())
     }
 
     fn review_inspection_family(extension: &str) -> Option<&'static str> {
@@ -7179,6 +7238,7 @@ mod desktop {
                 fleet_activity,
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
+                render_fleet_review_artifact,
                 inspect_fleet_starting_comparison,
                 start_attached_fleet,
                 stop_attached_fleet,
@@ -7383,6 +7443,55 @@ mod desktop {
         use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
         use std::os::unix::net::UnixListener;
         use std::thread;
+
+        #[test]
+        fn artifact_preview_encoding_keeps_saved_identity_and_no_approval_authority() {
+            use crate::artifact_preview::{ArtifactKind, ArtifactPreview, ArtifactRenderer};
+            let image = ArtifactPreview {
+                kind: ArtifactKind::Png,
+                png: b"preview".to_vec(),
+                text: None,
+                renderer: ArtifactRenderer::ImageIoThumbnail,
+                page_number: None,
+                page_count: None,
+            };
+            let version = "a".repeat(64);
+            let digest = "b".repeat(64);
+            let value = rendered_artifact_json(&image, "before", &version, &digest);
+            assert_eq!(
+                value.get("version_id").and_then(Json::as_text),
+                Some(version.as_str())
+            );
+            assert_eq!(
+                value.get("content_digest").and_then(Json::as_text),
+                Some(digest.as_str())
+            );
+            assert_eq!(value.get("side").and_then(Json::as_text), Some("before"));
+            assert_eq!(
+                value.get("image_data_url").and_then(Json::as_text),
+                Some("data:image/png;base64,cHJldmlldw==")
+            );
+            assert_eq!(
+                value.get("rendering_authorizes_approval"),
+                Some(&Json::Bool(false))
+            );
+            assert_eq!(value.get("text_lines"), Some(&Json::Null));
+            assert_eq!(value.get("page_number"), Some(&Json::Null));
+            let page = ArtifactPreview {
+                kind: ArtifactKind::Pdf,
+                renderer: ArtifactRenderer::PdfKitPage,
+                page_number: Some(3),
+                page_count: Some(8),
+                ..image
+            };
+            let value = rendered_artifact_json(&page, "after", &version, &digest);
+            assert_eq!(
+                value.get("scope").and_then(Json::as_text),
+                Some("exact-page-preview")
+            );
+            assert_eq!(value.get("page_number"), Some(&Json::Number(3)));
+            assert_eq!(value.get("page_count"), Some(&Json::Number(8)));
+        }
 
         #[cfg(target_os = "macos")]
         #[test]

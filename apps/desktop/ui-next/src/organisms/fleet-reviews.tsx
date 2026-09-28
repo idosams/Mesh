@@ -1,3 +1,4 @@
+import { reviewArtifactPreviewEnvelope } from "../models/review-artifact-preview";
 import { useMemo } from "react";
 import { useTranslation } from "../lib/localization";
 import { Button } from "../atoms/button";
@@ -10,14 +11,14 @@ export type FleetReviewSelection = { objective: string; lane: string; checkpoint
 type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
 export type FleetReviewView = { input_open: boolean; input_after: string | null; input_object: string | null; input_layout: "inline" | "split"; review_object: string | null; review_mode: "content" | "visual"; review_layout: "inline" | "split" };
 export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
-export type FleetReviewPin = { view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
+export type FleetReviewPin = { artifact?: { generation: number; object: string; page: number; loading: boolean; error: string; envelope: unknown }; view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 
 export function fleetSavedReviewModel(review: SavedReview): ReviewWorkbenchModel {
   if (!review.recorded || review.subject_operations_not_listed !== 0 || review.unavailable_code !== null) throw new Error("Incomplete saved review");
   return reviewWorkbenchFromProjection("Fleet lane", "Pinned saved result", review, {
-    canRenderArtifactPreview: false, canInspectExactCopies: false, canRecordReview: false, canApprove: false,
+    canRenderArtifactPreview: true, canInspectExactCopies: false, canRecordReview: false, canApprove: false,
     canApproveAndExport: false, canExportGit: false, canExportPrivateCopy: false,
     approvalReason: "Read-only saved result. Approval and integration into the original project's main are not available here.",
   });
@@ -28,11 +29,21 @@ function ReviewContent({ initial, pin, editable }: { initial: ReviewWorkbenchMod
     selectedChangeId: initial.changes.some(change => change.id === pin.view?.review_object) ? pin.view!.review_object! : initial.selectedChangeId,
     mode: pin.view?.review_mode ?? initial.mode, diffLayout: pin.view?.review_layout ?? initial.diffLayout,
   }), [initial, pin.view]);
-  return <ArtifactReview model={{ ...model, workspaceName: t(model.workspaceName), versionLabel: t(model.versionLabel), approvalReason: t(model.approvalReason) }} controls={{ countLabel: `${model.changes.length} ${t("changes in this saved review")}`, overflowLabel: null,
+  const artifact = pin.artifact?.object === model.selectedChangeId ? pin.artifact : undefined;
+  const preview = useMemo(() => {
+    if (!artifact?.envelope) return null;
+    try { return reviewArtifactPreviewEnvelope(artifact.envelope, artifact.generation, pin.selection.bundle, model); }
+    catch { return null; }
+  }, [artifact, pin.selection.bundle, model]);
+  return <ArtifactReview model={{ ...model, workspaceName: t(model.workspaceName), versionLabel: t(model.versionLabel), approvalReason: t(model.approvalReason) }} artifactPreview={preview} artifactPreviewLoading={Boolean(artifact?.loading)}
+    artifactPreviewError={artifact?.error || (artifact?.envelope && !preview ? "This exact saved preview could not be verified." : null)} controls={{ countLabel: `${model.changes.length} ${t("changes in this saved review")}`, overflowLabel: null,
     canSetupApproval: false, setupApprovalLabel: t("Approval unavailable"), setupApprovalReason: t(model.approvalReason),
     canRecordReview: false, recordReviewLabel: t("Review already recorded"), recordReviewReason: t("This panel shows an existing immutable review."), earlierReviews: [] }}
     onIntent={intent => {
-      // Local presentation only. This panel never routes mutation, approval or export intents.
+      if (editable && intent.type === "load-artifact-preview") {
+        send({ type: "artifact-preview", pin: pin.key, object: intent.changeId, page: String(intent.pageNumber) });
+      }
+      // Read-only presentation. This panel never routes mutation, approval or export intents.
       if (editable && ["select-change", "change-mode", "change-diff-layout"].includes(intent.type)) {
         const next = reduceReviewWorkbench(model, intent);
         send({ type: "review-view", pin: pin.key, object: next.selectedChangeId, mode: next.mode, layout: next.diffLayout });

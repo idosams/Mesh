@@ -817,3 +817,29 @@ this increment requires its own hosted checks. Parent #55 passed all seven check
 correspondence, original-main integration and remaining recovery increments are separate obligations.
 Required named human review, second-provider/four-worker/remote acceptance, eventual merges and final
 combined-main testing remain required. Original work and running verification are preserved.
+
+## R02c exact saved artifact previews in parallel reviews
+
+Preserved source `e961781d941c938de408b38866c4b43cee36f7fe` transfers on published #57 at
+`af46a567f55cf297bd8423d04e00ca2e57f69088`. Pinned fleet reviews render bounded native image,
+PDF-page and Office previews from verified historical bytes. Replies bind objective/lane/checkpoint/
+version/bundle, object, side and artifact digest. Each panel keeps transient request/content state;
+only selectors persist. Shared native JSON encoding and extracted renderer validation preserve the
+existing workspace-review path. Unsupported artifacts stay metadata, partial errors stay explicit,
+unequal PDF sides use verified page-count evidence and closed panels ignore late replies.
+
+The canonical adaptation preserves localized panel controls and adds localized fixed artifact failures
+in visual/content views while leaving literal paths, versions, image data and comparison models intact.
+The exact-preview regression fails with the old fleet component; the Hebrew failure regression fails
+with the old shared viewer. Both pass after byte-exact restoration. Local type/build, 139 interface
+and 529 desktop tests pass, including existing workspace artifact checks and new fleet selection,
+page-bound, malformed-response, concurrency and retry checks. Docs, vocabulary, formatting and diff
+checks pass. Native encoding/failing-before/full execution remains queued behind the preserved #44
+gate; this increment needs hosted validation and exact packaged graphical proof.
+
+Parent #56 has all seven checks passing: 3,009 Linux and 3,220 macOS tests, four separate macOS renderer
+tests, 44 daemon checks and 658 desktop/interface tests. The added legacy-backfill refusal passed on
+both platforms. #57 native validation remains running. Correspondence, candidates, original-main
+integration and remaining recovery phases follow in ledger order. Second-provider/four-worker/remote
+and packaged acceptance, named human review, eventual merges and final combined-main tests remain
+required. No original work or running verification was discarded and no PR has been merged.

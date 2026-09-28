@@ -1,3 +1,5 @@
+import { loadFleetArtifact } from './fleet-artifact-preview.js';
+import { reviewArtifactKind } from './review-artifact-validation.js';
 import { createFleetPinPersistence, defaultFleetView } from './fleet-pin-persistence.js';
 import { fleetInputComparison } from './fleet-input-comparison.js';
 // Immutable saved-result selection and independent presentation requests. No publication authority.
@@ -122,6 +124,23 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     }
     publish();
   }
+  async function loadArtifact(pin, object, page) {
+    if (disposed || pin.artifact?.loading || pin.loading || pin.error || !pin.review?.content_complete) return;
+    const change = pin.review.bundle_changes.find(change => change.object_id === object);
+    const kind = change && reviewArtifactKind(change);
+    if (!kind || !Number.isSafeInteger(page) || page < 1 || page > 64 || (kind !== 'pdf' && page !== 1)) return;
+    const loading = { generation: nextRead++, object, page, loading: true, error: '', envelope: null };
+    pins = pins.map(value => value === pin ? { ...value, artifact: loading } : value); publish();
+    try {
+      const envelope = await loadFleetArtifact(invoke, pin, change, page, loading.generation);
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.artifact === loading
+        ? { ...value, artifact: { ...loading, loading: false, envelope } } : value);
+    } catch {
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.artifact === loading
+        ? { ...value, artifact: { ...loading, loading: false, error: 'This exact saved artifact preview could not be verified. Retry to render it again.' } } : value);
+    }
+    publish();
+  }
   async function loadInput(pin, after = null, selected = null) {
     if (disposed) return;
     if (pin.input?.loading) return;
@@ -143,12 +162,17 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews'].includes(value.type)) return false;
+      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
         notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (value.type === 'artifact-preview' && fields === 'object,page,pin,type' && typeof value.page === 'string' && /^[1-9][0-9]?$/.test(value.page)) {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (pin) void loadArtifact(pin, value.object, Number(value.page));
+        return true;
       }
       if (value.type === 'input-layout' && fields === 'layout,pin,type' && ['inline', 'split'].includes(value.layout)) {
         const pin = pins.find(pin => pin.key === value.pin); if (pin) remember(pin, { input_layout: value.layout }); return true;

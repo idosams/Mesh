@@ -293,6 +293,14 @@ function SavedSideActions({
   );
 }
 
+function translatedArtifactFailure(message: string, t: (text: string) => string): string {
+  for (const label of ["Earlier version", "Current version"]) {
+    const prefix = `${label}: `;
+    if (message.startsWith(prefix)) return `${t(label)}: ${t(message.slice(prefix.length))}`;
+  }
+  return t(message);
+}
+
 function ContentReview({ change, layout, preview, loading, error, canLoad, onLayout, onLoad }: {
   change: ReviewChange;
   layout: DiffLayout;
@@ -336,7 +344,7 @@ function ContentReview({ change, layout, preview, loading, error, canLoad, onLay
           </p>
           {failed ? (
             <ul className="grid gap-1 text-sm text-red-100">
-              {contentState.messages.map((failure) => <li key={failure}>{failure}</li>)}
+              {contentState.messages.map((failure) => <li key={failure}>{translatedArtifactFailure(failure, t)}</li>)}
             </ul>
           ) : null}
           {!incompatible ? (
@@ -479,7 +487,7 @@ function ArtifactVisualComparison({
     error,
     preview?.beforeError ? `Earlier version: ${preview.beforeError}` : null,
     preview?.afterError ? `Current version: ${preview.afterError}` : null,
-  ].filter((message): message is string => message !== null).join(" ");
+  ].filter((message): message is string => message !== null).map(message => translatedArtifactFailure(message, t)).join(" ");
   return (
     <section className="grid gap-4" aria-label={t("Exact visual artifact comparison")}>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
@@ -631,7 +639,7 @@ function ArtifactPreviewPanel({ label, preview, absentPage, requestedPage, error
         <div className="grid min-h-48 place-items-center bg-muted/30 p-5 text-center text-sm text-muted-foreground">
           {absentPage
             ? `This saved PDF has ${absentPage.pageCount} page${absentPage.pageCount === 1 ? "" : "s"}; page ${requestedPage} is not present.`
-            : error ?? `${label} is not present in this saved version.`}
+            : error !== null ? t(error) : `${label} is not present in this saved version.`}
         </div>
       )}
       <figcaption className="border-t border-border px-4 py-3 text-xs text-muted-foreground">

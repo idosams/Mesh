@@ -312,3 +312,18 @@ identities. Local type/build, 137 interface and 524 desktop tests pass; rendered
 old restored-review restriction. Added native assertions require reopened history to refuse mismatched
 checkpoint/version/bundle selections without changing retained bytes. Native/full and packaged proof
 are tracked separately. All migration increments remain unmerged pending required review.
+
+Fleet saved artifact previews are now connected in desktop source. Each pinned recorded review can
+request bounded native image, PDF-page and Office previews from authenticated historical bytes,
+including restored fleet history. Responses bind objective, lane, checkpoint, review, object, side,
+version and content digest; each panel owns independent transient request state. Saved selectors
+contain no rendered content. Unsupported formats retain metadata, failures remain retryable, and
+closed panels ignore late replies. Existing native rendering and presentation validation are shared
+with workspace reviews. This grants no approval, export, execution or original-project integration
+authority. Packaged graphical verification remains outstanding.
+
+The canonical fleet artifact-preview transfer keeps saved identities literal and localizes fixed
+preview failures in both visual and content views. Local type/build, 139 interface and 529 desktop
+tests pass; rendered regressions reject the previous missing-preview and untranslated-error behavior.
+Native, full and exact packaged verification remain separately tracked. Passing source tests or hosted
+checks do not establish packaged acceptance or merged delivery.

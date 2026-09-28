@@ -1,5 +1,12 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Earlier version": "גרסה קודמת",
+"Current version": "גרסה נוכחית",
+
+"This exact saved artifact preview is unavailable. Retry to render it again.": "התצוגה המקדימה של הפריט השמור המדויק אינה זמינה. יש לנסות להציג אותה שוב.",
+"This exact saved artifact preview could not be verified. Retry to render it again.": "לא ניתן לאמת את התצוגה המקדימה של הפריט השמור המדויק. יש לנסות להציג אותה שוב.",
+"This exact saved preview could not be verified.": "לא ניתן לאמת את התצוגה המקדימה השמורה המדויקת.",
+
 "Saved lane review": "סקירת מסלול שמורה",
 "Saved changed-object selection": "בחירת אובייקט ששונה ונשמרה",
 "Content must be verified before display.": "יש לאמת את התוכן לפני הצגתו.",

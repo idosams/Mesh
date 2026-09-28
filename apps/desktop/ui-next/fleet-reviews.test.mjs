@@ -14,7 +14,8 @@ test('panels render verified text, exact base and disabled authority', () => {
   assert.match(html, /saved &lt;text&gt;/); assert.match(html, /&lt;script&gt;goal/); assert.doesNotMatch(html, /<script>/);
   assert.match(html, /Comparison base: the recorded review/); assert.match(html, /starting-version comparison below/);
   assert.match(html, /Reopening rechecks exact history/); assert.match(html, new RegExp(value.review.reviewed_head));
-  for (const field of ['canApprove', 'canApproveAndExport', 'canExportGit', 'canExportPrivateCopy', 'canRecordReview', 'canRenderArtifactPreview', 'canInspectExactCopies']) assert.equal(model[field], false);
+  for (const field of ['canApprove', 'canApproveAndExport', 'canExportGit', 'canExportPrivateCopy', 'canRecordReview', 'canInspectExactCopies']) assert.equal(model[field], false);
+  assert.equal(model.canRenderArtifactPreview, true);
   assert.strictEqual(reduceReviewWorkbench(model, { type: 'approve-version' }), model);
 });
 test('incomplete and malformed content cannot look like a complete empty result', () => {
@@ -201,5 +202,47 @@ test('Hebrew restored reviews translate persistence status and retain literal go
     assert.match(html, /לרבות בחירות מקומיות שלא נשמרו/);
     html = render({pins:[],notice:'',persistence:{phase:'saved',message:'',editable:true}});
     assert.match(html, /בחירות הסקירה נשמרו/);
+  } finally { module.exports.setLocale('en'); }
+});
+
+test('saved artifact preview renders only for the selected exact object and verified envelope', () => {
+  const value = pin(); value.review.bundle_changes = [{ ...change('a'), path_after: 'image.png', verified_text: null }];
+  value.view = { review_object: 'a'.repeat(32), review_mode: 'visual', review_layout: 'split' };
+  const side = { side: 'after', versionId: '4'.repeat(64), contentDigest: '5'.repeat(64), imageDataUrl: 'data:image/png;base64,AAAA', pageNumber: null, pageCount: null, textSource: null, textLines: null, textSections: null, textTruncated: false };
+  value.artifact = { generation: 7, object: 'a'.repeat(32), page: 1, loading: false, error: '', envelope: { generation: 7, bundle: value.selection.bundle, changeId: 'a'.repeat(32), kind: 'image', requestedPage: 1, before: null, after: side, beforeError: null, afterError: null, beforeAbsentPage: null, afterAbsentPage: null } };
+  let html = render({ pins: [value], notice: '' }); assert.match(html, /src="data:image\/png;base64,AAAA"/);
+  value.artifact.envelope.after.contentDigest = '9'.repeat(64);
+  html = render({ pins: [value], notice: '' }); assert.doesNotMatch(html, /src="data:image/); assert.match(html, /could not be verified/);
+  value.artifact.object = 'b'.repeat(32);
+  html = render({ pins: [value], notice: '' }); assert.doesNotMatch(html, /src="data:image|could not be verified/);
+});
+
+test('Hebrew saved artifact failures remain localized in visual and content views without altering identities', () => {
+  const value = pin();
+  const file = {...change('a'), path_before:'משפחה/image.png', path_after:'משפחה/image.png', before:{...change('a').after}, verified_text:null};
+  value.review.bundle_changes = [file];
+  value.view = {review_object:'a'.repeat(32),review_mode:'visual',review_layout:'split'};
+  const side = {side:'after',versionId:'4'.repeat(64),contentDigest:'5'.repeat(64),imageDataUrl:'data:image/png;base64,AAAA',pageNumber:null,pageCount:null,textSource:null,textLines:null,textSections:null,textTruncated:false};
+  value.artifact = {generation:7,object:'a'.repeat(32),page:1,loading:false,error:'',envelope:{generation:7,bundle:value.selection.bundle,changeId:'a'.repeat(32),kind:'image',requestedPage:1,before:null,after:side,beforeError:'This exact saved artifact preview is unavailable. Retry to render it again.',afterError:null,beforeAbsentPage:null,afterAbsentPage:null}};
+  module.exports.setLocale('he');
+  try {
+    for (const mode of ['visual','content']) {
+      value.view.review_mode = mode;
+      const html = render({pins:[value],notice:''});
+      assert.match(html, /גרסה קודמת: התצוגה המקדימה של הפריט השמור המדויק אינה זמינה/);
+      assert.ok(html.includes('משפחה/image.png'));
+      assert.ok(html.includes(`<bdi dir="ltr">${value.selection.version}</bdi>`));
+      assert.doesNotMatch(html, /Earlier version:|This exact saved artifact preview/);
+      if (mode === 'visual') assert.match(html, /src="data:image\/png;base64,AAAA"/);
+    }
+    value.view.review_mode = 'visual';
+    value.artifact.envelope.after.contentDigest = '9'.repeat(64);
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /לא ניתן לאמת את התצוגה המקדימה השמורה המדויקת/);
+    assert.doesNotMatch(html, /src="data:image/);
+    value.artifact.envelope = null;
+    value.artifact.error = 'This exact saved artifact preview could not be verified. Retry to render it again.';
+    html = render({pins:[value],notice:''});
+    assert.match(html, /לא ניתן לאמת את התצוגה המקדימה של הפריט השמור המדויק/);
   } finally { module.exports.setLocale('en'); }
 });
