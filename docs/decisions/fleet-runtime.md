@@ -238,3 +238,45 @@ process-tree termination guarantee is claimed. The source project and selected d
 independent. Native fixture-process tests cover duplicate start, continued observation, stop-before-start,
 owner loss, launch failure and fault-latched queued work. Graphical control wiring and packaged live
 scheduling proof remain unfinished.
+
+## Saved fleet review readers
+
+Native `SavedReviewSelection` binds lane, checkpoint, immutable operation and review bundle. A fleet
+reader matches all four against a completed durable checkpoint with a recorded review, then uses the
+lane's retained native context and allocation identity. It never uses the desktop-selected workspace,
+accepts a filesystem path, adopts a restored context, or falls back to an automatic review candidate.
+This read authority survives session revocation and cancellation; it conveys no mutation or approval
+capability. Existing human approval and selected-workspace artifact guards are unchanged.
+
+The dedicated lane read seam checks the original root and installation under the workspace serial,
+requires the exact durable review, reconstructs presentation/artifacts from verified immutable history,
+and rechecks the physical root before returning. It intentionally does not compare a mutable working
+fold: another private save must not retarget or invalidate an older selected result. Artifact access
+still requires an object in the recomputed bundle and a closed before/after side, inherits the 32 MiB
+artifact bound, and never reads current working bytes. Projection incompleteness and omitted-change
+counts are retained rather than treating unavailable content as an empty change.
+
+The fleet lock is released during the potentially expensive per-lane reconstruction so other lanes
+can continue. The service then refreshes its guarded control history and verifies the same selection
+and retained context before acknowledgment. Missing contexts and substituted folders refuse; this is
+not restart/context reconciliation.
+
+`mesh.fleet-saved-reviews/v1` pages at most fifty checkpoint identities in checkpoint-id order with
+an exact `after`, `next_after`, observed control revision and total. It is not chronological order or
+an atomic multi-page snapshot. New earlier IDs require refreshing the list. An unknown cursor
+refuses; immutable selections remain stable across list refresh. `mesh.fleet-saved-review/v1` echoes
+the complete selection with the bounded recorded review projection. These are additive native
+presentation schemas, not new persisted events or agent IPC tools.
+
+Desktop commands `fleet_saved_reviews` and `inspect_fleet_saved_review` use only current-host catalogue
+services and spawn native reads away from the UI thread. They accept opaque identities, not paths or
+signers. Fleet cards and parallel review panels still need to consume this seam, and the artifact
+reader is not yet exposed as a desktop rendering command. Source tests verify older result bytes
+after newer saves/unsaved edits, navigation, cancellation and revocation; selection mismatch, directory
+substitution and pagination across fifty-three checkpoints are covered. Packaged graphical and
+concurrent human approval proof remain separate requirements.
+
+The returned presentation uses the review's recorded canonical head. It does not silently reinterpret
+an attached-source operation as the managed lane's review base. Input-relative comparison and mapping
+lane results back to the original project's main remain separate required work; the eventual UI must
+identify the actual comparison base.

@@ -299,3 +299,11 @@ restart, inspect retained fleet state before creating another request; pending-i
 renderer reload is not implemented. Restored fleets cannot restart workers automatically. Fleet result
 review, worker recovery and integration into the original project's main remain unavailable in this
 view. Existing project history, manual lanes and their comparisons remain independently usable.
+
+
+A subsequent native development increment can read an exact recorded fleet result independently
+of the currently selected workspace and newer agent edits. Saved results remain readable after
+cancellation or session revocation while their native lane context remains attached. Missing or
+replaced contexts refuse. The result list is paged by checkpoint identity, not completion time;
+refresh the list to find newly inserted earlier identities. This read API does not approve work.
+Visible parallel review panels and restored-context access follow in separate increments.

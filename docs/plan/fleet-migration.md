@@ -172,10 +172,10 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Transferred onto published #42; canonical localization and native-mode contract adapted; validation and PR pending |
 | L01 | `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` | Open attached saved versions as independent work lanes | Pending transfer |
 | L01 | `c728c41c9831e636a6bdfbb9b0212739ad6ba974` | Connect attached saved versions to managed fleet lanes | Pending transfer |
-| L01 | `e987565983cc7f57be33fe211f9f4bb4d290fad2` | Expose scoped fleet MCP through the packaged desktop app | Pending transfer |
-| L02 | `877188898d0151d958bb06230b2e3797611a5ff2` | Persist native fleet discovery without adopting uncertain workers | Pending transfer |
-| L02 | `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` | Connect desktop-owned fleet scheduling and activity | Pending transfer |
-| L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | Pending transfer |
+| L01 | `e987565983cc7f57be33fe211f9f4bb4d290fad2` | Expose scoped fleet MCP through the packaged desktop app | [Mesh PR #46](https://github.com/idosams/Mesh/pull/46), `1434d269759e0ca62d9bc14b62ec6202580133a5`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
+| L02 | `877188898d0151d958bb06230b2e3797611a5ff2` | Persist native fleet discovery without adopting uncertain workers | [Mesh PR #47](https://github.com/idosams/Mesh/pull/47), `046ba075efc9290f9402ca2f3e4269610d1053fb`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
+| L02 | `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` | Connect desktop-owned fleet scheduling and activity | [Mesh PR #48](https://github.com/idosams/Mesh/pull/48), `f1578135da3da1aca14d77612117caf8ac031620`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
+| L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | [Mesh PR #49](https://github.com/idosams/Mesh/pull/49), `4a6126868cbe26b59c751488e2aa56f4dbe5072f`; 620 local desktop/interface tests passed; hosted checks running; local full/package validation and human review pending; not merged |
 | R01 | `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` | Read pinned fleet reviews independently of live work | Pending transfer |
 | R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | Pending transfer |
 | R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | Pending transfer |
@@ -614,3 +614,26 @@ none is merged. Pending-intent recovery across renderer reload, result review, w
 recovery and original-main integration remain separate increments. Continue with the preserved
 review phases after publishing this increment, retaining the complete second-provider, four-worker,
 remote-executor, human-review, merge and final combined-main acceptance obligations.
+
+## R01a independent exact saved-review readers
+
+Preserved source `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` transfers on #49 at
+`4a6126868cbe26b59c751488e2aa56f4dbe5072f`. Native reads bind the objective's lane, checkpoint,
+completed saved version and recorded bundle to the retained lane context. They reconstruct immutable
+review facts/artifacts independently of desktop selection, live files and later private saves. Reads
+hold the per-lane workspace guard but release the fleet lock during reconstruction, then revalidate
+the exact retained context. Revocation/cancellation does not remove read authority or grant approval.
+
+The transfer includes bounded fifty-row pagination and native desktop list/inspection commands. It
+preserves existing approval and physical-root guards without falling back to automatic candidates.
+Additional canonical refusal assertions cover substitution with another recorded bundle, a missing
+checkpoint borrowing a known bundle, and a syntactically valid object absent from the review. These
+complement the transferred newer-save/navigation/cancellation, changed-root and fifty-three-result
+fixtures. Local native/failing-before/full execution is queued behind the preserved #44 gate;
+source coverage is not a passing runtime or packaged claim. Hosted results must be recorded.
+
+Parent #49 is published before this increment starts. Parallel review panels, comparison to verified
+starting versions, saved selectors, offline history/artifacts, correspondence and all remaining
+integration/recovery work retain their order in the source ledger. Every increment remains subject
+to validation and required human review before merge, followed by combined-main and complete fleet
+acceptance. Original source commits, dirty work and verification remain preserved.

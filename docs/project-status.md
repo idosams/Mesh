@@ -219,3 +219,12 @@ identities and user goals. Packaged graphical interaction is not verified; the l
 acceptance was blocked by the locked session. Renderer-reload
 recovery of pending intent, fleet result review, context/process recovery and original-main integration
 remain incomplete; this is not the completed fleet phase.
+
+Native fleet saved-result readers now bind lane/checkpoint/version/bundle and use the lane's existing
+context independently of desktop selection. The exact historical projection and artifact bytes remain
+readable after newer saves, unsaved edits, cancellation and credential revocation. Replaced roots,
+wrong tuples and invalid artifact selectors refuse. A bounded saved-review list covers all pages in
+checkpoint-id order; it is not an atomic chronological feed. Native desktop commands expose the list
+and exact review projection. Tests verify fifty-three results and immutable bytes across navigation.
+Visible fleet result panels, desktop artifact rendering for these readers, restored-context access,
+main approval/integration and packaged graphical proof remain unfinished.

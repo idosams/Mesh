@@ -800,6 +800,51 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn fleet_saved_reviews(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        after: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.current_fleet(&objective)?
+                .saved_reviews(&lane, after.as_deref())
+                .map(|value| value.encode())
+                .map_err(|_| "Saved fleet results are unavailable".into())
+        })
+        .await
+        .map_err(|_| "Saved fleet results could not be loaded".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn inspect_fleet_saved_review(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.current_fleet(&objective)?
+                .saved_review(&selection)
+                .map(|value| value.encode())
+                .map_err(|_| "The exact saved review is unavailable".into())
+        })
+        .await
+        .map_err(|_| "Saved fleet review could not be loaded".to_owned())?
+    }
+
+    #[tauri::command]
     async fn fleet_activity(
         hosts: State<'_, Arc<crate::fleet_host::FleetHosts>>,
     ) -> Result<String, String> {
@@ -7082,6 +7127,8 @@ mod desktop {
                 attached_fleets,
                 provision_attached_fleet,
                 fleet_activity,
+                fleet_saved_reviews,
+                inspect_fleet_saved_review,
                 start_attached_fleet,
                 stop_attached_fleet,
                 attached_project_versions,

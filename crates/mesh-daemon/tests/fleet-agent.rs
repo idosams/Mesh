@@ -1167,3 +1167,295 @@ fn native_fleet_registration_retries_only_the_exact_service_instance() {
         .call("context", &Json::object([] as [(&str, Json); 0]))
         .is_ok());
 }
+
+#[test]
+fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and_cancellation() {
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    let mut f = Fixture::new("pinned-native-reader");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "review-reader-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x79; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    let selected = f.desktop.workspace_state().unwrap();
+    assert!(f
+        .service
+        .saved_reviews(&f.lane, None)
+        .unwrap()
+        .get("reviews")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    fs::write(root.join("note.txt"), "pinned first result\n").unwrap();
+    let first = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("first"))]),
+        )
+        .unwrap();
+    assert!(f
+        .service
+        .saved_reviews(&f.lane, None)
+        .unwrap()
+        .get("reviews")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let first_review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", first.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &f.lane,
+        text(&first, "checkpoint"),
+        text(&first, "version"),
+        text(&first_review, "bundle"),
+    )
+    .unwrap();
+    let frozen = f.service.saved_review(&selection).unwrap();
+    assert_eq!(frozen.get("selection"), Some(&selection.to_json()));
+    let item = frozen.get("review").unwrap();
+    assert_eq!(item.get("content_complete"), Some(&Json::Bool(true)));
+    let object = item
+        .get("bundle_changes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|change| change.get("path_after").and_then(Json::as_text) == Some("/note.txt"))
+        .unwrap()
+        .get("object_id")
+        .unwrap()
+        .as_text()
+        .unwrap();
+    assert_eq!(
+        f.service
+            .saved_review_artifact(&selection, object, "after")
+            .unwrap()
+            .bytes(),
+        b"pinned first result\n"
+    );
+    fs::write(root.join("note.txt"), "second saved result\n").unwrap();
+    let second = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("second"))]),
+        )
+        .unwrap();
+    let second_review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", second.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let second_selection = SavedReviewSelection::new(
+        &f.lane,
+        text(&second, "checkpoint"),
+        text(&second, "version"),
+        text(&second_review, "bundle"),
+    )
+    .unwrap();
+    fs::write(root.join("note.txt"), "unsaved work continues\n").unwrap();
+    let page = f.service.saved_reviews(&f.lane, None).unwrap();
+    assert_eq!(page.get("total").and_then(Json::as_u64), Some(2));
+    let rows = page.get("reviews").unwrap().as_array().unwrap();
+    let tail = f
+        .service
+        .saved_reviews(&f.lane, Some(text(&rows[0], "checkpoint")))
+        .unwrap();
+    assert_eq!(tail.get("reviews").unwrap().as_array().unwrap(), &rows[1..]);
+    assert!(f
+        .service
+        .saved_reviews(&f.lane, Some("unknown-cursor"))
+        .is_err());
+    assert!(f.service.saved_reviews("other-lane", None).is_err());
+    let wrong = SavedReviewSelection::new(
+        &f.lane,
+        text(&first, "checkpoint"),
+        text(&second, "version"),
+        text(&first_review, "bundle"),
+    )
+    .unwrap();
+    assert!(f.service.saved_review(&wrong).is_err());
+    // Each selection member is independently authoritative: another recorded bundle cannot
+    // substitute for this checkpoint, and an unknown checkpoint cannot borrow a known review.
+    assert_ne!(
+        text(&first_review, "bundle"),
+        text(&second_review, "bundle")
+    );
+    for (checkpoint, bundle) in [
+        (text(&first, "checkpoint"), text(&second_review, "bundle")),
+        ("missing-checkpoint", text(&first_review, "bundle")),
+    ] {
+        let wrong = SavedReviewSelection::new(&f.lane, checkpoint, text(&first, "version"), bundle)
+            .unwrap();
+        assert!(f.service.saved_review(&wrong).is_err());
+        assert!(f
+            .service
+            .saved_review_artifact(&wrong, object, "after")
+            .is_err());
+    }
+    let absent_object = mesh_materializer::ObjectId::from_bytes([0x9d; 16]).to_string();
+    assert!(mesh_materializer::ObjectId::parse(&absent_object).is_ok());
+    assert_ne!(absent_object, object);
+    assert!(f
+        .service
+        .saved_review_artifact(&selection, &absent_object, "after")
+        .is_err());
+    let wrong = SavedReviewSelection::new(
+        "different-lane",
+        text(&first, "checkpoint"),
+        text(&first, "version"),
+        text(&first_review, "bundle"),
+    )
+    .unwrap();
+    assert!(f.service.saved_review(&wrong).is_err());
+    assert!(f
+        .service
+        .saved_review_artifact(&selection, "../note.txt", "after")
+        .is_err());
+    assert!(f
+        .service
+        .saved_review_artifact(&selection, object, "working")
+        .is_err());
+    assert!(SavedReviewSelection::new(
+        "../lane",
+        "checkpoint",
+        text(&first, "version"),
+        text(&first_review, "bundle")
+    )
+    .is_err());
+    assert!(SavedReviewSelection::new(
+        &f.lane,
+        text(&first, "checkpoint"),
+        &text(&first, "version").to_uppercase(),
+        text(&first_review, "bundle")
+    )
+    .is_err());
+    let navigation = f.path.join("navigation");
+    fs::create_dir(&navigation).unwrap();
+    fs::write(navigation.join("other.txt"), "another project").unwrap();
+    let preview = f
+        .desktop
+        .preview_folder_import(navigation.to_str().unwrap())
+        .unwrap();
+    f.desktop
+        .confirm_folder_import(
+            navigation.to_str().unwrap(),
+            f.path.join("navigation.mesh").to_str().unwrap(),
+            text(&preview, "summary"),
+        )
+        .unwrap();
+    let navigated = f.desktop.workspace_state().unwrap();
+    assert_ne!(selected.root, navigated.root);
+    f.service
+        .native_command("cancel-reader", Command::Cancel)
+        .unwrap();
+    f.service.revoke(&f.credential).unwrap();
+    let revision = f.service.native_state().unwrap().revision;
+    assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
+    assert_eq!(
+        f.service
+            .saved_review_artifact(&selection, object, "after")
+            .unwrap()
+            .bytes(),
+        b"pinned first result\n"
+    );
+    assert_eq!(
+        f.service
+            .saved_review_artifact(&second_selection, object, "after")
+            .unwrap()
+            .bytes(),
+        b"second saved result\n"
+    );
+    assert_eq!(f.service.native_state().unwrap().revision, revision);
+    assert_eq!(f.desktop.workspace_state().unwrap(), navigated);
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"unsaved work continues\n"
+    );
+    assert_eq!(
+        fs::read(f.path.join("original/note.txt")).unwrap(),
+        b"immutable input\n"
+    );
+    fs::rename(&root, f.path.join("retained-reader-lane")).unwrap();
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("note.txt"), "foreign replacement").unwrap();
+    assert!(f.service.saved_review(&selection).is_err());
+    assert!(f
+        .service
+        .saved_review_artifact(&selection, object, "after")
+        .is_err());
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"foreign replacement"
+    );
+}
+
+#[test]
+fn saved_review_pages_are_bounded_and_cover_every_checkpoint_without_duplicates() {
+    let mut f = Fixture::new("review-pages");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "review-page-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x7a; 32],
+            ))),
+        )
+        .unwrap();
+    let mut expected = Vec::new();
+    for index in 0..53 {
+        let checkpoint = f
+            .call(
+                "checkpoint",
+                &Json::object([("request", Json::text(format!("page-{index:02}")))]),
+            )
+            .unwrap();
+        f.call(
+            "submit_review",
+            &Json::object([("checkpoint", checkpoint.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+        expected.push(text(&checkpoint, "checkpoint").to_owned());
+    }
+    expected.sort();
+    let first = f.service.saved_reviews(&f.lane, None).unwrap();
+    assert_eq!(first.get("total").and_then(Json::as_u64), Some(53));
+    let rows = first.get("reviews").unwrap().as_array().unwrap();
+    assert_eq!(rows.len(), 50);
+    assert_eq!(text(&first, "next_after"), expected[49]);
+    let second = f
+        .service
+        .saved_reviews(&f.lane, Some(text(&first, "next_after")))
+        .unwrap();
+    let tail = second.get("reviews").unwrap().as_array().unwrap();
+    assert_eq!(tail.len(), 3);
+    assert_eq!(second.get("next_after"), Some(&Json::Null));
+    let actual: Vec<_> = rows
+        .iter()
+        .chain(tail.iter())
+        .map(|row| text(row, "checkpoint").to_owned())
+        .collect();
+    assert_eq!(actual, expected);
+    let end = f
+        .service
+        .saved_reviews(&f.lane, expected.last().map(String::as_str))
+        .unwrap();
+    assert!(end.get("reviews").unwrap().as_array().unwrap().is_empty());
+    assert_eq!(end.get("next_after"), Some(&Json::Null));
+}

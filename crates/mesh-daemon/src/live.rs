@@ -3457,6 +3457,106 @@ impl LiveDaemon {
         })
     }
 
+    /// Read only a durable review through native lane identity. The mutable working fold is not
+    /// approval input here: newer private saves cannot retarget this immutable review selection.
+    pub(crate) fn recorded_lane_review(
+        &self,
+        root: &str,
+        installation: &str,
+        bundle: RecordDigest,
+        target: RecordDigest,
+    ) -> Result<crate::ipc::Json, Unavailable> {
+        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
+            open.recorded_review_item(bundle).ok_or_else(|| {
+                publication_refusal(
+                    "fleet-review-unavailable",
+                    "The exact saved lane review is unavailable.",
+                )
+            })
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn recorded_lane_artifact(
+        &self,
+        root: &str,
+        installation: &str,
+        bundle: RecordDigest,
+        target: RecordDigest,
+        object: &str,
+        side: &str,
+    ) -> Result<ReviewArtifact, Unavailable> {
+        let object = ObjectId::parse(object).map_err(|_| {
+            publication_refusal(
+                "fleet-review-object-invalid",
+                "The saved review object is invalid.",
+            )
+        })?;
+        let side = match side {
+            "before" => ReviewArtifactSide::Before,
+            "after" => ReviewArtifactSide::After,
+            _ => {
+                return Err(publication_refusal(
+                    "fleet-review-side-invalid",
+                    "The saved review side is invalid.",
+                ))
+            }
+        };
+        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
+            let artifact = open
+                .verified_review_artifact(bundle, target, object, side)
+                .map_err(|_| {
+                    publication_refusal(
+                        "fleet-review-artifact-unavailable",
+                        "The exact saved lane artifact could not be verified.",
+                    )
+                })?;
+            Ok(ReviewArtifact {
+                path: artifact.path,
+                version: artifact.version,
+                digest: artifact.digest,
+                bytes: artifact.bytes,
+            })
+        })
+    }
+
+    fn with_recorded_lane_review<T>(
+        &self,
+        root: &str,
+        installation: &str,
+        bundle: RecordDigest,
+        target: RecordDigest,
+        read: impl FnOnce(&OpenWorkspace) -> Result<T, Unavailable>,
+    ) -> Result<T, Unavailable> {
+        let _serial = self
+            .workspace_open
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let held = self.held();
+        let open = held.as_ref().ok_or_else(Unavailable::no_workspace_open)?;
+        if open.root().as_path() != Path::new(root) || open.installation() != installation {
+            return Err(publication_refusal(
+                "fleet-review-workspace-changed",
+                "The lane workspace identity changed.",
+            ));
+        }
+        open.ensure_physical_root()
+            .map_err(|_| publication_save_failed())?;
+        // Unlike the selected-workspace preview API, this seam never admits an automatic candidate.
+        open.review(&bundle)
+            .filter(|review| review.subject_operation == target && review.bundle == bundle)
+            .ok_or_else(|| {
+                publication_refusal(
+                    "fleet-review-not-recorded",
+                    "This exact review is not recorded in the lane.",
+                )
+            })?;
+        let result = read(open)?;
+        open.ensure_physical_root()
+            .map_err(|_| publication_save_failed())?;
+        Ok(result)
+    }
+
     /// Reconstruct one side of one displayed file change for a local artifact renderer.
     ///
     /// Root, fold digest and installation bind this read to the exact workspace snapshot shown by

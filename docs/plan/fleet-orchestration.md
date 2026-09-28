@@ -341,3 +341,15 @@ controls. Result review and recovery are explicitly unavailable until their inde
 and context reconciliation are connected. Pending-intent persistence across renderer reload, parallel
 fleet review and packaged graphical proof (previously blocked by the locked Mac) remain next work; manual attachment review
 and its existing pins remain available.
+
+Native saved fleet results are now independently readable through exact lane/checkpoint/version/bundle
+selections. Reads retain existing lane context, recheck native identity and guarded control history,
+and reconstruct immutable review/artifact content without consulting newer working bytes or changing
+desktop selection. The catalogue-backed desktop list and review commands are connected. Pagination
+and substitution/navigation/cancellation tests pass at the native seam; visible parallel panels,
+artifact presentation, persistence of pin selections, restored-context reads and packaged graphical
+verification are the next integration work. No approval or project-main integration is added here.
+
+The saved-review reader preserves each bundle's recorded canonical base. An attached source version
+is not automatically the managed lane's shared review base. Add explicit input-relative comparison
+and original-project main mapping before claiming the complete fleet review/integration journey.

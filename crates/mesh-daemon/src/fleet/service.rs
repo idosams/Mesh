@@ -191,6 +191,50 @@ struct Inner {
     workspaces: BTreeMap<String, Arc<LaneWorkspace>>,
     grants: BTreeMap<String, Grant>,
 }
+/// A pinned saved result. Native readers verify every member against durable checkpoint history.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SavedReviewSelection {
+    lane: String,
+    checkpoint: String,
+    version: RecordDigest,
+    bundle: RecordDigest,
+}
+impl SavedReviewSelection {
+    /// Parse bounded identities. Parsing alone grants no workspace or review authority.
+    pub fn new(
+        lane: &str,
+        checkpoint: &str,
+        version: &str,
+        bundle: &str,
+    ) -> Result<Self, Unavailable> {
+        super::id_valid(lane).map_err(runtime_error)?;
+        super::id_valid(checkpoint).map_err(runtime_error)?;
+        let digest = |value: &str| {
+            let parsed = RecordDigest::parse_hex(value)
+                .map_err(|_| refusal("fleet-review-identity-invalid"))?;
+            if parsed.to_string() != value {
+                return Err(refusal("fleet-review-identity-invalid"));
+            }
+            Ok(parsed)
+        };
+        Ok(Self {
+            lane: lane.into(),
+            checkpoint: checkpoint.into(),
+            version: digest(version)?,
+            bundle: digest(bundle)?,
+        })
+    }
+    /// Exact immutable selection for native-to-renderer correlation. It conveys no approval power.
+    pub fn to_json(&self) -> Json {
+        Json::object([
+            ("lane", Json::text(&self.lane)),
+            ("checkpoint", Json::text(&self.checkpoint)),
+            ("version", Json::text(self.version.to_string())),
+            ("bundle", Json::text(self.bundle.to_string())),
+        ])
+    }
+}
+
 /// One objective's native host. All mutation methods other than `agent_call` are native-only APIs.
 pub struct FleetService {
     inner: Mutex<Inner>,
@@ -826,6 +870,141 @@ impl FleetService {
         }
     }
 
+    /// Page durable saved-review identities in checkpoint-id order, not completion-time order.
+    /// Newly inserted earlier IDs require a refresh; selected immutable results never change.
+    pub fn saved_reviews(&self, lane: &str, after: Option<&str>) -> Result<Json, Unavailable> {
+        super::id_valid(lane).map_err(runtime_error)?;
+        if let Some(after) = after {
+            super::id_valid(after).map_err(runtime_error)?;
+        }
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        if !inner.runtime.state().lanes.contains_key(lane) {
+            return Err(refusal("fleet-lane-missing"));
+        }
+        let entries: Vec<_> = inner
+            .runtime
+            .state()
+            .checkpoints
+            .iter()
+            .filter(|(_, checkpoint)| {
+                checkpoint.lane == lane
+                    && checkpoint.review.is_some()
+                    && checkpoint
+                        .result
+                        .as_ref()
+                        .is_some_and(|result| result.complete)
+            })
+            .collect();
+        if after.is_some_and(|after| !entries.iter().any(|(id, _)| id.as_str() == after)) {
+            return Err(refusal("fleet-review-cursor-invalid"));
+        }
+        let remaining: Vec<_> = entries
+            .iter()
+            .filter(|(id, _)| after.is_none_or(|after| id.as_str() > after))
+            .collect();
+        let rows: Vec<_> = remaining
+            .iter()
+            .take(50)
+            .map(|(id, checkpoint)| {
+                let result = checkpoint
+                    .result
+                    .as_ref()
+                    .expect("complete result filtered");
+                Json::object([
+                    ("checkpoint", Json::text(id.as_str())),
+                    ("version", Json::text(result.version.to_string())),
+                    (
+                        "bundle",
+                        Json::text(
+                            checkpoint
+                                .review
+                                .expect("recorded review filtered")
+                                .to_string(),
+                        ),
+                    ),
+                    ("run", Json::text(&checkpoint.origin.run)),
+                ])
+            })
+            .collect();
+        Ok(Json::object([
+            ("schema", Json::text("mesh.fleet-saved-reviews/v1")),
+            ("objective", Json::text(inner.runtime.objective())),
+            ("lane", Json::text(lane)),
+            ("revision", Json::Number(inner.runtime.state().revision)),
+            ("order", Json::text("checkpoint-id")),
+            ("after", after.map_or(Json::Null, Json::text)),
+            ("total", Json::Number(entries.len() as u64)),
+            (
+                "next_after",
+                if remaining.len() > 50 {
+                    Json::text(remaining[49].0)
+                } else {
+                    Json::Null
+                },
+            ),
+            ("reviews", Json::Array(rows)),
+        ]))
+    }
+
+    /// Verify the immutable review for one saved checkpoint without navigating or reading live files.
+    pub fn saved_review(&self, selection: &SavedReviewSelection) -> Result<Json, Unavailable> {
+        let review = self.with_saved_review(selection, |workspace| {
+            workspace.daemon().recorded_lane_review(
+                workspace.binding().root(),
+                workspace.binding().installation(),
+                selection.bundle,
+                selection.version,
+            )
+        })?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.fleet-saved-review/v1")),
+            ("objective", Json::text(self.objective()?)),
+            ("selection", selection.to_json()),
+            ("review", review),
+        ]))
+    }
+
+    /// Read an exact historical artifact; object identity and side select content, never a path.
+    pub fn saved_review_artifact(
+        &self,
+        selection: &SavedReviewSelection,
+        object: &str,
+        side: &str,
+    ) -> Result<crate::ReviewArtifact, Unavailable> {
+        self.with_saved_review(selection, |workspace| {
+            workspace.daemon().recorded_lane_artifact(
+                workspace.binding().root(),
+                workspace.binding().installation(),
+                selection.bundle,
+                selection.version,
+                object,
+                side,
+            )
+        })
+    }
+
+    fn with_saved_review<T>(
+        &self,
+        selection: &SavedReviewSelection,
+        read: impl FnOnce(&LaneWorkspace) -> Result<T, Unavailable>,
+    ) -> Result<T, Unavailable> {
+        let workspace = {
+            let mut inner = self.lock()?;
+            inner.runtime.refresh().map_err(runtime_error)?;
+            saved_review_workspace(&inner, selection)?
+        };
+        // Do not hold the fleet-wide lock while reconstructing artifacts; other lanes keep working.
+        let result = read(&workspace)?;
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        let current = saved_review_workspace(&inner, selection)?;
+        if !Arc::ptr_eq(&workspace, &current) {
+            return Err(refusal("fleet-review-workspace-changed"));
+        }
+        Ok(result)
+    }
+
     /// Refresh durable native lifecycle state independently of the desktop selection.
     pub fn native_state(&self) -> Result<super::State, Unavailable> {
         let mut inner = self.lock()?;
@@ -895,6 +1074,41 @@ impl FleetService {
             ),
         ]))
     }
+}
+
+fn saved_review_workspace(
+    inner: &Inner,
+    selection: &SavedReviewSelection,
+) -> Result<Arc<LaneWorkspace>, Unavailable> {
+    let checkpoint = inner
+        .runtime
+        .state()
+        .checkpoints
+        .get(&selection.checkpoint)
+        .filter(|checkpoint| {
+            checkpoint.lane == selection.lane
+                && checkpoint.review == Some(selection.bundle)
+                && checkpoint
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.complete && result.version == selection.version)
+        })
+        .ok_or_else(|| refusal("fleet-review-selection-mismatch"))?;
+    let workspace = inner
+        .workspaces
+        .get(&checkpoint.lane)
+        .ok_or_else(|| refusal("fleet-lane-needs-reattachment"))?;
+    if inner
+        .runtime
+        .state()
+        .lanes
+        .get(&checkpoint.lane)
+        .and_then(|lane| lane.workspace.as_ref())
+        != Some(workspace.binding())
+    {
+        return Err(refusal("fleet-review-workspace-changed"));
+    }
+    Ok(workspace.clone())
 }
 
 fn review_summary(checkpoint: &str, version: RecordDigest, bundle: RecordDigest) -> Json {
