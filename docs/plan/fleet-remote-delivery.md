@@ -105,3 +105,27 @@ store-path input is exposed. Verified availability is a read-time fact, not perm
 materialization authority: native allocation must recheck store/destination identity
 and the actual output. Source-version export, authenticated transport, receiving-side
 allocation/execution and second-machine acceptance remain separate required steps.
+
+## Native attached-input export
+
+A provisioned attachment can now prepare an exact saved version as a `RemoteInputSource`.
+Preparation uses the existing native history/registration checks and its inspection lock,
+including normal disposable-index recovery. It derives the transfer manifest from the verified
+historical tree and retained chunk metadata; current project files are not transfer inputs.
+Empty directories/files and executable metadata remain explicit. Unsupported protocol bounds
+refuse the input instead of omitting entries.
+
+The returned handle owns immutable metadata and pinned directories, without an inspection lock,
+live daemon, signer or execution context. A later capture can complete while that handle remains
+alive. Each chunk request must occur in its declared manifest; it checks root identity before and
+after a bounded read and verifies exact length and BLAKE3 before exposing bytes. A grown file is
+read only to its expected size plus one byte, at most 4 MiB plus one. The returned verified chunk
+is at most 4 MiB; native transport must split it into the receiver's 64 KiB parts. Missing content,
+symlinks, changed roots and corruption refuse. Handle reads never repair or quarantine storage.
+This does not pin retention forever: collected content becomes explicitly unavailable.
+
+The API is native-only and conveys no dispatch or destination authority. Callers still must bind
+its manifest to the exact authorized assignment and authenticated peer, recheck session/lease
+state and provision receiving-side storage. Managed-lane/private-dependency export integration,
+mutual transport, remote execution/results/reconnect and actual second-machine acceptance remain
+required. Preparation itself is not a network transfer, and source tests are not remote proof.

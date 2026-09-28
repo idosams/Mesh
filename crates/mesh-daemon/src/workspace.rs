@@ -33,6 +33,9 @@
 //! disposable index must be replaced from the immutable journal. No storage meaning is
 //! re-implemented here.
 
+mod remote_input_export;
+pub use remote_input_export::RemoteInputSource;
+
 #[cfg(test)]
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};

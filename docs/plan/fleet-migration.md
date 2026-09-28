@@ -2185,3 +2185,21 @@ lost acknowledgments, corrupt chunks, incomplete input, changed identities, clos
 encoding, path conflicts, bounds and complete-file integrity. The remote delivery plan
 records the bounds and remaining native authority, export, transport, allocation and
 actual second-machine obligations. No network or remote execution is claimed here.
+
+## R04 native saved attached-input export
+
+New canonical implementation based on #117 at
+`43f2c5e9628286c470d695964106210ced1f738d`; no preserved source commit is replaced.
+A provisioned attachment now prepares an immutable manifest and read-only pinned export handle
+from exact verified saved history. It releases the inspection lock before returning, so later
+capture does not depend on transfer pacing. Declared-chunk reads recheck directory identity,
+bound allocation, verify exact length/hash and refuse unavailable or replaced content without
+quarantine or repair. No current working-file bytes enter the exported version.
+
+Native regressions cover saved content after a later capture, empty directories/files and modes,
+real receiver reconstruction, exact retry/reopen, undeclared or foreign identities, corruption,
+missing chunks, oversized files, symlinks and replaced storage. Repository/docs/license/storage,
+format and whitespace checks pass; native execution on this new revision remains pending behind
+the preserved combined-main run. The [remote plan](fleet-remote-delivery.md) retains managed-lane
+export, authenticated transport, receiving execution and actual remote acceptance requirements.
+This is not a claim that the remote phase or full goal is complete.

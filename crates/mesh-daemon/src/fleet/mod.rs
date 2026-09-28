@@ -21,6 +21,8 @@ mod file_deletions;
 pub mod provider;
 mod remote;
 mod remote_input;
+#[cfg(unix)]
+pub use crate::workspace::RemoteInputSource;
 pub use remote_input::{
     RemoteInputChunk, RemoteInputEntry, RemoteInputManifest, RemoteInputReceiver,
 };

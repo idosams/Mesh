@@ -44,6 +44,7 @@ mod group_integration;
 mod history;
 mod inspection;
 mod integration;
+mod remote_input;
 pub use group_integration::PreparedMainIntegration;
 mod lanes;
 mod recovery;

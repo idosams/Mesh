@@ -107,3 +107,10 @@ publication refusal. They do not prove signed approval, remote execution or a cl
 See the [user guide](user-guide.md), [architecture](architecture.md),
 [public-alpha guide](launch/public-alpha.md), [phase assessment](phase-assessment.md),
 [user playbooks](user-playbooks.md) and [measurement contract](plan/fleet-native-measurements.md).
+
+## Attached-input export increment
+
+Native source now includes an exact saved attached-version export handle with bounded verified
+chunk reads. Its inspection lock is released before transfer, allowing later capture while old
+saved content remains selected. This addition is under native validation; transport, managed-lane
+export integration and actual remote execution remain unfinished. See the [delivery ledger](plan/fleet-migration.md).
