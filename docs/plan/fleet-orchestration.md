@@ -721,3 +721,8 @@ preview; project/folder labels remain literal. The host rechecks the project gen
 This is the native host increment only: renderer controls, current native execution and packaged
 graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
 local FSEvents registration failure is not resolved by these commands.
+
+Group application/recovery controls now route exact native identities, retain uncertain outcomes and
+permit explicit inspection without automatic retry. Existing per-file controls, saved reviews and
+project imports remain available. Hebrew controls and literal file identifiers are preserved.
+Directory operations, watcher reconciliation and the full packaged acceptance objective remain.

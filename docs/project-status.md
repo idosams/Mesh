@@ -600,3 +600,9 @@ preview; project/folder labels remain literal. The host rechecks the project gen
 This is the native host increment only: renderer controls, current native execution and packaged
 graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
 local FSEvents registration failure is not resolved by these commands.
+
+Desktop controls now connect complete accepted regular-file groups to native confirmation and expose
+partial outcomes, verified group/member observations and explicit retained-file restoration. Hebrew
+copy and literal path/identity presentation are preserved. Failed recovery refreshes keep earlier
+observations visible but disable restoration. Focused controller tests pass; current renderer/native
+and packaged acceptance is tracked separately from these source changes.

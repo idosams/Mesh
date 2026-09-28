@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, attachedLane, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, attachedGroupChange, attachedGroupRecovery, attachedLane, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -725,7 +725,7 @@ function recoveryReply(selected = transaction) {
       attention_required: false, observation_final: false, atomic_snapshot: false, write_authority: false, automatic_replay: false, cleanup_authority: false,
       details: { path: 'work.txt', operation: selected.startsWith('restoration-') ? 'restore-retained' : 'apply-approved',
         content_is_approved_main: !selected.startsWith('restoration-'), approved_head: 'd'.repeat(64), is_current_main: false,
-        current_exclusions_checked: false, recorded_outcome: 'applied-observed', source: observation, retained: observation },
+        current_exclusions_checked: false, recorded_outcome: 'applied-observed', source: observation, retained: observation, retained_file_is_displaced: true },
     }],
   } };
 }
@@ -944,5 +944,154 @@ test('exact review navigation waits for an in-flight status refresh', async () =
   release(); await settle(); await settle();
   assert.deepEqual(inspections, [{ id, bundle: reviewRecord().bundle, target: operation }]);
   assert.equal(h.projections.at(-1).reviewNavigation.target, operation);
+  h.dispose();
+});
+
+test('native full file modes, addition/removal evidence and absent restoration results remain readable', () => {
+  const value = recoveryReply();
+  const details = value.recovery.entries[0].details;
+  for (const operation of ['add-approved', 'remove-approved', 'restore-retained']) {
+    details.operation = operation;
+    details.content_is_approved_main = operation !== 'restore-retained';
+    details.source = null;
+    details.retained_file_is_displaced = operation === 'remove-approved';
+    assert.equal(attachedRecovery(value, id).entries[0].retainedAvailable, operation === 'remove-approved');
+  }
+  details.retained.mode = 0o040755;
+  assert.throws(() => attachedRecovery(value, id));
+  details.retained.mode = 0o100644;
+  delete details.retained_file_is_displaced;
+  assert.equal(attachedRecovery(value, id).entries[0].retainedAvailable, false);
+  const creation = changeReply(true);
+  creation.outcome.schema = 'mesh.attachment-file-restoration-addition-result/v1';
+  creation.outcome.displaced_file_retained = false;
+  assert.equal(attachedFileChange(creation, id, true).creation, true);
+  creation.outcome.displaced_file_retained = true;
+  assert.throws(() => attachedFileChange(creation, id, true));
+});
+const groupId = `integration-group-${'c'.repeat(32)}`;
+function groupRecoveryReply() {
+  return { schema: 'mesh.attachment-integration-group-recovery/v1', project: id, group: groupId,
+    proposal_digest: 'c'.repeat(64), members: [{ transaction, recovery: recoveryReply().recovery }], already_present: ['unchanged.txt'],
+    restoration_references: [restoredTransaction], more_restoration_references_may_exist: false,
+    already_present_is_preparation_evidence: true, observations_are_atomic: false, automatic_replay: false, write_authority: false };
+}
+function groupChangeReply() {
+  return { schema: 'mesh.desktop-attachment-group-change/v1', project: id, group: groupId,
+    outcome: { schema: 'mesh.attachment-integration-group-result/v1', proposal_digest: 'c'.repeat(64), status: 'reconciliation-required',
+      members: [{transaction, status: 'reconciliation-required'}, {transaction: `integration-${'d'.repeat(32)}`, status: 'not-attempted'}],
+      observation_final: false, automatic_replay: false, displaced_files_retained: true } };
+}
+test('group outcomes and observations bind identities, bounded members and non-atomic evidence', () => {
+  assert.equal(attachedGroupChange(groupChangeReply(), id).members[1].status, 'not-attempted');
+  assert.equal(attachedGroupRecovery(groupRecoveryReply(), id, groupId).entries[0].group, groupId);
+  assert.deepEqual(attachedGroupRecovery(groupRecoveryReply(), id, groupId).restorations, [restoredTransaction]);
+  for (const mutate of [
+    value => { value.project = 'f'.repeat(64); },
+    value => { value.group = '../outside'; },
+    value => { value.outcome.status = 'applied-observed'; },
+    value => { value.outcome.automatic_replay = true; },
+    value => { value.outcome.members.push(value.outcome.members[0]); },
+  ]) { const value = groupChangeReply(); mutate(value); assert.throws(() => attachedGroupChange(value, id)); }
+  for (const mutate of [
+    value => { value.observations_are_atomic = true; },
+    value => { value.write_authority = true; },
+    value => { value.members[0].transaction = undefined; },
+    value => { value.members[0].recovery.project = 'f'.repeat(64); },
+    value => { value.members.push(value.members[0]); },
+    value => { value.already_present = ['../outside']; },
+    value => { value.restoration_references = ['../outside']; },
+  ]) { const value = groupRecoveryReply(); mutate(value); assert.throws(() => attachedGroupRecovery(value, id, groupId)); }
+});
+test('group application uses exact loaded main, preserves partial outcomes and never retries on refresh', async () => {
+  const calls = []; let failInspection = false;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attachment_approval_status') return mainReply(acceptedMain());
+    if (command === 'preview_attached_main_integration') return integrationReply();
+    if (command === 'apply_attached_main_group') return groupChangeReply();
+    if (command === 'inspect_attached_group_recovery') { if (failInspection) throw new Error('private'); return groupRecoveryReply(); }
+    if (command === 'inspect_attached_recovery') return recoveryReply();
+    return reply();
+  });
+  await settle();
+  h.intent({type: 'apply-main-group', id}); await settle();
+  assert.equal(calls.some(call => call.command === 'apply_attached_main_group'), false);
+  h.intent({type: 'check-approval', id}); await settle();
+  h.intent({type: 'compare-main', id}); await settle();
+  h.intent({type: 'apply-main-group', id, path: '/outside'}); await settle();
+  assert.equal(calls.some(call => call.command === 'apply_attached_main_group'), false);
+  h.intent({type: 'apply-main-group', id}); await settle();
+  assert.deepEqual(calls.find(call => call.command === 'apply_attached_main_group').args, {id, bundle: acceptedMain().bundle, target: operation});
+  assert.equal(h.projections.at(-1).groupOutcomes[id].members[1].status, 'not-attempted');
+  assert.equal(h.projections.at(-1).groupRecoveries[id].group, groupId);
+  assert.equal(h.projections.at(-1).integrationPreviews[id], undefined);
+  const pinned = h.projections.at(-1).groupRecoveries[id];
+  failInspection = true;
+  h.intent({type: 'lookup-group', id, group: groupId}); await settle();
+  assert.equal(h.projections.at(-1).groupRecoveries[id], pinned);
+  assert.match(h.projections.at(-1).groupRecoveryErrors[id], /out of date/);
+  h.intent({type: 'restore-group-file', id, group: groupId, transaction}); await settle();
+  assert.equal(calls.some(call => call.command === 'restore_attached_group_file'), false);
+  failInspection = false;
+  h.intent({type: 'lookup-group', id, group: groupId}); await settle();
+  assert.equal(h.projections.at(-1).groupRecoveryErrors[id], '');
+  assert.equal(h.projections.at(-1).recoveryErrors[id], '');
+  h.intent({type: 'refresh'}); await settle();
+  assert.equal(calls.filter(call => call.command === 'apply_attached_main_group').length, 1);
+  h.dispose();
+});
+test('restoring a group member keeps recovery scope native and inspects the new transaction without replay', async () => {
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({command, args});
+    if (command === 'inspect_attached_group_recovery') return groupRecoveryReply();
+    if (command === 'restore_attached_group_file') return {...changeReply(true), group: groupId};
+    if (command === 'inspect_attached_group_file') return {...recoveryReply(args.transaction), group: groupId};
+    if (command === 'inspect_attached_recovery') return recoveryReply();
+    return reply();
+  });
+  await settle();
+  h.intent({type: 'restore-group-file', id, group: groupId, transaction}); await settle();
+  assert.equal(calls.some(call => call.command === 'restore_attached_group_file'), false);
+  h.intent({type: 'lookup-group', id, group: groupId}); await settle();
+  h.intent({type: 'restore-group-file', id, group: '../outside', transaction}); await settle();
+  h.intent({type: 'restore-group-file', id, group: groupId, transaction, bytes: 'injected'}); await settle();
+  assert.equal(calls.some(call => call.command === 'restore_attached_group_file'), false);
+  h.intent({type: 'restore-group-file', id, group: groupId, transaction}); await settle();
+  assert.deepEqual(calls.find(call => call.command === 'restore_attached_group_file').args, {id, group: groupId, transaction});
+  assert.equal(h.projections.at(-1).selectedRecovery[id].group, groupId);
+  assert.equal(h.projections.at(-1).selectedRecovery[id].transaction, restoredTransaction);
+  h.intent({type: 'refresh'}); await settle();
+  assert.equal(calls.filter(call => call.command === 'restore_attached_group_file').length, 1);
+  h.dispose();
+});
+
+test('lost group replies retain discovery references and never automatically apply again', async () => {
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({command, args});
+    if (command === 'attachment_approval_status') return mainReply(acceptedMain());
+    if (command === 'preview_attached_main_integration') return integrationReply();
+    if (command === 'apply_attached_main_group') throw new Error('private native failure after possible write');
+    if (command === 'inspect_attached_recovery') {
+      const value = recoveryReply();
+      Object.assign(value.recovery.entries[0], {transaction: groupId, status: 'group-reference', details: null, attention_required: true});
+      return value;
+    }
+    if (command === 'inspect_attached_group_recovery') return groupRecoveryReply();
+    return reply();
+  });
+  await settle();
+  h.intent({type: 'check-approval', id}); await settle();
+  h.intent({type: 'compare-main', id}); await settle();
+  h.intent({type: 'apply-main-group', id}); await settle();
+  assert.match(h.projections.at(-1).fileChangeFeedback[id], /some working files may have changed/);
+  assert.doesNotMatch(h.projections.at(-1).fileChangeFeedback[id], /private native/);
+  assert.equal(h.projections.at(-1).recoveries[id].entries[0].transaction, groupId);
+  h.intent({type: 'lookup-group', id, group: groupId}); await settle();
+  h.intent({type: 'apply-main-group', id}); await settle();
+  h.intent({type: 'refresh'}); await settle();
+  assert.equal(calls.filter(call => call.command === 'apply_attached_main_group').length, 1);
   h.dispose();
 });

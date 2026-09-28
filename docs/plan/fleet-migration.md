@@ -1580,3 +1580,27 @@ covers misleading newlines and non-Latin folder names. Renderer wiring and graph
 Existing group/receipt formats remain supported; recovery results add bounded restoration reference
 fields. Native focused/failing-before/full execution is queued behind the preserved run. Structural
 checks and historical source claims are not canonical native or packaged acceptance.
+
+## I03c desktop group controls and recovery projection
+
+Transfers the four renderer paths from source `fc5b37d9bea6edf4311dea4a2914145da4e600ab`
+onto PR #87 at `54ca0c3d991d90e4a0b88ac0dd29c2a3e5265f42`: attached-project controller/tests,
+React attached-project cards and group recovery rendering tests. Native commands were transferred
+in I03b. Conflict resolution preserves canonical import/navigation controls, Hebrew UI and literal
+identifiers. New group labels and feedback are translated; group/path/transaction values remain
+literal and left-to-right. Source watcher paths and associated source-document reconciliation remain
+separate; this does not mark that source commit fully accounted for or issue #37 resolved.
+
+The controller binds exact project/main/group identities, preserves partial outcomes, distinguishes
+changed, uncertain and unattempted members, and never retries on refresh. Recovery references permit
+explicit bounded group/member lookup; stale or failed observations disable restoration. Approved
+regular-file groups are still applied only by native confirmation. Prepared already-present paths
+are historical evidence rather than a fresh filesystem observation. Directory support and current
+packaged/native graphical acceptance remain outstanding.
+
+Local validation: all 45 attachment controller tests pass. Removing the stale-group error guard
+makes the exact group-application regression fail; restoring it returns all 45 tests to passing.
+TypeScript passes. All three group rendering tests pass, including Hebrew literal identifiers and
+disabled stale restoration. The new Hebrew assertion initially used different wording from the
+existing translation; it was corrected to the established label without changing the disabled-state
+assertion. Full desktop verification is running; native full and packaged acceptance remain pending.

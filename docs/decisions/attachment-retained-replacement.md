@@ -515,3 +515,10 @@ preview; project/folder labels remain literal. The host rechecks the project gen
 This is the native host increment only: renderer controls, current native execution and packaged
 graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
 local FSEvents registration failure is not resolved by these commands.
+
+The renderer now routes group application through the complete native confirmation and presents
+partial member outcomes without describing them as atomic. Verified group/member lookup and explicit
+restoration use native identifiers only; failed refreshes preserve observations while disabling
+restoration. Already-present members remain preparation evidence. Hebrew labels never translate
+paths or transaction identities. These controls do not authorize replay, cleanup or main advancement;
+current packaged graphical acceptance remains required.

@@ -220,11 +220,12 @@ export function attachedIntegration(raw, id, main) {
 }
 
 const recoveryTransaction = value => typeof value === 'string' && /^(integration|restoration)-[0-9a-f]{32}$/.test(value);
-const recoveryStatuses = new Set(['prepared-arrangement', 'applied-arrangement', 'changed-files', 'identity-mismatch', 'incomplete-observation', 'invalid-outcome', 'contradictory-outcome', 'invalid-receipt', 'unverified-history', 'unavailable-directory', 'unrecognized-directory-entry']);
-export function attachedRecovery(raw, id, transaction = null) {
+const groupIdentity = value => typeof value === 'string' && /^integration-group-[0-9a-f]{32}$/.test(value);
+const recoveryStatuses = new Set(['group-reference', 'prepared-arrangement', 'applied-arrangement', 'changed-files', 'identity-mismatch', 'incomplete-observation', 'invalid-outcome', 'contradictory-outcome', 'invalid-receipt', 'unverified-history', 'unavailable-directory', 'unrecognized-directory-entry']);
+export function attachedRecovery(raw, id, transaction = null, group = null) {
   const outer = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const value = outer?.recovery;
-  if (outer?.schema !== 'mesh.desktop-attachment-recovery/v1' || outer.project !== id) throw new Error('Recovery identity mismatch');
+  if (outer?.schema !== 'mesh.desktop-attachment-recovery/v1' || outer.project !== id || (group === null ? outer.group !== undefined : outer.group !== group || !groupIdentity(group))) throw new Error('Recovery identity mismatch');
   if (value === null && transaction === null) return { entries: [], more: false };
   if (value?.schema !== 'mesh.attachment-integration-recovery/v1' || value.project !== id
     || value.automatic_replay !== false || value.write_authority !== false || typeof value.more !== 'boolean'
@@ -238,34 +239,69 @@ export function attachedRecovery(raw, id, transaction = null) {
   const entries = value.entries.map(item => {
     if (!recoveryStatuses.has(item?.status) || typeof item.attention_required !== 'boolean'
       || !['observation_final', 'atomic_snapshot', 'write_authority', 'automatic_replay', 'cleanup_authority'].every(key => item[key] === false)
-      || (item.status === 'unrecognized-directory-entry' ? item.transaction !== '' : !recoveryTransaction(item.transaction))
+      || (item.status === 'group-reference' ? !groupIdentity(item.transaction) || item.details !== null : item.status === 'unrecognized-directory-entry' ? item.transaction !== '' : !recoveryTransaction(item.transaction))
       || (item.transaction && seen.has(item.transaction))) throw new Error('Invalid recovery entry');
     if (item.transaction) seen.add(item.transaction);
     const details = item.details;
     if (details !== null && (!safeText(details?.path, 4096) || details.path.startsWith('/')
       || details.path.split('/').some(part => !part || part === '.' || part === '..')
-      || !['apply-approved', 'restore-retained'].includes(details.operation)
-      || details.content_is_approved_main !== (details.operation === 'apply-approved')
+      || !['apply-approved', 'restore-retained', 'add-approved', 'remove-approved'].includes(details.operation)
+      || details.content_is_approved_main !== (details.operation !== 'restore-retained')
       || !reviewIdentity(details.approved_head) || typeof details.is_current_main !== 'boolean'
       || !observation(details.source) || !observation(details.retained)
+      || (details.retained_file_is_displaced !== undefined && typeof details.retained_file_is_displaced !== 'boolean')
+      || (details.parent_policy_matches !== undefined && details.parent_policy_matches !== null && typeof details.parent_policy_matches !== 'boolean')
       || details.current_exclusions_checked !== false
       || !['absent', 'invalid', 'applied-observed', 'reconciliation-required'].includes(details.recorded_outcome))) throw new Error('Invalid recovery details');
-    return { transaction: item.transaction, status: item.status, attention: item.attention_required,
+    return { group, transaction: item.transaction, status: item.status, attention: item.attention_required,
       path: details?.path ?? null, operation: details?.operation ?? null,
-      retainedAvailable: details !== null && details.retained !== null && item.status !== 'prepared-arrangement',
+      retainedAvailable: details?.retained_file_is_displaced === true && details.retained !== null && item.status !== 'prepared-arrangement',
       recordedOutcome: details?.recorded_outcome ?? null };
   });
   return { entries, more: value.more };
 }
-export function attachedFileChange(raw, id, restoration) {
+export function attachedFileChange(raw, id, restoration, group = null) {
   const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const outcome = value?.outcome;
-  if (value?.schema !== 'mesh.desktop-attachment-file-change/v1' || value.project !== id
+  const creation = restoration && outcome?.schema === 'mesh.attachment-file-restoration-addition-result/v1';
+  if ((group === null ? value?.group !== undefined : value?.group !== group || !groupIdentity(group))
+    || value?.schema !== 'mesh.desktop-attachment-file-change/v1' || value.project !== id
     || !recoveryTransaction(value.transaction) || !value.transaction.startsWith(restoration ? 'restoration-' : 'integration-')
-    || outcome?.schema !== (restoration ? 'mesh.attachment-file-restoration-result/v1' : 'mesh.attachment-file-integration-result/v1')
+    || outcome?.schema !== (creation ? 'mesh.attachment-file-restoration-addition-result/v1' : restoration ? 'mesh.attachment-file-restoration-result/v1' : 'mesh.attachment-file-integration-result/v1')
     || !reviewIdentity(outcome.proposal_digest) || !['applied-observed', 'reconciliation-required'].includes(outcome.status)
-    || outcome.displaced_file_retained !== true || outcome.observation_final !== false) throw new Error('Invalid file-change result');
-  return { transaction: value.transaction, status: outcome.status };
+    || outcome.displaced_file_retained !== !creation || outcome.observation_final !== false) throw new Error('Invalid file-change result');
+  return { transaction: value.transaction, status: outcome.status, creation };
+}
+
+export function attachedGroupChange(raw, id) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const outcome = value?.outcome;
+  if (value?.schema !== 'mesh.desktop-attachment-group-change/v1' || value.project !== id || !groupIdentity(value.group)
+    || outcome?.schema !== 'mesh.attachment-integration-group-result/v1' || !reviewIdentity(outcome.proposal_digest)
+    || !['applied-observed', 'reconciliation-required'].includes(outcome.status) || outcome.observation_final !== false
+    || outcome.automatic_replay !== false || outcome.displaced_files_retained !== true
+    || !Array.isArray(outcome.members) || !outcome.members.length || outcome.members.length > 64
+    || new Set(outcome.members.map(item => item.transaction)).size !== outcome.members.length
+    || outcome.members.some(item => !recoveryTransaction(item.transaction) || !['applied-observed', 'reconciliation-required', 'not-attempted'].includes(item.status))
+    || (outcome.status === 'applied-observed' && outcome.members.some(item => item.status !== 'applied-observed'))) throw new Error('Invalid group outcome');
+  return { group: value.group, status: outcome.status, members: outcome.members.map(item => ({ transaction: item.transaction, status: item.status })) };
+}
+export function attachedGroupRecovery(raw, id, group) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.attachment-integration-group-recovery/v1' || value.project !== id || value.group !== group || !groupIdentity(group)
+    || !reviewIdentity(value.proposal_digest) || value.automatic_replay !== false || value.write_authority !== false
+    || value.observations_are_atomic !== false || value.already_present_is_preparation_evidence !== true
+    || !Array.isArray(value.members) || !value.members.length || !Array.isArray(value.already_present) || value.members.length + value.already_present.length > 64) throw new Error('Invalid group recovery');
+  if (value.members.some(member => !recoveryTransaction(member?.transaction))) throw new Error('Invalid group member');
+  const entries = value.members.map(member => attachedRecovery({ schema: 'mesh.desktop-attachment-recovery/v1', project: id, group, recovery: member.recovery }, id, member.transaction, group).entries[0]);
+  const paths = value.already_present;
+  if (new Set(entries.map(entry => entry.transaction)).size !== entries.length || new Set(paths).size !== paths.length
+    || paths.some(path => !safeText(path, 4096) || path.startsWith('/') || path.split('/').some(part => !part || part === '.' || part === '..'))) throw new Error('Invalid group membership');
+  const restorations = value.restoration_references ?? [];
+  const moreRestorations = value.more_restoration_references_may_exist ?? true;
+  if (!Array.isArray(restorations) || restorations.length > 32 || new Set(restorations).size !== restorations.length
+    || restorations.some(tx => !recoveryTransaction(tx) || !tx.startsWith('restoration-')) || typeof moreRestorations !== 'boolean') throw new Error('Invalid group restoration references');
+  return { group, entries, alreadyPresent: [...paths], restorations: [...restorations], moreRestorations };
 }
 
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
@@ -284,6 +320,9 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let integrationErrors = {};
   let recoveries = {};
   let selectedRecovery = {};
+  let groupRecoveries = {};
+  let groupOutcomes = {};
+  let groupRecoveryErrors = {};
   let recoveryErrors = {};
   let fileChangeFeedback = {};
   let laneRequests = {};
@@ -299,7 +338,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, reviewNavigation, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, laneRequests, laneFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, reviewNavigation, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, groupRecoveries, groupOutcomes, groupRecoveryErrors, recoveryErrors, fileChangeFeedback, laneRequests, laneFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
   async function createLane(id, pending) {
@@ -312,24 +351,51 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       laneFeedback = { ...laneFeedback, [id]: 'The line could not be confirmed. Retry the same request to avoid duplicating it. Partial work is retained.' };
     }
   }
-  async function readRecovery(id, transaction = null) {
-    const observation = attachedRecovery(await invoke('inspect_attached_recovery', { id, transaction }), id, transaction);
+  async function readRecovery(id, transaction = null, group = null) {
+    const raw = group === null ? await invoke('inspect_attached_recovery', { id, transaction }) : await invoke('inspect_attached_group_file', { id, transaction, group });
+    const observation = attachedRecovery(raw, id, transaction, group);
     if (transaction === null) recoveries = { ...recoveries, [id]: observation };
     else selectedRecovery = { ...selectedRecovery, [id]: observation.entries[0] };
     recoveryErrors = { ...recoveryErrors, [id]: '' };
   }
-  async function changeFile(id, command, args, restoration) {
+  async function changeFile(id, command, args, restoration, group = null) {
     try {
-      const result = attachedFileChange(await invoke(command, args), id, restoration);
+      const result = attachedFileChange(await invoke(command, args), id, restoration, group);
       fileChangeFeedback = { ...fileChangeFeedback, [id]: result.status === 'applied-observed'
-        ? 'The file change was observed. Previous working content is retained; later editor writes may still arrive.'
-        : 'The file change needs reconciliation. Both files are retained; inspect recovery before continuing.' };
-      await readRecovery(id, result.transaction);
+        ? result.creation ? 'The retained snapshot was restored as a new file. The original retained file remains available for later editor writes.' : 'The file change was observed. Previous working content is retained; later editor writes may still arrive.'
+        : 'The file change needs reconciliation. Retained work remains available; inspect recovery before continuing.' };
+      await readRecovery(id, result.transaction, group);
     } catch {
       fileChangeFeedback = { ...fileChangeFeedback, [id]: 'The file change was not confirmed or was cancelled. Inspect recovery before retrying; this does not prove the working file is unchanged.' };
     }
     try { await readRecovery(id); }
     catch { recoveryErrors = { ...recoveryErrors, [id]: 'Recovery could not be refreshed. Any previous observation is retained and may be out of date.' }; }
+  }
+  async function readGroup(id, group) {
+    try {
+      const observation = attachedGroupRecovery(await invoke('inspect_attached_group_recovery', { id, group }), id, group);
+      groupRecoveries = { ...groupRecoveries, [id]: observation };
+      groupRecoveryErrors = { ...groupRecoveryErrors, [id]: '' };
+    } catch {
+      groupRecoveryErrors = { ...groupRecoveryErrors, [id]: 'This recovery group could not be verified. Previous observations may be out of date.' };
+      throw new Error('Group recovery unavailable');
+    }
+  }
+  async function changeGroup(id, preview) {
+    let result = null;
+    try {
+      result = attachedGroupChange(await invoke('apply_attached_main_group', { id, bundle: preview.bundle, target: preview.target }), id);
+      groupOutcomes = { ...groupOutcomes, [id]: result };
+      fileChangeFeedback = { ...fileChangeFeedback, [id]: result.status === 'applied-observed'
+        ? 'The accepted group was observed in the working folder. Recovery records remain available.'
+        : 'The group needs reconciliation. Some files may have changed; remaining changes were stopped. Inspect each member before continuing.' };
+    } catch {
+      fileChangeFeedback = { ...fileChangeFeedback, [id]: 'The group was not confirmed or was cancelled. Inspect recovery before retrying; some working files may have changed.' };
+    }
+    if (result) { try { await readGroup(id, result.group); } catch { /* Keep the verified outcome and expose the separate inspection failure. */ } }
+    integrationPreviews = { ...integrationPreviews }; delete integrationPreviews[id];
+    try { await readRecovery(id); }
+    catch { recoveryErrors = { ...recoveryErrors, [id]: 'Recovery could not be refreshed; previous observations may be out of date.' }; }
   }
   async function readApproval(id) {
     const status = attachedMain(await invoke('attachment_approval_status', { id }), id);
@@ -482,7 +548,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       });
       return;
     }
-    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main', 'compare-main', 'recovery', 'lookup-recovery', 'restore-retained', 'apply-main-file'].includes(value.type)
+    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main', 'compare-main', 'recovery', 'lookup-recovery', 'restore-retained', 'restore-group-file', 'apply-main-file', 'apply-main-group', 'lookup-group', 'lookup-group-file'].includes(value.type)
       && !projects.some((project) => project.id === value.id)) return;
     if ((value.type === 'recovery' && Object.keys(value).length === 2)
       || (value.type === 'lookup-recovery' && Object.keys(value).length === 3 && recoveryTransaction(value.transaction))) {
@@ -491,9 +557,29 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
         catch { recoveryErrors = { ...recoveryErrors, [value.id]: 'Recovery could not be refreshed. Any previous observation is retained and may be out of date.' }; }
       }); return;
     }
+    if (value.type === 'lookup-group' && Object.keys(value).length === 3 && groupIdentity(value.group)) {
+      void run(async () => { try { await readGroup(value.id, value.group); }
+        catch { /* readGroup retains the prior view and its own error until a successful group refresh. */ } }); return;
+    }
+    if (value.type === 'lookup-group-file' && Object.keys(value).length === 4 && groupIdentity(value.group) && recoveryTransaction(value.transaction)) {
+      void run(async () => { try { await readRecovery(value.id, value.transaction, value.group); }
+        catch { recoveryErrors = { ...recoveryErrors, [value.id]: 'The group file could not be inspected. Previous observations may be out of date.' }; } }); return;
+    }
+    if (value.type === 'restore-group-file' && Object.keys(value).length === 4 && groupIdentity(value.group) && recoveryTransaction(value.transaction)) {
+      const entry = [...(groupRecoveries[value.id]?.entries ?? []), selectedRecovery[value.id]]
+        .find(item => item?.group === value.group && item.transaction === value.transaction && item.retainedAvailable);
+      if (!entry || recoveryErrors[value.id] || groupRecoveryErrors[value.id] || projects.find(project => project.id === value.id)?.detached) return;
+      void run(() => changeFile(value.id, 'restore_attached_group_file', { id: value.id, group: value.group, transaction: value.transaction }, true, value.group)); return;
+    }
+    if (value.type === 'apply-main-group' && Object.keys(value).length === 2) {
+      const preview = integrationPreviews[value.id];
+      const main = approvalStates[value.id]?.main;
+      if (!preview || main?.head !== preview.head || integrationErrors[value.id] || projects.find(project => project.id === value.id)?.detached) return;
+      void run(() => changeGroup(value.id, preview)); return;
+    }
     if (value.type === 'restore-retained' && Object.keys(value).length === 3 && recoveryTransaction(value.transaction)) {
       const entry = [...(recoveries[value.id]?.entries ?? []), selectedRecovery[value.id]]
-        .find(item => item?.transaction === value.transaction && item.retainedAvailable);
+        .find(item => item?.group === null && item.transaction === value.transaction && item.retainedAvailable);
       if (!entry || recoveryErrors[value.id] || projects.find(project => project.id === value.id)?.detached) return;
       void run(() => changeFile(value.id, 'restore_attached_retained_file', { id: value.id, transaction: value.transaction }, true)); return;
     }
