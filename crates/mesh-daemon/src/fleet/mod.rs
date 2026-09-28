@@ -77,11 +77,17 @@ pub struct Run {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkspaceBinding {
     source_version: RecordDigest,
+    starting_version: Option<RecordDigest>,
     root: String,
     digest: String,
     installation: String,
 }
 impl WorkspaceBinding {
+    /// Exact local initial import, bound during allocation. Legacy records have no such proof.
+    pub fn starting_version(&self) -> Option<RecordDigest> {
+        self.starting_version
+    }
+
     /// Pinned native working directory. It is a locator, not authorization by itself.
     pub fn root(&self) -> &str {
         &self.root

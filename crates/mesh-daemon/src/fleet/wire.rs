@@ -120,9 +120,8 @@ pub(super) fn encode(command: &Command) -> String {
                 ("generation", Json::text(&origin.generation)),
             ],
         ),
-        Command::BindWorkspace { lane, binding } => (
-            "bind-workspace",
-            vec![
+        Command::BindWorkspace { lane, binding } => {
+            let mut fields = vec![
                 ("lane", Json::text(lane)),
                 ("root", Json::text(&binding.root)),
                 (
@@ -131,8 +130,15 @@ pub(super) fn encode(command: &Command) -> String {
                 ),
                 ("digest", Json::text(&binding.digest)),
                 ("installation", Json::text(&binding.installation)),
-            ],
-        ),
+            ];
+            let kind = if let Some(version) = binding.starting_version {
+                fields.push(("starting_version", Json::text(version.to_string())));
+                "bind-workspace-v2"
+            } else {
+                "bind-workspace"
+            };
+            (kind, fields)
+        }
         Command::Dispatch { lane, run } => (
             "dispatch",
             vec![("lane", Json::text(lane)), ("run", Json::text(run))],
@@ -261,10 +267,15 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
                 generation: text("generation")?,
             },
         },
-        Some("bind-workspace") => Command::BindWorkspace {
+        Some(kind @ ("bind-workspace" | "bind-workspace-v2")) => Command::BindWorkspace {
             lane: text("lane")?,
             binding: WorkspaceBinding {
                 source_version: digest("source_version")?,
+                starting_version: if kind == "bind-workspace-v2" {
+                    Some(digest("starting_version")?)
+                } else {
+                    None
+                },
                 root: text("root")?,
                 digest: text("digest")?,
                 installation: text("installation")?,
@@ -322,6 +333,40 @@ fn parse_state(value: &str) -> Result<RunState, Error> {
 #[cfg(test)]
 mod attachment_tests {
     use super::*;
+
+    #[test]
+    fn starting_version_binding_is_additive_closed_and_never_inferred_for_legacy_records() {
+        let old = Command::BindWorkspace {
+            lane: "lane-one".into(),
+            binding: WorkspaceBinding {
+                source_version: RecordDigest::from_bytes([1; 32]),
+                starting_version: None,
+                root: "/native/lane".into(),
+                digest: "allocation-digest".into(),
+                installation: "allocation-installation".into(),
+            },
+        };
+        let legacy = encode(&old);
+        assert!(legacy.contains("\"kind\":\"bind-workspace\""));
+        assert!(!legacy.contains("starting_version"));
+        assert_eq!(decode(&legacy).unwrap(), old);
+        let Command::BindWorkspace { lane, mut binding } = old else {
+            unreachable!()
+        };
+        binding.starting_version = Some(RecordDigest::from_bytes([2; 32]));
+        let new = Command::BindWorkspace { lane, binding };
+        let encoded = encode(&new);
+        assert_eq!(decode(&encoded).unwrap(), new);
+        assert!(encoded.contains("bind-workspace-v2"));
+        for bad in [
+            encoded.replace("bind-workspace-v2", "bind-workspace"),
+            legacy.replace("bind-workspace", "bind-workspace-v2"),
+            encoded.replace("starting_version", "unknown"),
+            encoded.replace(&"02".repeat(32), "not-a-version"),
+        ] {
+            assert!(decode(&bad).is_err());
+        }
+    }
 
     #[test]
     fn attached_lane_encoding_is_additive_canonical_and_closed() {

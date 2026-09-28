@@ -400,7 +400,11 @@ mod tests {
         let hosts = FleetHosts::default();
         f.start(&hosts).unwrap();
         f.start(&hosts).unwrap();
-        wait(|| f.working().join("launches").exists());
+        // Shell redirection creates the file before echo writes the completed launch record.
+        wait(|| {
+            fs::read_to_string(f.working().join("launches"))
+                .is_ok_and(|value| value.ends_with('\n'))
+        });
         wait(|| {
             !status(&hosts)
                 .get("workers")

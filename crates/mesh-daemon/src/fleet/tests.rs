@@ -58,6 +58,7 @@ fn register_lane(r: &mut Runtime, id: &str, parent: Option<&str>) {
 fn binding(id: &str) -> WorkspaceBinding {
     WorkspaceBinding {
         source_version: RecordDigest::from_bytes([1; 32]),
+        starting_version: None,
         root: format!("/verified/{id}"),
         digest: format!("digest-{id}"),
         installation: format!("installation-{id}"),
@@ -481,4 +482,67 @@ fn durable_launch_claim_is_not_regranted_after_restart_or_to_another_host() {
     assert!(runtime.state().lanes["worker"].runs[0]
         .state
         .occupies_slot());
+}
+
+#[test]
+fn local_starting_version_survives_replay_and_cannot_be_rebound_after_dispatch() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    send(&mut runtime, lane("worker", None));
+    let mut original = binding("worker");
+    original.starting_version = Some(RecordDigest::from_bytes([2; 32]));
+    send(
+        &mut runtime,
+        Command::BindWorkspace {
+            lane: "worker".into(),
+            binding: original.clone(),
+        },
+    );
+    send(&mut runtime, dispatch("worker", "run"));
+    let state = runtime.state().clone();
+    drop(runtime);
+    let mut restored = fixture.runtime();
+    assert_eq!(restored.state(), &state);
+    let mut replacement = original.clone();
+    replacement.starting_version = Some(RecordDigest::from_bytes([3; 32]));
+    refuses(
+        &mut restored,
+        Command::BindWorkspace {
+            lane: "worker".into(),
+            binding: replacement,
+        },
+        "workspace-already-bound",
+    );
+    assert_eq!(
+        restored.state().lanes["worker"].workspace.as_ref(),
+        Some(&original)
+    );
+}
+
+#[test]
+fn legacy_starting_version_remains_absent_after_replay_and_refuses_backfill() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    let state = runtime.state().clone();
+    drop(runtime);
+    let mut restored = fixture.runtime();
+    assert_eq!(restored.state(), &state);
+    let original = restored.state().lanes["worker"].workspace.as_ref().unwrap();
+    assert_eq!(original.starting_version(), None);
+    let mut inferred = original.clone();
+    inferred.starting_version = Some(inferred.source_version);
+    refuses(
+        &mut restored,
+        Command::BindWorkspace {
+            lane: "worker".into(),
+            binding: inferred,
+        },
+        "workspace-already-bound",
+    );
+    assert_eq!(restored.state(), &state);
+    drop(restored);
+    assert_eq!(fixture.runtime().state(), &state);
 }

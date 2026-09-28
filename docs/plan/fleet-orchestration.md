@@ -379,3 +379,9 @@ Reopening rechecks native history and retains unavailable selections without sta
 coverage includes closes during writes, lost acknowledgements, conflicts, late replies after replacing
 the saved set, and failed initial loads. This advances parallel review continuity; full app restart
 context recovery, artifacts, original-main integration and packaged graphical proof remain required.
+
+Restart review prerequisite: new native allocations persist their verified source/local-import binding
+as `bind-workspace-v2`. Existing command bytes remain valid and carry no inferred local starting point.
+The next recovery boundary must validate retained directory and installation identity, open historical
+content without recovering working files or checkpoint timers, and keep restored lanes unavailable for
+execution. Persistence of the binding alone does not satisfy the restart review exit criterion.

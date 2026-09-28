@@ -765,3 +765,27 @@ This increment still needs its own hosted validation. Durable starting-version b
 history follow before artifacts/correspondence/integration and the remaining recovery phases. Required
 human review, second-provider/four-worker/remote and packaged acceptance, eventual merges and testing
 of the final combined canonical main remain required. Original source work and verification are preserved.
+
+## R02a durable lane starting-version binding
+
+Preserved source `b6b388caf30c7ffb1cc4d23f09f7175e0a220089` transfers on published #55 at
+`450943a6031ea1d0f14adafd6518d648bd74a6b8`. New allocations persist their verified local initial
+import alongside the original source version using the additive `bind-workspace-v2` command. Native
+comparison reads require this recorded proof. Existing legacy commands retain their exact encoding
+and explicitly lack starting-version evidence; no oldest-version inference or history rewriting is
+performed. Older binaries refuse the new command kind, so rollback must retain a compatible binary
+for fleets with v2 bindings. Ordinary project history and selector schemas remain unchanged.
+
+Source regressions cover closed canonical wire encoding, new binding replay, replacement refusal and
+native allocation-to-import identity. The canonical added regression reopens a legacy binding, checks
+that its starting version remains absent, refuses inferred backfill, and checks unchanged state after
+another reopen. The transferred provider fixture waits for a completed launch record instead of merely
+an existing file, avoiding the shell redirection/write race without weakening its launch assertions.
+
+Local formatting, documentation, diff and 52 desktop host/UI structural checks pass. These checks are
+not native runtime evidence. Native/failing-before/full validation remains queued behind the preserved
+#44 run on the shared build target; this increment requires its own hosted validation. Parents #53 and
+#54 have all seven checks passing, while #55 validation is running. All original work is preserved.
+History-only context reopening follows separately, before artifacts/correspondence/integration/recovery.
+Required human review, complete provider/four-worker/remote and packaged acceptance, eventual merges
+and final combined-main testing remain part of completion.

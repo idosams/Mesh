@@ -132,6 +132,18 @@ fn sibling_workspaces_are_independent_and_do_not_switch_desktop_selection() {
     )
     .unwrap();
     assert_eq!(restored.state(), runtime.state());
+    for (id, allocated) in [("a", &a), ("b", &b)] {
+        let initial = allocated.state().unwrap().workspace_versions[0].operation();
+        assert_eq!(
+            restored.state().lanes[id]
+                .workspace
+                .as_ref()
+                .unwrap()
+                .starting_version(),
+            Some(initial)
+        );
+    }
+
     assert_eq!(
         restored.state().lanes["a"]
             .workspace

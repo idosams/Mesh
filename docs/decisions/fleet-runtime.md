@@ -316,3 +316,19 @@ readback. Concurrent or stale writes refuse. Unknown schema, copied-directory re
 symlinks, hardlinks and partial first writes refuse without replacement. Interrupted staging remains
 for explicit reconciliation; a previous complete snapshot remains readable. This schema does not yet
 provide automatic repair of pending files or recovery of underlying lane/process contexts.
+
+## Durable source-to-local starting version
+
+New allocations record the verified local initial import alongside the source version in the existing
+native workspace binding. The command kind is `bind-workspace-v2`; both identifiers are immutable once
+bound. This preserves the source-to-local relationship for subsequent history-only restart recovery
+without choosing an arbitrary oldest version or consulting newer working files.
+
+The database envelope remains unchanged. Legacy `bind-workspace` commands retain their exact encoding
+and decode to a binding with no starting-version evidence. They are never backfilled by inference.
+New v2 commands require the starting version; missing, malformed or unknown fields refuse. Older
+binaries refuse the unknown v2 command rather than replaying it with less authority. Rollback therefore
+requires retaining a compatible binary for fleets containing v2 bindings; ordinary project history and
+attachment pin formats are unchanged. Wire tests cover both encodings and replay tests cover the
+immutable binding. This change persists evidence only: it does not reopen lane contexts, recover
+workers, acquire execution custody or establish that a starting version remains available.

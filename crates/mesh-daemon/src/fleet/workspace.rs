@@ -36,7 +36,6 @@ pub struct LaneWorkspace {
     daemon: Arc<LiveDaemon>,
     receipt: Json,
     binding: super::WorkspaceBinding,
-    starting_version: RecordDigest,
 }
 impl LaneWorkspace {
     /// Create an independent folder using the existing exact-version native transaction.
@@ -123,6 +122,7 @@ impl LaneWorkspace {
         let starting_version = initial.operation();
         let binding = super::WorkspaceBinding {
             source_version: input.version,
+            starting_version: Some(starting_version),
             root: state.root,
             digest: state.digest,
             installation: state.installation,
@@ -131,7 +131,6 @@ impl LaneWorkspace {
             daemon,
             receipt,
             binding,
-            starting_version,
         })
     }
 
@@ -195,6 +194,7 @@ impl LaneWorkspace {
         let starting_version = initial.operation();
         let binding = super::WorkspaceBinding {
             source_version: version,
+            starting_version: Some(starting_version),
             root: state.root,
             digest: state.digest,
             installation: state.installation,
@@ -203,13 +203,12 @@ impl LaneWorkspace {
             daemon,
             receipt,
             binding,
-            starting_version,
         })
     }
 
     /// Exact local import version verified against the requested immutable source at allocation.
-    pub(super) fn starting_version(&self) -> RecordDigest {
-        self.starting_version
+    pub(super) fn starting_version(&self) -> Option<RecordDigest> {
+        self.binding.starting_version()
     }
 
     /// Verified allocation identity to commit before any dispatch intent.

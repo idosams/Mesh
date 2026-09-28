@@ -286,3 +286,11 @@ identities/user goals. Its added rendered regression detects the unlocalized sou
 135 interface tests and 523 desktop tests pass, including prior attachment persistence behavior. Full
 local native validation remains queued behind the preserved earlier gate. Hosted checks and packaged
 acceptance are tracked separately; published increments remain unmerged pending required review.
+
+New fleet allocations now durably bind the exact local initial import to their source version through
+`bind-workspace-v2`. Legacy bindings remain readable with an explicitly absent starting-version proof;
+no oldest-version inference or history rewrite is performed. Canonical encoding and runtime replay
+tests cover compatibility and refusal to replace an existing binding, while native allocation tests
+check that the recorded local identity matches the actual verified import. This removes the in-memory
+only starting-point limitation for newly allocated lanes. History-only context reopening after restart
+is still unfinished; neither worker recovery nor original-main integration is added by this change.

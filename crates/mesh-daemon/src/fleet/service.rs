@@ -979,7 +979,9 @@ impl FleetService {
                 workspace.binding().installation(),
                 selection.bundle,
                 selection.version,
-                workspace.starting_version(),
+                workspace
+                    .starting_version()
+                    .ok_or_else(|| refusal("fleet-starting-version-unbound"))?,
                 after,
                 selected,
             )?;
