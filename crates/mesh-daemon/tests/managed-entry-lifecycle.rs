@@ -1685,3 +1685,127 @@ fn agent_deletion_refuses_stale_identity_or_version_and_preserves_concurrent_rec
         .meaningful_saved());
     fs::remove_dir_all(parent).unwrap();
 }
+
+#[test]
+fn prepared_agent_deletion_binds_operation_before_append_and_rechecks_after_callback() {
+    let (parent, managed) = workspace("agent-prepared-delete");
+    let daemon = open_daemon(&managed);
+    let initial = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &initial.root,
+            &initial.digest,
+            &initial.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let version = daemon
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .current_version()
+        .to_owned();
+    fs::remove_file(managed.join("existing/keep.txt")).unwrap();
+    let key = SigningKey::from_bytes(&[0x73; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let before = fs::read(private_storage(&managed).join("records.mesh")).unwrap();
+    let request = || mesh_daemon::AgentWorkspaceCheckpointRequest {
+        root: &initial.root,
+        digest: &initial.digest,
+        installation: &initial.installation,
+        generation: &generation,
+    };
+    let prepared = Cell::new(None);
+    assert!(daemon
+        .checkpoint_agent_file_deletion_prepared(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            signer(&key),
+            |operation| {
+                prepared.set(Some(operation));
+                assert!(daemon
+                    .inspect_agent_prepared_operation(request(), operation, public)
+                    .is_err());
+                assert_eq!(
+                    fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+                    before
+                );
+                assert!(daemon
+                    .create_managed_folder("smuggled", public, signer(&key))
+                    .is_err());
+                Err::<(), _>("intent storage unavailable")
+            }
+        )
+        .is_err());
+    let intended = prepared.get().unwrap();
+    assert!(!daemon
+        .inspect_agent_prepared_operation(request(), intended, public)
+        .unwrap());
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        before
+    );
+    assert!(daemon
+        .checkpoint_agent_file_deletion_prepared(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            signer(&key),
+            |operation| {
+                assert_eq!(operation, intended);
+                fs::write(managed.join("existing/keep.txt"), b"late creator\n").unwrap();
+                Ok::<_, core::convert::Infallible>(())
+            }
+        )
+        .is_err());
+    assert_eq!(
+        fs::read(managed.join("existing/keep.txt")).unwrap(),
+        b"late creator\n"
+    );
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        before
+    );
+    fs::remove_file(managed.join("existing/keep.txt")).unwrap();
+    let receipt = daemon
+        .checkpoint_agent_file_deletion_prepared(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            signer(&key),
+            |operation| {
+                assert_eq!(operation, intended);
+                assert_eq!(
+                    fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+                    before
+                );
+                Ok::<_, core::convert::Infallible>(())
+            },
+        )
+        .unwrap();
+    assert_eq!(receipt.changeset(), intended.to_string());
+    let after = daemon.workspace_state().unwrap();
+    let inspect = || mesh_daemon::AgentWorkspaceCheckpointRequest {
+        root: &after.root,
+        digest: &after.digest,
+        installation: &after.installation,
+        generation: &generation,
+    };
+    assert!(daemon
+        .inspect_agent_prepared_operation(inspect(), intended, public)
+        .unwrap());
+    assert!(daemon
+        .inspect_agent_prepared_operation(inspect(), intended, PublicKey::from_bytes([0; 32]))
+        .is_err());
+
+    assert!(receipt.meaningful_saved());
+    assert_eq!(
+        daemon.workspace_state().unwrap().shared_version,
+        initial.shared_version
+    );
+    fs::remove_dir_all(parent).unwrap();
+}

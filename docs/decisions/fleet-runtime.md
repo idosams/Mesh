@@ -493,7 +493,7 @@ still required. Unit tests cover three generations, ancestor deletion/recreation
 mismatches, graph validation and pagination. The native delegation journey proves edits/additions,
 exact parent-version selection, replaced-ancestor refusal and history-only restart. It explicitly
 verifies that a missing managed file still produces an incomplete checkpoint which cannot be
-submitted. Explicit agent deletion resolution remains unfinished; synthetic saved deletion mapping
+submitted. At that stage explicit agent deletion resolution remained unfinished; synthetic saved deletion mapping
 is not proof of that capture capability. No packaged graphical or integration claim follows.
 
 
@@ -814,12 +814,6 @@ file is preserved. The signer does not inherit mutation authority. Shared main a
 remain unchanged; ordinary whole-folder capture still refuses undeclared missing files and never
 infers a rename. After successful resolution, a subsequent clean checkpoint may complete.
 
-This uses existing authenticated deletion operations and journal formats. No persisted format or
-existing agent tool contract changes in this increment. Native tests cover completion, retained
-history, source preservation, stale assignment/version refusal, signer failure and concurrent
-recreation. Fleet request idempotency, tool exposure and end-to-end packaged agent deletion remain
-required before agents can use this through their harness.
-
 ### Durable deletion records before native recovery
 
 The fleet journal adds `begin-file-deletion`, `prepare-file-deletion` and `finish-file-deletion`
@@ -835,5 +829,21 @@ inputs, duplicate preparation and substituted operation outcomes refuse.
 Encoding adds command kinds within the existing deterministic journal envelope. Earlier histories
 replay with an empty deletion map. Older binaries cannot consume histories containing the new kinds
 and must refuse them; no claim of downgrade compatibility is made. Unknown fields and altered command
-shapes refuse. This increment does not expose a service, MCP tool or automatic filesystem recovery;
-those depend on the following native execution increment.
+shapes refuse. Native execution and harness access are described below.
+
+The harness tools `mesh_fleet_missing_files` and `mesh_fleet_resolve_file_deletion` expose bounded
+inspection and explicit resolution. Stable request keys recover identical results and reject changed
+inputs or origins. If preparation succeeded but append did not, retry requires the same input fold
+and exact prepared operation. If append succeeded but completion is missing, native inspection
+verifies the authenticated operation, signer and causal admission without signing again. Recovery
+reports `settled=false`; it does not infer the present folder is clean. A transferred native-lane service
+test leaves completion absent after append, recreates the file as later user work, and verifies that
+retry adds only the completion record with no new signature or workspace operation. Signing and preparation
+callbacks cannot reenter operation inspection or inherit mutation authority.
+
+A fresh whole-folder checkpoint is required before submitting the resulting work. The tools never
+delete present filesystem entries or infer a rename. Directory deletion and ambiguous missing-parent
+cases remain unsupported. A result identical to canonical main still produces `NothingToReview`;
+read-only empty-result review remains a separate gap. Cancellation prevents further agent calls even
+though the ledger permits native completion reconciliation after cancellation. Host-driven recovery
+of that case and packaged agent-deletion proof remain outstanding.

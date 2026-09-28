@@ -657,3 +657,9 @@ fixed review after verified main advancement and no worker adoption. Coordinator
 tests cover explicit mutation, read-only restoration, exact lost-response retry, independent panels,
 late replies, incomplete reviews and substituted identities. These transferred tests require execution on this canonical increment; packaged import invocation
 and graphical approval are not established by source tests.
+
+Explicit missing-file resolution now connects native deletion adoption to the fleet ledger and harness
+tools. Intent and prepared operation are durable before append; exact retry can reconcile an appended
+operation without signing again or touching later filesystem work. Resolution supplies no approval
+and does not substitute for a fresh complete checkpoint. Directory deletion, canonical no-op review,
+host reconciliation after cancellation and packaged agent-deletion verification remain required.

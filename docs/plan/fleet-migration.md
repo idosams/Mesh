@@ -1395,3 +1395,26 @@ idempotency, cancellation, malformed paths/stale runs/replaced inputs and closed
 Existing histories remain readable; older binaries refuse new command kinds. Native execution and
 harness exposure are not included in this slice. Local native/failing-before/full validation remains
 queued behind preserved verification; hosted runtime evidence is required before delivery.
+
+## D01c native deletion retry and authenticated harness access
+
+Completes the remaining implementation portion of source
+`278beb6d5549a2380953f0cbfb2e1351566637df`, following records-only PR #78 at
+`35b20458158fce6f5d281906ef1a05845483080b`. Transfers authenticated changeset signer inspection,
+workspace authenticated-operation lookup, live prepared deletion callbacks, fleet service/recovery
+and service tests, fleet-agent and managed-entry tests, MCP tools/tests and the associated source
+documentation. Together with D01b this accounts for all paths changed by that source commit;
+canonical documentation retains current validation limitations and prior delivery history.
+
+The prepared operation is durably recorded before append. A retry binds exact request/origin/path/
+version and either preserves the prepared identity on the same input fold or verifies an already
+appended authenticated operation without signing again. Later file recreation is not erased.
+Recovery reports an unsettled observation rather than claiming a clean folder. Authenticated harness
+inspection is bounded; explicit resolution never removes present OS entries or advances main.
+A new complete checkpoint remains necessary before review. Directory deletion, empty-result review
+and host reconciliation after cancellation follow as separate preserved source increments.
+
+Transferred tests cover interruption before append, lost completion after append, signer refusal,
+callback authority isolation, exact repeat/conflicting inputs, wrong operation/actor and later edits,
+plus scoped MCP routing. Local focused/failing-before/full native execution is queued behind the
+preserved full run; no packaged or real-agent completion is claimed from these source tests.

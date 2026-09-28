@@ -301,6 +301,8 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             "mesh_fleet_children",
             "mesh_fleet_delegate",
             "mesh_fleet_checkpoint",
+            "mesh_fleet_missing_files",
+            "mesh_fleet_resolve_file_deletion",
             "mesh_fleet_submit_review",
             "mesh_fleet_propose_review_change_result",
         ])
@@ -631,6 +633,73 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
     service
         .decide_review_change(&selection, feedback_id, "native-reopen", 1, None, |_| true)
         .unwrap();
+    fs::remove_file(working_root.join("note.txt")).unwrap();
+    let missing = call(
+        &mut stdin,
+        &mut stdout,
+        21,
+        "tools/call",
+        tool("mesh_fleet_missing_files", Json::empty_object()),
+        token,
+    );
+    let missing = missing
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    let files = missing.get("files").unwrap().as_array().unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(text(&files[0], "path"), "note.txt");
+    let deletion_args = Json::object([
+        ("request", Json::text("explicit-delete")),
+        ("path", Json::text("note.txt")),
+        ("version", files[0].get("version").unwrap().clone()),
+    ]);
+    let deleted = call(
+        &mut stdin,
+        &mut stdout,
+        22,
+        "tools/call",
+        tool("mesh_fleet_resolve_file_deletion", deletion_args.clone()),
+        token,
+    );
+    let deleted = deleted
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap()
+        .clone();
+    assert_eq!(deleted.get("approval_authority"), Some(&Json::Bool(false)));
+    let retry = call(
+        &mut stdin,
+        &mut stdout,
+        23,
+        "tools/call",
+        tool("mesh_fleet_resolve_file_deletion", deletion_args),
+        token,
+    );
+    assert_eq!(
+        retry.get("result").unwrap().get("structuredContent"),
+        Some(&deleted)
+    );
+    let after = call(
+        &mut stdin,
+        &mut stdout,
+        24,
+        "tools/call",
+        tool(
+            "mesh_fleet_checkpoint",
+            Json::object([("request", Json::text("after-delete"))]),
+        ),
+        token,
+    );
+    let after = after
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    assert_eq!(after.get("complete"), Some(&Json::Bool(true)));
+    assert_eq!(after.get("saved_changes"), Some(&Json::Number(0)));
     service.revoke(&credential).unwrap();
     let revoked = call(
         &mut stdin,
@@ -651,7 +720,7 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             fs::read(root.join("source/note.txt")).unwrap(),
             b"original work continues\n"
         );
-        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, native work decision, exact retry and revoked-session refusal; graphical=false");
+        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, native work decision, explicit deletion, exact retry and revoked-session refusal; graphical=false");
     }
     server.shutdown();
 }

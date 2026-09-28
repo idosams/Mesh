@@ -2309,3 +2309,176 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         text(&checkpoint, "version")
     );
 }
+
+#[test]
+fn explicit_file_deletion_is_scoped_replayable_and_allows_review_after_new_checkpoint() {
+    let mut f = Fixture::new("explicit-deletion");
+    let signer = Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+        &[0x75; 32],
+    )));
+    f.credential = f
+        .service
+        .grant_with_signer(&f.lane, "root-run", "delete-session", signer.clone())
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    let initial_main = f.desktop.workspace_state().unwrap().shared_version;
+    assert!(f
+        .call("missing_files", &Json::empty_object())
+        .unwrap()
+        .get("files")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    fs::remove_file(root.join("note.txt")).unwrap();
+    let inventory = f.call("missing_files", &Json::empty_object()).unwrap();
+    let files = inventory.get("files").unwrap().as_array().unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(text(&files[0], "path"), "note.txt");
+    let args = Json::object([
+        ("request", Json::text("delete-note")),
+        ("path", Json::text("note.txt")),
+        ("version", files[0].get("version").unwrap().clone()),
+    ]);
+    let blocked = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("before-resolution"))]),
+        )
+        .unwrap();
+    assert_eq!(blocked.get("complete"), Some(&Json::Bool(false)));
+    let saved = f.call("resolve_file_deletion", &args).unwrap();
+    assert_eq!(saved.get("approval_authority"), Some(&Json::Bool(false)));
+    assert_eq!(f.call("resolve_file_deletion", &args).unwrap(), saved);
+    let state = f.service.native_state().unwrap();
+    assert_eq!(state.file_deletions.len(), 1);
+    let receipt = state.file_deletions.values().next().unwrap();
+    assert!(receipt.operation.is_some());
+    assert!(receipt.result.is_some());
+    let complete = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("after-resolution"))]),
+        )
+        .unwrap();
+    assert_eq!(complete.get("complete"), Some(&Json::Bool(true)));
+    assert_eq!(complete.get("saved_changes"), Some(&Json::Number(0)));
+    // This lane's canonical main is empty. Removing its only imported file produces no
+    // canonical change, so the existing approval-bundle guard correctly refuses that review.
+    assert_eq!(
+        f.call(
+            "submit_review",
+            &Json::object([("checkpoint", complete.get("checkpoint").unwrap().clone())])
+        )
+        .unwrap_err()
+        .code,
+        "agent-review-unavailable"
+    );
+    fs::write(root.join("remaining.txt"), "retained result\n").unwrap();
+    let reviewable = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("remaining-result"))]),
+        )
+        .unwrap();
+    assert_eq!(reviewable.get("complete"), Some(&Json::Bool(true)));
+    f.call(
+        "submit_review",
+        &Json::object([("checkpoint", reviewable.get("checkpoint").unwrap().clone())]),
+    )
+    .unwrap();
+    fs::write(root.join("note.txt"), "later recreated work\n").unwrap();
+    assert_eq!(f.call("resolve_file_deletion", &args).unwrap(), saved);
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"later recreated work\n"
+    );
+    let conflicting = Json::object([
+        ("request", Json::text("delete-note")),
+        ("path", Json::text("elsewhere")),
+        ("version", files[0].get("version").unwrap().clone()),
+    ]);
+    assert_eq!(
+        f.call("resolve_file_deletion", &conflicting)
+            .unwrap_err()
+            .code,
+        "fleet-deletion-request-conflict"
+    );
+    assert_eq!(
+        fs::read(f.path.join("original/note.txt")).unwrap(),
+        b"immutable input\n"
+    );
+    assert_eq!(
+        f.desktop.workspace_state().unwrap().shared_version,
+        initial_main
+    );
+    f.credential = f
+        .service
+        .grant_with_signer(&f.lane, "root-run", "replacement-session", signer)
+        .unwrap();
+    assert_eq!(
+        f.call("resolve_file_deletion", &args).unwrap_err().code,
+        "fleet-deletion-request-conflict"
+    );
+}
+
+#[test]
+fn deletion_signer_failure_retains_one_intent_and_retries_without_duplicate_operations() {
+    struct Signer {
+        key: TestCheckpointSigner,
+        fail: std::sync::atomic::AtomicBool,
+    }
+    impl mesh_daemon::fleet::service::CheckpointSigner for Signer {
+        fn public_key(&self) -> mesh_types::PublicKey {
+            self.key.public_key()
+        }
+        fn sign(
+            &self,
+            payload: &mesh_crypto::SigningPayload,
+        ) -> Result<mesh_types::Signature, String> {
+            if self.fail.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                Err("temporary signer failure".into())
+            } else {
+                self.key.sign(payload)
+            }
+        }
+    }
+    let mut f = Fixture::new("deletion-signer-retry");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "delete-session",
+            Arc::new(Signer {
+                key: TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(&[0x76; 32])),
+                fail: std::sync::atomic::AtomicBool::new(true),
+            }),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::remove_file(root.join("note.txt")).unwrap();
+    let inventory = f.call("missing_files", &Json::empty_object()).unwrap();
+    let version = inventory.get("files").unwrap().as_array().unwrap()[0]
+        .get("version")
+        .unwrap()
+        .clone();
+    let args = Json::object([
+        ("request", Json::text("delete-note")),
+        ("path", Json::text("note.txt")),
+        ("version", version),
+    ]);
+    assert_eq!(
+        f.call("resolve_file_deletion", &args).unwrap_err().code,
+        "fleet-deletion-needs-reconciliation"
+    );
+    let state = f.service.native_state().unwrap();
+    let pending = state.file_deletions.values().next().unwrap();
+    assert!(pending.operation.is_none());
+    assert!(pending.result.is_none());
+    let saved = f.call("resolve_file_deletion", &args).unwrap();
+    assert_eq!(f.call("resolve_file_deletion", &args).unwrap(), saved);
+    assert_eq!(f.service.native_state().unwrap().file_deletions.len(), 1);
+}

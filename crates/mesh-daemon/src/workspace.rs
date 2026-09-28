@@ -3802,6 +3802,34 @@ impl OpenWorkspace {
         )
     }
 
+    pub(crate) fn authenticated_operation_present(
+        &self,
+        operation: RecordDigest,
+        actor: mesh_types::PublicKey,
+    ) -> Result<bool, String> {
+        self.ensure_physical_root().map_err(|e| e.to_string())?;
+        let Some(record) = self.record_index.operation(&operation) else {
+            return Ok(false);
+        };
+        let bytes = self
+            .payload_store
+            .read(&CasDigest::from_bytes(*record.payload_digest.as_bytes()))
+            .map_err(|e| e.to_string())?;
+        let envelope =
+            crate::authenticated_changeset::AuthenticatedChangeSet::from_canonical_bytes(&bytes)
+                .map_err(|e| e.to_string())?;
+        if Blake3::digest_bytes(&bytes).as_bytes() != operation.as_bytes()
+            || !envelope.signed_by(actor)
+            || !self
+                .record_index
+                .causally_ready_operations()
+                .contains(&operation)
+        {
+            return Err("prepared operation could not be authenticated".into());
+        }
+        Ok(true)
+    }
+
     pub(crate) fn verify_authenticated_operation(
         &self,
         operation: RecordDigest,

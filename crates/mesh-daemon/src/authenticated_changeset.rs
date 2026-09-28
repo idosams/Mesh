@@ -67,6 +67,10 @@ impl AuthenticatedChangeSet {
         Self::verified(changeset, actor_public_key, signature)
     }
 
+    pub(crate) fn signed_by(&self, actor: PublicKey) -> bool {
+        self.actor_public_key == actor
+    }
+
     pub(crate) fn has_authentication(&self, actor: PublicKey, signature: Signature) -> bool {
         self.actor_public_key == actor && self.signature == signature
     }

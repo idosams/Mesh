@@ -326,7 +326,7 @@ fn call_tool(request: &Json, id: Json, provider: &dyn WorkspaceStateProvider) ->
     Some(rpc_result(id, result))
 }
 
-const FLEET_INSTRUCTIONS: &str = "Call mesh_fleet_context first. It identifies your exact lane, run and native working folder. Its review_change_requests are recorded feedback for exact earlier results in your lane; check context again before submitting work. A recorded request does not prove it has been addressed. Check review_change_decisions: only open requests need further proposals; addressed requests require a native reviewer to reopen them. Agents cannot set these decisions. Work only there. Use mesh_fleet_checkpoint to save supported private edits and additions; incomplete results require attention and do not mean the whole folder was saved. Use a stable request identity for retries: it returns the same result even after later edits. A new capture needs a new request. Submit a complete checkpoint for immutable review with mesh_fleet_submit_review using its returned checkpoint identity. Submission does not approve or publish it. To propose that result for a recorded change request, call mesh_fleet_propose_review_change_result with the request id and your submitted checkpoint. This does not resolve the request or replace the open review. You can delegate private child lanes from one of your saved workspace_versions with mesh_fleet_delegate, then observe them with mesh_fleet_children. Use a stable request identity when retrying delegation. This session cannot approve shared state, choose output paths, or grant authority to another lane.";
+const FLEET_INSTRUCTIONS: &str = "Call mesh_fleet_context first. It identifies your exact lane, run and native working folder. Its review_change_requests are recorded feedback for exact earlier results in your lane; check context again before submitting work. A recorded request does not prove it has been addressed. Check review_change_decisions: only open requests need further proposals; addressed requests require a native reviewer to reopen them. Agents cannot set these decisions. Work only there. Use mesh_fleet_checkpoint to save supported private edits and additions; incomplete results require attention and do not mean the whole folder was saved. Use a stable request identity for retries: it returns the same result even after later edits. A new capture needs a new request. If capture reports checkpoint-entry-resolution-required, inspect mesh_fleet_missing_files. Only when you intentionally deleted a listed file, call mesh_fleet_resolve_file_deletion with a stable request, its exact path and saved version. It records an already-absent file; it does not delete a present file or infer a rename. Retry with unchanged inputs. After resolving intended deletions, take a new whole-folder checkpoint. Submit a complete checkpoint for immutable review with mesh_fleet_submit_review using its returned checkpoint identity. Submission does not approve or publish it. To propose that result for a recorded change request, call mesh_fleet_propose_review_change_result with the request id and your submitted checkpoint. This does not resolve the request or replace the open review. You can delegate private child lanes from one of your saved workspace_versions with mesh_fleet_delegate, then observe them with mesh_fleet_children. Use a stable request identity when retrying delegation. This session cannot approve shared state, choose output paths, or grant authority to another lane.";
 
 fn fleet_tools() -> Vec<Json> {
     [
@@ -345,6 +345,8 @@ fn fleet_tools() -> Vec<Json> {
             "Create an isolated child lane from an exact saved version",
             &["request", "goal", "provider", "version"][..],
         ),
+        ("mesh_fleet_missing_files", "Inspect absent tracked files in this assigned lane without recording deletion", &[][..]),
+        ("mesh_fleet_resolve_file_deletion", "Record an explicitly intended already-absent file deletion at its exact saved version", &["request", "path", "version"][..]),
         (
             "mesh_fleet_checkpoint",
             "Save private workspace edits and additions with a stable request identity",
@@ -412,6 +414,10 @@ fn fleet_tool_call(
         Some("mesh_fleet_context") => ("context", &[]),
         Some("mesh_fleet_children") => ("children", &[]),
         Some("mesh_fleet_delegate") => ("delegate", &["request", "goal", "provider", "version"]),
+        Some("mesh_fleet_missing_files") => ("missing_files", &[]),
+        Some("mesh_fleet_resolve_file_deletion") => {
+            ("resolve_file_deletion", &["request", "path", "version"])
+        }
         Some("mesh_fleet_checkpoint") => ("checkpoint", &["request"]),
         Some("mesh_fleet_propose_review_change_result") => {
             ("propose_review_change_result", &["request", "checkpoint"])

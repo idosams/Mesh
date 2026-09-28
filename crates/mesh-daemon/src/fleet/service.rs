@@ -827,6 +827,202 @@ impl FleetService {
         let state = exact_state(&workspace)?;
         verify_custody(&workspace, &state, &grant.generation)?;
         match action {
+            "missing_files" => {
+                exact_fields(arguments, &[])?;
+                let inventory = workspace
+                    .daemon()
+                    .inspect_agent_finish_preflight(
+                        &state.root,
+                        &state.digest,
+                        &state.installation,
+                        &grant.generation,
+                    )
+                    .map_err(|_| refusal("fleet-deletion-inspection-unavailable"))?;
+                Ok(Json::object([
+                    ("schema", Json::text("mesh.fleet-missing-files/v1")),
+                    (
+                        "files",
+                        Json::Array(
+                            inventory
+                                .missing_files()
+                                .iter()
+                                .take(128)
+                                .map(|file| {
+                                    Json::object([
+                                        ("path", Json::text(file.path())),
+                                        ("version", Json::text(file.current_version())),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                    (
+                        "not_listed",
+                        Json::Number(inventory.missing_files().len().saturating_sub(128) as u64),
+                    ),
+                    ("approval_authority", Json::Bool(false)),
+                ]))
+            }
+            "resolve_file_deletion" => {
+                exact_fields(arguments, &["request", "path", "version"])?;
+                let request = field(arguments, "request")?;
+                let path = field(arguments, "path")?;
+                let version = RecordDigest::parse_hex(field(arguments, "version")?)
+                    .map_err(|_| refusal("fleet-deletion-version-invalid"))?;
+                let id = format!(
+                    "file-deletion-{}",
+                    &lane_identity(inner.runtime.objective(), &grant.lane, request)?[5..]
+                );
+                let origin = super::AgentOrigin {
+                    actor: grant.actor.clone(),
+                    session: grant.session.clone(),
+                    run: grant.run.clone(),
+                    generation: grant.generation.clone(),
+                };
+                let signer = grant
+                    .signer
+                    .as_ref()
+                    .ok_or_else(|| refusal("fleet-checkpoint-signer-unavailable"))?;
+                let public = signer.public_key();
+                if RecordDigest::from_bytes(*public.as_bytes()).to_string() != grant.actor {
+                    return Err(refusal("fleet-checkpoint-signer-changed"));
+                }
+                if let Some(previous) = inner.runtime.state().file_deletions.get(&id) {
+                    if previous.lane != grant.lane
+                        || previous.origin != origin
+                        || previous.path != path
+                        || previous.version != version
+                    {
+                        return Err(refusal("fleet-deletion-request-conflict"));
+                    }
+                    if let Some(result) = &previous.result {
+                        return Ok(file_deletion_summary(&id, result));
+                    }
+                    if let Some(operation) = previous.operation {
+                        if workspace
+                            .daemon()
+                            .inspect_agent_prepared_operation(
+                                crate::AgentWorkspaceCheckpointRequest {
+                                    root: &state.root,
+                                    digest: &state.digest,
+                                    installation: &state.installation,
+                                    generation: &grant.generation,
+                                },
+                                operation,
+                                public,
+                            )
+                            .map_err(|_| refusal("fleet-deletion-proof-unavailable"))?
+                        {
+                            let result = super::FileDeletionResult {
+                                operation,
+                                workspace_digest: state.digest.clone(),
+                                settled: false,
+                            };
+                            inner
+                                .runtime
+                                .record(
+                                    &format!("finish-{id}"),
+                                    Command::FinishFileDeletion {
+                                        id: id.clone(),
+                                        result: result.clone(),
+                                    },
+                                )
+                                .map_err(runtime_error)?;
+                            return Ok(file_deletion_summary(&id, &result));
+                        }
+                    }
+                    if previous.input_digest != state.digest {
+                        return Err(refusal("fleet-deletion-needs-reconciliation"));
+                    }
+                } else {
+                    let inventory = workspace
+                        .daemon()
+                        .inspect_agent_finish_preflight(
+                            &state.root,
+                            &state.digest,
+                            &state.installation,
+                            &grant.generation,
+                        )
+                        .map_err(|_| refusal("fleet-deletion-inspection-unavailable"))?;
+                    if !inventory.missing_files().iter().any(|file| {
+                        file.path() == path && file.current_version() == version.to_string()
+                    }) {
+                        return Err(refusal("fleet-deletion-inspection-changed"));
+                    }
+                    let _authority = workspace
+                        .daemon()
+                        .lock_workspace_agent_setup(
+                            &state.root,
+                            &state.digest,
+                            &state.installation,
+                            &grant.generation,
+                        )
+                        .map_err(|_| refusal("fleet-session-custody-changed"))?;
+                    inner
+                        .runtime
+                        .record(
+                            &format!("begin-{id}"),
+                            Command::BeginFileDeletion {
+                                id: id.clone(),
+                                lane: grant.lane.clone(),
+                                origin,
+                                input_digest: state.digest.clone(),
+                                path: path.into(),
+                                version,
+                            },
+                        )
+                        .map_err(runtime_error)?;
+                }
+                let prepared = inner.runtime.state().file_deletions[&id].operation;
+                let receipt = workspace
+                    .daemon()
+                    .checkpoint_agent_file_deletion_prepared(
+                        crate::AgentWorkspaceCheckpointRequest {
+                            root: &state.root,
+                            digest: &state.digest,
+                            installation: &state.installation,
+                            generation: &grant.generation,
+                        },
+                        path,
+                        &version.to_string(),
+                        public,
+                        |payload| signer.sign(payload),
+                        |operation| {
+                            if prepared.is_some_and(|expected| expected != operation) {
+                                return Err("prepared deletion operation changed".to_owned());
+                            }
+                            inner
+                                .runtime
+                                .record(
+                                    &format!("prepare-{id}"),
+                                    Command::PrepareFileDeletion {
+                                        id: id.clone(),
+                                        operation,
+                                    },
+                                )
+                                .map(|_| ())
+                                .map_err(|e| e.to_string())
+                        },
+                    )
+                    .map_err(|_| refusal("fleet-deletion-needs-reconciliation"))?;
+                let result = super::FileDeletionResult {
+                    operation: RecordDigest::parse_hex(receipt.changeset())
+                        .map_err(|_| refusal("fleet-deletion-operation-invalid"))?,
+                    workspace_digest: exact_state(&workspace)?.digest,
+                    settled: receipt.meaningful_saved(),
+                };
+                inner
+                    .runtime
+                    .record(
+                        &format!("finish-{id}"),
+                        Command::FinishFileDeletion {
+                            id: id.clone(),
+                            result: result.clone(),
+                        },
+                    )
+                    .map_err(runtime_error)?;
+                Ok(file_deletion_summary(&id, &result))
+            }
             "propose_review_change_result" => {
                 exact_fields(arguments, &["request", "checkpoint"])?;
                 let request = field(arguments, "request")?;
@@ -2522,3 +2718,18 @@ fn runtime_error(error: super::Error) -> Unavailable {
 fn refusal(code: &str) -> Unavailable {
     Unavailable::new(code, "Mesh could not authorize or complete this fleet action. Refresh the fleet and inspect the lane state.")
 }
+
+fn file_deletion_summary(id: &str, result: &super::FileDeletionResult) -> Json {
+    Json::object([
+        ("schema", Json::text("mesh.fleet-file-deletion/v1")),
+        ("request", Json::text(id)),
+        ("operation", Json::text(result.operation.to_string())),
+        ("workspace_digest", Json::text(&result.workspace_digest)),
+        ("settled", Json::Bool(result.settled)),
+        ("approval_authority", Json::Bool(false)),
+    ])
+}
+
+#[cfg(all(test, target_os = "macos"))]
+#[path = "service_deletion_tests.rs"]
+mod deletion_tests;

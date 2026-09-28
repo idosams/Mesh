@@ -6798,6 +6798,34 @@ impl LiveDaemon {
         F: FnOnce(&SigningPayload) -> Result<Signature, E>,
         E: std::fmt::Display,
     {
+        self.checkpoint_agent_file_deletion_prepared(
+            request,
+            relative_path,
+            expected_current_version,
+            actor_public_key,
+            sign,
+            |_| Ok::<_, core::convert::Infallible>(()),
+        )
+    }
+
+    /// Resolve an explicit deletion only after a native caller durably binds its exact operation.
+    /// The preparation callback runs before append and receives no mutation authority. Failure
+    /// preserves workspace history; absence and parent identity are rechecked after it returns.
+    pub fn checkpoint_agent_file_deletion_prepared<F, E, P, PE>(
+        &self,
+        request: AgentWorkspaceCheckpointRequest<'_>,
+        relative_path: &str,
+        expected_current_version: &str,
+        actor_public_key: PublicKey,
+        sign: F,
+        prepared: P,
+    ) -> Result<ManagedEntryChange, ManagedTextFileError>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+        P: FnOnce(RecordDigest) -> Result<(), PE>,
+        PE: std::fmt::Display,
+    {
         if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
             return Err(ManagedTextFileError::Recovery(
                 "nested agent deletion resolution was refused".to_owned(),
@@ -6810,7 +6838,7 @@ impl LiveDaemon {
             request.generation,
         )?;
         let _context = VerifiedMutationContext::enter(self, request.installation)?;
-        self.adopt_native_file_deletion_privately(
+        self.adopt_native_file_deletion_with_prepared(
             relative_path,
             expected_current_version,
             actor_public_key,
@@ -6818,7 +6846,36 @@ impl LiveDaemon {
                 let _suspended = SuspendedMutationContext::enter();
                 sign(payload)
             },
+            |operation| {
+                let _suspended = SuspendedMutationContext::enter();
+                prepared(operation)
+            },
         )
+    }
+
+    /// Reconcile an exact native-prepared operation under the current assignment without signing.
+    /// Presence verifies its authenticated payload and causal admission, not current file absence.
+    pub fn inspect_agent_prepared_operation(
+        &self,
+        request: AgentWorkspaceCheckpointRequest<'_>,
+        operation: RecordDigest,
+        actor_public_key: PublicKey,
+    ) -> Result<bool, ManagedTextFileError> {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested agent operation inspection was refused".to_owned(),
+            ));
+        }
+        let _authority = self.lock_workspace_agent_setup(
+            request.root,
+            request.digest,
+            request.installation,
+            request.generation,
+        )?;
+        let held = self.held();
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        open.authenticated_operation_present(operation, actor_public_key)
+            .map_err(ManagedTextFileError::Authoring)
     }
 
     /// Capture supported edits and additions under one exact native assignment.
@@ -7860,6 +7917,29 @@ impl LiveDaemon {
         F: FnOnce(&SigningPayload) -> Result<Signature, E>,
         E: std::fmt::Display,
     {
+        self.adopt_native_file_deletion_with_prepared(
+            relative_path,
+            expected_current_version,
+            actor_public_key,
+            sign,
+            |_| Ok::<_, core::convert::Infallible>(()),
+        )
+    }
+
+    fn adopt_native_file_deletion_with_prepared<F, E, P, PE>(
+        &self,
+        relative_path: &str,
+        expected_current_version: &str,
+        actor_public_key: PublicKey,
+        sign: F,
+        prepared: P,
+    ) -> Result<ManagedEntryChange, ManagedTextFileError>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+        P: FnOnce(RecordDigest) -> Result<(), PE>,
+        PE: std::fmt::Display,
+    {
         let _workspace_authority = self.lock_current_managed_workspace_mutation()?;
         let _serial = self
             .managed_edit
@@ -7909,6 +7989,7 @@ impl LiveDaemon {
         ];
         let (request, intended) =
             self.signed_operation_request(basis, operations, actor_public_key, sign)?;
+        prepared(intended).map_err(|error| ManagedTextFileError::Recovery(error.to_string()))?;
         let missing = confined_free_path(&root, relative_path)?;
         let parent = missing.parent().ok_or(ManagedTextFileError::InvalidPath)?;
         if managed_directory_identity(parent).map_err(|error| {
