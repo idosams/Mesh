@@ -638,6 +638,7 @@ fn workspace_version_preview_changes(
 thread_local! {
     static BEFORE_HISTORICAL_EXPORT_REMOVE: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_REOPEN_DIRECTORY_LOCK: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
+    static AFTER_MANAGED_MOVE_PERSIST: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static AFTER_VERSION_FORK_CONFIRM: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
     static BETWEEN_AGENT_LIVE_FILE_READS: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
 }
@@ -1761,12 +1762,36 @@ impl Drop for VerifiedMutationContext {
 struct IdleCheckpointScheduler {
     state: Mutex<IdleCheckpointSchedulerState>,
     wake: Condvar,
+    drained: Condvar,
+    #[cfg(test)]
+    worker_gate: Mutex<Option<CheckpointWorkerTestGate>>,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct CheckpointWorkerTestGate {
+    entered: std::sync::mpsc::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+    panic_after_release: bool,
+}
+
+// Declared outside the worker loop, so every upgraded database/workspace reference is dropped
+// before completion is acknowledged, including when the worker unwinds.
+struct CheckpointWorkerLifetime(Arc<IdleCheckpointScheduler>);
+
+impl Drop for CheckpointWorkerLifetime {
+    fn drop(&mut self) {
+        let mut idle = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
+        idle.active_workers -= 1;
+        self.0.drained.notify_all();
+    }
 }
 
 #[derive(Debug, Default)]
 struct IdleCheckpointSchedulerState {
     generation: u64,
     worker_running: bool,
+    active_workers: usize,
     shutdown: bool,
     scheduled: Option<IdleCheckpointSchedule>,
     maximum_started_at: Option<Instant>,
@@ -1951,6 +1976,14 @@ impl Drop for LiveDaemon {
             .unwrap_or_else(PoisonError::into_inner);
         idle.shutdown = true;
         self.checkpoint_idle.wake.notify_all();
+        // Requesting shutdown does not release the worker's SQLite connections. Wait until all
+        // generations have released their strong references before a caller can reopen the path.
+        drop(
+            self.checkpoint_idle
+                .drained
+                .wait_while(idle, |state| state.active_workers != 0)
+                .unwrap_or_else(PoisonError::into_inner),
+        );
     }
 }
 
@@ -4568,14 +4601,17 @@ impl LiveDaemon {
                     self.checkpoint_idle.wake.notify_one();
                     return None;
                 }
-                IdleScheduleUpdate::StartWorker => {}
+                IdleScheduleUpdate::StartWorker => {
+                    idle.active_workers += 1;
+                }
             }
         }
         let checkpoint = Arc::downgrade(&self.checkpoint);
         let open = Arc::downgrade(&self.open);
         let feed = Arc::downgrade(&self.feed);
         let checkpoint_idle = Arc::clone(&self.checkpoint_idle);
-        Some(std::thread::spawn(move || loop {
+        let lifetime = CheckpointWorkerLifetime(Arc::clone(&checkpoint_idle));
+        let worker = move || loop {
             let (Some(checkpoint), Some(open), Some(feed)) =
                 (checkpoint.upgrade(), open.upgrade(), feed.upgrade())
             else {
@@ -4588,6 +4624,15 @@ impl LiveDaemon {
                 idle.maximum_started_at = None;
                 return Ok(None);
             };
+            #[cfg(test)]
+            {
+                let gate = checkpoint_idle.worker_gate.lock().unwrap().take();
+                if let Some(gate) = gate {
+                    gate.entered.send(()).unwrap();
+                    gate.release.recv().unwrap();
+                    assert!(!gate.panic_after_release, "injected worker unwind");
+                }
+            }
             let (intervals, scheduled, generation) = {
                 let checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
                 let held = open.lock().unwrap_or_else(PoisonError::into_inner);
@@ -4773,6 +4818,10 @@ impl LiveDaemon {
             idle.scheduled = None;
             idle.maximum_started_at = None;
             return result;
+        };
+        Some(std::thread::spawn(move || {
+            let _lifetime = lifetime;
+            worker()
         }))
     }
 
@@ -7485,6 +7534,13 @@ impl LiveDaemon {
                 .map_err(|error| std::io::Error::other(error.to_string()))
         })?;
         self.finish_managed_intent(&intent);
+        // Only test builds can inject an OS replacement at this exact durable-to-settling boundary.
+        #[cfg(test)]
+        AFTER_MANAGED_MOVE_PERSIST.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
         let meaningful = match saved {
             Some((_saved, installation)) => {
                 self.settle_managed_change(&root, installation, sequence, || {
@@ -10012,6 +10068,85 @@ mod tests {
         RecoveryStatePersistence as _, SqlExecutor as _, Sqlite, RECOVERY_DATABASE_FILE_NAME,
     };
 
+    #[test]
+    fn a_newer_os_change_during_move_settling_stays_working() {
+        use ed25519_dalek::Signer as _;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let parent = scratch("move-settling");
+        let source = parent.join("source");
+        let managed = parent.join("managed");
+        fs::create_dir_all(source.join("existing")).unwrap();
+        fs::write(source.join("existing/keep.txt"), "keep\n").unwrap();
+        crate::PreparedFolderImport::prepare(&source, &managed)
+            .unwrap()
+            .confirm_into_workspace()
+            .unwrap();
+        let daemon = LiveDaemon::with_checkpoint_runtime(
+            started(),
+            CheckpointRuntimeParameters {
+                idle_interval: Some(Duration::from_millis(50)),
+                maximum_uncheckpointed_bytes: Some(65_536),
+                maximum_uncheckpointed_interval: Some(Duration::from_millis(25)),
+            },
+        )
+        .unwrap();
+        daemon.open_at_start(&managed).unwrap();
+        let key = SigningKey::from_bytes(&[0x63; 32]);
+        let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+        let sign = |payload: &SigningPayload| -> Result<Signature, std::convert::Infallible> {
+            Ok(Signature::from_bytes(
+                key.sign(payload.as_bytes()).to_bytes(),
+            ))
+        };
+        daemon
+            .create_managed_text_file("draft.txt", "durable bytes\n", public, sign)
+            .unwrap();
+        let target = managed.join("final.txt");
+        let displaced = managed.join("externally-moved.txt");
+        let called = Rc::new(Cell::new(false));
+        AFTER_MANAGED_MOVE_PERSIST.with(|hook| {
+            let target = target.clone();
+            let displaced = displaced.clone();
+            let managed = managed.clone();
+            let called = Rc::clone(&called);
+            *hook.borrow_mut() = Some(Box::new(move || {
+                assert!(!managed.join("draft.txt").exists());
+                assert!(!managed.join(".mesh-managed-mutation").exists());
+                assert_eq!(fs::read(&target).unwrap(), b"durable bytes\n");
+                fs::rename(&target, &displaced).expect("external move");
+                fs::create_dir(&target).expect("newer external folder");
+                called.set(true);
+            }));
+        });
+        let moved = daemon
+            .move_managed_entry_privately("draft.txt", "final.txt", public, sign)
+            .unwrap();
+        assert!(
+            called.get(),
+            "the replacement must precede the settling check"
+        );
+        assert_eq!(
+            daemon.durable_operation(RecordDigest::parse_hex(moved.changeset()).unwrap()),
+            Some(true)
+        );
+        assert!(!moved.meaningful_saved());
+        assert!(target.is_dir());
+        assert_eq!(fs::read(displaced).unwrap(), b"durable bytes\n");
+        assert!(daemon
+            .checkpoint_snapshot()
+            .unwrap()
+            .open_window()
+            .is_some());
+        assert!(
+            daemon.workspace_state().unwrap().review_items.is_empty(),
+            "a newer unsettled operating-system change must suppress the stale automatic card"
+        );
+        drop(daemon);
+        fs::remove_dir_all(parent).unwrap();
+    }
+
     fn started() -> StartupSummary {
         StartupSummary::from(&nothing_to_recover())
     }
@@ -10021,6 +10156,101 @@ mod tests {
         path.push(format!("mesh-live-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         path
+    }
+
+    #[test]
+    fn daemon_drop_waits_for_checkpoint_database_owners_even_when_worker_unwinds() {
+        use mesh_operations as op;
+        for panic_after_release in [false, true] {
+            let root = scratch(if panic_after_release {
+                "shutdown-unwind"
+            } else {
+                "shutdown-worker"
+            });
+            let managed = root.join("managed");
+            let daemon = LiveDaemon::with_checkpoint_runtime(
+                started(),
+                CheckpointRuntimeParameters {
+                    idle_interval: Some(Duration::from_secs(60)),
+                    maximum_uncheckpointed_bytes: Some(65_536),
+                    maximum_uncheckpointed_interval: Some(Duration::from_secs(30)),
+                },
+            )
+            .unwrap();
+            daemon.open_at_start(&managed).unwrap();
+            let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            *daemon.checkpoint_idle.worker_gate.lock().unwrap() = Some(CheckpointWorkerTestGate {
+                entered: entered_tx,
+                release: release_rx,
+                panic_after_release,
+            });
+            let request = FileVersionCheckpointRequest::new(
+                op::WorkspaceId::from_bytes([1; 16]),
+                op::ActorId::from_bytes([2; 32]),
+                op::SessionId::from_bytes([3; 16]),
+                op::ActorSequence::new(1),
+                op::CausalParents::genesis(),
+                op::HeadId::from_bytes([4; 32]),
+                op::PolicyEpoch::new(5),
+                op::Hlc::new(1_700_000_000_001, 6),
+                op::ObjectId::from_bytes([7; 16]),
+                op::VersionId::from_bytes([8; 32]),
+                Vec::new(),
+                PortableMetadata::new(true),
+                op::Signature::from_bytes([10; 64]),
+            );
+            daemon
+                .save_file_version(
+                    RecoverySequence::new(1).unwrap(),
+                    b"durable saved work",
+                    &ChunkingConfig::default(),
+                    crate::ManifestPagingPolicy::flat(),
+                    request,
+                    &LocalChangesetHead,
+                )
+                .unwrap();
+            entered_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("real worker owns database references");
+            let checkpoint = Arc::downgrade(&daemon.checkpoint);
+            let open = Arc::downgrade(&daemon.open);
+            let idle = Arc::clone(&daemon.checkpoint_idle);
+            let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+            let dropping = std::thread::spawn(move || {
+                drop(daemon);
+                finished_tx.send(()).unwrap();
+            });
+            {
+                let state = idle.state.lock().unwrap();
+                let (state, _) = idle
+                    .wake
+                    .wait_timeout_while(state, Duration::from_secs(5), |state| !state.shutdown)
+                    .unwrap();
+                assert!(state.shutdown, "drop must request shutdown");
+            }
+            // The worker is explicitly parked while owning both databases. Always release it
+            // before asserting so a regression failure cannot strand the drop thread.
+            let returned_while_owned = finished_rx.recv_timeout(Duration::from_millis(100)).is_ok();
+            assert!(checkpoint.upgrade().is_some());
+            assert!(open.upgrade().is_some());
+            release_tx.send(()).unwrap();
+            dropping.join().unwrap();
+            assert!(
+                !returned_while_owned,
+                "daemon drop returned before its worker released database owners"
+            );
+            assert!(checkpoint.upgrade().is_none());
+            assert!(open.upgrade().is_none());
+            let reopened =
+                LiveDaemon::with_checkpoint_runtime(started(), checkpoint_parameters()).unwrap();
+            reopened
+                .open_at_start(&managed)
+                .expect("immediate same-path restart");
+            assert_eq!(reopened.workspace_state().unwrap().records, 2);
+            drop(reopened);
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     #[test]
