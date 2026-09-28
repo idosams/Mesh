@@ -1418,3 +1418,27 @@ Transferred tests cover interruption before append, lost completion after append
 callback authority isolation, exact repeat/conflicting inputs, wrong operation/actor and later edits,
 plus scoped MCP routing. Local focused/failing-before/full native execution is queued behind the
 preserved full run; no packaged or real-agent completion is claimed from these source tests.
+
+## D01d inspection-only deletion results and historical proof accounting
+
+Transfers implementation source `c7ac2e33de18a20b2517e23b667b0b3847e0ed19` onto PR #79 at
+`19e85e29f400f3974c4d72583e93d214f384570f`. All six code/test paths are transferred; source
+contract text is adapted to preserve canonical validation history. Exact native state equality permits
+an independently derived no-change inspection identity, while approval/publication still require
+regular bundles. Pinned input comparison retains deletions; project import produces the actual
+source-project review. Transferred tests cover immutable later reads, retained history, changed bases,
+source preservation, MCP inspection and refusal of approval context/preview for inspection identities.
+
+Two associated source documentation commits are accounted for as historical evidence, not current
+canonical acceptance: `6c40c1e1c6562a931d533219032d4c2f0e04f3f2` records the packaged deletion
+journey at old source `278beb6d5549a2380953f0cbfb2e1351566637df`, with 3,248 Rust tests (14 skipped)
+and 666 desktop tests; `c1835ae651f4ca57edd399be0697b3c73a17520d` records the packaged empty-result
+journey at old source `c7ac2e33de18a20b2517e23b667b0b3847e0ed19`, with 3,249 Rust tests (14 skipped)
+and 666 desktop tests. Both source records report `source_exact=true`, `graphical=false` and ad-hoc
+signing. They do not establish graphical or platform-backed approval; the latter records unavailable
+Computer Use permissions. Those historical reports were not rerun here and must not be presented as
+verification of any canonical replacement commit. Current packaged and graphical acceptance remains.
+
+Canonical native focused/failing-before/full execution remains queued behind preserved local runs.
+This source accounting does not complete directory deletion, cancellation recovery, grouped integration,
+restoration, provider/remote acceptance or final combined-main verification.

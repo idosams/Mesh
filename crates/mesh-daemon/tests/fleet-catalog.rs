@@ -1473,3 +1473,205 @@ fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
         Some(&Json::text(next_main))
     );
 }
+
+#[test]
+fn deletion_only_lane_imports_as_exact_project_deletion_and_reopens_without_execution() {
+    use mesh_approval::{
+        ApprovalDecision, ExpectedHumanApproval, HumanApprovalCredential, HumanApprovalReceiptDraft,
+    };
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    use ring::rand::SystemRandom;
+    use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
+    use std::sync::Arc;
+    let f = Fixture::new("empty-lane-project-review");
+    let random = SystemRandom::new();
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &random).unwrap();
+    let key =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &random).unwrap();
+    let credential =
+        HumanApprovalCredential::from_public_key(key.public_key().as_ref().try_into().unwrap())
+            .unwrap();
+    let trust = TrustedReviewers::with_human_credentials([credential.clone()]);
+    // Cryptographic fixture receipts exercise the native fold; this is not OS user-presence proof.
+    let approve = |version: &str, challenge: u8| {
+        let review = f
+            .history
+            .request_review_with_trusted_reviewers(
+                version,
+                mesh_types::PublicKey::from_bytes([3; 32]),
+                &trust,
+            )
+            .unwrap();
+        let preview = f
+            .history
+            .approval_preview(text(&review, "bundle"), version, &trust)
+            .unwrap();
+        let draft = HumanApprovalReceiptDraft::new(
+            ExpectedHumanApproval::new(
+                preview.context().clone(),
+                credential.clone(),
+                [challenge; 32],
+            ),
+            ApprovalDecision::Approve,
+        );
+        let signature = key.sign(&random, &draft.canonical_bytes()).unwrap();
+        let receipt = draft
+            .with_signature(signature.as_ref().to_vec())
+            .unwrap()
+            .canonical_bytes();
+        f.history
+            .approve_review(text(&review, "bundle"), version, &receipt, &trust)
+            .unwrap()
+    };
+    let first_main = approve(&f.request.version.to_string(), 1).to_string();
+    let catalog = f.open().unwrap();
+    let service = catalog.create_attached(&f.history, &f.request).unwrap();
+    let state = service.native_state().unwrap();
+    let lane = state.lanes.keys().next().unwrap();
+    let root = PathBuf::from(state.lanes[lane].workspace.as_ref().unwrap().root());
+    service
+        .native_command(
+            "dispatch",
+            Command::Dispatch {
+                lane: lane.clone(),
+                run: "run".into(),
+            },
+        )
+        .unwrap();
+    let agent = service
+        .grant_with_signer(
+            lane,
+            "run",
+            "session",
+            Arc::new(HistorySigner(SigningKey::from_bytes(&[63; 32]))),
+        )
+        .unwrap();
+
+    fs::remove_file(root.join("work.txt")).unwrap();
+    let missing = service
+        .agent_call(
+            agent.transport_value(),
+            "missing_files",
+            &Json::empty_object(),
+        )
+        .unwrap();
+    let file = &missing.get("files").unwrap().as_array().unwrap()[0];
+    service
+        .agent_call(
+            agent.transport_value(),
+            "resolve_file_deletion",
+            &Json::object([
+                ("request", Json::text("remove-work")),
+                ("path", Json::text("work.txt")),
+                ("version", file.get("version").unwrap().clone()),
+            ]),
+        )
+        .unwrap();
+    let saved = service
+        .agent_call(
+            agent.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("empty"))]),
+        )
+        .unwrap();
+    assert_eq!(saved.get("complete"), Some(&Json::Bool(true)));
+    let reviewed = service
+        .agent_call(
+            agent.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        text(&reviewed, "bundle"),
+    )
+    .unwrap();
+    let inspected = service.saved_review(&selection).unwrap();
+    assert_eq!(
+        inspected.get("review").unwrap().get("content_complete"),
+        Some(&Json::Bool(true))
+    );
+    let input = service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    let changes = input
+        .get("input")
+        .unwrap()
+        .get("comparison")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(changes.len(), 1);
+    assert_eq!(text(&changes[0], "effect"), "removed");
+    assert_eq!(text(changes[0].get("before").unwrap(), "path"), "work.txt");
+    assert_eq!(changes[0].get("after"), Some(&Json::Null));
+    let request = "9".repeat(32);
+    service
+        .stage_project_candidate(&selection, &f.history, &trust, &request, Some(&first_main))
+        .unwrap();
+    let signer = ImportSigner {
+        key: SigningKey::from_bytes(&[125; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: false,
+    };
+    service
+        .import_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            &signer,
+        )
+        .unwrap();
+    let imported = service
+        .review_imported_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            true,
+        )
+        .unwrap();
+    let review = imported.get("review").unwrap();
+    let preview = f
+        .history
+        .approval_preview(text(review, "bundle"), text(review, "target"), &trust)
+        .unwrap();
+    assert_eq!(preview.review_bundle().presentation().len(), 1);
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"saved input\n"
+    );
+    let objective = service.objective().unwrap();
+    let main_before = f.history.accepted_main(&trust).unwrap();
+    let lane = lane.clone();
+    fs::write(root.join("later.txt"), b"later private work\n").unwrap();
+    drop(service);
+    drop(catalog);
+    let restored = f.open().unwrap();
+    let history = restored.history(&objective).unwrap();
+    assert_eq!(history.saved_review(&selection).unwrap(), inspected);
+    assert_eq!(
+        history
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        input
+    );
+    assert_eq!(
+        history.saved_reviews(&lane, None).unwrap().get("total"),
+        Some(&Json::Number(1))
+    );
+    assert!(restored.current_service(&objective).is_err());
+    assert_eq!(f.history.accepted_main(&trust).unwrap(), main_before);
+    assert_eq!(
+        fs::read(root.join("later.txt")).unwrap(),
+        b"later private work\n"
+    );
+}

@@ -2364,17 +2364,38 @@ fn explicit_file_deletion_is_scoped_replayable_and_allows_review_after_new_check
         .unwrap();
     assert_eq!(complete.get("complete"), Some(&Json::Bool(true)));
     assert_eq!(complete.get("saved_changes"), Some(&Json::Number(0)));
-    // This lane's canonical main is empty. Removing its only imported file produces no
-    // canonical change, so the existing approval-bundle guard correctly refuses that review.
-    assert_eq!(
-        f.call(
+    // A canonical no-op is inspectable, including its real deletion relative to lane input.
+    let empty_review = f
+        .call(
             "submit_review",
-            &Json::object([("checkpoint", complete.get("checkpoint").unwrap().clone())])
+            &Json::object([("checkpoint", complete.get("checkpoint").unwrap().clone())]),
         )
-        .unwrap_err()
-        .code,
-        "agent-review-unavailable"
+        .unwrap();
+    let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+        &f.lane,
+        text(&complete, "checkpoint"),
+        text(&complete, "version"),
+        text(&empty_review, "bundle"),
+    )
+    .unwrap();
+    let inspected = f.service.saved_review(&selection).unwrap();
+    assert_eq!(
+        inspected.get("review").unwrap().get("content_complete"),
+        Some(&Json::Bool(true))
     );
+    assert!(inspected
+        .get("review")
+        .unwrap()
+        .get("bundle_changes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let input = f
+        .service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    assert!(input.encode().contains("note.txt"));
     fs::write(root.join("remaining.txt"), "retained result\n").unwrap();
     let reviewable = f
         .call(
@@ -2389,6 +2410,13 @@ fn explicit_file_deletion_is_scoped_replayable_and_allows_review_after_new_check
     )
     .unwrap();
     fs::write(root.join("note.txt"), "later recreated work\n").unwrap();
+    assert_eq!(f.service.saved_review(&selection).unwrap(), inspected);
+    assert_eq!(
+        f.service
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        input
+    );
     assert_eq!(f.call("resolve_file_deletion", &args).unwrap(), saved);
     assert_eq!(
         fs::read(root.join("note.txt")).unwrap(),

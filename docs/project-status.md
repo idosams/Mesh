@@ -538,3 +538,9 @@ host reconciliation and packaged agent-deletion proof remain outstanding.
 
 Transferred native tests require execution on this canonical increment. Full local verification
 remains queued behind the preserved compiler run; hosted and packaged results remain unclaimed.
+
+Deletion-only lane results can now receive a distinct inspection identity when native reconstruction
+proves no changes against lane main. They remain inspectable against their original input and can
+be imported as actual source-project deletions. Ordinary approval contexts reject these inspection
+identities. Transferred tests cover later edits, retained-history reopen, source preservation and
+approval refusal; canonical native and packaged execution remains pending.

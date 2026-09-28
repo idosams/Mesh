@@ -844,6 +844,35 @@ callbacks cannot reenter operation inspection or inherit mutation authority.
 A fresh whole-folder checkpoint is required before submitting the resulting work. The tools never
 delete present filesystem entries or infer a rename. Directory deletion and ambiguous missing-parent
 cases remain unsupported. A result identical to canonical main still produces `NothingToReview`;
-read-only empty-result review remains a separate gap. Cancellation prevents further agent calls even
+the inspection-only path below exposes that result without approval authority. Cancellation prevents further agent calls even
 though the ledger permits native completion reconciliation after cancellation. Host-driven recovery
 of that case and packaged agent-deletion proof remain outstanding.
+
+### Inspection of lane results equal to lane main
+
+A completed lane result can be empty while the originating project contains files. Its deletion is
+meaningful relative to the lane input and project main even though the lane-local approval comparison
+has no changes. Agent review submission now falls back to a saved no-change inspection only after
+native reconstruction proves exact equality of the saved actor and verified canonical states.
+
+The existing Review record stores a separate identity: BLAKE3 over the UTF-8 domain
+`mesh.saved-no-change-inspection/v1`, a NUL byte, then four fixed 32-byte fields in order: target
+operation, verified canonical head, derived actor head, and workspace-state digest. No fields are
+omitted or inferred from live files. The empty presentation uses BLAKE3 over the UTF-8 domain
+`mesh.empty-inspection-presentation/v1`. Existing publication bundle identities and encodings remain
+unchanged. Older readers retain the record but cannot reconstruct its presentation or authorize it;
+they report it unavailable. New readers rederive its identity against verified historical bases.
+
+These inspection records use the existing pinned-review and starting-version comparison paths,
+including read-only reopen without worker adoption. A no-change inspection has zero canonical changes;
+its starting-version comparison can still show removed files and exact retained before-content.
+Human approval and publication continue to recompute regular approval bundles and reject no-change
+results. Agent submission, inspection, candidate staging and import do not advance protected main.
+An imported deletion is reviewed separately against the original project's verified main.
+
+Transferred native tests exercise deletion of the only lane file, immutable inspection after later edits,
+refusal of human-approval context/preview, and import into the source project as a genuine one-file
+deletion review. Reopening retained fleet history preserves both inspection and input comparison
+without granting execution ownership. The MCP journey also submits and reads the empty lane result.
+Canonical native execution and packaged verification of this extension remain pending. Historical
+source verification is recorded separately in the migration ledger and is not current-build proof.

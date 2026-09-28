@@ -2087,6 +2087,60 @@ impl OpenWorkspace {
             .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
     }
 
+    /// Saved lane inspection also admits an exact no-change comparison. Its domain-separated
+    /// identity is not an approval bundle: human approval still recomputes publication_review.
+    pub(crate) fn saved_agent_inspection_bundle(
+        &self,
+        target: RecordDigest,
+    ) -> Result<RecordDigest, String> {
+        self.saved_publication_review_bundle(target)
+            .or_else(|original| {
+                let base = self
+                    .shared_version()
+                    .unwrap_or(crate::publication::GENESIS_SHARED_HEAD);
+                self.no_change_inspection(target, base)
+                    .map(|(id, _)| id)
+                    .map_err(|_| original)
+            })
+    }
+
+    fn no_change_inspection(
+        &self,
+        target: RecordDigest,
+        base: mesh_approval::HeadId,
+    ) -> Result<(RecordDigest, mesh_approval::HeadId), String> {
+        self.ensure_physical_root().map_err(|e| e.to_string())?;
+        if base != crate::publication::GENESIS_SHARED_HEAD && !self.has_verified_shared_head(base) {
+            return Err("inspection base is not verified main history".into());
+        }
+        let all = operation_records(&self.record_index);
+        let selected = causal_operation_closure(&all, target)?;
+        let (actor, _) = self.review_workspace_state(selected.clone(), true)?;
+        let head = review_head_for_records(&selected)?;
+        let canonical = if base == crate::publication::GENESIS_SHARED_HEAD {
+            mesh_approval::WorkspaceState::new(actor.root())
+        } else {
+            let records = causal_operation_closure(&all, self.review_target_for_head(base)?)?;
+            if !records.keys().all(|id| selected.contains_key(id)) {
+                return Err("inspection target does not descend from its base".into());
+            }
+            self.review_workspace_state(records, true)?.0
+        };
+        if actor != canonical {
+            return Err("inspection contains changes requiring a regular review bundle".into());
+        }
+        // Fixed-width fields in order: exact operation, verified main, causal head, saved state.
+        let mut bytes = b"mesh.saved-no-change-inspection/v1\0".to_vec();
+        bytes.extend_from_slice(target.as_bytes());
+        bytes.extend_from_slice(base.as_bytes());
+        bytes.extend_from_slice(head.as_bytes());
+        bytes.extend_from_slice(actor.digest().as_bytes());
+        Ok((
+            RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes()),
+            head,
+        ))
+    }
+
     /// Derive a fixed review only against genesis or a head admitted by the trusted approval fold.
     pub(crate) fn saved_publication_review_bundle_at(
         &self,
@@ -2324,6 +2378,9 @@ impl OpenWorkspace {
                     .is_ok_and(|(bundle, _, _)| {
                         bundle.id().digest().as_bytes() == review.bundle.as_bytes()
                     })
+                    || self
+                        .no_change_inspection(review.subject_operation, base)
+                        .is_ok_and(|(id, _)| id == review.bundle)
                 {
                     return Ok(base);
                 }
@@ -2874,6 +2931,36 @@ impl OpenWorkspace {
                     verified_text,
                 ))
             });
+        if projection.is_err() {
+            // Inspection records can show a canonical no-op while the input-relative lane comparison
+            // contains real deletions. They never become publication bundles or approval contexts.
+            if let Ok((id, head)) = self
+                .canonical_head_for_review(&review)
+                .and_then(|base| self.no_change_inspection(review.subject_operation, base))
+            {
+                if id == bundle {
+                    return review_item_json(
+                        bundle,
+                        review,
+                        recorded,
+                        Some(subject),
+                        ReviewItemProjection {
+                            reviewed_head: Some(head.to_string()),
+                            operations,
+                            operations_not_listed,
+                            presentation_digest: Some(
+                                Blake3::digest_bytes(b"mesh.empty-inspection-presentation/v1")
+                                    .to_string(),
+                            ),
+                            bundle_changes: Vec::new(),
+                            bundle_changes_not_listed: 0,
+                            unavailable_code: operation_failure,
+                        },
+                    );
+                }
+            }
+        }
+
         let (
             reviewed_head,
             presentation_digest,

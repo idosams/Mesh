@@ -661,5 +661,11 @@ and graphical approval are not established by source tests.
 Explicit missing-file resolution now connects native deletion adoption to the fleet ledger and harness
 tools. Intent and prepared operation are durable before append; exact retry can reconcile an appended
 operation without signing again or touching later filesystem work. Resolution supplies no approval
-and does not substitute for a fresh complete checkpoint. Directory deletion, canonical no-op review,
-host reconciliation after cancellation and packaged agent-deletion verification remain required.
+and does not substitute for a fresh complete checkpoint. Directory deletion, host reconciliation after cancellation and packaged agent-deletion verification
+remain required. No-change lane inspection is described below.
+
+Deletion-only lane results use inspection-only saved reviews when they equal lane main. Native
+reconstruction must prove exact equality before creating the separate inspection identity. The pinned
+starting-version comparison retains actual deleted content; importing into the original project
+creates a separate review against verified project main. Inspection identities never authorize
+approval or publication. Current canonical runtime and packaged verification remain required.

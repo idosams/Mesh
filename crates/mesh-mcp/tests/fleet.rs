@@ -700,6 +700,45 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
         .unwrap();
     assert_eq!(after.get("complete"), Some(&Json::Bool(true)));
     assert_eq!(after.get("saved_changes"), Some(&Json::Number(0)));
+    let empty_review = call(
+        &mut stdin,
+        &mut stdout,
+        25,
+        "tools/call",
+        tool(
+            "mesh_fleet_submit_review",
+            Json::object([("checkpoint", after.get("checkpoint").unwrap().clone())]),
+        ),
+        token,
+    );
+    let empty_review = empty_review
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    assert_eq!(empty_review.get("recorded"), Some(&Json::Bool(true)));
+    let empty_selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+        &lane,
+        text(after, "checkpoint"),
+        text(after, "version"),
+        text(empty_review, "bundle"),
+    )
+    .unwrap();
+    let empty = service.saved_review(&empty_selection).unwrap();
+    assert_eq!(
+        empty.get("review").unwrap().get("content_complete"),
+        Some(&mesh_daemon::ipc::Json::Bool(true))
+    );
+    assert!(empty
+        .get("review")
+        .unwrap()
+        .get("bundle_changes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(service.saved_review(&selection).unwrap(), pinned);
+
     service.revoke(&credential).unwrap();
     let revoked = call(
         &mut stdin,
@@ -720,7 +759,7 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             fs::read(root.join("source/note.txt")).unwrap(),
             b"original work continues\n"
         );
-        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, native work decision, explicit deletion, exact retry and revoked-session refusal; graphical=false");
+        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, native work decision, explicit deletion, empty-result review, exact retry and revoked-session refusal; graphical=false");
     }
     server.shutdown();
 }

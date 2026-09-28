@@ -3328,7 +3328,7 @@ impl LiveDaemon {
         {
             return Ok(bundle);
         }
-        let bundle = open.saved_publication_review_bundle(target).map_err(|_| {
+        let bundle = open.saved_agent_inspection_bundle(target).map_err(|_| {
             publication_refusal(
                 "agent-review-unavailable",
                 "The exact saved review could not be reconstructed.",

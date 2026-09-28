@@ -176,6 +176,41 @@ fn appended_deletion_without_completion_recovers_without_signing_or_touching_lat
         assert!(inner.runtime.state().file_deletions[&id].result.is_none());
         (workspace, version, receipt.changeset().to_owned())
     };
+    let checkpoint = service
+        .agent_call(
+            credential.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("empty-result"))]),
+        )
+        .unwrap();
+    let review = service
+        .agent_call(
+            credential.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", checkpoint.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let target =
+        RecordDigest::parse_hex(checkpoint.get("version").unwrap().as_text().unwrap()).unwrap();
+    let bundle = RecordDigest::parse_hex(review.get("bundle").unwrap().as_text().unwrap()).unwrap();
+    let identity = exact_state(&workspace).unwrap();
+    workspace
+        .daemon()
+        .with_recorded_lane_review(
+            &identity.root,
+            &identity.installation,
+            bundle,
+            target,
+            |open| {
+                let recorded = open.review(&bundle).unwrap();
+                assert!(open.human_approval_context(&recorded).is_err());
+                assert!(open.human_approval_preview(&recorded).is_err());
+                assert!(open.saved_publication_review_bundle(target).is_err());
+                assert_eq!(open.saved_agent_inspection_bundle(target).unwrap(), bundle);
+                Ok(())
+            },
+        )
+        .unwrap();
     let before = exact_state(&workspace).unwrap();
     fs::write(
         Path::new(&before.root).join("note.txt"),
