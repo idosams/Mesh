@@ -808,19 +808,39 @@ fn taking_a_snapshot_does_not_move_a_counter() {
 
 #[test]
 fn concurrent_recording_is_reported_and_not_smoothed_away() {
+    use std::sync::mpsc;
     use std::sync::Arc;
+    use std::time::Duration;
 
     let registry = Arc::new(Counters::new());
     let target = id("context.task.completions");
+    let (recorded, ready) = mpsc::channel();
+    let (resume, resumed) = mpsc::channel();
     let writer = {
         let registry = Arc::clone(&registry);
         std::thread::spawn(move || {
-            for _ in 0..20_000 {
+            for _ in 0..10_000 {
+                registry.record(target, 1);
+            }
+            recorded.send(()).expect("reader exists");
+            resumed
+                .recv_timeout(Duration::from_secs(10))
+                .expect("reader observed mid-flight state");
+            for _ in 0..10_000 {
                 registry.record(target, 1);
             }
         })
     };
-    let mut snapshots = 0_u64;
+    // Guarantee a real observation before all queued work finishes, even when the OS schedules
+    // the writer first. The remaining half still races the reader as in the original test.
+    ready
+        .recv_timeout(Duration::from_secs(10))
+        .expect("first batch recorded");
+    let halfway = registry.snapshot();
+    assert_eq!(read(&halfway, "context.task.completions"), (10_000, 10_000));
+    assert!(halfway.collection.snapshot_consistent);
+    resume.send(()).expect("writer remains alive");
+    let mut snapshots = 1_u64;
     while !writer.is_finished() {
         let snapshot = registry.snapshot();
         // What is asserted mid-flight is only what the bracketing tally can prove: the window can
