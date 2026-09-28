@@ -4,7 +4,7 @@ use crate::attachment_capture::NativeCaptureSigner;
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
     AttachmentCaptureService, AttachmentPinState, AttachmentStorage, CaptureOutcome, CapturePhase,
-    CaptureSchedule, CaptureStatus, NativeSignalState, ProvisionedAttachment,
+    CaptureSchedule, CaptureStatus, FleetPinState, NativeSignalState, ProvisionedAttachment,
 };
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
@@ -679,6 +679,35 @@ impl AttachmentHost {
         Ok(stored.to_json().encode())
     }
 
+    pub fn load_fleet_pins(&self) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let pins = match &state.storage {
+            Some(storage) => storage
+                .load_fleet_pins()
+                .map_err(|_| "Saved pin selectors need reconciliation")?,
+            None => FleetPinState {
+                revision: 0,
+                pins: Vec::new(),
+            },
+        };
+        Ok(pins.to_json().encode())
+    }
+
+    pub fn save_fleet_pins(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot =
+            FleetPinState::parse_projection(snapshot).map_err(|_| "Invalid pin selectors")?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        let stored = state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_fleet_pins(snapshot.revision, snapshot.pins)
+            .map_err(|_| "Pin state changed or could not be saved")?;
+        Ok(stored.to_json().encode())
+    }
+
     pub fn comparison_path(
         &self,
         id: &str,
@@ -848,6 +877,58 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn fleet_pin_storage_reopens_without_creating_or_adopting_work() {
+        use mesh_daemon::project_attachment::FleetPin;
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-fleet-pins-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let host = AttachmentHost::new(&root);
+        assert_eq!(
+            FleetPinState::parse_projection(&host.load_fleet_pins().unwrap())
+                .unwrap()
+                .revision,
+            0
+        );
+        assert!(!root.join("attached-projects").exists());
+        assert!(host.save_fleet_pins("{}").is_err());
+        assert!(!root.join("attached-projects").exists());
+        let snapshot = FleetPinState {
+            revision: 0,
+            pins: vec![FleetPin {
+                key: "1".into(),
+                objective: format!("fleet-{}", "a".repeat(64)),
+                lane: "worker".into(),
+                checkpoint: "checkpoint".into(),
+                version: "b".repeat(64),
+                bundle: "c".repeat(64),
+                source_version: "d".repeat(64),
+                input_after: None,
+                input_object: None,
+                input_open: false,
+                input_layout: "inline".into(),
+                review_object: None,
+                review_mode: "content".into(),
+                review_layout: "split".into(),
+            }],
+        };
+        let saved = host.save_fleet_pins(&snapshot.to_json().encode()).unwrap();
+        assert!(host.state.lock().unwrap().projects.is_empty());
+        assert!(!root.join("fleets").exists());
+        drop(host);
+        let reopened = AttachmentHost::new(&root);
+        assert_eq!(reopened.load_fleet_pins().unwrap(), saved);
+        assert!(reopened.state.lock().unwrap().projects.is_empty());
+        assert!(reopened
+            .save_fleet_pins(&snapshot.to_json().encode())
+            .is_err());
+        #[cfg(target_os = "macos")]
+        assert!(reopened.current_fleet(&snapshot.pins[0].objective).is_err());
+        assert!(!root.join("fleets").exists());
+        drop(reopened);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn manual_lanes_capture_independently_recover_ancestry_and_preserve_the_source_session() {

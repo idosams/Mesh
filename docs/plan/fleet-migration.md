@@ -178,8 +178,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | [Mesh PR #49](https://github.com/idosams/Mesh/pull/49), `4a6126868cbe26b59c751488e2aa56f4dbe5072f`; 620 local desktop/interface tests passed; all seven hosted checks passed; local full/package validation and human review pending; not merged |
 | R01 | `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` | Read pinned fleet reviews independently of live work | [Mesh PR #50](https://github.com/idosams/Mesh/pull/50), `c2c625a1ff7fe9bfc0acd42f0655e637890f24d7`; all seven hosted checks passed; local native/full and packaged checks pending; not merged |
 | R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | [Mesh PR #51](https://github.com/idosams/Mesh/pull/51), `35f486661ed4aa82ea59327da7cec75e3a2da8f5`; 634 local desktop/interface tests passed; all seven hosted checks passed; not merged |
-| R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | [Mesh PR #52](https://github.com/idosams/Mesh/pull/52), `90be90858d8a8c1271160edc8bdccd3b160c26a5`; hosted/native validation running; not merged |
-| R01 | `5a553e78177cc045f10af15a2da86bdb32c95bf0` | Show starting-version comparisons in pinned fleet reviews | Pending transfer |
+| R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | [Mesh PR #52](https://github.com/idosams/Mesh/pull/52), `90be90858d8a8c1271160edc8bdccd3b160c26a5`; all seven hosted checks passed; not merged |
+| R01 | `5a553e78177cc045f10af15a2da86bdb32c95bf0` | Show starting-version comparisons in pinned fleet reviews | [Mesh PR #53](https://github.com/idosams/Mesh/pull/53), `4fa921244a3c02322114c60e7e09c54764621a06`; 646 local desktop/interface tests passed; hosted checks running; not merged |
 | R01 | `5b9f758c2db294b636bc2bfd9b4eb867a2fcb2ff` | Persist exact fleet review selectors through native storage | Pending transfer |
 | R01 | `20b01d6023616e02e2c9e5cabdc82dc39bb82c3b` | Restore exact fleet review selections and independent view state | Pending transfer |
 | R02 | `b6b388caf30c7ffb1cc4d23f09f7175e0a220089` | Persist verified lane starting versions for history recovery | Pending transfer |
@@ -717,3 +717,27 @@ point. This panel increment still needs hosted checks and exact-revision package
 Selector persistence, restored history/artifacts, correspondence and all integration/recovery phases
 remain in dependency order. Required human review, provider/four-worker/remote acceptance, eventual
 merges and final combined-main testing remain part of completion. Original work is preserved.
+
+## R01e durable native fleet review selectors
+
+Preserved source `5b9f758c2db294b636bc2bfd9b4eb867a2fcb2ff` transfers on published #53 at
+`4fa921244a3c02322114c60e7e09c54764621a06`. The external attachment catalogue stores up to eight
+exact fleet selectors and view choices, separately from existing attachment comparisons. Closed,
+bounded schemas carry no file content or verification/approval authority. Revision-checked updates
+publish a private, identity-bound snapshot through create-only staging, atomic rename and directory
+sync. Foreign/corrupt/linked snapshots and interrupted staging are preserved rather than replaced.
+
+The canonical transfer retains the nonblocking capture state import and all earlier corrections.
+The added exhaustion regression requires a maximum revision to permit only an exact no-op: changed
+or stale snapshots must refuse before staging, retain the acknowledged bytes and survive reopen.
+Transferred coverage includes independent namespaces, malformed/oversized selectors, concurrent
+writers, copied/corrupt/hard-linked/symbolic-linked records and retained interrupted staging. The
+native desktop test proves empty reads create no storage, selector saves create no fleet history,
+and reopen never grants execution context.
+
+Parent #52 has all seven hosted checks passing; #53 is published with hosted validation running.
+This native store still needs native/failing-before/full and hosted validation. The preserved #44
+local full gate remains active on the shared build target. Renderer save/restore follows as a separate
+published increment; visible pins currently remain renderer-session-only. Original work and tests are
+preserved. Restored history/artifacts, correspondence, integration/recovery, full provider/package/
+remote acceptance, required review, eventual merges and final combined-main testing remain required.

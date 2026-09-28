@@ -295,3 +295,24 @@ This increment changes no durable events or workspace encoding. The retained bas
 current native context. Restored unattached fleets still refuse reads; recovery must re-establish the
 verified source-to-local-import binding rather than guess from a current or oldest visible version.
 The comparison is read-only and is not an approval statement or dependency-closure proof.
+
+
+## Durable fleet review navigation
+
+Fleet review selectors have a separate native snapshot in the existing external attachment storage.
+`desktop-fleet-pins.json` uses `mesh.fleet-pins/v1`, bound to the retained catalogue directory identity;
+the desktop projection is `mesh.desktop-fleet-pin-selectors/v1`. Existing attachment pin records and
+schemas are unchanged. This is navigation state, not a fleet lifecycle ledger or content provenance.
+
+At most eight distinct exact objective/lane/checkpoint/version/bundle selections are retained, with
+original input identity, object cursors/selections and closed layout choices. No source path, file
+content, prompt, credential or approval is stored. Syntactically valid selectors may refer to offline
+or unavailable work: native history must reverify them before displaying content, and restoring them
+must not provision contexts, adopt workers or restart execution.
+
+Native reads/writes hold the existing catalogue lock. Saves require the current revision, stage a
+private create-only file, publish atomically and acknowledge only after file/directory durability and
+readback. Concurrent or stale writes refuse. Unknown schema, copied-directory receipts, corrupt records,
+symlinks, hardlinks and partial first writes refuse without replacement. Interrupted staging remains
+for explicit reconciliation; a previous complete snapshot remains readable. This schema does not yet
+provide automatic repair of pending files or recovery of underlying lane/process contexts.

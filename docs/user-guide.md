@@ -323,3 +323,11 @@ That base can differ from the lane's starting version. Both comparisons remain p
 work. Artifact rendering, main approval and integration are not yet connected. Incomplete content
 and omitted changes are labeled explicitly. Pins are retained only in the current app view, not after
 reload. The complete packaged graphical interaction remains unverified.
+
+
+A subsequent native development increment can persist up to eight exact fleet review selectors and
+view choices outside your project, independently of existing attachment comparisons. Saved selectors
+contain no file contents and must be verified against native history before use. Concurrent or
+uncertain writes preserve the last acknowledged snapshot and refuse replacement when reconciliation
+is needed. Loading selectors does not open a project, adopt a worker or approve anything. The renderer
+save/restore connection follows separately; the panels described above still remain session-only.

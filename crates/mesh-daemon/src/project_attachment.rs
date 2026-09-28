@@ -18,7 +18,9 @@ const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
 
 mod detachment;
+mod fleet_pins;
 mod pins;
+pub use fleet_pins::{FleetPin, FleetPinState};
 pub use pins::{AttachmentPin, AttachmentPinState};
 
 mod provisioning;

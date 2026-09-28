@@ -268,3 +268,10 @@ The canonical starting-comparison panels preserve English/Hebrew labels and lite
 with separate wording for saved comparisons and the existing working-copy view. Local type/build,
 132 interface tests and 514 desktop tests pass. Hosted and packaged graphical validation remain
 separate; this increment is unmerged and grants no approval or main-update authority.
+
+Native fleet pin persistence now stores bounded exact selectors and view choices in a separate external
+record with revision checks and atomic publication. It preserves compatibility with attachment pins.
+Native tests cover reopen/removal, concurrent writers, malformed selectors, copied/corrupt/linked
+records and interrupted staging. Desktop commands load/save selectors without creating fleet history,
+opening projects or adopting workers. Renderer save/restore is not connected yet, so current visible
+fleet pins still last only for the app view. Context recovery and packaged graphical proof remain open.
