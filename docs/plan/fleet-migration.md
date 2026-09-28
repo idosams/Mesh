@@ -2271,3 +2271,15 @@ replacement without writes into the replacement, links/oversized partial objects
 external bytes, and ancestor-alias movement into a protected project. Native execution and full
 CI are pending. The [execution contract](fleet-remote-execution-contract.md) retains crash/space,
 authentication, receiving lifecycle, result reconciliation and actual second-machine requirements.
+
+## R09 atomic insertion provenance for receiving ownership
+
+New canonical implementation based on #123 at
+`ee3b2d3de91be911502211604499962484141b86`; no preserved source commits are replaced.
+The existing transactional fleet store now exposes inserted-versus-replayed outcomes without
+changing its schema, receipt encoding or legacy append behavior. This supplies a required building
+block for the receiving attempt registry; it is not the registry, a launch permit, or remote execution.
+Three added regressions cover identical concurrent requests, restart/later-write replay, and authority
+loss after independently observed durable commit. Native execution/full CI remain pending. The
+[execution contract](fleet-remote-execution-contract.md) retains all receiving lifecycle and acceptance
+requirements.

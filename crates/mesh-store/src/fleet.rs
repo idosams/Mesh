@@ -28,6 +28,24 @@ pub struct FleetEvent {
     pub payload: String,
 }
 
+/// Result of this writer transaction, distinct from the durable event being recovered.
+/// This is a storage fact, not authentication, policy approval or an execution permit.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FleetAppendOutcome {
+    /// This call inserted and committed the event, then passed the final authority check.
+    Inserted(FleetEvent),
+    /// An identical earlier event was recovered; no new external effect is authorized.
+    Replayed(FleetEvent),
+}
+impl FleetAppendOutcome {
+    /// Recover the ordinary durable receipt when the caller does not need insertion provenance.
+    pub fn into_event(self) -> FleetEvent {
+        match self {
+            Self::Inserted(event) | Self::Replayed(event) => event,
+        }
+    }
+}
+
 /// Failure to read or atomically advance the control ledger.
 #[derive(Debug)]
 pub enum FleetStoreError {
@@ -229,6 +247,22 @@ impl FleetStore {
         request: &str,
         payload: &str,
     ) -> Result<FleetEvent, FleetStoreError> {
+        self.append_with_outcome(stream, expected_revision, request, payload)
+            .map(FleetAppendOutcome::into_event)
+    }
+
+    /// Append with an atomic distinction between a new commit and recovery of an old receipt.
+    /// The distinction is made under the same writer transaction as lookup and insertion; a
+    /// separate caller-side lookup cannot safely replace it. A post-commit authority failure
+    /// returns an error, not Inserted, and a later identical retry is Replayed. Callers must
+    /// retain that uncertainty rather than interpreting replay as a second grant to execute.
+    pub fn append_with_outcome(
+        &mut self,
+        stream: &str,
+        expected_revision: u64,
+        request: &str,
+        payload: &str,
+    ) -> Result<FleetAppendOutcome, FleetStoreError> {
         self.check_authority()?;
         valid_id(stream)?;
         valid_id(request)?;
@@ -253,12 +287,12 @@ impl FleetStore {
                 return Err(FleetStoreError::RequestConflict);
             }
             check_authority(self.authority.as_deref())?;
-            return Ok(FleetEvent {
+            return Ok(FleetAppendOutcome::Replayed(FleetEvent {
                 stream: stream.to_owned(),
                 revision,
                 request: request.to_owned(),
                 payload: saved,
-            });
+            }));
         }
         let actual: u64 = tx.query_row(
             "SELECT coalesce(max(revision), 0) FROM fleet_events WHERE stream = ?1",
@@ -276,12 +310,12 @@ impl FleetStore {
         check_authority(self.authority.as_deref())?;
         tx.commit()?;
         self.check_authority()?;
-        Ok(FleetEvent {
+        Ok(FleetAppendOutcome::Inserted(FleetEvent {
             stream: stream.to_owned(),
             revision,
             request: request.to_owned(),
             payload: payload.to_owned(),
-        })
+        }))
     }
 
     /// Read a bounded ordered page after the supplied cursor. Events are never consumed by reads.
@@ -439,6 +473,127 @@ mod tests {
             FleetStore::open(dir.db()).unwrap().revision("o").unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn identical_concurrent_requests_report_one_insert_and_one_replay() {
+        let dir = Directory::new();
+        let stores = [
+            FleetStore::open(dir.db()).unwrap(),
+            FleetStore::open(dir.db()).unwrap(),
+        ];
+        let barrier = Arc::new(Barrier::new(2));
+        let handles: Vec<_> = stores
+            .into_iter()
+            .map(|mut store| {
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    store.append_with_outcome("o", 0, "same-request", "launch-intent")
+                })
+            })
+            .collect();
+        let results: Vec<_> = handles
+            .into_iter()
+            .map(|h| h.join().unwrap().unwrap())
+            .collect();
+        assert_eq!(
+            results
+                .iter()
+                .filter(|r| matches!(r, FleetAppendOutcome::Inserted(_)))
+                .count(),
+            1
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|r| matches!(r, FleetAppendOutcome::Replayed(_)))
+                .count(),
+            1
+        );
+        let events: Vec<_> = results
+            .into_iter()
+            .map(FleetAppendOutcome::into_event)
+            .collect();
+        assert_eq!(events[0], events[1]);
+        assert_eq!(
+            FleetStore::open(dir.db()).unwrap().revision("o").unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn lost_insert_reply_is_only_replayed_after_restart_and_later_writes() {
+        let dir = Directory::new();
+        {
+            let mut store = FleetStore::open(dir.db()).unwrap();
+            assert!(matches!(
+                store.append_with_outcome("o", 0, "intent", "launch"),
+                Ok(FleetAppendOutcome::Inserted(_))
+            ));
+            store.append("o", 1, "later", "observation").unwrap();
+        }
+        let mut reopened = FleetStore::open(dir.db()).unwrap();
+        let outcome = reopened
+            .append_with_outcome("o", 0, "intent", "launch")
+            .unwrap();
+        assert!(matches!(outcome, FleetAppendOutcome::Replayed(_)));
+        assert_eq!(outcome.into_event().revision, 1);
+        assert!(matches!(
+            reopened.append_with_outcome("o", 0, "intent", "changed"),
+            Err(FleetStoreError::RequestConflict)
+        ));
+        assert_eq!(reopened.revision("o").unwrap(), 2);
+    }
+
+    #[derive(Debug)]
+    struct RevokeAfterDurableCommit {
+        path: std::path::PathBuf,
+        armed: std::sync::atomic::AtomicBool,
+    }
+    impl FleetStoreAuthority for RevokeAfterDurableCommit {
+        fn check(&self) -> Result<(), FleetStoreError> {
+            if !self.armed.load(Ordering::SeqCst) {
+                return Ok(());
+            }
+            // Another SQLite connection observes only durable committed rows, not this writer's
+            // uncommitted insert. Revoke based on independent evidence, not a check-call counter.
+            let connection = Connection::open_with_flags(
+                &self.path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )?;
+            let count: u64 =
+                connection.query_row("SELECT count(*) FROM fleet_events", [], |row| row.get(0))?;
+            if count > 0 {
+                Err(FleetStoreError::AuthorityChanged)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    #[test]
+    fn post_commit_authority_loss_returns_no_insert_outcome_and_retry_only_replays() {
+        let dir = Directory::new();
+        let path = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let authority = Arc::new(RevokeAfterDurableCommit {
+            path: path.clone(),
+            armed: std::sync::atomic::AtomicBool::new(false),
+        });
+        let mut store = FleetStore::open_guarded(&path, true, authority.clone()).unwrap();
+        authority.armed.store(true, Ordering::SeqCst);
+        assert!(matches!(
+            store.append_with_outcome("o", 0, "intent", "launch"),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        drop(store);
+        // The test's independently admitted fixture can inspect the committed event. Production
+        // must reestablish native authority first; this does not authorize bypassing a failed guard.
+        let mut inspected = FleetStore::open(path).unwrap();
+        assert_eq!(inspected.revision("o").unwrap(), 1);
+        assert!(matches!(
+            inspected.append_with_outcome("o", 0, "intent", "launch"),
+            Ok(FleetAppendOutcome::Replayed(_))
+        ));
     }
 
     #[test]

@@ -158,3 +158,18 @@ at the cost of another verified mapping. Start with bounded transfers and existi
 revisit throughput, connection pooling, fair scheduling, retention and fleet-wide resource budgets only
 after measured second-machine behavior. None of those optimizations may weaken ownership or receipt
 semantics. This contract is planned integration work; it does not change current supported capability.
+
+## Atomic commit versus replay
+
+The receiving lifecycle must use a transaction outcome that distinguishes insertion from replay.
+The store's additive `append_with_outcome` API now returns `Inserted` only after the insert commits
+and the final authority check succeeds. An identical request recovered in the same writer transaction
+returns `Replayed`, including after restart and later events. The existing `append` API still returns
+the ordinary durable event and remains suitable for callers that do not mint external effects.
+
+This outcome is a storage fact, not a launch capability or caller authentication. The future worker
+registry must validate current assignment, workspace, limits and ownership before committing intent,
+and grant a non-replayable launch permit only for the original successful insertion. If authority is
+lost after commit, the call returns an error; a later receipt recovery remains replay and cannot be
+used to infer that no process started or to authorize another launch. A separate pre-read is not an
+atomic substitute, because concurrent identical requests can both miss an earlier receipt.
