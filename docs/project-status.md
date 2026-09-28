@@ -733,3 +733,11 @@ complete confirmation of retained and current work, then rechecks project genera
 and native inputs. It refuses incomplete or unrenderable confirmation. The renderer
 has no restoration controls for this command yet. Native test execution and actual
 packaged dialog evidence remain pending; no merged-delivery claim follows.
+
+### Whole-entry restart discovery (unmerged increment)
+
+Native recovery pages can now discover whole-entry transactions separately from
+ordinary file restorations and inspect an exact selected record through its native
+validator. Listings are bounded and do not treat names as trusted receipts. The
+existing desktop inspection commands use this path; renderer controls are still
+pending. Native regression execution and packaged restart evidence remain required.

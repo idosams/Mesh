@@ -48,7 +48,7 @@ fn private(root: &PinnedWorkspaceRoot) -> io::Result<()> {
     }
     Ok(())
 }
-fn transaction(value: &str) -> bool {
+pub(super) fn transaction(value: &str) -> bool {
     value.strip_prefix("entry-restoration-").is_some_and(|id| {
         id.len() == 32
             && id

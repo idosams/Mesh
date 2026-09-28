@@ -806,3 +806,8 @@ Whole-entry restoration now has native desktop consent and command wiring in sou
 The remaining restoration path is discovery, localized presentation, renderer actions
 and explicit undo, followed by native and packaged verification. All broader fleet,
 provider, remote recovery and final merged-main requirements remain unchanged.
+
+Native restart discovery now includes bounded whole-entry references and exact
+validated inspection for direct and grouped recovery. The next increment connects
+localized recovery presentation and restoration/undo actions; this source work does
+not satisfy packaged restart or complete fleet acceptance by itself.

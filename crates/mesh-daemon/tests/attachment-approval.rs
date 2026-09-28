@@ -3927,3 +3927,155 @@ fn entry_restoration_refuses_changed_private_work_staging_and_untrusted_origins(
         }
     }
 }
+
+#[test]
+fn whole_entry_discovery_reopens_exact_records_without_treating_names_as_authority() {
+    for grouped in [false, true] {
+        let (f, _, trust, bundle, target, outer) =
+            approved_entry_conversion(&format!("entry-discovery-{grouped}"), false);
+        let (root, origin, group_id) = if grouped {
+            let prepared = f
+                .history
+                .prepare_main_integration(
+                    &bundle,
+                    &target,
+                    &outer,
+                    &trust,
+                    ObservationLimits::default(),
+                )
+                .unwrap();
+            let root = prepared.recovery_path().to_owned();
+            let origin = prepared
+                .directories()
+                .next()
+                .unwrap()
+                .recovery_path()
+                .to_owned();
+            let id = root.file_name().unwrap().to_str().unwrap().to_owned();
+            prepared.apply(&trust).unwrap();
+            (root, origin, Some(id))
+        } else {
+            let prepared = f
+                .history
+                .prepare_main_entry_conversion(
+                    &bundle,
+                    &target,
+                    "entry",
+                    &outer,
+                    &trust,
+                    ObservationLimits::default(),
+                )
+                .unwrap();
+            let origin = prepared.recovery_path().to_owned();
+            prepared.apply(&trust).unwrap();
+            (outer.clone(), origin, None)
+        };
+        let original_id = origin.file_name().unwrap().to_str().unwrap();
+        let journal = f.journal();
+        let prepared = f
+            .history
+            .prepare_retained_entry_restoration(
+                &root,
+                original_id,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        let restored = prepared.recovery_path().to_owned();
+        let restored_id = restored.file_name().unwrap().to_str().unwrap();
+        prepared.apply(&trust).unwrap();
+        let page = f
+            .history
+            .inspect_integration_recovery(&root, None, &trust, ObservationLimits::default())
+            .unwrap();
+        let references = page
+            .get("entry_references")
+            .and_then(Json::as_array)
+            .unwrap();
+        assert!(references.contains(&Json::text(original_id)));
+        assert!(references.contains(&Json::text(restored_id)));
+        assert_eq!(page.get("write_authority"), Some(&Json::Bool(false)));
+        for (id, schema) in [
+            (original_id, "mesh.attachment-entry-conversion-recovery/v1"),
+            (restored_id, "mesh.attachment-entry-restoration-recovery/v1"),
+        ] {
+            let selected = f
+                .history
+                .inspect_integration_recovery(&root, Some(id), &trust, ObservationLimits::default())
+                .unwrap();
+            assert_eq!(selected.get("schema"), Some(&Json::text(schema)));
+            assert_eq!(selected.get("write_authority"), Some(&Json::Bool(false)));
+        }
+        if let Some(group) = group_id {
+            let reopened = f
+                .history
+                .inspect_main_integration_group(
+                    &outer,
+                    &group,
+                    &trust,
+                    ObservationLimits::default(),
+                )
+                .unwrap();
+            assert!(reopened
+                .get("entry_restoration_references")
+                .and_then(Json::as_array)
+                .unwrap()
+                .contains(&Json::text(restored_id)));
+            assert!(!reopened
+                .get("restoration_references")
+                .and_then(Json::as_array)
+                .unwrap()
+                .contains(&Json::text(restored_id)));
+        }
+        let fake = format!("entry-restoration-{}", "f".repeat(32));
+        fs::create_dir(root.join(&fake)).unwrap();
+        let page = f
+            .history
+            .inspect_integration_recovery(&root, None, &trust, ObservationLimits::default())
+            .unwrap();
+        assert!(page
+            .get("entry_references")
+            .and_then(Json::as_array)
+            .unwrap()
+            .contains(&Json::text(&fake)));
+        for id in [
+            fake.as_str(),
+            "../entry-restoration",
+            "entry-restoration-INVALID",
+        ] {
+            assert!(f
+                .history
+                .inspect_integration_recovery(&root, Some(id), &trust, ObservationLimits::default())
+                .is_err());
+        }
+        let bounded = f
+            .history
+            .inspect_integration_recovery(
+                &root,
+                None,
+                &trust,
+                ObservationLimits {
+                    entries: 1,
+                    ..ObservationLimits::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(bounded.get("more"), Some(&Json::Bool(true)));
+        assert!(
+            bounded
+                .get("entries")
+                .and_then(Json::as_array)
+                .unwrap()
+                .len()
+                + bounded
+                    .get("entry_references")
+                    .and_then(Json::as_array)
+                    .unwrap()
+                    .len()
+                <= 1
+        );
+        assert_eq!(f.journal(), journal);
+        assert!(origin.join("exchange").exists());
+        assert!(restored.join("exchange").exists());
+    }
+}

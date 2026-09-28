@@ -899,3 +899,19 @@ the host generation and native inputs; it does not approve Mesh main. Replies us
 and native outcome. Renderer actions and recovery discovery are not connected in
 this increment. Automated native execution and an actual packaged dialog remain
 separate acceptance requirements.
+
+## Bounded whole-entry restart discovery
+
+Ordinary recovery pages now include a separate `entry_references` array for canonical
+directory and whole-entry restoration transaction names. Group recovery keeps
+ordinary file `restoration_references` unchanged and adds
+`entry_restoration_references`. Both use the existing bounded directory prefix and
+continuation warning; a reference is not proof that its receipt exists or is trusted.
+Selected inspection dispatches to the exact native directory or restoration reader
+before acquiring the ordinary-file history lock. This avoids recursive locking and
+retains ancestry, path, private-storage and content-budget validation.
+
+Existing desktop inspection commands reach this dispatch without accepting a
+renderer-supplied filesystem path. Older renderers can ignore the additive arrays;
+whole-entry presentation and actions require the following renderer increment.
+Discovery never provisions recovery storage, applies changes or advances main.

@@ -1905,3 +1905,17 @@ refusal. These native tests await execution; #102's full verification still owns
 shared build target. Source checks do not establish native-dialog or packaged
 acceptance. Renderer commands, discovery, localized recovery and explicit undo
 remain the next phase.
+
+## I07c bounded whole-entry recovery discovery
+
+New canonical implementation based on #104 at
+`ab46c6fed087af8a7e54418233a60cdef50e6339`. Native recovery pages expose separate
+whole-entry references, and exact selection delegates to the native receipt
+inspector before the ordinary-file history lock. Group references remain distinct
+from ordinary file restoration. No source commit is replaced by this new work.
+
+A native regression covers direct and grouped conversion/restoration, reopening
+both exact record types, unchanged Mesh history, bounded listing, and canonical
+names without valid receipts. Names remain references, not authority. Native
+execution and failing-before proof are pending behind #102's live full validation;
+renderer presentation and packaged acceptance still follow.

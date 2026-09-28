@@ -927,6 +927,12 @@ pub(super) fn inspect(
         .filter(|name| name.starts_with("restoration-") && transaction(name))
         .map(Json::text)
         .collect();
+    let entry_restorations: Vec<_> = children
+        .iter()
+        .filter_map(|name| name.to_str())
+        .filter(|name| super::entry_restoration::transaction(name))
+        .map(Json::text)
+        .collect();
     let execution_after = execution::Snapshot::read(&root, members.len());
     root.ensure_namespace_identity()?;
     outer.ensure_namespace_identity()?;
@@ -947,6 +953,10 @@ pub(super) fn inspect(
             execution_before.projection(&execution_after, &proposal),
         ),
         ("restoration_references", Json::Array(restorations)),
+        (
+            "entry_restoration_references",
+            Json::Array(entry_restorations),
+        ),
         (
             "more_restoration_references_may_exist",
             Json::Bool(more_restorations),

@@ -758,6 +758,30 @@ pub(super) fn inspect_recovery(
     limits: ObservationLimits,
 ) -> io::Result<Json> {
     limits.validate()?;
+    // Exact native inspectors acquire their own history lock. Dispatch before entering the
+    // ordinary-file inspection lock; references alone never establish valid receipts.
+    if let Some(id) = selected {
+        if super::entry_restoration::transaction(id) {
+            return super::entry_restoration::inspect(
+                history,
+                store,
+                recovery_root,
+                id,
+                trusted,
+                limits,
+            );
+        }
+        if super::directory_writeback::transaction(id) {
+            return super::directory_writeback::inspect(
+                history,
+                store,
+                recovery_root,
+                id,
+                trusted,
+                limits,
+            );
+        }
+    }
     if selected.is_some_and(|id| !transaction(id)) {
         return Err(invalid("invalid recovery transaction identity"));
     }
@@ -779,7 +803,15 @@ pub(super) fn inspect_recovery(
             };
             let mut remaining = limits.bytes;
             let mut entries = Vec::new();
+            let mut entry_references = Vec::new();
             for name in names.iter().take(page) {
+                if let Some(id) = name.to_str().filter(|id| {
+                    super::entry_restoration::transaction(id)
+                        || super::directory_writeback::transaction(id)
+                }) {
+                    entry_references.push(Json::text(id));
+                    continue;
+                }
                 if let Some(id) = name.to_str().filter(|id| group_identity(id)) {
                     // Discovery is only a reference, never a verified group or mutation capability.
                     entries.push(report(id, "group-reference", Json::Null));
@@ -808,6 +840,7 @@ pub(super) fn inspect_recovery(
                 ),
                 ("project", Json::text(history.id())),
                 ("entries", Json::Array(entries)),
+                ("entry_references", Json::Array(entry_references)),
                 ("more", Json::Bool(more)),
                 ("live_content_budget_remaining", Json::Number(remaining)),
                 ("automatic_replay", Json::Bool(false)),
