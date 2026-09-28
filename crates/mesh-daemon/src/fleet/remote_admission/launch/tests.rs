@@ -363,9 +363,10 @@ fn lost_authority_after_durable_intent_grants_nothing_and_restart_does_not_regra
         observer: Mutex::new(FleetStore::open(fixture.0.join("worker.sqlite")).unwrap()),
         stream: fixture.registry().launch_stream("assignment"),
     });
-    let mut guarded = registry(
-        FleetStore::open_guarded(&fixture.0.join("worker.sqlite"), false, authority).unwrap(),
-    );
+    // Guarded opens require a native-resolved parent; macOS temp_dir may use /var's alias.
+    // Keep the final database entry unresolved so SQLite still rejects symbolic ledger files.
+    let path = fixture.0.canonicalize().unwrap().join("worker.sqlite");
+    let mut guarded = registry(FleetStore::open_guarded(&path, false, authority).unwrap());
     assert!(matches!(
         guarded.claim_launch_record(proposed.clone(), 100),
         Err(Error::Store(FleetStoreError::AuthorityChanged))
