@@ -770,3 +770,7 @@ Remote execution remains unfinished. Its review branch now adds durable assignme
 and lease correlation to existing dispatches, preserving uncertain ownership through
 restart and refusing stale renewals or local relaunch. Authentication, verified
 transfer, remote executor integration and second-machine acceptance are still pending.
+A native single-use worker challenge now binds the configured peer key to the exact
+pending remote assignment before recording its claim. It verifies signatures and
+freshness but does not establish a mutually authenticated connection or start a
+remote process. Full remote transfer/execution/reconnect acceptance remains pending.

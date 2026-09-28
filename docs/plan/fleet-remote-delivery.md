@@ -49,3 +49,26 @@ has no wall-clock authority. A renewed record remains uncertain until the native
 transport reconciles it. The same request can recover its original durable receipt,
 but this is never a second grant to launch. Sequence exhaustion refuses. An expired
 assignment is retained and cannot be reused by another lane, worker or local host.
+
+## Assignment worker proof
+
+The next increment supplies a native single-use challenge for a still-unclaimed
+allocated dispatch. Native configuration supplies the expected worker key separately
+from the proposed assignment. An OS-random nonce and a distinct signing domain bind
+that key to the objective, lane/run, immutable version and bundle, assignment/lease,
+provider and goal. Native paths are retained for local context revalidation and are
+not included in the task-bearing challenge. Never log the challenge body.
+
+The challenge expires at the earlier of thirty seconds or the assignment deadline.
+Backward clock observations refuse. The consumed reply must verify through Mesh's
+strict Ed25519 implementation; then native code refreshes the durable context and
+uses the current revision for the claim. A changed attempt, cancellation, competing
+claim, substituted key, nonce, bundle or domain refuses without claiming execution.
+Losing a challenge on restart requires fresh proof and does not adopt a worker.
+
+This proves possession of the configured worker key for one pending assignment and
+records ownership only. It does not authenticate the coordinator to the worker,
+protect a transport, prove transfer completeness, spawn a process, authorize a lease
+renewal, trust results or approve main. Native peer/key provisioning, mutual transport
+authentication and the remaining delivery steps above are still required. The lower
+level ledger commands remain trusted-native primitives; a peer reply cannot call them.

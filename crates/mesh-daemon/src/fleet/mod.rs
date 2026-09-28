@@ -21,6 +21,10 @@ mod file_deletions;
 pub mod provider;
 mod remote;
 #[cfg(unix)]
+mod remote_peer;
+#[cfg(unix)]
+pub use remote_peer::RemotePeerChallenge;
+#[cfg(unix)]
 pub mod service;
 mod wire;
 pub use file_deletions::{FileDeletion, FileDeletionResult};

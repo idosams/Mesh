@@ -2096,3 +2096,15 @@ terminal/cancelled runs. Closed wire tests reject injected and fractional fields
 The [remote delivery sequence](fleet-remote-delivery.md) identifies the remaining
 authentication, transfer, executor, reconnect, UI and second-machine acceptance work.
 No remote execution, authentication or verified transfer is claimed by this reducer.
+
+## R02 single-use assignment worker proof
+
+New canonical implementation based on #114 at
+`02cad17eb9814ef5a53df9a1bee41a4e1f10dc36`; no preserved source commit is replaced.
+The native RemotePeerChallenge binds OS randomness, the configured worker key, exact
+pending context and an expiring assignment under its own signing domain. Strict
+verification precedes a revision-checked claim; failed/expired or competing replies
+cannot grant another launch. Tests use actual Ed25519 signatures and SQLite records
+for durable success and nonce/key/domain/bundle/context/time/cancellation refusal.
+The source exposes no network or renderer entry point and does not claim mutual
+transport authentication, verified input transfer or actual remote execution.
