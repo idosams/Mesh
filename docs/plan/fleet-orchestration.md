@@ -713,3 +713,11 @@ Both removal and replacement origins retain verified ancestry and read-only rest
 The single-file native confirmation describes creation explicitly. Directory operations, complete
 group confirmation/recovery and packaged graphical proof remain required; earlier absent-path
 restoration gaps above are superseded for regular files with existing parents.
+
+
+Native desktop commands now support complete regular-file group confirmation, verified group/member
+recovery inspection and explicit retained-member restoration. Every changed file must fit the native
+preview; project/folder labels remain literal. The host rechecks the project generation after consent.
+This is the native host increment only: renderer controls, current native execution and packaged
+graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
+local FSEvents registration failure is not resolved by these commands.

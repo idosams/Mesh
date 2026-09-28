@@ -2502,12 +2502,44 @@ mod desktop {
         id: String,
         transaction: String,
     ) -> Result<String, String> {
+        restore_retained_file(app, host, id, transaction, None)
+    }
+
+    #[tauri::command(async)]
+    fn restore_attached_group_file(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        group: String,
+        transaction: String,
+    ) -> Result<String, String> {
+        restore_retained_file(app, host, id, transaction, Some(group))
+    }
+
+    fn restore_retained_file(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        transaction: String,
+        group: Option<String>,
+    ) -> Result<String, String> {
         let (history, generation) = host.file_change_history(&id)?;
         let trust = attachment_review_trust();
-        let root = history
+        let mut root = history
             .file_recovery_root(false)
             .map_err(|_| "File recovery storage is unavailable")?
             .ok_or("There are no retained files for this project")?;
+        if let Some(group) = &group {
+            history
+                .inspect_main_integration_group(
+                    &root,
+                    group,
+                    &trust,
+                    mesh_daemon::project_attachment::ObservationLimits::default(),
+                )
+                .map_err(|_| "The recovery group could not be verified")?;
+            root = root.join(group);
+        }
         let prepared = history.prepare_retained_restoration(
             &root, &transaction, &trust,
             mesh_daemon::project_attachment::ObservationLimits::default(),
@@ -2537,7 +2569,94 @@ mod desktop {
         }
         let outcome = host.confirm_file_change(&id, generation, || prepared.apply(&attachment_review_trust())
             .map_err(|_| "Restoration was not confirmed. Inspect recovery before retrying; working files may have changed.".to_owned()))?;
-        Ok(crate::attachment_recovery::result(&id, &next, outcome))
+        let result = crate::attachment_recovery::result(&id, &next, outcome);
+        if let Some(group) = group {
+            let mut value = mesh_daemon::ipc::Json::parse(&result)
+                .map_err(|_| "Native restoration result unavailable")?;
+            if let mesh_daemon::ipc::Json::Object(fields) = &mut value {
+                fields.push(("group".into(), mesh_daemon::ipc::Json::text(group)));
+            }
+            Ok(value.encode())
+        } else {
+            Ok(result)
+        }
+    }
+
+    #[tauri::command]
+    async fn inspect_attached_group_recovery(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        group: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.group_recovery(&id, &group, &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| "Group recovery inspection stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn inspect_attached_group_file(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        group: String,
+        transaction: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.group_file_recovery(&id, &group, &transaction, &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| "Group file inspection stopped".to_owned())?
+    }
+
+    #[tauri::command(async)]
+    fn apply_attached_main_group(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        bundle: String,
+        target: String,
+    ) -> Result<String, String> {
+        use mesh_daemon::ipc::Json;
+        let (history, generation) = host.file_change_history(&id)?;
+        let root = history
+            .file_recovery_root(true)
+            .map_err(|_| "Private recovery storage is unavailable")?
+            .ok_or("Private recovery storage is unavailable")?;
+        let prepared = history.prepare_main_integration(&bundle, &target, &root, &attachment_review_trust(), mesh_daemon::project_attachment::ObservationLimits::default())
+            .map_err(|_| "This complete review cannot currently be applied. Refresh the comparison and resolve divergent files. Directory changes require further support.")?;
+        let group = crate::attachment_recovery::transaction_id(prepared.recovery_path())?;
+        let prompt = crate::attachment_recovery::group_confirmation(
+            &id,
+            history.project().root(),
+            &prepared,
+        )?;
+        if !app
+            .dialog()
+            .message(prompt)
+            .title("Apply accepted changes")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Apply these changes".into(),
+                "Cancel".into(),
+            ))
+            .blocking_show()
+        {
+            return Err("Application was cancelled; the prepared group remains in recovery".into());
+        }
+        let outcome = host.confirm_file_change(&id, generation, || prepared.apply(&attachment_review_trust())
+            .map_err(|_| "The group outcome is uncertain. Inspect recovery before retrying; some working files may have changed.".to_owned()))?;
+        Ok(Json::object([
+            (
+                "schema",
+                Json::text("mesh.desktop-attachment-group-change/v1"),
+            ),
+            ("project", Json::text(id)),
+            ("group", Json::text(group)),
+            ("outcome", outcome),
+        ])
+        .encode())
     }
 
     #[tauri::command(async)]
@@ -7584,7 +7703,11 @@ mod desktop {
                 open_attached_version_lane,
                 open_attached_folder,
                 restore_attached_retained_file,
+                restore_attached_group_file,
                 apply_attached_main_file,
+                apply_attached_main_group,
+                inspect_attached_group_recovery,
+                inspect_attached_group_file,
                 load_attachment_pins,
                 save_attachment_pins,
                 load_fleet_review_outbox,

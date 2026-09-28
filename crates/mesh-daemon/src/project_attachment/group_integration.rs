@@ -454,14 +454,7 @@ pub(super) fn inspect(
 ) -> io::Result<Json> {
     use super::recovery::{read_json, text, transaction};
     limits.validate()?;
-    let suffix = id
-        .strip_prefix("integration-group-")
-        .ok_or_else(|| invalid("invalid group identity"))?;
-    if suffix.len() != 32
-        || !suffix
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
+    if !super::recovery::group_identity(id) {
         return Err(invalid("invalid group identity"));
     }
     let outer = external_store(recovery_root, history.project())?;
@@ -616,6 +609,15 @@ pub(super) fn inspect(
             ("recovery", observed),
         ]));
     }
+    let (children, more_restorations) = root
+        .filesystem()
+        .read_directory_prefix(Path::new(""), 32.min(limits.entries))?;
+    let restorations: Vec<_> = children
+        .iter()
+        .filter_map(|name| name.to_str())
+        .filter(|name| name.starts_with("restoration-") && transaction(name))
+        .map(Json::text)
+        .collect();
     root.ensure_namespace_identity()?;
     outer.ensure_namespace_identity()?;
     if read_json(&root, "group-prepared.json")?.0 != proposal {
@@ -630,6 +632,11 @@ pub(super) fn inspect(
         ("group", Json::text(id)),
         ("proposal_digest", Json::text(digest(&proposal))),
         ("members", Json::Array(observations)),
+        ("restoration_references", Json::Array(restorations)),
+        (
+            "more_restoration_references_may_exist",
+            Json::Bool(more_restorations),
+        ),
         ("already_present", Json::Array(present.to_vec())),
         ("already_present_is_preparation_evidence", Json::Bool(true)),
         ("observations_are_atomic", Json::Bool(false)),

@@ -65,6 +65,11 @@ pub(super) fn transaction(value: &str) -> bool {
         .or_else(|| value.strip_prefix("restoration-"))
         .is_some_and(|id| hex(id, 32))
 }
+pub(super) fn group_identity(value: &str) -> bool {
+    value
+        .strip_prefix("integration-group-")
+        .is_some_and(|id| hex(id, 32))
+}
 const RESTORE_KEYS: &[&str] = &[
     "installed_metadata_digest",
     "origin_transaction",
@@ -696,6 +701,12 @@ fn inspect(
         ("recorded_outcome", Json::text(outcome)),
         ("source", evidence(&source)),
         ("retained", evidence(&retained)),
+        (
+            "retained_file_is_displaced",
+            Json::Bool(retained.as_ref().is_some_and(|item| {
+                value.get("source_file").and_then(Json::as_text) == Some(item.installation.as_str())
+            })),
+        ),
         ("current_exclusions_checked", Json::Bool(false)),
     ]);
     if removing || adding {
@@ -760,6 +771,11 @@ pub(super) fn inspect_recovery(
             let mut remaining = limits.bytes;
             let mut entries = Vec::new();
             for name in names.iter().take(page) {
+                if let Some(id) = name.to_str().filter(|id| group_identity(id)) {
+                    // Discovery is only a reference, never a verified group or mutation capability.
+                    entries.push(report(id, "group-reference", Json::Null));
+                    continue;
+                }
                 let Some(id) = name.to_str().filter(|name| transaction(name)) else {
                     entries.push(report("", "unrecognized-directory-entry", Json::Null));
                     continue;

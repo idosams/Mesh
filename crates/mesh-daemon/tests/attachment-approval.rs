@@ -2496,3 +2496,90 @@ fn replacement_retained_work_can_be_restored_after_the_installed_path_disappears
     assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
     assert_eq!(fs::read(root.join(id).join("exchange")).unwrap(), b"base");
 }
+
+#[test]
+fn group_catalogue_is_only_a_reference_and_native_member_evidence_identifies_displaced_files() {
+    let (f, trust, root, id) = removed_file_for_restoration("group-catalogue");
+    let outer = root.parent().unwrap();
+    let group = root.file_name().unwrap().to_str().unwrap();
+    let catalogue = f
+        .history
+        .inspect_integration_recovery(outer, None, &trust, ObservationLimits::default())
+        .unwrap();
+    let reference = catalogue
+        .get("entries")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry.get("transaction") == Some(&Json::text(group)))
+        .unwrap();
+    assert_eq!(
+        reference.get("status"),
+        Some(&Json::text("group-reference"))
+    );
+    assert_eq!(reference.get("details"), Some(&Json::Null));
+    assert_eq!(reference.get("write_authority"), Some(&Json::Bool(false)));
+    let evidence = f
+        .history
+        .inspect_main_integration_group(outer, group, &trust, ObservationLimits::default())
+        .unwrap();
+    let member = &evidence.get("members").unwrap().as_array().unwrap()[0];
+    let entry = &member
+        .get("recovery")
+        .unwrap()
+        .get("entries")
+        .unwrap()
+        .as_array()
+        .unwrap()[0];
+    assert_eq!(
+        entry
+            .get("details")
+            .unwrap()
+            .get("retained_file_is_displaced"),
+        Some(&Json::Bool(true))
+    );
+    let restored = f
+        .history
+        .prepare_retained_restoration(&root, &id, &trust, ObservationLimits::default())
+        .unwrap();
+    let tx = restored
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let inspect = || {
+        f.history
+            .inspect_integration_recovery(&root, Some(&tx), &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    let staged = inspect();
+    let entry = &staged.get("entries").unwrap().as_array().unwrap()[0];
+    assert_eq!(
+        entry
+            .get("details")
+            .unwrap()
+            .get("retained_file_is_displaced"),
+        Some(&Json::Bool(false))
+    );
+    restored.apply(&trust).unwrap();
+    assert_eq!(recovery_status(&inspect()), "applied-arrangement");
+    let rediscovered = f
+        .storage
+        .reopen(f.history.id())
+        .unwrap()
+        .inspect_main_integration_group(outer, group, &trust, ObservationLimits::default())
+        .unwrap();
+    assert!(rediscovered
+        .get("restoration_references")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .contains(&Json::text(&tx)));
+    assert!(f
+        .history
+        .inspect_main_integration_group(outer, "../outside", &trust, ObservationLimits::default())
+        .is_err());
+}

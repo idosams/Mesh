@@ -825,6 +825,58 @@ impl AttachmentHost {
         .encode())
     }
 
+    pub fn group_recovery(
+        &self,
+        id: &str,
+        group: &str,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
+        let history = self.review_history(id)?;
+        let root = history
+            .file_recovery_root(false)
+            .map_err(|_| "File recovery storage is unavailable")?
+            .ok_or("This recovery group is unavailable")?;
+        history
+            .inspect_main_integration_group(
+                &root,
+                group,
+                trusted,
+                mesh_daemon::project_attachment::ObservationLimits::default(),
+            )
+            .map(|value| value.encode())
+            .map_err(|_| "This recovery group could not be verified".into())
+    }
+
+    pub fn group_file_recovery(
+        &self,
+        id: &str,
+        group: &str,
+        transaction: &str,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
+        self.group_recovery(id, group, trusted)?;
+        let history = self.review_history(id)?;
+        let root = history
+            .file_recovery_root(false)
+            .map_err(|_| "File recovery storage is unavailable")?
+            .ok_or("Recovery is unavailable")?;
+        let recovery = history
+            .inspect_integration_recovery(
+                &root.join(group),
+                Some(transaction),
+                trusted,
+                mesh_daemon::project_attachment::ObservationLimits::default(),
+            )
+            .map_err(|_| "The group file could not be inspected")?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-recovery/v1")),
+            ("project", Json::text(id)),
+            ("group", Json::text(group)),
+            ("recovery", recovery),
+        ])
+        .encode())
+    }
+
     pub fn request_review(
         &self,
         id: &str,
@@ -1380,6 +1432,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(response.get("recovery"), Some(&Json::Null));
+        assert!(host
+            .group_recovery(id, "../outside", &mesh_daemon::TrustedReviewers::default())
+            .is_err());
+        assert!(host
+            .group_file_recovery(
+                id,
+                &format!("integration-group-{}", "a".repeat(32)),
+                "../outside",
+                &mesh_daemon::TrustedReviewers::default()
+            )
+            .is_err());
         assert!(!history.metadata_path().join("file-recovery").exists());
         assert!(host
             .file_recovery("unknown", None, &mesh_daemon::TrustedReviewers::default())

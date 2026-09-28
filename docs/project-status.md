@@ -592,3 +592,11 @@ keep restored content private and support bounded restart inspection without rep
 native text confirmation describes the absent destination and complete proposed content. Transferred
 tests await canonical native execution; packaged graphical verification, missing-parent creation, directory restoration and
 grouped desktop confirmation/recovery remain unfinished.
+
+
+Native desktop commands now support complete regular-file group confirmation, verified group/member
+recovery inspection and explicit retained-member restoration. Every changed file must fit the native
+preview; project/folder labels remain literal. The host rechecks the project generation after consent.
+This is the native host increment only: renderer controls, current native execution and packaged
+graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
+local FSEvents registration failure is not resolved by these commands.

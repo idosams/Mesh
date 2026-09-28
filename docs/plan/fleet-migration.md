@@ -1558,3 +1558,25 @@ collisions and substituted parents, exclusions, malformed receipts and restart i
 confirmation tests reject inconsistent absence facts. Local focused/failing-before/full native
 execution remains queued behind the preserved run. Source-reported 3,284 Rust/666 desktop and
 28 isolated restoration tests are historical only.
+
+
+## I03b native desktop group confirmation and recovery host
+
+Partially transfers source `fc5b37d9bea6edf4311dea4a2914145da4e600ab` onto PR #86 at
+`4e55abd227327f3b5bd7387d14e9a831b0d4a513`: native attachment host, confirmation and commands,
+daemon group/recovery inspection, and attachment approval integration tests (six source code paths).
+The renderer controls/tests and source documentation remain a following increment; the source
+commit is not yet fully accounted for. Four watcher paths are deliberately not applied over the
+newer canonical #41 lifecycle implementation. Their independent differences still need reconciliation;
+this transfer does not claim issue #37 resolved.
+
+Native commands prepare the entire regular-file group, present every create/replace/remove and
+already-present path, then recheck host generation and apply. Incomplete/binary/oversized previews
+refuse before consent. Read-only group/member inspection and explicit retained-member restoration
+use verified group identities. Bounded restoration references preserve restart discoverability.
+Project and folder labels are separate escaped native facts; the transferred confirmation test now
+covers misleading newlines and non-Latin folder names. Renderer wiring and graphical proof remain.
+
+Existing group/receipt formats remain supported; recovery results add bounded restoration reference
+fields. Native focused/failing-before/full execution is queued behind the preserved run. Structural
+checks and historical source claims are not canonical native or packaged acceptance.

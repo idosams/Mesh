@@ -507,3 +507,11 @@ The original source reports 3,284 Rust tests (14 skipped), 666 desktop tests and
 restoration tests, including the four new integration cases and native confirmation case. These
 historical results do not validate this canonical transfer. Local focused, failing-before and full
 native execution remains queued behind the preserved run; graphical acceptance remains outstanding.
+
+
+Native desktop commands now support complete regular-file group confirmation, verified group/member
+recovery inspection and explicit retained-member restoration. Every changed file must fit the native
+preview; project/folder labels remain literal. The host rechecks the project generation after consent.
+This is the native host increment only: renderer controls, current native execution and packaged
+graphical proof remain pending. Canonical monitoring lifecycle behavior is preserved; the unresolved
+local FSEvents registration failure is not resolved by these commands.
