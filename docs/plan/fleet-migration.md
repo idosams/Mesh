@@ -2582,3 +2582,38 @@ exact workspace/launch-intent handoff, abandoned and invalid proofs, receipt-onl
 unexpected frames, conflicting allocation preservation, replaced storage and lease refusal. Validation
 is in progress. Resident-worker deployment, bounded control-schema routing, SSH/key provisioning,
 signed results, saved-history recovery and actual second-machine acceptance remain required.
+
+
+### R18 delivered evidence
+
+[#136](https://github.com/idosams/Mesh/pull/136) merged at
+`a915612ad8e32273bf0ed7585c74db6755bd8496` after all seven exact-head checks passed.
+Linux passed 3,216 tests; macOS passed 3,470 plus four renderer tests and the real daemon demo.
+The exact local executable passed all 15 receiving/authentication tests. Combined-main run 36494757882
+also passed. Earlier compile failures and intermediate/local aggregate verification remain preserved.
+
+## R19 bounded receiving broker loop
+
+New canonical implementation on merged #136; no preserved source commits are replaced.
+A synchronous broker loop borrows the supervisor's fixed receiving session and sends its fresh proof.
+It accepts only canonical authentication, chunk-status and materialization controls, plus the existing
+manifest/chunk frames. Commands cannot choose paths, keys, work or another assignment. Authentication
+must precede all other operations. Request IDs are unique within the connection and replies carry
+admission correlation facts. Unknown/noncanonical controls and framing/native failures end the connection.
+
+The loop bounds incoming frames (131,072), control identities (32,768), and total framed input bytes
+(2 GiB plus 16 MiB framing/control allowance). The byte budget is checked on a complete bounded frame
+before native dispatch; at most one already-bounded frame is read beyond the remaining budget.
+Synchronous replies add no accumulating queue. The caller still supplies transport deadlines,
+connection budgets, initial worker identity admission, authenticated streams and bounded diagnostics.
+
+Materialization returns the original native allocation and guarded registry to the supervisor even
+when the final reply write/flush fails. A successful write is not durable peer acknowledgment. EOF or
+failure before handoff retains the session and requires fresh proof on reconnect. These are input
+handoff facts, not provider completion or signed result receipts.
+
+Seven local tests pass, including real Unix-stream reconnect/status/resume, final reply failure with
+retained handoff, unauthenticated refusal, duplicate request IDs, frame/byte budgets and closed canonical
+command parsing. Full validation is in progress. This is an embedding loop, not a deployed worker,
+SSH connector or key provisioner. Initial worker-proof transport, resident service lifecycle, client
+reply verification, signed results/reconciliation and actual second-machine acceptance remain open.

@@ -153,10 +153,15 @@ override capacity or recreate a reservation; all 22 focused local admission/laun
 at `90eed19f0cc535362d1d47060a193ffc35c349f0`, with all seven exact-head checks passing.
 All nine local framing/CAS tests passed, including disconnect, durable reopen and confirmed-offset resume.
 
-The next increment retains receiving state in the native supervisor while each broker connection
-must authenticate afresh. Partial input and the original reservation survive connection loss; saved
-receipts alone cannot recreate a reservation after supervisor restart. The typed handoff composes with
-native workspace initialization and launch intent. Validation is in progress. A deployed worker/broker,
-control-schema routing, authenticated SSH, signed results/recovery and actual second-machine operation
-remain unfinished. Evidence is tracked in the [ledger](plan/fleet-migration.md#r18-supervisor-owned-receiving-session)
-and [remote execution contract](plan/fleet-remote-execution-contract.md).
+[PR #136](https://github.com/idosams/Mesh/pull/136) merged supervisor-owned receiving sessions
+at `a915612ad8e32273bf0ed7585c74db6755bd8496`; all seven exact-head and combined-main checks passed.
+All 15 focused local receiving/authentication tests passed. Partial input and the original reservation
+survive connection loss; saved receipts alone cannot recreate a reservation after supervisor restart.
+
+The next increment adds the bounded broker command loop around that session. It routes authentication,
+manifest/chunk receipt, confirmed offsets and one materialization handoff. A failed final reply retains
+the native handoff for the supervisor. Seven focused local broker tests passed; full CI is pending.
+A deployed worker, initial worker-proof transport, configured SSH, client reply verification, signed
+results/recovery and actual second-machine operation remain unfinished. Evidence is tracked in the
+[ledger](plan/fleet-migration.md#r19-bounded-receiving-broker-loop) and
+[remote execution contract](plan/fleet-remote-execution-contract.md).

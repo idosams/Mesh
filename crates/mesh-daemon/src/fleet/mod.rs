@@ -13,9 +13,16 @@ pub mod host;
 #[cfg(unix)]
 mod received_host;
 #[cfg(unix)]
+mod receiving_broker;
+#[cfg(unix)]
 mod receiving_session;
 #[cfg(unix)]
 pub use received_host::ReceivedWorkerHost;
+#[cfg(unix)]
+pub use receiving_broker::{
+    serve_remote_receiving, RemoteReceivedHandoff, RemoteReceivingBrokerOutcome,
+    RemoteReceivingCommand,
+};
 #[cfg(unix)]
 pub use receiving_session::{
     RemoteReceivingAccess, RemoteReceivingConnection, RemoteReceivingProgress,

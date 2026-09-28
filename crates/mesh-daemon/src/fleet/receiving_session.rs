@@ -212,6 +212,13 @@ impl RemoteReceivingConnection<'_, '_> {
         }
     }
 
+    /// Authenticated, currently revalidated admission facts for a bounded broker reply.
+    /// Reading or cloning this receipt cannot recreate the original reservation.
+    pub fn receipt(&self) -> Result<&RemoteAdmissionReceipt, Error> {
+        self.check()?;
+        self.session.receipt.as_ref().ok_or(Error::InvalidHistory)
+    }
+
     /// Read confirmed chunk state after reauthentication, not after a bare reconnect.
     pub fn status(&mut self, digest: Digest32) -> Result<(u64, bool), Error> {
         self.check()?;
@@ -297,4 +304,4 @@ impl Drop for RemoteReceivingConnection<'_, '_> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;

@@ -389,3 +389,41 @@ then releases receiving exclusion. Once consumed, failure ends the session and p
 A missing/incomplete input detected before consumption can continue receiving. These native APIs open
 no endpoint and launch no provider. Control-schema dispatch, deployed supervisor/broker lifecycle,
 SSH admission, renewed/expired-lease status recovery, signed results and actual remote proof remain open.
+
+
+## Receiving broker command loop
+
+`serve_remote_receiving` borrows a supervisor-owned receiving session for one stream connection.
+It sends the canonical coordinator-admission challenge first. The initial worker identity proof and
+native transport/host admission must already be established by the embedding supervisor; this loop
+is not a generic signing oracle or an SSH endpoint. Stream owners must configure deadlines, cancellation,
+connection limits and separately bounded/redacted stderr, then close the streams when the loop returns.
+
+Control bodies use canonical `mesh.receiving-command/v1` with `operation` and a bounded `request` ID.
+`authenticate` additionally carries a 128-character lowercase hexadecimal coordinator signature;
+`status` carries a declared chunk `digest`; `materialize` has no additional fields. Unknown versions,
+operations, fields, encodings and duplicate request IDs refuse. The first accepted command must be
+`authenticate`; another authentication on the same connection refuses. IDs correlate only that
+connection's serial replies and do not create durable allocation or execution authority.
+
+Replies use `mesh.receiving-reply/v1`, a `kind`, a `request` ID (null for manifest/chunk-frame replies),
+an `admission` object and `detail`. Admission facts bind coordinator, objective, lane/run, assignment,
+source input/bundle, allocation and durable admission revision. Kinds are `authenticated`, `manifest`,
+`chunk` and `materialized`. Authentication detail distinguishes receiving from retained-only access;
+chunk detail contains digest, confirmed offset and verified completeness. Other detail is null.
+Clients must verify schema, expected correlation and native peer/transport authority; these unsigned
+input-stage replies are not signed saved-result envelopes or proof that a provider ran.
+
+A connection accepts at most 131,072 incoming frames, 32,768 distinct control IDs and 2 GiB plus 16 MiB
+of framed input. Header-level allocation bounds still apply first. The total-byte limit is checked
+before native dispatch after reading one complete bounded frame, so budget exhaustion may read at most
+one bounded frame beyond the remaining allowance. Budget exhaustion ends the connection without
+reconstructing reservations or clearing partial input. Native manifest/CAS total-content limits remain
+independent and mandatory. Callers must not accumulate returned frames or unbounded diagnostics.
+
+On complete materialization, `RemoteReceivingBrokerOutcome::Materialized` returns the original native
+handoff even if its reply could not be written. `reply_written` reports only local write/flush success,
+never durable peer receipt. The supervisor must retain or reconcile that handoff independently of the
+connection; it must not replay allocation to recover a missing reply. Before handoff, EOF/errors drop
+connection authentication while retaining the native session. Deployed lifecycle and authenticated
+lookup of completed handoffs/results after reconnect or supervisor restart still require integration.

@@ -13,15 +13,15 @@ use std::io::Cursor;
 use std::os::unix::fs::PermissionsExt;
 
 const ALLOCATION: &str = "0123456789abcdef0123456789abcdef";
-struct Setup {
-    f: Fixture,
-    destination: RemoteInputDestination,
-    manifest: RemoteInputManifest,
-    bytes: Vec<u8>,
-    digest: Digest32,
+pub(in crate::fleet) struct Setup {
+    pub(in crate::fleet) f: Fixture,
+    pub(in crate::fleet) destination: RemoteInputDestination,
+    pub(in crate::fleet) manifest: RemoteInputManifest,
+    pub(in crate::fleet) bytes: Vec<u8>,
+    pub(in crate::fleet) digest: Digest32,
 }
 impl Setup {
-    fn new() -> Self {
+    pub(in crate::fleet) fn new() -> Self {
         let mut f = Fixture::new();
         for name in ["store", "allocations"] {
             fs::create_dir(f.path.join(name)).unwrap();
@@ -59,7 +59,7 @@ impl Setup {
             digest,
         }
     }
-    fn session(&self) -> RemoteReceivingSession<'_> {
+    pub(in crate::fleet) fn session(&self) -> RemoteReceivingSession<'_> {
         RemoteReceivingSession::new(
             self.f.registry(),
             self.f.work.clone(),
@@ -85,12 +85,12 @@ impl Setup {
             .unwrap();
         Signature::from_bytes(self.f.coordinator.sign(payload.as_bytes()).to_bytes())
     }
-    fn manifest_frame(&self) -> RemoteFrame {
+    pub(in crate::fleet) fn manifest_frame(&self) -> RemoteFrame {
         wire(RemoteFrame::Manifest(
             self.manifest.encoded().as_bytes().to_vec(),
         ))
     }
-    fn part(&self, offset: usize, end: usize) -> RemoteFrame {
+    pub(in crate::fleet) fn part(&self, offset: usize, end: usize) -> RemoteFrame {
         wire(RemoteFrame::Chunk {
             digest: self.digest,
             offset: offset as u64,
@@ -98,7 +98,7 @@ impl Setup {
             bytes: self.bytes[offset..end].to_vec(),
         })
     }
-    fn assert_empty_store(&self) {
+    pub(in crate::fleet) fn assert_empty_store(&self) {
         assert_eq!(fs::read_dir(self.f.path.join("store")).unwrap().count(), 0);
     }
 }

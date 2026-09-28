@@ -8,7 +8,7 @@ const MAGIC: &[u8; 4] = b"MSHR";
 const VERSION: u8 = 1;
 const HEADER_BYTES: usize = 10;
 const CHUNK_PREFIX_BYTES: usize = 41;
-const MAX_CONTROL_BYTES: usize = 65_536;
+pub(super) const MAX_CONTROL_BYTES: usize = 65_536;
 
 /// One complete frame. No Debug implementation: bodies may contain private tasks or file content.
 /// These are untrusted facts until native authentication, schema and assignment checks succeed.
@@ -30,6 +30,12 @@ pub enum RemoteFrame {
     },
 }
 impl RemoteFrame {
+    // Validated framing cost for the broker's total ingress budget, including fixed metadata.
+    pub(in crate::fleet) fn encoded_len(&self) -> io::Result<u64> {
+        let header = self.header()?;
+        Ok(HEADER_BYTES as u64 + u64::from(u32::from_be_bytes(header[6..].try_into().unwrap())))
+    }
+
     fn header(&self) -> io::Result<[u8; HEADER_BYTES]> {
         let (kind, len) = match self {
             Self::Control(bytes) => (1, bytes.len()),
