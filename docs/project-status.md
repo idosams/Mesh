@@ -144,10 +144,14 @@ passed. The host owns that process, native signing sessions and a local endpoint
 scoped fleet calls. Polling does not dispatch another attempt; connection loss does not drop the host.
 Local provider startup remains under investigation in [#133](https://github.com/idosams/Mesh/issues/133).
 
-The next increment adds coordinator identity verification before worker admission. Signing bytes
-must match an already-claimed native attempt; a short-lived worker challenge binds the full task,
-keys, versions, limits and lease. A valid signature still cannot override capacity or recreate a
-reservation. Validation is in progress. The resident worker entry point, authenticated broker,
-result/reconnect protocol and actual second-machine operation remain unfinished. Delivery evidence
-is tracked in the [ledger](plan/fleet-migration.md#r16-coordinator-proof-before-receiving-admission)
+[PR #134](https://github.com/idosams/Mesh/pull/134) merged coordinator identity verification before
+worker admission at `5184000c449b0d7284942911796a31040aaeb6ec`, with all seven exact-head checks
+passing. Signing bytes must match an already-claimed native attempt. A valid signature cannot
+override capacity or recreate a reservation; all 22 focused local admission/launch tests passed.
+
+The next increment supplies bounded synchronous frames for control, manifests and chunk parts.
+Partial or malformed frames end the connection without returning incomplete content; resumed transfer
+uses the CAS's confirmed offset. Validation is in progress. A deployed resident worker/broker,
+authenticated SSH, result/reconnect routing and actual second-machine operation remain unfinished.
+Delivery evidence is tracked in the [ledger](plan/fleet-migration.md#r17-bounded-remote-stream-framing)
 and [remote execution contract](plan/fleet-remote-execution-contract.md).

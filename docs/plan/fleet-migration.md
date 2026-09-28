@@ -2513,3 +2513,35 @@ its signature domain is `mesh.v1.fleet-coordinator-admission-proof`. Existing du
 are unchanged. This is a native signing/verification boundary, not a deployed authenticated broker,
 key provisioning or a persisted remote certificate. Status/reconnect authorization and result delivery
 remain separate work. Validation is in progress; actual second-machine acceptance remains open.
+
+
+### R16 delivered evidence
+
+[#134](https://github.com/idosams/Mesh/pull/134) merged at
+`5184000c449b0d7284942911796a31040aaeb6ec` after all seven exact-head checks passed.
+Linux passed 3,200 tests; macOS passed 3,454 plus four renderer tests and the real daemon demo.
+The local focused executable passed all 22 admission/launch tests, including the eight new proof
+regressions. Its wall time was 562.175 seconds, while the test harness reported 0.85 seconds;
+a preserved sample observed a pre-test loader wait tracked in #133. This is not a local full-gate,
+packaged or second-machine acceptance result. Existing running verification remains preserved.
+
+## R17 bounded remote stream framing
+
+New canonical implementation on merged #134; no preserved source commits are replaced.
+Synchronous native readers/writers carry control bytes, input manifests and chunk parts without
+an accumulating queue. Header bounds are checked before body allocation or reading. Chunk metadata
+uses fixed digest/offset/final fields and the existing receiver's part/chunk limits. Native schema,
+authentication, assignment and CAS checks remain mandatory after framing.
+
+Malformed headers, unknown versions/kinds/flags, truncated frames and I/O failures end the connection;
+no later header is scanned for recovery. Partial bodies are never returned. Outbound frames are fully
+range-validated before any write, and partial-write/flush failures refuse further use of that writer.
+A flush is not a durable acknowledgment and reconnection grants no permission to repeat execution.
+
+Regressions cover exact header bytes, maximum bounds, rejection before body reads, every truncation,
+fragmented/interrupted reads, timeout/would-block, partial writes and flush failure. A real local Unix
+stream transfers a manifest and part into the existing CAS, disconnects mid-frame, reopens durable
+storage, resumes from the confirmed offset and verifies complete content. Validation is in progress.
+This framing is not a deployed broker, SSH transport, authenticated state machine or second-machine
+proof. Supervisor entry point, admission/transfer routing, key provisioning, bounded diagnostics,
+deadlines, result/reconnect protocol and actual remote acceptance remain required.

@@ -38,8 +38,10 @@ mod worker_directory;
 #[cfg(target_os = "macos")]
 pub use worker_directory::NativeRemoteWorkerDirectory;
 mod remote_input;
+mod remote_transport;
 #[cfg(unix)]
 pub use remote_input::NativeRemoteInputReceiver;
+pub use remote_transport::{RemoteFrame, RemoteFrameReader, RemoteFrameWriter};
 #[cfg(unix)]
 mod remote_materialization;
 #[cfg(unix)]

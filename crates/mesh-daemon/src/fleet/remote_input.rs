@@ -12,12 +12,12 @@ use mesh_types::NormalizedName;
 pub use native::NativeRemoteInputReceiver;
 use std::collections::BTreeMap;
 
-const MAX_MANIFEST_BYTES: usize = 1_048_576;
+pub(super) const MAX_MANIFEST_BYTES: usize = 1_048_576;
 const MAX_ENTRIES: usize = 4096;
 const MAX_CHUNKS: usize = 16_384;
-const MAX_CHUNK_BYTES: u64 = 4_194_304;
+pub(super) const MAX_CHUNK_BYTES: u64 = 4_194_304;
 const MAX_TOTAL_BYTES: u64 = 2_147_483_648;
-const MAX_PART_BYTES: usize = 65_536;
+pub(super) const MAX_PART_BYTES: usize = 65_536;
 const DOMAIN: &[u8] = b"mesh.v1.fleet-input-manifest\0";
 
 /// One complete CAS chunk in reconstruction order; offsets follow from preceding lengths.

@@ -330,3 +330,33 @@ a persisted certificate. No generic signing, network exposure or peer-selected p
 The future broker must use this boundary rather than directly invoking native reservation. Initial
 admission authentication does not implement renewed leases, authenticated saved-status recovery,
 remote acknowledgments/results, key provisioning or actual second-machine acceptance.
+
+
+## Bounded stream format
+
+The native `RemoteFrameReader` and `RemoteFrameWriter` implement one synchronous frame at a time.
+The ten-byte header is ASCII `MSHR`, version byte `1`, kind byte, and a four-byte big-endian body
+length. Unknown magic, version or kind refuses. Kind `1` carries 1–65,536 control bytes; kind `2`
+carries 1–1,048,576 manifest bytes. These are opaque bytes until the selected native schema parser
+validates canonical fields against independently expected identities.
+
+Kind `3` carries a 32-byte content digest, eight-byte big-endian offset, one final-part flag (`0` or
+`1` only), and 1–65,536 chunk bytes. Offset plus data length must not exceed the existing 4 MiB
+chunk bound; the existing CAS receiver still checks declared digest membership, contiguous confirmed
+offset, actual declared size, final marker and content hash. Manifest/part/chunk limits share the
+receiver constants. Frames contain no filesystem paths as transport authority.
+
+The reader checks kind/length before allocating or reading a body, and chunk metadata before data.
+It returns no incomplete frame. EOF is clean only between frames. Any malformed input, truncation,
+timeout, would-block or other I/O error permanently ends that reader; interrupted system calls retry.
+There is no scan for another header after corruption. The writer validates before writing and becomes
+unusable after write/flush failure. It writes bodies directly without a second encoded-body buffer.
+Synchronous calls provide backpressure without an internal queue; the caller must not accumulate
+frames, and must enforce connection counts, deadlines, cancellation and total transfer budgets.
+
+The embedding broker supplies authenticated streams, bounds/redacts stderr separately, dispatches
+only allowed schemas in the current authenticated state, and closes the connection on framing error.
+No frame, flush, clean EOF or reconnection establishes durable receipt, successful work, freed
+capacity or permission to replay a launch. Reconnect must consult existing durable facts. The local
+stream/CAS disconnect regression proves framing and saved-offset composition, not SSH, a resident
+worker endpoint, mutual authentication or actual second-machine operation.
