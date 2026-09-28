@@ -1652,3 +1652,21 @@ This is new canonical correction work on PR #89 at
 parent revisions and their local running verification remain preserved. Focused localization/group
 rendering execution is running on this corrected tree; hosted and full acceptance must be refreshed.
 No product behavior, permissions or verification threshold is changed by the test correction.
+
+## I03f native saved group execution evidence
+
+Partially transfers source `9bfc1f43466ec5a45082a854e51421dab2ae32d2` onto
+PR #90 at `3ab0dc58e1951a7c9cb4b1c63e13cacfe3b33d23`. This increment contains
+the three native paths: group inspection, the execution record reader and native
+group regressions. Four renderer paths and the remaining source documentation
+accounting are reserved for the following localized UI increment.
+
+Historical execution is explicitly separate from current independent file
+observations. Exact bounded records, contiguous attempts, stop ordering and
+before/after record comparison determine whether the saved outcome can be shown.
+Missing, corrupt, linked or changing records never grant retry authority. Existing
+persisted formats remain unchanged; inspection adds a versioned projection.
+
+Native focused, failing-before and full execution are queued behind the preserved
+canonical run. Required hosted checks must pass before merge. Neither historical
+source results nor structural checks establish current native or packaged proof.

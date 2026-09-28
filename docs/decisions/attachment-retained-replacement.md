@@ -576,3 +576,28 @@ approval/application/recovery proof remain unfinished.
 This contract is transferred from preserved source into canonical PRs #87 and #88. Controller,
 TypeScript and focused rendering checks passed on #88; full local desktop/native and packaged
 verification remain outstanding. Source implementation coverage is not current runtime acceptance.
+
+## Native saved group execution evidence
+
+Group inspection reads existing `attempt-NNNN.json` and `group-observed.json`
+records before and after independent member observations. The additive
+`mesh.attachment-integration-group-execution/v1` projection reports `recorded`,
+`no-outcome`, `invalid` or `changed`, ordered member attempts and an outcome only
+when the sequence is consistent. It carries `historical:true`,
+`observation_final:false`, `automatic_replay:false` and `write_authority:false`.
+Durable record formats are unchanged. Each JSON read remains bounded to 64 KiB;
+a group contains at most 64 members.
+
+Checks bind the exact proposal digest, canonical shape, index, member order,
+contiguous attempt prefix and stop-on-uncertainty ordering. A failed marker write
+can leave an attempt record without invoking the file operation. A missing final
+record cannot establish that files were unchanged. Changed, unreadable, linked or
+contradictory execution records suppress the aggregate outcome but preserve
+independent file observations. The double read does not establish an atomic
+snapshot or current filesystem truth, and never grants replay or cleanup authority.
+
+Native regressions cover interruption and reopening, later editor work, missing,
+corrupt and linked outcomes, contradictory ordering and changing records. These
+are transferred tests, pending canonical runtime verification. Desktop parsing
+and localized display of this evidence are a following increment; packaged
+graphical acceptance remains outstanding.

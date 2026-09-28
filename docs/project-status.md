@@ -613,3 +613,12 @@ acceptance/documentation increment. The newer canonical monitoring lifecycle is 
 native-event test now establishes a fresh post-registration baseline and requires a new callback.
 Historical source counts are not canonical validation. The local registration stall, current full
 verification, directory support and packaged graphical fleet acceptance remain outstanding.
+
+### Saved group execution evidence (unmerged native increment)
+
+Group recovery now exposes verified historical attempt ordering and final outcomes
+without requiring an earlier in-memory reply. Missing, unreadable or changing
+records are explicit and never authorize replay; independent member observations
+remain available. Native regression tests are transferred but local execution is
+pending behind the preserved full run. Localized display and current packaged
+acceptance remain separate outstanding work.

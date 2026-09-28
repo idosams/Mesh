@@ -15,6 +15,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
 const MAX_FILES: usize = 64;
+mod execution;
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
@@ -585,6 +586,7 @@ pub(super) fn inspect(
         },
     )?;
     let group_path = recovery_root.join(id);
+    let execution_before = execution::Snapshot::read(&root, members.len());
     let mut observations = Vec::new();
     let mut remaining = limits.bytes;
     for member in members {
@@ -618,6 +620,7 @@ pub(super) fn inspect(
         .filter(|name| name.starts_with("restoration-") && transaction(name))
         .map(Json::text)
         .collect();
+    let execution_after = execution::Snapshot::read(&root, members.len());
     root.ensure_namespace_identity()?;
     outer.ensure_namespace_identity()?;
     if read_json(&root, "group-prepared.json")?.0 != proposal {
@@ -632,6 +635,10 @@ pub(super) fn inspect(
         ("group", Json::text(id)),
         ("proposal_digest", Json::text(digest(&proposal))),
         ("members", Json::Array(observations)),
+        (
+            "execution",
+            execution_before.projection(&execution_after, &proposal),
+        ),
         ("restoration_references", Json::Array(restorations)),
         (
             "more_restoration_references_may_exist",

@@ -255,6 +255,70 @@ fn group_stops_after_mid_apply_change_and_retains_every_member() {
         recovered.get("members").unwrap().as_array().unwrap().len(),
         3
     );
+    let execution = recovered.get("execution").unwrap();
+    assert_eq!(execution.get("status"), Some(&Json::text("recorded")));
+    assert_eq!(execution.get("outcome"), Some(&outcome));
+    let attempts = execution.get("attempts").unwrap().as_array().unwrap();
+    assert_eq!(attempts[0].get("status"), Some(&Json::text("recorded")));
+    assert_eq!(attempts[1].get("status"), Some(&Json::text("recorded")));
+    assert_eq!(attempts[2].get("status"), Some(&Json::text("absent")));
+    let inspect = || {
+        reopened
+            .inspect_main_integration_group(
+                &root,
+                group_path.file_name().unwrap().to_str().unwrap(),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap()
+    };
+    fs::write(f.source.join("a.txt"), "later editor work").unwrap();
+    assert_eq!(
+        inspect().get("execution").unwrap().get("outcome"),
+        Some(&outcome)
+    );
+    // A lost final record preserves attempt evidence but never synthesizes a successful outcome.
+    fs::remove_file(group_path.join("group-observed.json")).unwrap();
+    let missing = inspect();
+    assert_eq!(
+        missing.get("execution").unwrap().get("status"),
+        Some(&Json::text("no-outcome"))
+    );
+    assert_eq!(
+        missing.get("execution").unwrap().get("outcome"),
+        Some(&Json::Null)
+    );
+    assert_eq!(
+        missing.get("execution").unwrap().get("attempts"),
+        Some(&Json::Array(attempts.to_vec()))
+    );
+    // Corrupt, linked or contradictory records do not hide independent member observations.
+    for malformed in ["{", "null", "{}"] {
+        fs::write(group_path.join("group-observed.json"), malformed).unwrap();
+        let invalid = inspect();
+        assert_eq!(
+            invalid.get("execution").unwrap().get("status"),
+            Some(&Json::text("invalid"))
+        );
+        assert_eq!(invalid.get("members").unwrap().as_array().unwrap().len(), 3);
+    }
+    fs::remove_file(group_path.join("group-observed.json")).unwrap();
+    std::os::unix::fs::symlink(
+        f.source.join("work.txt"),
+        group_path.join("group-observed.json"),
+    )
+    .unwrap();
+    assert_eq!(
+        inspect().get("execution").unwrap().get("status"),
+        Some(&Json::text("invalid"))
+    );
+    fs::remove_file(group_path.join("group-observed.json")).unwrap();
+    fs::write(group_path.join("group-observed.json"), outcome.encode()).unwrap();
+    fs::remove_file(group_path.join("attempt-0000.json")).unwrap();
+    assert_eq!(
+        inspect().get("execution").unwrap().get("status"),
+        Some(&Json::text("invalid"))
+    );
     assert_eq!(f.journal(), journal);
     assert_eq!(
         fs::read(f.source.join("b.txt")).unwrap(),

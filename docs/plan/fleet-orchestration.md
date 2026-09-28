@@ -733,3 +733,11 @@ acceptance/documentation increment. The newer canonical monitoring lifecycle is 
 native-event test now establishes a fresh post-registration baseline and requires a new callback.
 Historical source counts are not canonical validation. The local registration stall, current full
 verification, directory support and packaged graphical fleet acceptance remain outstanding.
+
+### Saved execution evidence follow-through
+
+The native group inspector now projects bounded historical attempts and outcomes
+after restart, independently of current file observations. Missing, inconsistent
+or changing records cannot authorize a retry. Localized desktop presentation is
+a separate increment; canonical runtime and packaged graphical acceptance remain
+pending. See the migration ledger for source-path accounting.
