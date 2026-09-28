@@ -459,7 +459,16 @@ mod tests {
                 .unwrap();
         let second =
             RemotePeerChallenge::issue(&mut f.runtime, "lane", "run", assignment, peer()).unwrap();
-        assert_ne!(first.signing_payload(), second.signing_payload());
+        let nonce = |challenge: &RemotePeerChallenge| {
+            let bytes = challenge.signing_payload().as_bytes();
+            let body = std::str::from_utf8(&bytes[16 + DOMAIN.as_str().len()..]).unwrap();
+            Json::parse(body).unwrap().get("nonce").unwrap().clone()
+        };
+        assert_ne!(
+            nonce(&first),
+            nonce(&second),
+            "freshness must come from OS randomness, not differing timestamps"
+        );
         assert!(!String::from_utf8_lossy(first.signing_payload().as_bytes())
             .contains("/native/verified"));
         let signed = signature(&first);
