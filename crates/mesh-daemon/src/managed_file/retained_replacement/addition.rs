@@ -57,6 +57,50 @@ impl RetainedAddition {
         recovery: PinnedWorkspaceRoot,
         receipt: impl FnOnce(ManagedFileIdentity, u32, &str, &str, u32) -> io::Result<()>,
     ) -> io::Result<Self> {
+        Self::prepare_inner(
+            source, relative, parent, bytes, executable, recovery, None, receipt,
+        )
+    }
+
+    /// Restore a private retained snapshot into an absent path, preserving its exact metadata.
+    /// The original retained inode is never moved or consumed.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn prepare_restoration(
+        source: PinnedWorkspaceRoot,
+        relative: PathBuf,
+        parent: String,
+        bytes: Vec<u8>,
+        mode: u32,
+        recovery: PinnedWorkspaceRoot,
+        retained: &File,
+        receipt: impl FnOnce(ManagedFileIdentity, u32, &str, &str, u32) -> io::Result<()>,
+    ) -> io::Result<Self> {
+        if mode & !0o100777 != 0 || mode & 0o100000 == 0 {
+            return Err(io::Error::other("unsupported restoration mode"));
+        }
+        Self::prepare_inner(
+            source,
+            relative,
+            parent,
+            bytes,
+            mode & 0o111 != 0,
+            recovery,
+            Some((retained, mode)),
+            receipt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_inner(
+        source: PinnedWorkspaceRoot,
+        relative: PathBuf,
+        parent: String,
+        bytes: Vec<u8>,
+        executable: bool,
+        recovery: PinnedWorkspaceRoot,
+        retained: Option<(&File, u32)>,
+        receipt: impl FnOnce(ManagedFileIdentity, u32, &str, &str, u32) -> io::Result<()>,
+    ) -> io::Result<Self> {
         if absent_parent(&source, &relative)?.as_deref() != Some(&parent) {
             return Err(io::Error::other(
                 "addition destination changed before preparation",
@@ -70,9 +114,16 @@ impl RetainedAddition {
         }
         let directory = recovery.try_clone_directory()?;
         // Let the kernel apply the process umask without reading or mutating process-global state.
-        let requested_mode = if executable { 0o755 } else { 0o644 };
+        let requested_mode = if retained.is_some() {
+            0o600
+        } else if executable {
+            0o755
+        } else {
+            0o644
+        };
         let mut stage = create_new_at_mode(&directory, EXCHANGE, requested_mode)?;
-        let effective_mode = stage.metadata()?.mode() & 0o777;
+        let effective_mode =
+            retained.map_or(stage.metadata()?.mode() & 0o777, |(_, mode)| mode & 0o777);
         let (parent_directory, entry) = source
             .filesystem()
             .inspect_optional_entry_with_parent(&relative)?;
@@ -82,8 +133,15 @@ impl RetainedAddition {
             ));
         }
         stage.write_all(&bytes)?;
-        let (parent_metadata, parent_mode) =
-            metadata::inherit_new_file(&parent_directory, &stage, effective_mode)?;
+        let (parent_metadata, parent_mode) = if let Some((retained, _)) = retained {
+            let policy = metadata_digest(&parent_directory)?;
+            let parent_mode = parent_directory.metadata()?.mode();
+            copy_metadata(retained, &stage)?;
+            stage.set_permissions(fs::Permissions::from_mode(effective_mode))?;
+            (policy, parent_mode)
+        } else {
+            metadata::inherit_new_file(&parent_directory, &stage, effective_mode)?
+        };
         stage.sync_all()?;
         let mode = stage.metadata()?.mode();
         if mode != (0o100000 | effective_mode) || (mode & 0o111 != 0) != executable {

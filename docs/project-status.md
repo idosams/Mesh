@@ -583,3 +583,12 @@ reconciliation. Read-only recovery retains v1 compatibility and exposes v2 polic
 Transferred tests compare inheritance with kernel-created files and cover restrictive umasks and
 policy races; canonical execution remains pending. Linux default ACLs/extended attributes remain
 unsupported. No grouped packaged graphical proof is claimed by this increment.
+
+Retained regular files can now be restored into an absent original path beneath an existing confined
+parent. Preparation preserves the retained snapshot's metadata in a separate stage and leaves the
+project untouched; explicit native apply never replaces a concurrently created file. The origin
+inode remains retained for later editor writes. New receipts distinguish creation from replacement,
+keep restored content private and support bounded restart inspection without replay. The single-file
+native text confirmation describes the absent destination and complete proposed content. Transferred
+tests await canonical native execution; packaged graphical verification, missing-parent creation, directory restoration and
+grouped desktop confirmation/recovery remain unfinished.

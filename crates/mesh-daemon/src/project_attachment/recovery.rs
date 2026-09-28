@@ -74,8 +74,18 @@ const RESTORE_KEYS: &[&str] = &[
     "origin_mode",
     "origin_metadata_digest",
 ];
+pub(super) fn is_absent_restoration(value: &Json) -> bool {
+    value.get("schema") == Some(&Json::text("mesh.attachment-file-restoration-addition/v1"))
+}
 pub(super) fn is_restoration(value: &Json) -> bool {
-    value.get("schema") == Some(&Json::text("mesh.attachment-file-restoration/v1"))
+    is_absent_restoration(value)
+        || value.get("schema") == Some(&Json::text("mesh.attachment-file-restoration/v1"))
+}
+fn is_insertion(value: &Json) -> bool {
+    is_addition(value) || is_absent_restoration(value)
+}
+fn has_parent_policy(value: &Json) -> bool {
+    is_addition_v2(value) || is_absent_restoration(value)
 }
 pub(super) fn is_removal(value: &Json) -> bool {
     value.get("schema") == Some(&Json::text("mesh.attachment-file-removal/v1"))
@@ -88,7 +98,9 @@ pub(super) fn is_addition(value: &Json) -> bool {
         || value.get("schema") == Some(&Json::text("mesh.attachment-file-addition/v1"))
 }
 pub(super) fn result_schema(value: &Json) -> &'static str {
-    if is_restoration(value) {
+    if is_absent_restoration(value) {
+        "mesh.attachment-file-restoration-addition-result/v1"
+    } else if is_restoration(value) {
         "mesh.attachment-file-restoration-result/v1"
     } else if is_addition_v2(value) {
         "mesh.attachment-file-addition-result/v2"
@@ -147,7 +159,7 @@ pub(super) fn validate_receipt(
     };
     let restoring = is_restoration(value);
     let removing = is_removal(value);
-    let adding = is_addition(value);
+    let adding = is_insertion(value);
     let extra: &[&str] = if restoring {
         RESTORE_KEYS
     } else if is_addition_v2(value) {
@@ -155,10 +167,16 @@ pub(super) fn validate_receipt(
     } else {
         &[]
     };
-    if !fields
+    let policy_extra: &[&str] = if is_absent_restoration(value) {
+        &["parent_metadata_digest", "parent_mode"]
+    } else {
+        &[]
+    };
+    if !fields.iter().map(|(key, _)| key.as_str()).eq(KEYS
         .iter()
-        .map(|(key, _)| key.as_str())
-        .eq(KEYS.iter().chain(extra).copied())
+        .chain(extra)
+        .chain(policy_extra)
+        .copied())
         || (!restoring
             && !removing
             && !adding
@@ -253,7 +271,7 @@ pub(super) fn validate_receipt(
         || (!restoring && source_mode & !0o111 != installed_mode & !0o111)
         || (!adding
             && value.get("source_executable") != Some(&Json::Bool(source_mode & 0o111 != 0)))
-        || (adding
+        || (is_addition(value)
             && if is_addition_v2(value) {
                 installed_mode & !0o100755 != 0
             } else {
@@ -262,7 +280,7 @@ pub(super) fn validate_receipt(
     {
         return Err(invalid("invalid recovery mode"));
     }
-    if is_addition_v2(value) {
+    if has_parent_policy(value) {
         digest(text(value, "parent_metadata_digest")?)?;
         let mode = number(value, "parent_mode")?;
         if mode & !0o047777 != 0 || mode & 0o040000 == 0 {
@@ -283,6 +301,8 @@ pub(super) fn validate_receipt(
             || value.get("origin_digest") != value.get("installed_digest")
             || value.get("origin_mode") != value.get("installed_mode")
             || value.get("origin_metadata_digest") != value.get("installed_metadata_digest")
+            || (is_absent_restoration(value)
+                && value.get("native_metadata_digest") != value.get("installed_metadata_digest"))
         {
             return Err(invalid("invalid restoration snapshot binding"));
         }
@@ -480,7 +500,7 @@ fn inspect(
                     Json::text(Blake3::digest_bytes(raw.as_bytes()).to_string()),
                 ),
                 ("status", Json::text(status)),
-                ("displaced_file_retained", Json::Bool(!is_addition(&value))),
+                ("displaced_file_retained", Json::Bool(!is_insertion(&value))),
                 ("observation_final", Json::Bool(false)),
             ]);
             if observed != expected
@@ -497,7 +517,7 @@ fn inspect(
     // Validation above established exact types. This code only compares observations; it never
     // turns a matching byte digest or an old success receipt into permission to mutate.
     let removing = is_removal(&value);
-    let adding = is_addition(&value);
+    let adding = is_insertion(&value);
     let source_absent = (removing || adding)
         .then(|| {
             absent_parent(
@@ -632,7 +652,7 @@ fn inspect(
     if recovery.ensure_namespace_identity().is_err() {
         return report(id, "unavailable-directory", Json::Null);
     }
-    let parent_policy_matches = if is_addition_v2(&value) {
+    let parent_policy_matches = if has_parent_policy(&value) {
         crate::managed_file::retained_replacement::parent_policy(
             &history.project().pinned,
             Path::new(text(&value, "path").unwrap()),
@@ -687,7 +707,7 @@ fn inspect(
             fields.push(("retained_absent".into(), Json::Bool(retained_absent)));
         }
     }
-    if is_addition_v2(&value) {
+    if has_parent_policy(&value) {
         if let Json::Object(fields) = &mut details {
             fields.push((
                 "parent_policy_matches".into(),
@@ -696,7 +716,7 @@ fn inspect(
         }
     }
     let mut result = report(id, status, details);
-    if is_addition_v2(&value) && parent_policy_matches != Some(true) {
+    if has_parent_policy(&value) && parent_policy_matches != Some(true) {
         if let Json::Object(fields) = &mut result {
             if let Some((_, attention)) = fields
                 .iter_mut()

@@ -705,3 +705,11 @@ reconciliation. Read-only recovery retains v1 compatibility and exposes v2 polic
 Transferred tests compare inheritance with kernel-created files and cover restrictive umasks and
 policy races; canonical execution remains pending. Linux default ACLs/extended attributes remain
 unsupported. No grouped packaged graphical proof is claimed by this increment.
+
+Native retained-file restoration now handles an absent leaf beneath an existing confined parent.
+It restores a separate frozen copy while keeping the original retained inode available for late
+editor writes, refuses concurrent destination creation and records that no current file was displaced.
+Both removal and replacement origins retain verified ancestry and read-only restart evidence.
+The single-file native confirmation describes creation explicitly. Directory operations, complete
+group confirmation/recovery and packaged graphical proof remain required; earlier absent-path
+restoration gaps above are superseded for regular files with existing parents.

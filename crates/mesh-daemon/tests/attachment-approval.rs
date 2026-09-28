@@ -2153,3 +2153,346 @@ fn addition_recovery_reads_v1_evidence_and_reports_v2_parent_policy_changes_with
     );
     assert_eq!(fs::read(f.source.join("new.txt")).unwrap(), b"new approved");
 }
+
+fn removed_file_for_restoration(name: &str) -> (Fixture, TrustedReviewers, PathBuf, String) {
+    let f = Fixture::new(name);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::create_dir(f.source.join("folder")).unwrap();
+    fs::write(f.source.join("folder/old.txt"), "retained base").unwrap();
+    let first = f.save("unchanged");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::remove_file(f.source.join("folder/old.txt")).unwrap();
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("folder/old.txt"), "retained base").unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &recovery_root(&f),
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let root = prepared.recovery_path().to_owned();
+    let id = prepared
+        .files()
+        .next()
+        .unwrap()
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    prepared.apply(&trust).unwrap();
+    (f, trust, root, id)
+}
+
+#[test]
+fn absent_retained_restoration_preserves_original_inode_metadata_and_late_editor_work() {
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+    let (f, trust, root, id) = removed_file_for_restoration("restore-absent");
+    let original = root.join(&id).join("exchange");
+    let old_inode = fs::metadata(&original).unwrap().ino();
+    let mut editor = fs::OpenOptions::new().append(true).open(&original).unwrap();
+    editor.write_all(b" + private work").unwrap();
+    fs::set_permissions(&original, fs::Permissions::from_mode(0o640)).unwrap();
+    #[cfg(target_os = "macos")]
+    {
+        assert!(std::process::Command::new("/usr/bin/xattr")
+            .args(["-w", "user.mesh.restore", "retained metadata"])
+            .arg(&original)
+            .status()
+            .unwrap()
+            .success());
+        assert!(std::process::Command::new("/bin/chmod")
+            .args(["+a", "everyone allow read"])
+            .arg(&original)
+            .status()
+            .unwrap()
+            .success());
+    }
+    let restored = f.source.join("folder/old.txt");
+    let journal = f.journal();
+    let prepared = f
+        .history
+        .prepare_retained_restoration(&root, &id, &trust, ObservationLimits::default())
+        .unwrap();
+    assert!(prepared.adds_path());
+    assert_eq!(prepared.current_content(), b"");
+    assert_eq!(prepared.restored_content(), b"retained base + private work");
+    assert!(!restored.exists());
+    let transaction = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let staged = prepared.recovery_path().join("exchange");
+    let staged_inode = fs::metadata(&staged).unwrap().ino();
+    let inspect = || {
+        f.storage
+            .reopen(f.history.id())
+            .unwrap()
+            .inspect_integration_recovery(
+                &root,
+                Some(&transaction),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap()
+    };
+    assert_eq!(recovery_status(&inspect()), "prepared-arrangement");
+    let outcome = prepared.apply(&trust).unwrap();
+    assert_eq!(outcome.get("status"), Some(&Json::text("applied-observed")));
+    assert_eq!(
+        outcome.get("displaced_file_retained"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(fs::metadata(&restored).unwrap().ino(), staged_inode);
+    assert_eq!(fs::metadata(&restored).unwrap().mode() & 0o777, 0o640);
+    assert_eq!(fs::metadata(&original).unwrap().ino(), old_inode);
+    assert!(!staged.exists());
+    assert_eq!(recovery_status(&inspect()), "applied-arrangement");
+    #[cfg(target_os = "macos")]
+    {
+        let result = std::process::Command::new("/usr/bin/xattr")
+            .args(["-p", "user.mesh.restore"])
+            .arg(&restored)
+            .output()
+            .unwrap();
+        assert!(result.status.success());
+        assert_eq!(result.stdout, b"retained metadata\n");
+        let receipt = Json::parse(
+            &fs::read_to_string(root.join(&transaction).join("prepared.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.get("origin_metadata_digest"),
+            receipt.get("installed_metadata_digest")
+        );
+    }
+    editor.write_all(b" + later editor work").unwrap();
+    editor.sync_all().unwrap();
+    assert_eq!(
+        fs::read(&restored).unwrap(),
+        b"retained base + private work"
+    );
+    assert_eq!(
+        fs::read(&original).unwrap(),
+        b"retained base + private work + later editor work"
+    );
+    fs::remove_file(root.join(&transaction).join("observed.json")).unwrap();
+    assert_eq!(recovery_status(&inspect()), "applied-arrangement");
+    // This creation displaced nothing, so it cannot be used as an automatic delete/undo authority.
+    assert!(f
+        .history
+        .prepare_retained_restoration(&root, &transaction, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn absent_restoration_refuses_collisions_changed_retained_work_and_unavailable_parents() {
+    use std::os::unix::fs::{symlink, PermissionsExt as _};
+    let (f, trust, root, id) = removed_file_for_restoration("restore-absent-refusals");
+    let original = root.join(&id).join("exchange");
+    let destination = f.source.join("folder/old.txt");
+    let prepare = || {
+        f.history
+            .prepare_retained_restoration(&root, &id, &trust, ObservationLimits::default())
+    };
+    let journal = f.journal();
+    let prepared = prepare().unwrap();
+    let stage = prepared.recovery_path().join("exchange");
+    fs::write(&destination, "new user work").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert_eq!(fs::read(&destination).unwrap(), b"new user work");
+    assert_eq!(fs::read(&stage).unwrap(), b"retained base");
+    fs::remove_file(&destination).unwrap();
+    let prepared = prepare().unwrap();
+    symlink(&original, &destination).unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert!(prepare().is_err());
+    fs::remove_file(&destination).unwrap();
+    let prepared = prepare().unwrap();
+    fs::write(&original, "later retained work").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert!(!destination.exists());
+    let prepared = prepare().unwrap();
+    let parent = f.source.join("folder");
+    let mode = fs::metadata(&parent).unwrap().permissions().mode();
+    fs::set_permissions(&parent, fs::Permissions::from_mode(mode ^ 0o010)).unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    fs::set_permissions(&parent, fs::Permissions::from_mode(mode)).unwrap();
+    let prepared = prepare().unwrap();
+    fs::rename(&parent, f.source.join("moved-folder")).unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert!(prepare().is_err());
+    fs::rename(f.source.join("moved-folder"), &parent).unwrap();
+    let prepared = prepare().unwrap();
+    fs::write(f.source.join(".meshignore"), "folder/old.txt\n").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert!(prepare().is_err());
+    fs::remove_file(f.source.join(".meshignore")).unwrap();
+    assert!(prepare()
+        .unwrap()
+        .apply(&TrustedReviewers::default())
+        .is_err());
+    assert!(f
+        .history
+        .prepare_retained_restoration(
+            &root,
+            &id,
+            &trust,
+            ObservationLimits {
+                file_bytes: 1,
+                ..ObservationLimits::default()
+            }
+        )
+        .is_err());
+    assert!(!destination.exists());
+    assert_eq!(fs::read(&original).unwrap(), b"later retained work");
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn absent_restoration_recovery_checks_null_source_policy_and_ancestry_without_replay() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (f, trust, root, id) = removed_file_for_restoration("restore-absent-evidence");
+    let prepared = f
+        .history
+        .prepare_retained_restoration(&root, &id, &trust, ObservationLimits::default())
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let transaction = path.file_name().unwrap().to_str().unwrap();
+    let receipt_path = path.join("prepared.json");
+    let receipt = prepared.proposal().clone();
+    let inspect = || {
+        f.storage
+            .reopen(f.history.id())
+            .unwrap()
+            .inspect_integration_recovery(
+                &root,
+                Some(transaction),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap()
+    };
+    for (field, value) in [
+        ("source_digest", Json::text("0".repeat(64))),
+        (
+            "source_file",
+            receipt.get("installed_file").unwrap().clone(),
+        ),
+        ("source_mode", Json::Number(0o100600)),
+        ("source_executable", Json::Bool(false)),
+        ("parent_mode", Json::Number(0o100755)),
+        ("parent_metadata_digest", Json::Null),
+        ("installed_metadata_digest", Json::text("0".repeat(64))),
+    ] {
+        fs::write(&receipt_path, replace_json(&receipt, field, value).encode()).unwrap();
+        assert_eq!(recovery_status(&inspect()), "invalid-receipt", "{field}");
+    }
+    fs::write(
+        &receipt_path,
+        replace_json(
+            &receipt,
+            "origin_proposal_digest",
+            Json::text("0".repeat(64)),
+        )
+        .encode(),
+    )
+    .unwrap();
+    assert_eq!(recovery_status(&inspect()), "unverified-history");
+    fs::write(&receipt_path, receipt.encode()).unwrap();
+    let parent = f.source.join("folder");
+    let mode = fs::metadata(&parent).unwrap().permissions().mode();
+    fs::set_permissions(&parent, fs::Permissions::from_mode(mode ^ 0o010)).unwrap();
+    let inspection = inspect();
+    assert_eq!(recovery_status(&inspection), "prepared-arrangement");
+    let entry = &inspection.get("entries").unwrap().as_array().unwrap()[0];
+    assert_eq!(entry.get("attention_required"), Some(&Json::Bool(true)));
+    assert_eq!(
+        entry.get("details").unwrap().get("parent_policy_matches"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        entry
+            .get("details")
+            .unwrap()
+            .get("content_is_approved_main"),
+        Some(&Json::Bool(false))
+    );
+    fs::set_permissions(&parent, fs::Permissions::from_mode(mode)).unwrap();
+    fs::rename(&parent, f.source.join("moved")).unwrap();
+    assert_eq!(recovery_status(&inspect()), "incomplete-observation");
+    fs::rename(f.source.join("moved"), &parent).unwrap();
+    let outcome = prepared.apply(&trust).unwrap();
+    fs::write(
+        path.join("observed.json"),
+        replace_json(&outcome, "displaced_file_retained", Json::Bool(true)).encode(),
+    )
+    .unwrap();
+    assert_eq!(recovery_status(&inspect()), "invalid-outcome");
+    fs::write(path.join("observed.json"), outcome.encode()).unwrap();
+    fs::write(f.source.join("folder/old.txt"), "new private edits").unwrap();
+    assert_eq!(recovery_status(&inspect()), "changed-files");
+    assert_eq!(
+        fs::read(f.source.join("folder/old.txt")).unwrap(),
+        b"new private edits"
+    );
+    assert_eq!(
+        fs::read(root.join(&id).join("exchange")).unwrap(),
+        b"retained base"
+    );
+}
+
+#[test]
+fn replacement_retained_work_can_be_restored_after_the_installed_path_disappears() {
+    let f = Fixture::new("restore-replacement-absent");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let root = recovery_root(&f);
+    let integration = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let id = integration
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    integration.apply(&trust).unwrap();
+    fs::remove_file(f.source.join("work.txt")).unwrap();
+    let restore = f
+        .history
+        .prepare_retained_restoration(&root, &id, &trust, ObservationLimits::default())
+        .unwrap();
+    assert!(restore.adds_path());
+    assert_eq!(
+        restore.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    assert_eq!(fs::read(root.join(id).join("exchange")).unwrap(), b"base");
+}

@@ -1,8 +1,8 @@
 # Retained recovery for attached-file integration
 
 Status: native regular-file addition/replacement/removal groups, restart inspection and retained-file
-replacement restoration implemented; desktop source connects single-file text confirmation and
-recovery inspection. Directory changes, absent-path restoration, the grouped desktop
+restoration into existing or absent regular-file paths implemented; desktop source connects
+single-file text confirmation and recovery inspection. Directory changes, the grouped desktop
 journey and packaged graphical proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
@@ -447,7 +447,7 @@ false/unavailable results while preserving the observed file arrangement. It nev
 Native tests cover policy changes, malformed policy receipts and legacy-v1 read-only recovery.
 
 Linux uses its setgid-parent or effective-process group rule, but the existing native metadata
-boundary still refuses extended attributes/default ACLs. This increment was exercised on macOS;
+boundary still refuses extended attributes/default ACLs. The historical source was exercised on macOS;
 it does not establish Linux runtime proof or complete portable ACL inheritance. Directory operations,
 restoration into absent paths and the grouped desktop/packaged graphical journey remain unfinished.
 
@@ -456,3 +456,54 @@ new native/persistence regressions. It also records a lingering-handle diagnosti
 CAS test and a passing isolated rerun. These are historical source reports, not validation of the
 canonical transfer. Local focused, failing-before and full native execution remains queued behind
 the preserved run; packaged graphical and human-presence acceptance remains outstanding.
+
+## Restoring retained work into an absent path
+
+`prepare_retained_restoration` now accepts a genuinely absent leaf under an existing confined parent.
+It checks the prospective path against captured exclusions and the structural Git boundary, and
+requires explicit native absence evidence. An unreadable path, symlink, directory, missing parent
+or substituted parent is never treated as absence. This covers retained files from approved removals
+and retained replacements whose installed working path was subsequently removed by an ordinary tool.
+
+The native proposal exposes `adds_path()` so callers distinguish file creation from replacement of
+an empty file. It stages a new copy of the exact bounded retained snapshot, including the selected
+retained permissions, ownership, extended attributes and ACL supported by the native adapter. Unlike
+an ordinary approved addition, restoration preserves the selected file's metadata instead of
+synthesizing destination inheritance or masking the saved mode again. Unsupported special bits or
+metadata refuse. The origin inode stays named in its existing recovery transaction, including late
+writes through already-open editor handles.
+
+After explicit confirmation, the origin snapshot, receipt, approval ancestry, exclusions, staged
+content and metadata, exact parent identity/policy and absent leaf are checked again. A no-replace
+rename installs the copy. A concurrent destination creation is preserved and refuses the operation;
+post-rename uncertainty requires inspection and never causes automatic undo, unlink or retry.
+Original retained files are never consumed. No new displaced file is claimed when creating a path.
+A restoration that displaced nothing cannot authorize deleting its installed file as an implicit undo.
+
+The new canonical schema is `mesh.attachment-file-restoration-addition/v1`. Its ordered fields are
+the existing base keys, the existing restoration snapshot/ancestry keys, then
+`parent_metadata_digest` and `parent_mode`. Source file, digest, mode and executable fields are null.
+The native and installed metadata digests both bind the staged retained snapshot. The corresponding
+`mesh.attachment-file-restoration-addition-result/v1` records `displaced_file_retained:false`.
+Existing replacement-restoration and addition/removal schemas remain unchanged and readable.
+Older readers refuse the new schema; no durable history, approval or journal migration is needed.
+
+Read-only restart inspection verifies the bounded ancestry back to an accepted integration, reports
+prepared/applied/changed/uncertain arrangements, and surfaces parent-policy mismatch separately.
+Restored content remains `content_is_approved_main:false` even when its ancestry identifies an
+accepted head. Missing outcomes never trigger replay. Malformed null-source facts, snapshot bindings,
+parent policy and retention claims are rejected. An absent parent yields incomplete observation.
+
+The existing desktop native confirmation now explicitly says that the destination is absent, shows
+the complete bounded proposed text and permissions, explains creation without replacement, and
+rejects contradictory source facts. Binary or oversized text remains unsupported by that dialog.
+The renderer still supplies only an attachment and recovery reference. Native/source tests cover
+both removal and replacement origins, metadata and late-editor retention, concurrent files/symlinks,
+changed inputs/trust/policy, missing parents, budgets, malformed receipts, lost outcomes and exact
+confirmation wording. Packaged graphical confirmation remains unverified; directory restoration and
+the complete grouped desktop workflow remain unfinished.
+
+The original source reports 3,284 Rust tests (14 skipped), 666 desktop tests and 28 isolated
+restoration tests, including the four new integration cases and native confirmation case. These
+historical results do not validate this canonical transfer. Local focused, failing-before and full
+native execution remains queued behind the preserved run; graphical acceptance remains outstanding.

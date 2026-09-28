@@ -42,10 +42,30 @@ pub fn confirmation(
             .and_then(Json::as_u64)
             .ok_or_else(|| "Native file permissions are unavailable".to_owned())
     };
+    let absent =
+        proposal.get("schema") == Some(&Json::text("mesh.attachment-file-restoration-addition/v1"));
+    let (before, effect) = if absent {
+        if !current.is_empty()
+            || [
+                "source_file",
+                "source_digest",
+                "source_mode",
+                "source_executable",
+            ]
+            .iter()
+            .any(|key| proposal.get(key) != Some(&Json::Null))
+        {
+            return Err("Native absent-file facts are inconsistent".into());
+        }
+        ("DESTINATION IS ABSENT\nA new file will be created at this path.".to_owned(),
+         "This creates only this working file using the retained snapshot's permissions and metadata. A file created there by another tool will never be replaced. The original retained file stays available, including later writes through an already-open editor.")
+    } else {
+        (format!("CURRENT FILE TO PRESERVE\nDigest: {}\nPermissions: {:o}\n{}", field("source_digest")?, mode("source_mode")?, text(current)?),
+         "This changes only this working file. Its current file is retained in private recovery storage, including later writes through an already-open editor. Existing retained files stay available.")
+    };
     let prompt = format!(
-        "{action}\n\nProject: {project:?}\nFolder: {root:?}\nFile: {:?}\n\nCURRENT FILE TO PRESERVE\nDigest: {}\nPermissions: {:o}\n{}\n\nCONTENT TO INSTALL\nDigest: {}\nPermissions: {:o}\n{}\n\nThis changes only this working file. Its current file is retained in private recovery storage, including later writes through an already-open editor. Existing retained files stay available. Mesh main and Git are unchanged. Restored content remains private work.\n\nThe exact inputs will be checked again after confirmation. A concurrent change can require recovery inspection. Cancel leaves your working file unchanged and retains the prepared record.",
-        field("path")?, field("source_digest")?, mode("source_mode")?, text(current)?,
-        field("installed_digest")?, mode("installed_mode")?, text(proposed)?,
+        "{action}\n\nProject: {project:?}\nFolder: {root:?}\nFile: {:?}\n\n{before}\n\nCONTENT TO INSTALL\nDigest: {}\nPermissions: {:o}\n{}\n\n{effect} Mesh main and Git are unchanged. Restored content remains private work.\n\nThe exact inputs will be checked again after confirmation. A concurrent change can require recovery inspection. Cancel leaves your working file unchanged and retains the prepared record.",
+        field("path")?, field("installed_digest")?, mode("installed_mode")?, text(proposed)?,
     );
     if prompt.len() > MAX_PROMPT {
         return Err("This change is too large to show completely in the native confirmation. No content will be omitted.".into());
@@ -145,6 +165,65 @@ mod tests {
             &Json::Null,
             b"before",
             b"after"
+        )
+        .is_err());
+    }
+    #[test]
+    fn absent_restoration_confirmation_describes_creation_and_rejects_inconsistent_facts() {
+        let mut proposal = proposal();
+        let Json::Object(fields) = &mut proposal else {
+            unreachable!()
+        };
+        fields.push((
+            "schema".into(),
+            Json::text("mesh.attachment-file-restoration-addition/v1"),
+        ));
+        for key in [
+            "source_file",
+            "source_digest",
+            "source_mode",
+            "source_executable",
+        ] {
+            fields.retain(|(name, _)| name != key);
+            fields.push((key.into(), Json::Null));
+        }
+        let prompt = confirmation(
+            "Restore",
+            "project",
+            Path::new("/fixture"),
+            &proposal,
+            b"",
+            b"private retained work",
+        )
+        .unwrap();
+        assert!(prompt.contains("DESTINATION IS ABSENT"));
+        assert!(prompt.contains("will never be replaced"));
+        assert!(prompt.contains("private retained work"));
+        assert!(!prompt.contains("CURRENT FILE TO PRESERVE"));
+        assert!(confirmation(
+            "Restore",
+            "project",
+            Path::new("/fixture"),
+            &proposal,
+            b"existing work",
+            b"retained"
+        )
+        .is_err());
+        let Json::Object(fields) = &mut proposal else {
+            unreachable!()
+        };
+        fields
+            .iter_mut()
+            .find(|(name, _)| name == "source_digest")
+            .unwrap()
+            .1 = Json::text("unexpected");
+        assert!(confirmation(
+            "Restore",
+            "project",
+            Path::new("/fixture"),
+            &proposal,
+            b"",
+            b"retained"
         )
         .is_err());
     }

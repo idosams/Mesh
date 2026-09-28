@@ -1537,3 +1537,24 @@ an isolated process, refuse changed ACLs/modes, and inspect persisted policy aft
 native focused/failing-before/full verification remains queued behind the preserved run. Historical
 source reports of 3,279 Rust/666 desktop tests and its CAS lingering-handle diagnostic are retained
 as provenance only. Canonical runtime and packaged acceptance remains outstanding.
+
+
+## I03a retained restoration into an absent file path
+
+Transfers source `59e0b5b13995e516ed112b09cd295311807523e3` onto PR #85 at
+`ec305a6ada14d5d3e33d64d9fdde33d8c06203b8`. Restoration stages a frozen copy of retained
+content and supported metadata, preserving the original inode and later editor writes. Exact
+absence under an existing confined parent and capture exclusions are required; concurrent creation
+is never overwritten. Explicit native confirmation distinguishes creation from replacement.
+
+Canonical conflict resolution preserves literal project/folder labels and the root argument in
+confirmation and its regression tests. New versioned restoration-addition receipts retain origin
+provenance and parent-policy evidence; existing formats remain supported, unknown schemas refuse,
+and inspection never authorizes automatic replay or main advancement. Missing parents, directories
+and the complete grouped desktop/packaged journey remain outstanding.
+
+Transferred tests cover removal/replacement origins, metadata preservation, later editor writes,
+collisions and substituted parents, exclusions, malformed receipts and restart inspection. Native
+confirmation tests reject inconsistent absence facts. Local focused/failing-before/full native
+execution remains queued behind the preserved run. Source-reported 3,284 Rust/666 desktop and
+28 isolated restoration tests are historical only.
