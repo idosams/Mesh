@@ -121,29 +121,38 @@ impl CapturedProjectInput {
     }
     /// Exact policy fingerprint, including the attachment's structural Git exclusion contract.
     pub fn exclusion_digest(&self) -> Digest32 {
-        let policy = Json::object([
-            ("schema", Json::text("mesh.attachment-exclusions/v1")),
-            (
-                "gitignore",
-                self.exclusions
-                    .0
-                    .as_deref()
-                    .map(Json::text)
-                    .unwrap_or(Json::Null),
-            ),
-            (
-                "meshignore",
-                self.exclusions
-                    .1
-                    .as_deref()
-                    .map(Json::text)
-                    .unwrap_or(Json::Null),
-            ),
-            ("git_case_variants_excluded", Json::Bool(true)),
-        ]);
-        Blake3::digest_bytes(policy.encode().as_bytes())
+        policy_digest(&self.exclusions)
     }
 }
+fn policy_digest(exclusions: &(Option<String>, Option<String>)) -> Digest32 {
+    let policy = Json::object([
+        ("schema", Json::text("mesh.attachment-exclusions/v1")),
+        (
+            "gitignore",
+            exclusions
+                .0
+                .as_deref()
+                .map(Json::text)
+                .unwrap_or(Json::Null),
+        ),
+        (
+            "meshignore",
+            exclusions
+                .1
+                .as_deref()
+                .map(Json::text)
+                .unwrap_or(Json::Null),
+        ),
+        ("git_case_variants_excluded", Json::Bool(true)),
+    ]);
+    Blake3::digest_bytes(policy.encode().as_bytes())
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(super) static CAPTURE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 impl std::fmt::Debug for CapturedProjectInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CapturedProjectInput")
@@ -195,11 +204,26 @@ impl ProjectAttachment {
     /// Any incomplete scan refuses the whole input; no partial project can be passed to a commit.
     /// Returned bytes survive later source edits, but are not durable until a version writer commits.
     pub fn capture_inputs(&self, limits: ObservationLimits) -> io::Result<CapturedProjectInput> {
+        #[cfg(test)]
+        CAPTURE_COUNT.with(|count| count.set(count.get() + 1));
         let scan = self.scan(limits, true)?;
         if scan.report.get("complete") != Some(&Json::Bool(true)) {
             return Err(invalid("attachment capture is incomplete"));
         }
         Ok(scan.captured)
+    }
+
+    /// Recheck the bounded root ignore rules without traversing or hashing project content.
+    /// Identity and repeated reads reject a replaced attachment or a policy changing during read.
+    pub(super) fn current_exclusion_digest(&self) -> io::Result<Digest32> {
+        self.ensure_current()?;
+        let filesystem = self.pinned.filesystem();
+        let before = rules(&filesystem)?;
+        if rules(&filesystem)? != before {
+            return Err(invalid("exclusions changed during validation"));
+        }
+        self.ensure_current()?;
+        Ok(policy_digest(&before))
     }
 
     fn scan(&self, limits: ObservationLimits, retain_bytes: bool) -> io::Result<Scan> {

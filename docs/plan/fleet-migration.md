@@ -1461,3 +1461,17 @@ them. Transferred tests cover complete preflight, partial interruption after the
 concurrent editor changes, preserved stages, already-present inode preservation and restart inspection.
 Local native/failing-before/full validation is queued behind preserved runs. The source's historical
 3,252 Rust/666 desktop result is not validation of this canonical replacement.
+
+
+## I01b bounded project capture reuse
+
+Transfers source `0a1af9129359a9bfbfe1ef40131d2c38d6ffd481` onto PR #81 at
+`c80d0fc70bfa573985d45ee1de875e90a005daf8`. Group staging shares one complete captured input
+under the verified history lock. Each member still reopens its exact file and verifies identity,
+bytes, metadata and exclusion policy. Standalone replacement retains complete fresh preflight.
+No persisted record format or authority boundary changes.
+
+Transferred regressions compare capture counts for 2- and 24-member groups and stop later exchanges
+when ignore rules change after the first member. Local native focused/failing-before/full execution
+is queued behind the preserved full run. Source-reported 3,254 Rust/666 desktop results are historical
+only. Scan-count bounds are not measured latency or packaged acceptance.

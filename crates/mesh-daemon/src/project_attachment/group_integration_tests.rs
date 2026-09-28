@@ -261,3 +261,129 @@ fn group_stops_after_mid_apply_change_and_retains_every_member() {
         b"concurrent user work"
     );
 }
+
+#[test]
+fn full_project_capture_count_stays_constant_as_replacement_group_grows() {
+    use super::super::observation::CAPTURE_COUNT;
+    for count in [2, 24] {
+        let f = Fixture::new(&format!("group-capture-count-{count}"));
+        let signer = TestSigner::generate();
+        let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+        for index in 0..count {
+            fs::write(f.source.join(format!("file-{index:02}")), "base").unwrap();
+        }
+        let first = f.capture();
+        let first_bundle = f.request(&first, &trust);
+        f.history
+            .approve_review(
+                &first_bundle,
+                &first,
+                &f.receipt(&signer, &trust, &first_bundle, &first, 1),
+                &trust,
+            )
+            .unwrap();
+        for index in 0..count {
+            fs::write(f.source.join(format!("file-{index:02}")), "accepted").unwrap();
+        }
+        let target = f.capture();
+        let bundle = f.request(&target, &trust);
+        f.history
+            .approve_review(
+                &bundle,
+                &target,
+                &f.receipt(&signer, &trust, &bundle, &target, 2),
+                &trust,
+            )
+            .unwrap();
+        for index in 0..count {
+            fs::write(f.source.join(format!("file-{index:02}")), "base").unwrap();
+        }
+        // Unrelated content must not be hashed once for each changed member.
+        fs::write(f.source.join("unrelated.bin"), vec![0x3a; 1024 * 1024]).unwrap();
+        let recovery = f.history.file_recovery_root(true).unwrap().unwrap();
+        CAPTURE_COUNT.with(|counter| counter.set(0));
+        let prepared = f
+            .history
+            .prepare_main_integration(
+                &bundle,
+                &target,
+                &recovery,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        assert!(CAPTURE_COUNT.with(|counter| counter.get()) <= 3);
+        assert_eq!(prepared.files().count(), count);
+        CAPTURE_COUNT.with(|counter| counter.set(0));
+        assert_eq!(
+            prepared.apply(&trust).unwrap().get("status"),
+            Some(&Json::text("applied-observed"))
+        );
+        assert!(CAPTURE_COUNT.with(|counter| counter.get()) <= 2);
+        for index in 0..count {
+            assert_eq!(
+                fs::read(f.source.join(format!("file-{index:02}"))).unwrap(),
+                b"accepted"
+            );
+        }
+        assert_eq!(
+            fs::read(f.source.join("unrelated.bin")).unwrap(),
+            vec![0x3a; 1024 * 1024]
+        );
+    }
+}
+
+#[test]
+fn changed_ignore_rules_between_group_members_stop_further_exchanges() {
+    let f = Fixture::new("group-policy-change");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    let first = f.save("base");
+    let first_bundle = f.request(&first, &trust);
+    f.history
+        .approve_review(
+            &first_bundle,
+            &first,
+            &f.receipt(&signer, &trust, &first_bundle, &first, 1),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "accepted").unwrap();
+    let target = f.save("accepted");
+    let bundle = f.request(&target, &trust);
+    f.history
+        .approve_review(
+            &bundle,
+            &target,
+            &f.receipt(&signer, &trust, &bundle, &target, 2),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let recovery = f.history.file_recovery_root(true).unwrap().unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &recovery,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let result = prepared
+        .apply_with_hook(&trust, |index| {
+            if index == 1 {
+                fs::write(f.source.join(".meshignore"), "work.txt\n").unwrap();
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        result.get("status"),
+        Some(&Json::text("reconciliation-required"))
+    );
+    assert_eq!(fs::read(f.source.join("a.txt")).unwrap(), b"accepted");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+}

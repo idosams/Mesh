@@ -551,3 +551,10 @@ attempt retains recovery evidence. Already-present files are not rewritten. A re
 verifies complete accepted-review membership and individual retained transactions. Additions, deletions
 and directory changes refuse the whole group; their executors, desktop group confirmation/recovery
 and packaged graphical proof remain unfinished.
+
+
+Replacement groups now reuse one complete captured input for member staging and check current ignore
+rules without rescanning unrelated project content at each member boundary. Native tests cover
+2-file/24-file groups with constant full-capture budgets, unchanged unrelated content, changed-policy
+refusal and mid-apply edit preservation. This is scan-count evidence; no large-project latency claim
+or completed desktop group workflow follows from it.

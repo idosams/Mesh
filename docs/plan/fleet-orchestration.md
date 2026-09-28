@@ -676,3 +676,9 @@ automatic rollback. Recovery inspection rederives full review membership and ver
 member. Unsupported additions/removals/directory changes refuse the entire group before source writes.
 This is the replacement executor foundation; the other entry executors, complete native desktop
 confirmation, grouped recovery UI and packaged proof remain required.
+
+
+Group preparation now reuses a verified project capture, preserving targeted file/metadata and ignore
+policy checks at each member boundary. Native tests bound full captures to three for preparation and
+two for apply for both 2-file and 24-file groups. Large-project timing, the other entry executors and
+the grouped desktop journey remain required.

@@ -175,19 +175,21 @@ pub(super) fn prepare(
     );
     let root = recovery.create_child_directory(std::ffi::OsStr::new(&id))?;
     let path = recovery_root.join(&id);
-    let mut files = Vec::new();
-    for relative in &planned.ready {
-        files.push(super::writeback::prepare(
-            history.clone(),
-            store.clone(),
-            bundle,
-            target,
-            relative,
-            &path,
-            trusted,
-            limits,
-        )?);
-    }
+    let files = history.project().with_review_history(
+        history.metadata_path(),
+        store.clone(),
+        trusted,
+        |workspace, store| {
+            let captured = history.project().capture_inputs(limits)?;
+            let mut files = Vec::new();
+            for relative in &planned.ready {
+                files.push(super::writeback::prepare_captured(
+                    &history, workspace, store, bundle, target, relative, &path, limits, &captured,
+                )?);
+            }
+            Ok(files)
+        },
+    )?;
     let mut members = Vec::new();
     for file in &files {
         members.push(Json::object([

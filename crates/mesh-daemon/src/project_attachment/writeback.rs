@@ -124,122 +124,160 @@ pub(super) fn prepare(
         store.clone(),
         trusted,
         |workspace, store| {
-            let (head, proposed, executable, base_digest, base_executable) =
-                approved_file(workspace, bundle, target, relative, limits.file_bytes)?;
             let capture = history.project().capture_inputs(limits)?;
-            history
-                .project()
-                .history_configuration(store, Some(capture.exclusion_digest()))?;
-            let current = capture
-                .files()
-                .iter()
-                .find(|file| file.path() == Path::new(relative))
-                .ok_or_else(|| invalid("selected file is excluded or unavailable"))?;
-            if current.digest().to_string() != base_digest
-                || current.executable() != base_executable
-            {
-                return Err(invalid("current file diverged from the approved base"));
-            }
-            let (source, expected) = read_target(
-                history.project().root(),
+            prepare_captured(
+                &history,
+                workspace,
+                store,
+                bundle,
+                target,
                 relative,
-                limits.file_bytes as usize,
-            )
-            .map_err(error)?;
-            if expected != current.bytes() || source.executable() != current.executable() {
-                return Err(invalid("source changed during preparation"));
-            }
-            let root = external_store(recovery_root, history.project())?;
-            let source_device = history.project().device;
-            if root.identity()?.0 != source_device {
-                return Err(invalid("recovery must share the source filesystem"));
-            }
-            if root.try_clone_directory()?.metadata()?.permissions().mode() & 0o077 != 0 {
-                return Err(invalid("recovery root must be private to its owner"));
-            }
-            let mut random = [0u8; 16];
-            File::open("/dev/urandom")?.read_exact(&mut random)?;
-            let name = format!(
-                "integration-{}",
-                random
-                    .iter()
-                    .map(|byte| format!("{byte:02x}"))
-                    .collect::<String>()
-            );
-            let recovery = root.create_child_directory(OsStr::new(&name))?;
-            let recovery_path = recovery_root.join(&name);
-            let recovery_identity = recovery.identity()?;
-            let source_parent = source.parent_installation();
-            let source_file = source.file_installation();
-            let source_mode = source.mode_with_executable(source.executable());
-            let mode = source.mode_with_executable(executable);
-            let exclusions = capture.exclusion_digest().to_string();
-            let mut receipt = Json::Null;
-            let replacement = RetainedReplacement::prepare(
-                source,
-                expected,
-                proposed.clone(),
-                mode,
-                recovery.clone(),
-                |installed, metadata_digest| {
-                    receipt = Json::object([
-                        ("schema", Json::text("mesh.attachment-file-integration/v1")),
-                        ("project", Json::text(history.id())),
-                        ("attachment", history.project().receipt()?),
-                        ("head", Json::text(&head)),
-                        ("bundle", Json::text(bundle)),
-                        ("target", Json::text(target)),
-                        ("path", Json::text(relative)),
-                        ("source_parent", Json::text(&source_parent)),
-                        ("source_file", Json::text(&source_file)),
-                        ("source_digest", Json::text(&base_digest)),
-                        ("native_metadata_digest", Json::text(metadata_digest)),
-                        ("source_executable", Json::Bool(base_executable)),
-                        ("source_mode", Json::Number(u64::from(source_mode))),
-                        (
-                            "store_device",
-                            Json::text(format!("{:016x}", store.identity()?.0)),
-                        ),
-                        (
-                            "store_inode",
-                            Json::text(format!("{:016x}", store.identity()?.1)),
-                        ),
-                        ("installed_file", Json::text(installed.token())),
-                        ("installed_digest", Json::text(digest(&proposed))),
-                        ("installed_mode", Json::Number(u64::from(mode))),
-                        ("exclusions", Json::text(&exclusions)),
-                        (
-                            "recovery_device",
-                            Json::text(format!("{:016x}", recovery_identity.0)),
-                        ),
-                        (
-                            "recovery_inode",
-                            Json::text(format!("{:016x}", recovery_identity.1)),
-                        ),
-                        ("automatic_replay", Json::Bool(false)),
-                    ]);
-                    recovery.filesystem().write_new_file(
-                        Path::new("prepared.json"),
-                        receipt.encode().as_bytes(),
-                        fs::Permissions::from_mode(0o600),
-                    )
-                },
-            )?;
-            Ok(PreparedMainFileIntegration {
-                history: history.clone(),
-                store: store.clone(),
-                recovery,
-                recovery_path,
-                receipt,
-                replacement,
+                recovery_root,
                 limits,
-                bundle: bundle.to_owned(),
-                target: target.to_owned(),
-                head,
-                exclusions,
-            })
+                &capture,
+            )
         },
     )
+}
+
+/// Stage from one complete group input; each selected path is freshly rechecked before staging.
+/// The caller retains the verified history lock. Captured content cannot select another project.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn prepare_captured(
+    history: &ProvisionedAttachment,
+    workspace: &OpenWorkspace,
+    store: &PinnedWorkspaceRoot,
+    bundle: &str,
+    target: &str,
+    relative: &str,
+    recovery_root: &Path,
+    limits: ObservationLimits,
+    capture: &super::CapturedProjectInput,
+) -> io::Result<PreparedMainFileIntegration> {
+    limits.validate()?;
+    if capture.root() != history.project().root()
+        || capture.identity() != (history.project().device, history.project().inode)
+        || relative.is_empty()
+        || relative
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+        || history.project().current_exclusion_digest()? != capture.exclusion_digest()
+    {
+        return Err(invalid(
+            "capture or exclusion policy changed before staging",
+        ));
+    }
+    let (head, proposed, executable, base_digest, base_executable) =
+        approved_file(workspace, bundle, target, relative, limits.file_bytes)?;
+    history
+        .project()
+        .history_configuration(store, Some(capture.exclusion_digest()))?;
+    let current = capture
+        .files()
+        .iter()
+        .find(|file| file.path() == Path::new(relative))
+        .ok_or_else(|| invalid("selected file is excluded or unavailable"))?;
+    if current.digest().to_string() != base_digest || current.executable() != base_executable {
+        return Err(invalid("current file diverged from the approved base"));
+    }
+    let (source, expected) = read_target(
+        history.project().root(),
+        relative,
+        limits.file_bytes as usize,
+    )
+    .map_err(error)?;
+    if expected != current.bytes() || source.executable() != current.executable() {
+        return Err(invalid("source changed during preparation"));
+    }
+    let root = external_store(recovery_root, history.project())?;
+    let source_device = history.project().device;
+    if root.identity()?.0 != source_device {
+        return Err(invalid("recovery must share the source filesystem"));
+    }
+    if root.try_clone_directory()?.metadata()?.permissions().mode() & 0o077 != 0 {
+        return Err(invalid("recovery root must be private to its owner"));
+    }
+    let mut random = [0u8; 16];
+    File::open("/dev/urandom")?.read_exact(&mut random)?;
+    let name = format!(
+        "integration-{}",
+        random
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let recovery = root.create_child_directory(OsStr::new(&name))?;
+    let recovery_path = recovery_root.join(&name);
+    let recovery_identity = recovery.identity()?;
+    let source_parent = source.parent_installation();
+    let source_file = source.file_installation();
+    let source_mode = source.mode_with_executable(source.executable());
+    let mode = source.mode_with_executable(executable);
+    let exclusions = capture.exclusion_digest().to_string();
+    let mut receipt = Json::Null;
+    let replacement = RetainedReplacement::prepare(
+        source,
+        expected,
+        proposed.clone(),
+        mode,
+        recovery.clone(),
+        |installed, metadata_digest| {
+            receipt = Json::object([
+                ("schema", Json::text("mesh.attachment-file-integration/v1")),
+                ("project", Json::text(history.id())),
+                ("attachment", history.project().receipt()?),
+                ("head", Json::text(&head)),
+                ("bundle", Json::text(bundle)),
+                ("target", Json::text(target)),
+                ("path", Json::text(relative)),
+                ("source_parent", Json::text(&source_parent)),
+                ("source_file", Json::text(&source_file)),
+                ("source_digest", Json::text(&base_digest)),
+                ("native_metadata_digest", Json::text(metadata_digest)),
+                ("source_executable", Json::Bool(base_executable)),
+                ("source_mode", Json::Number(u64::from(source_mode))),
+                (
+                    "store_device",
+                    Json::text(format!("{:016x}", store.identity()?.0)),
+                ),
+                (
+                    "store_inode",
+                    Json::text(format!("{:016x}", store.identity()?.1)),
+                ),
+                ("installed_file", Json::text(installed.token())),
+                ("installed_digest", Json::text(digest(&proposed))),
+                ("installed_mode", Json::Number(u64::from(mode))),
+                ("exclusions", Json::text(&exclusions)),
+                (
+                    "recovery_device",
+                    Json::text(format!("{:016x}", recovery_identity.0)),
+                ),
+                (
+                    "recovery_inode",
+                    Json::text(format!("{:016x}", recovery_identity.1)),
+                ),
+                ("automatic_replay", Json::Bool(false)),
+            ]);
+            recovery.filesystem().write_new_file(
+                Path::new("prepared.json"),
+                receipt.encode().as_bytes(),
+                fs::Permissions::from_mode(0o600),
+            )
+        },
+    )?;
+    Ok(PreparedMainFileIntegration {
+        history: history.clone(),
+        store: store.clone(),
+        recovery,
+        recovery_path,
+        receipt,
+        replacement,
+        limits,
+        bundle: bundle.to_owned(),
+        target: target.to_owned(),
+        head,
+        exclusions,
+    })
 }
 
 impl PreparedMainFileIntegration {
@@ -274,6 +312,12 @@ impl PreparedMainFileIntegration {
             self.store.clone(),
             trusted,
             |workspace, store| {
+                // Standalone application retains its complete fresh project preflight. Groups
+                // perform this once for all members through their accepted-review plan.
+                let capture = history.project().capture_inputs(self.limits)?;
+                history
+                    .project()
+                    .history_configuration(store, Some(capture.exclusion_digest()))?;
                 self.validate(workspace, store)?;
                 self.apply_validated()
             },
@@ -298,11 +342,11 @@ impl PreparedMainFileIntegration {
         {
             return Err(invalid("Mesh main changed since preparation"));
         }
-        let capture = self.history.project().capture_inputs(self.limits)?;
+        let exclusions = self.history.project().current_exclusion_digest()?;
         self.history
             .project()
-            .history_configuration(store, Some(capture.exclusion_digest()))?;
-        if capture.exclusion_digest().to_string() != self.exclusions {
+            .history_configuration(store, Some(exclusions))?;
+        if exclusions.to_string() != self.exclusions {
             return Err(invalid("exclusions changed since preparation"));
         }
         self.recovery.ensure_namespace_identity()?;

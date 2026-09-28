@@ -285,7 +285,31 @@ the final member untouched. Restart inspection does not replay the partial group
 add/remove/directory support and packaged graphical proof remain required for the full journey.
 
 
-The original source commit reports 3,252 Rust tests (14 skipped) and 666 desktop tests. Those
-historical results do not validate this canonical transfer; native execution remains queued. Current
-preparation and member validation repeat bounded project captures; reuse of verified captures and
-large-project timing remain performance work before making group-latency claims.
+The original group and capture-reuse source commits report 3,252 and 3,254 Rust tests respectively
+(14 skipped), and 666 desktop tests. Those historical results do not validate these canonical
+transfers. Local native execution remains queued behind the preserved full run.
+
+### Bounded full-project captures per group
+
+Group staging now shares one complete captured project input while retaining the verified history
+lock. The internal staging helper verifies that input's project/root identity and exclusion digest,
+then reopens and checks each selected file before preparing its retained replacement. Every staged
+file still binds its exact source/parent identity, bytes, mode, metadata and recovery receipt.
+
+Member validation rereads the bounded root ignore files twice and rechecks attachment identity;
+changed or unstable policy refuses. It verifies that fingerprint against the stored history policy
+and original proposal. Selected source/stage/metadata checks remain at every individual exchange.
+Whole-project capture brackets group preparation and application; standalone single-file apply keeps
+its existing complete project preflight. The capture fingerprint encoding and all durable receipts
+are unchanged.
+
+A regression test integrates both 2-file and 24-file groups alongside an unrelated 1 MiB file,
+asserting at most three full captures for preparation and two for application in either case.
+A separate test changes ignore rules after the first member and confirms the next member is untouched.
+When executed, these assertions check bounded scan count independent of group size, not a wall-clock speedup or
+large-project latency target. Historical-state reconstruction and per-file verification still cost
+work proportional to the group; broader performance measurement remains required.
+
+
+Canonical focused, failing-before and full native verification remains pending. No packaged
+graphical or wall-clock performance claim is made.
