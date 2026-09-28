@@ -19,10 +19,12 @@ pub use project_import::{CandidateImportSigner, PreparedProjectCandidateImport};
 mod file_deletions;
 #[cfg(unix)]
 pub mod provider;
+mod remote;
 #[cfg(unix)]
 pub mod service;
 mod wire;
 pub use file_deletions::{FileDeletion, FileDeletionResult};
+pub use remote::RemoteAssignment;
 #[cfg(unix)]
 pub mod workspace;
 
@@ -79,6 +81,8 @@ pub struct Run {
     pub state: RunState,
     /// Native host that durably claimed the one launch attempt; not a credential or liveness proof.
     pub launch_owner: Option<String>,
+    /// Durable remote assignment, absent for existing local run histories.
+    pub remote: Option<RemoteAssignment>,
 }
 
 /// Native allocation identity, constructed from a verified lane workspace receipt.
@@ -268,6 +272,32 @@ pub enum Command {
         checkpoint: String,
         /// Native-authenticated caller, not agent-supplied metadata.
         origin: AgentOrigin,
+    },
+    /// Reserve remote execution before transfer. Native code must authenticate the worker
+    /// and verify the immutable bundle before submitting this control-plane record.
+    ClaimRemoteLaunch {
+        /// Exact lane.
+        lane: String,
+        /// Exact current attempt.
+        run: String,
+        /// Native-verified assignment; contains no credentials or filesystem paths.
+        assignment: RemoteAssignment,
+    },
+    /// Record a verified continuation of the same remote assignment. This never grants
+    /// another launch, releases a slot or proves result integrity or process completion.
+    AdvanceRemoteLease {
+        /// Exact lane.
+        lane: String,
+        /// Exact current attempt.
+        run: String,
+        /// Exact retained assignment identity.
+        assignment: String,
+        /// Authenticated worker public-key identity, supplied by native code.
+        worker_key: String,
+        /// Previously acknowledged sequence, preventing stale renewal races.
+        expected_sequence: u64,
+        /// New native-authorized expiry, strictly later than the retained expiry.
+        lease_until_ms: u64,
     },
     /// Claim a dispatch exactly once before performing its external process launch.
     ClaimLaunch {
@@ -720,6 +750,54 @@ impl State {
                 self.review_change_requests
                     .insert(request.id.clone(), request.clone());
             }
+            Command::ClaimRemoteLaunch {
+                lane,
+                run,
+                assignment,
+            } => {
+                assignment.validate()?;
+                if self.cancelled {
+                    return refuse("objective-cancelled");
+                }
+                if self.lanes.values().flat_map(|lane| &lane.runs).any(|run| {
+                    run.remote
+                        .as_ref()
+                        .is_some_and(|old| old.id == assignment.id)
+                }) {
+                    return refuse("remote-assignment-exists");
+                }
+                let target = self.lanes.get(lane).ok_or(Error::Refused("lane-missing"))?;
+                if target.base != assignment.input {
+                    return refuse("remote-input-mismatch");
+                }
+                let current = current_run(&mut self.lanes, lane, run)?;
+                if current.state != RunState::Launching || current.launch_owner.is_some() {
+                    return refuse("launch-needs-reconciliation");
+                }
+                current.launch_owner = Some(format!("remote:{}", assignment.id));
+                current.remote = Some(assignment.clone());
+            }
+            Command::AdvanceRemoteLease {
+                lane,
+                run,
+                assignment,
+                worker_key,
+                expected_sequence,
+                lease_until_ms,
+            } => {
+                if self.cancelled {
+                    return refuse("objective-cancelled");
+                }
+                let current = current_run(&mut self.lanes, lane, run)?;
+                if !current.state.occupies_slot() || current.state == RunState::Stopping {
+                    return refuse("remote-run-not-active");
+                }
+                current
+                    .remote
+                    .as_mut()
+                    .ok_or(Error::Refused("remote-assignment-missing"))?
+                    .advance(assignment, worker_key, *expected_sequence, *lease_until_ms)?;
+            }
             Command::ClaimLaunch { lane, run, owner } => {
                 id_valid(owner)?;
                 if self.cancelled {
@@ -1009,6 +1087,7 @@ impl State {
                     id: run.clone(),
                     state: RunState::Launching,
                     launch_owner: None,
+                    remote: None,
                 });
             }
             Command::Observe { lane, run, state } => {

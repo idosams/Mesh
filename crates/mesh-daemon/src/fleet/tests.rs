@@ -1108,3 +1108,189 @@ fn deletion_command_encoding_is_additive_closed_and_roundtrips_exactly() {
     drop(runtime);
     assert!(fixture.runtime().state().file_deletions.is_empty());
 }
+
+fn remote_assignment() -> RemoteAssignment {
+    RemoteAssignment {
+        id: "assignment-one".into(),
+        worker_key: "ab".repeat(32),
+        input: RecordDigest::from_bytes([1; 32]),
+        bundle: RecordDigest::from_bytes([9; 32]),
+        lease_sequence: 1,
+        lease_until_ms: 1000,
+    }
+}
+fn remote_claim(assignment: RemoteAssignment) -> Command {
+    Command::ClaimRemoteLaunch {
+        lane: "worker".into(),
+        run: "run".into(),
+        assignment,
+    }
+}
+fn remote_advance(sequence: u64, until: u64) -> Command {
+    Command::AdvanceRemoteLease {
+        lane: "worker".into(),
+        run: "run".into(),
+        assignment: "assignment-one".into(),
+        worker_key: "ab".repeat(32),
+        expected_sequence: sequence,
+        lease_until_ms: until,
+    }
+}
+#[test]
+fn remote_assignment_and_exact_lease_ack_survive_restart_without_relaunch() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    let claim = send(&mut runtime, remote_claim(remote_assignment()));
+    send(
+        &mut runtime,
+        observe("worker", "run", RunState::Reconciling),
+    );
+    let renewal = send(&mut runtime, remote_advance(1, 2000));
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(
+        runtime
+            .submit(
+                claim.revision - 1,
+                &claim.request,
+                remote_claim(remote_assignment())
+            )
+            .unwrap(),
+        claim
+    );
+    assert_eq!(
+        runtime
+            .submit(
+                renewal.revision - 1,
+                &renewal.request,
+                remote_advance(1, 2000)
+            )
+            .unwrap(),
+        renewal
+    );
+    let run = &runtime.state().lanes["worker"].runs[0];
+    assert_eq!(run.state, RunState::Reconciling);
+    assert!(run.state.occupies_slot());
+    let assignment = run.remote.as_ref().unwrap();
+    assert_eq!(assignment.lease_sequence, 2);
+    assert_eq!(assignment.lease_until_ms, 2000);
+    assert_eq!(assignment.bundle, remote_assignment().bundle);
+    refuses(
+        &mut runtime,
+        Command::ClaimLaunch {
+            lane: "worker".into(),
+            run: "run".into(),
+            owner: "local-host".into(),
+        },
+        "launch-needs-reconciliation",
+    );
+    refuses(
+        &mut runtime,
+        remote_claim(remote_assignment()),
+        "remote-assignment-exists",
+    );
+    let mut other = remote_assignment();
+    other.id = "replacement".into();
+    refuses(
+        &mut runtime,
+        remote_claim(other),
+        "launch-needs-reconciliation",
+    );
+    refuses(
+        &mut runtime,
+        dispatch("worker", "second-run"),
+        "run-already-active",
+    );
+    refuses(&mut runtime, remote_advance(1, 3000), "remote-lease-stale");
+    refuses(&mut runtime, remote_advance(2, 2000), "remote-lease-stale");
+    send(&mut runtime, remote_advance(2, 3000));
+    assert_eq!(runtime.state().lanes["worker"].runs.len(), 1);
+}
+#[test]
+fn remote_assignment_refuses_wrong_inputs_peers_and_cancelled_or_finished_runs() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    let mut wrong = remote_assignment();
+    wrong.input = RecordDigest::from_bytes([2; 32]);
+    refuses(&mut runtime, remote_claim(wrong), "remote-input-mismatch");
+    for kind in 0..4 {
+        let mut invalid = remote_assignment();
+        match kind {
+            0 => invalid.worker_key = "AB".repeat(32),
+            1 => invalid.lease_sequence = 2,
+            2 => invalid.lease_until_ms = 0,
+            _ => invalid.worker_key = "unknown".into(),
+        }
+        refuses(
+            &mut runtime,
+            remote_claim(invalid),
+            "remote-assignment-invalid",
+        );
+    }
+    send(&mut runtime, remote_claim(remote_assignment()));
+    let mut wrong_peer = remote_advance(1, 2000);
+    if let Command::AdvanceRemoteLease { worker_key, .. } = &mut wrong_peer {
+        *worker_key = "cd".repeat(32);
+    }
+    refuses(&mut runtime, wrong_peer, "remote-assignment-mismatch");
+    let mut wrong_id = remote_advance(1, 2000);
+    if let Command::AdvanceRemoteLease { assignment, .. } = &mut wrong_id {
+        *assignment = "other".into();
+    }
+    refuses(&mut runtime, wrong_id, "remote-assignment-mismatch");
+    send(&mut runtime, observe("worker", "run", RunState::Running));
+    send(&mut runtime, observe("worker", "run", RunState::Succeeded));
+    refuses(
+        &mut runtime,
+        remote_advance(1, 2000),
+        "remote-run-not-active",
+    );
+    send(&mut runtime, Command::Cancel);
+    refuses(&mut runtime, remote_advance(1, 2000), "objective-cancelled");
+}
+#[test]
+fn remote_assignment_cannot_replace_local_claim_or_reuse_another_lanes_identity() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    register_lane(&mut runtime, "other", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    send(&mut runtime, dispatch("other", "other-run"));
+    send(&mut runtime, remote_claim(remote_assignment()));
+    refuses(
+        &mut runtime,
+        Command::ClaimRemoteLaunch {
+            lane: "other".into(),
+            run: "other-run".into(),
+            assignment: remote_assignment(),
+        },
+        "remote-assignment-exists",
+    );
+    send(
+        &mut runtime,
+        Command::ClaimLaunch {
+            lane: "other".into(),
+            run: "other-run".into(),
+            owner: "local".into(),
+        },
+    );
+    let mut other = remote_assignment();
+    other.id = "other-assignment".into();
+    refuses(
+        &mut runtime,
+        Command::ClaimRemoteLaunch {
+            lane: "other".into(),
+            run: "other-run".into(),
+            assignment: other,
+        },
+        "launch-needs-reconciliation",
+    );
+    assert!(runtime.state().lanes["other"].runs[0].remote.is_none());
+}

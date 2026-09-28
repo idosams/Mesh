@@ -765,3 +765,8 @@ and allowed Codex/Claude providers, then inspect the saved choices before Start.
 Uncertain provisioning retains the exact choices for explicit retry. Missing or
 inconsistent saved policies cannot enable execution. Actual authenticated Claude
 execution and packaged graphical acceptance remain unverified.
+
+Remote execution remains unfinished. Its review branch now adds durable assignment
+and lease correlation to existing dispatches, preserving uncertain ownership through
+restart and refusing stale renewals or local relaunch. Authentication, verified
+transfer, remote executor integration and second-machine acceptance are still pending.

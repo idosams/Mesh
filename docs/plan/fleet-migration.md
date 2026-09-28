@@ -2082,3 +2082,17 @@ A normal pure percentile regression covers empty and small samples, rank boundar
 and ordered inputs. Actual provider execution, whole integration compilation and full
 combined-native validation remain pending; this is a published acceptance driver,
 not a performance claim or completion of Phase 5.
+
+## R01 durable remote assignment foundation
+
+New canonical implementation based on #113 at
+`5c21f94bb6fc0cf5418a9ef8b15a84eb92d56ad4`; no preserved source commit is replaced.
+An additive remote claim binds one existing dispatch to its exact input, bundle,
+worker identity and lease. Exact-sequence renewal retains the same owner and never
+relaunches or frees its slot. Original local claims and legacy histories retain
+compatibility. SQLite replay/refusal regressions cover restart, lost acknowledgments,
+stale renewal, changed peers/inputs, duplicate identities, local claim conflicts and
+terminal/cancelled runs. Closed wire tests reject injected and fractional fields.
+The [remote delivery sequence](fleet-remote-delivery.md) identifies the remaining
+authentication, transfer, executor, reconnect, UI and second-machine acceptance work.
+No remote execution, authentication or verified transfer is claimed by this reducer.

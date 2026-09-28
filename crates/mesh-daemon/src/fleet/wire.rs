@@ -1,7 +1,7 @@
 //! Versioned deterministic command encoding. Unknown fields/versions refuse during replay.
 use super::{
-    AgentOrigin, CheckpointResult, Command, Error, FileDeletionResult, Limits, ReviewChangeRequest,
-    RunState, WorkspaceBinding,
+    AgentOrigin, CheckpointResult, Command, Error, FileDeletionResult, Limits, RemoteAssignment,
+    ReviewChangeRequest, RunState, WorkspaceBinding,
 };
 use crate::ipc::Json;
 use mesh_store::RecordDigest;
@@ -84,6 +84,41 @@ pub(super) fn encode(command: &Command) -> String {
                 ("version", Json::text(request.version.to_string())),
                 ("bundle", Json::text(request.bundle.to_string())),
                 ("message", Json::text(&request.message)),
+            ],
+        ),
+        Command::ClaimRemoteLaunch {
+            lane,
+            run,
+            assignment,
+        } => (
+            "claim-remote-launch",
+            vec![
+                ("lane", Json::text(lane)),
+                ("run", Json::text(run)),
+                ("assignment", Json::text(&assignment.id)),
+                ("worker_key", Json::text(&assignment.worker_key)),
+                ("input", Json::text(assignment.input.to_string())),
+                ("bundle", Json::text(assignment.bundle.to_string())),
+                ("lease_sequence", Json::Number(assignment.lease_sequence)),
+                ("lease_until_ms", Json::Number(assignment.lease_until_ms)),
+            ],
+        ),
+        Command::AdvanceRemoteLease {
+            lane,
+            run,
+            assignment,
+            worker_key,
+            expected_sequence,
+            lease_until_ms,
+        } => (
+            "advance-remote-lease",
+            vec![
+                ("lane", Json::text(lane)),
+                ("run", Json::text(run)),
+                ("assignment", Json::text(assignment)),
+                ("worker_key", Json::text(worker_key)),
+                ("expected_sequence", Json::Number(*expected_sequence)),
+                ("lease_until_ms", Json::Number(*lease_until_ms)),
             ],
         ),
         Command::ClaimLaunch { lane, run, owner } => (
@@ -326,6 +361,26 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
             bundle: digest("bundle")?,
             message: text("message")?,
         }),
+        Some("claim-remote-launch") => Command::ClaimRemoteLaunch {
+            lane: text("lane")?,
+            run: text("run")?,
+            assignment: RemoteAssignment {
+                id: text("assignment")?,
+                worker_key: text("worker_key")?,
+                input: digest("input")?,
+                bundle: digest("bundle")?,
+                lease_sequence: number("lease_sequence")?,
+                lease_until_ms: number("lease_until_ms")?,
+            },
+        },
+        Some("advance-remote-lease") => Command::AdvanceRemoteLease {
+            lane: text("lane")?,
+            run: text("run")?,
+            assignment: text("assignment")?,
+            worker_key: text("worker_key")?,
+            expected_sequence: number("expected_sequence")?,
+            lease_until_ms: number("lease_until_ms")?,
+        },
         Some("claim-launch") => Command::ClaimLaunch {
             lane: text("lane")?,
             run: text("run")?,
@@ -502,6 +557,51 @@ mod attachment_tests {
         ] {
             assert!(decode(&bad).is_err());
         }
+    }
+
+    #[test]
+    fn remote_assignment_encoding_is_closed_and_legacy_launch_is_unchanged() {
+        let claim = Command::ClaimRemoteLaunch {
+            lane: "lane".into(),
+            run: "run".into(),
+            assignment: RemoteAssignment {
+                id: "assignment".into(),
+                worker_key: "ab".repeat(32),
+                input: RecordDigest::from_bytes([1; 32]),
+                bundle: RecordDigest::from_bytes([2; 32]),
+                lease_sequence: 1,
+                lease_until_ms: 1000,
+            },
+        };
+        let renew = Command::AdvanceRemoteLease {
+            lane: "lane".into(),
+            run: "run".into(),
+            assignment: "assignment".into(),
+            worker_key: "ab".repeat(32),
+            expected_sequence: 1,
+            lease_until_ms: 2000,
+        };
+        for command in [claim, renew] {
+            let encoded = encode(&command);
+            assert_eq!(decode(&encoded).unwrap(), command);
+            assert!(decode(&encoded.replacen("\"kind\":", "\"extra\":0,\"kind\":", 1)).is_err());
+            assert!(decode(&encoded.replacen("\"lane\"", "\"unknown\"", 1)).is_err());
+            assert!(decode(
+                &encoded
+                    .replace("\"lease_until_ms\":1000", "\"lease_until_ms\":1.0")
+                    .replace("\"lease_until_ms\":2000", "\"lease_until_ms\":2.0")
+            )
+            .is_err());
+        }
+        let local = Command::ClaimLaunch {
+            lane: "lane".into(),
+            run: "run".into(),
+            owner: "host".into(),
+        };
+        let encoded = encode(&local);
+        assert!(encoded.contains("claim-launch"));
+        assert!(!encoded.contains("lease"));
+        assert_eq!(decode(&encoded).unwrap(), local);
     }
 
     #[test]
