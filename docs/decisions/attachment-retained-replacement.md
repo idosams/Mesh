@@ -2,8 +2,8 @@
 
 Status: native regular-file addition/replacement/removal groups, restart inspection and retained-file
 restoration into existing or absent regular-file paths implemented; desktop source connects
-single-file text confirmation and recovery inspection. Directory changes, the grouped desktop
-journey and packaged graphical proof are unfinished.
+single-file and complete regular-file group confirmation and recovery inspection. Directory changes
+and packaged graphical proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
 ## Decision and reason
@@ -522,3 +522,57 @@ restoration use native identifiers only; failed refreshes preserve observations 
 restoration. Already-present members remain preparation evidence. Hebrew labels never translate
 paths or transaction identities. These controls do not authorize replay, cleanup or main advancement;
 current packaged graphical acceptance remains required.
+
+
+## Desktop confirmation and recovery for regular-file groups
+
+The desktop now connects native `prepare_main_integration` and its single-use apply handle to one
+explicit native confirmation. The renderer supplies only attachment, accepted bundle and target
+identities. Native preparation rederives the complete accepted review and rejects unsupported
+directory changes, divergent inputs or incomplete observations before offering the dialog. The
+existing attachment generation check invalidates confirmation after detach/reattach.
+
+The dialog lists every create, replace and remove operation with the complete frozen before/after
+text, digests and permissions. Already-present paths are listed separately and are not rewritten.
+The total native prompt is bounded to 48 KiB; binary, incomplete and oversized presentations refuse
+without omitting any member. Prepared records remain discoverable even after refusal or cancellation.
+The dialog states that application is sequential and non-atomic, can stop after partial progress, and
+never automatically rolls back or retries. Existing native retained-inode and no-replace executors
+remain the source-write authority.
+
+The result view retains per-member observed, uncertain and not-attempted outcomes. It clears the
+old application comparison after an attempt and requires a new comparison for another apply intent.
+Refresh, recovery inspection and lost-response handling never dispatch another apply. A verified
+outcome remains visible if later inspection fails; stale recovery views disable restoration until
+refreshed. All displayed outcomes remain observations, not immutable filesystem state.
+
+Bounded native recovery catalogues now emit `group-reference` records for canonical group names.
+Discovery alone does not verify a group. Selecting a reference invokes native complete-membership,
+trusted-history, receipt and bounded member inspection. The UI distinguishes historical
+already-present evidence from fresh member observations. Exact lookup also accepts group references;
+malformed names never become renderer-supplied paths. Group-file lookup/restoration resolves only
+beneath a natively verified recovery group. Restorations create independent retained transactions
+inside that group and can be inspected by their returned reference without replaying the group.
+Group inspection also discovers bounded restoration references after restart, with an explicit
+possible-omission flag and an exact file-reference lookup within the selected group. These names
+are discovery only; selecting one independently verifies its receipt and approval ancestry.
+
+Native recovery additionally emits `retained_file_is_displaced`, based on exact retained/source inode
+identity. A prepared stage or addition collision therefore cannot offer restoration as though it were
+displaced user work. The renderer accepts native regular-file mode values including their file-type
+bits, addition/removal observations and absent-path restoration results. Previous parser assumptions
+accepted only permission bits and replacement results; those assumptions could hide valid native
+recovery. Missing displacement evidence remains readable but never enables restoration. These are
+additive live-view fields and desktop envelopes; existing durable receipts are unchanged. Older
+clients may refuse the new catalogue status rather than interpret it as write authority.
+
+Tests cover complete mixed-action native prompts, text bounds and binary refusal, native catalogue
+references and displacement evidence, typed controller identities, partial/lost responses, group
+member restoration scope, stale-view refusal and rendered disabled states. The regular-file desktop
+source flow is implemented; directory changes, large/binary confirmation and real packaged graphical
+approval/application/recovery proof remain unfinished.
+
+
+This contract is transferred from preserved source into canonical PRs #87 and #88. Controller,
+TypeScript and focused rendering checks passed on #88; full local desktop/native and packaged
+verification remain outstanding. Source implementation coverage is not current runtime acceptance.
