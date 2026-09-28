@@ -268,7 +268,7 @@ impl ProjectAttachment {
         Ok(store)
     }
 
-    fn enable_capture_line(
+    pub(super) fn enable_capture_line(
         &self,
         store: &PinnedWorkspaceRoot,
         configuration: &str,

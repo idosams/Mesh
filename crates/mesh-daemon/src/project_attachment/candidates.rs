@@ -108,6 +108,66 @@ fn ready(
     ]))
 }
 impl ProvisionedAttachment {
+    /// Retain an already verified candidate under the caller's native history lock. No allocation.
+    pub(super) fn retain_import_candidate(
+        &self,
+        request: &str,
+        candidate: &Json,
+        snapshot: &HistoricalWorkspacePreview,
+    ) -> io::Result<PinnedWorkspaceRoot> {
+        if request.len() != 32
+            || !request
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(invalid("invalid candidate request"));
+        }
+        let name = format!(
+            "candidate-{}",
+            digest(format!("{}:{request}", self.id()).as_bytes())
+        );
+        if candidate.get("candidate") != Some(&Json::text(&name))
+            || candidate.get("project") != Some(&Json::text(self.id()))
+            || candidate.get("schema") != Some(&Json::text("mesh.fleet-project-candidate/v1"))
+            || candidate.get("content_digest") != Some(&Json::text(content_digest(snapshot)))
+        {
+            return Err(invalid("candidate import identity changed"));
+        }
+        let container = private(self.store.open_child_directory(OsStr::new(CANDIDATES))?)?;
+        let allocation = private(container.open_child_directory(OsStr::new(&name))?)?;
+        let files = private(allocation.open_child_directory(OsStr::new("files"))?)?;
+        let intent = Json::object([
+            ("schema", Json::text("mesh.fleet-candidate-intent/v1")),
+            ("candidate", Json::text(&name)),
+            ("request", Json::text(request)),
+            ("project", Json::text(self.id())),
+            (
+                "provenance",
+                candidate
+                    .get("provenance")
+                    .ok_or_else(|| invalid("missing candidate provenance"))?
+                    .clone(),
+            ),
+            ("allocation", identity(&allocation)?),
+            ("content_digest", Json::text(content_digest(snapshot))),
+        ])
+        .encode();
+        if recovery::read_json(&allocation, "intent.json")?.1 != intent
+            || recovery::read_json(&allocation, "ready.json")?.0
+                != ready(&allocation, &files, &intent)?
+        {
+            return Err(invalid("candidate retained identity changed"));
+        }
+        verify_manifest(&allocation, &manifest(snapshot).encode())?;
+        lanes::verify_materialized(snapshot, &files, ObservationLimits::default())?;
+        files.ensure_namespace_identity()?;
+        allocation.ensure_namespace_identity()?;
+        container.ensure_namespace_identity()?;
+        self.store.ensure_namespace_identity()?;
+        self.project().ensure_current()?;
+        Ok(allocation)
+    }
+
     /// Stage a native-verified exact result. Existing receipts recover only identical arguments and
     /// unchanged retained content. Partial allocations are preserved and refused, never overwritten.
     pub(crate) fn stage_fleet_candidate(

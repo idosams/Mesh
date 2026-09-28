@@ -27,6 +27,7 @@ mod provisioning;
 pub use provisioning::{AttachmentStorage, ProvisionedAttachment, RegisteredAttachment};
 
 mod background;
+mod candidate_import;
 mod candidate_review;
 mod candidates;
 mod capture_line;

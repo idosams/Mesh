@@ -15,13 +15,23 @@ fn error(value: impl std::fmt::Display) -> io::Error {
     io::Error::other(value.to_string())
 }
 
+/// Native signing capability for candidate import, distinct from approval authority.
+pub trait CandidateImportSigner: crate::checkpoint_storage::CheckpointSigner {
+    /// Sign the domain-separated receipt binding provenance to the exact authenticated operation.
+    fn sign_import_provenance(
+        &self,
+        payload: &mesh_crypto::SigningPayload,
+    ) -> Result<mesh_types::Signature, String>;
+}
+
 /// An opaque, read-only compilation. It grants no journal append, review or approval authority.
 /// A writer must rederive it under retained project custody and bind an exact durable import receipt.
 pub struct PreparedProjectCandidateImport {
-    historical: HistoricalOperationPlan,
-    files: Vec<PreparedCheckpointFile>,
-    candidate: RecordDigest,
+    pub(crate) historical: HistoricalOperationPlan,
+    pub(crate) files: Vec<PreparedCheckpointFile>,
+    pub(crate) candidate: RecordDigest,
     digest: RecordDigest,
+    pub(crate) snapshot: HistoricalWorkspacePreview,
 }
 impl PreparedProjectCandidateImport {
     /// Original-project operations validated against one exact historical predecessor.
@@ -50,7 +60,7 @@ struct Desired {
     retained: bool,
 }
 
-pub(super) fn compile(
+pub(crate) fn compile(
     project: &OpenWorkspace,
     predecessor: RecordDigest,
     target: &OpenWorkspace,
@@ -286,6 +296,7 @@ pub(super) fn compile(
     Ok(PreparedProjectCandidateImport {
         historical,
         files,
+        snapshot: snapshot.clone(),
         candidate: receipt,
         digest: RecordDigest::from_bytes(*Blake3::digest_bytes(&commitment).as_bytes()),
     })

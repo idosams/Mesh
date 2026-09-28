@@ -635,12 +635,10 @@ saved trees (including explicit removal), while original ordinary files and prot
 unchanged. Reused actors outside ancestry refuse; a later policy epoch changes the plan while its
 historical base and clock remain fixed.
 
-This is the import foundation, not an enabled source-project importer. Attachment observation now
-uses the durable capture line described below, preserving independence from candidate branches.
-The importer must still compile retained content through original-object
-correspondence, bind source provenance and an exact retry receipt, use a separate native signing
-identity, and create the signable project review. Approval, dependency closure and guarded original
-folder application remain required. No desktop command or agent capability can append this plan.
+This historical preparation API remains read-only. The native importer described below uses the
+independent capture line, original-object correspondence and signed provenance receipts. Desktop
+signing-identity provisioning and review orchestration, approval, dependency closure and guarded
+original-folder application remain required. No desktop command or agent capability appends this plan.
 
 
 ### Independent observation history
@@ -650,7 +648,8 @@ an explicit native capture position, independently of other branches in the proj
 Saved observation listings follow that exact ancestry. Signed regression fixtures prove that an
 agent candidate can change a file and add a directory while subsequent ordinary captures retain
 only the user's ongoing changes. Neither capture nor this separation advances protected main or
-writes the original project files. Candidate import remains unfinished.
+writes the original project files. Native import uses this separation; desktop import and review
+orchestration remain unfinished.
 
 The external `mesh.attachment-capture-line/v1` record binds the original history configuration,
 last capture and optional exact pending signed operation. Native code persists intent before append.
@@ -687,11 +686,49 @@ outside the predecessor's ancestry and empty operation sets refuse. A no-op cand
 fabricate a saved version. Later user captures stay outside the proposal.
 
 The opaque result exposes bounded context and a read-only historical operation plan. It does not
-append, sign, create a review or authorize integration. An eventual writer must rederive it under
-project custody, verify the exact candidate and expected main again, bind provenance into the
-signed import and persist an exact retry receipt before appending. Signer provisioning must respect
+append, sign, create a review or authorize integration. The native writer described below rederives
+it under project custody, verifies the exact candidate and expected main again, binds provenance
+into the signed import and persists an exact retry receipt before appending. Signer provisioning must respect
 independent actor sequences across candidate branches. Native signed-journal fixtures prove the
 compiled result preserves moved originals, removes deleted entries, distinguishes replacements,
 retains exact bytes/modes and leaves ordinary files/main untouched. A delegated-lineage service
-test checks stable preparation and stale-input refusal. Runtime import receipts, crash recovery,
-signable review, desktop invocation and packaged user proof remain outstanding.
+test checks stable preparation and stale-input refusal. Runtime receipts and recovery are described
+below; desktop import/review orchestration and packaged user proof remain outstanding.
+
+
+### Durable signed candidate import
+
+Native `FleetService::import_project_candidate` now appends an exact staged candidate as a private
+original-project version. The host supplies a `CandidateImportSigner`, with separate capabilities
+for the private ChangeSet and its provenance receipt. The import remains outside the observation
+capture line, does not adopt workers, leaves original files untouched and cannot advance main.
+A successful target can enter the existing explicit project-review API; import itself does not
+open or approve a review.
+
+Under the retained source-history lock, the writer validates the candidate allocation/content,
+rederives the historical authoring context and requires the recorded main base. Legacy capture
+metadata is separated before any candidate append. Signing is followed by fresh project, history,
+capture-position, main, policy/context and retained-content verification. The create-only
+`fleet-candidates/<candidate>/import.json` is flushed before the normal authenticated CAS/journal
+append. Its `mesh.fleet-project-import-receipt/v1` envelope signs a
+`mesh.fleet-project-import-statement/v1` using domain `mesh.v0.fleet-project-import`; the statement
+binds the complete candidate/provenance, plan context/digest, source predecessor, actor, exact
+operation and ChangeSet signature. Existing workspace operation formats do not change. Older
+readers can ignore the extra receipt; the already-established v2 history wrapper prevents old
+all-tip attachment writers from resuming.
+
+Read-only inspection validates the private, single-link bounded receipt, native candidate identity,
+provenance signature and complete journal. A present operation must have the exact authenticated
+signature, predecessor and retained whole-project content. It reports `imported`; an absent operation
+reports `pending` without signing or replay. An explicit import retry uses the retained signature
+and operation only if current context and main still match. A completed retry recovers even after
+main advances. Partial/corrupt/aliased receipts, partial journal tails and changed context refuse and
+retain evidence. A receipt alone is neither append nor approval authority.
+
+Native fault tests stop after durable intent and prove read-only pending inspection, exact retry
+without signing, preserved user edits and later independent capture. Service tests cover delegated
+import, provenance tampering, recovery with signing disabled, history-only restart, existing native
+review creation, completed retry after verified main advancement and stale fresh-import refusal.
+Desktop signing-identity provisioning, durable user-facing import selectors, review orchestration,
+packaged import invocation and graphical/OS approval proof remain outstanding. The native signer
+must keep independent actor sequences for independent candidate branches.

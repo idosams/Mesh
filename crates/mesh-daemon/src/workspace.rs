@@ -3789,6 +3789,32 @@ impl OpenWorkspace {
         )
     }
 
+    pub(crate) fn verify_authenticated_operation(
+        &self,
+        operation: RecordDigest,
+        actor: mesh_types::PublicKey,
+        signature: mesh_types::Signature,
+    ) -> Result<(), String> {
+        self.ensure_physical_root().map_err(|e| e.to_string())?;
+        let record = self
+            .record_index
+            .operation(&operation)
+            .ok_or("import operation absent")?;
+        let bytes = self
+            .payload_store
+            .read(&CasDigest::from_bytes(*record.payload_digest.as_bytes()))
+            .map_err(|e| e.to_string())?;
+        let envelope =
+            crate::authenticated_changeset::AuthenticatedChangeSet::from_canonical_bytes(&bytes)
+                .map_err(|e| e.to_string())?;
+        if Blake3::digest_bytes(&bytes).as_bytes() != operation.as_bytes()
+            || !envelope.has_authentication(actor, signature)
+        {
+            return Err("import operation authentication changed".into());
+        }
+        Ok(())
+    }
+
     /// Exact linear ancestry, used only by the native observation cursor. No newest-tip inference.
     pub(crate) fn linear_history(
         &self,

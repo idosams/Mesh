@@ -301,6 +301,26 @@ impl FleetHistory {
         self.0
             .review_project_candidate(selection, source, trusted, request, expected_main, page)
     }
+    /// Recover exact import status from retained history without adopting execution or signing.
+    pub fn inspect_project_candidate_import(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        actor: mesh_types::PublicKey,
+    ) -> Result<Json, Unavailable> {
+        self.0.inspect_project_candidate_import(
+            selection,
+            source,
+            trusted,
+            request,
+            expected_main,
+            actor,
+        )
+    }
+
     /// Recover an existing exact staged candidate without creating content or adopting workers.
     pub fn inspect_project_candidate(
         &self,
@@ -1669,6 +1689,79 @@ impl FleetService {
             )
             .map_err(|_| refusal("fleet-candidate-staging-unavailable"))?;
         history.verify()?;
+        Ok(result)
+    }
+
+    /// Inspect only durable import intent and journal completion. This never signs or appends.
+    pub fn inspect_project_candidate_import(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        actor: mesh_types::PublicKey,
+    ) -> Result<Json, Unavailable> {
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let result = self
+            .with_saved_review(selection, |open, _| {
+                let snapshot = open
+                    .historical_workspace_preview(selection.version)
+                    .map_err(|_| refusal("fleet-candidate-content-unavailable"))?;
+                source
+                    .inspect_fleet_import(request, &candidate, &snapshot, actor, trusted)
+                    .map_err(|_| refusal("fleet-candidate-import-unavailable"))
+            })?
+            .unwrap_or(Json::Null);
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-import-input-changed"));
+        }
+        Ok(result)
+    }
+
+    /// Append a provenance-bound private project version. Exact retries recover journal truth;
+    /// this never creates approval, advances main or writes the original project folder.
+    pub fn import_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        signer: &dyn super::CandidateImportSigner,
+    ) -> Result<Json, Unavailable> {
+        let existing = self.inspect_project_candidate_import(
+            selection,
+            source,
+            trusted,
+            request,
+            expected_main,
+            signer.public_key(),
+        )?;
+        if existing.get("state") == Some(&Json::text("imported")) {
+            return Ok(existing);
+        }
+        let plan = self.prepare_project_candidate_import(
+            selection,
+            source,
+            trusted,
+            request,
+            expected_main,
+            signer.public_key(),
+        )?;
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let result = source
+            .commit_fleet_import(request, &candidate, plan, signer, trusted)
+            .map_err(|_| refusal("fleet-candidate-import-unavailable"))?;
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-import-input-changed"));
+        }
         Ok(result)
     }
 

@@ -207,7 +207,7 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | C02 | `c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b` | feat(desktop): pin project comparisons with durable preparation inputs | Pending transfer |
 | C03 | `3aef42a9373ff0ebb84fd482819d39536b022ab2` | feat(history): prepare operations against exact saved ancestry | Pending transfer |
 | C03 | `d3b34517d6f9f390f2834a141717254861bc5358` | Keep attachment captures independent of candidate branches | Pending transfer |
-| C03 | `0d6114701a778f1277cbd69ff2bc3280feb2a716` | Compile fleet candidates with original project object identity | Pending transfer |
+| C03 | `0d6114701a778f1277cbd69ff2bc3280feb2a716` | Compile fleet candidates with original project object identity | [PR #70](https://github.com/idosams/Mesh/pull/70), replacement `46d473879e07b24f51bef5e9a2bb816c1448b02e`; full validation pending |
 | C03 | `a8d3bd00105941a9ceb23bd9215b87d367645d5a` | Persist signed fleet candidate imports with exact retry recovery | Pending transfer |
 | C04 | `3a3b0da0139b16fb527de4bf8a9ece0d9772f523` | Connect candidate imports to desktop fixed project reviews | Pending transfer |
 | C04 | `15111733b9da3565d5a1ddd8aba6457b0b2f85b9` | Open exact project reviews directly from fleet panels | Pending transfer |
@@ -1231,3 +1231,27 @@ lane-local identities makes the compiler regression fail; restoring the exact so
 and hosted validation remain pending. Durable signed import
 receipts, desktop signable review, the remaining source increments and complete acceptance remain
 required. The separate native registration failure is not resolved by this compiler transfer.
+
+## C03d signed candidate import and exact retry recovery
+
+Preserved source `a8d3bd00105941a9ceb23bd9215b87d367645d5a` transfers onto published
+[PR #70](https://github.com/idosams/Mesh/pull/70), replacement
+`46d473879e07b24f51bef5e9a2bb816c1448b02e`. The original source, dirty work and canonical
+validation corrections remain preserved. A separate clean worktree keeps #70's active full test
+run unchanged. Canonical native testing for this importer must wait for that run to finish.
+
+A private, bounded signed receipt records the exact candidate provenance, actor, historical plan
+and authenticated operation before append. Read-only inspection derives pending/imported state
+from journal truth. Explicit retry reuses the retained signature; changed or ambiguous receipts
+refuse without overwriting recovery evidence. Ordinary source files and protected main remain
+unchanged, and import does not grant approval or create a review.
+
+Compatibility adds the v1 import receipt and statement under existing external candidate storage.
+Old candidates have no import receipt; existing capture history remains independent of imported
+branches. Partial writes and conflicting evidence remain for reconciliation. Transferred tests
+cover a durable-intent fault, retry without resigning, tampered and aliased records, exact delegated
+imports and main advancement. Canonical repository/docs/license/storage/format checks pass. Added refusal coverage for public
+permissions and oversized receipts checks unchanged bytes, modes, journal, working file and signing
+count, then recovers the original pending receipt. Canonical native focused/full/hosted checks remain
+pending behind #70's active full run; this is not a packaged acceptance claim. Remaining desktop import/review, deletion, grouped integration and
+restoration increments, complete provider/remote/packaged journeys and final-main validation remain.

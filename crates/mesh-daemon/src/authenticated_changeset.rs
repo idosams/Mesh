@@ -67,6 +67,10 @@ impl AuthenticatedChangeSet {
         Self::verified(changeset, actor_public_key, signature)
     }
 
+    pub(crate) fn has_authentication(&self, actor: PublicKey, signature: Signature) -> bool {
+        self.actor_public_key == actor && self.signature == signature
+    }
+
     /// Exact inner canonical ChangeSet statement.
     pub(crate) fn changeset(&self) -> &[u8] {
         &self.changeset

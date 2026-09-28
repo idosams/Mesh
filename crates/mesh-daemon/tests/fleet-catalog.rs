@@ -13,6 +13,34 @@ use std::os::unix::fs::{symlink, PermissionsExt as _};
 use std::path::PathBuf;
 use std::time::Duration;
 
+struct ImportSigner {
+    key: SigningKey,
+    calls: std::sync::atomic::AtomicUsize,
+    refuse: bool,
+}
+impl mesh_daemon::CheckpointSigner for ImportSigner {
+    fn public_key(&self) -> mesh_types::PublicKey {
+        mesh_types::PublicKey::from_bytes(self.key.verifying_key().to_bytes())
+    }
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.refuse {
+            return Err("signing disabled".into());
+        }
+        Ok(mesh_types::Signature::from_bytes(
+            self.key.sign(payload.as_bytes()).to_bytes(),
+        ))
+    }
+}
+impl mesh_daemon::fleet::CandidateImportSigner for ImportSigner {
+    fn sign_import_provenance(
+        &self,
+        payload: &mesh_crypto::SigningPayload,
+    ) -> Result<mesh_types::Signature, String> {
+        mesh_daemon::CheckpointSigner::sign(self, payload)
+    }
+}
+
 struct Fixture {
     root: PathBuf,
     source: PathBuf,
@@ -901,10 +929,124 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
             .unwrap(),
         Json::Null
     );
+    let signer = ImportSigner {
+        key: SigningKey::from_bytes(&[123; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: false,
+    };
+    assert_eq!(
+        service
+            .inspect_project_candidate_import(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None,
+                import_actor
+            )
+            .unwrap(),
+        Json::Null
+    );
+    let imported = service
+        .import_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            &signer,
+        )
+        .unwrap();
+    assert_eq!(text(&imported, "state"), "imported");
+    assert_eq!(signer.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert_eq!(imported.get("approval_authority"), Some(&Json::Bool(false)));
+    assert_eq!(
+        f.history
+            .project()
+            .saved_versions(f.history.metadata_path())
+            .unwrap(),
+        versions_before
+    );
+    assert_eq!(
+        f.history
+            .accepted_main(&TrustedReviewers::default())
+            .unwrap(),
+        Json::Null
+    );
+    let unsigned_retry = ImportSigner {
+        key: SigningKey::from_bytes(&[123; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: true,
+    };
+    assert_eq!(
+        service
+            .import_project_candidate(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None,
+                &unsigned_retry
+            )
+            .unwrap(),
+        imported
+    );
+    assert_eq!(
+        unsigned_retry
+            .calls
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    let import_receipt = fs::read(retained.join("import.json")).unwrap();
+    let mut altered = Json::parse(std::str::from_utf8(&import_receipt).unwrap()).unwrap();
+    if let Json::Object(fields) = &mut altered {
+        *fields
+            .iter_mut()
+            .find(|(key, _)| key == "signature")
+            .unwrap() = ("signature".into(), Json::text("00".repeat(64)));
+    }
+    fs::write(retained.join("import.json"), altered.encode()).unwrap();
+    assert!(service
+        .inspect_project_candidate_import(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            import_actor
+        )
+        .is_err());
+    fs::write(retained.join("import.json"), &import_receipt).unwrap();
+    let review = f
+        .history
+        .request_review_with_trusted_reviewers(
+            text(&imported, "target"),
+            import_actor,
+            &TrustedReviewers::default(),
+        )
+        .unwrap();
+    assert!(review.get("bundle").is_some());
     drop(service);
     drop(catalog);
     let reopened = f.open().unwrap();
     let history = reopened.history(&objective).unwrap();
+    assert_eq!(
+        history
+            .inspect_project_candidate_import(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None,
+                import_actor
+            )
+            .unwrap(),
+        imported
+    );
+    assert_eq!(
+        fs::read(retained.join("import.json")).unwrap(),
+        import_receipt
+    );
     let before = reopened.snapshot().unwrap();
     assert_eq!(
         history
@@ -1093,6 +1235,31 @@ fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
     let candidate = service
         .stage_project_candidate(&selection, &f.history, &trust, &request, Some(&first_main))
         .unwrap();
+    let signer = ImportSigner {
+        key: SigningKey::from_bytes(&[124; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: false,
+    };
+    let imported = service
+        .import_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            &signer,
+        )
+        .unwrap();
+    let unimported_request = "d".repeat(32);
+    service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &unimported_request,
+            Some(&first_main),
+        )
+        .unwrap();
     let original = service
         .review_project_candidate(
             &selection,
@@ -1152,6 +1319,36 @@ fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
         .unwrap()
         .operation();
     let next_main = approve(&next.to_string(), 2).to_string();
+    let retry = ImportSigner {
+        key: SigningKey::from_bytes(&[124; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: true,
+    };
+    assert_eq!(
+        service
+            .import_project_candidate(
+                &selection,
+                &f.history,
+                &trust,
+                &request,
+                Some(&first_main),
+                &retry
+            )
+            .unwrap(),
+        imported
+    );
+    assert!(service
+        .import_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &unimported_request,
+            Some(&first_main),
+            &retry
+        )
+        .is_err());
+    assert_eq!(retry.calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+
     assert_eq!(
         service
             .stage_project_candidate(&selection, &f.history, &trust, &request, Some(&first_main))

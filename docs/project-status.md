@@ -379,8 +379,8 @@ versions and observed verified project main without creating a candidate or adva
 coverage includes three generations and ancestor deletion/recreation. Native tests cover supported
 edits/additions, exact parent-version selection, replaced-ancestor refusal and history-only restart.
 Missing managed files still require explicit entry resolution and cannot produce a complete agent
-checkpoint or submitted review. Candidate import, private dependency graphs, UI, approval, grouped
-integration and explicit agent deletion resolution remain incomplete. This source API is not a
+checkpoint or submitted review. Private dependency graphs, desktop import/review orchestration,
+approval, grouped integration and explicit agent deletion resolution remain incomplete. This source API is not a
 packaged user journey.
 
 The canonical correspondence increment adds same-path replacement and ambiguous inventory regressions.
@@ -397,9 +397,9 @@ remain pending; no migration PR is merged.
 Native fleet candidate staging now copies exact saved results into external project metadata with
 recorded ancestry, checkpoint attribution, expected main, a content manifest and a durable ready
 receipt. Source tests verify retries, restart inspection, stale/conflicting inputs, interrupted or
-altered candidates, capacity limits and unchanged source capture history/main. This is not yet an
-original-project review or operation import; it has no desktop controls, agent tool, signed approval
-or grouped integration. Inspection requires the original root and retained source/lane history;
+altered candidates, capacity limits and unchanged source capture history/main. Staging itself does
+not import or approve work. Desktop preparation and native signed import are described below;
+agent import tools, human approval and grouped integration remain unfinished. Inspection requires the original root and retained source/lane history;
 standalone offline verification, discovery and partial-candidate reconciliation remain unavailable.
 
 The canonical candidate-staging transfer retains all previous lineage and decision corrections and
@@ -412,8 +412,9 @@ Staged fleet candidates now have a native whole-project content review against t
 main base. The review identity remains stable after main advances, while a separate observation marks
 the base stale. Native tests cover signed fixture main advancement, inherited-file completeness,
 restart, saved text, 200-path pagination, 256 KiB text limits and altered content/unverified base refusal.
-The context digest is not an approvable source-history bundle. Operation import, signable review,
-UI/artifacts, dependency validation, human approval and integration remain unfinished.
+The context digest is not an approvable source-history bundle. Native imported targets can enter
+explicit project review; desktop orchestration, artifacts, dependency validation, human approval
+and integration remain unfinished.
 
 The canonical fixed-main review transfer preserves earlier candidate and ancestry regressions and
 adds exact text-limit and invalid UTF-8 coverage. Local repository/docs/license/storage/format checks
@@ -427,8 +428,8 @@ after restart through read-only fleet history before current execution ownership
 new preparation. Changed inputs, unrelated projects and unavailable bases refuse; no command
 imports operations, approves results, advances main, applies source files or adopts workers.
 A native desktop test exercises real capture, signed agent checkpoint, review, staging, exact retry,
-wrong-project refusal and restart recovery with later live edits preserved. Renderer controls,
-durable pending request inputs, packaged invocation and graphical proof remain unfinished.
+wrong-project refusal and restart recovery with later live edits preserved. Renderer preparation
+controls and durable selectors are described below; graphical proof remains unfinished.
 
 The canonical native desktop route transfer adds substituted checkpoint/version/bundle refusal
 coverage across mapping, preparation and review, preserving exact receipt recovery afterward. Local
@@ -441,7 +442,7 @@ independent paths/text, exact retries and a separate stale-main observation. Pre
 its exact project/request/main selectors durably; restart reads existing candidates without worker
 adoption or implicit staging. Fleet pin v2 accepts v1 navigation and migrates on a changed save;
 older binaries refuse v2. Native, coordinator and static-render tests cover this connection. Actual
-packaged graphical proof remains outstanding, as do candidate operation import, signable review,
+packaged graphical proof remains outstanding, as do desktop import/review orchestration,
 human approval and integration. Pending feedback/decision requests still need durable recovery.
 
 Canonical comparison-panel transfer preserves Hebrew localization, raw saved content, nullable lane
@@ -454,16 +455,16 @@ required review, ordered merges and combined-main verification remain outstandin
 Native historical operation preparation now validates a proposal against one saved predecessor
 without absorbing later journal branches. Signed journal regression tests cover independent trees,
 explicit removal, actor-sequence refusal, policy changes and unchanged ordinary files/main. This
-read-only foundation does not enable source candidate import: provenance-bound import receipts,
-signable review and integration remain outstanding.
+read-only foundation supports the native signed importer described below. Desktop review
+orchestration and integration remain outstanding.
 
 
 Attachment observation now follows a durable capture line independently of signed candidate
 branches. Native tests cover unchanged saves, later human edits, exact interrupted-append recovery,
 legacy identity-preserving migration and refusal of missing, malformed or linked position records.
 Legacy histories migrate on save to a v2 wrapper retaining the original identity seed; old writers
-refuse that wrapper. Original project files and protected main remain unchanged. Candidate operation
-import and signable review remain incomplete; this change has no packaged graphical proof yet.
+refuse that wrapper. Original project files and protected main remain unchanged. Native import uses
+this separation; graphical import and review verification remain outstanding.
 
 Canonical historical-authoring transfer adds partial-plan and oversized-plan refusal coverage with
 unchanged durable history and repeatable context across restart. Repository/docs/license/storage and
@@ -483,6 +484,14 @@ operations, preserving object identity through moves/edits and distinguishing sa
 Preparation is read-only and refuses stale main, invalid correspondence and unchanged/no-op input.
 Transferred signed-journal fixtures exercise the resulting historical tree independently of newer
 user work; service coverage exercises delegated preparation and stable retry context. Canonical
-compiler and delegated-history regressions pass. Full local, hosted and packaged validation remain
-incomplete; this is not a delivered runtime importer. The runtime importer,
-provenance-bound signed receipt, signable review and packaged user journey remain unfinished.
+compiler and delegated-history regressions pass. The compiler's full local run is still active;
+final combined-main, hosted and packaged validation remain incomplete.
+
+Native fleet import now persists a signed provenance receipt before appending the exact private
+project operation. Read-only restart inspection distinguishes pending from imported work; explicit
+retries reuse the retained signature and completed retries recover after main advances. Transferred
+source and fault tests cover preserved ordinary files, independent capture, tampered/aliased receipt
+refusal, unsigned retries, delegated import and the explicit project-review API. Canonical native
+execution of this newly transferred importer remains pending. Import grants no approval and does
+not create a review automatically. Desktop signer provisioning, import/review controls and packaged
+graphical/OS approval proof remain unfinished.
