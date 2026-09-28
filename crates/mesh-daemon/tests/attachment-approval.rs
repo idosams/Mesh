@@ -1635,11 +1635,13 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
         fs::metadata(f.source.join("other.txt")).unwrap().ino(),
         inode
     );
-    fs::write(f.source.join("new.txt"), "new accepted").unwrap();
+    fs::create_dir(f.source.join("new-folder")).unwrap();
+    fs::write(f.source.join("new-folder/new.txt"), "new accepted").unwrap();
     let third = f.save("third");
     let third_bundle = accept(&f, &signer, &trust, &third, 3);
     fs::write(f.source.join("work.txt"), "accepted").unwrap();
-    fs::remove_file(f.source.join("new.txt")).unwrap();
+    fs::remove_file(f.source.join("new-folder/new.txt")).unwrap();
+    fs::remove_dir(f.source.join("new-folder")).unwrap();
     let count = fs::read_dir(&root).unwrap().count();
     assert!(f
         .history
@@ -1837,4 +1839,204 @@ fn integration_group_already_absent_removal_is_not_confused_with_empty_or_missin
     fs::create_dir(f.source.join("nested")).unwrap();
     prepare().unwrap().apply(&trust).unwrap();
     assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+}
+
+#[test]
+fn integration_group_adds_replaces_and_removes_without_rewriting_already_present_additions() {
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+    let f = Fixture::new("group-addition");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("old.txt"), "old base").unwrap();
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::remove_file(f.source.join("old.txt")).unwrap();
+    fs::write(f.source.join("new.txt"), "approved new file").unwrap();
+    fs::set_permissions(f.source.join("new.txt"), fs::Permissions::from_mode(0o755)).unwrap();
+    let target = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::remove_file(f.source.join("new.txt")).unwrap();
+    fs::write(f.source.join("old.txt"), "old base").unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let root = recovery_root(&f);
+    assert!(f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "new.txt",
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(prepared.files().count(), 3);
+    let group_path = prepared.recovery_path().to_owned();
+    let group = group_path.file_name().unwrap().to_str().unwrap();
+    let addition = prepared.files().find(|file| file.adds_path()).unwrap();
+    assert!(!addition.removes_path());
+    assert_eq!(addition.current_content(), b"");
+    assert_eq!(addition.proposed_content(), b"approved new file");
+    assert_eq!(
+        addition.proposal().get("schema"),
+        Some(&Json::text("mesh.attachment-file-addition/v1"))
+    );
+    for field in [
+        "source_file",
+        "source_digest",
+        "source_mode",
+        "source_executable",
+    ] {
+        assert_eq!(addition.proposal().get(field), Some(&Json::Null));
+    }
+    let transaction = addition
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let retained = addition.recovery_path().join("exchange");
+    let inspect = |history: &ProvisionedAttachment| {
+        let result = history
+            .inspect_integration_recovery(
+                &group_path,
+                Some(&transaction),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        result.get("entries").unwrap().as_array().unwrap()[0].clone()
+    };
+    assert_eq!(
+        inspect(&f.history).get("status"),
+        Some(&Json::text("prepared-arrangement"))
+    );
+    let journal = f.journal();
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert!(!f.source.join("old.txt").exists());
+    assert!(!retained.exists());
+    assert_eq!(
+        fs::read(f.source.join("new.txt")).unwrap(),
+        b"approved new file"
+    );
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    reopened
+        .inspect_main_integration_group(&root, group, &trust, ObservationLimits::default())
+        .unwrap();
+    let receipt_path = group_path.join(&transaction).join("prepared.json");
+    let raw = fs::read_to_string(&receipt_path).unwrap();
+    let receipt = Json::parse(&raw).unwrap();
+    fs::write(
+        &receipt_path,
+        replace_json(
+            &receipt,
+            "source_file",
+            receipt.get("installed_file").unwrap().clone(),
+        )
+        .encode(),
+    )
+    .unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("invalid-receipt"))
+    );
+    fs::write(&receipt_path, raw).unwrap();
+    fs::remove_file(group_path.join(&transaction).join("observed.json")).unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    assert_eq!(
+        inspect(&reopened).get("attention_required"),
+        Some(&Json::Bool(true))
+    );
+    let inode = fs::metadata(f.source.join("new.txt")).unwrap().ino();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let again = reopened
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(again.files().count(), 1);
+    again.apply(&trust).unwrap();
+    assert_eq!(fs::metadata(f.source.join("new.txt")).unwrap().ino(), inode);
+    fs::write(f.source.join("new.txt"), "later user work").unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("changed-files"))
+    );
+    assert_eq!(
+        fs::read(f.source.join("new.txt")).unwrap(),
+        b"later user work"
+    );
+    fs::remove_file(f.source.join("new.txt")).unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("incomplete-observation"))
+    );
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn initial_approved_main_can_add_regular_files_with_verified_restart_evidence() {
+    let f = Fixture::new("group-initial-addition");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let target = f.save("first accepted");
+    let bundle = accept(&f, &signer, &trust, &target, 1);
+    fs::remove_file(f.source.join("work.txt")).unwrap();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let group = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert!(prepared.files().next().unwrap().adds_path());
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"first accepted"
+    );
 }

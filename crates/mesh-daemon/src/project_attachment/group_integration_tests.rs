@@ -468,3 +468,87 @@ fn recreated_removal_member_stops_later_members_without_rolling_back_prior_remov
         .unwrap();
     assert_eq!(fs::read(f.source.join("b.txt")).unwrap(), b"new user work");
 }
+
+#[test]
+fn concurrent_addition_stops_group_and_retains_the_uninstalled_approved_stage() {
+    let f = Fixture::new("group-addition-collision");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    let first = f.save("base");
+    let first_bundle = f.request(&first, &trust);
+    f.history
+        .approve_review(
+            &first_bundle,
+            &first,
+            &f.receipt(&signer, &trust, &first_bundle, &first, 1),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "accepted").unwrap();
+    fs::write(f.source.join("b-new.txt"), "approved new file").unwrap();
+    let target = f.save("accepted");
+    let bundle = f.request(&target, &trust);
+    f.history
+        .approve_review(
+            &bundle,
+            &target,
+            &f.receipt(&signer, &trust, &bundle, &target, 2),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    fs::remove_file(f.source.join("b-new.txt")).unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let recovery = f.history.file_recovery_root(true).unwrap().unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &recovery,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let retained = prepared
+        .files()
+        .find(|file| file.adds_path())
+        .unwrap()
+        .recovery_path()
+        .join("exchange");
+    let result = prepared
+        .apply_with_hook(&trust, |index| {
+            if index == 1 {
+                fs::write(f.source.join("b-new.txt"), "concurrent user file").unwrap();
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        result.get("status"),
+        Some(&Json::text("reconciliation-required"))
+    );
+    assert_eq!(fs::read(f.source.join("a.txt")).unwrap(), b"accepted");
+    assert_eq!(
+        fs::read(f.source.join("b-new.txt")).unwrap(),
+        b"concurrent user file"
+    );
+    assert_eq!(fs::read(&retained).unwrap(), b"approved new file");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    assert!(!path.join("attempt-0002.json").exists());
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    reopened
+        .inspect_main_integration_group(
+            &recovery,
+            path.file_name().unwrap().to_str().unwrap(),
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        fs::read(f.source.join("b-new.txt")).unwrap(),
+        b"concurrent user file"
+    );
+    assert_eq!(fs::read(retained).unwrap(), b"approved new file");
+}

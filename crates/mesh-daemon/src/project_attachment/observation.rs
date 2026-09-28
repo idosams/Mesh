@@ -119,6 +119,39 @@ impl CapturedProjectInput {
     pub fn exclusion_rules(&self) -> (Option<&str>, Option<&str>) {
         (self.exclusions.0.as_deref(), self.exclusions.1.as_deref())
     }
+    /// Admission for a path that is not present yet. Apply the same policy to every ancestor;
+    /// an absent ignored file must not bypass the capture boundary just because it has no bytes.
+    pub(super) fn admits_file_path(&self, relative: &str) -> io::Result<bool> {
+        let policy = EffectiveExclusions::from_texts(
+            Some(self.root.join(".gitignore")),
+            self.exclusions.0.clone(),
+            None,
+            Some(self.root.join(".meshignore")),
+            self.exclusions.1.clone(),
+        )
+        .map_err(|_| invalid("attachment exclusion rules unavailable"))?;
+        let mut path = String::new();
+        for part in relative.split('/') {
+            if part.is_empty() || part == "." || part == ".." {
+                return Err(invalid("invalid prospective file path"));
+            }
+            if part.eq_ignore_ascii_case(".git") {
+                return Ok(false);
+            }
+            if !path.is_empty() {
+                path.push('/');
+            }
+            path.push_str(part);
+            if !policy
+                .versions_presented_path(&path)
+                .map_err(|_| invalid("invalid prospective file path"))?
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// Exact policy fingerprint, including the attachment's structural Git exclusion contract.
     pub fn exclusion_digest(&self) -> Digest32 {
         policy_digest(&self.exclusions)
@@ -493,6 +526,52 @@ fn rule_file(filesystem: &PinnedRootFs, name: &str) -> io::Result<Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prospective_file_admission_preserves_capture_exclusions_and_structural_git_boundary() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-prospective-policy-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        let metadata = root.join("metadata");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::create_dir(&metadata).unwrap();
+        std::fs::write(
+            source.join(".gitignore"),
+            "ignored\n!ignored/allowed.txt\n*.secret\n!public.secret\n",
+        )
+        .unwrap();
+        let attached = ProjectAttachment::register(&source, &metadata).unwrap();
+        let captured = attached
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        for path in [
+            "new.txt",
+            "folder/new.txt",
+            "public.secret",
+            "metadata.sqlite",
+        ] {
+            assert!(captured.admits_file_path(path).unwrap(), "{path}");
+        }
+        for path in [
+            "private.secret",
+            "ignored/allowed.txt",
+            ".git/config",
+            "folder/.GIT/config",
+        ] {
+            assert!(!captured.admits_file_path(path).unwrap(), "{path}");
+        }
+        for path in [
+            "",
+            "/new.txt",
+            "../new.txt",
+            "folder/./new.txt",
+            "folder//new.txt",
+        ] {
+            assert!(captured.admits_file_path(path).is_err(), "{path}");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn changes_after_hashing_are_reported_as_incomplete() {
         let root =

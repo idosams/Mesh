@@ -80,9 +80,14 @@ pub(super) fn is_restoration(value: &Json) -> bool {
 pub(super) fn is_removal(value: &Json) -> bool {
     value.get("schema") == Some(&Json::text("mesh.attachment-file-removal/v1"))
 }
+pub(super) fn is_addition(value: &Json) -> bool {
+    value.get("schema") == Some(&Json::text("mesh.attachment-file-addition/v1"))
+}
 pub(super) fn result_schema(value: &Json) -> &'static str {
     if is_restoration(value) {
         "mesh.attachment-file-restoration-result/v1"
+    } else if is_addition(value) {
+        "mesh.attachment-file-addition-result/v1"
     } else if is_removal(value) {
         "mesh.attachment-file-removal-result/v1"
     } else {
@@ -136,6 +141,7 @@ pub(super) fn validate_receipt(
     };
     let restoring = is_restoration(value);
     let removing = is_removal(value);
+    let adding = is_addition(value);
     let extra = if restoring { RESTORE_KEYS } else { &[] };
     if !fields
         .iter()
@@ -143,6 +149,7 @@ pub(super) fn validate_receipt(
         .eq(KEYS.iter().chain(extra).copied())
         || (!restoring
             && !removing
+            && !adding
             && text(value, "schema")? != "mesh.attachment-file-integration/v1")
         || text(value, "project")? != history.id()
         || value.get("attachment") != Some(&history.project().receipt()?)
@@ -159,13 +166,13 @@ pub(super) fn validate_receipt(
         "native_metadata_digest",
         "exclusions",
     ] {
-        if removing && key == "installed_digest" {
+        if (removing && key == "installed_digest") || (adding && key == "source_digest") {
             continue;
         }
         digest(text(value, key)?)?;
     }
     for key in ["source_file", "installed_file"] {
-        if removing && key == "installed_file" {
+        if (removing && key == "installed_file") || (adding && key == "source_file") {
             continue;
         }
         if !file_identity(text(value, key)?) {
@@ -179,7 +186,19 @@ pub(super) fn validate_receipt(
     {
         return Err(invalid("removal cannot install a file"));
     }
-    if !removing && text(value, "source_file")? == text(value, "installed_file")? {
+    if adding
+        && [
+            "source_file",
+            "source_digest",
+            "source_mode",
+            "source_executable",
+        ]
+        .into_iter()
+        .any(|key| value.get(key) != Some(&Json::Null))
+    {
+        return Err(invalid("addition cannot replace a source file"));
+    }
+    if !removing && !adding && text(value, "source_file")? == text(value, "installed_file")? {
         return Err(invalid("recovery identities overlap"));
     }
     let parent: Vec<_> = text(value, "source_parent")?.split(':').collect();
@@ -203,7 +222,14 @@ pub(super) fn validate_receipt(
             return Err(invalid("recovery directory identity changed"));
         }
     }
-    let source_mode = number(value, "source_mode")?;
+    let source_mode = number(
+        value,
+        if adding {
+            "installed_mode"
+        } else {
+            "source_mode"
+        },
+    )?;
     let installed_mode = if removing {
         source_mode
     } else {
@@ -213,7 +239,9 @@ pub(super) fn validate_receipt(
         .into_iter()
         .any(|mode| mode & !0o100777 != 0 || mode & 0o100000 == 0)
         || (!restoring && source_mode & !0o111 != installed_mode & !0o111)
-        || value.get("source_executable") != Some(&Json::Bool(source_mode & 0o111 != 0))
+        || (!adding
+            && value.get("source_executable") != Some(&Json::Bool(source_mode & 0o111 != 0)))
+        || (adding && !matches!(installed_mode, 0o100644 | 0o100755))
     {
         return Err(invalid("invalid recovery mode"));
     }
@@ -280,37 +308,40 @@ pub(super) fn verify_history(
     mesh_approval::verify_human_approval_receipt(&bytes, &expected)
         .map_err(|_| invalid("recovery signature mismatch"))?;
     let base = context.expected_canonical_head();
-    if base == crate::publication::GENESIS_SHARED_HEAD {
-        return Err(invalid("replacement has no saved base"));
-    }
-    let before = comparison_entries(
-        workspace
-            .historical_workspace_preview(workspace.review_target_for_head(base).map_err(fail)?)
-            .map_err(|_| invalid("base content unavailable"))?,
-    );
+    let before = if base == crate::publication::GENESIS_SHARED_HEAD {
+        Default::default()
+    } else {
+        comparison_entries(
+            workspace
+                .historical_workspace_preview(workspace.review_target_for_head(base).map_err(fail)?)
+                .map_err(|_| invalid("base content unavailable"))?,
+        )
+    };
     let after = comparison_entries(
         workspace
             .historical_workspace_preview(review.subject_operation)
             .map_err(|_| invalid("approved content unavailable"))?,
     );
     let path = text(value, "path")?;
-    let old = before
-        .get(path)
-        .filter(|entry| entry.kind == "file")
-        .ok_or_else(|| invalid("base file unavailable"))?;
+    let old = before.get(path);
+    let new = after.get(path);
+    let valid_base = if is_addition(value) {
+        old.is_none()
+    } else if let Some(old) = old.filter(|entry| entry.kind == "file") {
+        old.digest == Some(digest(text(value, "source_digest")?)?)
+            && old.executable == Some(number(value, "source_mode")? & 0o111 != 0)
+    } else {
+        false
+    };
     let valid_result = if is_removal(value) {
-        !after.contains_key(path)
-    } else if let Some(new) = after.get(path).filter(|entry| entry.kind == "file") {
-        old != new
-            && new.digest == Some(digest(text(value, "installed_digest")?)?)
+        new.is_none()
+    } else if let Some(new) = new.filter(|entry| entry.kind == "file") {
+        new.digest == Some(digest(text(value, "installed_digest")?)?)
             && new.executable == Some(number(value, "installed_mode")? & 0o111 != 0)
     } else {
         false
     };
-    if !valid_result
-        || old.digest != Some(digest(text(value, "source_digest")?)?)
-        || old.executable != Some(number(value, "source_mode")? & 0o111 != 0)
-    {
+    if !valid_base || !valid_result || old == new {
         return Err(invalid("recovery content does not match approved history"));
     }
     Ok(())
@@ -425,7 +456,7 @@ fn inspect(
                     Json::text(Blake3::digest_bytes(raw.as_bytes()).to_string()),
                 ),
                 ("status", Json::text(status)),
-                ("displaced_file_retained", Json::Bool(true)),
+                ("displaced_file_retained", Json::Bool(!is_addition(&value))),
                 ("observation_final", Json::Bool(false)),
             ]);
             if observed != expected
@@ -442,7 +473,8 @@ fn inspect(
     // Validation above established exact types. This code only compares observations; it never
     // turns a matching byte digest or an old success receipt into permission to mutate.
     let removing = is_removal(&value);
-    let source_absent = removing
+    let adding = is_addition(&value);
+    let source_absent = (removing || adding)
         .then(|| {
             absent_parent(
                 &history.project().pinned,
@@ -452,7 +484,7 @@ fn inspect(
             .flatten()
         })
         .flatten();
-    let retained_absent = removing
+    let retained_absent = (removing || adding)
         && absent_parent(&recovery, Path::new("exchange")).is_ok_and(|parent| parent.is_some());
     let source = if source_absent.is_some() {
         None
@@ -486,6 +518,40 @@ fn inspect(
     };
     let status = if outcome == "invalid" {
         "invalid-outcome"
+    } else if adding {
+        if source_absent
+            .as_deref()
+            .is_some_and(|parent| parent != text(&value, "source_parent").unwrap())
+            || source
+                .as_ref()
+                .is_some_and(|item| item.parent != text(&value, "source_parent").unwrap())
+        {
+            "identity-mismatch"
+        } else if let Some(source) = source.as_ref().filter(|_| retained_absent) {
+            if matching(source, "installed") {
+                "applied-arrangement"
+            } else if source.installation == text(&value, "installed_file").unwrap() {
+                "changed-files"
+            } else {
+                "identity-mismatch"
+            }
+        } else if let Some(retained) = &retained {
+            if retained.installation != text(&value, "installed_file").unwrap() {
+                "identity-mismatch"
+            } else if source_absent.is_some() && matching(retained, "installed") {
+                if outcome == "absent" {
+                    "prepared-arrangement"
+                } else {
+                    "contradictory-outcome"
+                }
+            } else if source_absent.is_some() || source.is_some() {
+                "changed-files"
+            } else {
+                "incomplete-observation"
+            }
+        } else {
+            "incomplete-observation"
+        }
     } else if removing {
         if source_absent
             .as_deref()
@@ -547,6 +613,8 @@ fn inspect(
             "operation",
             Json::text(if is_restoration(&value) {
                 "restore-retained"
+            } else if adding {
+                "add-approved"
             } else if removing {
                 "remove-approved"
             } else {
@@ -572,7 +640,7 @@ fn inspect(
         ("retained", evidence(&retained)),
         ("current_exclusions_checked", Json::Bool(false)),
     ]);
-    if removing {
+    if removing || adding {
         if let Json::Object(fields) = &mut details {
             fields.push((
                 "source_absent_parent".into(),

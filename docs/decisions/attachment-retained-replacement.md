@@ -1,8 +1,8 @@
 # Retained recovery for attached-file integration
 
-Status: native regular-file replacement/removal groups, restart inspection and retained-file
+Status: native regular-file addition/replacement/removal groups, restart inspection and retained-file
 replacement restoration implemented; desktop source connects single-file text confirmation and
-recovery inspection. Additions, directory changes, absent-path restoration, the grouped desktop
+recovery inspection. Directory changes, absent-path restoration, the grouped desktop
 journey and packaged graphical proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
@@ -83,7 +83,7 @@ live files and the history journal while changing only the explicitly selected a
 Native restart inspection now classifies retained artifacts without replaying writes.
 
 Still required: packaged native confirmation and desktop recovery proof, crash-process campaigns,
-retention that does not discard live descriptors' work, grouped additions/directory changes and dependency
+retention that does not discard live descriptors' work, grouped directory changes and dependency
 handling, external-volume UX, Linux
 metadata preservation, and revision-bound packaged graphical proof. No general integration or
 packaged user-presence claim follows from these native tests.
@@ -242,11 +242,11 @@ The native receipt/observation format itself is unchanged.
 
 The native `prepare_main_integration` operation now selects all changed paths in one accepted review.
 The initial executor supported regular-file replacements; the removal extension is described below.
-An unsupported addition, directory change,
+An unsupported directory change,
 conflict, exclusion, unavailable member or group budget overflow refuses the complete group. It never
 silently reduces the accepted result to a supported subset. Up to 64 changed files and the configured
 aggregate byte budget are admitted. Already-present accepted files are recorded and not rewritten;
-unrelated current work is preserved. Addition/directory executors and desktop group confirmation
+unrelated current work is preserved. Directory executors and desktop group confirmation
 remain unfinished, so this does not complete general integration.
 
 Preparation first derives a complete plan from trusted accepted history and a fresh bounded source
@@ -284,7 +284,7 @@ preservation, refusal of mixed unsupported changes before staging, restart inspe
 membership. A deterministic mid-apply test changes the second of three files after the first exchange:
 apply stops, retains the completed member and every stage, preserves the new user content and leaves
 the final member untouched. Restart inspection does not replay the partial group. Desktop confirmation,
-addition/directory support and packaged graphical proof remain required for the full journey.
+directory support and packaged graphical proof remain required for the full journey.
 
 
 The original group and capture-reuse source commits report 3,252 and 3,254 Rust tests respectively
@@ -361,3 +361,56 @@ The original removal source reports 3,264 Rust tests (14 skipped) and 666 deskto
 historical results do not validate the canonical transfer. Local native focused, failing-before and
 full verification remains queued behind the preserved run. Packaged graphical confirmation and
 platform-backed human-presence acceptance remain outstanding.
+
+## Regular-file additions in accepted groups
+
+An accepted review can now add a regular file beneath an existing confined directory. The first
+approved main uses an empty saved base, so it can supply additions without inventing a prior version.
+Groups still reject directory changes as a whole; missing parents are not created implicitly. The
+prospective path and every ancestor must pass the exact captured ignore policy and structural Git
+boundary. This closes the gap where an absent ignored path would have no captured file to check.
+An already-present file with the accepted bytes and executable state is recorded without rewriting
+its inode. A different current file refuses the group before staging.
+
+Preparation creates the complete approved content as `exchange` in a private external transaction.
+It uses the existing native export creation modes, 0644 or 0755 according to approved executable
+state, and binds the actual staged ownership/attributes/ACL metadata. No old source metadata exists
+to copy. The staged metadata moves unchanged; this does not synthesize destination-directory ACL
+inheritance. Stage and directory are flushed before the preparation receipt. Failure or abandonment
+leaves the stage for inspection and never writes the attached project.
+
+`mesh.attachment-file-addition/v1` uses the existing ordered preparation keys. `source_file`,
+`source_digest`, `source_mode` and `source_executable` are JSON null. `source_parent` is the exact
+observed existing parent; installed identity, digest, mode and native metadata bind the staged file.
+Verified approval history must have no entry at the path in the saved base and the exact regular
+file in the accepted result. `mesh.attachment-file-addition-result/v1` has the existing result fields
+with `displaced_file_retained:false`, because no file was displaced. Unknown schemas and null source
+facts make older readers refuse rather than reinterpret an addition as a replacement. No existing
+receipt, journal, approval or saved-version encoding changes.
+
+Apply revalidates current accepted main, project/exclusion policy, the exact absent destination,
+parent identity, stage identity/content/mode/metadata and prepared receipt. One descriptor-relative
+no-replace rename moves the stage into the working folder. Both directory barriers are attempted;
+post-install inspection must verify the installed file under the exact parent and the absent stage
+before reporting `applied-observed`. A collision leaves the user file and approved stage untouched.
+A post-install edit, substituted namespace or failed durability barrier needs reconciliation; apply
+never unlinks, rolls back or retries automatically. Later group members stop on uncertainty.
+
+Read-only recovery separately observes source and stage absence. It recognizes prepared and applied
+arrangements, concurrent collisions, later edits, malformed receipts, lost outcomes and unavailable
+content without gaining write authority. The existing restoration action does not turn an addition
+receipt into permission to delete the newly added file. Single-file preparation remains replacement-
+only so its desktop confirmation does not silently gain new behavior. Group native confirmation can
+use `adds_path()` to distinguish creation from replacing an empty file.
+
+Native tests cover mixed add/replace/remove groups, first-main additions, already-present inode
+preservation, executable state, capture exclusions, source collisions before and at rename,
+parent/root replacement, stage changes, failed preparation receipts and directory barriers,
+partial-group stopping, lost outcomes, receipt tampering and restart inspection. Directory changes,
+restoration into absent paths, destination-inherited metadata semantics and the complete grouped
+desktop/packaged graphical journey remain unfinished.
+
+The original addition source reports 3,273 Rust tests (14 skipped) and 666 desktop tests.
+Those historical results do not validate this canonical transfer. Local focused, failing-before
+and full native verification is queued behind the preserved run. Grouped packaged graphical and
+platform-backed human-presence acceptance remains outstanding.

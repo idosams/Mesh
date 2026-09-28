@@ -545,12 +545,12 @@ be imported as actual source-project deletions. Ordinary approval contexts rejec
 identities. Transferred tests cover later edits, retained-history reopen, source preservation and
 approval refusal; canonical native and packaged execution remains pending.
 
-Native integration can now prepare a complete accepted-review group of regular-file replacements
-and removals.
+Native integration can now prepare a complete accepted-review group of regular-file additions,
+replacements and removals.
 All members are preflighted before writing; changed or uncertain members stop further work, and each
 attempt retains recovery evidence. Already-present files are not rewritten. A read-only group inspector
-verifies complete accepted-review membership and individual retained transactions. Additions
-and directory changes refuse the whole group; their executors, desktop group confirmation/recovery
+verifies complete accepted-review membership and individual retained transactions. Directory
+changes refuse the whole group; their executors, desktop group confirmation/recovery
 and packaged graphical proof remain unfinished.
 
 
@@ -565,5 +565,13 @@ Removed inodes remain named in private recovery storage for late editor writes. 
 confirmed leaf absence from unreadable content or missing parents, verifies the removal against
 accepted history and never replays it. Transferred mixed-group and race/restart tests cover this path;
 canonical native execution remains pending.
-Existing single-file desktop preparation remains replacement-only. Additions, directory changes,
+Existing single-file desktop preparation remains replacement-only. Directory changes,
 restoration into absent paths and the complete grouped desktop/packaged journey remain unfinished.
+
+Native groups now create approved regular files through a private stage and an atomic no-replace
+rename into an exact existing parent. Concurrent file creation preserves both the user's file and
+the staged approved content and stops later members. The first approved main can also supply
+additions; prospective paths obey current capture exclusions before staging. Transferred tests cover
+mixed groups, existing-file preservation, executable state, lost outcomes, malformed receipts and
+restart inspection; canonical native execution remains pending. Directory changes, absent-path restoration, destination-folder permission
+inheritance and grouped desktop proof remain.

@@ -4,8 +4,10 @@ use crate::root_authority::PinnedWorkspaceRoot;
 
 const EXCHANGE: &str = "exchange";
 
+mod addition;
 mod metadata;
 mod removal;
+pub(crate) use addition::RetainedAddition;
 use metadata::{copy_metadata, metadata_digest};
 pub(crate) use removal::{absent_parent, RetainedRemoval};
 

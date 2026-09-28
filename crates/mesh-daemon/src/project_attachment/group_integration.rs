@@ -31,7 +31,7 @@ struct Plan {
 }
 
 /// Native-only single-use group. Every changed path in the accepted review must be accounted for.
-/// This executor supports regular-file replacement and removal; additions and directory
+/// This executor supports regular-file addition, replacement and removal; directory
 /// changes refuse the whole group before staging. Applying never claims filesystem-wide atomicity.
 pub struct PreparedMainIntegration {
     history: ProvisionedAttachment,
@@ -66,14 +66,17 @@ fn plan(
         .human_approval_context(&review)
         .map_err(error)?
         .expected_canonical_head();
-    if base == crate::publication::GENESIS_SHARED_HEAD {
-        return Err(invalid("group replacement requires an accepted base"));
-    }
-    let before = comparison_entries(
-        workspace
-            .historical_workspace_preview(workspace.review_target_for_head(base).map_err(error)?)
-            .map_err(error)?,
-    );
+    let before = if base == crate::publication::GENESIS_SHARED_HEAD {
+        Default::default()
+    } else {
+        comparison_entries(
+            workspace
+                .historical_workspace_preview(
+                    workspace.review_target_for_head(base).map_err(error)?,
+                )
+                .map_err(error)?,
+        )
+    };
     let after = comparison_entries(
         workspace
             .historical_workspace_preview(review.subject_operation)
@@ -97,32 +100,38 @@ fn plan(
         if a == b {
             continue;
         }
-        let (a, b) = match (a, b) {
-            (Some(a), b) if a.kind == "file" && b.is_none_or(|b| b.kind == "file") => (a, b),
-            _ => {
-                return Err(invalid(
-                    "group contains an addition or directory change requiring another executor",
-                ))
-            }
-        };
+        if a.is_some_and(|entry| entry.kind != "file")
+            || b.is_some_and(|entry| entry.kind != "file")
+        {
+            return Err(invalid(
+                "group contains a directory change requiring another executor",
+            ));
+        }
+        if !captured.admits_file_path(path)? {
+            return Err(invalid("group member is excluded by capture policy"));
+        }
         if result.ready.len() + result.present.len() >= MAX_FILES {
             return Err(invalid("integration group exceeds file limit"));
         }
         bytes = bytes
-            .checked_add(a.bytes.unwrap_or(u64::MAX))
+            .checked_add(a.map_or(0, |a| a.bytes.unwrap_or(u64::MAX)))
             .and_then(|n| n.checked_add(b.map_or(0, |b| b.bytes.unwrap_or(u64::MAX))))
             .ok_or_else(|| invalid("group byte budget overflow"))?;
         if bytes > limits.bytes {
             return Err(invalid("integration group exceeds byte limit"));
         }
-        if b.is_none()
+        if (a.is_none() || b.is_none())
             && crate::managed_file::retained_replacement::absent_parent(
                 &history.project().pinned,
                 Path::new(path),
             )?
             .is_some()
         {
-            result.present.push(path.clone());
+            if b.is_none() {
+                result.present.push(path.clone());
+            } else {
+                result.ready.push(path.clone());
+            }
             continue;
         }
         let current = captured
@@ -139,7 +148,7 @@ fn plan(
         };
         if b.is_some_and(matches) {
             result.present.push(path.clone());
-        } else if matches(a) {
+        } else if a.is_some_and(matches) {
             result.ready.push(path.clone());
         } else {
             return Err(invalid("group member diverged from accepted base"));
@@ -554,13 +563,17 @@ pub(super) fn inspect(
                 .human_approval_context(&review)
                 .map_err(error)?
                 .expected_canonical_head();
-            let before = comparison_entries(
-                workspace
-                    .historical_workspace_preview(
-                        workspace.review_target_for_head(base).map_err(error)?,
-                    )
-                    .map_err(error)?,
-            );
+            let before = if base == crate::publication::GENESIS_SHARED_HEAD {
+                Default::default()
+            } else {
+                comparison_entries(
+                    workspace
+                        .historical_workspace_preview(
+                            workspace.review_target_for_head(base).map_err(error)?,
+                        )
+                        .map_err(error)?,
+                )
+            };
             let after = comparison_entries(
                 workspace
                     .historical_workspace_preview(review.subject_operation)

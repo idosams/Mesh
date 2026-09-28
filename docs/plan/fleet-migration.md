@@ -1496,3 +1496,24 @@ Transferred tests cover late editor writes, changed sources, occupied recovery, 
 substituted inodes, failed directory flushes, missing/replaced parents, mixed groups and restart
 inspection. Local native focused/failing-before/full verification is queued behind the preserved
 run. Source-reported 3,264 Rust/666 desktop results are historical only, not canonical acceptance.
+
+
+## I02b approved regular-file additions
+
+Transfers source `b8e9d0dcf1cafd65a06a390a1222579941b3236b` onto PR #83 at
+`04408cf8c89bef5d307fa13747282f347dbd43dc`. Accepted groups stage new regular files privately
+and install them into an exact existing parent using an atomic no-overwrite rename. Concurrent
+creation preserves both user work and the stage; uncertainty never triggers rollback. Genesis
+approval is supported. Prospective paths obey captured exclusions and the structural Git boundary.
+
+Versioned addition receipts bind staged identity, native metadata and approved history, with null
+source-file fields. Older readers refuse unknown addition receipts; existing replacement/removal/
+restoration formats and canonical mode validation remain intact. Standalone desktop preparation
+remains replacement-only. Directory changes, absent-path restoration, inherited destination metadata
+and complete grouped desktop/packaged acceptance remain separate work.
+
+Transferred regressions cover executable files, concurrent creation, changed stages/parents/roots,
+failed receipts and durability, exclusions, genesis and mixed groups, malformed receipts and restart
+inspection. Repository structural checks do not establish these runtime properties. Native focused,
+failing-before and full execution remains queued behind the preserved run. Source-reported
+3,273 Rust/666 desktop results are historical only.

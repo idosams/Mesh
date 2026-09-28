@@ -3,7 +3,7 @@ use super::inspection::comparison_entries;
 use super::{external_store, invalid, ObservationLimits, ProvisionedAttachment};
 use crate::ipc::Json;
 use crate::managed_file::retained_replacement::{
-    read_target, RetainedRemoval, RetainedReplacement,
+    absent_parent, read_target, RetainedAddition, RetainedRemoval, RetainedReplacement,
 };
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
@@ -35,38 +35,43 @@ pub struct PreparedMainFileIntegration {
 enum PreparedFileChange {
     Replace(RetainedReplacement),
     Remove(RetainedRemoval),
+    Add(RetainedAddition),
 }
 impl PreparedFileChange {
     fn current_bytes(&self) -> &[u8] {
         match self {
             Self::Replace(v) => v.current_bytes(),
             Self::Remove(v) => v.current_bytes(),
+            Self::Add(_) => &[],
         }
     }
     fn replacement_bytes(&self) -> &[u8] {
         match self {
             Self::Replace(v) => v.replacement_bytes(),
             Self::Remove(_) => &[],
+            Self::Add(v) => v.replacement_bytes(),
         }
     }
     fn validate(&self) -> io::Result<()> {
         match self {
             Self::Replace(v) => v.validate(),
             Self::Remove(v) => v.validate(),
+            Self::Add(v) => v.validate(),
         }
     }
     fn apply(self) -> io::Result<bool> {
         match self {
             Self::Replace(v) => v.apply(),
             Self::Remove(v) => v.apply(),
+            Self::Add(v) => v.apply(),
         }
     }
 }
 struct ApprovedChange {
     head: String,
     proposed: Option<(Vec<u8>, bool)>,
-    base_digest: String,
-    base_executable: bool,
+    base_digest: Option<String>,
+    base_executable: Option<bool>,
 }
 
 fn error(value: impl std::fmt::Display) -> io::Error {
@@ -81,7 +86,7 @@ fn approved_file(
     target: &str,
     relative: &str,
     maximum_bytes: u64,
-    allow_removal: bool,
+    allow_entry_changes: bool,
 ) -> io::Result<ApprovedChange> {
     let head = super::approval::main_head(workspace)?
         .ok_or_else(|| invalid("Mesh main has no approved version"))?;
@@ -96,31 +101,34 @@ fn approved_file(
         .human_approval_context(&review)
         .map_err(error)?
         .expected_canonical_head();
-    if base == crate::publication::GENESIS_SHARED_HEAD {
-        return Err(invalid(
-            "file replacement requires an existing approved base",
-        ));
-    }
-    let base_entries = comparison_entries(
-        workspace
-            .historical_workspace_preview(workspace.review_target_for_head(base).map_err(error)?)
-            .map_err(error)?,
-    );
+    let base_entries = if base == crate::publication::GENESIS_SHARED_HEAD {
+        Default::default()
+    } else {
+        comparison_entries(
+            workspace
+                .historical_workspace_preview(
+                    workspace.review_target_for_head(base).map_err(error)?,
+                )
+                .map_err(error)?,
+        )
+    };
     let proposed = comparison_entries(
         workspace
             .historical_workspace_preview(review.subject_operation)
             .map_err(error)?,
     );
-    let before = base_entries
-        .get(relative)
-        .filter(|entry| entry.kind == "file")
-        .ok_or_else(|| invalid("replacement base is not a saved regular file"))?;
+    let before = base_entries.get(relative);
+    if before.is_some_and(|entry| entry.kind != "file")
+        || (before.is_none() && !allow_entry_changes)
+    {
+        return Err(invalid("unsupported approved base entry"));
+    }
     let after = proposed.get(relative);
     let proposed = match after {
-        None if allow_removal => None,
+        None if allow_entry_changes && before.is_some() => None,
         Some(after)
             if after.kind == "file"
-                && before != after
+                && before != Some(after)
                 && after.bytes.is_some_and(|size| size <= maximum_bytes) =>
         {
             let file = workspace
@@ -135,12 +143,20 @@ fn approved_file(
         head: head.to_string(),
         proposed,
         base_digest: before
-            .digest
-            .ok_or_else(|| invalid("base digest unavailable"))?
-            .to_string(),
+            .map(|entry| {
+                entry
+                    .digest
+                    .ok_or_else(|| invalid("base digest unavailable"))
+            })
+            .transpose()?
+            .map(|digest| digest.to_string()),
         base_executable: before
-            .executable
-            .ok_or_else(|| invalid("base mode unavailable"))?,
+            .map(|entry| {
+                entry
+                    .executable
+                    .ok_or_else(|| invalid("base mode unavailable"))
+            })
+            .transpose()?,
     })
 }
 
@@ -198,7 +214,7 @@ pub(super) fn prepare_captured(
     recovery_root: &Path,
     limits: ObservationLimits,
     capture: &super::CapturedProjectInput,
-    allow_removal: bool,
+    allow_entry_changes: bool,
 ) -> io::Result<PreparedMainFileIntegration> {
     limits.validate()?;
     if capture.root() != history.project().root()
@@ -224,30 +240,53 @@ pub(super) fn prepare_captured(
         target,
         relative,
         limits.file_bytes,
-        allow_removal,
+        allow_entry_changes,
     )?;
     let removing = proposed.is_none();
+    let adding = base_digest.is_none();
     let (proposed, executable) = proposed.unwrap_or_default();
     history
         .project()
         .history_configuration(store, Some(capture.exclusion_digest()))?;
-    let current = capture
-        .files()
-        .iter()
-        .find(|file| file.path() == Path::new(relative))
-        .ok_or_else(|| invalid("selected file is excluded or unavailable"))?;
-    if current.digest().to_string() != base_digest || current.executable() != base_executable {
-        return Err(invalid("current file diverged from the approved base"));
+    if !capture.admits_file_path(relative)? {
+        return Err(invalid("selected path is excluded by capture policy"));
     }
-    let (source, expected) = read_target(
-        history.project().root(),
-        relative,
-        limits.file_bytes as usize,
-    )
-    .map_err(error)?;
-    if expected != current.bytes() || source.executable() != current.executable() {
-        return Err(invalid("source changed during preparation"));
-    }
+    let (source, expected, source_parent) = if adding {
+        if capture
+            .files()
+            .iter()
+            .any(|file| file.path() == Path::new(relative))
+        {
+            return Err(invalid(
+                "addition destination was not absent in captured input",
+            ));
+        }
+        let parent = absent_parent(&history.project().pinned, Path::new(relative))?
+            .ok_or_else(|| invalid("addition destination is occupied"))?;
+        (None, Vec::new(), parent)
+    } else {
+        let current = capture
+            .files()
+            .iter()
+            .find(|file| file.path() == Path::new(relative))
+            .ok_or_else(|| invalid("selected file is excluded or unavailable"))?;
+        if Some(current.digest().to_string()) != base_digest
+            || Some(current.executable()) != base_executable
+        {
+            return Err(invalid("current file diverged from the approved base"));
+        }
+        let (source, expected) = read_target(
+            history.project().root(),
+            relative,
+            limits.file_bytes as usize,
+        )
+        .map_err(error)?;
+        if expected != current.bytes() || source.executable() != current.executable() {
+            return Err(invalid("source changed during preparation"));
+        }
+        let parent = source.parent_installation();
+        (Some(source), expected, parent)
+    };
     let root = external_store(recovery_root, history.project())?;
     let source_device = history.project().device;
     if root.identity()?.0 != source_device {
@@ -268,18 +307,24 @@ pub(super) fn prepare_captured(
     let recovery = root.create_child_directory(OsStr::new(&name))?;
     let recovery_path = recovery_root.join(&name);
     let recovery_identity = recovery.identity()?;
-    let source_parent = source.parent_installation();
-    let source_file = source.file_installation();
-    let source_mode = source.mode_with_executable(source.executable());
-    let mode = source.mode_with_executable(executable);
+    let source_file = source.as_ref().map(|source| source.file_installation());
+    let source_mode = source
+        .as_ref()
+        .map(|source| source.mode_with_executable(source.executable()));
+    let mode = source
+        .as_ref()
+        .map_or(0, |source| source.mode_with_executable(executable));
     let exclusions = capture.exclusion_digest().to_string();
     let mut receipt = Json::Null;
     let mut record = |installed: Option<crate::managed_file::ManagedFileIdentity>,
+                      installed_mode: u32,
                       metadata_digest: &str| {
         receipt = Json::object([
             (
                 "schema",
-                Json::text(if removing {
+                Json::text(if adding {
+                    "mesh.attachment-file-addition/v1"
+                } else if removing {
                     "mesh.attachment-file-removal/v1"
                 } else {
                     "mesh.attachment-file-integration/v1"
@@ -292,11 +337,23 @@ pub(super) fn prepare_captured(
             ("target", Json::text(target)),
             ("path", Json::text(relative)),
             ("source_parent", Json::text(&source_parent)),
-            ("source_file", Json::text(&source_file)),
-            ("source_digest", Json::text(&base_digest)),
+            (
+                "source_file",
+                source_file.as_ref().map_or(Json::Null, Json::text),
+            ),
+            (
+                "source_digest",
+                base_digest.as_ref().map_or(Json::Null, Json::text),
+            ),
             ("native_metadata_digest", Json::text(metadata_digest)),
-            ("source_executable", Json::Bool(base_executable)),
-            ("source_mode", Json::Number(u64::from(source_mode))),
+            (
+                "source_executable",
+                base_executable.map_or(Json::Null, Json::Bool),
+            ),
+            (
+                "source_mode",
+                source_mode.map_or(Json::Null, |mode| Json::Number(u64::from(mode))),
+            ),
             (
                 "store_device",
                 Json::text(format!("{:016x}", store.identity()?.0)),
@@ -322,7 +379,7 @@ pub(super) fn prepare_captured(
                 if removing {
                     Json::Null
                 } else {
-                    Json::Number(u64::from(mode))
+                    Json::Number(u64::from(installed_mode))
                 },
             ),
             ("exclusions", Json::text(&exclusions)),
@@ -342,21 +399,31 @@ pub(super) fn prepare_captured(
             fs::Permissions::from_mode(0o600),
         )
     };
-    let replacement = if removing {
+    let replacement = if adding {
+        PreparedFileChange::Add(RetainedAddition::prepare(
+            history.project().pinned.clone(),
+            PathBuf::from(relative),
+            source_parent.clone(),
+            proposed.clone(),
+            executable,
+            recovery.clone(),
+            |installed, mode, metadata| record(Some(installed), mode, metadata),
+        )?)
+    } else if removing {
         PreparedFileChange::Remove(RetainedRemoval::prepare(
-            source,
+            source.ok_or_else(|| invalid("missing removal source"))?,
             expected,
             recovery.clone(),
-            |metadata| record(None, metadata),
+            |metadata| record(None, 0, metadata),
         )?)
     } else {
         PreparedFileChange::Replace(RetainedReplacement::prepare(
-            source,
+            source.ok_or_else(|| invalid("missing replacement source"))?,
             expected,
             proposed.clone(),
             mode,
             recovery.clone(),
-            |installed, metadata| record(Some(installed), metadata),
+            |installed, metadata| record(Some(installed), mode, metadata),
         )?)
     };
     Ok(PreparedMainFileIntegration {
@@ -378,6 +445,11 @@ impl PreparedMainFileIntegration {
     /// Frozen current bytes presented by the native confirmation host.
     pub fn current_content(&self) -> &[u8] {
         self.replacement.current_bytes()
+    }
+
+    /// Whether the approved result creates a previously absent path rather than replacing a file.
+    pub fn adds_path(&self) -> bool {
+        matches!(self.replacement, PreparedFileChange::Add(_))
     }
 
     /// Whether the approved result removes the path rather than replacing it with empty content.
@@ -483,7 +555,10 @@ impl PreparedMainFileIntegration {
                     "reconciliation-required"
                 }),
             ),
-            ("displaced_file_retained", Json::Bool(true)),
+            (
+                "displaced_file_retained",
+                Json::Bool(!super::recovery::is_addition(&self.receipt)),
+            ),
             ("observation_final", Json::Bool(false)),
         ]);
         // Failure here means uncertain acknowledgement, not that the exchange was undone.
