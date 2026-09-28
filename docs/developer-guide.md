@@ -81,3 +81,19 @@ to obtain a passing run.
 
 The Node minimum includes default TypeScript stripping, introduced in
 [Node 22.18](https://nodejs.org/en/blog/release/v22.18.0), and satisfies the locked Vite engine.
+
+## Checkpoint worker shutdown
+
+Dropping `LiveDaemon` requests idle-checkpoint shutdown, wakes waiting workers and waits until
+all worker generations release their strong workspace/checkpoint references. Completion is separate
+from timer notifications so draining a retired worker cannot restart another worker's idle interval.
+The scheduler's returned join handle remains available to explicit callers. An in-flight native
+filesystem or database operation can delay shutdown; requesting stop does not cancel durable work.
+
+Immediate same-path restart must occur after ownership is released. Otherwise a prior connection
+can close or replace SQLite sidecars while the new open verifies their identities. Database
+single-link, permission and physical identity checks must remain intact. The regression
+`daemon_drop_waits_for_checkpoint_database_owners_even_when_worker_unwinds` parks a real pending-save
+worker after it owns database references, checks both normal exit and unwind, and immediately
+reopens the preserved journal. This does not verify macOS attachment-event registration or packaged
+application shutdown; those are separate boundaries.

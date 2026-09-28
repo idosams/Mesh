@@ -1679,12 +1679,36 @@ impl Drop for VerifiedMutationContext {
 struct IdleCheckpointScheduler {
     state: Mutex<IdleCheckpointSchedulerState>,
     wake: Condvar,
+    drained: Condvar,
+    #[cfg(test)]
+    worker_gate: Mutex<Option<CheckpointWorkerTestGate>>,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct CheckpointWorkerTestGate {
+    entered: std::sync::mpsc::Sender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+    panic_after_release: bool,
+}
+
+// Declared outside the worker loop, so every upgraded database/workspace reference is dropped
+// before completion is acknowledged, including when the worker unwinds.
+struct CheckpointWorkerLifetime(Arc<IdleCheckpointScheduler>);
+
+impl Drop for CheckpointWorkerLifetime {
+    fn drop(&mut self) {
+        let mut idle = self.0.state.lock().unwrap_or_else(PoisonError::into_inner);
+        idle.active_workers -= 1;
+        self.0.drained.notify_all();
+    }
 }
 
 #[derive(Debug, Default)]
 struct IdleCheckpointSchedulerState {
     generation: u64,
     worker_running: bool,
+    active_workers: usize,
     shutdown: bool,
     scheduled: Option<IdleCheckpointSchedule>,
     maximum_started_at: Option<Instant>,
@@ -1869,6 +1893,14 @@ impl Drop for LiveDaemon {
             .unwrap_or_else(PoisonError::into_inner);
         idle.shutdown = true;
         self.checkpoint_idle.wake.notify_all();
+        // Requesting shutdown does not release the worker's SQLite connections. Wait until all
+        // generations have released their strong references before a caller can reopen the path.
+        drop(
+            self.checkpoint_idle
+                .drained
+                .wait_while(idle, |state| state.active_workers != 0)
+                .unwrap_or_else(PoisonError::into_inner),
+        );
     }
 }
 
@@ -4364,14 +4396,17 @@ impl LiveDaemon {
                     self.checkpoint_idle.wake.notify_one();
                     return None;
                 }
-                IdleScheduleUpdate::StartWorker => {}
+                IdleScheduleUpdate::StartWorker => {
+                    idle.active_workers += 1;
+                }
             }
         }
         let checkpoint = Arc::downgrade(&self.checkpoint);
         let open = Arc::downgrade(&self.open);
         let feed = Arc::downgrade(&self.feed);
         let checkpoint_idle = Arc::clone(&self.checkpoint_idle);
-        Some(std::thread::spawn(move || loop {
+        let lifetime = CheckpointWorkerLifetime(Arc::clone(&checkpoint_idle));
+        let worker = move || loop {
             let (Some(checkpoint), Some(open), Some(feed)) =
                 (checkpoint.upgrade(), open.upgrade(), feed.upgrade())
             else {
@@ -4384,6 +4419,15 @@ impl LiveDaemon {
                 idle.maximum_started_at = None;
                 return Ok(None);
             };
+            #[cfg(test)]
+            {
+                let gate = checkpoint_idle.worker_gate.lock().unwrap().take();
+                if let Some(gate) = gate {
+                    gate.entered.send(()).unwrap();
+                    gate.release.recv().unwrap();
+                    assert!(!gate.panic_after_release, "injected worker unwind");
+                }
+            }
             let (intervals, scheduled, generation) = {
                 let checkpoint = checkpoint.lock().unwrap_or_else(PoisonError::into_inner);
                 let held = open.lock().unwrap_or_else(PoisonError::into_inner);
@@ -4569,6 +4613,10 @@ impl LiveDaemon {
             idle.scheduled = None;
             idle.maximum_started_at = None;
             return result;
+        };
+        Some(std::thread::spawn(move || {
+            let _lifetime = lifetime;
+            worker()
         }))
     }
 
@@ -9679,6 +9727,101 @@ mod tests {
         path.push(format!("mesh-live-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         path
+    }
+
+    #[test]
+    fn daemon_drop_waits_for_checkpoint_database_owners_even_when_worker_unwinds() {
+        use mesh_operations as op;
+        for panic_after_release in [false, true] {
+            let root = scratch(if panic_after_release {
+                "shutdown-unwind"
+            } else {
+                "shutdown-worker"
+            });
+            let managed = root.join("managed");
+            let daemon = LiveDaemon::with_checkpoint_runtime(
+                started(),
+                CheckpointRuntimeParameters {
+                    idle_interval: Some(Duration::from_secs(60)),
+                    maximum_uncheckpointed_bytes: Some(65_536),
+                    maximum_uncheckpointed_interval: Some(Duration::from_secs(30)),
+                },
+            )
+            .unwrap();
+            daemon.open_at_start(&managed).unwrap();
+            let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            *daemon.checkpoint_idle.worker_gate.lock().unwrap() = Some(CheckpointWorkerTestGate {
+                entered: entered_tx,
+                release: release_rx,
+                panic_after_release,
+            });
+            let request = FileVersionCheckpointRequest::new(
+                op::WorkspaceId::from_bytes([1; 16]),
+                op::ActorId::from_bytes([2; 32]),
+                op::SessionId::from_bytes([3; 16]),
+                op::ActorSequence::new(1),
+                op::CausalParents::genesis(),
+                op::HeadId::from_bytes([4; 32]),
+                op::PolicyEpoch::new(5),
+                op::Hlc::new(1_700_000_000_001, 6),
+                op::ObjectId::from_bytes([7; 16]),
+                op::VersionId::from_bytes([8; 32]),
+                Vec::new(),
+                PortableMetadata::new(true),
+                op::Signature::from_bytes([10; 64]),
+            );
+            daemon
+                .save_file_version(
+                    RecoverySequence::new(1).unwrap(),
+                    b"durable saved work",
+                    &ChunkingConfig::default(),
+                    crate::ManifestPagingPolicy::flat(),
+                    request,
+                    &LocalChangesetHead,
+                )
+                .unwrap();
+            entered_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("real worker owns database references");
+            let checkpoint = Arc::downgrade(&daemon.checkpoint);
+            let open = Arc::downgrade(&daemon.open);
+            let idle = Arc::clone(&daemon.checkpoint_idle);
+            let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+            let dropping = std::thread::spawn(move || {
+                drop(daemon);
+                finished_tx.send(()).unwrap();
+            });
+            {
+                let state = idle.state.lock().unwrap();
+                let (state, _) = idle
+                    .wake
+                    .wait_timeout_while(state, Duration::from_secs(5), |state| !state.shutdown)
+                    .unwrap();
+                assert!(state.shutdown, "drop must request shutdown");
+            }
+            // The worker is explicitly parked while owning both databases. Always release it
+            // before asserting so a regression failure cannot strand the drop thread.
+            let returned_while_owned = finished_rx.recv_timeout(Duration::from_millis(100)).is_ok();
+            assert!(checkpoint.upgrade().is_some());
+            assert!(open.upgrade().is_some());
+            release_tx.send(()).unwrap();
+            dropping.join().unwrap();
+            assert!(
+                !returned_while_owned,
+                "daemon drop returned before its worker released database owners"
+            );
+            assert!(checkpoint.upgrade().is_none());
+            assert!(open.upgrade().is_none());
+            let reopened =
+                LiveDaemon::with_checkpoint_runtime(started(), checkpoint_parameters()).unwrap();
+            reopened
+                .open_at_start(&managed)
+                .expect("immediate same-path restart");
+            assert_eq!(reopened.workspace_state().unwrap().records, 2);
+            drop(reopened);
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     #[test]
