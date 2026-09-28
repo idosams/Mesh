@@ -755,3 +755,10 @@ retained subtree staging/metadata, native group execution/recovery, then localiz
 complete-tree confirmation and controls. Each increment has its own PR and source
 accounting. The first primitive does not establish working directory integration
 or packaged acceptance; those remain required outcomes of this sequence.
+
+The native subtree executor and group v2 reader are now transferred on an unmerged
+branch. New approved directory trees retain private staging, exact review coverage
+and no-replace installation; uncertainty never triggers replay. Existing desktop
+confirmation refuses these groups pending complete-tree presentation. Directory
+removal/type replacement, large/binary confirmation and packaged graphical proof
+remain unfinished; this native increment does not complete directory acceptance.

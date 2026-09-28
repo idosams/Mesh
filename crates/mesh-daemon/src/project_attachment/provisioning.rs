@@ -402,6 +402,48 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Stage an entirely new approved directory subtree outside the source. Applying the returned
+    /// single-use native handle requires separate complete confirmation; no agent/renderer API exists.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_main_directory_addition(
+        &self,
+        bundle: &str,
+        target: &str,
+        relative: &str,
+        recovery_root: &Path,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedMainDirectoryAddition> {
+        super::directory_writeback::prepare(
+            self.clone(),
+            self.store.clone(),
+            bundle,
+            target,
+            relative,
+            recovery_root,
+            trusted,
+            limits,
+        )
+    }
+
+    /// Observe one exact directory-addition transaction without replay or cleanup authority.
+    pub fn inspect_directory_addition(
+        &self,
+        recovery_root: &Path,
+        transaction: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        super::directory_writeback::inspect(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+
     /// Inspect one exact retained integration group without retrying any source write.
     pub fn inspect_main_integration_group(
         &self,

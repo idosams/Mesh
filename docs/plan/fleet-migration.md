@@ -1725,3 +1725,26 @@ remain explicitly unsupported and refuse. Source macOS tests compare kernel
 creation, descendants, group and deny entries; an additional Linux regression
 compares modes/group/setgid, unchanged parent and invalid-mode refusal. Native
 focused/failing-before/full execution remains pending behind the preserved run.
+
+## I04c native retained subtree integration
+
+Transfers nine native paths from `c711c6531220f61bfe5e9994f12df19c4450bd2c`
+onto PR #94 at `eafef923292ffde5c717b0428ed3276afb045fe8`: retained-tree
+module/export, directory writeback/export, provisioning, group integration/tests,
+recovery history extraction and attachment approval integration tests. Root
+authority and metadata inheritance are in #93/#94. The native desktop confirmation,
+four renderer paths and remaining source documentation accounting are still pending.
+
+Complete approved absent subtrees are staged privately and installed with a
+same-filesystem no-replace root rename. Exact history, parent policy, exclusions,
+stage identity/content and expanded group coverage are rechecked. Races and
+uncertain durability preserve work and record reconciliation; no automatic undo,
+cleanup or replay exists. Group v2 adds directory members while v1 remains readable.
+The existing desktop confirmation rejects directory groups because its complete
+file count differs from group membership; complete-tree confirmation follows.
+
+Transferred regressions cover staged tampering, occupied destinations, changed
+parents/policy, receipts/trust/budgets, restrictive umask, late descriptor writes,
+partial groups and restart inspection. Native focused/failing-before/full execution
+remains pending behind the preserved canonical run. Historical source claims
+(3,304 Rust/678 desktop, 14 Rust skips) are not evidence on this tree.

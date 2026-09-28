@@ -51,6 +51,8 @@ mod restoration;
 pub use restoration::PreparedRetainedRestoration;
 mod writeback;
 pub use writeback::PreparedMainFileIntegration;
+mod directory_writeback;
+pub use directory_writeback::PreparedMainDirectoryAddition;
 mod reviews;
 pub use history::SavedAttachmentVersion;
 

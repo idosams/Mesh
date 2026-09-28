@@ -117,7 +117,7 @@ pub(super) fn result_schema(value: &Json) -> &'static str {
         "mesh.attachment-file-integration-result/v1"
     }
 }
-fn file_identity(value: &str) -> bool {
+pub(super) fn file_identity(value: &str) -> bool {
     if !value.is_ascii() {
         return false;
     }
@@ -322,11 +322,12 @@ pub(super) fn validate_receipt(
     }
     Ok(())
 }
-pub(super) fn verify_history(
+type ComparisonTree = std::collections::BTreeMap<String, super::inspection::ComparisonEntry>;
+pub(super) fn verified_trees(
     value: &Json,
     workspace: &OpenWorkspace,
     trusted: &TrustedReviewers,
-) -> io::Result<()> {
+) -> io::Result<(ComparisonTree, ComparisonTree)> {
     let fail = |_| invalid("recovery approval cannot be verified");
     super::approval::main_head(workspace)?;
     let head = HeadId::from_bytes(*digest(text(value, "head")?)?.as_bytes());
@@ -371,6 +372,14 @@ pub(super) fn verify_history(
             .historical_workspace_preview(review.subject_operation)
             .map_err(|_| invalid("approved content unavailable"))?,
     );
+    Ok((before, after))
+}
+pub(super) fn verify_history(
+    value: &Json,
+    workspace: &OpenWorkspace,
+    trusted: &TrustedReviewers,
+) -> io::Result<()> {
+    let (before, after) = verified_trees(value, workspace, trusted)?;
     let path = text(value, "path")?;
     let old = before.get(path);
     let new = after.get(path);

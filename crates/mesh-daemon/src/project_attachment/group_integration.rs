@@ -29,11 +29,12 @@ struct Plan {
     exclusions: String,
     ready: Vec<String>,
     present: Vec<String>,
+    trees: BTreeSet<String>,
 }
 
 /// Native-only single-use group. Every changed path in the accepted review must be accounted for.
-/// This executor supports regular-file addition, replacement and removal; directory
-/// changes refuse the whole group before staging. Applying never claims filesystem-wide atomicity.
+/// Supports regular-file changes and complete new directory subtrees. Directory removal and
+/// type replacement refuse the whole group before staging. Applying never claims filesystem-wide atomicity.
 pub struct PreparedMainIntegration {
     history: ProvisionedAttachment,
     store: PinnedWorkspaceRoot,
@@ -41,10 +42,46 @@ pub struct PreparedMainIntegration {
     path: PathBuf,
     proposal: Json,
     plan: Plan,
-    files: Vec<PreparedMainFileIntegration>,
+    files: Vec<Member>,
     bundle: String,
     target: String,
     limits: ObservationLimits,
+}
+
+enum Member {
+    File(Box<PreparedMainFileIntegration>),
+    Directory(Box<super::PreparedMainDirectoryAddition>),
+}
+impl Member {
+    fn proposal(&self) -> &Json {
+        match self {
+            Self::File(file) => file.proposal(),
+            Self::Directory(tree) => tree.proposal(),
+        }
+    }
+    fn recovery_path(&self) -> &Path {
+        match self {
+            Self::File(file) => file.recovery_path(),
+            Self::Directory(tree) => tree.recovery_path(),
+        }
+    }
+    fn validate(
+        &self,
+        workspace: &OpenWorkspace,
+        store: &PinnedWorkspaceRoot,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<()> {
+        match self {
+            Self::File(file) => file.validate(workspace, store),
+            Self::Directory(tree) => tree.validate(workspace, store, trusted),
+        }
+    }
+    fn apply_validated(self) -> io::Result<Json> {
+        match self {
+            Self::File(file) => file.apply_validated(),
+            Self::Directory(tree) => tree.apply_validated(),
+        }
+    }
 }
 
 fn plan(
@@ -92,34 +129,94 @@ fn plan(
         exclusions: captured.exclusion_digest().to_string(),
         ready: vec![],
         present: vec![],
+        trees: BTreeSet::new(),
     };
     let paths: BTreeSet<_> = before.keys().chain(after.keys()).collect();
+    let changed: Vec<_> = paths
+        .into_iter()
+        .filter(|path| before.get(*path) != after.get(*path))
+        .collect();
+    if changed.len() > MAX_FILES.min(limits.entries) {
+        return Err(invalid("integration group exceeds entry limit"));
+    }
     let mut bytes = 0u64;
-    for path in paths {
+    for path in &changed {
+        for entry in [before.get(*path), after.get(*path)].into_iter().flatten() {
+            if entry.kind == "file" {
+                bytes = bytes
+                    .checked_add(
+                        entry
+                            .bytes
+                            .ok_or_else(|| invalid("missing group file size"))?,
+                    )
+                    .ok_or_else(|| invalid("group byte budget overflow"))?;
+            }
+        }
+        if bytes > limits.bytes {
+            return Err(invalid("integration group exceeds byte limit"));
+        }
+    }
+    let mut covered = BTreeSet::new();
+    for path in changed {
+        if covered.contains(path) {
+            continue;
+        }
         let a = before.get(path);
         let b = after.get(path);
-        if a == b {
+        if a.is_none() && b.is_some_and(|entry| entry.kind == "folder") {
+            let prefix = format!("{path}/");
+            let subtree: Vec<_> = after
+                .iter()
+                .filter(|(member, _)| *member == path || member.starts_with(&prefix))
+                .collect();
+            for (member, _) in &subtree {
+                if before.contains_key(*member) || !captured.admits_file_path(member)? {
+                    return Err(invalid("new tree contains existing or excluded members"));
+                }
+                covered.insert((*member).clone());
+            }
+            if crate::managed_file::retained_replacement::absent_parent(
+                &history.project().pinned,
+                Path::new(path),
+            )?
+            .is_some()
+            {
+                result.trees.insert(path.clone());
+                result.ready.push(path.clone());
+            } else {
+                for (member, entry) in subtree {
+                    let matches = if entry.kind == "folder" {
+                        captured
+                            .directories()
+                            .iter()
+                            .any(|directory| directory == Path::new(member))
+                    } else {
+                        captured.files().iter().any(|file| {
+                            file.path() == Path::new(member)
+                                && entry
+                                    .digest
+                                    .is_some_and(|d| d.to_string() == file.digest().to_string())
+                                && entry.executable == Some(file.executable())
+                                && entry.bytes == Some(file.bytes().len() as u64)
+                        })
+                    };
+                    if !matches {
+                        return Err(invalid("new directory destination is partial or divergent"));
+                    }
+                    result.present.push(member.clone());
+                }
+            }
             continue;
         }
         if a.is_some_and(|entry| entry.kind != "file")
             || b.is_some_and(|entry| entry.kind != "file")
         {
             return Err(invalid(
-                "group contains a directory change requiring another executor",
+                "group contains a directory removal or type change requiring another executor",
             ));
         }
         if !captured.admits_file_path(path)? {
             return Err(invalid("group member is excluded by capture policy"));
-        }
-        if result.ready.len() + result.present.len() >= MAX_FILES {
-            return Err(invalid("integration group exceeds file limit"));
-        }
-        bytes = bytes
-            .checked_add(a.map_or(0, |a| a.bytes.unwrap_or(u64::MAX)))
-            .and_then(|n| n.checked_add(b.map_or(0, |b| b.bytes.unwrap_or(u64::MAX))))
-            .ok_or_else(|| invalid("group byte budget overflow"))?;
-        if bytes > limits.bytes {
-            return Err(invalid("integration group exceeds byte limit"));
         }
         if (a.is_none() || b.is_none())
             && crate::managed_file::retained_replacement::absent_parent(
@@ -207,10 +304,17 @@ pub(super) fn prepare(
             let captured = history.project().capture_inputs(limits)?;
             let mut files = Vec::new();
             for relative in &planned.ready {
-                files.push(super::writeback::prepare_captured(
-                    &history, workspace, store, bundle, target, relative, &path, limits, &captured,
-                    true,
-                )?);
+                files.push(if planned.trees.contains(relative) {
+                    Member::Directory(Box::new(super::directory_writeback::prepare_captured(
+                        &history, workspace, store, bundle, target, relative, &path, trusted,
+                        limits, &captured,
+                    )?))
+                } else {
+                    Member::File(Box::new(super::writeback::prepare_captured(
+                        &history, workspace, store, bundle, target, relative, &path, limits,
+                        &captured, true,
+                    )?))
+                });
             }
             Ok(files)
         },
@@ -238,7 +342,14 @@ pub(super) fn prepare(
         ]));
     }
     let proposal = Json::object([
-        ("schema", Json::text("mesh.attachment-integration-group/v1")),
+        (
+            "schema",
+            Json::text(if planned.trees.is_empty() {
+                "mesh.attachment-integration-group/v1"
+            } else {
+                "mesh.attachment-integration-group/v2"
+            }),
+        ),
         ("project", Json::text(history.id())),
         ("attachment", history.project().receipt()?),
         ("head", Json::text(&planned.head)),
@@ -276,7 +387,7 @@ pub(super) fn prepare(
                 return Err(invalid("group changed during preparation"));
             }
             for file in &files {
-                file.validate(workspace, store)?;
+                file.validate(workspace, store, trusted)?;
             }
             Ok(())
         },
@@ -302,7 +413,17 @@ impl PreparedMainIntegration {
     }
     /// Each member's complete frozen before/after content is available for native confirmation.
     pub fn files(&self) -> impl Iterator<Item = &PreparedMainFileIntegration> {
-        self.files.iter()
+        self.files.iter().filter_map(|member| match member {
+            Member::File(file) => Some(file.as_ref()),
+            _ => None,
+        })
+    }
+    /// Complete newly created subtrees, including frozen file content and empty-directory evidence.
+    pub fn directories(&self) -> impl Iterator<Item = &super::PreparedMainDirectoryAddition> {
+        self.files.iter().filter_map(|member| match member {
+            Member::Directory(tree) => Some(tree.as_ref()),
+            _ => None,
+        })
     }
     /// External retained group directory, including prepared but unattempted members after failure.
     pub fn recovery_path(&self) -> &Path {
@@ -338,7 +459,7 @@ impl PreparedMainIntegration {
                     return Err(invalid("integration group changed before apply"));
                 }
                 for file in &self.files {
-                    file.validate(workspace, store)?;
+                    file.validate(workspace, store, trusted)?;
                 }
                 let mut results = Vec::new();
                 let mut stopped = false;
@@ -379,7 +500,7 @@ impl PreparedMainIntegration {
                             "not-attempted"
                         } else {
                             match file
-                                .validate(workspace, store)
+                                .validate(workspace, store, trusted)
                                 .and_then(|_| file.apply_validated())
                             {
                                 Ok(result)
@@ -487,7 +608,10 @@ pub(super) fn inspect(
         "filesystem_atomic",
     ];
     if !matches!(&proposal, Json::Object(pairs) if pairs.len() == fields.len() && fields.iter().all(|key| proposal.get(key).is_some()))
-        || text(&proposal, "schema")? != "mesh.attachment-integration-group/v1"
+        || !matches!(
+            text(&proposal, "schema")?,
+            "mesh.attachment-integration-group/v1" | "mesh.attachment-integration-group/v2"
+        )
         || text(&proposal, "project")? != history.id()
         || proposal.get("attachment") != Some(&history.project().receipt()?)
         || text(&proposal, "recovery_identity")?
@@ -508,6 +632,7 @@ pub(super) fn inspect(
     if members.is_empty() || members.len() + present.len() > MAX_FILES {
         return Err(invalid("group membership exceeds limit"));
     }
+    let directory_members = text(&proposal, "schema")? == "mesh.attachment-integration-group/v2";
     let mut paths = BTreeSet::new();
     let mut transactions = BTreeSet::new();
     let mut receipts = Vec::new();
@@ -516,7 +641,10 @@ pub(super) fn inspect(
             return Err(invalid("invalid group member"));
         }
         let tx = text(member, "transaction")?;
-        if !transaction(tx) || !transactions.insert(tx) || !paths.insert(text(member, "path")?) {
+        if !(transaction(tx) || directory_members && super::directory_writeback::transaction(tx))
+            || !transactions.insert(tx)
+            || !paths.insert(text(member, "path")?.to_owned())
+        {
             return Err(invalid("ambiguous group membership"));
         }
         let child = root.open_child_directory(std::ffi::OsStr::new(tx))?;
@@ -534,7 +662,8 @@ pub(super) fn inspect(
     for item in present {
         if !paths.insert(
             item.as_text()
-                .ok_or_else(|| invalid("invalid present path"))?,
+                .ok_or_else(|| invalid("invalid present path"))?
+                .to_owned(),
         ) {
             return Err(invalid("duplicate group path"));
         }
@@ -546,7 +675,23 @@ pub(super) fn inspect(
         trusted,
         |workspace, _| {
             for receipt in &receipts {
-                super::recovery::verify_history(receipt, workspace, trusted)?;
+                if receipt.get("schema")
+                    == Some(&Json::text("mesh.attachment-directory-addition/v1"))
+                {
+                    if !directory_members {
+                        return Err(invalid("directory member requires group v2"));
+                    }
+                    super::directory_writeback::verify_tree(receipt, workspace, trusted)?;
+                    let root = text(receipt, "path")?;
+                    for entry in receipt.get("tree").and_then(Json::as_array).unwrap() {
+                        let relative = text(entry, "path")?;
+                        if !relative.is_empty() && !paths.insert(format!("{root}/{relative}")) {
+                            return Err(invalid("overlapping directory group members"));
+                        }
+                    }
+                } else {
+                    super::recovery::verify_history(receipt, workspace, trusted)?;
+                }
             }
             let bundle =
                 mesh_store::RecordDigest::parse_hex(text(&proposal, "bundle")?).map_err(error)?;
@@ -577,9 +722,9 @@ pub(super) fn inspect(
             let changed: BTreeSet<_> = all
                 .into_iter()
                 .filter(|path| before.get(*path) != after.get(*path))
-                .map(String::as_str)
+                .cloned()
                 .collect();
-            if paths != changed {
+            if paths != changed || paths.len() > MAX_FILES.min(limits.entries) {
                 return Err(invalid("group does not cover its complete accepted review"));
             }
             Ok(())
@@ -594,14 +739,25 @@ pub(super) fn inspect(
         let mut bounded = limits;
         bounded.bytes = remaining;
         // Every member inspection revalidates source/store identity and the actual approval.
-        let observed = super::recovery::inspect_recovery(
-            history,
-            store.clone(),
-            &group_path,
-            Some(tx),
-            trusted,
-            bounded,
-        )?;
+        let observed = if super::directory_writeback::transaction(tx) {
+            super::directory_writeback::inspect(
+                history,
+                store.clone(),
+                &group_path,
+                tx,
+                trusted,
+                bounded,
+            )?
+        } else {
+            super::recovery::inspect_recovery(
+                history,
+                store.clone(),
+                &group_path,
+                Some(tx),
+                trusted,
+                bounded,
+            )?
+        };
         remaining = observed
             .get("live_content_budget_remaining")
             .and_then(Json::as_u64)

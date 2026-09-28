@@ -616,3 +616,98 @@ fn concurrent_addition_stops_group_and_retains_the_uninstalled_approved_stage() 
     );
     assert_eq!(fs::read(retained).unwrap(), b"approved new file");
 }
+
+#[test]
+fn directory_collision_stops_mixed_group_and_reopens_saved_partial_sequence() {
+    let f = Fixture::new("group-directory-collision");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    let first = f.save("base");
+    let first_bundle = f.request(&first, &trust);
+    f.history
+        .approve_review(
+            &first_bundle,
+            &first,
+            &f.receipt(&signer, &trust, &first_bundle, &first, 1),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "accepted").unwrap();
+    fs::create_dir_all(f.source.join("new/empty")).unwrap();
+    fs::write(f.source.join("new/file"), "approved tree").unwrap();
+    let target = f.save("accepted");
+    let bundle = f.request(&target, &trust);
+    f.history
+        .approve_review(
+            &bundle,
+            &target,
+            &f.receipt(&signer, &trust, &bundle, &target, 2),
+            &trust,
+        )
+        .unwrap();
+    fs::write(f.source.join("a.txt"), "base").unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    fs::remove_dir_all(f.source.join("new")).unwrap();
+    let root = f.history.file_recovery_root(true).unwrap().unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let stage = prepared
+        .directories()
+        .next()
+        .unwrap()
+        .recovery_path()
+        .join("exchange");
+    let outcome = prepared
+        .apply_with_hook(&trust, |index| {
+            if index == 1 {
+                fs::create_dir(f.source.join("new")).unwrap();
+                fs::write(f.source.join("new/user"), "concurrent").unwrap();
+            }
+        })
+        .unwrap();
+    let statuses: Vec<_> = outcome
+        .get("members")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .map(|member| member.get("status").and_then(Json::as_text).unwrap())
+        .collect();
+    assert_eq!(
+        statuses,
+        [
+            "applied-observed",
+            "reconciliation-required",
+            "not-attempted"
+        ]
+    );
+    assert_eq!(fs::read(f.source.join("a.txt")).unwrap(), b"accepted");
+    assert_eq!(fs::read(f.source.join("new/user")).unwrap(), b"concurrent");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    assert_eq!(fs::read(stage.join("file")).unwrap(), b"approved tree");
+    assert!(stage.join("empty").is_dir());
+    assert!(!path.join("attempt-0002.json").exists());
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    let observed = reopened
+        .inspect_main_integration_group(
+            &root,
+            path.file_name().unwrap().to_str().unwrap(),
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        observed.get("execution").unwrap().get("outcome"),
+        Some(&outcome)
+    );
+    assert_eq!(fs::read(f.source.join("new/user")).unwrap(), b"concurrent");
+}

@@ -647,3 +647,13 @@ Private staging can now inherit directory-specific macOS ACL propagation and
 Linux destination group/setgid behavior without creating a probe in the user
 folder. Linux default ACLs and extended attributes remain refused. Platform
 regressions are added; local native execution and subtree integration are pending.
+
+### Native retained subtree integration (unmerged increment)
+
+Native source now stages and installs complete new approved directory subtrees
+without overwriting a concurrent destination. Versioned group recovery verifies
+expanded review coverage and exposes independent source/stage observations.
+Uncertain results preserve work without automatic replay or cleanup. Native tests
+are transferred but local execution remains pending. Desktop complete-tree
+confirmation and localized recovery display follow separately; existing prompts
+refuse directory groups. No packaged graphical acceptance is claimed.

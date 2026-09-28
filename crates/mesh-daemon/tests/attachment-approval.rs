@@ -1642,19 +1642,69 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
     fs::write(f.source.join("work.txt"), "accepted").unwrap();
     fs::remove_file(f.source.join("new-folder/new.txt")).unwrap();
     fs::remove_dir(f.source.join("new-folder")).unwrap();
-    let count = fs::read_dir(&root).unwrap().count();
-    assert!(f
+    let prepared = f
         .history
         .prepare_main_integration(
             &third_bundle,
             &third,
             &root,
             &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(prepared.directories().count(), 1);
+    assert_eq!(prepared.files().count(), 1);
+    let group_id = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let before = f
+        .history
+        .inspect_main_integration_group(&root, &group_id, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        before
+            .get("members")
+            .and_then(Json::as_array)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert_eq!(
+        fs::read(f.source.join("new-folder/new.txt")).unwrap(),
+        b"new accepted"
+    );
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"third");
+    f.history
+        .inspect_main_integration_group(&root, &group_id, &trust, ObservationLimits::default())
+        .unwrap();
+    // Directory removal still requires its own retained-tree executor; never skip it.
+    fs::remove_dir_all(f.source.join("new-folder")).unwrap();
+    let fourth = f.save("fourth");
+    let fourth_bundle = accept(&f, &signer, &trust, &fourth, 4);
+    fs::create_dir(f.source.join("new-folder")).unwrap();
+    fs::write(f.source.join("new-folder/new.txt"), "new accepted").unwrap();
+    fs::write(f.source.join("work.txt"), "third").unwrap();
+    let count = fs::read_dir(&root).unwrap().count();
+    assert!(f
+        .history
+        .prepare_main_integration(
+            &fourth_bundle,
+            &fourth,
+            &root,
+            &trust,
             ObservationLimits::default()
         )
         .is_err());
     assert_eq!(fs::read_dir(root).unwrap().count(), count);
-    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"third");
 }
 
 #[test]
@@ -2581,5 +2631,428 @@ fn group_catalogue_is_only_a_reference_and_native_member_evidence_identifies_dis
     assert!(f
         .history
         .inspect_main_integration_group(outer, "../outside", &trust, ObservationLimits::default())
+        .is_err());
+}
+
+fn approved_new_directory(
+    name: &str,
+) -> (
+    Fixture,
+    TestSigner,
+    TrustedReviewers,
+    String,
+    String,
+    PathBuf,
+) {
+    use std::os::unix::fs::PermissionsExt as _;
+    let f = Fixture::new(name);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("original work");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::create_dir_all(f.source.join("new/sub/empty")).unwrap();
+    fs::write(f.source.join("new/sub/run"), b"approved executable").unwrap();
+    fs::set_permissions(
+        f.source.join("new/sub/run"),
+        fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    fs::write(f.source.join("new/data"), [0u8, 255, 12]).unwrap();
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::remove_dir_all(f.source.join("new")).unwrap();
+    let root = recovery_root(&f);
+    (f, signer, trust, bundle, target, root)
+}
+
+#[test]
+fn approved_directory_addition_stages_complete_tree_and_recovers_without_replay() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let (f, _, trust, bundle, target, root) = approved_new_directory("directory-complete");
+    f.git(&["init", "--quiet"]);
+    let git = f.git(&["status", "--porcelain"]);
+    let journal = f.journal();
+    let prepared = f
+        .history
+        .prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "new",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = prepared.recovery_path().to_owned();
+    let id = path.file_name().unwrap().to_str().unwrap();
+    assert!(!f.source.join("new").exists());
+    assert_eq!(f.git(&["status", "--porcelain"]), git);
+    assert_eq!(
+        prepared
+            .proposal()
+            .get("tree")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        5
+    );
+    assert!(path.join("exchange/sub/empty").is_dir());
+    assert_eq!(fs::read(path.join("exchange/data")).unwrap(), [0, 255, 12]);
+    let inspect = |history: &ProvisionedAttachment| {
+        history
+            .inspect_directory_addition(&root, id, &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(
+        inspect(&f.history).get("status"),
+        Some(&Json::text("prepared-arrangement"))
+    );
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert_eq!(fs::read(f.source.join("new/data")).unwrap(), [0, 255, 12]);
+    assert!(f.source.join("new/sub/empty").is_dir());
+    assert_ne!(
+        fs::metadata(f.source.join("new/sub/run"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o111,
+        0
+    );
+    assert!(!path.join("exchange").exists());
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    assert_eq!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    fs::write(f.source.join("new/sub/run"), b"later editor work").unwrap();
+    fs::write(f.source.join("new/user"), b"additional work").unwrap();
+    assert_ne!(
+        inspect(&reopened).get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    fs::remove_file(path.join("observed.json")).unwrap();
+    assert_eq!(
+        inspect(&reopened).get("recorded_outcome"),
+        Some(&Json::text("absent"))
+    );
+    assert_eq!(
+        fs::read(f.source.join("new/sub/run")).unwrap(),
+        b"later editor work"
+    );
+    assert_eq!(
+        fs::read(f.source.join("new/user")).unwrap(),
+        b"additional work"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"original work"
+    );
+    assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn directory_addition_refuses_concurrent_destination_or_changed_stage_without_cleanup() {
+    for variant in [
+        "directory",
+        "file",
+        "symlink",
+        "staged-file",
+        "extra-ignored",
+        "stage-link",
+        "policy",
+    ] {
+        let (f, _, trust, bundle, target, root) =
+            approved_new_directory(&format!("directory-{variant}"));
+        let prepared = f
+            .history
+            .prepare_main_directory_addition(
+                &bundle,
+                &target,
+                "new",
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        let stage = prepared.recovery_path().join("exchange");
+        match variant {
+            "directory" => {
+                fs::create_dir(f.source.join("new")).unwrap();
+                fs::write(f.source.join("new/user"), b"keep").unwrap();
+            }
+            "file" => fs::write(f.source.join("new"), b"keep").unwrap(),
+            "symlink" => std::os::unix::fs::symlink(&f.source, f.source.join("new")).unwrap(),
+            "staged-file" => fs::write(stage.join("data"), b"changed stage").unwrap(),
+            "extra-ignored" => {
+                fs::create_dir(stage.join(".git")).unwrap();
+                fs::write(stage.join(".git/config"), b"keep extra").unwrap();
+            }
+            "stage-link" => {
+                fs::remove_file(stage.join("data")).unwrap();
+                std::os::unix::fs::symlink(f.source.join("work.txt"), stage.join("data")).unwrap();
+            }
+            "policy" => {
+                use std::os::unix::fs::PermissionsExt as _;
+                let mode = fs::metadata(&f.source).unwrap().permissions().mode() ^ 0o010;
+                fs::set_permissions(&f.source, fs::Permissions::from_mode(mode)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert!(prepared.apply(&trust).is_err(), "{variant}");
+        assert!(stage.exists(), "staging was cleaned up for {variant}");
+        assert_eq!(
+            fs::read(f.source.join("work.txt")).unwrap(),
+            b"original work"
+        );
+        if variant == "directory" {
+            assert_eq!(fs::read(f.source.join("new/user")).unwrap(), b"keep");
+        }
+        if variant == "file" {
+            assert_eq!(fs::read(f.source.join("new")).unwrap(), b"keep");
+        }
+    }
+}
+
+#[test]
+fn directory_addition_binds_approval_policy_budget_and_receipts() {
+    let (f, signer, trust, bundle, target, root) = approved_new_directory("directory-bindings");
+    let prepare = |trust: &TrustedReviewers| {
+        f.history.prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "new",
+            &root,
+            trust,
+            ObservationLimits::default(),
+        )
+    };
+    assert!(prepare(&TrustedReviewers::default()).is_err());
+    assert!(f
+        .history
+        .prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "../new",
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    assert!(f
+        .history
+        .prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "new",
+            &root,
+            &trust,
+            ObservationLimits {
+                file_bytes: 2,
+                ..ObservationLimits::default()
+            }
+        )
+        .is_err());
+    let staged = prepare(&trust).unwrap();
+    let path = staged.recovery_path().to_owned();
+    let id = path.file_name().unwrap().to_str().unwrap();
+    fs::write(path.join("prepared.json"), "{}").unwrap();
+    assert!(staged.apply(&trust).is_err());
+    assert!(f
+        .history
+        .inspect_directory_addition(&root, id, &trust, ObservationLimits::default())
+        .is_err());
+    let staged = prepare(&trust).unwrap();
+    fs::write(f.source.join(".meshignore"), "new\n").unwrap();
+    assert!(staged.apply(&trust).is_err());
+    fs::remove_file(f.source.join(".meshignore")).unwrap();
+    let staged = prepare(&trust).unwrap();
+    let later = f.save("later approved main");
+    accept(&f, &signer, &trust, &later, 3);
+    assert!(staged.apply(&trust).is_err());
+    assert!(!f.source.join("new").exists());
+}
+
+#[test]
+fn directory_recovery_distinguishes_parent_replacement_and_policy_changes() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let f = Fixture::new("tree-parent-recovery");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::create_dir(f.source.join("parent")).unwrap();
+    let first = f.save("original");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::create_dir(f.source.join("parent/new")).unwrap();
+    fs::write(f.source.join("parent/new/file"), b"accepted").unwrap();
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::remove_dir_all(f.source.join("parent/new")).unwrap();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "parent/new",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let id = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    prepared.apply(&trust).unwrap();
+    let inspect = || {
+        f.history
+            .inspect_directory_addition(&root, &id, &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    let mode = fs::metadata(f.source.join("parent"))
+        .unwrap()
+        .permissions()
+        .mode();
+    fs::set_permissions(
+        f.source.join("parent"),
+        fs::Permissions::from_mode(mode ^ 0o010),
+    )
+    .unwrap();
+    let bounded = f
+        .history
+        .inspect_directory_addition(
+            &root,
+            &id,
+            &trust,
+            ObservationLimits {
+                file_bytes: 1,
+                ..ObservationLimits::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        bounded.get("source").unwrap().get("state"),
+        Some(&Json::text("unavailable"))
+    );
+    assert_eq!(
+        bounded.get("live_content_budget_remaining"),
+        Some(&Json::Number(0))
+    );
+    let policy = inspect();
+    assert_eq!(
+        policy.get("status"),
+        Some(&Json::text("parent-policy-changed"))
+    );
+    assert_eq!(
+        policy.get("parent_identity_matches"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        policy.get("parent_policy_matches"),
+        Some(&Json::Bool(false))
+    );
+    fs::set_permissions(f.source.join("parent"), fs::Permissions::from_mode(mode)).unwrap();
+    fs::rename(f.source.join("parent"), f.source.join("former")).unwrap();
+    fs::create_dir(f.source.join("parent")).unwrap();
+    fs::rename(f.source.join("former/new"), f.source.join("parent/new")).unwrap();
+    let moved = inspect();
+    assert_eq!(
+        moved.get("status"),
+        Some(&Json::text("source-parent-changed"))
+    );
+    assert_eq!(
+        moved.get("parent_identity_matches"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        fs::read(f.source.join("parent/new/file")).unwrap(),
+        b"accepted"
+    );
+}
+
+#[test]
+fn directory_group_recovers_complete_coverage_and_preserves_concurrent_destination() {
+    let (f, _, trust, bundle, target, root) = approved_new_directory("directory-group-race");
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        prepared.proposal().get("schema"),
+        Some(&Json::text("mesh.attachment-integration-group/v2"))
+    );
+    assert_eq!(prepared.directories().count(), 1);
+    assert_eq!(prepared.files().count(), 0);
+    let directory = prepared.directories().next().unwrap();
+    assert_eq!(directory.proposed_files().count(), 2);
+    let retained = directory.recovery_path().join("exchange");
+    let group = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    fs::create_dir(f.source.join("new")).unwrap();
+    fs::write(f.source.join("new/user"), b"concurrent").unwrap();
+    assert!(prepared.apply(&trust).is_err());
+    assert_eq!(fs::read(f.source.join("new/user")).unwrap(), b"concurrent");
+    assert_eq!(fs::read(retained.join("data")).unwrap(), [0, 255, 12]);
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    let recovery = reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        recovery
+            .get("members")
+            .and_then(Json::as_array)
+            .unwrap()
+            .len(),
+        1
+    );
+    let record = root.join(&group).join("group-prepared.json");
+    let original = fs::read_to_string(&record).unwrap();
+    // A v1 reader must never interpret a tree member as a regular-file operation.
+    fs::write(
+        &record,
+        original.replace(
+            "mesh.attachment-integration-group/v2",
+            "mesh.attachment-integration-group/v1",
+        ),
+    )
+    .unwrap();
+    assert!(reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .is_err());
+    fs::write(&record, &original).unwrap();
+    let proposal = Json::parse(&original).unwrap();
+    let Json::Object(pairs) = proposal else {
+        panic!("proposal object")
+    };
+    let changed = Json::object(pairs.iter().map(|(key, value)| {
+        (
+            key.clone(),
+            if key == "already_present" {
+                Json::Array(vec![Json::text("new/sub/run")])
+            } else {
+                value.clone()
+            },
+        )
+    }));
+    fs::write(&record, changed.encode()).unwrap();
+    assert!(reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
         .is_err());
 }

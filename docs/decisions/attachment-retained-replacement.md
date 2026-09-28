@@ -637,3 +637,44 @@ before and after configuration. No probe is created in the user folder and the
 process umask is unchanged. Kernel-comparison regressions are present for both
 platforms, pending native execution. Directory installation remains a following
 increment; no additional approval or write command is exposed here.
+
+### Native complete-subtree installation
+
+A wholly new approved subtree can be staged outside the project, including frozen
+files, executable state and empty directories. Every descendant must be absent
+from the accepted base. Exact allocated identity, metadata, permissions and
+content are bound to the receipt; raw bounded observation detects unexpected
+entries even when ordinary capture would exclude them. Failed preparation retains
+the stage and leaves the source unchanged.
+
+Apply rechecks trusted main, exclusion policy, receipt, destination parent and the
+entire stage, then uses a descriptor-relative no-replace rename on the same
+filesystem. Both durability barriers are attempted. Concurrent files, directories
+and symlinks are preserved. Later edits, changed parents/policy and uncertain
+durability produce reconciliation evidence without undo, cleanup or replay. Open
+descriptors remain usable after installation. Groups remain sequential, not atomic
+project snapshots.
+
+The new `mesh.attachment-directory-addition/v1` prepared receipt lives in a
+`directory-<32 lowercase hex>` transaction. It binds project, attachment, store,
+recovery, accepted head/bundle/target, canonical path, exclusions and parent
+identity/mode/metadata. The complete ordered tree binds path, kind, installation
+identity, mode, metadata, content digest and byte count. Limits are 64 entries
+including root, 64 MiB content and 64 KiB prepared JSON, additionally constrained
+by caller budgets. Read-only recovery rederives coverage from approved history,
+reports source/stage observations and parent agreement, and grants no write,
+cleanup or restoration authority. Existing file transaction formats are unchanged.
+
+Groups containing staged directories use `mesh.attachment-integration-group/v2`;
+file-only groups remain v1. Recovery reads both, expands directory members for
+exact coverage and rejects overlap/missing paths. Older readers reject v2. Existing
+execution records still bind the exact proposal digest. Entire already-present
+approved trees are accounted for without rewriting unrelated extra user content;
+partial or divergent trees refuse. Directory removal and type replacement remain
+unsupported here. The current desktop prompt refuses directory-member groups
+until complete-tree confirmation is implemented. Standalone directory records
+require exact native inspection; the file catalogue does not discover them.
+
+Native regressions cover interruption, races, late writes, staged changes, policy,
+trust, budget and recovery boundaries. They are transferred pending canonical
+runtime verification; packaged graphical approval remains outstanding.
