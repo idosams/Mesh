@@ -1,0 +1,13 @@
+{
+  "record": "mesh.v0.op.initialize-workspace",
+  "schema": {
+    "domain_tag": "mesh.v0.op.initialize-workspace",
+    "fields": [
+      {
+        "name": "root_id",
+        "type": "bytes",
+        "byte_length": 16
+      }
+    ]
+  }
+}
