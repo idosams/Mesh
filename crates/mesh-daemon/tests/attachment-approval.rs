@@ -1149,7 +1149,7 @@ fn retained_restoration_preserves_both_editor_streams_and_supports_a_new_undo_tr
     f.git(&["add", "work.txt"]);
     let index = fs::read(f.source.join(".git/index")).unwrap();
     let head = fs::read(f.source.join(".git/HEAD")).unwrap();
-    let root = recovery_root(&f);
+    let root = f.history.file_recovery_root(true).unwrap().unwrap();
     let mut original_editor = fs::OpenOptions::new()
         .append(true)
         .open(f.source.join("work.txt"))
@@ -1467,4 +1467,34 @@ fn restoration_ancestry_is_bounded_and_tampering_never_authorizes_replay() {
     assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), source);
     assert_eq!(fs::read(previous.join("exchange")).unwrap(), retained);
     assert_eq!(f.journal(), journal);
+}
+
+#[test]
+fn native_file_recovery_allocation_is_external_private_and_never_follows_replacements() {
+    use std::os::unix::fs::{symlink, PermissionsExt as _};
+    let f = Fixture::new("native-recovery-root");
+    assert!(f.history.file_recovery_root(false).unwrap().is_none());
+    let root = f.history.file_recovery_root(true).unwrap().unwrap();
+    assert!(root.starts_with(f.history.metadata_path()));
+    assert!(!root.starts_with(&f.source));
+    assert_eq!(fs::metadata(&root).unwrap().permissions().mode() & 0o077, 0);
+    assert_eq!(
+        f.history.file_recovery_root(false).unwrap(),
+        Some(root.clone())
+    );
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(f.history.file_recovery_root(false).is_err());
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let kept = f.root.join("retained-recovery-root");
+    fs::rename(&root, &kept).unwrap();
+    symlink(&kept, &root).unwrap();
+    assert!(f.history.file_recovery_root(false).is_err());
+    assert!(f.history.file_recovery_root(true).is_err());
+    fs::remove_file(&root).unwrap();
+    fs::rename(&kept, &root).unwrap();
+    let metadata = f.history.metadata_path();
+    fs::rename(metadata, f.root.join("retained-metadata")).unwrap();
+    fs::create_dir(metadata).unwrap();
+    assert!(f.history.file_recovery_root(true).is_err());
+    assert!(!metadata.join("file-recovery").exists());
 }

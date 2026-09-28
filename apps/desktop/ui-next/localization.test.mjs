@@ -341,7 +341,7 @@ test('attached main comparison renders localized read-only conflicts and inert e
     for (const label of ['Compare main with working files', 'Working folder compared with Mesh main',
       'This directory contains entries outside the captured view, including possible ignored content.',
       'more entries are omitted from this overview. The counts include all entries.',
-      'Read-only observation. Working files may have changed since this comparison; it is not an atomic snapshot or permission to overwrite them. Write-back is not enabled here.',
+      'Working files may have changed since this comparison. Applying a file requires a fresh native check and complete text confirmation. Diverged files, additions, deletions and grouped changes are unavailable.',
       projection.integrationErrors[id]]) {
       assert.ok(html.includes(ui.translate(locale, label)), label);
       if (locale === 'he') assert.notEqual(ui.translate(locale, label), label);
@@ -370,4 +370,94 @@ test('pending native setup and cleanup have localized status independent of capt
     ui.setLocale('en');
     assert.ok(ui.renderAttachments().includes(expected));
   }
+});
+
+function attachedRecoveryProjection() {
+  const id = 'a'.repeat(64), target = 'b'.repeat(64), head = 'c'.repeat(64), bundle = 'd'.repeat(64);
+  return { projects: [{ id, generation: '1', root: '/Users/משפחה/Files', phase: 'waiting', detached: false,
+    outcome: 'saved', savedVersion: target, captureAgeMs: null, recovery: null }],
+    histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '',
+    busy: false, error: '', available: true,
+    approvalStates: { [id]: { available: false, enrolled: false, mainAvailable: true, main: { head, target, bundle } } },
+    integrationPreviews: { [id]: { head, target, bundle, base_head: 'e'.repeat(64), observed_digest: 'f'.repeat(64),
+      matches_base: 1, already_present: 0, preserve_current: 0, conflicts: 0, blocked: 0, not_listed: 0,
+      entries: [{ path: 'תיקייה/<script>current</script>.txt', status: 'matches-base', reason: null, base: { kind: 'file' }, target: { kind: 'file' } }] } },
+    recoveries: { [id]: { more: false, entries: [{ transaction: `restoration-${'b'.repeat(32)}`, status: 'changed-files',
+      attention: true, path: 'תיקייה/<script>retained</script>.txt', operation: 'restore-retained', retainedAvailable: true, recordedOutcome: 'absent' }] } } };
+}
+
+test('attached recovery localizes uncertainty while retaining literal file and transaction identities', async () => {
+  const projection = attachedRecoveryProjection(), id = projection.projects[0].id;
+  projection.recoveries[id].more = true;
+  const states = [
+    ['prepared-arrangement', 'Prepared content is retained'],
+    ['applied-arrangement', 'Installed and retained files match the recorded arrangement'],
+    ['identity-mismatch', 'File identity changed'],
+    ['incomplete-observation', 'Files could not be fully checked'],
+    ['invalid-outcome', 'Outcome record needs attention'],
+    ['contradictory-outcome', 'Recorded outcome conflicts with current files'],
+    ['invalid-receipt', 'Recovery record needs attention'],
+    ['unverified-history', 'Approval history could not be verified'],
+    ['unavailable-directory', 'Recovery folder unavailable'],
+    ['unrecognized-directory-entry', 'Unrecognized recovery entry'],
+  ];
+  projection.recoveries[id].entries.push(...states.map(([status], i) => ({
+    transaction: i === 9 ? '' : `integration-${String(i).padStart(32, '0')}`, status, attention: true,
+    path: null, operation: null, retainedAvailable: false, recordedOutcome: null,
+  })));
+
+  projection.selectedRecovery = { [id]: { ...projection.recoveries[id].entries[0], transaction: `restoration-${'f'.repeat(32)}` } };
+  projection.recoveryErrors = { [id]: 'Recovery could not be refreshed. Any previous observation is retained and may be out of date.' };
+  projection.fileChangeFeedback = { [id]: 'The file change was not confirmed or was cancelled. Inspect recovery before retrying; this does not prove the working file is unchanged.' };
+  const ui = await loadLocalization(projection);
+  for (const locale of ['en', 'he']) {
+    ui.setLocale(locale);
+    const html = ui.renderAttachments();
+    for (const label of ['Retained file recovery', 'Review applying this file', 'Review restoring retained file',
+      'Files changed since the recorded operation', 'Needs attention', 'Recovery reference:',
+      'Restored private work; this does not approve it as Mesh main.',
+      'No outcome was recorded. This does not prove that the working file was unchanged.',
+      'Refresh retained files', 'Last observed recovery entries', 'Exact recovery reference', 'Inspect exact recovery',
+      'Selected recovery · last observed', 'More entries exist outside this bounded overview. Use an exact recovery reference to inspect one.',
+      'Restoring requires native confirmation. The current working file is retained in a new recovery entry, which can be restored separately to undo the change.',
+      'File details unavailable', 'Unavailable', ...states.map(([, label]) => label),
+      projection.recoveryErrors[id], projection.fileChangeFeedback[id]]) {
+      assert.ok(html.includes(ui.translate(locale, label)), label);
+      if (locale === 'he') assert.notEqual(ui.translate(locale, label), label);
+    }
+    assert.ok(html.includes('<bdi dir="ltr">תיקייה/&lt;script&gt;retained&lt;/script&gt;.txt</bdi>'));
+    assert.ok(html.includes('<bdi dir="ltr">תיקייה/&lt;script&gt;current&lt;/script&gt;.txt</bdi>'));
+    assert.ok(html.includes('<bdi dir="ltr">' + projection.selectedRecovery[id].transaction + '</bdi>'));
+    assert.match(html, /<input dir="ltr"[^>]*autoComplete="off"/);
+    assert.doesNotMatch(html, /<script>/);
+  }
+});
+
+test('attached file controls require current main and preserve detached and uncertain recovery boundaries', async () => {
+  const id = 'a'.repeat(64);
+  for (const [change, applyDisabled, restoreDisabled] of [
+    [() => {}, false, false],
+    [p => { p.projects[0].detached = true; }, true, true],
+    [p => { p.busy = true; }, true, true],
+    [p => { p.approvalStates[id].main.head = 'f'.repeat(64); }, true, false],
+    [p => { p.integrationErrors = { [id]: 'Unavailable' }; }, true, false],
+    [p => { p.recoveryErrors = { [id]: 'Unavailable' }; }, false, true],
+  ]) {
+    const projection = attachedRecoveryProjection(); change(projection);
+    const ui = await loadLocalization(projection);
+    for (const locale of ['en', 'he']) {
+      ui.setLocale(locale);
+      const html = ui.renderAttachments();
+      for (const [label, disabled] of [['Review applying this file', applyDisabled], ['Review restoring retained file', restoreDisabled]]) {
+        const button = [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/g)].find(([, , text]) => text === ui.translate(locale, label));
+        assert.ok(button, label);
+        assert.equal(/ disabled=""/.test(button[1]), disabled, label);
+      }
+    }
+  }
+  const projection = attachedRecoveryProjection();
+  projection.integrationPreviews[id].entries[0].status = 'conflict';
+  projection.recoveries[id].entries[0].retainedAvailable = false;
+  const ui = await loadLocalization(projection);
+  assert.doesNotMatch(ui.renderAttachments(), /Review applying this file|Review restoring retained file/);
 });

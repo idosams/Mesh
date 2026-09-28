@@ -178,6 +178,12 @@ file in a new transaction, and supports explicit undo without replaying an old e
 private bytes cannot advance main. Confirmation UI, offline recovery, grouped changes and packaged
 acceptance remain required.
 
+Desktop source now connects bounded recovery inspection, exact lookup and explicit single-file
+apply/restore through complete native text confirmation. Native-owned recovery allocation and
+session generation checks preserve the authority boundary. Binary or large content, cross-volume
+defaults, offline recovery and grouped changes remain unsupported by this increment; actual
+packaged confirmation and recovery proof are still required.
+
 ## Phase 2: durable orchestration
 
 Persist objective limits, lanes, run attempts, input versions, event cursors, pending commands and

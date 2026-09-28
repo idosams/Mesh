@@ -167,9 +167,9 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | [Mesh PR #35](https://github.com/idosams/Mesh/pull/35), `3119b8b6233d17309d283d30d6aa855c2a14b8ce`; stacked on #34; not merged |
 | A09b | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; stacked on #35; all seven hosted checks pass in run 36359358791; initial and unchanged local gates failed native startup waits; not merged |
 | A09c | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | [Mesh PR #38](https://github.com/idosams/Mesh/pull/38), `7ccdc4be19e66840bc005b6ba9302e7bc706807a`; focused checks passed, local startup and hosted Linux restart failures retained; not merged |
-| A09d | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Transferred onto published #41; native validation and PR pending |
+| A09d | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | [Mesh PR #42](https://github.com/idosams/Mesh/pull/42), `c6dfcf3ba53a932c4f12e41fdea45c1ca16e5f55`; all seven hosted checks pass in run 36363835722; local native/full validation and review pending; not merged |
 | A09b prerequisite | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Included in [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; do not apply twice |
-| A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Pending transfer |
+| A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Transferred onto published #42; canonical localization and native-mode contract adapted; validation and PR pending |
 | L01 | `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` | Open attached saved versions as independent work lanes | Pending transfer |
 | L01 | `c728c41c9831e636a6bdfbb9b0212739ad6ba974` | Connect attached saved versions to managed fleet lanes | Pending transfer |
 | L01 | `e987565983cc7f57be33fe211f9f4bb4d290fad2` | Expose scoped fleet MCP through the packaged desktop app | Pending transfer |
@@ -441,3 +441,28 @@ This restoration increment still requires focused native/refusal tests, failing-
 full canonical validation, hosted checks and named human review. Native confirmation, offline or
 renamed roots, external-volume UX, grouped changes, crash campaigns, Linux metadata support and
 packaged graphical acceptance remain required by the full plan.
+
+## A09e desktop native confirmation and recovery
+
+Source `1c332ba96d3a74c33701143ef54003f35895e1e3` transfers on #42 at
+`c6dfcf3ba53a932c4f12e41fdea45c1ca16e5f55`. The canonical English/Hebrew attachment UI and
+literal identities are preserved, along with #41's monitoring lifecycle. Native recovery allocation,
+exact inspection, complete-content confirmation and generation-bound apply/restore remain separate
+from agent authority. This adds three native desktop commands, not agent IPC write capabilities.
+The parent passed all seven hosted checks: 2,989 Linux and 3,177 macOS native tests, the separate
+four-test macOS step, desktop/docs and all 44 daemon checks. Neither parent nor this increment is merged.
+
+A transfer defect was found before publication: the source renderer accepted permission-only modes,
+while actual native observations contain complete regular-file modes. The real-file metadata
+regression failed against that source parser; the corrected parser and all 36 coordinator tests
+passed. The new recovery rendering test failed against the previous view, the adapted component
+was restored byte-for-byte, and all 111 UI rendering tests passed. UI type checking and production
+build also passed. An initial localization failure for a missing attention label is retained;
+the corrected bilingual test includes uncertain, unavailable and stale recovery states. Native
+project/folder prompt fields are separately quoted; no human-dialog acceptance is claimed.
+
+Local native tests, native failing-before proof, the canonical full gate and hosted validation
+remain pending. Preserved full-gate session 4896 still owns the shared native build target; no
+parallel native build was started. Actual packaged confirmation/recovery, eligible approval,
+non-disruptive manual and agent journeys, remaining fleet phases and combined-main testing remain
+required. Original checkouts, staged restoration and historical failed verification are preserved.

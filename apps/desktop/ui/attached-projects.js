@@ -203,6 +203,55 @@ export function attachedIntegration(raw, id, main) {
   return value;
 }
 
+const recoveryTransaction = value => typeof value === 'string' && /^(integration|restoration)-[0-9a-f]{32}$/.test(value);
+const recoveryStatuses = new Set(['prepared-arrangement', 'applied-arrangement', 'changed-files', 'identity-mismatch', 'incomplete-observation', 'invalid-outcome', 'contradictory-outcome', 'invalid-receipt', 'unverified-history', 'unavailable-directory', 'unrecognized-directory-entry']);
+export function attachedRecovery(raw, id, transaction = null) {
+  const outer = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const value = outer?.recovery;
+  if (outer?.schema !== 'mesh.desktop-attachment-recovery/v1' || outer.project !== id) throw new Error('Recovery identity mismatch');
+  if (value === null && transaction === null) return { entries: [], more: false };
+  if (value?.schema !== 'mesh.attachment-integration-recovery/v1' || value.project !== id
+    || value.automatic_replay !== false || value.write_authority !== false || typeof value.more !== 'boolean'
+    || !Number.isSafeInteger(value.live_content_budget_remaining) || value.live_content_budget_remaining < 0
+    || !Array.isArray(value.entries) || value.entries.length > 32
+    || (transaction !== null && (!recoveryTransaction(transaction) || value.more || value.entries.length !== 1 || value.entries[0].transaction !== transaction))) throw new Error('Invalid recovery observation');
+  const observation = item => item === null || (safeText(item?.installation, 128)
+    && reviewIdentity(item.digest) && Number.isSafeInteger(item.mode) && item.mode >= 0o100000 && item.mode <= 0o107777
+    && Number.isSafeInteger(item.bytes) && item.bytes >= 0 && reviewIdentity(item.native_metadata_digest));
+  const seen = new Set();
+  const entries = value.entries.map(item => {
+    if (!recoveryStatuses.has(item?.status) || typeof item.attention_required !== 'boolean'
+      || !['observation_final', 'atomic_snapshot', 'write_authority', 'automatic_replay', 'cleanup_authority'].every(key => item[key] === false)
+      || (item.status === 'unrecognized-directory-entry' ? item.transaction !== '' : !recoveryTransaction(item.transaction))
+      || (item.transaction && seen.has(item.transaction))) throw new Error('Invalid recovery entry');
+    if (item.transaction) seen.add(item.transaction);
+    const details = item.details;
+    if (details !== null && (!safeText(details?.path, 4096) || details.path.startsWith('/')
+      || details.path.split('/').some(part => !part || part === '.' || part === '..')
+      || !['apply-approved', 'restore-retained'].includes(details.operation)
+      || details.content_is_approved_main !== (details.operation === 'apply-approved')
+      || !reviewIdentity(details.approved_head) || typeof details.is_current_main !== 'boolean'
+      || !observation(details.source) || !observation(details.retained)
+      || details.current_exclusions_checked !== false
+      || !['absent', 'invalid', 'applied-observed', 'reconciliation-required'].includes(details.recorded_outcome))) throw new Error('Invalid recovery details');
+    return { transaction: item.transaction, status: item.status, attention: item.attention_required,
+      path: details?.path ?? null, operation: details?.operation ?? null,
+      retainedAvailable: details !== null && details.retained !== null && item.status !== 'prepared-arrangement',
+      recordedOutcome: details?.recorded_outcome ?? null };
+  });
+  return { entries, more: value.more };
+}
+export function attachedFileChange(raw, id, restoration) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const outcome = value?.outcome;
+  if (value?.schema !== 'mesh.desktop-attachment-file-change/v1' || value.project !== id
+    || !recoveryTransaction(value.transaction) || !value.transaction.startsWith(restoration ? 'restoration-' : 'integration-')
+    || outcome?.schema !== (restoration ? 'mesh.attachment-file-restoration-result/v1' : 'mesh.attachment-file-integration-result/v1')
+    || !reviewIdentity(outcome.proposal_digest) || !['applied-observed', 'reconciliation-required'].includes(outcome.status)
+    || outcome.displaced_file_retained !== true || outcome.observation_final !== false) throw new Error('Invalid file-change result');
+  return { transaction: value.transaction, status: outcome.status };
+}
+
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
   let projects = [];
   let histories = {};
@@ -215,6 +264,10 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let approvalFeedback = {};
   let integrationPreviews = {};
   let integrationErrors = {};
+  let recoveries = {};
+  let selectedRecovery = {};
+  let recoveryErrors = {};
+  let fileChangeFeedback = {};
   let pins = [];
   let nextPin = 1n;
   let pinStatus = 'loading';
@@ -226,9 +279,28 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
+  async function readRecovery(id, transaction = null) {
+    const observation = attachedRecovery(await invoke('inspect_attached_recovery', { id, transaction }), id, transaction);
+    if (transaction === null) recoveries = { ...recoveries, [id]: observation };
+    else selectedRecovery = { ...selectedRecovery, [id]: observation.entries[0] };
+    recoveryErrors = { ...recoveryErrors, [id]: '' };
+  }
+  async function changeFile(id, command, args, restoration) {
+    try {
+      const result = attachedFileChange(await invoke(command, args), id, restoration);
+      fileChangeFeedback = { ...fileChangeFeedback, [id]: result.status === 'applied-observed'
+        ? 'The file change was observed. Previous working content is retained; later editor writes may still arrive.'
+        : 'The file change needs reconciliation. Both files are retained; inspect recovery before continuing.' };
+      await readRecovery(id, result.transaction);
+    } catch {
+      fileChangeFeedback = { ...fileChangeFeedback, [id]: 'The file change was not confirmed or was cancelled. Inspect recovery before retrying; this does not prove the working file is unchanged.' };
+    }
+    try { await readRecovery(id); }
+    catch { recoveryErrors = { ...recoveryErrors, [id]: 'Recovery could not be refreshed. Any previous observation is retained and may be out of date.' }; }
+  }
   async function readApproval(id) {
     const status = attachedMain(await invoke('attachment_approval_status', { id }), id);
     approvalStates = { ...approvalStates, [id]: status };
@@ -348,8 +420,31 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       });
       return;
     }
-    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main', 'compare-main'].includes(value.type)
+    if (['reviews', 'request-review', 'open-review', 'review-files', 'check-approval', 'enroll-approval', 'approve-review', 'open-main', 'compare-main', 'recovery', 'lookup-recovery', 'restore-retained', 'apply-main-file'].includes(value.type)
       && !projects.some((project) => project.id === value.id)) return;
+    if ((value.type === 'recovery' && Object.keys(value).length === 2)
+      || (value.type === 'lookup-recovery' && Object.keys(value).length === 3 && recoveryTransaction(value.transaction))) {
+      void run(async () => {
+        try { await readRecovery(value.id, value.type === 'recovery' ? null : value.transaction); }
+        catch { recoveryErrors = { ...recoveryErrors, [value.id]: 'Recovery could not be refreshed. Any previous observation is retained and may be out of date.' }; }
+      }); return;
+    }
+    if (value.type === 'restore-retained' && Object.keys(value).length === 3 && recoveryTransaction(value.transaction)) {
+      const entry = [...(recoveries[value.id]?.entries ?? []), selectedRecovery[value.id]]
+        .find(item => item?.transaction === value.transaction && item.retainedAvailable);
+      if (!entry || recoveryErrors[value.id] || projects.find(project => project.id === value.id)?.detached) return;
+      void run(() => changeFile(value.id, 'restore_attached_retained_file', { id: value.id, transaction: value.transaction }, true)); return;
+    }
+    if (value.type === 'apply-main-file' && Object.keys(value).length === 3) {
+      const preview = integrationPreviews[value.id];
+      const main = approvalStates[value.id]?.main;
+      const entry = preview?.entries.find(item => item.path === value.path);
+      if (!entry || entry.status !== 'matches-base' || entry.base?.kind !== 'file' || entry.target?.kind !== 'file'
+        || main?.head !== preview.head || integrationErrors[value.id] || projects.find(project => project.id === value.id)?.detached) return;
+      void run(() => changeFile(value.id, 'apply_attached_main_file', {
+        id: value.id, bundle: preview.bundle, target: preview.target, path: entry.path,
+      }, false)); return;
+    }
     if (value.type === 'check-approval' && Object.keys(value).length === 2) {
       void run(async () => {
         forgetApproval(value.id);

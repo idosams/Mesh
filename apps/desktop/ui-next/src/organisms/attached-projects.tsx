@@ -18,8 +18,10 @@ type ApprovalState = { available: boolean; enrolled: boolean; reason: string | n
   main: { head: string; bundle: string; target: string } | null };
 type IntegrationPreview = { head: string; bundle: string; target: string; base_head: string; observed_digest: string;
   matches_base: number; already_present: number; preserve_current: number; conflicts: number; blocked: number; not_listed: number;
-  entries: { path: string; status: string; reason: string | null }[] };
-type Projection = { integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+  entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
+type RecoveryEntry = { transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
+type Recovery = { entries: RecoveryEntry[]; more: boolean };
+type Projection = { recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -119,7 +121,9 @@ export function AttachedProjects() {
           {projection.approvalFeedback?.[project.id] && <p role="status" className="text-sm">{t(projection.approvalFeedback[project.id])}</p>}
         </section>
         {projection.integrationErrors?.[project.id] && <p role="alert" className="text-sm">{t(projection.integrationErrors[project.id])}</p>}
-        {projection.integrationPreviews?.[project.id] && <IntegrationPreviewCard preview={projection.integrationPreviews[project.id]} />}
+        {projection.integrationPreviews?.[project.id] && <IntegrationPreviewCard project={project.id} preview={projection.integrationPreviews[project.id]} disabled={disabled || Boolean(project.detached) || Boolean(projection.integrationErrors?.[project.id]) || projection.approvalStates?.[project.id]?.main?.head !== projection.integrationPreviews[project.id].head} />}
+        <FileRecovery project={project.id} recovery={projection.recoveries?.[project.id]} selected={projection.selectedRecovery?.[project.id]}
+          error={projection.recoveryErrors?.[project.id]} feedback={projection.fileChangeFeedback?.[project.id]} disabled={disabled} detached={Boolean(project.detached)} />
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
           <p className="text-xs text-muted-foreground">{t("Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
@@ -150,7 +154,7 @@ export function AttachedProjects() {
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
     })}
-    <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")} {t("Writing saved versions back to your working folder is not available here yet.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")} {t("Applying main currently supports one existing text file at a time, after native confirmation. Additions, deletions and grouped changes are not available here yet.")}</p>
   </section>;
 }
 
@@ -246,7 +250,7 @@ const integrationReasons: Record<string, string> = {
   "contains-unobserved-entry": "This directory contains entries outside the captured view, including possible ignored content.",
   "parent-change-conflicts": "A parent directory must be resolved first.",
 };
-function IntegrationPreviewCard({ preview }: { preview: IntegrationPreview }) {
+function IntegrationPreviewCard({ project, preview, disabled }: { project: string; preview: IntegrationPreview; disabled: boolean }) {
   const t = useTranslation();
   return <section aria-label={t("Working-folder comparison")} className="grid gap-2 rounded-lg border border-border p-3">
     <h4 className="text-sm font-semibold">{t("Working folder compared with Mesh main")}</h4>
@@ -254,8 +258,52 @@ function IntegrationPreviewCard({ preview }: { preview: IntegrationPreview }) {
     <p className="text-sm">{preview.matches_base} {t("match the approved base")} · {preview.already_present} {t("already match main")} · {preview.preserve_current} {t("current changes to keep")} · {preview.conflicts} {t("conflicts")} · {preview.blocked} {t("blocked changes")}</p>
     <ul className="max-h-64 overflow-auto text-xs">{preview.entries.map(entry => <li key={entry.path} className="break-all py-1">
       <strong>{t(integrationLabels[entry.status])}</strong>: <bdi dir="ltr">{entry.path}</bdi>{entry.reason && <p>{t(integrationReasons[entry.reason])}</p>}
+      {entry.status === "matches-base" && entry.base?.kind === "file" && entry.target?.kind === "file" && <Button variant="secondary" disabled={disabled}
+        onClick={() => send({ type: "apply-main-file", id: project, path: entry.path })}>{t("Review applying this file")}</Button>}
     </li>)}</ul>
     {preview.not_listed > 0 && <p className="text-xs">{preview.not_listed} {t("more entries are omitted from this overview. The counts include all entries.")}</p>}
-    <p className="text-xs text-muted-foreground">{t("Read-only observation. Working files may have changed since this comparison; it is not an atomic snapshot or permission to overwrite them. Write-back is not enabled here.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Working files may have changed since this comparison. Applying a file requires a fresh native check and complete text confirmation. Diverged files, additions, deletions and grouped changes are unavailable.")}</p>
+  </section>;
+}
+
+const recoveryLabels: Record<string, string> = {
+  "prepared-arrangement": "Prepared content is retained", "applied-arrangement": "Installed and retained files match the recorded arrangement",
+  "changed-files": "Files changed since the recorded operation", "identity-mismatch": "File identity changed",
+  "incomplete-observation": "Files could not be fully checked", "invalid-outcome": "Outcome record needs attention",
+  "contradictory-outcome": "Recorded outcome conflicts with current files", "invalid-receipt": "Recovery record needs attention",
+  "unverified-history": "Approval history could not be verified", "unavailable-directory": "Recovery folder unavailable",
+  "unrecognized-directory-entry": "Unrecognized recovery entry",
+};
+function FileRecovery({ project, recovery, selected, error, feedback, disabled, detached }: {
+  project: string; recovery?: Recovery; selected?: RecoveryEntry; error?: string; feedback?: string; disabled: boolean; detached: boolean;
+}) {
+  const t = useTranslation();
+  const [transaction, setTransaction] = useState("");
+  const row = (entry: RecoveryEntry, key: string) => <li key={key} className="grid gap-2 border-b border-border py-3">
+    <p className="break-all text-sm font-medium">{entry.path ? <bdi dir="ltr">{entry.path}</bdi> : t("File details unavailable")}</p>
+    <p className="text-sm">{t(recoveryLabels[entry.status])}{entry.attention ? <> · {t("Needs attention")}</> : ""}</p>
+    <p className="break-all text-xs">{t("Recovery reference:")} {entry.transaction ? <bdi dir="ltr">{entry.transaction}</bdi> : t("Unavailable")}</p>
+    {entry.operation === "restore-retained" && <p className="text-xs">{t("Restored private work; this does not approve it as Mesh main.")}</p>}
+    {entry.recordedOutcome === "absent" && <p className="text-xs">{t("No outcome was recorded. This does not prove that the working file was unchanged.")}</p>}
+    {entry.retainedAvailable && <Button variant="secondary" disabled={disabled || detached || Boolean(error)}
+      onClick={() => send({ type: "restore-retained", id: project, transaction: entry.transaction })}>{t("Review restoring retained file")}</Button>}
+  </li>;
+  return <section aria-label={t("Retained file recovery")} className="grid gap-2 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Retained file recovery")}</h4>
+    <p className="text-xs text-muted-foreground">{t("Inspect files preserved when applying or restoring work. An open editor may still be writing to a retained file. Nothing is replayed or deleted automatically.")}</p>
+    <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "recovery", id: project })}>{t("Refresh retained files")}</Button>
+    {feedback && <p role="status" className="text-sm">{t(feedback)}</p>}
+    {error && <p role="alert" className="text-sm">{t(error)}</p>}
+    {recovery && <><p className="text-xs">{t("Last observed recovery entries")}</p>
+      {recovery.entries.length === 0 ? <p className="text-sm">{t("No file recovery entries found.")}</p> : <ul>{recovery.entries.map((entry, index) => row(entry, `${entry.transaction}-${index}`))}</ul>}
+      {recovery.more && <p className="text-sm">{t("More entries exist outside this bounded overview. Use an exact recovery reference to inspect one.")}</p>}
+    </>}
+    <label className="grid gap-2 text-sm">{t("Exact recovery reference")}
+      <input dir="ltr" className="min-h-11 rounded-md border border-border bg-background px-3" value={transaction} onChange={event => setTransaction(event.target.value)} autoComplete="off" />
+    </label>
+    <Button variant="secondary" disabled={disabled || !/^(integration|restoration)-[0-9a-f]{32}$/.test(transaction)}
+      onClick={() => send({ type: "lookup-recovery", id: project, transaction })}>{t("Inspect exact recovery")}</Button>
+    {selected && <div><p className="text-sm font-medium">{t("Selected recovery \u00b7 last observed")}</p><ul>{row(selected, selected.transaction)}</ul></div>}
+    <p className="text-xs text-muted-foreground">{t("Restoring requires native confirmation. The current working file is retained in a new recovery entry, which can be restored separately to undo the change.")}</p>
   </section>;
 }

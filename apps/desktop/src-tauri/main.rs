@@ -16,6 +16,7 @@ mod attachment_capture;
 
 #[cfg(unix)]
 mod attachment_host;
+mod attachment_recovery;
 
 #[cfg(unix)]
 mod artifact_preview;
@@ -1899,6 +1900,115 @@ mod desktop {
                 ("project", Json::text(id)), ("preview", preview),
             ]).encode())
         }).await.map_err(|_| "Working-folder comparison stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn inspect_attached_recovery(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        transaction: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.file_recovery(&id, transaction.as_deref(), &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| "Retained-file inspection stopped".to_owned())?
+    }
+
+    #[tauri::command(async)]
+    fn restore_attached_retained_file(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        transaction: String,
+    ) -> Result<String, String> {
+        let (history, generation) = host.file_change_history(&id)?;
+        let trust = attachment_review_trust();
+        let root = history
+            .file_recovery_root(false)
+            .map_err(|_| "File recovery storage is unavailable")?
+            .ok_or("There are no retained files for this project")?;
+        let prepared = history.prepare_retained_restoration(
+            &root, &transaction, &trust,
+            mesh_daemon::project_attachment::ObservationLimits::default(),
+        ).map_err(|_| "This retained file cannot currently be restored. Refresh recovery and check for changed or unavailable files.")?;
+        let prompt = crate::attachment_recovery::confirmation(
+            "Restore retained work",
+            &id,
+            history.project().root(),
+            prepared.proposal(),
+            prepared.current_content(),
+            prepared.restored_content(),
+        )?;
+        let next = crate::attachment_recovery::transaction_id(prepared.recovery_path())?;
+        if !app
+            .dialog()
+            .message(prompt)
+            .title("Restore retained work")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Restore this file".into(),
+                "Cancel".into(),
+            ))
+            .blocking_show()
+        {
+            return Err(
+                "Restoration was cancelled; the prepared recovery record is retained".into(),
+            );
+        }
+        let outcome = host.confirm_file_change(&id, generation, || prepared.apply(&attachment_review_trust())
+            .map_err(|_| "Restoration was not confirmed. Inspect recovery before retrying; working files may have changed.".to_owned()))?;
+        Ok(crate::attachment_recovery::result(&id, &next, outcome))
+    }
+
+    #[tauri::command(async)]
+    fn apply_attached_main_file(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        bundle: String,
+        target: String,
+        path: String,
+    ) -> Result<String, String> {
+        let (history, generation) = host.file_change_history(&id)?;
+        let root = history
+            .file_recovery_root(true)
+            .map_err(|_| "Private file recovery storage is unavailable")?
+            .ok_or("Private file recovery storage is unavailable")?;
+        let prepared = history.prepare_main_file_integration(
+            &bundle, &target, &path, &root, &attachment_review_trust(),
+            mesh_daemon::project_attachment::ObservationLimits::default(),
+        ).map_err(|_| "This file cannot currently be applied. It must still match the approved base, with recovery storage on the same volume. Refresh main and the working-folder comparison.")?;
+        let prompt = crate::attachment_recovery::confirmation(
+            "Apply one file from Mesh main",
+            &id,
+            history.project().root(),
+            prepared.proposal(),
+            prepared.current_content(),
+            prepared.proposed_content(),
+        )?;
+        let transaction = crate::attachment_recovery::transaction_id(prepared.recovery_path())?;
+        if !app
+            .dialog()
+            .message(prompt)
+            .title("Apply one file from Mesh main")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Apply this file".into(),
+                "Cancel".into(),
+            ))
+            .blocking_show()
+        {
+            return Err(
+                "Application was cancelled; the prepared recovery record is retained".into(),
+            );
+        }
+        let outcome = host.confirm_file_change(&id, generation, || prepared.apply(&attachment_review_trust())
+            .map_err(|_| "Application was not confirmed. Inspect recovery before retrying; working files may have changed.".to_owned()))?;
+        Ok(crate::attachment_recovery::result(
+            &id,
+            &transaction,
+            outcome,
+        ))
     }
 
     #[tauri::command(async)]
@@ -6869,6 +6979,9 @@ mod desktop {
                 attachment_approval_status,
                 approve_attached_review,
                 preview_attached_main_integration,
+                inspect_attached_recovery,
+                restore_attached_retained_file,
+                apply_attached_main_file,
                 load_attachment_pins,
                 save_attachment_pins,
                 compare_attached_path,

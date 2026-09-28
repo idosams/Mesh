@@ -110,11 +110,24 @@ comparison base when another review advances main, including after restart. This
 changes stable; it does not make an old approval valid against the new main version. A stale approval
 must be prepared and reviewed again through the normal current-main flow.
 
-Retained-file restoration is under development and has no desktop action in this increment. Its
-restoration path keeps both the selected retained work and the current working file, including later
-writes through existing editor windows. It requires an explicit review of the exact content before
-applying; it does not automatically undo an earlier operation or approve recovered content as main.
-Graphical confirmation and packaged acceptance are still pending.
+In the unmerged desktop recovery increment, **Compare main with working files** can offer **Review
+applying this file** for an existing text file that still matches the approved base. The native
+confirmation shows the exact current and proposed content, file location and permissions. Confirming
+changes that working file and retains its previous file for recovery, including later writes from an
+already-open editor. Mesh main and Git are unchanged. Changed files, additions, deletions and grouped
+changes cannot use this action yet.
+
+Use **Refresh retained files** to inspect the last observed recovery state. **Review restoring
+retained file** prepares a frozen copy of the selected retained work and requires another native
+confirmation. The current working file becomes a new retained entry, so undo is another explicit
+restoration. Existing retained files remain available. An exact recovery reference can inspect a
+record outside the bounded overview. Missing results and later edits require inspection; they do not
+prove the earlier action was rolled back. Nothing is retried or deleted automatically.
+
+The native confirmation currently uses English and refuses binary, NUL-containing or oversized
+content rather than omitting it. Recovery controls retain English/Hebrew UI text. The default
+recovery location must be on the project's volume; offline folders and a location selector for
+other volumes remain unfinished. Actual packaged confirmation and recovery acceptance are pending.
 
 ## The six words Mesh shows people
 

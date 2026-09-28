@@ -1,7 +1,8 @@
 # Retained recovery for attached-file replacement
 
 Status: native regular-file integration, restart inspection and retained-file restoration implemented;
-desktop confirmation/recovery, additions/removals, grouped integration and packaged proof are unfinished.
+desktop source now connects single-file text confirmation and recovery inspection; additions/removals,
+grouped integration and packaged graphical proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
 ## Decision and reason
@@ -15,8 +16,8 @@ A trusted native caller separately prepares and applies one regular-file replace
 current, verified accepted main review. Preparation checks its exact base against freshly captured
 source bytes and executable state, retains exact parent/file identity, and stages approved bytes
 in a private external recovery directory. It does not write the source, advance main or change Git.
-The native host must obtain explicit confirmation of this proposal before calling apply. No agent,
-MCP, CLI or renderer command exposes apply in this slice. Approval of main alone does not authorize
+The native host must obtain explicit confirmation of this proposal before calling apply. No agent, MCP or CLI tool exposes apply. Desktop commands prepare a fresh native proposal and
+require a complete native confirmation before invoking apply. Approval of main alone does not authorize
 source write-back. The in-process proposal is not serializable or cloneable.
 
 The recovery root is native-configured, outside project content, owner-private and on the source
@@ -80,9 +81,9 @@ and exact approval/trust/exclusion revalidation. The domain test retains Git ind
 live files and the history journal while changing only the explicitly selected approved file.
 Native restart inspection now classifies retained artifacts without replaying writes.
 
-Still required: native confirmation and desktop recovery presentation, crash-process campaigns,
+Still required: packaged native confirmation and desktop recovery proof, crash-process campaigns,
 retention that does not discard live descriptors' work, grouped additions/deletions and dependency
-handling, integration with native confirmation and desktop rendering, external-volume UX, Linux
+handling, external-volume UX, Linux
 metadata preservation, and revision-bound packaged graphical proof. No general integration or
 packaged user-presence claim follows from these native tests.
 
@@ -148,7 +149,7 @@ origin's `exchange` to retain the original source installation, captures the cur
 its unchanged exclusions, and reads retained bytes within the remaining capture budget. An unused
 staged proposal is not a displaced source and cannot be restored through this operation.
 
-The native proposal exposes frozen before/after bytes and exact metadata facts for a future native
+The native proposal exposes frozen before/after bytes and exact metadata facts for native
 confirmation. No source mutation occurs during preparation. Applying after explicit confirmation
 revalidates origin ancestry, retained content/identity/metadata, current exclusions, staged receipt
 and exact current source. A change to either input while confirmation is pending refuses before
@@ -189,3 +190,49 @@ ancestry, and enforce the ancestry bound without dropping prior work. These nati
 prove an actual human confirmation or packaged recovery UI. Offline/renamed roots, restoring a
 currently absent path, grouped directory changes, long-chain consolidation, remote recovery and
 safe explicit retention management still require further work.
+
+## Desktop connection
+
+The native host now uses `file-recovery` within the exact external project metadata store as its
+configured default. Allocation is descriptor-relative, owner-private and symlink-refusing. Read-only
+inspection never creates a missing directory. Same-volume exchange remains mandatory; an attached
+project on a different volume can still be captured/reviewed, but this default cannot apply files
+there. A native external-volume location selector remains unfinished.
+
+Desktop source exposes bounded recovery inspection and exact transaction lookup, plus explicit
+single-file apply and restore requests. The renderer supplies project/review/file selectors or an
+exact recovery transaction, never recovery locations, receipts or replacement bytes. Native code
+retains the prepared transaction across a complete text confirmation, including project location,
+relative path, byte digests, permissions and frozen before/after text. Text is quoted with escaped
+control characters. Binary, NUL-containing or oversized confirmation content refuses rather than
+being omitted; the entire prompt is limited to 48 KiB. Cancelled or refused preparations remain as
+recovery records and do not authorize replay.
+
+Applying requires an existing regular file matching the exact accepted base; it is not a grouped
+integration. Restoration uses its original displaced inode and a fresh frozen snapshot, including
+later editor work. The host refuses detached projects and revalidates its native session generation
+under the control lock after confirmation. Detach/reattach or resume during the dialog invalidates
+the operation. The underlying transaction rechecks content, identities, policy and approval trust.
+Result errors remain uncertain; the UI refreshes recovery without automatic retries or claims of
+rollback. Exact resulting transactions remain inspectable beyond the bounded overview. Inspection
+views remain fixed while capture runs and display stale observations explicitly after refresh errors.
+
+Native and renderer tests cover managed allocation, source/store replacement refusal, session
+invalidation, complete bounded confirmation, selector binding and uncertain replies. These are
+source tests; an actual packaged human-confirmation/recovery journey remains required.
+
+## Canonical desktop transfer adaptations
+
+Source `1c332ba96d3a74c33701143ef54003f35895e1e3` is transferred on canonical PR #42. The
+localized English/Hebrew view and literal bidirectional path/transaction rendering remain intact.
+The native formatter receives project identity and folder separately and quotes both, alongside
+complete quoted content and relative file name. Native confirmation text remains English; actual
+rendered-dialog completeness is not established by string construction tests.
+
+Recovery observations serialize the full POSIX regular-file mode (`st_mode`), including file type,
+not permission bits alone. The older renderer predicate rejected every such native file record.
+The canonical parser accepts only regular-file modes from `0100000` through `0107777`; directory,
+link, permission-only and malformed values refuse. Permission changes in an observed retained file
+do not grant mutation authority: preparation/application still revalidate identities, metadata and
+supported modes. A real temporary file's metadata fails the older parser and passes the correction.
+The native receipt/observation format itself is unchanged.

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, startAttachedProjects } from './attached-projects.js';
+import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -710,4 +713,133 @@ test('stopped captures cannot claim an active native signal stream', () => {
     const value = reply(); Object.assign(value.projects[0].capture, { phase, native_events: true, native_signal_state: 'active' });
     assert.throws(() => attachedProjectList(value));
   }
+});
+
+const transaction = `integration-${'a'.repeat(32)}`;
+const restoredTransaction = `restoration-${'b'.repeat(32)}`;
+function recoveryReply(selected = transaction) {
+  const observation = { installation: 'native-file', digest: 'a'.repeat(64), mode: 0o100644, bytes: 12, native_metadata_digest: 'c'.repeat(64) };
+  return { schema: 'mesh.desktop-attachment-recovery/v1', project: id, recovery: {
+    schema: 'mesh.attachment-integration-recovery/v1', project: id, automatic_replay: false, write_authority: false,
+    more: false, live_content_budget_remaining: 100, entries: [{ transaction: selected, status: 'applied-arrangement',
+      attention_required: false, observation_final: false, atomic_snapshot: false, write_authority: false, automatic_replay: false, cleanup_authority: false,
+      details: { path: 'work.txt', operation: selected.startsWith('restoration-') ? 'restore-retained' : 'apply-approved',
+        content_is_approved_main: !selected.startsWith('restoration-'), approved_head: 'd'.repeat(64), is_current_main: false,
+        current_exclusions_checked: false, recorded_outcome: 'applied-observed', source: observation, retained: observation },
+    }],
+  } };
+}
+function changeReply(restoration = false) {
+  return { schema: 'mesh.desktop-attachment-file-change/v1', project: id, transaction: restoration ? restoredTransaction : transaction,
+    outcome: { schema: restoration ? 'mesh.attachment-file-restoration-result/v1' : 'mesh.attachment-file-integration-result/v1',
+      proposal_digest: 'e'.repeat(64), status: 'applied-observed', displaced_file_retained: true, observation_final: false } };
+}
+test('recovery observations bind exact project and transaction without granting write or cleanup authority', () => {
+  assert.equal(attachedRecovery(recoveryReply(), id).entries[0].retainedAvailable, true);
+  assert.equal(attachedRecovery({ schema: 'mesh.desktop-attachment-recovery/v1', project: id, recovery: null }, id).entries.length, 0);
+  assert.throws(() => attachedRecovery(recoveryReply(), id, restoredTransaction));
+  for (const mutate of [
+    value => { value.project = 'f'.repeat(64); },
+    value => { value.recovery.project = 'f'.repeat(64); },
+    value => { value.recovery.write_authority = true; },
+    value => { value.recovery.entries[0].cleanup_authority = true; },
+    value => { value.recovery.entries[0].observation_final = true; },
+    value => { value.recovery.entries[0].status = 'safe-to-overwrite'; },
+    value => { value.recovery.entries[0].details.path = '../outside'; },
+    value => { value.recovery.entries[0].details.retained = undefined; },
+    value => { value.recovery.entries[0].details.operation = 'restore-retained'; },
+    value => { value.recovery.entries.push(value.recovery.entries[0]); },
+  ]) { const value = recoveryReply(); mutate(value); assert.throws(() => attachedRecovery(value, id)); }
+  const prepared = recoveryReply(); prepared.recovery.entries[0].status = 'prepared-arrangement';
+  assert.equal(attachedRecovery(prepared, id).entries[0].retainedAvailable, false);
+  assert.equal(attachedFileChange(changeReply(), id, false).transaction, transaction);
+  assert.throws(() => attachedFileChange(changeReply(), id, true));
+  for (const mutate of [
+    value => { value.outcome.displaced_file_retained = false; },
+    value => { value.outcome.observation_final = true; },
+    value => { value.outcome.status = 'rolled-back'; },
+    value => { value.transaction = '../outside'; },
+  ]) { const value = changeReply(); mutate(value); assert.throws(() => attachedFileChange(value, id, false)); }
+});
+test('retained-file restoration selects native identifiers, rejects injected paths and refreshes uncertain results without replay', async () => {
+  let fail = false; const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'inspect_attached_recovery') return recoveryReply(args.transaction ?? transaction);
+    if (command === 'restore_attached_retained_file') {
+      if (fail) throw new Error('private native diagnostic');
+      return changeReply(true);
+    }
+    return reply();
+  });
+  await settle();
+  h.intent({ type: 'restore-retained', id, transaction }); await settle();
+  assert.equal(calls.some(call => call.command === 'restore_attached_retained_file'), false);
+  h.intent({ type: 'recovery', id }); await settle();
+  const count = calls.length;
+  h.intent({ type: 'restore-retained', id, transaction, path: '/outside' });
+  h.intent({ type: 'lookup-recovery', id, transaction: '../outside' });
+  assert.equal(calls.length, count);
+  h.intent({ type: 'restore-retained', id, transaction }); await settle();
+  assert.deepEqual(calls.find(call => call.command === 'restore_attached_retained_file').args, { id, transaction });
+  assert.equal(h.projections.at(-1).selectedRecovery[id].transaction, restoredTransaction);
+  assert.match(h.projections.at(-1).fileChangeFeedback[id], /observed/);
+  fail = true;
+  h.intent({ type: 'restore-retained', id, transaction: restoredTransaction }); await settle();
+  assert.match(h.projections.at(-1).fileChangeFeedback[id], /does not prove/);
+  assert.doesNotMatch(h.projections.at(-1).fileChangeFeedback[id], /private native/);
+  assert.equal(calls.filter(call => call.command === 'restore_attached_retained_file').length, 2);
+  const pinned = h.projections.at(-1).selectedRecovery[id];
+  h.intent({ type: 'refresh' }); await settle();
+  assert.equal(h.projections.at(-1).selectedRecovery[id], pinned);
+  h.dispose();
+});
+test('applying main requires an exact loaded file comparison and sends no renderer content or recovery location', async () => {
+  const calls = []; let inspectFailure = false;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attachment_approval_status') return mainReply(acceptedMain());
+    if (command === 'preview_attached_main_integration') return integrationReply();
+    if (command === 'apply_attached_main_file') return changeReply();
+    if (command === 'inspect_attached_recovery') { if (inspectFailure) throw new Error('private'); return recoveryReply(); }
+    return reply();
+  });
+  await settle(); h.intent({ type: 'check-approval', id }); await settle();
+  h.intent({ type: 'apply-main-file', id, path: 'work.txt' }); await settle();
+  assert.equal(calls.some(call => call.command === 'apply_attached_main_file'), false);
+  h.intent({ type: 'compare-main', id }); await settle();
+  const count = calls.length;
+  h.intent({ type: 'apply-main-file', id, path: '../other' });
+  h.intent({ type: 'apply-main-file', id, path: 'work.txt', bytes: 'injected' });
+  assert.equal(calls.length, count);
+  h.intent({ type: 'apply-main-file', id, path: 'work.txt' }); await settle();
+  assert.deepEqual(calls.find(call => call.command === 'apply_attached_main_file').args,
+    { id, bundle: acceptedMain().bundle, target: operation, path: 'work.txt' });
+  const previous = h.projections.at(-1).recoveries[id];
+  inspectFailure = true; h.intent({ type: 'recovery', id }); await settle();
+  assert.equal(h.projections.at(-1).recoveries[id], previous);
+  assert.match(h.projections.at(-1).recoveryErrors[id], /out of date/);
+  const after = calls.length;
+  h.intent({ type: 'restore-retained', id, transaction }); await settle();
+  assert.equal(calls.length, after);
+  h.dispose();
+});
+
+
+test('recovery accepts native regular-file modes and refuses permission-only or non-file modes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'mesh-recovery-mode-'));
+  try {
+    const path = join(root, 'work.txt');
+    writeFileSync(path, 'fixture', { mode: 0o600 });
+    const mode = statSync(path).mode;
+    assert.equal(mode & 0o170000, 0o100000);
+    const value = recoveryReply();
+    value.recovery.entries[0].details.source.mode = mode;
+    value.recovery.entries[0].details.retained.mode = mode;
+    assert.equal(attachedRecovery(value, id).entries[0].retainedAvailable, true);
+    for (const bad of [0o600, 0o040755, 0o120777, 0o110644, -1, 1.5, Number.MAX_SAFE_INTEGER]) {
+      const invalid = recoveryReply(); invalid.recovery.entries[0].details.retained.mode = bad;
+      assert.throws(() => attachedRecovery(invalid, id));
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

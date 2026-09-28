@@ -243,6 +243,16 @@ pub(super) fn prepare(
 }
 
 impl PreparedMainFileIntegration {
+    /// Frozen current bytes presented by the native confirmation host.
+    pub fn current_content(&self) -> &[u8] {
+        self.replacement.current_bytes()
+    }
+
+    /// Frozen approved bytes presented by the native confirmation host.
+    pub fn proposed_content(&self) -> &[u8] {
+        self.replacement.replacement_bytes()
+    }
+
     /// Private durable transaction directory. Never automatically remove its displaced file: an
     /// already-open editor may continue writing it even after apply returns successfully.
     pub fn recovery_path(&self) -> &Path {

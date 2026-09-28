@@ -358,7 +358,7 @@ impl ProvisionedAttachment {
 
     /// Stage one approved regular-file replacement in native-configured external recovery storage.
     /// This changes no source files. Applying the returned single-use proposal is a separate,
-    /// explicit native operation; no agent tool or renderer command exposes it.
+    /// explicit native operation; graphical hosts must obtain their own complete native confirmation.
     #[allow(clippy::too_many_arguments)]
     pub fn prepare_main_file_integration(
         &self,
@@ -379,6 +379,41 @@ impl ProvisionedAttachment {
             trusted,
             limits,
         )
+    }
+
+    /// Native host default for file recovery, inside this exact external metadata store.
+    /// Inspection passes `false` and never provisions a missing directory. No renderer may
+    /// select this path. External-volume hosts can still configure a separate recovery root.
+    pub fn file_recovery_root(&self, create: bool) -> io::Result<Option<PathBuf>> {
+        use std::os::unix::fs::PermissionsExt as _;
+        self.store.ensure_namespace_identity()?;
+        let name = OsStr::new("file-recovery");
+        let root = match self.store.open_child_directory(name) {
+            Ok(root) => root,
+            Err(error) if error.kind() == io::ErrorKind::NotFound && create => {
+                match self.store.create_child_directory(name) {
+                    Ok(root) => root,
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                        self.store.open_child_directory(name)?
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let path = self.metadata.join(name);
+        let external = external_store(&path, self.project())?;
+        if external.identity()? != root.identity()?
+            || root.try_clone_directory()?.metadata()?.permissions().mode() & 0o077 != 0
+        {
+            return Err(invalid(
+                "file recovery storage identity or permissions changed",
+            ));
+        }
+        root.ensure_namespace_identity()?;
+        self.store.ensure_namespace_identity()?;
+        Ok(Some(path))
     }
 
     /// Inspect retained integration evidence after restart without replay, cleanup or writes.

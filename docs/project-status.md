@@ -78,6 +78,10 @@ current file in a new retained transaction. It rechecks origin ancestry, source,
 later edits refuse or remain retained for reconciliation. Undo is another preserving transaction,
 and private recovered content cannot advance main. Desktop confirmation, offline recovery and
 packaged acceptance remain unfinished.
+Desktop recovery controls now request native single-file apply/restore confirmation, inspect bounded
+retained-file observations and look up exact recovery records. Cancelled or uncertain outcomes never
+authorize replay or deletion. This transfer is under validation; actual packaged confirmation,
+offline/cross-volume recovery and grouped changes remain unfinished.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

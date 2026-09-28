@@ -291,6 +291,72 @@ impl AttachmentHost {
             .ok_or("Saved history is unavailable".into())
     }
 
+    pub(crate) fn file_change_history(
+        &self,
+        id: &str,
+    ) -> Result<(ProvisionedAttachment, u64), String> {
+        let state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        let project = state.projects.get(id).ok_or("This project is not open")?;
+        if project.detached {
+            return Err("Reattach the project before changing a working file".into());
+        }
+        Ok((
+            project
+                .history
+                .clone()
+                .ok_or("Saved history is unavailable")?,
+            project.generation,
+        ))
+    }
+
+    pub(crate) fn confirm_file_change<T>(
+        &self,
+        id: &str,
+        generation: u64,
+        apply: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        // Serialize session controls with the confirmed mutation. Detach or reattach during
+        // the dialog invalidates the proposal even though its native directory remains pinned.
+        let state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        let project = state.projects.get(id).ok_or("This project is not open")?;
+        if project.detached || project.generation != generation {
+            return Err("The project session changed during confirmation. Inspect recovery before retrying.".into());
+        }
+        apply()
+    }
+
+    pub fn file_recovery(
+        &self,
+        id: &str,
+        transaction: Option<&str>,
+        trusted: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
+        let history = self.review_history(id)?;
+        let root = history
+            .file_recovery_root(false)
+            .map_err(|_| "File recovery storage is unavailable")?;
+        let recovery = match root {
+            Some(root) => history
+                .inspect_integration_recovery(
+                    &root,
+                    transaction,
+                    trusted,
+                    mesh_daemon::project_attachment::ObservationLimits::default(),
+                )
+                .map_err(|_| "Retained files could not be inspected")?,
+            None if transaction.is_some() => {
+                return Err("This recovery transaction is unavailable".into())
+            }
+            None => Json::Null,
+        };
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-recovery/v1")),
+            ("project", Json::text(id)),
+            ("recovery", recovery),
+        ])
+        .encode())
+    }
+
     pub fn request_review(
         &self,
         id: &str,
@@ -531,6 +597,57 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn file_recovery_inspection_does_not_provision_and_detach_invalidates_confirmation() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-file-recovery-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "ongoing work").unwrap();
+        let host = AttachmentHost::new(&root);
+        let attached = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = attached.get("id").unwrap().as_text().unwrap();
+        let (history, generation) = host.file_change_history(id).unwrap();
+        let response = Json::parse(
+            &host
+                .file_recovery(id, None, &mesh_daemon::TrustedReviewers::default())
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(response.get("recovery"), Some(&Json::Null));
+        assert!(!history.metadata_path().join("file-recovery").exists());
+        assert!(host
+            .file_recovery("unknown", None, &mesh_daemon::TrustedReviewers::default())
+            .is_err());
+        assert_eq!(
+            host.confirm_file_change(id, generation, || Ok(7)).unwrap(),
+            7
+        );
+        let detached =
+            Json::parse(&host.control(id, &generation.to_string(), "detach").unwrap()).unwrap();
+        assert!(host.file_change_history(id).is_err());
+        assert!(host
+            .confirm_file_change(id, generation, || -> Result<(), String> {
+                panic!("stale mutation invoked")
+            })
+            .is_err());
+        host.control(
+            id,
+            detached.get("generation").unwrap().as_text().unwrap(),
+            "reattach",
+        )
+        .unwrap();
+        assert!(host
+            .confirm_file_change(id, generation, || -> Result<(), String> {
+                panic!("old confirmation revived")
+            })
+            .is_err());
+        assert_eq!(fs::read(source.join("work")).unwrap(), b"ongoing work");
+        drop(host);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn desktop_sessions_deduplicate_and_reject_stale_controls() {
