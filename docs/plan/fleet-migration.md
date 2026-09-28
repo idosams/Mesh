@@ -2451,3 +2451,35 @@ the fixture is not evidence of a real provider, authenticated transport or secon
 No persisted record schema changes: the separate session stream uses existing fleet commands.
 Independent supervisor/broker lifetime, scoped MCP integration, durable remote acknowledgment/results,
 terminal reconciliation, authenticated transport and actual remote acceptance remain required.
+
+### R14 delivered evidence
+
+[#131](https://github.com/idosams/Mesh/pull/131) merged at
+`227f3ad1e3f6bb65a4a2b40b276075157bdf0c81` with all seven exact-head checks passing.
+Linux passed 3,189 tests; macOS passed 3,443 plus four renderer tests and the real daemon demo.
+An earlier local binary, built before the final resource-retention changes, passed 12 tests and
+timed out waiting for its provider fixture to exit. That failure is preserved; it is not replaced
+by the hosted result or represented as current-commit execution. Current local verification remains
+in progress and does not widen the hosted evidence into local or packaged acceptance.
+
+## R15 received worker host
+
+New canonical implementation on merged #131; no preserved source commits are replaced.
+`ReceivedWorkerHost` owns the received native service, its sole prepared process and a private local
+IPC server. The existing host's signer/grant/launch path is shared by normal dispatch and received
+prepared attempts. The new host polls owned work only and cannot dispatch another lane or retry.
+Native cancellation revokes credentials and requests direct-process stop, while preserving uncertain
+capacity. Individual IPC connections do not own the process or server lifetime.
+
+The provider endpoint's limited router accepts the matching objective's scoped fleet calls. General
+workspace operations refuse using the existing operation defaults. The native-configured endpoint
+requires an existing private directory and preserves conflicting endpoint files. No new transport
+or persisted schema is introduced.
+
+Regressions use an actual deterministic process, local socket and signing key to exercise connection
+loss/reconnect, exact custody generation, checkpoint/review submission and saved-review reconstruction,
+completion revocation, cancellation with retained capacity, and failed signer/endpoint preservation.
+Validation is in progress. This is local native composition, not authenticated remote operation or a
+real-provider acceptance run. The resident worker must retain/poll this host independently of its
+broker. A deployed worker entry point, bounded broker frames, bidirectional authentication, durable
+remote result envelopes/reconnect and actual second-machine proof remain required.

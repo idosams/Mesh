@@ -282,3 +282,22 @@ handle. Dropping a process handle still does not establish descendant terminatio
 remote admission slot. The embedding native supervisor must retain and poll its handles, bind the
 scoped MCP endpoint, and provide independent broker lifetime. That supervisor and transport wiring
 remain unfinished; this native composition alone does not expose remote execution to a peer.
+
+## Received worker host and local provider route
+
+`ReceivedWorkerHost` composes the original reservation with a native provider, signer factory and
+private local endpoint. It starts only the already dispatched attempt and retains the existing
+native host's process/credential ownership. Its `poll` observes owned work without scheduling new
+lanes. Cancellation keeps uncertain capacity and requires continued polling; no direct-process
+exit or dropped handle establishes descendant termination or frees the remote admission slot.
+
+The local endpoint implements only the matching objective's scoped fleet operations, plus ordinary
+protocol/status negotiation. General workspace opening and publication operations refuse. The
+separate router retains the service without creating a daemon/service reference cycle. Closing a
+connection does not close the provider endpoint, revoke its still-active native session or produce
+another attempt. A completed provider session is revoked through the existing host logic.
+
+This handle is owned and polled by the resident native worker, independently of a future broker's
+connections. It is not itself a deployed worker daemon, an authenticated peer endpoint or a durable
+remote acknowledgment/result protocol. Those integrations remain required before remote capability
+can be exposed to users. The deterministic process/socket/signing tests prove local composition only.

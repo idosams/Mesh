@@ -59,6 +59,11 @@ pub struct NativeFleetHost {
 pub type CodexFleetHost = NativeFleetHost;
 
 impl NativeFleetHost {
+    #[cfg(test)]
+    pub(super) fn test_owned_credential(&self, lane: &str) -> &str {
+        self.workers[lane].credential.transport_value()
+    }
+
     /// Compose trusted native dependencies; starting work requires an explicit subsequent tick.
     pub fn new(
         service: Arc<FleetService>,
@@ -94,6 +99,59 @@ impl NativeFleetHost {
     /// Existing handles and uncertain attempts remain owned; this is not restart reconciliation.
     pub fn poll_owned(&mut self) -> Result<Vec<WorkerObservation>, Unavailable> {
         self.tick_with_dispatch(false)
+    }
+
+    /// Native received-work composition only: consume the already dispatched exact attempt.
+    /// No dispatch, retry, PID adoption or replacement of an owned worker is performed here.
+    pub(super) fn start_prepared(&mut self, lane: &str, run: &str) -> Result<(), Unavailable> {
+        let state = self.service.native_state()?;
+        let assigned = state
+            .lanes
+            .get(lane)
+            .ok_or_else(|| unavailable("fleet-host-lane-missing"))?;
+        let attempt = assigned
+            .runs
+            .last()
+            .ok_or_else(|| unavailable("fleet-host-run-missing"))?;
+        if state.cancelled
+            || assigned.provider != self.adapter.provider()
+            || attempt.id != run
+            || attempt.state != RunState::Launching
+            || attempt.launch_owner.is_some()
+        {
+            return Err(unavailable("fleet-host-prepared-attempt-refused"));
+        }
+        self.start_owned(lane, run)
+    }
+
+    fn start_owned(&mut self, lane: &str, run: &str) -> Result<(), Unavailable> {
+        if self.workers.contains_key(lane) {
+            return Err(unavailable("fleet-host-worker-already-owned"));
+        }
+        let signer = self.signers.signer(lane, run)?;
+        let credential = self.service.grant_with_signer(lane, run, run, signer)?;
+        let process = match self
+            .service
+            .start_provider(&credential, &self.adapter, &self.endpoint)
+        {
+            Ok(process) => process,
+            Err(error) => {
+                // An uncertain launch retains its claim/custody but not an authorized failed session.
+                let _ = self.service.revoke(&credential);
+                return Err(error);
+            }
+        };
+        self.workers.insert(
+            lane.into(),
+            Worker {
+                run: run.into(),
+                credential,
+                process,
+                stop_requested: false,
+                acknowledged: false,
+            },
+        );
+        Ok(())
     }
 
     fn tick_with_dispatch(
@@ -151,13 +209,12 @@ impl NativeFleetHost {
             .flat_map(|lane| &lane.runs)
             .filter(|run| run.state.occupies_slot())
             .count() as u64;
+        let provider = self.adapter.provider();
         for lane in state
             .lanes
             .values()
             .filter(|lane| {
-                lane.provider == self.adapter.provider()
-                    && lane.workspace.is_some()
-                    && lane.runs.is_empty()
+                lane.provider == provider && lane.workspace.is_some() && lane.runs.is_empty()
             })
             .take(limit.saturating_sub(occupied) as usize)
         {
@@ -174,33 +231,7 @@ impl NativeFleetHost {
                     run: run.clone(),
                 },
             )?;
-            let signer = self.signers.signer(&lane.id, &run)?;
-            let credential = self
-                .service
-                .grant_with_signer(&lane.id, &run, &run, signer)?;
-            let process =
-                match self
-                    .service
-                    .start_provider(&credential, &self.adapter, &self.endpoint)
-                {
-                    Ok(process) => process,
-                    Err(error) => {
-                        // A failed launch may have crossed the external-effect boundary. Preserve its
-                        // durable claim and custody, but never leave a failed session authorized.
-                        let _ = self.service.revoke(&credential);
-                        return Err(error);
-                    }
-                };
-            self.workers.insert(
-                lane.id.clone(),
-                Worker {
-                    run,
-                    credential,
-                    process,
-                    stop_requested: false,
-                    acknowledged: false,
-                },
-            );
+            self.start_owned(&lane.id, &run)?;
         }
         Ok(observations)
     }

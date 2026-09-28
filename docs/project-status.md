@@ -134,11 +134,14 @@ an explicit durable source-to-worker mapping. This does not claim a remote provi
 
 [PR #130](https://github.com/idosams/Mesh/pull/130) merged durable launch ownership at
 `486b0e0bcc2889e46b33739d9d0a55fc21c102e8`, with all seven exact-head checks passing.
-The next increment consumes that original ownership into the existing native service and provider
+[PR #131](https://github.com/idosams/Mesh/pull/131) merged at
+`227f3ad1e3f6bb65a4a2b40b276075157bdf0c81`, with all seven checks passing. It consumes original ownership into the existing native service and provider
 launch path, retaining the same ledger and initialized workspace. It restricts the local execution
-session to the assigned lane/run and checks the lease immediately before spawn. Its regression and
-CI validation are in progress. It adds no network authentication, process adoption, automatic retries
-or protected-main authority. Independent supervisor/broker lifetime and actual remote operation remain
-unfinished. Delivery evidence and remaining work are tracked in the
-[ledger](plan/fleet-migration.md#r14-received-native-session) and
+session to the assigned lane/run and checks the lease immediately before spawn.
+The next worker-host increment owns that process, native signing sessions and an actual local IPC
+endpoint restricted to scoped fleet calls. Polling does not dispatch another attempt; connection loss
+does not drop the host. Validation is in progress. It adds no network authentication, process adoption,
+automatic retries or protected-main authority. The resident worker entry point, authenticated broker
+transport and actual second-machine operation remain unfinished. Delivery evidence and remaining work
+are tracked in the [ledger](plan/fleet-migration.md#r15-received-worker-host) and
 [remote execution contract](plan/fleet-remote-execution-contract.md).

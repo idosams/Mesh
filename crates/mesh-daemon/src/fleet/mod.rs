@@ -11,6 +11,10 @@ pub(crate) mod comparison;
 #[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
+mod received_host;
+#[cfg(unix)]
+pub use received_host::ReceivedWorkerHost;
+#[cfg(unix)]
 pub(crate) mod project_import;
 #[cfg(unix)]
 mod project_mapping;
