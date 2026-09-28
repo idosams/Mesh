@@ -174,3 +174,26 @@ readiness or launch receipt, does not initialize a workspace or spawn a provider
 reopened after restart without native reconciliation. Failures preserve partial work for inspection.
 Authenticated transport, durable receiving ownership, workspace initialization, result transfer and
 real second-machine acceptance remain required.
+
+## Native receiving-store authority
+
+A native receiver now acquires a nonblocking exclusive lock on an independently opened descriptor
+for the admitted private store. Its CAS uses descriptor-relative operations; every operation also
+rechecks the destination's namespace, permissions and protected-root relationship. A second native
+receiver refuses until the first handle is dropped. This is cooperating native exclusion, not a
+claim that arbitrary same-user programs cannot modify files.
+
+Reads and length probes reject hard links and objects larger than 4 MiB; reads also stop at that
+bound plus one byte to detect growth. This bound applies to receiving-store objects, including
+metadata read through that filesystem. Oversized metadata refuses instead of consuming unbounded
+memory. Appending inspects the exact opened descriptor before writing and refuses existing hard
+links. Unsupported or unknown entries are treated as present for CAS existence decisions, so an
+error cannot become permission to overwrite a path. CAS corruption and durable resume semantics
+otherwise remain unchanged.
+
+The receiver binds the manifest to the validated assignment before initializing store layout and
+returns receipt/status only after rechecking native authority. Dropping and reopening can resume
+confirmed partial content; it grants no execution or adoption authority. Materialization uses the
+same admitted destination while receiving ownership remains held. Network authentication, durable
+attempt ownership, space-exhaustion/crash acceptance and the rest of the execution contract remain
+required. No peer or renderer endpoint exposes the receiver in this increment.

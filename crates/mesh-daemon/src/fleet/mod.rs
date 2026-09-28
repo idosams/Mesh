@@ -22,6 +22,8 @@ pub mod provider;
 mod remote;
 mod remote_input;
 #[cfg(unix)]
+pub use remote_input::NativeRemoteInputReceiver;
+#[cfg(unix)]
 mod remote_materialization;
 #[cfg(unix)]
 pub use crate::workspace::RemoteInputSource;

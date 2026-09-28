@@ -2255,3 +2255,19 @@ The [integration contract](fleet-remote-execution-contract.md) ties native recei
 durable launch ownership, independent worker history, authenticated transport and verified local
 result import into one required execution path. It records PR boundaries and decisive tests.
 This is design, not remote execution support or second-machine evidence.
+
+## R08 pinned native input receipt
+
+New canonical implementation based on #122 at
+`d54dc27f38bdef47c7204f4aea4fddb70c380495`; no preserved source commits are replaced.
+A native receiver composes the existing CAS protocol with admitted descriptor-relative storage,
+exclusive directory ownership, bounded reads, protected-root rechecks and exact-descriptor append
+checks. The generic receiver remains source-compatible through its default filesystem parameter.
+No wire format, signing domain or dependency changes. This integrates native receiving authority;
+it does not implement transport, launch ownership or remote execution.
+
+Four native regressions cover transfer/resume/exclusive ownership and materialization, store
+replacement without writes into the replacement, links/oversized partial objects with retained
+external bytes, and ancestor-alias movement into a protected project. Native execution and full
+CI are pending. The [execution contract](fleet-remote-execution-contract.md) retains crash/space,
+authentication, receiving lifecycle, result reconciliation and actual second-machine requirements.

@@ -64,7 +64,7 @@ impl RemoteInputDestination {
         admitted.verify()?;
         Ok(admitted)
     }
-    fn verify(&self) -> io::Result<()> {
+    pub(super) fn verify(&self) -> io::Result<()> {
         private(&self.store)?;
         private(&self.parent)?;
         if self.store.is_within(token(&self.parent)?)?
@@ -79,10 +79,15 @@ impl RemoteInputDestination {
         }
         Ok(())
     }
-    pub(super) fn materialize(
+    pub(super) fn receiving_store(&self) -> io::Result<(PinnedWorkspaceRoot, PathBuf)> {
+        self.verify()?;
+        Ok((self.store.clone(), self.store_path.clone()))
+    }
+
+    pub(super) fn materialize<F: mesh_cas::DurableFs>(
         &self,
         manifest: &RemoteInputManifest,
-        cas: &Cas,
+        cas: &Cas<F>,
         allocation_id: &str,
     ) -> io::Result<RemoteInputAllocation> {
         self.verify()?;

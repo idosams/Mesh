@@ -2,9 +2,14 @@
 //! The native caller owns/authenticates the session and private store. No path is materialized here.
 use super::{refuse, Error, RemoteAssignment};
 use crate::ipc::Json;
-use mesh_cas::{Blake3, Cas, ContentDigest, Digest32, DigestHasher};
+use mesh_cas::{Blake3, Cas, ContentDigest, Digest32, DigestHasher, DurableFs, StdFs};
+use std::borrow::Cow;
+#[cfg(unix)]
+mod native;
 use mesh_store::RecordDigest;
 use mesh_types::NormalizedName;
+#[cfg(unix)]
+pub use native::NativeRemoteInputReceiver;
 use std::collections::BTreeMap;
 
 const MAX_MANIFEST_BYTES: usize = 1_048_576;
@@ -283,22 +288,25 @@ fn encode(input: RecordDigest, entries: &[RemoteInputEntry]) -> String {
 
 /// Serial receipt into a native-admitted private CAS. The caller must retain store identity and
 /// exclude competing receivers; a network peer cannot supply the store or authorize filesystem use.
-pub struct RemoteInputReceiver<'a> {
-    manifest: RemoteInputManifest,
-    cas: &'a Cas,
+pub struct RemoteInputReceiver<'a, F: DurableFs = StdFs> {
+    manifest: Cow<'a, RemoteInputManifest>,
+    cas: &'a Cas<F>,
 }
-impl<'a> RemoteInputReceiver<'a> {
+impl<'a, F: DurableFs> RemoteInputReceiver<'a, F> {
     /// Bind an already-verified manifest to the retained native assignment and private store.
     /// Possession of this data is not peer authentication or store-ownership authority.
     pub fn new(
         manifest: RemoteInputManifest,
         assignment: &RemoteAssignment,
-        cas: &'a Cas,
+        cas: &'a Cas<F>,
     ) -> Result<Self, Error> {
         if manifest.input() != assignment.input || manifest.bundle() != assignment.bundle {
             return refuse("remote-input-assignment-mismatch");
         }
-        Ok(Self { manifest, cas })
+        Ok(Self {
+            manifest: Cow::Owned(manifest),
+            cas,
+        })
     }
     /// Durable resume offset and verified-complete flag for a declared chunk only.
     pub fn status(&self, digest: Digest32) -> Result<(u64, bool), Error> {

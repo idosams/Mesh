@@ -119,3 +119,8 @@ All five new materialization regressions passed on hosted Linux/macOS and locall
 Hosted coverage includes the earlier export/history regressions. The combined local full gate remains
 separate and unfinished. These tests do not prove authenticated remote dispatch, workspace
 initialization, executor ownership, restart reconciliation or second-machine acceptance.
+
+The next native receiving increment binds CAS transfer to an admitted directory descriptor with
+exclusive receiving ownership, bounded reads and replacement/protected-root checks. Its regressions
+are pending. This closes a storage-authority integration gap before network exposure; it does not
+establish remote transport or execution readiness.

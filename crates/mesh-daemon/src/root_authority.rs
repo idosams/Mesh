@@ -522,6 +522,16 @@ impl PinnedRootFs {
         Ok((names, more))
     }
 
+    /// Append through the exact opened descriptor, refusing a pre-existing hard link.
+    /// Private receiving stores must not modify an inode also named outside their store.
+    pub(crate) fn append_private_regular(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        let mut file = self.open_append_create(path)?;
+        if file.metadata()?.nlink() != 1 {
+            return Err(io::Error::other("receiving file has another link"));
+        }
+        file.write_all(bytes)
+    }
+
     /// Create and durably populate one file beneath the retained root descriptor.
     ///
     /// The returned pathname is never reopened: bytes, permissions, and durability are applied to
