@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fleetCatalogue, fleetActivity, fleetProvisioned, startFleets } from './fleets.js';
+import { fleetProviderPolicy, fleetCatalogue, fleetActivity, fleetProvisioned, startFleets } from './fleets.js';
 const id = 'a'.repeat(64), version = 'b'.repeat(64), objective = `fleet-${'c'.repeat(64)}`, lane = `lane-${'d'.repeat(64)}`;
-const catalogue = () => ({ schema: 'mesh.native-fleets/v1', fleets: [{ objective, ownership: 'current-host', state: {
+const catalogue = () => ({ schema: 'mesh.native-fleets/v1', fleets: [{ objective, ownership: 'current-host', policy: { coordinator: 'codex', providers: ['codex'] }, state: {
   objective, revision: 3, cancelled: false, lanes: [{ id: lane, parent: null, source_project: id, goal: 'Coordinate', provider: 'codex', base: version, allocated: true, workspace: { root: '/native/lane', installation: 'native-installation' }, run: null }],
 } }] });
 const savedPins = () => ({ schema: 'mesh.desktop-fleet-pin-selectors/v2', revision: '0', pins: [] });
@@ -33,7 +33,7 @@ test('catalogue validates identities, ownership, bounds and parent/run correlati
     value => { value.fleets[0].state.revision = Number.MAX_SAFE_INTEGER + 1; },
     value => { value.fleets[0].ownership = 'unavailable'; },
   ]) { const value = catalogue(); mutate(value); assert.throws(() => fleetCatalogue(value)); }
-  const unavailable = catalogue(); unavailable.fleets[0].ownership = 'unavailable'; unavailable.fleets[0].state = null;
+  const unavailable = catalogue(); unavailable.fleets[0].ownership = 'unavailable'; unavailable.fleets[0].state = null; unavailable.fleets[0].policy = null;
   assert.equal(fleetCatalogue(unavailable)[0].lanes.length, 0);
 });
 test('activity keeps exact attempt identity and refuses ambiguous observations', () => {
@@ -143,7 +143,7 @@ test('failed start remains visible after a later successful poll and is never re
   assert.match(h.projections.at(-1).feedback, /could not yet be confirmed/);
   h.intent({ type: 'refresh' }); await settle();
   assert.equal(h.projections.at(-1).error, '');
-  assert.match(h.projections.at(-1).feedback, /installed Codex/);
+  assert.match(h.projections.at(-1).feedback, /selected providers and accounts/);
   assert.equal(calls.filter(command => command === 'start_attached_fleet').length, 1);
   assert.doesNotMatch(h.projections.at(-1).feedback, /private native error/); h.dispose();
 });
@@ -204,4 +204,63 @@ test('restored fleets expose saved result reads while execution stays unavailabl
   h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); await settle();
   assert.deepEqual(calls.sort(), ['attached_fleets', 'fleet_activity', 'fleet_saved_reviews', 'load_fleet_pins', 'load_fleet_review_outbox'].sort());
   h.dispose();
+});
+
+
+test('provider policies are closed, canonical and independent of input', () => {
+  const input = { coordinator: 'claude', providers: ['codex', 'claude'] };
+  const policy = fleetProviderPolicy(input, false);
+  assert.deepEqual(policy, { coordinator: 'claude', providers: ['claude', 'codex'] });
+  input.providers.pop(); assert.equal(policy.providers.length, 2);
+  assert.ok(Object.isFrozen(policy) && Object.isFrozen(policy.providers));
+  for (const invalid of [null, {}, { coordinator: 'claude', providers: ['codex'] }, { coordinator: 'codex', providers: ['codex', 'codex'] }, { coordinator: 'other', providers: ['other'] }, { coordinator: 'codex', providers: ['codex'], path: '/tmp' }, { coordinator: 'codex', providers: [] }]) assert.throws(() => fleetProviderPolicy(invalid, false));
+  assert.throws(() => fleetProviderPolicy({ coordinator: 'claude', providers: ['codex', 'claude'] }));
+});
+test('explicit provisioning requires exact canonical v2 policy receipt', () => {
+  const pending = { ...provision, request: 'e'.repeat(32), policy: fleetProviderPolicy({ coordinator: 'claude', providers: ['claude', 'codex'] }) };
+  const receipt = { schema: 'mesh.desktop-attached-fleet/v2', project: id, request: pending.request, objective, started: false, policy: pending.policy };
+  assert.equal(fleetProvisioned(receipt, pending), objective);
+  for (const mutation of [{ schema: 'mesh.desktop-attached-fleet/v1' }, { policy: undefined }, { policy: { coordinator: 'codex', providers: ['claude', 'codex'] } }, { policy: { coordinator: 'claude', providers: ['claude'] } }]) assert.throws(() => fleetProvisioned({ ...receipt, ...mutation }, pending));
+});
+test('catalogue policy must agree with every lane and coordinator; missing policy remains readable', () => {
+  for (const policy of [{ coordinator: 'claude', providers: ['claude', 'codex'] }, { coordinator: 'claude', providers: ['claude'] }]) {
+    const value = catalogue(); value.fleets[0].policy = policy; assert.throws(() => fleetCatalogue(value));
+  }
+  const value = catalogue(); delete value.fleets[0].policy;
+  assert.equal(fleetCatalogue(value)[0].policy, null);
+  assert.equal(fleetCatalogue(value)[0].lanes.length, 1);
+});
+test('policy uncertainty preserves a frozen request and exact retry without starting', async () => {
+  const calls = []; let match = false;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'load_fleet_pins') return savedPins();
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
+    if (command === 'attached_fleets') return catalogue();
+    if (command === 'fleet_activity') return activity();
+    if (command === 'provision_attached_fleet') return { schema: 'mesh.desktop-attached-fleet/v2', project: id, request: args.request, objective, started: false, policy: match ? JSON.parse(args.policyJson) : { coordinator: 'codex', providers: ['codex'] } };
+    throw new Error(command);
+  });
+  await settle();
+  h.intent({ ...provision, policy: { coordinator: 'claude', providers: ['codex'] } });
+  assert.equal(calls.some(call => call.command === 'provision_attached_fleet'), false);
+  const input = { ...provision, policy: { coordinator: 'claude', providers: ['codex', 'claude'] } };
+  h.intent(input); await settle();
+  const pending = h.projections.at(-1).pending;
+  assert.equal(pending.policy.coordinator, 'claude');
+  input.policy.coordinator = 'codex'; input.policy.providers.length = 0;
+  assert.throws(() => { pending.policy.providers.push('codex'); });
+  assert.throws(() => { pending.limits.lanes = 1024; });
+  match = true; h.intent({ type: 'retry-provision' }); await settle();
+  const attempts = calls.filter(call => call.command === 'provision_attached_fleet');
+  assert.equal(attempts.length, 2); assert.deepEqual(attempts[1], attempts[0]);
+  assert.equal(h.projections.at(-1).pending, null);
+  assert.equal(calls.some(call => call.command === 'start_attached_fleet'), false);
+  h.dispose();
+});
+test('unknown catalogue policy cannot start agents', async () => {
+  const calls = [];
+  const h = harness(async command => { calls.push(command); if (command === 'attached_fleets') { const value = catalogue(); delete value.fleets[0].policy; return value; } if (command === 'fleet_activity') return activity(); if (command === 'load_fleet_pins') return savedPins(); return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] }; });
+  await settle(); h.intent({ type: 'start', objective }); await settle();
+  assert.equal(calls.includes('start_attached_fleet'), false); h.dispose();
 });

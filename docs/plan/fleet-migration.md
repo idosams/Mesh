@@ -2049,3 +2049,22 @@ Repository/docs/license/storage/format checks pass. Full desktop validation is
 running; native integration and combined npm validation remain pending. The corrected
 #109 now passes all seven hosted checks; #110 native checks are still pending.
 No successful authenticated Claude, multi-machine or packaged acceptance is claimed.
+
+## I08e visible provider choices and exact retry receipts
+
+New canonical implementation based on #111 at
+`dee740c36a0bd8f535317ee7228d0687df547d76`; no preserved source commit is replaced.
+The fleet form chooses a Codex or Claude coordinator and the permitted provider set.
+The coordinator remains included. Pending requests freeze the goal, saved version,
+budgets and canonical provider choices; retries reuse the exact request. Explicit
+choices require the matching v2 native receipt. Legacy callers retain v1 compatibility.
+Catalogue policies are validated against every lane and the coordinator. Old snapshots
+without policy remain readable but cannot start agents. Saved choices appear before
+Start, in English and Hebrew, with provider identities displayed literally.
+
+All 378 controller tests pass, including 17 fleet tests. Removing receipt-policy
+equality fails the regression suite; restoring it passes. Renderer tests cover
+pending controls and saved choices, with their execution still pending at publication.
+Repository, docs, license, storage and vocabulary checks pass.
+Full combined native, actual Claude, remote recovery and packaged acceptance remain
+separate pending gates. This increment does not claim merged delivery.

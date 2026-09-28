@@ -363,3 +363,13 @@ Mesh still shows the latest decision if someone has since reopened the request. 
 and choose again** abandons the pending retry only after verifying current history. Reloading or
 closing a panel does not cancel a native confirmation already in progress. Pending retry identities
 are session-only, and the native graphical confirmation journey remains unverified.
+
+### Choose fleet providers
+
+When provisioning a fleet from a saved version, choose Codex or Claude for the
+coordinator and select the providers its workers may use. The coordinator must stay
+selected. Each selected provider needs its installed executable and account.
+Provisioning prepares lanes; **Start agents** begins provider usage. Review the saved
+provider choices on the fleet card before starting. If provisioning is uncertain,
+the pending request retains its choices and offers an explicit retry. Refresh a fleet
+with unavailable provider choices before starting it; its saved work remains readable.

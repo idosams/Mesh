@@ -759,3 +759,9 @@ restoration or undo. English/Hebrew text keeps paths literal; stale, detached an
 busy views disable requests. TypeScript and 35 focused rendering/localization tests
 pass with a demonstrated failing-before disabled-state regression. This connects
 the source flow but does not establish native-dialog, packaged or merged delivery.
+
+Provider selection is now presented on the fleet review branch: choose the coordinator
+and allowed Codex/Claude providers, then inspect the saved choices before Start.
+Uncertain provisioning retains the exact choices for explicit retry. Missing or
+inconsistent saved policies cannot enable execution. Actual authenticated Claude
+execution and packaged graphical acceptance remain unverified.

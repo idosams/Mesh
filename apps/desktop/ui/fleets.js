@@ -12,6 +12,16 @@ const states = new Set(['launching', 'running', 'waiting', 'reconciling', 'stopp
 const parse = (raw) => typeof raw === 'string' ? JSON.parse(raw) : raw;
 const require = (valid) => { if (!valid) throw new Error('Fleet response could not be verified'); };
 
+export function fleetProviderPolicy(value, canonical = true) {
+  require(value && typeof value === 'object' && Object.keys(value).sort().join(',') === 'coordinator,providers'
+    && Array.isArray(value.providers) && value.providers.length >= 1 && value.providers.length <= 2
+    && value.providers.every(provider => ['claude', 'codex'].includes(provider))
+    && new Set(value.providers).size === value.providers.length && value.providers.includes(value.coordinator));
+  const providers = [...value.providers].sort();
+  require(!canonical || providers.every((provider, index) => provider === value.providers[index]));
+  return Object.freeze({ coordinator: value.coordinator, providers: Object.freeze(providers) });
+}
+
 export function fleetCatalogue(raw) {
   const value = parse(raw);
   require(value?.schema === 'mesh.native-fleets/v1' && Array.isArray(value.fleets) && value.fleets.length <= 16);
@@ -19,7 +29,8 @@ export function fleetCatalogue(raw) {
   return value.fleets.map((row) => {
     require(objective(row?.objective) && !ids.has(row.objective) && ['current-host', 'restored-unattached', 'unavailable'].includes(row.ownership));
     ids.add(row.objective);
-    if (row.ownership === 'unavailable') { require(row.state === null); return { objective: row.objective, ownership: row.ownership, cancelled: false, lanes: [] }; }
+    if (row.ownership === 'unavailable') { require(row.state === null && row.policy == null); return { policy: null, objective: row.objective, ownership: row.ownership, cancelled: false, lanes: [] }; }
+    const policy = row.policy == null ? null : fleetProviderPolicy(row.policy);
     const state = row.state;
     require(state?.objective === row.objective && integer(state.revision, Number.MAX_SAFE_INTEGER) && typeof state.cancelled === 'boolean' && Array.isArray(state.lanes) && state.lanes.length <= 1024);
     const lanes = new Set();
@@ -35,7 +46,8 @@ export function fleetCatalogue(raw) {
         base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state } : null };
     });
     require(result.every(lane => lane.parent === null || (lane.parent !== lane.id && lanes.has(lane.parent))));
-    return { objective: row.objective, ownership: row.ownership, revision: state.revision, cancelled: state.cancelled, lanes: result };
+    require(!policy || result.every(lane => policy.providers.includes(lane.provider) && (lane.parent !== null || lane.provider === policy.coordinator)));
+    return { policy, objective: row.objective, ownership: row.ownership, revision: state.revision, cancelled: state.cancelled, lanes: result };
   });
 }
 export function fleetActivity(raw) {
@@ -61,7 +73,8 @@ export function fleetActivity(raw) {
 }
 export function fleetProvisioned(raw, pending) {
   const value = parse(raw);
-  require(value?.schema === 'mesh.desktop-attached-fleet/v1' && value.project === pending.id && value.request === pending.request && objective(value.objective) && value.started === false);
+  require(value?.schema === (pending.policy ? 'mesh.desktop-attached-fleet/v2' : 'mesh.desktop-attached-fleet/v1') && value.project === pending.id && value.request === pending.request && objective(value.objective) && value.started === false);
+  if (pending.policy) require(JSON.stringify(fleetProviderPolicy(value.policy)) === JSON.stringify(pending.policy));
   return value.objective;
 }
 export function startFleets({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
@@ -86,7 +99,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
     finally { busy = false; publish(); plan(); }
   }
   async function provision() {
-    fleetProvisioned(await invoke('provision_attached_fleet', { id: pending.id, request: pending.request, goal: pending.goal, version: pending.version, limitsJson: JSON.stringify(pending.limits) }), pending);
+    fleetProvisioned(await invoke('provision_attached_fleet', { id: pending.id, request: pending.request, goal: pending.goal, version: pending.version, limitsJson: JSON.stringify(pending.limits), ...(pending.policy ? { policyJson: JSON.stringify(pending.policy) } : {}) }), pending);
     pending = null;
     feedback = 'Fleet provisioned. Review it below, then choose Start agents.';
   }
@@ -98,24 +111,26 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
     const fields = Object.keys(value).sort().join(',');
     if (value.type === 'refresh' && fields === 'type') { void refresh(); return; }
     if (value.type === 'retry-provision' && fields === 'type' && pending) { void refresh(provision); return; }
-    if (value.type === 'provision' && fields === 'concurrency,depth,goal,id,lanes,type,version' && !pending && !error && !sources.error) {
+    if (value.type === 'provision' && ['concurrency,depth,goal,id,lanes,type,version', 'concurrency,depth,goal,id,lanes,policy,type,version'].includes(fields) && !pending && !error && !sources.error) {
+      let policy;
+      if ('policy' in value) { try { policy = fleetProviderPolicy(value.policy, false); } catch { return; } }
       const source = sources.projects.find(project => project.id === value.id);
       if (!source || source.detached || !digest(value.version) || !text(value.goal, 8192) || !value.goal.trim()) return;
       if (![value.lanes, value.concurrency, value.depth].every(number => typeof number === 'string' && /^(0|[1-9][0-9]{0,3})$/.test(number))) return;
       const limits = { lanes: Number(value.lanes), concurrency: Number(value.concurrency), depth: Number(value.depth), retries: 0 };
       if (!integer(limits.lanes, 1024) || limits.lanes < 1 || !integer(limits.concurrency, 64) || limits.concurrency < 1 || limits.concurrency > limits.lanes || !integer(limits.depth, 32)) return;
       const request = requestId(); if (!hex(request, 32)) return;
-      pending = { id: value.id, version: value.version, goal: value.goal, request, limits }; feedback = '';
+      pending = Object.freeze({ id: value.id, version: value.version, goal: value.goal, request, limits: Object.freeze(limits), ...(policy ? { policy } : {}) }); feedback = '';
       void refresh(provision); return;
     }
     if (['start', 'stop'].includes(value.type) && fields === 'objective,type') {
       const fleet = fleets.find(fleet => fleet.objective === value.objective && fleet.ownership === 'current-host');
       if (!fleet || fleet.cancelled) return;
-      if (value.type === 'start' && (error || fleet.lanes.length === 0 || fleet.lanes.some(lane => lane.run !== null || !lane.allocated) || activity.some(row => row.objective === fleet.objective))) return;
+      if (value.type === 'start' && (error || !fleet.policy || fleet.lanes.length === 0 || fleet.lanes.some(lane => lane.run !== null || !lane.allocated) || activity.some(row => row.objective === fleet.objective))) return;
       void refresh(async () => {
         // Commands are never replayed by polling. Native objective/ownership checks remain decisive.
         feedback = value.type === 'start'
-          ? 'Start could not yet be confirmed. Check the installed Codex provider and fleet status before retrying.'
+          ? 'Start could not yet be confirmed. Check the selected providers and accounts and fleet status before retrying.'
           : 'Stop could not yet be confirmed. Refresh and retry the stop request for this fleet.';
         fleetActivity(await invoke(value.type === 'start' ? 'start_attached_fleet' : 'stop_attached_fleet', { objective: value.objective }));
         feedback = value.type === 'start' ? 'Start requested. Activity appears below.' : 'Stop requested. Ownership remains reserved until worker recovery is verified.';

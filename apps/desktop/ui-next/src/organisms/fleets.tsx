@@ -5,12 +5,13 @@ import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
 type Lane = { id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string } | null };
-type Fleet = { objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
+type ProviderPolicy = { coordinator: string; providers: string[] };
+type Fleet = { policy?: ProviderPolicy | null; objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type Projection = { reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { policy?: ProviderPolicy; id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
-const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
+const send = (detail: Record<string, unknown>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const states: Record<string, string> = { launching: "Starting", running: "Working", waiting: "Waiting", reconciling: "Needs recovery", stopping: "Stop requested · ownership reserved", succeeded: "Execution completed", failed: "Execution failed", cancelled: "Cancelled" };
 const age = (value: string, t: ReturnType<typeof useTranslation>) => {
   const milliseconds = Number(value);
@@ -26,6 +27,8 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
   const [lanes, setLanes] = useState("4");
   const [concurrency, setConcurrency] = useState("2");
   const [depth, setDepth] = useState("1");
+  const [coordinator, setCoordinator] = useState("codex");
+  const [providers, setProviders] = useState<string[]>(["codex"]);
   useEffect(() => {
     const update = (event: Event) => setProjection((event as CustomEvent<Projection>).detail);
     document.addEventListener("mesh:fleets-projection", update);
@@ -53,12 +56,15 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
         <p className="text-xs text-muted-foreground">{t("Use \u201cShow latest versions\u201d on the project below to make older versions available here.")}</p>
         <label className="grid gap-1 text-sm">{t("What should the agents accomplish?")}<textarea dir="auto" className="min-h-24 rounded border bg-background p-2" value={goal} maxLength={8192} disabled={formDisabled} onChange={event => setGoal(event.target.value)} /></label>
         <div className="grid gap-3 sm:grid-cols-3">{[{ label: "Maximum lanes, including coordinator", value: lanes, setter: setLanes, min: 1, max: 1024 }, { label: "Agents running at once", value: concurrency, setter: setConcurrency, min: 1, max: 64 }, { label: "Delegation depth", value: depth, setter: setDepth, min: 0, max: 32 }].map(field => <label key={field.label} className="grid gap-1 text-sm">{t(field.label)}<input type="number" className="min-h-11 rounded border bg-background p-2" min={field.min} max={field.max} value={field.value} disabled={formDisabled} onChange={event => field.setter(event.target.value)} /></label>)}</div>
-        <p className="text-xs text-muted-foreground">{t("Codex uses your installed provider and account. Provisioning creates the lane; Start agents begins provider usage. Failed or uncertain attempts are not retried automatically.")}</p>
+        <label className="grid gap-1 text-sm">{t("Coordinator provider")}<select dir="ltr" value={coordinator} disabled={formDisabled} onChange={event => { const next = event.target.value; setCoordinator(next); setProviders(previous => [...new Set([...previous, next])].sort()); }} className="min-h-11 rounded border bg-background p-2"><option value="codex">Codex</option><option value="claude">Claude</option></select></label>
+        <fieldset disabled={formDisabled} className="grid gap-2"><legend>{t("Allowed providers")}</legend>{["codex", "claude"].map(provider => <label key={provider} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={providers.includes(provider)} disabled={formDisabled || provider === coordinator} onChange={event => setProviders(previous => event.target.checked ? [...new Set([...previous, provider])].sort() : previous.filter(value => value !== provider))} /><bdi dir="ltr">{provider}</bdi></label>)}</fieldset>
+        <p className="text-xs text-muted-foreground">{t("All selected providers need an installed executable and account. Provisioning creates the lane; Start agents begins provider usage. Failed or uncertain attempts are not retried automatically.")}</p>
         <Button disabled={disabled || Boolean(projection.pending) || Boolean(projection.error) || Boolean(sourceError) || !source || Boolean(source.detached) || !input.version || !goalValid || !numbersValid}
-          onClick={() => send({ type: "provision", ...input, goal, lanes, concurrency, depth })}>{t("Provision fleet")}</Button>
+          onClick={() => send({ type: "provision", ...input, goal, lanes, concurrency, depth, policy: { coordinator, providers } })}>{t("Provision fleet")}</Button>
       </div>
     </details>
     {projection.pending && <div role="status" className="grid gap-2 text-sm"><p>{t("Provisioning not yet confirmed. This request keeps the same starting version and limits.")}</p><p dir="auto" className="whitespace-pre-wrap break-words">{projection.pending.goal}</p><p className="break-all">{t("Version")}: <bdi dir="ltr">{projection.pending.version}</bdi></p>
+      <FleetPolicy policy={projection.pending.policy} />
       <p>{projection.pending.limits.lanes} {t("lanes")} · {projection.pending.limits.concurrency} {t("agents at once")} · {t("depth")} {projection.pending.limits.depth}</p>
       <Button disabled={disabled} onClick={() => send({ type: "retry-provision" })}>{t("Retry this provisioning request")}</Button></div>}
     {projection.error && <p role="alert" className="text-sm">{t(projection.error)}</p>}
@@ -77,11 +83,12 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
     <div className="grid items-start gap-4 xl:grid-cols-2">{projection.fleets.map(fleet => {
       const activity = fleet.ownership === "current-host" ? projection.activity.find(row => row.objective === fleet.objective) : undefined;
       const current = fleet.ownership === "current-host";
-      const ready = current && !fleet.cancelled && !activity && fleet.lanes.length > 0 && fleet.lanes.every(lane => lane.allocated && !lane.run);
+      const ready = Boolean(fleet.policy) && current && !fleet.cancelled && !activity && fleet.lanes.length > 0 && fleet.lanes.every(lane => lane.allocated && !lane.run);
       return <article key={fleet.objective} className="grid min-w-0 gap-3 rounded border border-border p-3">
         <h4 dir="auto" className="whitespace-pre-wrap break-words font-semibold">{fleet.lanes.find(lane => lane.parent === null)?.goal ?? t("Retained fleet")}</h4>
         <details className="break-all text-xs"><summary>{t("Fleet identity")}</summary><bdi dir="ltr">{fleet.objective}</bdi></details>
         <p className="text-sm">{projection.error ? <>{t("Status may be out of date")} · </> : ""}{t(!current ? fleet.ownership === "restored-unattached" ? "Saved state · workers need recovery before execution" : "Fleet unavailable · retained work needs recovery" : fleet.cancelled ? "Stopped scheduling · worker ownership retained" : activity?.status === "needs-attention" ? "Needs attention · new agents will not start" : activity?.stopRequested ? "Stop requested" : activity ? "Monitoring agents" : fleet.lanes.some(lane => !lane.allocated) ? "Lane allocation incomplete" : fleet.lanes.some(lane => lane.run) ? "Saved run status · no live observations" : "Provisioned · agents have not started")}</p>
+        <FleetPolicy policy={fleet.policy} />
         <div className="flex flex-wrap gap-2"><Button disabled={disabled || Boolean(projection.error) || !ready} onClick={() => send({ type: "start", objective: fleet.objective })}>{t("Start agents")}</Button>
           <Button variant="secondary" disabled={disabled || !current || fleet.cancelled} onClick={() => send({ type: "stop", objective: fleet.objective })}>{t("Stop agents")}</Button></div>
         <p className="text-xs text-muted-foreground">{activity?.observedAt ? age(activity.observedAt, t) : t("No worker observations in this app session")}</p>
@@ -116,4 +123,9 @@ export function FleetPendingReviewOperations({ value }: { value: NonNullable<Pro
       </div>)}
       {value.loaded && !value.entries.length && <p className="text-xs">{t("No pending operations were returned by the last successful read.")}</p>}
     </section>;
+}
+
+function FleetPolicy({ policy }: { policy?: ProviderPolicy | null }) {
+  const t = useTranslation();
+  return policy ? <div className="text-sm"><p>{t("Coordinator provider")}: <bdi dir="ltr">{policy.coordinator}</bdi></p><p>{t("Allowed providers")}: <bdi dir="ltr">{policy.providers.join(", ")}</bdi></p></div> : <p className="text-sm">{t("Provider choices unavailable. Refresh before starting agents.")}</p>;
 }

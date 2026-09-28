@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { FleetCards, FleetPendingReviewOperations } from "./src/organisms/fleets.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports.setLocale = setLocale; module.exports.pending = props => renderToStaticMarkup(React.createElement(FleetPendingReviewOperations, props)); module.exports.render = props => renderToStaticMarkup(React.createElement(FleetCards, props));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
 const module = { exports: {} };
 Function('require', 'module', 'exports', output.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
-const props = () => ({ disabled: false, projects: [], projection: { error: '', fleets: [{ objective: 'fleet-one', ownership: 'current-host', cancelled: false, lanes: [{ id: 'lane-one', parent: null, goal: '<script>private goal</script>', provider: 'codex', base: 'base-version', allocated: true, sourceProject: null, run: null }] }], activity: [] } });
+const props = () => ({ disabled: false, projects: [], projection: { error: '', fleets: [{ objective: 'fleet-one', ownership: 'current-host', policy: { coordinator: 'codex', providers: ['codex'] }, cancelled: false, lanes: [{ id: 'lane-one', parent: null, goal: '<script>private goal</script>', provider: 'codex', base: 'base-version', allocated: true, sourceProject: null, run: null }] }], activity: [] } });
 const render = module.exports.render;
 test('fleet cards escape goals and make start explicit only for fresh provisioned work', () => {
   const value = props(), html = render(value);
@@ -87,7 +87,7 @@ test('Hebrew observations preserve raw activity and label unavailable timestamps
 });
 
 test('unconfirmed provisioning freezes new input and exposes exact input and explicit retry in either language', async () => {
-  const projection = { fleets: [], activity: [], pending: { id: 'source', version: 'Review', goal: 'Working', limits: { lanes: 4, concurrency: 2, depth: 1 } }, busy: false, available: true, error: '', feedback: 'Fleet provisioned. Review it below, then choose Start agents.' };
+  const projection = { fleets: [], activity: [], pending: { policy: { coordinator: 'claude', providers: ['claude', 'codex'] }, id: 'source', version: 'Review', goal: 'Working', limits: { lanes: 4, concurrency: 2, depth: 1 } }, busy: false, available: true, error: '', feedback: 'Fleet provisioned. Review it below, then choose Start agents.' };
   const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { Fleets } from "./src/organisms/fleets.tsx"; export { setLocale } from "./src/lib/localization.ts"; export const render = () => renderToStaticMarkup(React.createElement(Fleets, {projects: [{id:"source", root:"/Users/משפחה/Working", savedVersion:"Review"}], histories:{}, sourceError:""}));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false, plugins: [{ name: 'pending-native-projection', setup(builder) { builder.onLoad({ filter: /fleets\.tsx$/ }, ({path}) => ({ contents: readFileSync(path, 'utf8').replace('useState<Projection>(empty)', `useState<Projection>(${JSON.stringify(projection)})`), loader:'tsx' })); } }] });
   const module = {exports:{}};
   Function('require','module','exports',output.outputFiles[0].text)(createRequire(import.meta.url),module,module.exports);
@@ -95,6 +95,9 @@ test('unconfirmed provisioning freezes new input and exposes exact input and exp
     module.exports.setLocale(locale);
     const html = module.exports.render();
     assert.ok(html.includes(pending));
+    assert.match(html, /<bdi dir="ltr">claude, codex<\/bdi>/);
+    assert.match(html, /<input type="checkbox"[^>]*disabled=""/);
+    assert.match(html, /<option value="claude">Claude<\/option>/);
     assert.match(html, /<bdi dir="ltr">Review<\/bdi>/);
     assert.match(html, /<p dir="auto"[^>]*>Working<\/p>/);
     assert.match(html, /<select dir="ltr"[^>]*disabled=""/);
@@ -156,4 +159,15 @@ test('Hebrew pending recovery keeps exact inputs literal and disables dispatch w
     assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון נוסף לאותה פעולה בדיוק<\/button>/);
     assert.match(html, /רענון קורא בלבד/);
   } finally { module.exports.setLocale('en'); }
+});
+
+test('saved provider policy is visible before start and unknown policy disables start', () => {
+  const value = props();
+  value.projection.fleets[0].policy = { coordinator: 'claude', providers: ['claude', 'codex'] };
+  const html = render(value);
+  assert.ok(html.indexOf('Allowed providers') < html.indexOf('>Start agents</button>'));
+  assert.match(html, /<bdi dir="ltr">claude, codex<\/bdi>/);
+  delete value.projection.fleets[0].policy;
+  assert.match(render(value), /Provider choices unavailable/);
+  assert.match(render(value), /<button[^>]*disabled=""[^>]*>Start agents<\/button>/);
 });
