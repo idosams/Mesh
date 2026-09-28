@@ -73,6 +73,73 @@ pub fn confirmation(
     Ok(prompt)
 }
 
+/// Only native prepared content is eligible for confirmation; renderer facts never enter this path.
+pub fn entry_restoration_confirmation(
+    project: &str,
+    root: &Path,
+    prepared: &mesh_daemon::project_attachment::PreparedRetainedEntryRestoration,
+) -> Result<String, String> {
+    entry_restoration_prompt(
+        project,
+        root,
+        prepared.proposal(),
+        &prepared.restored_files().collect::<Vec<_>>(),
+        &prepared.current_files().collect::<Vec<_>>(),
+    )
+}
+
+fn entry_restoration_prompt(
+    project: &str,
+    root: &Path,
+    proposal: &Json,
+    restored: &[(&str, &[u8], bool)],
+    current: &[(&str, &[u8], bool)],
+) -> Result<String, String> {
+    let fail = || "Complete restoration facts are unavailable for native confirmation".to_owned();
+    if proposal.get("schema") != Some(&Json::text("mesh.attachment-entry-restoration/v1"))
+        || proposal.get("project") != Some(&Json::text(project))
+        || proposal.get("automatic_replay") != Some(&Json::Bool(false))
+    {
+        return Err(fail());
+    }
+    let field = |key| proposal.get(key).and_then(Json::as_text).ok_or_else(fail);
+    let original = proposal
+        .get("origin_tree")
+        .and_then(Json::as_array)
+        .ok_or_else(fail)?;
+    let installed = proposal
+        .get("installed_tree")
+        .and_then(Json::as_array)
+        .ok_or_else(fail)?;
+    if original.len() != installed.len()
+        || original.iter().zip(installed).any(|(a, b)| {
+            ["path", "kind", "mode", "metadata", "digest", "bytes"]
+                .iter()
+                .any(|key| a.get(key).is_none() || a.get(key) != b.get(key))
+        })
+    {
+        return Err(fail());
+    }
+    let before = match proposal.get("current_tree") {
+        Some(Json::Null) if current.is_empty() => {
+            "DESTINATION IS ABSENT\nA concurrent entry will never be replaced.".to_owned()
+        }
+        Some(Json::Array(entries)) => format!(
+            "CURRENT ENTRY TO PRESERVE\n{}",
+            entries_prompt(entries, current)?
+        ),
+        _ => return Err(fail()),
+    };
+    let prompt = format!(
+        "Restore retained file or folder\n\nProject: {project:?}\nFolder: {root:?}\nEntry: {:?}\nOrigin recovery reference: {:?}\n\n{before}\n\nRETAINED SNAPSHOT TO COPY\n{}\nA fresh copy of this complete snapshot will be installed. The original retained objects and their open handles stay in their original recovery location. Any current destination is preserved in a new recovery transaction, including later writes through its open handles. No automatic undo, replay or cleanup occurs. Mesh main and Git are unchanged; restored content remains private work.\n\nThe exact inputs and project generation will be checked again after confirmation. Cancel leaves working files unchanged and retains the prepared record.",
+        field("path")?, field("origin_transaction")?, entries_prompt(original, restored)?,
+    );
+    if prompt.len() > MAX_PROMPT {
+        return Err(fail());
+    }
+    Ok(prompt)
+}
+
 pub fn group_confirmation(
     project: &str,
     root: &Path,
@@ -812,5 +879,140 @@ mod tests {
             assert!(conversion_prompt(&receipt, before, &[]).is_err());
             assert!(conversion_prompt(&receipt, &[("", &[0], false)], after).is_err());
         }
+    }
+    fn restoration_tree(directory: bool, bytes: &[u8]) -> Json {
+        use mesh_types::ContentDigest as _;
+        let directory_entry = |path| {
+            Json::object([
+                ("path", Json::text(path)),
+                ("kind", Json::text("directory")),
+                ("mode", Json::Number(0o040700)),
+                ("metadata", Json::text("metadata")),
+                ("digest", Json::Null),
+                ("bytes", Json::Null),
+            ])
+        };
+        let file = Json::object([
+            (
+                "path",
+                Json::text(if directory { "שם/file\nname" } else { "" }),
+            ),
+            ("kind", Json::text("file")),
+            ("mode", Json::Number(0o100600)),
+            ("metadata", Json::text("metadata")),
+            (
+                "digest",
+                Json::text(mesh_types::Blake3::digest_bytes(bytes).to_string()),
+            ),
+            ("bytes", Json::Number(bytes.len() as u64)),
+        ]);
+        Json::Array(if directory {
+            vec![
+                directory_entry(""),
+                directory_entry("empty"),
+                directory_entry("שם"),
+                file,
+            ]
+        } else {
+            vec![file]
+        })
+    }
+    fn restoration_receipt(original: Json, current: Json) -> Json {
+        Json::object([
+            ("schema", Json::text("mesh.attachment-entry-restoration/v1")),
+            ("project", Json::text("project")),
+            ("path", Json::text("שם/entry\nRESTORE fake")),
+            ("origin_transaction", Json::text("directory-reference")),
+            ("automatic_replay", Json::Bool(false)),
+            ("origin_tree", original.clone()),
+            ("installed_tree", original),
+            ("current_tree", current),
+        ])
+    }
+    #[test]
+    fn entry_restoration_confirmation_shows_both_complete_sides_and_literal_identity() {
+        for directory in [false, true] {
+            for current_directory in [None, Some(false), Some(true)] {
+                let original = restoration_tree(directory, b"retained\ntext");
+                let current =
+                    current_directory.map_or(Json::Null, |kind| restoration_tree(kind, b"current"));
+                let proposal = restoration_receipt(original, current);
+                let restored: Vec<(&str, &[u8], bool)> = vec![(
+                    if directory { "שם/file\nname" } else { "" },
+                    b"retained\ntext",
+                    false,
+                )];
+                let current: Vec<(&str, &[u8], bool)> = current_directory.map_or(vec![], |kind| {
+                    vec![(
+                        if kind { "שם/file\nname" } else { "" },
+                        &b"current"[..],
+                        false,
+                    )]
+                });
+                let prompt = entry_restoration_prompt(
+                    "project",
+                    Path::new("/שם\nFolder"),
+                    &proposal,
+                    &restored,
+                    &current,
+                )
+                .unwrap();
+                assert!(prompt.contains("retained\\ntext"));
+                assert!(prompt.contains("שם/entry\\nRESTORE fake"));
+                assert!(prompt.contains("/שם\\nFolder"));
+                assert!(prompt.contains("Mesh main and Git are unchanged"));
+                assert!(prompt.contains("original retained objects"));
+                if directory || current_directory == Some(true) {
+                    assert!(prompt.contains("DIRECTORY \"empty\""));
+                }
+                if current_directory.is_none() {
+                    assert!(prompt.contains("DESTINATION IS ABSENT"));
+                } else {
+                    assert!(prompt.contains("CURRENT ENTRY TO PRESERVE"));
+                    assert!(prompt.contains("\"current\""));
+                }
+            }
+        }
+    }
+    #[test]
+    fn entry_restoration_confirmation_refuses_missing_changed_or_unrenderable_sides() {
+        let tree = restoration_tree(false, b"text");
+        let proposal = restoration_receipt(tree.clone(), tree);
+        let files: Vec<(&str, &[u8], bool)> = vec![("", b"text", false)];
+        let prompt =
+            |proposal: &Json, restored: &[(&str, &[u8], bool)], current: &[(&str, &[u8], bool)]| {
+                entry_restoration_prompt(
+                    "project",
+                    Path::new("/project"),
+                    proposal,
+                    restored,
+                    current,
+                )
+            };
+        assert!(prompt(&proposal, &[], &files).is_err());
+        assert!(prompt(&proposal, &files, &[]).is_err());
+        for field in ["installed_tree", "schema", "project", "automatic_replay"] {
+            let mut changed = proposal.clone();
+            if let Json::Object(fields) = &mut changed {
+                fields.iter_mut().find(|(key, _)| key == field).unwrap().1 = Json::Null;
+            }
+            assert!(prompt(&changed, &files, &files).is_err());
+        }
+        let absent = restoration_receipt(restoration_tree(false, b"text"), Json::Null);
+        assert!(prompt(&absent, &files, &files).is_err());
+        for bytes in [vec![0], vec![0xff], vec![b'x'; MAX_PROMPT]] {
+            let receipt = restoration_receipt(restoration_tree(false, &bytes), Json::Null);
+            assert!(prompt(&receipt, &[("", &bytes, false)], &[]).is_err());
+        }
+        let changed_install = restoration_receipt(restoration_tree(false, b"text"), Json::Null);
+        let mut changed_install = changed_install;
+        if let Json::Object(fields) = &mut changed_install {
+            fields
+                .iter_mut()
+                .find(|(key, _)| key == "installed_tree")
+                .unwrap()
+                .1 = restoration_tree(false, b"other");
+        }
+        assert!(prompt(&changed_install, &files, &[]).is_err());
     }
 }

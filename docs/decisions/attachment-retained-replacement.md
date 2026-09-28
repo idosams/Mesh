@@ -881,3 +881,21 @@ These checks do not establish graphical confirmation or packaged restoration beh
 Canonical validation status: this is a transfer of preserved, uncommitted work, not
 a previously tested source commit. Native execution and failing-before proof on
 this base are pending; the previous combined validation remains running.
+
+## Native desktop whole-entry consent
+
+`restore_attached_retained_entry` accepts a project identity, transaction and optional
+verified integration group. Native code resolves recovery storage, prepares the
+single-use operation, and obtains all confirmation bytes from that prepared object.
+The prompt identifies the project folder, path and origin recovery reference using
+escaped literal text. It shows the complete retained snapshot and current entry,
+including empty folders, file contents, digests and permissions. The installed copy
+must match the frozen origin's content and metadata; missing, binary, NUL-containing
+or oversized presentation refuses rather than omitting information.
+
+Cancellation preserves the prepared record without applying. Confirmation rechecks
+the host generation and native inputs; it does not approve Mesh main. Replies use
+`mesh.desktop-attachment-entry-change/v1` with the new transaction, optional group
+and native outcome. Renderer actions and recovery discovery are not connected in
+this increment. Automated native execution and an actual packaged dialog remain
+separate acceptance requirements.

@@ -725,3 +725,11 @@ retained objects and any newly displaced work recoverable. Restart inspection
 checks the origin chain without granting replay or cleanup authority. Native tests
 are transferred but not yet executed on this base. Desktop confirmation and
 recovery controls are still absent, and packaged acceptance remains required.
+
+### Native desktop restoration consent (unmerged increment)
+
+A registered native command now prepares whole-entry restoration and requires
+complete confirmation of retained and current work, then rechecks project generation
+and native inputs. It refuses incomplete or unrenderable confirmation. The renderer
+has no restoration controls for this command yet. Native test execution and actual
+packaged dialog evidence remain pending; no merged-delivery claim follows.

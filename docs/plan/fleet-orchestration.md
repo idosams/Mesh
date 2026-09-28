@@ -801,3 +801,8 @@ desktop commands and discovery, localized recovery/undo, refusal tests and packa
 proof must follow. Native restoration does not approve private work as Mesh main.
 The registration failure and all full fleet/provider/remote acceptance obligations
 remain open.
+
+Whole-entry restoration now has native desktop consent and command wiring in source.
+The remaining restoration path is discovery, localized presentation, renderer actions
+and explicit undo, followed by native and packaged verification. All broader fleet,
+provider, remote recovery and final merged-main requirements remain unchanged.

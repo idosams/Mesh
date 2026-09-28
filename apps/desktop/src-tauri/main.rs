@@ -2516,6 +2516,72 @@ mod desktop {
         restore_retained_file(app, host, id, transaction, Some(group))
     }
 
+    #[tauri::command(async)]
+    fn restore_attached_retained_entry(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        transaction: String,
+        group: Option<String>,
+    ) -> Result<String, String> {
+        let (history, generation) = host.file_change_history(&id)?;
+        let trust = attachment_review_trust();
+        let mut root = history
+            .file_recovery_root(false)
+            .map_err(|_| "Entry recovery storage is unavailable")?
+            .ok_or("There are no retained entries for this project")?;
+        if let Some(group) = &group {
+            history
+                .inspect_main_integration_group(
+                    &root,
+                    group,
+                    &trust,
+                    mesh_daemon::project_attachment::ObservationLimits::default(),
+                )
+                .map_err(|_| "The recovery group could not be verified")?;
+            root = root.join(group);
+        }
+        let prepared = history.prepare_retained_entry_restoration(&root, &transaction, &trust,
+            mesh_daemon::project_attachment::ObservationLimits::default())
+            .map_err(|_| "This retained entry cannot currently be restored. Refresh recovery and inspect changed or unavailable work.")?;
+        let prompt = crate::attachment_recovery::entry_restoration_confirmation(
+            &id,
+            history.project().root(),
+            &prepared,
+        )?;
+        let next = crate::attachment_recovery::transaction_id(prepared.recovery_path())?;
+        if !app
+            .dialog()
+            .message(prompt)
+            .title("Restore retained file or folder")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Restore this entry".into(),
+                "Cancel".into(),
+            ))
+            .blocking_show()
+        {
+            return Err(
+                "Restoration was cancelled; the prepared recovery record is retained".into(),
+            );
+        }
+        let outcome = host.confirm_file_change(&id, generation, || {
+            prepared.apply(&attachment_review_trust()).map_err(|_| {
+                "Restoration was not confirmed. Inspect recovery before retrying; working entries may have changed.".to_owned()
+            })
+        })?;
+        Ok(Json::object([
+            (
+                "schema",
+                Json::text("mesh.desktop-attachment-entry-change/v1"),
+            ),
+            ("project", Json::text(id)),
+            ("transaction", Json::text(next)),
+            ("group", group.map_or(Json::Null, Json::text)),
+            ("outcome", outcome),
+        ])
+        .encode())
+    }
+
     fn restore_retained_file(
         app: tauri::AppHandle,
         host: State<'_, Arc<AttachmentHost>>,
@@ -7703,6 +7769,7 @@ mod desktop {
                 open_attached_version_lane,
                 open_attached_folder,
                 restore_attached_retained_file,
+                restore_attached_retained_entry,
                 restore_attached_group_file,
                 apply_attached_main_file,
                 apply_attached_main_group,

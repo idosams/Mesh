@@ -1889,3 +1889,19 @@ admission-refusal/shared-byte-budget regression requiring no private staged copy
 Native execution and failing-before proof are pending behind #102's active full
 validation. Desktop confirmation, command wiring, discovery and localized recovery
 for this operation still require implementation; this is not finished restoration.
+
+## I07b native desktop whole-entry consent
+
+New canonical implementation builds on #103 at
+`30462d0d6c7226f6475cf73cc1084c2fd6c8e11e`; no preserved desktop restoration
+implementation existed to transfer. The registered command uses native recovery
+resolution and optional verified group membership, frozen complete confirmation,
+and the existing host-generation guard before applying single-use restoration.
+
+Prompt regressions cover both original entry types over absent/file/directory
+current work, literal multiline/non-Latin identities, empty folders, complete bytes,
+missing sides, inconsistent copies, wrong identity, binary/NUL content and size
+refusal. These native tests await execution; #102's full verification still owns the
+shared build target. Source checks do not establish native-dialog or packaged
+acceptance. Renderer commands, discovery, localized recovery and explicit undo
+remain the next phase.
