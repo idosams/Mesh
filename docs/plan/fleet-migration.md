@@ -2203,3 +2203,19 @@ format and whitespace checks pass; native execution on this new revision remains
 the preserved combined-main run. The [remote plan](fleet-remote-delivery.md) retains managed-lane
 export, authenticated transport, receiving execution and actual remote acceptance requirements.
 This is not a claim that the remote phase or full goal is complete.
+
+## R05 retained managed-review input export
+
+New canonical implementation based on #118 at
+`75f2339218be8735402a4bc5d83e92218325fcb9`; no preserved source commit is replaced.
+Native service/history readers now prepare a remote input from the exact recorded saved-review
+selection and native allocation. The handle retains parent pins and physical allocation ancestry
+for each subsequent chunk read. Reopening exports no live context and adopts no worker.
+
+The existing macOS offline-history journey now checks exact saved bytes through both the original
+and reopened export handles, with current edits preserved and substituted review identities refused.
+A native allocation regression moves a wrapper outside the admitted lane behind a symlink and
+proves that matching final directory identities alone cannot retain export authority. New regression
+execution and full CI are pending; repository/docs/license/storage/format/whitespace checks pass.
+Current dependency authorization and all remaining remote execution/acceptance obligations remain
+required, as described in the [remote sequence](fleet-remote-delivery.md).

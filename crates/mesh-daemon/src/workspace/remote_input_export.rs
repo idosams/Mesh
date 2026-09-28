@@ -22,6 +22,7 @@ pub struct RemoteInputSource {
     chunks: BTreeMap<Digest32, u64>,
     roots: Vec<PinnedWorkspaceRoot>,
     store: PinnedWorkspaceRoot,
+    allocation: Option<crate::ProtectedWorkspaceRoot>,
 }
 impl RemoteInputSource {
     /// Immutable verified description. Task-bearing names stay private; this is no dispatch grant.
@@ -35,7 +36,26 @@ impl RemoteInputSource {
         }
         self.store
             .ensure_namespace_identity()
-            .map_err(|_| invalid())
+            .map_err(|_| invalid())?;
+        if let Some(allocation) = self.allocation {
+            if !self.roots[0].is_within(allocation).map_err(|_| invalid())?
+                || !self.store.is_within(allocation).map_err(|_| invalid())?
+            {
+                return Err(invalid());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn protecting_allocation(
+        mut self,
+        parents: Vec<PinnedWorkspaceRoot>,
+        allocation: crate::ProtectedWorkspaceRoot,
+    ) -> io::Result<Self> {
+        self.roots.extend(parents);
+        self.allocation = Some(allocation);
+        self.verify_roots()?;
+        Ok(self)
     }
 
     /// Read one declared complete chunk, at most 4 MiB, and hash it before returning any bytes.
@@ -128,8 +148,56 @@ impl OpenWorkspace {
             chunks,
             roots: vec![self.pinned_root.clone(), self.storage_pinned_root.clone()],
             store: self.storage_pinned_root.clone(),
+            allocation: None,
         };
         source.verify_roots()?;
         Ok(source)
+    }
+}
+
+#[cfg(test)]
+mod allocation_tests {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::symlink;
+
+    #[test]
+    fn exported_handle_retains_physical_allocation_after_ancestor_alias() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-export-allocation-{}", std::process::id()));
+        let lane = root.join("lane");
+        let wrapper = lane.join("wrapper");
+        let working = wrapper.join("working");
+        fs::create_dir_all(&working).unwrap();
+        let open = OpenWorkspace::open(&working).unwrap();
+        let parent = PinnedWorkspaceRoot::open(lane.clone()).unwrap();
+        let (device, inode) = parent.identity().unwrap();
+        let allocation = crate::ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{device:016x}:{inode:016x}"
+        ))
+        .unwrap();
+        // The regression targets the lifetime of native directory authority. Empty immutable
+        // metadata avoids giving this fixture any claim of a real recorded review or dispatch.
+        let source = RemoteInputSource {
+            manifest: RemoteInputManifest::new(RecordDigest::from_bytes([1; 32]), vec![]).unwrap(),
+            chunks: BTreeMap::new(),
+            roots: vec![open.pinned_root.clone(), open.storage_pinned_root.clone()],
+            store: open.storage_pinned_root.clone(),
+            allocation: None,
+        }
+        .protecting_allocation(vec![parent], allocation)
+        .unwrap();
+        drop(open);
+        let outside = root.join("outside");
+        fs::rename(&wrapper, &outside).unwrap();
+        symlink(&outside, &wrapper).unwrap();
+        for pin in &source.roots {
+            pin.ensure_namespace_identity().unwrap();
+        }
+        assert!(
+            source.verify_roots().is_err(),
+            "matching final identities must not preserve authority outside the admitted lane"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

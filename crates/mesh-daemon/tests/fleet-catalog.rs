@@ -631,6 +631,34 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
             .unwrap(),
         mapping
     );
+    let export = service.prepare_remote_review_input(&selection).unwrap();
+    let exported_manifest = export.manifest().clone();
+    let exported_chunk = exported_manifest
+        .entries()
+        .iter()
+        .find_map(|entry| match entry {
+            mesh_daemon::fleet::RemoteInputEntry::File { path, chunks, .. }
+                if path == "work.txt" =>
+            {
+                Some(chunks[0].digest)
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        export.read_chunk(exported_chunk).unwrap(),
+        b"saved agent result\n"
+    );
+    let wrong_selection = SavedReviewSelection::new(
+        &lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        &"ab".repeat(32),
+    )
+    .unwrap();
+    assert!(service
+        .prepare_remote_review_input(&wrong_selection)
+        .is_err());
     let expected = service.saved_review(&selection).unwrap();
     let input = service
         .saved_starting_comparison(&selection, None, None)
@@ -646,6 +674,20 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
     let before = restored.snapshot().unwrap();
     assert_eq!(history.saved_reviews(&lane, None).unwrap(), page);
     assert_eq!(history.saved_review(&selection).unwrap(), expected);
+    let reopened_export = history.prepare_remote_review_input(&selection).unwrap();
+    assert_eq!(reopened_export.manifest(), &exported_manifest);
+    assert_eq!(
+        reopened_export.read_chunk(exported_chunk).unwrap(),
+        b"saved agent result\n"
+    );
+    assert_eq!(
+        export.read_chunk(exported_chunk).unwrap(),
+        b"saved agent result\n"
+    );
+    assert!(history
+        .prepare_remote_review_input(&wrong_selection)
+        .is_err());
+
     assert_eq!(
         history.saved_review_change_activity(&selection).unwrap(),
         activity

@@ -114,3 +114,8 @@ Native source now includes an exact saved attached-version export handle with bo
 chunk reads. Its inspection lock is released before transfer, allowing later capture while old
 saved content remains selected. This addition is under native validation; transport, managed-lane
 export integration and actual remote execution remain unfinished. See the [delivery ledger](plan/fleet-migration.md).
+
+Native managed-review export now binds the complete recorded selection and retains physical lane
+ancestry checks in its read handle, including history-only reopening. Its new native regressions
+are pending. Exporting readable saved bytes does not authorize private-dependency use or remote
+execution; the remaining transport, executor and acceptance requirements are unchanged.

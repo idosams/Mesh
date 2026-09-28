@@ -389,6 +389,13 @@ impl FleetHistory {
         self.0
             .saved_project_mapping(selection, source, trusted, after)
     }
+    /// Prepare exact saved-review bytes without adopting execution or dispatch authority.
+    pub fn prepare_remote_review_input(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<super::RemoteInputSource, Unavailable> {
+        self.0.prepare_remote_review_input(selection)
+    }
     /// List durable saved-result identities.
     pub fn saved_reviews(&self, lane: &str, after: Option<&str>) -> Result<Json, Unavailable> {
         self.0.saved_reviews(lane, after)
@@ -2222,6 +2229,41 @@ impl FleetService {
                 .map_err(|_| refusal("fleet-review-artifact-unavailable"))?;
             Ok(crate::ReviewArtifact::from_verified(artifact))
         })
+    }
+
+    /// Prepare a native-only export of one exact recorded lane result, including after restart.
+    ///
+    /// History is reopened through the allocation policy without creating an execution context.
+    /// The returned handle retains directory pins and physical allocation bounds after this call.
+    /// A native caller must separately authorize dependency use, assignment and the destination;
+    /// readable saved history alone is neither a dispatch grant nor approval of its content.
+    pub fn prepare_remote_review_input(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<super::RemoteInputSource, Unavailable> {
+        let state = self.native_state()?;
+        let binding = saved_review_binding_from_state(&state, selection)?.clone();
+        let history = self.allocator.reopen_history(&selection.lane, &binding)?;
+        history.verify()?;
+        history
+            .open
+            .review(&selection.bundle)
+            .filter(|review| {
+                review.subject_operation == selection.version && review.bundle == selection.bundle
+            })
+            .ok_or_else(|| refusal("fleet-review-not-recorded"))?;
+        let source = history
+            .open
+            .remote_input_source(selection.version)
+            .and_then(|source| {
+                source.protecting_allocation(history.parents.clone(), history.allocation)
+            })
+            .map_err(|_| refusal("fleet-remote-input-unavailable"))?;
+        history.verify()?;
+        if saved_review_binding_from_state(&self.native_state()?, selection)? != &binding {
+            return Err(refusal("fleet-review-workspace-changed"));
+        }
+        Ok(source)
     }
 
     fn with_saved_review<T>(

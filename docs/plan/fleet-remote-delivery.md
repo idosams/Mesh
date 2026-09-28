@@ -129,3 +129,23 @@ its manifest to the exact authorized assignment and authenticated peer, recheck 
 state and provision receiving-side storage. Managed-lane/private-dependency export integration,
 mutual transport, remote execution/results/reconnect and actual second-machine acceptance remain
 required. Preparation itself is not a network transfer, and source tests are not remote proof.
+
+## Managed saved-review export
+
+Native fleet services and history-only catalogue readers can prepare input from an exact recorded
+lane/checkpoint/version/review selection. The service verifies its durable selection and allocation
+binding, reopens the recorded history through the native allocator, checks the recorded review and
+complete saved tree, and revalidates the selection before returning the export handle. It does not
+install a live context, checkpoint timer, credential or provider. Original-project availability is
+not required for retained lane history. Working edits do not become export content.
+
+The handle retains allocation-parent directory pins and a physical allocation boundary in addition
+to its workspace/store pins. Every later chunk read rechecks these facts. A directory moved outside
+its admitted lane behind an ancestor symlink refuses even when its final directory identity still
+matches. An unavailable or replaced allocation cannot be repaired or recreated by export.
+
+This is a read capability for saved bytes, not authorization to consume a private dependency or
+launch it remotely. The caller must separately verify the current dependency closure, rejection
+state, assignment and peer policy. Remote dispatch integration, authenticated transport, receiving
+materialization/execution, result/reconnect reconciliation and real second-machine proof remain open.
+No agent or renderer command exposes this native export API.
