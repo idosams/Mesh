@@ -49,6 +49,8 @@ mod lanes;
 mod recovery;
 mod restoration;
 pub use restoration::PreparedRetainedRestoration;
+mod entry_restoration;
+pub use entry_restoration::PreparedRetainedEntryRestoration;
 mod writeback;
 pub use writeback::PreparedMainFileIntegration;
 mod directory_writeback;

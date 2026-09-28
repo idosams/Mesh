@@ -602,6 +602,43 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Freeze a complete retained entry into a new restoration transaction. Native callers must
+    /// confirm both full trees before applying; this never approves or advances Mesh main.
+    pub fn prepare_retained_entry_restoration(
+        &self,
+        recovery_root: &Path,
+        transaction: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedRetainedEntryRestoration> {
+        super::entry_restoration::prepare(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+
+    /// Reopen whole-entry restoration evidence without replaying, cleaning up, or writing files.
+    pub fn inspect_retained_entry_restoration(
+        &self,
+        recovery_root: &Path,
+        transaction: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        super::entry_restoration::inspect(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

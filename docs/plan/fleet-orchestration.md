@@ -794,3 +794,10 @@ shows direction and retained entries without restoration authority. This complet
 source transfer only. The failing native watcher registration, whole-entry
 restoration, combined-main testing and all provider/remote/packaged acceptance
 requirements remain open.
+
+The preserved native whole-entry restoration implementation is reconciled onto
+#102. This is the first half of restoration delivery: complete native confirmation,
+desktop commands and discovery, localized recovery/undo, refusal tests and packaged
+proof must follow. Native restoration does not approve private work as Mesh main.
+The registration failure and all full fleet/provider/remote acceptance obligations
+remain open.

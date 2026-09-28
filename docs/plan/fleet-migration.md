@@ -1870,3 +1870,22 @@ regression fail, and restoration returns all 48 to passing. TypeScript and all
 the previous main #70 run failed native watcher registration (issue #37), with
 1,274 passes, one failure, 14 skips and 1,982 tests unrun. Its logs remain preserved;
 this increment does not resolve that failure or establish packaged acceptance.
+
+## I07a preserved native whole-entry restoration
+
+Reconciles the eight native paths from the preserved dirty fleet worktree based on
+`6ec9c8ccf9e273de25d1a84c323c0cd4f3f4b821` onto #102 at
+`b50fe49f70bf81bd1ca60879e3a074be87f6d70f`. There is no source commit to claim:
+five tracked native patches and three untracked modules were inventoried and
+backed up without changing the original checkout. The three dirty source documents
+are reconciled here rather than copied with historical progress claims.
+
+This increment adds frozen entry copying, native single-use restoration and
+restart inspection. Original retained objects and newly displaced destination work
+remain separate. Trusted ancestry, exclusions, exact observations, parent policy,
+bounds and ordinary metadata are checked; restoration does not advance Mesh main.
+The preserved native/domain regressions are transferred, with an additional
+admission-refusal/shared-byte-budget regression requiring no private staged copy.
+Native execution and failing-before proof are pending behind #102's active full
+validation. Desktop confirmation, command wiring, discovery and localized recovery
+for this operation still require implementation; this is not finished restoration.

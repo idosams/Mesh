@@ -625,7 +625,7 @@ pub(super) fn transaction(value: &str) -> bool {
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     })
 }
-fn validate_receipt(
+pub(super) fn validate_receipt(
     value: &Json,
     history: &ProvisionedAttachment,
     store: &PinnedWorkspaceRoot,

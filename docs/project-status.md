@@ -716,3 +716,12 @@ Controller direction-refusal, TypeScript and focused rendering checks pass.
 Combined native verification remains blocked by issue #37's registration failure;
 whole-entry restoration, real-provider/remote acceptance and packaged graphical
 proof remain unfinished. Published PRs are not merged delivery.
+
+### Native whole-entry restoration (unmerged increment)
+
+Preserved unfinished work is now reconciled into a native restoration API. It
+copies retained files or whole trees into the project while keeping original
+retained objects and any newly displaced work recoverable. Restart inspection
+checks the origin chain without granting replay or cleanup authority. Native tests
+are transferred but not yet executed on this base. Desktop confirmation and
+recovery controls are still absent, and packaged acceptance remains required.

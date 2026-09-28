@@ -3622,3 +3622,308 @@ fn conversion_refuses_unknown_source_entries_changed_stage_and_untrusted_history
         assert!(stage.exists());
     }
 }
+
+#[test]
+fn whole_entry_restoration_copies_late_retained_work_and_preserves_both_generations() {
+    for directory_before in [false, true] {
+        let (f, signer, trust, bundle, target, root) = approved_entry_conversion(
+            &format!("restore-entry-{directory_before}"),
+            directory_before,
+        );
+        let conversion = f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        let origin = conversion.recovery_path().to_owned();
+        let id = origin.file_name().unwrap().to_str().unwrap();
+        conversion.apply(&trust).unwrap();
+        let retained = origin.join(if directory_before {
+            "exchange/file"
+        } else {
+            "exchange"
+        });
+        fs::write(&retained, b"late retained work").unwrap();
+        if directory_before {
+            fs::write(origin.join("exchange/extra"), b"new retained child").unwrap();
+        }
+        let current = f.source.join(if directory_before {
+            "entry"
+        } else {
+            "entry/file"
+        });
+        fs::write(&current, b"new current work").unwrap();
+        let mut editor = fs::OpenOptions::new().append(true).open(&current).unwrap();
+        let next = f.save("main advances independently");
+        accept(&f, &signer, &trust, &next, 3);
+        let journal = f.journal();
+        let restore = f
+            .history
+            .prepare_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+            .unwrap();
+        assert_eq!(
+            restore
+                .restored_files()
+                .find(|(_, bytes, _)| *bytes == b"late retained work")
+                .unwrap()
+                .1,
+            b"late retained work"
+        );
+        assert_eq!(
+            restore.current_files().next().unwrap().1,
+            b"new current work"
+        );
+        let recovery = restore.recovery_path().to_owned();
+        let inspect = || {
+            f.history
+                .inspect_retained_entry_restoration(
+                    &root,
+                    recovery.file_name().unwrap().to_str().unwrap(),
+                    &trust,
+                    ObservationLimits::default(),
+                )
+                .unwrap()
+        };
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("prepared-arrangement"))
+        );
+        let outcome = restore.apply(&trust).unwrap();
+        assert_eq!(outcome.get("status"), Some(&Json::text("applied-observed")));
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("applied-arrangement"))
+        );
+        fs::remove_file(recovery.join("observed.json")).unwrap();
+        assert_eq!(
+            inspect().get("recorded_outcome"),
+            Some(&Json::text("absent"))
+        );
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("applied-arrangement"))
+        );
+        assert_eq!(fs::read(&retained).unwrap(), b"late retained work");
+        editor.write_all(b" after restoration").unwrap();
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("changed-entries"))
+        );
+        assert_eq!(
+            fs::read(recovery.join(if directory_before {
+                "exchange"
+            } else {
+                "exchange/file"
+            }))
+            .unwrap(),
+            b"new current work after restoration"
+        );
+        assert_eq!(
+            fs::read(f.source.join(if directory_before {
+                "entry/file"
+            } else {
+                "entry"
+            }))
+            .unwrap(),
+            b"late retained work"
+        );
+        if directory_before {
+            assert!(f.source.join("entry/empty").is_dir());
+            assert_eq!(
+                fs::read(f.source.join("entry/extra")).unwrap(),
+                b"new retained child"
+            );
+        }
+        assert_eq!(f.journal(), journal);
+        // Undo selects the new transaction's retained entry, including late editor work. It does
+        // not reverse either exchange and can be prepared after reopening attachment storage.
+        let reopened = f.storage.reopen(f.history.id()).unwrap();
+        let undo = reopened
+            .prepare_retained_entry_restoration(
+                &root,
+                recovery.file_name().unwrap().to_str().unwrap(),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        undo.apply(&trust).unwrap();
+        assert_eq!(
+            fs::read(current).unwrap(),
+            b"new current work after restoration"
+        );
+        assert_eq!(fs::read(retained).unwrap(), b"late retained work");
+        assert_eq!(f.journal(), journal);
+    }
+}
+
+#[test]
+fn retained_removed_tree_restores_to_absence_without_consuming_the_original_tree() {
+    let (f, _, trust, bundle, target, root) = approved_directory_removal("restore-removed-tree");
+    let removal = f
+        .history
+        .prepare_main_directory_removal(
+            &bundle,
+            &target,
+            "old",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let origin = removal.recovery_path().to_owned();
+    removal.apply(&trust).unwrap();
+    fs::write(origin.join("exchange/sub/new"), b"late retained child").unwrap();
+    let restore = f
+        .history
+        .prepare_retained_entry_restoration(
+            &root,
+            origin.file_name().unwrap().to_str().unwrap(),
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(restore.proposal().get("current_tree"), Some(&Json::Null));
+    assert_eq!(restore.current_files().count(), 0);
+    let recovery = restore.recovery_path().to_owned();
+    assert_eq!(
+        restore
+            .apply(&trust)
+            .unwrap()
+            .get("displaced_entry_retained"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        fs::read(f.source.join("old/sub/new")).unwrap(),
+        b"late retained child"
+    );
+    assert!(f.source.join("old/sub/empty").is_dir());
+    assert!(origin.join("exchange/sub/file").exists());
+    assert!(!recovery.join("exchange").exists());
+    let id = recovery.file_name().unwrap().to_str().unwrap();
+    let report = f
+        .history
+        .inspect_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        report.get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    assert_eq!(report.get("write_authority"), Some(&Json::Bool(false)));
+    assert!(f
+        .history
+        .prepare_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+        .is_err());
+    fs::write(origin.join("exchange/sub/new"), b"later origin").unwrap();
+    assert_eq!(
+        f.history
+            .inspect_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+            .unwrap()
+            .get("status"),
+        Some(&Json::text("origin-changed"))
+    );
+    fs::write(recovery.join("observed.json"), b"{}").unwrap();
+    assert_eq!(
+        f.history
+            .inspect_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+            .unwrap()
+            .get("status"),
+        Some(&Json::text("invalid-outcome"))
+    );
+}
+
+#[test]
+fn entry_restoration_refuses_changed_private_work_staging_and_untrusted_origins() {
+    for changed in [
+        "origin",
+        "destination",
+        "stage",
+        "receipt",
+        "unknown",
+        "identity",
+    ] {
+        let (f, _, trust, bundle, target, root) =
+            approved_entry_conversion(&format!("restore-entry-refuse-{changed}"), true);
+        let conversion = f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        let origin = conversion.recovery_path().to_owned();
+        conversion.apply(&trust).unwrap();
+        let id = origin.file_name().unwrap().to_str().unwrap();
+        assert!(f
+            .history
+            .prepare_retained_entry_restoration(
+                &root,
+                id,
+                &TrustedReviewers::new([]),
+                ObservationLimits::default()
+            )
+            .is_err());
+        if changed == "unknown" {
+            fs::create_dir(origin.join("exchange/.git")).unwrap();
+            fs::write(origin.join("exchange/.git/config"), b"private").unwrap();
+            assert!(f
+                .history
+                .prepare_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+                .is_err());
+            for entry in fs::read_dir(&root).unwrap() {
+                let entry = entry.unwrap();
+                if entry
+                    .file_name()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("entry-restoration-")
+                {
+                    assert!(
+                        !entry.path().join("exchange").exists(),
+                        "excluded content must not be copied into a new stage"
+                    );
+                }
+            }
+            assert_eq!(fs::read(f.source.join("entry")).unwrap(), b"accepted");
+            continue;
+        }
+        if changed == "identity" {
+            fs::rename(origin.join("exchange"), origin.join("moved")).unwrap();
+            fs::create_dir_all(origin.join("exchange/empty")).unwrap();
+            fs::write(origin.join("exchange/file"), b"original").unwrap();
+            assert!(f
+                .history
+                .prepare_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+                .is_err());
+            continue;
+        }
+        let restore = f
+            .history
+            .prepare_retained_entry_restoration(&root, id, &trust, ObservationLimits::default())
+            .unwrap();
+        let recovery = restore.recovery_path().to_owned();
+        let changed_path = match changed {
+            "origin" => origin.join("exchange/file"),
+            "destination" => f.source.join("entry"),
+            "stage" => recovery.join("exchange/file"),
+            _ => origin.join("prepared.json"),
+        };
+        fs::write(&changed_path, b"changed work").unwrap();
+        assert!(restore.apply(&trust).is_err());
+        assert_eq!(fs::read(&changed_path).unwrap(), b"changed work");
+        assert!(origin.join("exchange/file").exists());
+        assert!(recovery.join("exchange/file").exists());
+        if changed != "destination" {
+            assert_eq!(fs::read(f.source.join("entry")).unwrap(), b"accepted");
+        }
+    }
+}

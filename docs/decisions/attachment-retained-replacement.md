@@ -816,3 +816,68 @@ open handles remain in recovery. These changes reconcile the remaining source
 conversion documentation without adopting its historical test counts as canonical
 proof. Whole-entry restoration and packaged graphical confirmation/recovery still
 require separate implementation and acceptance.
+
+
+## Native whole-entry restoration
+
+`prepare_retained_entry_restoration` adds a native-only, single-use restoration operation for retained
+entries from directory removals, file/directory conversions, and earlier whole-entry restorations.
+It accepts both regular files and complete directory trees. The destination can be absent, a regular
+file, or a directory; a parent must already exist. Existing single-file restoration formats and APIs
+are unchanged. This is native library progress: desktop confirmation, discovery and recovery controls
+are not yet connected to this new operation.
+
+Preparation first checks bounded raw tree evidence against retained-root identity and current exclusion
+policy, before freezing content or creating a staged copy. A refused excluded tree leaves no new
+content copy. It then freezes the retained entry and current destination as independently observed
+complete trees. A bounded walk retains file bytes and native descriptors, checks each identity/content/mode/
+metadata record, then compares another complete observation. These checks detect observed changes;
+they do not establish an atomic filesystem-wide snapshot. Each side is limited to 64 entries and the
+combined frozen content to 64 MiB or the smaller caller budget, with per-file limits. Symbolic links, unsupported
+entries, excluded paths, non-UTF-8 names and special permission bits refuse. Ordinary permissions,
+ownership, supported native attributes, flags and ACLs are copied and compared. Files and directories
+are freshly allocated; directory metadata is applied after constructing children so restrictive
+permissions cannot be silently widened for construction. Unavailable metadata refuses preparation.
+Linux runtime behavior remains unverified.
+
+The origin remains in its original recovery transaction. New staging contains a frozen copy rather
+than the origin inode. Apply rechecks origin and destination content/identity/metadata, parent identity
+and policy, all receipts, historical approval ancestry and current exclusions. A present destination
+is exchanged once with the new stage; an absent destination uses a no-replace rename. Both durability
+barriers are attempted. Late writes through original recovery handles stay on the original object;
+late destination-handle writes stay on the newly displaced object. Boundary changes and uncertain
+outcomes retain all available copies without undo, cleanup or replay. Explicit undo chooses the new
+transaction's retained destination, creating another transaction and preserving both earlier ones.
+Restoration never advances Mesh main, and continued main advancement does not invalidate the trusted
+historical origin. An absent-path restoration has no displaced entry to restore again; its older
+origin remains available.
+
+The new `entry-restoration-<32 lowercase hex>` namespace uses
+`mesh.attachment-entry-restoration/v1`. Ordered fields bind project/attachment/store/recovery,
+path, origin transaction/proposal digest/recovery identity, complete frozen origin/current/installed
+trees, source parent identity/policy, exclusions and no-replay semantics. Absent current content is
+`null`, not an empty tree. Tree entries use the existing seven fields. Origin ancestry is bounded to
+eight levels, ends in a trusted directory-removal or conversion receipt, binds the retained root
+allocation, and never treats a saved outcome as write authority. Later content and new children under
+that original root may be selected explicitly, while a recreated root refuses. Previous receipt
+schemas require no migration and older discovery readers do not interpret the new namespace.
+
+`mesh.attachment-entry-restoration-result/v1` binds the exact proposal digest and records observed or
+reconciliation-required status, whether destination work was displaced, and that the origin remains.
+Missing results are not proof that nothing moved. The native `inspect_retained_entry_restoration`
+reader validates ancestry and provides independent current source, stage and origin observations
+through `mesh.attachment-entry-restoration-recovery/v1`. It distinguishes prepared/applied arrangements,
+changed entries or origin, parent identity/policy changes, incomplete observation, invalid outcomes
+and contradictory recorded success. Inspection has a shared live-content budget and grants no write,
+cleanup or replay authority. A fresh native preparation and complete confirmation remain mandatory.
+
+Transferred native tests are intended to exercise file/tree restoration over absent/file/tree destinations, preserved permissions
+and empty folders, fresh allocations, late original handles, changed inputs, last-instant collisions,
+post-exchange replacement and failed durability barriers. Transferred domain tests are intended to exercise trusted historical
+ancestry, later main advancement, retained new children, reopened undo, untouched Mesh history,
+untrusted/recreated/excluded origin refusal, missing outcomes and independent restart observations.
+These checks do not establish graphical confirmation or packaged restoration behavior.
+
+Canonical validation status: this is a transfer of preserved, uncommitted work, not
+a previously tested source commit. Native execution and failing-before proof on
+this base are pending; the previous combined validation remains running.
