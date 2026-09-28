@@ -937,3 +937,10 @@ Parent #59 now has all seven hosted checks passing. Parent #60 has five passing 
 and macOS continue. Candidate/integration/recovery migration, second-provider/four-worker/remote and
 packaged acceptance, named human review, eventual merges and final combined-main testing remain in
 scope. Original histories, dirty work and running verification remain preserved. Nothing has merged.
+
+
+R03c validation correction: hosted macOS run 36372737993 stopped during compilation because the added
+integration regression accessed private selection fields. The regression now uses the original public
+checkpoint/review receipts, as the existing fixture does. Selection encapsulation and every refusal
+assertion remain unchanged; no production API is widened. The failed log is retained. Formatting and
+whitespace checks pass; hosted/native execution must validate the corrected revision.

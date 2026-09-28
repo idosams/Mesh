@@ -2131,21 +2131,21 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         SavedReviewSelection::new(
             &f.lane,
             "wrong-checkpoint",
-            &selection.version.to_string(),
-            &selection.bundle.to_string(),
+            text(&checkpoint, "version"),
+            text(&review, "bundle"),
         )
         .unwrap(),
         SavedReviewSelection::new(
             &f.lane,
-            &selection.checkpoint,
+            text(&checkpoint, "checkpoint"),
             &"0".repeat(64),
-            &selection.bundle.to_string(),
+            text(&review, "bundle"),
         )
         .unwrap(),
         SavedReviewSelection::new(
             &f.lane,
-            &selection.checkpoint,
-            &selection.version.to_string(),
+            text(&checkpoint, "checkpoint"),
+            text(&checkpoint, "version"),
             &"0".repeat(64),
         )
         .unwrap(),
