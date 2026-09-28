@@ -58,6 +58,9 @@ export function FleetProjectComparison({ pin, pending, comparison, enabled, proj
         {!imported.review.complete && <p>{t("Review evidence is incomplete; approval is unavailable.")}</p>}
         <ul className="grid gap-1 text-sm">{imported.review.changes.map((change, index) => <li className="break-all" key={index}>{t(change.effect)} · {change.before === null ? t("New") : <bdi dir="ltr">{change.before}</bdi>} → {change.after === null ? t("Removed") : <bdi dir="ltr">{change.after}</bdi>}</li>)}</ul>
         {imported.review.changes_not_listed > 0 && <p>{imported.review.changes_not_listed} {t("additional changes are not listed here.")}</p>}
+        <Button variant="secondary" disabled={!enabled || imported.loading} onClick={() => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail: {
+          type: "open-exact-review", id: pending.project, bundle: imported.review!.bundle, target: imported.review!.target,
+        } }))}>{t("Open this project review")}</Button>
         <p className="text-xs">{t("This exact review is also available in the project's Reviews. Approval remains a separate human action.")}</p></>}
     </section>}
     <p className="text-xs text-muted-foreground">{t("Preparation and inspection do not approve changes, advance main, or replace working files. Reopening only reads saved content and never restarts workers.")}</p>

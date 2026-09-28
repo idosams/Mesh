@@ -504,3 +504,9 @@ receipt. Retained fleet history can import without adopting worker execution. Tr
 execution on this canonical increment remains pending. The panels show
 confirmed imported versions, pending recovery, exact review identity and stale-base observations.
 The complete graphical approval/integration journey and packaged import invocation remain unverified.
+
+Fleet import panels now offer direct navigation to the exact recorded project review. The native
+inspection must verify project, bundle and target before selection and keyboard focus change;
+queue pagination is not required. Navigation waits for an ongoing attachment refresh and performs
+no save, review creation, approval or integration. Coordinator and render coverage exercise this
+connection; graphical focus and the complete approval journey still require live app verification.

@@ -1305,3 +1305,21 @@ build or packaged acceptance claim is made. #71 has all seven hosted checks pass
 3,042 Linux and 3,260 macOS native tests and four renderer tests; it is still awaiting additional local
 verification. Remaining direct review, pending-input recovery, deletion, integration and restoration
 source increments and the full provider/remote/packaged/final-main acceptance scope remain required.
+
+## C04b direct navigation to exact imported reviews
+
+Transfers source `15111733b9da3565d5a1ddd8aba6457b0b2f85b9` onto canonical PR #73
+at `64f9278fdb0bb56c7a69a5fbf60d9e43f635c477`. A pinned imported result opens its exact
+original-project review. Native response identity is verified before selection and focus; a pending
+status refresh defers navigation without creating another review, approving work or changing files.
+Keyboard focus lands on the selected review, and newer localized labels and literal identifiers are
+preserved. The Hebrew regression also checks that navigation is disabled while selection is unconfirmed.
+
+All 40 attachment coordinator tests pass. Disabling the new navigation handler makes both exact
+navigation regressions fail (38 pass, 2 fail); restoring the handler returns all 40 to passing.
+Repository (7), docs (5 plus link checking), TypeScript and whitespace validation pass. The initial
+TypeScript attempt lacked this worktree's dependencies; after installing the locked dependencies,
+the actual check passed. Full local renderer/native verification remains queued behind preserved
+runs; hosted and graphical keyboard-focus evidence are still required. This increment grants no
+approval authority and does not complete the remaining recovery/integration/restoration or full
+provider, remote, packaged and final-main acceptance obligations.

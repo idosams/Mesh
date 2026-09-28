@@ -276,6 +276,8 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let comparisons = {};
   let reviewQueues = {};
   let selectedReviews = {};
+  let reviewNavigation = null;
+  let pendingReviewNavigation = null;
   let approvalStates = {};
   let approvalFeedback = {};
   let integrationPreviews = {};
@@ -297,7 +299,7 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, laneRequests, laneFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, reviewNavigation, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, laneRequests, laneFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
   async function createLane(id, pending) {
@@ -396,6 +398,10 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       busy = false;
       publish();
       planRefresh();
+      if (pendingReviewNavigation && !disposed) {
+        const detail = pendingReviewNavigation; pendingReviewNavigation = null;
+        intent({ detail });
+      }
     }
   }
   function visible(event) {
@@ -408,6 +414,20 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
     if (!mounted || !value || typeof value !== 'object') return;
     if (pinStatus !== 'loading' && value.type === 'close-pin' && Object.keys(value).length === 2 && typeof value.pin === 'string') {
       pins = pins.filter((pin) => pin.key !== value.pin); persistence.changed(); publish(); return;
+    }
+    if (value.type === 'open-exact-review' && Object.keys(value).length === 4
+      && projects.some(project => project.id === value.id)
+      && reviewIdentity(value.bundle) && reviewIdentity(value.target)) {
+      if (busy) { pendingReviewNavigation = { ...value }; return; }
+      void run(async () => {
+        const review = attachedReview(await invoke('inspect_attached_review', {
+          id: value.id, bundle: value.bundle, target: value.target,
+        }), value.id, value.target, value.bundle);
+        if (disposed) return;
+        selectedReviews = { ...selectedReviews, [value.id]: review };
+        reviewNavigation = { id: value.id, bundle: review.bundle, target: review.target,
+          sequence: (reviewNavigation?.sequence ?? 0) + 1 };
+      }); return;
     }
     if (busy) return;
     if (['retry-pin-save', 'reload-pins'].includes(value.type) && Object.keys(value).length === 1) {

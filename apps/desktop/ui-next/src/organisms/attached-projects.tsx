@@ -22,7 +22,7 @@ type IntegrationPreview = { head: string; bundle: string; target: string; base_h
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
 type RecoveryEntry = { transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
 type Recovery = { entries: RecoveryEntry[]; more: boolean };
-type Projection = { laneRequests?: Record<string, { request: string; version: string }>; laneFeedback?: Record<string, string>; recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+type Projection = { reviewNavigation?: { id: string; bundle: string; target: string; sequence: number } | null; laneRequests?: Record<string, { request: string; version: string }>; laneFeedback?: Record<string, string>; recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -48,6 +48,13 @@ export function AttachedProjects() {
       document.dispatchEvent(new CustomEvent("mesh:attachments-visible", { detail: false }));
     };
   }, []);
+  useEffect(() => {
+    const navigation = projection.reviewNavigation;
+    if (!navigation) return;
+    const review = document.getElementById(`project-review-${navigation.id}-${navigation.bundle}-${navigation.target}`);
+    review?.focus();
+    review?.scrollIntoView({ block: "nearest" });
+  }, [projection.reviewNavigation]);
   const disabled = projection.busy || !projection.available || Boolean(projection.error);
   return <section className="grid gap-4 rounded-xl border border-border bg-background p-5" aria-label={t("Attached projects")} data-mesh-proof="attached-projects">
     <div>
@@ -236,7 +243,7 @@ function ComparisonSide({ label, file, kind }: { label: string; file: SavedFile 
 
 function AttachmentReview({ project, review, disabled, approval }: { project: string; review: SavedReview; disabled: boolean; approval?: ApprovalState }) {
   const t = useTranslation();
-  return <section aria-label={t("Selected saved review")} className="grid gap-2 rounded-lg border border-border p-3">
+  return <section id={`project-review-${project}-${review.bundle}-${review.target}`} tabIndex={-1} aria-label={t("Selected saved review")} className="grid gap-2 rounded-lg border border-border p-3">
     <h4 className="text-sm font-semibold">{t("Review request recorded")}</h4>
     <p className="break-all text-xs">{t("Bundle:")} <bdi dir="ltr">{review.bundle}</bdi></p>
     <p className="break-all text-xs">{t("Saved version:")} <bdi dir="ltr">{review.target}</bdi></p>

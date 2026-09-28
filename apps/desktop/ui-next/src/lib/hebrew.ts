@@ -667,4 +667,5 @@ export const hebrew: Readonly<Record<string, string>> = Object.freeze({
 "additional changes are not listed here.":"שינויים נוספים אינם מוצגים כאן.",
 "This exact review is also available in the project's Reviews. Approval remains a separate human action.":"בדיקה מדויקת זו זמינה גם בבדיקות הפרויקט. אישור נשאר פעולה אנושית נפרדת.",
 "The saved version or its review could not be confirmed. Keep these exact inputs and retry, or refresh to inspect retained progress.":"לא ניתן היה לאמת את הגרסה השמורה או את הבדיקה שלה. יש לשמור את הנתונים המדויקים ולנסות שוב, או לרענן כדי לבדוק את ההתקדמות שנשמרה.",
+"Open this project review":"פתיחת בדיקת פרויקט זו",
 });

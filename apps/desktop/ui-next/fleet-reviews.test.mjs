@@ -395,7 +395,7 @@ test('import panels distinguish saving, pending recovery and fixed project revie
   value.projectImport.outcome.state = 'imported'; html = render({ pins: [value], notice: '' }); assert.match(html, /Create project review/); assert.doesNotMatch(html, /Save as a project version/);
   value.projectImport.review = { bundle: 'd'.repeat(64), target: 'c'.repeat(64), complete: true, changes: [{ before: 'old', after: '<new>', effect: 'moved' }], changes_not_listed: 0 };
   value.projectImport.baseIsCurrent = false;
-  html = render({ pins: [value], notice: '' }); assert.match(html, /This review keeps its original base/); assert.match(html, /&lt;new&gt;/); assert.match(html, /Approval remains a separate human action/);
+  html = render({ pins: [value], notice: '' }); assert.match(html, /This review keeps its original base/); assert.match(html, /&lt;new&gt;/); assert.match(html, /Approval remains a separate human action/); assert.match(html, /Open this project review/);
 });
 
  test('Hebrew imported review keeps paths literal and pending actions disabled while selection is unconfirmed', () => {
@@ -410,6 +410,7 @@ test('import panels distinguish saving, pending recovery and fixed project revie
     assert.match(html,/<bdi dir="ltr">Create project review<\/bdi>/);
     assert.match(html,/<bdi dir="ltr">&lt;new&gt;<\/bdi>/);
     assert.match(html,/האישור אינו זמין/);
+    assert.match(html,/<button[^>]*disabled=""[^>]*>פתיחת בדיקת פרויקט זו<\/button>/);
     assert.match(html,/בדיקה זו שומרת על הבסיס המקורי/);
     value.projectImport.review = null;
     html = render({pins:[value],notice:''});

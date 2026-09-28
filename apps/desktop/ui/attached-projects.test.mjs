@@ -900,3 +900,49 @@ test('lane creation retains a request after a lost reply and leaves saved views 
   assert.deepEqual(calls.find(call => call.command === 'open_attached_folder').args, { id: child });
   h.dispose();
 });
+
+
+test('exact review navigation verifies native identity without loading queues or creating work', async () => {
+  const calls = []; let substituted = false;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'inspect_attached_review') {
+      const result = reviewReply();
+      if (substituted) result.review.target = comparedTarget;
+      return result;
+    }
+    return reply();
+  });
+  await settle();
+  const intent = { type: 'open-exact-review', id, bundle: reviewRecord().bundle, target: operation };
+  h.intent(intent); await settle();
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  assert.deepEqual(h.projections.at(-1).reviewNavigation, { id, bundle: intent.bundle, target: operation, sequence: 1 });
+  h.intent(intent); await settle();
+  assert.equal(h.projections.at(-1).reviewNavigation.sequence, 2);
+  substituted = true; h.intent(intent); await settle();
+  assert.equal(h.projections.at(-1).reviewNavigation.sequence, 2);
+  assert.equal(h.projections.at(-1).selectedReviews[id].target, operation);
+  const count = calls.length;
+  h.intent({ ...intent, target: 'latest' }); h.intent({ ...intent, id: 'f'.repeat(64) });
+  h.intent({ ...intent, extra: true }); await settle();
+  assert.equal(calls.length, count);
+  assert.ok(calls.every(call => ['attached_projects', 'load_attachment_pins', 'inspect_attached_review'].includes(call.command)));
+  h.dispose();
+});
+
+test('exact review navigation waits for an in-flight status refresh', async () => {
+  let release; let hold = false; const inspections = [];
+  const h = harness(async (command, args) => {
+    if (command === 'attached_projects' && hold) { hold = false; await new Promise(resolve => { release = resolve; }); }
+    if (command === 'inspect_attached_review') { inspections.push(args); return reviewReply(); }
+    return reply();
+  });
+  await settle(); hold = true; h.intent({ type: 'refresh' }); await settle();
+  h.intent({ type: 'open-exact-review', id, bundle: reviewRecord().bundle, target: operation });
+  assert.equal(inspections.length, 0);
+  release(); await settle(); await settle();
+  assert.deepEqual(inspections, [{ id, bundle: reviewRecord().bundle, target: operation }]);
+  assert.equal(h.projections.at(-1).reviewNavigation.target, operation);
+  h.dispose();
+});
