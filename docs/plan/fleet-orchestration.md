@@ -726,3 +726,10 @@ Group application/recovery controls now route exact native identities, retain un
 permit explicit inspection without automatic retry. Existing per-file controls, saved reviews and
 project imports remain available. Hebrew controls and literal file identifiers are preserved.
 Directory operations, watcher reconciliation and the full packaged acceptance objective remain.
+
+
+Grouped desktop source reconciliation is accounted for by canonical PRs #87–#88 and the watcher
+acceptance/documentation increment. The newer canonical monitoring lifecycle is preserved; the
+native-event test now establishes a fresh post-registration baseline and requires a new callback.
+Historical source counts are not canonical validation. The local registration stall, current full
+verification, directory support and packaged graphical fleet acceptance remain outstanding.

@@ -381,8 +381,10 @@ fn native_events_capture_nested_edits_and_atomic_replacement_before_reconciliati
     )
     .unwrap();
     let captured = outcome(&service, CaptureOutcome::Saved, 0);
+    let ready = wait(&service, |status| status.native_events);
+    assert!(service.request_capture());
     let first = wait(&service, |status| {
-        status.native_events && status.phase == CapturePhase::Waiting
+        status.attempts > ready.attempts && status.phase == CapturePhase::Waiting
     });
     assert_eq!(first.saved_version, captured.saved_version);
     assert!(
@@ -400,7 +402,7 @@ fn native_events_capture_nested_edits_and_atomic_replacement_before_reconciliati
                     == Some(b"nested edit".to_vec())
         })
     });
-    assert!(nested.event_signals > 0);
+    assert!(nested.event_signals > first.event_signals);
     fs::write(f.source.join("replacement"), b"atomic replacement").unwrap();
     fs::rename(f.source.join("replacement"), f.source.join("nested/work")).unwrap();
     let replaced = wait(&service, |status| {
@@ -439,8 +441,10 @@ fn native_root_change_wakes_capture_without_adopting_the_replacement() {
     )
     .unwrap();
     let captured = outcome(&service, CaptureOutcome::Saved, 0);
+    let ready = wait(&service, |status| status.native_events);
+    assert!(service.request_capture());
     let first = wait(&service, |status| {
-        status.native_events && status.phase == CapturePhase::Waiting
+        status.attempts > ready.attempts && status.phase == CapturePhase::Waiting
     });
     assert_eq!(first.saved_version, captured.saved_version);
     assert!(first.native_events);

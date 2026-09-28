@@ -1604,3 +1604,25 @@ TypeScript passes. All three group rendering tests pass, including Hebrew litera
 disabled stale restoration. The new Hebrew assertion initially used different wording from the
 existing translation; it was corrected to the established label without changing the disabled-state
 assertion. Full desktop verification is running; native full and packaged acceptance remain pending.
+
+
+## I03d watcher and documentation reconciliation
+
+Completes path accounting for source `fc5b37d9bea6edf4311dea4a2914145da4e600ab` on PR #88
+at `a75d3c9ce02f2f486aa91305194e957f37615472`. Six native paths transferred in #87; four
+renderer paths in #88. Of four watcher paths, attachment-background tests now use the source's
+post-registration capture baseline and event-counter increment, additionally preserving canonical
+initial saved identity. The source background.rs, background/signal_worker.rs and signals_macos.rs
+implementation is superseded by canonical #41's explicit native lifecycle and signals_worker.rs.
+Terminal capture atomically sets stop, phase and inactive events; callbacks and late registration
+check that stop flag. Importing the older worker would lose canonical status and regressions.
+
+The source's four documentation paths are reconciled through this ledger, project status, fleet
+plan, retained-replacement contract and corrected project-attachment lifecycle text. Its historical
+3,288 Rust/673 desktop result (14 Rust skips), including native event wakeups, is provenance only.
+It neither validates this canonical replacement nor resolves the later local registration failure.
+Source path accounting is complete; runtime acceptance, issue #37 and the full fleet objective are not.
+
+No production watcher behavior or deadline changes. The test adjustment still requires real native
+registration and new callback evidence before the five-minute fallback, with the existing bounded
+waits. Local native focused/failing-before/full execution is queued behind the preserved run.

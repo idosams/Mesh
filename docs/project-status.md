@@ -606,3 +606,10 @@ partial outcomes, verified group/member observations and explicit retained-file 
 copy and literal path/identity presentation are preserved. Failed recovery refreshes keep earlier
 observations visible but disable restoration. Focused controller tests pass; current renderer/native
 and packaged acceptance is tracked separately from these source changes.
+
+
+Grouped desktop source reconciliation is accounted for by canonical PRs #87–#88 and the watcher
+acceptance/documentation increment. The newer canonical monitoring lifecycle is preserved; the
+native-event test now establishes a fresh post-registration baseline and requires a new callback.
+Historical source counts are not canonical validation. The local registration stall, current full
+verification, directory support and packaged graphical fleet acceptance remain outstanding.

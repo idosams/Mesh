@@ -512,8 +512,8 @@ attachment, review-pin or detachment acceptance journeys.
 macOS capture now owns a recursive FSEvents stream on a private serial dispatch queue. The native
 adapter is a small platform-gated FFI boundary using the installed SDK contract; it adds no dependency.
 Its context is retained/released with Arc through the framework callbacks, panics cannot cross the C
-callback, and the capture worker stops, invalidates and releases the stream before finishing.
-The stream starts before the initial scan; every callback batch, including dropped-event or root-change
+callback, and a separate bounded native helper creates, stops, invalidates and releases the stream.
+Registration can overlap the initial scan; every callback batch, including dropped-event or root-change
 notifications, only sets one pending rescan flag. No event path, identifier or flag authorizes content,
 proves authorship or substitutes for the complete descriptor-confined inventory.
 
@@ -525,10 +525,11 @@ A replaced root may wake capture but is never adopted. Ignored-path events can c
 rescan; selective dirty-path hashing and large-project resource measurements remain future work.
 
 Status adds `native_events` and `event_signals` (callback batches, not edit counts). The desktop shows
-native signals plus periodic checks or periodic fallback. Stop clears the active-stream status only
-after the worker has released its native watcher. Real macOS tests use a five-minute reconciliation
+native signals plus periodic checks or periodic fallback. Capture termination clears active-stream
+status while native cleanup may remain pending; native_signal_state reports that separate lifecycle.
+Real macOS tests use a five-minute reconciliation
 interval and observe nested edits, atomic replacement and root-change refusal within an eight-second
-deadline, proving the wakeup path rather than the fallback timer. Separate disabled-signal tests
+deadline to require the wakeup path rather than the fallback timer. Separate disabled-signal tests
 verify periodic capture and restart catch-up. This does not establish a four-worker latency target or
 the packaged graphical journey.
 
@@ -647,3 +648,19 @@ ceremony at a time, rechecks main after success or uncertainty, and never descri
 as a rollback. A failed refresh leaves approval disabled until a new native check succeeds.
 These source, rendering and native fixture tests do not prove an actual platform ceremony or the
 packaged graphical journey. Those acceptance boundaries require separate evidence.
+
+
+## Canonical watcher reconciliation with the grouped desktop source
+
+The older grouped-desktop source also split monitoring from capture, but canonical PR #41 already
+provides that separation with explicit native lifecycle states, bounded permits and independent
+cleanup status. Its terminal capture transition sets the stop flag, clears event activity and sets
+Stopped/Failed under the same lock, so callbacks and late registration cannot revive that terminal
+service. The older background/signal_worker module must not replace this implementation.
+
+Native event acceptance now waits for actual registration and one subsequent completed capture
+before editing, then requires the event counter to increase after the nested edit. Initial saved
+identity remains unchanged through baseline establishment. Existing eight-second waits, real native
+registration requirement and five-minute reconciliation interval are unchanged. This is a stronger
+baseline assertion, not a workaround for startup failure. The preserved local FSEvents registration
+RPC stall and issue #37 remain unresolved; canonical execution of this test adjustment is pending.
