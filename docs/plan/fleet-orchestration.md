@@ -31,8 +31,10 @@ Completion requires every accepted increment to be merged into `idosams/Mesh` ma
 combined main revision passing the actual repository checks and the acceptance journeys required
 by this plan. Published PRs and passing branch tests are intermediate states. Record exact tested
 and merged revisions, hosted CI results, packaged evidence where required, and unresolved issues.
-The owner's 2026-09-27 instruction authorizes eventual merges after checks and required reviews
-are satisfied. It does not waive human review, permit self-approval, or authorize bypassing checks.
+The owner explicitly authorized this effort to merge without human review. Required checks remain
+mandatory; this authorization permits neither self-approval nor bypassing checks. This repository
+delivery authorization does not replace the product's native human approval for advancing a user's
+protected project main version.
 
 ## Product model
 

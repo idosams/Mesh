@@ -8,11 +8,36 @@ historical evidence. The full [fleet objective](fleet-orchestration.md) is uncha
 The sections below retain the migration's historical observations. Later verified delivery supersedes
 earlier statements that no PR has merged or named human review is still required. The owner explicitly
 authorized merging without human review for this effort; required checks remain mandatory, and no
-self-approval or check bypass is authorized. Main is verified through #55 at
-`b9d3f48c1b4adc2fce79099c7941a592a5eda17f`. The published dependency chain through #69 has been
-reconciled without rewriting original commits or changing those implementations. Each reconciled
-head requires fresh hosted checks before its merge. Final combined-main and runtime acceptance
-remain incomplete, including the preserved native macOS registration failure on #69's original tree.
+self-approval or check bypass is authorized. Canonical main is verified through
+[PR #70](https://github.com/idosams/Mesh/pull/70) at
+`46d473879e07b24f51bef5e9a2bb816c1448b02e` (merged 2026-09-28 at 14:37:23 UTC).
+PRs #56–#70 were merged in dependency order after each exact head passed all seven hosted checks.
+Reconciliation preserved original commits and implementation trees. This checkpoint does not claim
+that the remaining source increments or acceptance journeys are complete.
+
+PR #70's focused compiler and delegated-catalog regressions executed successfully locally. An
+identity-substitution mutation failed the compiler regression; restoring the implementation passed.
+Its full local gate remains live: compilation completed, but test discovery is delayed before test
+code starts. A sampled process was at `_dyld_start`; the cause is not established. Preserve this run.
+The earlier full #69 run failed a macOS native-watcher test and remains unresolved in
+[issue #37](https://github.com/idosams/Mesh/issues/37); hosted success does not erase that failure.
+
+[PR #71](https://github.com/idosams/Mesh/pull/71) is published at
+`985adffffd29b3202c6cff22e6964c7454820d2c`, replacing source
+`a8d3bd00105941a9ceb23bd9215b87d367645d5a`. Its Linux job executed 3,042 passing tests,
+including the signed pending-import, invalid/aliased receipt and nonprivate/oversized receipt
+regressions. Six checks are complete; the macOS job passed its test steps and is still finishing.
+Local native/mutation/full validation is queued behind #70. It is not merged at this checkpoint.
+
+PRs #14 and #16 were closed as superseded, not merged: their complete changed files are identical
+to canonical main at `5ea158f9d53b4d247d457f50a1808bb56489f02d`. Their branches and history remain
+preserved. The incorporated corrections remain traceable through the validation/source mappings below.
+Mesh-internal's deprecation PR remains open because its CI jobs could not start due to GitHub's
+reported payment/spending-limit restriction. No billing or repository settings were changed.
+
+Remaining work includes desktop import/review and recovery, deletion, grouped integration,
+restoration, real second-provider/four-worker and remote acceptance, latest packaged/native approval
+journeys, resolution of local native failures and final combined-main validation.
 
 ## Verified reconciliation baseline
 
@@ -52,13 +77,12 @@ For every increment record replacement commit(s), PR URL, exact local validation
 status. Source test logs are historical context; rerun the actual canonical checks. Human merge
 authorization is separate and mandatory; no self-approval or check bypass.
 
-On 2026-09-27 the owner made tested, merged delivery an explicit goal requirement and authorized
-eventual merges once checks and required reviews are satisfied. This supersedes the earlier lack
-of merge authorization; it is not a completed code review. Integrate dependencies in order, refresh
+The owner made tested, merged delivery an explicit goal requirement and subsequently authorized
+merging without human review for this effort. This is merge authorization, not a completed code review. Integrate dependencies in order, refresh
 checks after base changes, and verify the final combined canonical main revision. Keep source PRs
 and replacement mappings traceable when a correction is delivered through another increment.
-Repository-required named human reviews remain outstanding; do not infer approval from absent
-GitHub branch rules. Until final main and the full acceptance journeys are verified, the goal stays
+The explicit owner authorization waives named human review for this effort. Do not infer such a
+waiver merely from absent GitHub branch rules; required checks still apply. Until final main and the full acceptance journeys are verified, the goal stays
 incomplete even if all migration PRs have been published.
 
 The following CI corrections were originally published independently against canonical main and
