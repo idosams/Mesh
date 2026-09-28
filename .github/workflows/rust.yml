@@ -58,7 +58,8 @@ jobs:
         with:
           node-version: 22.18.0
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo nextest run --workspace
+      # Preserve every failure in one run; an unrelated early failure must not hide later evidence.
+      - run: cargo nextest run --workspace --no-fail-fast
       - run: npm run test:macos-renderers
       - run: npm run verify:demo
 
