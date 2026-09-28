@@ -5,6 +5,8 @@ use crate::root_authority::PinnedWorkspaceRoot;
 const EXCHANGE: &str = "exchange";
 
 mod addition;
+mod conversion;
+pub(crate) use conversion::{observe_entry, ConversionInput, EntryLimits, RetainedConversion};
 mod metadata;
 mod removal;
 mod tree_addition;

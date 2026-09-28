@@ -423,7 +423,7 @@ impl ProvisionedAttachment {
             recovery_root,
             trusted,
             limits,
-            false,
+            "addition",
         )
     }
 
@@ -447,7 +447,31 @@ impl ProvisionedAttachment {
             recovery_root,
             trusted,
             limits,
-            true,
+            "removal",
+        )
+    }
+
+    /// Prepare a complete approved file/directory type exchange; retain the displaced entry after explicit native confirmation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_main_entry_conversion(
+        &self,
+        bundle: &str,
+        target: &str,
+        relative: &str,
+        recovery_root: &Path,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedMainDirectoryChange> {
+        super::directory_writeback::prepare(
+            self.clone(),
+            self.store.clone(),
+            bundle,
+            target,
+            relative,
+            recovery_root,
+            trusted,
+            limits,
+            "conversion",
         )
     }
 

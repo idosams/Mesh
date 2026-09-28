@@ -1818,3 +1818,20 @@ together. All 48 controller tests pass. Mutating removal classification to addit
 makes the operation regression fail; restoration returns all 48 to passing.
 TypeScript and all 30 rendering/localization tests pass. Full native, packaged confirmation/recovery,
 whole-tree restoration and file/directory conversion remain unfinished.
+
+## I06a native retained entry conversion
+
+Partially transfers source `6ec9c8ccf9e273de25d1a84c323c0cd4f3f4b821` onto
+PR #99 at `c1cdf63721014eb774dc520d9b99df9a017571be`: seven daemon paths
+(retained conversion/export, shared tree staging, directory writeback, group
+integration, provisioning and approval tests). Native desktop confirmation, four
+renderer paths and remaining source-document accounting follow separately.
+
+Both file-to-directory and directory-to-file replacements bind approved before/after
+content and retain original objects through one native exchange. Whole-source and
+stage observations, trust, exclusions and parent policy are rechecked. Group v4
+accounts for the union of changed paths while v1/v2/v3 remain readable. Existing
+desktop directory confirmation rejects the conversion schema until complete
+two-sided presentation is added. Local native focused/failing-before/full execution
+is pending behind the preserved run. Source historical 3,318 Rust/680 desktop
+tests with 14 skips are provenance only, not canonical runtime proof.

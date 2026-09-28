@@ -690,3 +690,11 @@ keeps late-work paths literal and never offers the file-restoration command.
 All 48 controller tests pass with a demonstrated failing-before classification
 regression. TypeScript and all 30 rendering/localization tests pass; complete native, restoration,
 conversion and packaged graphical acceptance remain outstanding.
+
+### Native retained entry conversion (unmerged increment)
+
+Native source can now prepare and exchange approved file/directory conversions
+while retaining original objects and open handles. It verifies both complete sides
+and reports uncertain outcomes without automatic replay or cleanup. Native tests
+are transferred pending local execution. Complete desktop confirmation, localized
+conversion recovery, whole-entry restoration and packaged proof remain outstanding.

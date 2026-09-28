@@ -146,80 +146,12 @@ impl RetainedTreeAddition {
         let (destination_parent, _) = source
             .filesystem()
             .inspect_optional_entry_with_parent(&relative)?;
-        recovery.ensure_namespace_identity()?;
-        if destination_parent.metadata()?.dev() != recovery.identity()?.0 {
-            return Err(io::Error::other(
-                "directory recovery must share the destination filesystem",
-            ));
-        }
-        let stage = recovery.create_child_directory_with_mode(OsStr::new(EXCHANGE), 0o777)?;
-        let descriptor = stage.try_clone_directory()?;
-        let mode = descriptor.metadata()?.mode() & 0o777;
-        let (parent_metadata, parent_mode) =
-            metadata::inherit_new_entry(&destination_parent, &descriptor, mode)?;
-        let mut directories = BTreeMap::from([(String::new(), stage.clone())]);
-        let mut expected =
-            BTreeMap::from([(String::new(), prepared_entry("", &descriptor, None)?)]);
-        let mut seen = std::collections::BTreeSet::new();
-        let mut bytes = 0u64;
-        for input in inputs {
-            let path = input.path();
-            if path.is_empty()
-                || path
-                    .split('/')
-                    .any(|part| part.is_empty() || part == "." || part == "..")
-                || !seen.insert(path)
-            {
-                return Err(io::Error::other(
-                    "invalid or duplicate directory tree member",
-                ));
-            }
-            let (parent_path, leaf) = path.rsplit_once('/').unwrap_or(("", path));
-            let parent = directories
-                .get(parent_path)
-                .ok_or_else(|| io::Error::other("tree parent is unavailable or unordered"))?
-                .clone();
-            let parent_fd = parent.try_clone_directory()?;
-            match input {
-                TreeInput::Directory(_) => {
-                    let child = parent.create_child_directory_with_mode(OsStr::new(leaf), 0o777)?;
-                    let fd = child.try_clone_directory()?;
-                    let mode = fd.metadata()?.mode() & 0o777;
-                    metadata::inherit_new_entry(&parent_fd, &fd, mode)?;
-                    fd.sync_all()?;
-                    expected.insert(path.to_owned(), prepared_entry(path, &fd, None)?);
-                    directories.insert(path.to_owned(), child);
-                }
-                TreeInput::File(_, content, executable) => {
-                    bytes = bytes
-                        .checked_add(content.len() as u64)
-                        .filter(|bytes| *bytes <= 64 * 1024 * 1024)
-                        .ok_or_else(|| io::Error::other("tree bytes exceed limit"))?;
-                    let mut fd = create_new_at_mode(
-                        &parent_fd,
-                        leaf,
-                        if *executable { 0o755 } else { 0o644 },
-                    )?;
-                    let mode = fd.metadata()?.mode() & 0o777;
-                    fd.write_all(content)?;
-                    metadata::inherit_new_entry(&parent_fd, &fd, mode)?;
-                    if (fd.metadata()?.mode() & 0o111 != 0) != *executable {
-                        return Err(io::Error::other("tree executable state was not preserved"));
-                    }
-                    fd.sync_all()?;
-                    expected.insert(path.to_owned(), prepared_entry(path, &fd, Some(content))?);
-                }
-            }
-            parent_fd.sync_all()?;
-        }
-        descriptor.sync_all()?;
-        recovery.try_clone_directory()?.sync_all()?;
-        let evidence = crate::ipc::Json::Array(expected.into_values().collect());
-        if observe_tree(&stage, inputs.len() + 1, bytes, bytes)? != evidence {
-            return Err(io::Error::other(
-                "directory tree changed during preparation",
-            ));
-        }
+        let StagedTree {
+            evidence,
+            bytes,
+            parent_metadata,
+            parent_mode,
+        } = stage_tree(&destination_parent, inputs, &recovery)?;
         let prepared = Self {
             source,
             relative,
@@ -316,7 +248,104 @@ impl RetainedTreeAddition {
     }
 }
 
-fn prepared_entry(path: &str, file: &File, bytes: Option<&[u8]>) -> io::Result<crate::ipc::Json> {
+pub(super) struct StagedTree {
+    pub(super) evidence: crate::ipc::Json,
+    pub(super) bytes: u64,
+    pub(super) parent_metadata: String,
+    pub(super) parent_mode: u32,
+}
+/// Shared private staging for absent-path creation and an occupied-path type exchange.
+pub(super) fn stage_tree(
+    destination_parent: &File,
+    inputs: &[TreeInput],
+    recovery: &PinnedWorkspaceRoot,
+) -> io::Result<StagedTree> {
+    if inputs.len() >= 64 {
+        return Err(io::Error::other("directory tree exceeds entry limit"));
+    }
+    recovery.ensure_namespace_identity()?;
+    if destination_parent.metadata()?.dev() != recovery.identity()?.0 {
+        return Err(io::Error::other(
+            "directory recovery must share the destination filesystem",
+        ));
+    }
+    let stage = recovery.create_child_directory_with_mode(OsStr::new(EXCHANGE), 0o777)?;
+    let descriptor = stage.try_clone_directory()?;
+    let mode = descriptor.metadata()?.mode() & 0o777;
+    let (parent_metadata, parent_mode) =
+        metadata::inherit_new_entry(destination_parent, &descriptor, mode)?;
+    let mut directories = BTreeMap::from([(String::new(), stage.clone())]);
+    let mut expected = BTreeMap::from([(String::new(), prepared_entry("", &descriptor, None)?)]);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut bytes = 0u64;
+    for input in inputs {
+        let path = input.path();
+        if path.is_empty()
+            || path
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == "..")
+            || !seen.insert(path)
+        {
+            return Err(io::Error::other(
+                "invalid or duplicate directory tree member",
+            ));
+        }
+        let (parent_path, leaf) = path.rsplit_once('/').unwrap_or(("", path));
+        let parent = directories
+            .get(parent_path)
+            .ok_or_else(|| io::Error::other("tree parent is unavailable or unordered"))?
+            .clone();
+        let parent_fd = parent.try_clone_directory()?;
+        match input {
+            TreeInput::Directory(_) => {
+                let child = parent.create_child_directory_with_mode(OsStr::new(leaf), 0o777)?;
+                let fd = child.try_clone_directory()?;
+                let mode = fd.metadata()?.mode() & 0o777;
+                metadata::inherit_new_entry(&parent_fd, &fd, mode)?;
+                fd.sync_all()?;
+                expected.insert(path.to_owned(), prepared_entry(path, &fd, None)?);
+                directories.insert(path.to_owned(), child);
+            }
+            TreeInput::File(_, content, executable) => {
+                bytes = bytes
+                    .checked_add(content.len() as u64)
+                    .filter(|bytes| *bytes <= 64 * 1024 * 1024)
+                    .ok_or_else(|| io::Error::other("tree bytes exceed limit"))?;
+                let mut fd =
+                    create_new_at_mode(&parent_fd, leaf, if *executable { 0o755 } else { 0o644 })?;
+                let mode = fd.metadata()?.mode() & 0o777;
+                fd.write_all(content)?;
+                metadata::inherit_new_entry(&parent_fd, &fd, mode)?;
+                if (fd.metadata()?.mode() & 0o111 != 0) != *executable {
+                    return Err(io::Error::other("tree executable state was not preserved"));
+                }
+                fd.sync_all()?;
+                expected.insert(path.to_owned(), prepared_entry(path, &fd, Some(content))?);
+            }
+        }
+        parent_fd.sync_all()?;
+    }
+    descriptor.sync_all()?;
+    recovery.try_clone_directory()?.sync_all()?;
+    let evidence = crate::ipc::Json::Array(expected.into_values().collect());
+    if observe_tree(&stage, inputs.len() + 1, bytes, bytes)? != evidence {
+        return Err(io::Error::other(
+            "directory tree changed during preparation",
+        ));
+    }
+    Ok(StagedTree {
+        evidence,
+        bytes,
+        parent_metadata,
+        parent_mode,
+    })
+}
+
+pub(super) fn prepared_entry(
+    path: &str,
+    file: &File,
+    bytes: Option<&[u8]>,
+) -> io::Result<crate::ipc::Json> {
     use crate::ipc::Json;
     use mesh_types::ContentDigest as _;
     let stat = file.metadata()?;

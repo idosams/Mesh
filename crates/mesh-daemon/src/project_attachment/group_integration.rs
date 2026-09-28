@@ -31,11 +31,12 @@ struct Plan {
     present: Vec<String>,
     trees: BTreeSet<String>,
     removed_trees: BTreeSet<String>,
+    converted_trees: BTreeSet<String>,
 }
 
 /// Native-only single-use group. Every changed path in the accepted review must be accounted for.
-/// Supports regular-file changes and complete directory addition/removal. File/directory type
-/// replacement refuses the whole group before staging. Applying never claims filesystem-wide atomicity.
+/// Supports regular-file changes, complete directory addition/removal, and file/directory conversion.
+/// Applying never claims filesystem-wide atomicity.
 pub struct PreparedMainIntegration {
     history: ProvisionedAttachment,
     store: PinnedWorkspaceRoot,
@@ -132,6 +133,7 @@ fn plan(
         present: vec![],
         trees: BTreeSet::new(),
         removed_trees: BTreeSet::new(),
+        converted_trees: BTreeSet::new(),
     };
     let paths: BTreeSet<_> = before.keys().chain(after.keys()).collect();
     let changed: Vec<_> = paths
@@ -259,6 +261,62 @@ fn plan(
                 result.trees.insert(path.clone());
                 result.removed_trees.insert(path.clone());
                 result.ready.push(path.clone());
+            }
+            continue;
+        }
+        if matches!(
+            (a.map(|entry| entry.kind), b.map(|entry| entry.kind)),
+            (Some("file"), Some("folder")) | (Some("folder"), Some("file"))
+        ) {
+            let prefix = format!("{path}/");
+            let members: BTreeSet<_> = before
+                .keys()
+                .chain(after.keys())
+                .filter(|member| *member == path || member.starts_with(&prefix))
+                .collect();
+            for member in members {
+                if !captured.admits_file_path(member)? {
+                    return Err(invalid("conversion contains excluded members"));
+                }
+                covered.insert(member.clone());
+            }
+            let matches_tree =
+                |tree: &std::collections::BTreeMap<String, super::inspection::ComparisonEntry>| {
+                    tree.iter()
+                        .filter(|(member, _)| *member == path || member.starts_with(&prefix))
+                        .all(|(member, entry)| {
+                            if entry.kind == "folder" {
+                                captured
+                                    .directories()
+                                    .iter()
+                                    .any(|directory| directory == Path::new(member))
+                            } else {
+                                captured.files().iter().any(|file| {
+                                    file.path() == Path::new(member)
+                                        && entry.digest.is_some_and(|d| {
+                                            d.to_string() == file.digest().to_string()
+                                        })
+                                        && entry.executable == Some(file.executable())
+                                        && entry.bytes == Some(file.bytes().len() as u64)
+                                })
+                            }
+                        })
+                };
+            if matches_tree(&after) {
+                result.present.extend(
+                    covered
+                        .iter()
+                        .filter(|member| *member == path || member.starts_with(&prefix))
+                        .cloned(),
+                );
+            } else if matches_tree(&before) {
+                result.trees.insert(path.clone());
+                result.converted_trees.insert(path.clone());
+                result.ready.push(path.clone());
+            } else {
+                return Err(invalid(
+                    "conversion source differs from approved base and result",
+                ));
             }
             continue;
         }
@@ -398,7 +456,9 @@ pub(super) fn prepare(
     let proposal = Json::object([
         (
             "schema",
-            Json::text(if !planned.removed_trees.is_empty() {
+            Json::text(if !planned.converted_trees.is_empty() {
+                "mesh.attachment-integration-group/v4"
+            } else if !planned.removed_trees.is_empty() {
                 "mesh.attachment-integration-group/v3"
             } else if planned.trees.is_empty() {
                 "mesh.attachment-integration-group/v1"
@@ -669,6 +729,7 @@ pub(super) fn inspect(
             "mesh.attachment-integration-group/v1"
                 | "mesh.attachment-integration-group/v2"
                 | "mesh.attachment-integration-group/v3"
+                | "mesh.attachment-integration-group/v4"
         )
         || text(&proposal, "project")? != history.id()
         || proposal.get("attachment") != Some(&history.project().receipt()?)
@@ -738,6 +799,7 @@ pub(super) fn inspect(
                     Some(
                         "mesh.attachment-directory-addition/v1"
                             | "mesh.attachment-directory-removal/v1"
+                            | "mesh.attachment-entry-conversion/v1"
                     )
                 ) {
                     if !directory_members {
@@ -745,14 +807,35 @@ pub(super) fn inspect(
                     }
                     if receipt.get("schema")
                         == Some(&Json::text("mesh.attachment-directory-removal/v1"))
-                        && text(&proposal, "schema")? != "mesh.attachment-integration-group/v3"
+                        && !matches!(
+                            text(&proposal, "schema")?,
+                            "mesh.attachment-integration-group/v3"
+                                | "mesh.attachment-integration-group/v4"
+                        )
                     {
                         return Err(invalid("directory removal requires group v3"));
                     }
+                    if receipt.get("schema")
+                        == Some(&Json::text("mesh.attachment-entry-conversion/v1"))
+                        && text(&proposal, "schema")? != "mesh.attachment-integration-group/v4"
+                    {
+                        return Err(invalid("entry conversion requires group v4"));
+                    }
                     super::directory_writeback::verify_tree(receipt, workspace, trusted)?;
                     let root = text(receipt, "path")?;
-                    for entry in receipt.get("tree").and_then(Json::as_array).unwrap() {
-                        let relative = text(entry, "path")?;
+                    let mut member_paths = BTreeSet::new();
+                    for tree in [receipt.get("before_tree"), receipt.get("tree")]
+                        .into_iter()
+                        .flatten()
+                    {
+                        for entry in tree
+                            .as_array()
+                            .ok_or_else(|| invalid("invalid conversion coverage"))?
+                        {
+                            member_paths.insert(text(entry, "path")?);
+                        }
+                    }
+                    for relative in member_paths {
                         if !relative.is_empty() && !paths.insert(format!("{root}/{relative}")) {
                             return Err(invalid("overlapping directory group members"));
                         }

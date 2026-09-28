@@ -755,3 +755,36 @@ open-handle continuity. That historical experiment is not canonical implementati
 or Linux/packaged acceptance. Conversion still requires a complete exchange
 executor, exact source/stage bindings, race handling, receipts, confirmation and
 recovery; a remove-then-add sequence is not an equivalent substitute.
+
+### Native approved entry conversion
+
+An approved regular file can become a complete directory subtree, or an approved
+subtree can become a regular file. Preparation verifies complete approved base and
+result, refuses unknown/excluded/divergent entries and freezes both sides for
+confirmation. Separate addition/removal entry points retain their original scope.
+Replacement staging is external and follows destination inheritance and umask.
+Each side is bounded to 64 entries with per-file and combined approved-content
+budgets of at most 64 MiB or the smaller caller limit.
+
+Apply rechecks current trusted main, exclusions, receipt, parent identity/policy
+and complete source/replacement evidence, then performs one descriptor-relative
+exchange. It never removes the source first. Both durability barriers are attempted.
+The original object remains named in recovery, preserving open file and directory
+handles. Boundary edits, replacement and uncertain durability require reconciliation
+without automatic undo, cleanup or retry. A lost reply does not prove no exchange.
+
+Conversion receipt v1 adds before_tree to the ordered directory binding fields;
+before_tree is verified against the base and tree against the result. Exactly one
+root is a file. The result binds the proposal and displaced-entry retention;
+recovery reports independent source/retained observations and before/after kinds
+without authority. Existing addition/removal formats stay unchanged. Group v4
+requires conversion receipts and verifies union coverage without duplicate roots;
+readers retain v1/v2/v3 compatibility and old readers reject v4. Journals and
+signatures do not migrate.
+
+The current desktop prompt refuses this new schema. Complete original/replacement
+confirmation and localized recovery follow separately. Native regressions cover
+both orientations, late handles, source/stage changes, durability, approved history,
+budgets, version/overlap refusal and historical recovery. They await canonical
+local execution. Whole-entry restoration and packaged graphical acceptance remain
+required; historical source test counts do not establish completion.

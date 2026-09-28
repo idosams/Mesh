@@ -1601,7 +1601,7 @@ fn integration_group_preflights_all_members_and_preserves_editor_handles_and_res
 }
 
 #[test]
-fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_changes() {
+fn integration_group_does_not_rewrite_already_present_files_or_skip_divergent_directory_changes() {
     use std::os::unix::fs::MetadataExt as _;
     let f = Fixture::new("group-coverage");
     let signer = TestSigner::generate();
@@ -1685,7 +1685,7 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
     f.history
         .inspect_main_integration_group(&root, &group_id, &trust, ObservationLimits::default())
         .unwrap();
-    // File/directory conversion still requires its own retained exchange; never skip it.
+    // Conversion cannot discard divergent working content; never skip it.
     fs::remove_dir_all(f.source.join("new-folder")).unwrap();
     fs::write(f.source.join("new-folder"), "converted to file").unwrap();
     let fourth = f.save("fourth");
@@ -1694,6 +1694,7 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
     fs::create_dir(f.source.join("new-folder")).unwrap();
     fs::write(f.source.join("new-folder/new.txt"), "new accepted").unwrap();
     fs::write(f.source.join("work.txt"), "third").unwrap();
+    fs::write(f.source.join("new-folder/new.txt"), "unreviewed user work").unwrap();
     let count = fs::read_dir(&root).unwrap().count();
     assert!(f
         .history
@@ -3318,4 +3319,306 @@ fn native_directory_removal_checks_operation_kind_and_retention_receipt() {
         fs::read(record.join("exchange/sub/file")).unwrap(),
         b"original tree"
     );
+}
+
+fn approved_entry_conversion(
+    name: &str,
+    directory_before: bool,
+) -> (
+    Fixture,
+    TestSigner,
+    TrustedReviewers,
+    String,
+    String,
+    PathBuf,
+) {
+    let f = Fixture::new(name);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let set_entry = |directory: bool, text: &str| {
+        if directory {
+            fs::create_dir_all(f.source.join("entry/empty")).unwrap();
+            fs::write(f.source.join("entry/file"), text).unwrap();
+        } else {
+            fs::write(f.source.join("entry"), text).unwrap();
+        }
+    };
+    let remove_entry = |directory: bool| {
+        if directory {
+            fs::remove_dir_all(f.source.join("entry")).unwrap();
+        } else {
+            fs::remove_file(f.source.join("entry")).unwrap();
+        }
+    };
+    set_entry(directory_before, "original");
+    let base = f.save("stable");
+    accept(&f, &signer, &trust, &base, 1);
+    remove_entry(directory_before);
+    set_entry(!directory_before, "accepted");
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    remove_entry(!directory_before);
+    set_entry(directory_before, "original");
+    let root = recovery_root(&f);
+    (f, signer, trust, bundle, target, root)
+}
+
+#[test]
+fn approved_type_conversion_binds_both_sides_and_retains_late_work() {
+    for directory_before in [false, true] {
+        let (f, signer, trust, bundle, target, root) = approved_entry_conversion(
+            &format!("native-conversion-{directory_before}"),
+            directory_before,
+        );
+        assert!(f
+            .history
+            .prepare_main_directory_addition(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits::default()
+            )
+            .is_err());
+        let journal = f.journal();
+        let prepared = f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        assert_eq!(prepared.current_files().count(), 1);
+        assert_eq!(prepared.proposed_files().count(), 1);
+        let record = prepared.recovery_path().to_owned();
+        let tx = record.file_name().unwrap().to_str().unwrap();
+        let inspect = || {
+            f.history
+                .inspect_directory_change(&root, tx, &trust, ObservationLimits::default())
+                .unwrap()
+        };
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("prepared-arrangement"))
+        );
+        let mut editor = fs::OpenOptions::new()
+            .append(true)
+            .open(if directory_before {
+                f.source.join("entry/file")
+            } else {
+                f.source.join("entry")
+            })
+            .unwrap();
+        let outcome = prepared.apply(&trust).unwrap();
+        assert_eq!(outcome.get("status"), Some(&Json::text("applied-observed")));
+        assert_eq!(
+            outcome.get("displaced_entry_retained"),
+            Some(&Json::Bool(true))
+        );
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("applied-arrangement"))
+        );
+        editor.write_all(b" late").unwrap();
+        assert_eq!(
+            fs::read(if directory_before {
+                record.join("exchange/file")
+            } else {
+                record.join("exchange")
+            })
+            .unwrap(),
+            b"original late"
+        );
+        assert_eq!(
+            fs::read(if directory_before {
+                f.source.join("entry")
+            } else {
+                f.source.join("entry/file")
+            })
+            .unwrap(),
+            b"accepted"
+        );
+        assert_eq!(
+            inspect().get("status"),
+            Some(&Json::text("changed-entries"))
+        );
+        assert_eq!(f.journal(), journal);
+        let next = f.save("new main");
+        accept(&f, &signer, &trust, &next, 3);
+        inspect();
+    }
+}
+
+#[test]
+fn conversion_groups_cover_both_sides_and_refuse_legacy_or_overlapping_membership() {
+    for directory_before in [false, true] {
+        let (f, _, trust, bundle, target, root) = approved_entry_conversion(
+            &format!("group-conversion-{directory_before}"),
+            directory_before,
+        );
+        let group = f
+            .history
+            .prepare_main_integration(
+                &bundle,
+                &target,
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            group.proposal().get("schema"),
+            Some(&Json::text("mesh.attachment-integration-group/v4"))
+        );
+        assert_eq!(group.files().count(), 0);
+        assert_eq!(group.directories().count(), 1);
+        let path = group.recovery_path().to_owned();
+        let id = path.file_name().unwrap().to_str().unwrap();
+        let inspect = || {
+            f.history
+                .inspect_main_integration_group(&root, id, &trust, ObservationLimits::default())
+                .unwrap()
+        };
+        inspect();
+        assert_eq!(
+            group.apply(&trust).unwrap().get("status"),
+            Some(&Json::text("applied-observed"))
+        );
+        let observed = inspect();
+        let member = &observed.get("members").and_then(Json::as_array).unwrap()[0];
+        assert_eq!(
+            member.get("recovery").unwrap().get("status"),
+            Some(&Json::text("applied-arrangement"))
+        );
+        assert_eq!(
+            member.get("recovery").unwrap().get("before_kind"),
+            Some(&Json::text(if directory_before {
+                "directory"
+            } else {
+                "file"
+            }))
+        );
+        let receipt = path.join("group-prepared.json");
+        let original = fs::read_to_string(&receipt).unwrap();
+        for version in ["v1", "v2", "v3"] {
+            fs::write(
+                &receipt,
+                original.replace(
+                    "mesh.attachment-integration-group/v4",
+                    &format!("mesh.attachment-integration-group/{version}"),
+                ),
+            )
+            .unwrap();
+            assert!(f
+                .history
+                .inspect_main_integration_group(&root, id, &trust, ObservationLimits::default())
+                .is_err());
+        }
+        fs::write(&receipt, &original).unwrap();
+        let Json::Object(fields) = Json::parse(&original).unwrap() else {
+            panic!("group object")
+        };
+        let overlapping = Json::object(fields.into_iter().map(|(key, value)| {
+            let value = if key == "already_present" {
+                Json::Array(vec![Json::text("entry/empty")])
+            } else {
+                value
+            };
+            (key, value)
+        }));
+        fs::write(&receipt, overlapping.encode()).unwrap();
+        assert!(f
+            .history
+            .inspect_main_integration_group(&root, id, &trust, ObservationLimits::default())
+            .is_err());
+    }
+}
+
+#[test]
+fn conversion_refuses_unknown_source_entries_changed_stage_and_untrusted_history() {
+    for directory_before in [false, true] {
+        let (f, _, trust, bundle, target, root) = approved_entry_conversion(
+            &format!("conversion-refusal-{directory_before}"),
+            directory_before,
+        );
+        assert!(f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &TrustedReviewers::new([]),
+                ObservationLimits::default()
+            )
+            .is_err());
+        assert!(f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits {
+                    bytes: 1,
+                    file_bytes: 1,
+                    ..ObservationLimits::default()
+                }
+            )
+            .is_err());
+        let prepared = f
+            .history
+            .prepare_main_entry_conversion(
+                &bundle,
+                &target,
+                "entry",
+                &root,
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        let stage = prepared.recovery_path().join("exchange");
+        fs::write(
+            if directory_before {
+                stage.clone()
+            } else {
+                stage.join("file")
+            },
+            b"unreviewed stage",
+        )
+        .unwrap();
+        assert!(prepared.apply(&trust).is_err());
+        assert_eq!(
+            fs::read(if directory_before {
+                f.source.join("entry/file")
+            } else {
+                f.source.join("entry")
+            })
+            .unwrap(),
+            b"original"
+        );
+        if directory_before {
+            fs::create_dir(f.source.join("entry/.git")).unwrap();
+            fs::write(f.source.join("entry/.git/config"), b"ignored work").unwrap();
+        } else {
+            fs::write(f.source.join("entry"), b"new source").unwrap();
+        }
+        assert!(f
+            .history
+            .prepare_main_integration(
+                &bundle,
+                &target,
+                &root,
+                &trust,
+                ObservationLimits::default()
+            )
+            .is_err());
+        assert!(stage.exists());
+    }
 }

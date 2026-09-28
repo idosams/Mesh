@@ -781,3 +781,9 @@ including possible later descriptor writes, without exposing file restoration.
 The removal source is fully accounted for across #98 and its UI increment, but
 native runtime, whole-tree restoration, conversion and packaged graphical proof
 remain required. Historical exchange experiments do not complete conversion.
+
+The native conversion executor now transfers both file/directory orientations
+using a preserving exchange and exact two-sided evidence. Group v4 expands both
+sides for complete review coverage. Desktop confirmation still refuses conversion
+receipts pending complete presentation; localized recovery, whole-entry restoration
+and native/packaged acceptance remain required.

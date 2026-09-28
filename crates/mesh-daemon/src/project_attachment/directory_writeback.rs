@@ -1,8 +1,8 @@
-//! Native-only complete approved directory creation/removal with retained recovery.
+//! Native-only complete approved directory changes and entry conversion with retained recovery.
 use super::{external_store, invalid, ObservationLimits, ProvisionedAttachment};
 use crate::managed_file::retained_replacement::{
-    absent_parent, observe_tree, open_tree, parent_policy, RetainedTreeAddition,
-    RetainedTreeRemoval, TreeInput,
+    absent_parent, observe_entry, observe_tree, open_tree, parent_policy, ConversionInput,
+    EntryLimits, RetainedConversion, RetainedTreeAddition, RetainedTreeRemoval, TreeInput,
 };
 use crate::{
     ipc::Json, root_authority::PinnedWorkspaceRoot, workspace::OpenWorkspace, TrustedReviewers,
@@ -26,6 +26,7 @@ pub struct PreparedMainDirectoryChange {
     proposal: Json,
     operation: DirectoryOperation,
     inputs: Vec<TreeInput>,
+    before_inputs: Vec<TreeInput>,
 }
 /// Compatibility name for callers that prepare only additions.
 pub type PreparedMainDirectoryAddition = PreparedMainDirectoryChange;
@@ -33,26 +34,34 @@ pub type PreparedMainDirectoryAddition = PreparedMainDirectoryChange;
 enum DirectoryOperation {
     Add(RetainedTreeAddition),
     Remove(RetainedTreeRemoval),
+    Convert(RetainedConversion),
 }
 impl DirectoryOperation {
     fn validate(&self) -> io::Result<()> {
         match self {
             Self::Add(op) => op.validate(),
             Self::Remove(op) => op.validate(),
+            Self::Convert(op) => op.validate(),
         }
     }
     fn apply(self) -> io::Result<bool> {
         match self {
             Self::Add(op) => op.apply(),
             Self::Remove(op) => op.apply(),
+            Self::Convert(op) => op.apply(),
         }
     }
 }
 fn removal(proposal: &Json) -> bool {
     proposal.get("schema") == Some(&Json::text("mesh.attachment-directory-removal/v1"))
 }
+fn conversion(proposal: &Json) -> bool {
+    proposal.get("schema") == Some(&Json::text("mesh.attachment-entry-conversion/v1"))
+}
 fn result_schema(proposal: &Json) -> &'static str {
-    if removal(proposal) {
+    if conversion(proposal) {
+        "mesh.attachment-entry-conversion-result/v1"
+    } else if removal(proposal) {
         "mesh.attachment-directory-removal-result/v1"
     } else {
         "mesh.attachment-directory-addition-result/v1"
@@ -91,6 +100,35 @@ pub(super) fn verify_tree(
         return Err(invalid("invalid approved directory path"));
     }
     let (before, after) = super::recovery::verified_trees(proposal, workspace, trusted)?;
+    if conversion(proposal) {
+        if !matches!(
+            (
+                before.get(root).map(|e| e.kind),
+                after.get(root).map(|e| e.kind)
+            ),
+            (Some("file"), Some("folder")) | (Some("folder"), Some("file"))
+        ) {
+            return Err(invalid(
+                "approved conversion does not change file/directory type",
+            ));
+        }
+        verify_evidence(
+            proposal
+                .get("before_tree")
+                .ok_or_else(|| invalid("conversion source evidence missing"))?,
+            root,
+            &before,
+            true,
+        )?;
+        return verify_evidence(
+            proposal
+                .get("tree")
+                .ok_or_else(|| invalid("conversion target evidence missing"))?,
+            root,
+            &after,
+            false,
+        );
+    }
     let removed = removal(proposal);
     let (original, result) = if removed {
         (&after, &before)
@@ -104,10 +142,24 @@ pub(super) fn verify_tree(
             "approved directory change does not cover a whole subtree",
         ));
     }
-    let tree = proposal
-        .get("tree")
-        .and_then(Json::as_array)
-        .ok_or_else(|| invalid("directory tree evidence unavailable"))?;
+    verify_evidence(
+        proposal
+            .get("tree")
+            .ok_or_else(|| invalid("directory evidence missing"))?,
+        root,
+        result,
+        removed,
+    )
+}
+fn verify_evidence(
+    value: &Json,
+    root: &str,
+    result: &std::collections::BTreeMap<String, super::inspection::ComparisonEntry>,
+    removed: bool,
+) -> io::Result<()> {
+    let tree = value
+        .as_array()
+        .ok_or_else(|| invalid("invalid tree evidence"))?;
     let expected: Vec<_> = result
         .iter()
         .filter(|(path, _)| selected(path, root))
@@ -163,7 +215,7 @@ pub(super) fn prepare(
     recovery_root: &Path,
     trusted: &TrustedReviewers,
     limits: ObservationLimits,
-    expected_removal: bool,
+    expected_kind: &str,
 ) -> io::Result<PreparedMainDirectoryChange> {
     limits.validate()?;
     if !canonical(relative) {
@@ -186,7 +238,7 @@ pub(super) fn prepare(
                 trusted,
                 limits,
                 &capture,
-                Some(expected_removal),
+                Some(expected_kind),
             )
         },
     )
@@ -204,7 +256,7 @@ pub(super) fn prepare_captured(
     trusted: &TrustedReviewers,
     limits: ObservationLimits,
     capture: &super::CapturedProjectInput,
-    expected_removal: Option<bool>,
+    expected_kind: Option<&str>,
 ) -> io::Result<PreparedMainDirectoryChange> {
     limits.validate()?;
     if !canonical(relative)
@@ -241,56 +293,92 @@ pub(super) fn prepare_captured(
         .get(relative)
         .is_some_and(|entry| entry.kind == "folder")
         && !before.keys().any(|path| selected(path, relative));
-    if (!removed && !added) || expected_removal.is_some_and(|expected| expected != removed) {
+    let converted = matches!(
+        (
+            before.get(relative).map(|e| e.kind),
+            after.get(relative).map(|e| e.kind)
+        ),
+        (Some("file"), Some("folder")) | (Some("folder"), Some("file"))
+    );
+    let actual_kind = if converted {
+        "conversion"
+    } else if removed {
+        "removal"
+    } else {
+        "addition"
+    };
+    if (!removed && !added && !converted)
+        || expected_kind.is_some_and(|expected| expected != actual_kind)
+    {
         return Err(invalid(
-            "directory change requires a complete approved addition or removal",
+            "approved directory operation kind differs from request",
         ));
     }
-    let historical_target = if removed {
+    let base_target = if removed || converted {
         let base = workspace
             .human_approval_context(&accepted)
             .map_err(err)?
             .expected_canonical_head();
-        workspace.review_target_for_head(base).map_err(err)?
+        Some(workspace.review_target_for_head(base).map_err(err)?)
     } else {
-        accepted.subject_operation
+        None
     };
-    let entries: Vec<_> = (if removed { &before } else { &after })
-        .iter()
-        .filter(|(path, _)| selected(path, relative))
-        .collect();
-    if entries.len() > 64.min(limits.entries) {
-        return Err(invalid("approved tree exceeds entry budget"));
-    }
-    let mut inputs = Vec::new();
     let mut total = 0u64;
-    for (path, entry) in entries {
-        if !capture.admits_file_path(path)? {
-            return Err(invalid("approved tree is excluded by current policy"));
-        }
-        if path == relative {
-            continue;
-        }
-        let name = path[relative.len() + 1..].to_owned();
-        if entry.kind == "folder" {
-            inputs.push(TreeInput::Directory(name));
-        } else {
-            let size = entry
-                .bytes
-                .ok_or_else(|| invalid("approved file size unavailable"))?;
-            total = total
-                .checked_add(size)
-                .ok_or_else(|| invalid("tree budget overflow"))?;
-            if size > limits.file_bytes || total > limits.bytes.min(64 * 1024 * 1024) {
-                return Err(invalid("approved tree exceeds byte budget"));
+    let mut load =
+        |tree: &std::collections::BTreeMap<String, super::inspection::ComparisonEntry>,
+         operation|
+         -> io::Result<Vec<TreeInput>> {
+            let entries: Vec<_> = tree
+                .iter()
+                .filter(|(path, _)| selected(path, relative))
+                .collect();
+            if entries.len() > 64.min(limits.entries) {
+                return Err(invalid("approved tree exceeds entry budget"));
             }
-            let file = workspace
-                .historical_workspace_file(historical_target, path)
-                .map_err(err)?
-                .ok_or_else(|| invalid("approved tree file unavailable"))?;
-            inputs.push(TreeInput::File(name, file.bytes, file.executable));
-        }
-    }
+            let mut inputs = Vec::new();
+            for (path, entry) in entries {
+                if !capture.admits_file_path(path)? {
+                    return Err(invalid("approved tree is excluded by current policy"));
+                }
+                if path == relative && entry.kind == "folder" {
+                    continue;
+                }
+                let name = if path == relative {
+                    String::new()
+                } else {
+                    path[relative.len() + 1..].to_owned()
+                };
+                if entry.kind == "folder" {
+                    inputs.push(TreeInput::Directory(name));
+                } else {
+                    let size = entry
+                        .bytes
+                        .ok_or_else(|| invalid("approved file size unavailable"))?;
+                    total = total
+                        .checked_add(size)
+                        .ok_or_else(|| invalid("tree byte budget overflow"))?;
+                    if size > limits.file_bytes || total > limits.bytes.min(64 * 1024 * 1024) {
+                        return Err(invalid("approved trees exceed byte budget"));
+                    }
+                    let file = workspace
+                        .historical_workspace_file(operation, path)
+                        .map_err(err)?
+                        .ok_or_else(|| invalid("approved file unavailable"))?;
+                    inputs.push(TreeInput::File(name, file.bytes, file.executable));
+                }
+            }
+            Ok(inputs)
+        };
+    let before_inputs = if converted {
+        load(&before, base_target.unwrap())?
+    } else {
+        vec![]
+    };
+    let inputs = if removed {
+        load(&before, base_target.unwrap())?
+    } else {
+        load(&after, accepted.subject_operation)?
+    };
     let outer = external_store(recovery_root, history.project())?;
     if outer.identity()?.0 != history.project().device
         || outer
@@ -313,45 +401,81 @@ pub(super) fn prepare_captured(
     );
     let recovery = outer.create_child_directory(OsStr::new(&name))?;
     let mut proposal = Json::Null;
-    let record = |tree: &Json, parent: &str, policy: &str, mode: u32| {
-        proposal = Json::object([
-            (
-                "schema",
-                Json::text(if removed {
-                    "mesh.attachment-directory-removal/v1"
-                } else {
-                    "mesh.attachment-directory-addition/v1"
-                }),
-            ),
-            ("project", Json::text(history.id())),
-            ("attachment", history.project().receipt()?),
-            ("head", Json::text(&head)),
-            ("bundle", Json::text(bundle)),
-            ("target", Json::text(target)),
-            ("path", Json::text(relative)),
-            ("source_parent", Json::text(parent)),
-            ("parent_metadata_digest", Json::text(policy)),
-            ("parent_mode", Json::Number(mode as u64)),
-            ("store_identity", identity(store)?),
-            ("recovery_identity", identity(&recovery)?),
-            (
-                "exclusions",
-                Json::text(capture.exclusion_digest().to_string()),
-            ),
-            ("tree", tree.clone()),
-            ("automatic_replay", Json::Bool(false)),
-        ]);
-        verify_tree(&proposal, workspace, trusted)?;
-        if proposal.encode().len() > 65_536 {
-            return Err(invalid("directory receipt exceeds limit"));
-        }
-        recovery.filesystem().write_new_file(
-            Path::new("prepared.json"),
-            proposal.encode().as_bytes(),
-            fs::Permissions::from_mode(0o600),
-        )
-    };
-    let operation = if removed {
+    let mut record =
+        |before_tree: Option<&Json>, tree: &Json, parent: &str, policy: &str, mode: u32| {
+            proposal = Json::object([
+                (
+                    "schema",
+                    Json::text(if converted {
+                        "mesh.attachment-entry-conversion/v1"
+                    } else if removed {
+                        "mesh.attachment-directory-removal/v1"
+                    } else {
+                        "mesh.attachment-directory-addition/v1"
+                    }),
+                ),
+                ("project", Json::text(history.id())),
+                ("attachment", history.project().receipt()?),
+                ("head", Json::text(&head)),
+                ("bundle", Json::text(bundle)),
+                ("target", Json::text(target)),
+                ("path", Json::text(relative)),
+                ("source_parent", Json::text(parent)),
+                ("parent_metadata_digest", Json::text(policy)),
+                ("parent_mode", Json::Number(mode as u64)),
+                ("store_identity", identity(store)?),
+                ("recovery_identity", identity(&recovery)?),
+                (
+                    "exclusions",
+                    Json::text(capture.exclusion_digest().to_string()),
+                ),
+                ("tree", tree.clone()),
+                ("automatic_replay", Json::Bool(false)),
+            ]);
+            if let Some(before_tree) = before_tree {
+                let Json::Object(fields) = &mut proposal else {
+                    unreachable!()
+                };
+                fields.push(("before_tree".into(), before_tree.clone()));
+            }
+            verify_tree(&proposal, workspace, trusted)?;
+            if proposal.encode().len() > 65_536 {
+                return Err(invalid("directory receipt exceeds limit"));
+            }
+            recovery.filesystem().write_new_file(
+                Path::new("prepared.json"),
+                proposal.encode().as_bytes(),
+                fs::Permissions::from_mode(0o600),
+            )
+        };
+    let operation = if converted {
+        let input = if after
+            .get(relative)
+            .is_some_and(|entry| entry.kind == "file")
+        {
+            let [TreeInput::File(path, bytes, executable)] = inputs.as_slice() else {
+                return Err(invalid("conversion file inputs unavailable"));
+            };
+            if !path.is_empty() {
+                return Err(invalid("conversion root file unavailable"));
+            }
+            ConversionInput::File(bytes, *executable)
+        } else {
+            ConversionInput::Directory(&inputs)
+        };
+        DirectoryOperation::Convert(RetainedConversion::prepare(
+            history.project().pinned.clone(),
+            PathBuf::from(relative),
+            recovery.clone(),
+            input,
+            EntryLimits {
+                entries: limits.entries,
+                bytes: limits.bytes,
+                file_bytes: limits.file_bytes,
+            },
+            |before, after, parent, policy, mode| record(Some(before), after, parent, policy, mode),
+        )?)
+    } else if removed {
         DirectoryOperation::Remove(RetainedTreeRemoval::prepare(
             history.project().pinned.clone(),
             PathBuf::from(relative),
@@ -359,7 +483,7 @@ pub(super) fn prepare_captured(
             limits.entries,
             limits.bytes,
             limits.file_bytes,
-            record,
+            |tree, parent, policy, mode| record(None, tree, parent, policy, mode),
         )?)
     } else {
         DirectoryOperation::Add(RetainedTreeAddition::prepare(
@@ -367,7 +491,7 @@ pub(super) fn prepare_captured(
             PathBuf::from(relative),
             &inputs,
             recovery.clone(),
-            record,
+            |tree, parent, policy, mode| record(None, tree, parent, policy, mode),
         )?)
     };
     Ok(PreparedMainDirectoryChange {
@@ -378,6 +502,7 @@ pub(super) fn prepare_captured(
         proposal,
         operation,
         inputs,
+        before_inputs,
     })
 }
 
@@ -395,9 +520,18 @@ impl PreparedMainDirectoryChange {
         self.confirmation_files()
             .filter(|_| !removal(&self.proposal))
     }
-    /// Exact frozen files for native confirmation: source content for removal, proposed content for addition.
+    /// Frozen source content for removal, or replacement content for addition/conversion.
     pub fn confirmation_files(&self) -> impl Iterator<Item = (&str, &[u8], bool)> {
         self.inputs.iter().filter_map(|input| match input {
+            TreeInput::File(path, bytes, executable) => {
+                Some((path.as_str(), bytes.as_slice(), *executable))
+            }
+            TreeInput::Directory(_) => None,
+        })
+    }
+    /// Frozen original file content for conversion confirmation; never a mutable source reread.
+    pub fn current_files(&self) -> impl Iterator<Item = (&str, &[u8], bool)> {
+        self.before_inputs.iter().filter_map(|input| match input {
             TreeInput::File(path, bytes, executable) => {
                 Some((path.as_str(), bytes.as_slice(), *executable))
             }
@@ -470,7 +604,7 @@ impl PreparedMainDirectoryChange {
             ),
             (
                 "displaced_entry_retained",
-                Json::Bool(removal(&self.proposal)),
+                Json::Bool(removal(&self.proposal) || conversion(&self.proposal)),
             ),
             ("observation_final", Json::Bool(false)),
         ]);
@@ -497,7 +631,7 @@ fn validate_receipt(
     store: &PinnedWorkspaceRoot,
     recovery: &PinnedWorkspaceRoot,
 ) -> io::Result<()> {
-    let fields = [
+    let mut fields = vec![
         "schema",
         "project",
         "attachment",
@@ -514,10 +648,17 @@ fn validate_receipt(
         "tree",
         "automatic_replay",
     ];
+    if conversion(value) {
+        fields.push("before_tree");
+    }
     if !matches!(value, Json::Object(pairs) if pairs.len() == fields.len() && fields.iter().all(|key| value.get(key).is_some()))
         || !matches!(
             value.get("schema").and_then(Json::as_text),
-            Some("mesh.attachment-directory-addition/v1" | "mesh.attachment-directory-removal/v1")
+            Some(
+                "mesh.attachment-directory-addition/v1"
+                    | "mesh.attachment-directory-removal/v1"
+                    | "mesh.attachment-entry-conversion/v1"
+            )
         )
         || value.get("project") != Some(&Json::text(history.id()))
         || value.get("attachment") != Some(&history.project().receipt()?)
@@ -547,7 +688,15 @@ fn validate_receipt(
         .get("tree")
         .and_then(Json::as_array)
         .ok_or_else(|| invalid("invalid directory evidence"))?;
-    for entry in entries {
+    let before_entries = if conversion(value) {
+        value
+            .get("before_tree")
+            .and_then(Json::as_array)
+            .ok_or_else(|| invalid("conversion original evidence missing"))?
+    } else {
+        &[]
+    };
+    for entry in entries.iter().chain(before_entries) {
         let keys = [
             "path",
             "kind",
@@ -621,9 +770,22 @@ pub(super) fn inspect(
             Ok(None) => {}
             _ => return Json::object([("state", Json::text("unavailable")), ("tree", Json::Null)]),
         }
-        match open_tree(root, path).and_then(|root| {
-            observe_tree(&root, limits.entries.min(64), remaining, limits.file_bytes)
-        }) {
+        let observed = if conversion(&proposal) {
+            observe_entry(
+                root,
+                path,
+                EntryLimits {
+                    entries: limits.entries,
+                    bytes: remaining,
+                    file_bytes: limits.file_bytes,
+                },
+            )
+        } else {
+            open_tree(root, path).and_then(|root| {
+                observe_tree(&root, limits.entries.min(64), remaining, limits.file_bytes)
+            })
+        };
+        match observed {
             Ok(tree) => {
                 let spent = tree
                     .as_array()
@@ -668,7 +830,21 @@ pub(super) fn inspect(
     } else {
         (&source, &stage)
     };
-    let mut status = if state(installed, "absent") && private.get("tree") == proposal.get("tree") {
+    let mut status = if conversion(&proposal) {
+        if source.get("tree") == proposal.get("before_tree")
+            && stage.get("tree") == proposal.get("tree")
+        {
+            "prepared-arrangement"
+        } else if source.get("tree") == proposal.get("tree")
+            && stage.get("tree") == proposal.get("before_tree")
+        {
+            "applied-arrangement"
+        } else if state(&source, "unavailable") || state(&stage, "unavailable") {
+            "incomplete-observation"
+        } else {
+            "changed-entries"
+        }
+    } else if state(installed, "absent") && private.get("tree") == proposal.get("tree") {
         "prepared-arrangement"
     } else if state(private, "absent") && installed.get("tree") == proposal.get("tree") {
         "applied-arrangement"
@@ -693,7 +869,10 @@ pub(super) fn inspect(
                 ("schema", Json::text(result_schema(&proposal))),
                 ("proposal_digest", Json::text(digest(&proposal))),
                 ("status", Json::text(reported)),
-                ("displaced_entry_retained", Json::Bool(removed)),
+                (
+                    "displaced_entry_retained",
+                    Json::Bool(removed || conversion(&proposal)),
+                ),
                 ("observation_final", Json::Bool(false)),
             ]);
             if value != expected {
@@ -718,10 +897,12 @@ pub(super) fn inspect(
     if super::recovery::read_json(&recovery, "prepared.json")?.0 != proposal {
         return Err(invalid("directory receipt changed during inspection"));
     }
-    Ok(Json::object([
+    let mut result = Json::object([
         (
             "schema",
-            Json::text(if removed {
+            Json::text(if conversion(&proposal) {
+                "mesh.attachment-entry-conversion-recovery/v1"
+            } else if removed {
                 "mesh.attachment-directory-removal-recovery/v1"
             } else {
                 "mesh.attachment-directory-addition-recovery/v1"
@@ -747,5 +928,20 @@ pub(super) fn inspect(
         ("automatic_replay", Json::Bool(false)),
         ("write_authority", Json::Bool(false)),
         ("cleanup_authority", Json::Bool(false)),
-    ]))
+    ]);
+    if conversion(&proposal) {
+        let Json::Object(fields) = &mut result else {
+            unreachable!()
+        };
+        for (key, tree) in [("before_kind", "before_tree"), ("after_kind", "tree")] {
+            fields.push((
+                key.into(),
+                proposal.get(tree).and_then(Json::as_array).unwrap()[0]
+                    .get("kind")
+                    .unwrap()
+                    .clone(),
+            ));
+        }
+    }
+    Ok(result)
 }
