@@ -1359,3 +1359,22 @@ whitespace checks pass. Focused renderer validation is running; native focused/f
 queued behind preserved local verification. Hosted and graphical restart/approval evidence remains
 required. Source deletion/integration/restoration and complete provider/remote/packaged/final-main
 acceptance continue after this published increment.
+
+## D01a exact agent assignment for explicit missing-file resolution
+
+Transfers source `62e8c885ab9c72fa257b1f3cea2483b650e3a4a8` onto canonical PR #76
+at `a87005e8db37bb917f43468a91c02d1dd9662d91`. The native agent entry point binds an already-absent
+tracked file to the admitted root, fold, installation, active custody generation, explicit path and
+last saved version. It reuses existing authenticated deletion adoption and suspends mutation
+authority inside the signer. Ordinary checkpoints still refuse ambiguous missing entries; this
+operation does not delete an OS file, infer renames, approve main or release agent custody.
+
+The transferred positive/refusal regressions cover complete capture after explicit resolution,
+retained retired-entry history, unchanged source/main, stale assignment and version rejection before
+signing, failed signing, callback authority isolation and concurrent file recreation after signing.
+No journal-format or existing tool-contract change is introduced. Native focused/failing-before/full
+validation is queued behind the preserved local full run; hosted and packaged proof remain required.
+Fleet idempotency/tool exposure and later deletion/integration/restoration increments follow in order.
+
+D01a canonical checks: repository 7, docs 5 plus 106-document links, license/storage self-tests,
+Rust formatting and whitespace checks pass. These checks do not establish native runtime behavior.

@@ -6780,6 +6780,47 @@ impl LiveDaemon {
         }
     }
 
+    /// Explicitly record one already-absent tracked file under an exact agent assignment.
+    ///
+    /// The caller must supply its intended path and last saved file version. This never removes
+    /// an operating-system entry, guesses a rename, releases custody or approves shared state.
+    /// Existing native deletion adoption rechecks absence and parent identity after signing.
+    /// The signing callback receives no inherited workspace mutation authority.
+    pub fn checkpoint_agent_file_deletion<F, E>(
+        &self,
+        request: AgentWorkspaceCheckpointRequest<'_>,
+        relative_path: &str,
+        expected_current_version: &str,
+        actor_public_key: PublicKey,
+        sign: F,
+    ) -> Result<ManagedEntryChange, ManagedTextFileError>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested agent deletion resolution was refused".to_owned(),
+            ));
+        }
+        let _authority = self.lock_workspace_agent_setup(
+            request.root,
+            request.digest,
+            request.installation,
+            request.generation,
+        )?;
+        let _context = VerifiedMutationContext::enter(self, request.installation)?;
+        self.adopt_native_file_deletion_privately(
+            relative_path,
+            expected_current_version,
+            actor_public_key,
+            |payload| {
+                let _suspended = SuspendedMutationContext::enter();
+                sign(payload)
+            },
+        )
+    }
+
     /// Capture supported edits and additions under one exact native assignment.
     ///
     /// Native files are never rewritten. Missing/unsupported entries require explicit resolution;

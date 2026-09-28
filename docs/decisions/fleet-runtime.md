@@ -803,3 +803,19 @@ closed panels and offers explicit retry. A decision may also be reconciled by ex
 verified current activity and removing its retry inputs without submitting a replacement decision.
 An in-flight operation remains guarded even after its panel closes. Native host, coordinator and
 persistence tests cover these paths; graphical recovery remains unverified.
+
+### Explicit agent deletion resolution
+
+The native daemon now has an assignment-bound `checkpoint_agent_file_deletion` entry point. It
+requires the admitted root, exact workspace fold, installation and active custody generation,
+plus an explicit relative path and last saved file version. It reuses native absent-file adoption:
+no OS file is deleted, absence and parent identity are rechecked after signing, and a reappearing
+file is preserved. The signer does not inherit mutation authority. Shared main and agent custody
+remain unchanged; ordinary whole-folder capture still refuses undeclared missing files and never
+infers a rename. After successful resolution, a subsequent clean checkpoint may complete.
+
+This uses existing authenticated deletion operations and journal formats. No persisted format or
+existing agent tool contract changes in this increment. Native tests cover completion, retained
+history, source preservation, stale assignment/version refusal, signer failure and concurrent
+recreation. Fleet request idempotency, tool exposure and end-to-end packaged agent deletion remain
+required before agents can use this through their harness.

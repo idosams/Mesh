@@ -1446,3 +1446,242 @@ fn agent_submits_historical_review_while_newer_private_work_continues() {
     );
     fs::remove_dir_all(parent).unwrap();
 }
+
+#[test]
+fn explicit_agent_file_deletion_allows_a_complete_checkpoint_and_retains_history() {
+    let (parent, managed) = workspace("agent-explicit-delete");
+    let daemon = open_daemon(&managed);
+    let initial = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &initial.root,
+            &initial.digest,
+            &initial.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let version = daemon
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .current_version()
+        .to_owned();
+    fs::remove_file(managed.join("existing/keep.txt")).unwrap();
+    let key = SigningKey::from_bytes(&[0x71; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let before = fs::read(private_storage(&managed).join("records.mesh")).unwrap();
+    let request = || mesh_daemon::AgentWorkspaceCheckpointRequest {
+        root: &initial.root,
+        digest: &initial.digest,
+        installation: &initial.installation,
+        generation: &generation,
+    };
+    let report = daemon
+        .checkpoint_agent_workspace(request(), public, |_| -> Result<Signature, &'static str> {
+            panic!("ordinary capture guessed deletion")
+        })
+        .unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.issue, Some("checkpoint-entry-resolution-required"));
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        before
+    );
+    let receipt = daemon
+        .checkpoint_agent_file_deletion(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            |payload| {
+                assert!(daemon
+                    .create_managed_folder("smuggled", public, signer(&key))
+                    .is_err());
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert!(receipt.meaningful_saved());
+    assert_eq!(receipt.action(), "adopt_delete");
+    assert!(!managed.join("existing/keep.txt").exists());
+    assert_eq!(
+        fs::read(parent.join("source/existing/keep.txt")).unwrap(),
+        b"keep\n"
+    );
+    let current = daemon.workspace_state().unwrap();
+    assert_eq!(current.shared_version, initial.shared_version);
+    let report = daemon
+        .checkpoint_agent_workspace(
+            mesh_daemon::AgentWorkspaceCheckpointRequest {
+                root: &current.root,
+                digest: &current.digest,
+                installation: &current.installation,
+                generation: &generation,
+            },
+            public,
+            |_| -> Result<Signature, &'static str> { panic!("unchanged checkpoint signed again") },
+        )
+        .unwrap();
+    assert!(report.complete);
+    assert!(report.saved_changes.is_empty());
+    assert!(daemon
+        .create_managed_folder("still-owned", public, signer(&key))
+        .is_err());
+    drop(daemon);
+    let history = OpenWorkspace::open(&managed).unwrap();
+    assert!(history.file_histories().is_empty());
+    assert!(history
+        .retired_entries()
+        .iter()
+        .any(|entry| entry.path() == "existing/keep.txt"));
+    assert_eq!(
+        history
+            .retired_entries()
+            .iter()
+            .find(|entry| entry.path() == "existing/keep.txt")
+            .unwrap()
+            .entry_type(),
+        "file"
+    );
+    fs::remove_dir_all(parent).unwrap();
+}
+
+#[test]
+fn agent_deletion_refuses_stale_identity_or_version_and_preserves_concurrent_recreation() {
+    let (parent, managed) = workspace("agent-delete-refusal");
+    let daemon = open_daemon(&managed);
+    let initial = daemon.workspace_state().unwrap();
+    let generation = daemon
+        .acquire_workspace_agent_custody(
+            &initial.root,
+            &initial.digest,
+            &initial.installation,
+            false,
+            None,
+        )
+        .unwrap();
+    let version = daemon
+        .inspect_managed_file("existing/keep.txt")
+        .unwrap()
+        .current_version()
+        .to_owned();
+    fs::remove_file(managed.join("existing/keep.txt")).unwrap();
+    let key = SigningKey::from_bytes(&[0x72; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let before = fs::read(private_storage(&managed).join("records.mesh")).unwrap();
+    for (digest, installation, owner, path, saved) in [
+        (
+            "wrong",
+            initial.installation.as_str(),
+            generation.as_str(),
+            "existing/keep.txt",
+            version.as_str(),
+        ),
+        (
+            initial.digest.as_str(),
+            "wrong",
+            generation.as_str(),
+            "existing/keep.txt",
+            version.as_str(),
+        ),
+        (
+            initial.digest.as_str(),
+            initial.installation.as_str(),
+            "wrong",
+            "existing/keep.txt",
+            version.as_str(),
+        ),
+        (
+            initial.digest.as_str(),
+            initial.installation.as_str(),
+            generation.as_str(),
+            "../keep.txt",
+            version.as_str(),
+        ),
+        (
+            initial.digest.as_str(),
+            initial.installation.as_str(),
+            generation.as_str(),
+            "existing/keep.txt",
+            "wrong",
+        ),
+    ] {
+        assert!(daemon
+            .checkpoint_agent_file_deletion(
+                mesh_daemon::AgentWorkspaceCheckpointRequest {
+                    root: &initial.root,
+                    digest,
+                    installation,
+                    generation: owner
+                },
+                path,
+                saved,
+                public,
+                |_| -> Result<Signature, &'static str> { panic!("stale deletion reached signer") }
+            )
+            .is_err());
+    }
+    let request = || mesh_daemon::AgentWorkspaceCheckpointRequest {
+        root: &initial.root,
+        digest: &initial.digest,
+        installation: &initial.installation,
+        generation: &generation,
+    };
+    assert!(daemon
+        .checkpoint_agent_file_deletion(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            |_| Err::<Signature, _>("signing failed")
+        )
+        .is_err());
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        before
+    );
+    assert!(daemon
+        .checkpoint_agent_file_deletion(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            |payload| {
+                fs::write(
+                    managed.join("existing/keep.txt"),
+                    b"concurrent recreation\n",
+                )
+                .unwrap();
+                Ok::<_, core::convert::Infallible>(Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            }
+        )
+        .is_err());
+    assert_eq!(
+        fs::read(managed.join("existing/keep.txt")).unwrap(),
+        b"concurrent recreation\n"
+    );
+    assert_eq!(
+        fs::read(private_storage(&managed).join("records.mesh")).unwrap(),
+        before
+    );
+    assert_eq!(
+        daemon.workspace_state().unwrap().shared_version,
+        initial.shared_version
+    );
+    fs::remove_file(managed.join("existing/keep.txt")).unwrap();
+    assert!(daemon
+        .checkpoint_agent_file_deletion(
+            request(),
+            "existing/keep.txt",
+            &version,
+            public,
+            signer(&key)
+        )
+        .unwrap()
+        .meaningful_saved());
+    fs::remove_dir_all(parent).unwrap();
+}

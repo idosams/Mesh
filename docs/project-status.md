@@ -525,3 +525,10 @@ outbox commands. Restart reads pending work without replay; an independent pendi
 supports explicit retry after panels close. Lost save acknowledgments block dispatch until retry
 confirms the retained inputs. Verified receipts remove retry inputs; explicit decision reconciliation
 reads current activity before abandoning a retry. Graphical restart/recovery proof remains outstanding.
+
+Explicit agent file-deletion resolution now has a native assignment-bound entry point. It records
+only an already-absent tracked file at its exact saved version, rechecks after signing, retains
+history and leaves shared main and custody unchanged. Ordinary capture still refuses undeclared
+missing files. Transferred native tests cover resolution followed by complete capture, stale identities,
+signer failure and concurrent recreation; execution on this canonical increment remains pending. Fleet request recovery, harness tooling and packaged
+agent-deletion proof remain unfinished; the existing agent tool surface is unchanged.
