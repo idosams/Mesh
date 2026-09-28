@@ -152,11 +152,16 @@ schema!(ADVANCE_CANONICAL_HEAD, "mesh.v0.op.advance-canonical-head", [
     "approval_id": DIGEST,
 ]);
 
+schema!(INITIALIZE_WORKSPACE, "mesh.v0.op.initialize-workspace", [
+    "root_id": OBJECT,
+]);
+
 impl OperationKind {
     /// This member's published schema.
     #[must_use]
     pub const fn schema(&self) -> &'static RecordSchema {
         match self {
+            Self::InitializeWorkspace => &INITIALIZE_WORKSPACE,
             Self::CreateFile => &CREATE_FILE,
             Self::CreateDirectory => &CREATE_DIRECTORY,
             Self::WriteFileVersion => &WRITE_FILE_VERSION,
@@ -194,7 +199,7 @@ impl OperationKind {
 /// Every operation schema, in plan §4.3 order.
 ///
 /// This is the list to publish beside `protocol/test-vectors/`. It is a function rather than a
-/// constant so that the eighteen schemas have exactly one home — [`OperationKind::schema`] — and a
+/// constant so that the nineteen schemas have exactly one home — [`OperationKind::schema`] — and a
 /// nineteenth cannot be added to a published list without being added to the vocabulary.
 #[must_use]
 pub fn operation_schemas() -> Vec<&'static RecordSchema> {
@@ -237,6 +242,7 @@ impl CanonicalEncode for Operation {
 
     fn canonical_fields(&self) -> Vec<CanonicalValue> {
         match self {
+            Self::InitializeWorkspace { root_id } => vec![object(*root_id)],
             Self::CreateFile { object_id } | Self::CreateDirectory { object_id } => {
                 vec![object(*object_id)]
             }
@@ -549,6 +555,9 @@ pub fn decode_operation(bytes: &[u8]) -> Result<Operation, DecodeError> {
     };
 
     Ok(match kind {
+        OperationKind::InitializeWorkspace => Operation::InitializeWorkspace {
+            root_id: ObjectId::from_bytes(fields.bytes(0, "root_id")?),
+        },
         OperationKind::CreateFile => Operation::CreateFile {
             object_id: ObjectId::from_bytes(fields.bytes(0, "object_id")?),
         },
@@ -664,18 +673,40 @@ mod tests {
     use crate::cbor::CborWriter;
 
     #[test]
+    fn workspace_root_declaration_has_exact_wire_shape() {
+        let root = ObjectId::from_bytes([0x17; 16]);
+        let operation = Operation::InitializeWorkspace { root_id: root };
+        let mut writer = CborWriter::new();
+        writer.array(2);
+        writer.text("mesh.v0.op.initialize-workspace");
+        writer.bytes(&[0x17; 16]);
+        let expected = writer.finish();
+        assert_eq!(crate::encode_canonical(&operation), expected);
+        assert_eq!(decode_operation(&expected).unwrap(), operation);
+        for (fields, length) in [(0, 16), (2, 16), (1, 15), (1, 17)] {
+            let mut writer = CborWriter::new();
+            writer.array(fields + 1);
+            writer.text("mesh.v0.op.initialize-workspace");
+            for _ in 0..fields {
+                writer.bytes(&vec![0x17; length]);
+            }
+            assert!(decode_operation(&writer.finish()).is_err());
+        }
+    }
+
+    #[test]
     fn every_domain_tag_is_unique_and_carries_the_prefix() {
         let mut domains: Vec<&str> = operation_schemas()
             .into_iter()
             .map(|schema| schema.domain)
             .collect();
-        assert_eq!(domains.len(), 18);
+        assert_eq!(domains.len(), 19);
         for domain in &domains {
             assert!(domain.starts_with(OPERATION_DOMAIN_PREFIX), "{domain}");
         }
         domains.sort_unstable();
         domains.dedup();
-        assert_eq!(domains.len(), 18);
+        assert_eq!(domains.len(), 19);
     }
 
     #[test]

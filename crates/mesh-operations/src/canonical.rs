@@ -15,7 +15,7 @@
 //!
 //! `mesh-types` carries the schema as an associated `const SCHEMA` on a trait. That is right for a
 //! record type with one shape, and wrong for a *vocabulary*: [`Operation`](crate::Operation) is a
-//! sum with eighteen members, each with its own domain tag and its own field list, and an
+//! sum with nineteen members, each with its own domain tag and its own field list, and an
 //! associated constant cannot vary by variant. So [`CanonicalEncode::schema`] here is a method.
 //!
 //! That difference is what makes a decoder possible for a sum type at all. The domain tag is the
@@ -172,7 +172,7 @@ impl CanonicalValue {
 /// A record with a canonical encoding: a published schema, and its fields in that order.
 ///
 /// [`CanonicalEncode::schema`] is a method rather than an associated constant so that a
-/// vocabulary — one Rust type, eighteen record shapes — can implement it. See this module's
+/// vocabulary — one Rust type, nineteen record shapes — can implement it. See this module's
 /// header.
 pub trait CanonicalEncode {
     /// This value's published schema.

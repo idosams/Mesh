@@ -5,7 +5,7 @@
 //! "Every operation round-trips" is only as good as the corpus it is checked over, and a corpus
 //! that lives in `#[cfg(test)]` is invisible to the crate's own integration tests, to
 //! `mesh-materializer` downstream, and to an external implementer entirely. Publishing it means
-//! the same eighteen values are the subject of the round-trip test, the schema-agreement test, the
+//! the same nineteen values are the subject of the round-trip test, the schema-agreement test, the
 //! materializer's apply test and anyone else's — so a member that is representable but wrong is
 //! wrong in one place rather than in four private copies.
 //!
@@ -35,7 +35,7 @@ fn name(text: &str) -> NormalizedName {
 /// use mesh_operations::{one_of_every_operation, OperationKind};
 ///
 /// let corpus = one_of_every_operation();
-/// assert_eq!(corpus.len(), 18);
+/// assert_eq!(corpus.len(), 19);
 /// for (operation, kind) in corpus.iter().zip(OperationKind::ALL) {
 ///     assert_eq!(operation.kind(), kind);
 /// }
@@ -146,6 +146,9 @@ pub fn one_of_every_operation() -> Vec<Operation> {
             from_head: HeadId::from_bytes([0x51; 32]),
             to_head: HeadId::from_bytes([0x52; 32]),
             approval_id: ApprovalId::from_bytes([0x91; 32]),
+        },
+        Operation::InitializeWorkspace {
+            root_id: ObjectId::from_bytes([0x10; 16]),
         },
     ]
 }

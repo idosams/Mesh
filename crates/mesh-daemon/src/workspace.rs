@@ -4597,18 +4597,23 @@ fn materialize_operation_records<F: mesh_cas::DurableFs>(
 
     let mut created_directories = BTreeSet::new();
     let mut referenced_directories = BTreeSet::new();
+    let mut declared_roots = BTreeSet::new();
     for (_, operations) in &decoded {
         for operation in operations {
             directory_facts(
                 operation,
                 &mut created_directories,
                 &mut referenced_directories,
+                &mut declared_roots,
             );
         }
     }
     let candidates: Vec<mesh_materializer::ObjectId> = referenced_directories
         .difference(&created_directories)
         .copied()
+        .chain(declared_roots)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect();
 
     let root = match candidates.as_slice() {
@@ -5587,10 +5592,14 @@ fn directory_facts(
     operation: &mesh_operations::Operation,
     created: &mut BTreeSet<mesh_materializer::ObjectId>,
     referenced: &mut BTreeSet<mesh_materializer::ObjectId>,
+    declared: &mut BTreeSet<mesh_materializer::ObjectId>,
 ) {
     use mesh_operations::Operation;
 
     match operation {
+        Operation::InitializeWorkspace { root_id } => {
+            declared.insert(*root_id);
+        }
         Operation::CreateDirectory { object_id } => {
             created.insert(*object_id);
         }
@@ -6601,6 +6610,89 @@ mod tests {
             .iter()
             .any(|(subject, _)| *subject == "file names and folders"));
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_explicit_empty_root_reopens_with_saved_historical_state() {
+        use mesh_operations::{ObjectId, Operation};
+        let root = scratch("declared-empty-root");
+        saved_changeset(
+            &root,
+            vec![Operation::InitializeWorkspace {
+                root_id: ObjectId::from_bytes([1; 16]),
+            }],
+        );
+        for _ in 0..2 {
+            let open = OpenWorkspace::open(&root).expect("reopen saved root");
+            assert!(open.names_answered());
+            assert!(open.conditions().is_empty());
+            assert!(open.entries().is_empty());
+            assert_eq!(open.operations(), 1);
+            let history = open
+                .historical_workspace_preview(
+                    *operation_records(&open.record_index).keys().next().unwrap(),
+                )
+                .expect("empty historical tree");
+            assert!(history.directories.is_empty());
+            assert!(history.files.is_empty());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn conflicting_root_declarations_are_not_hidden_by_directory_creation() {
+        use mesh_operations::{ObjectId, Operation};
+        for create_second in [false, true] {
+            let root = scratch("conflicting-declared-roots");
+            let second = ObjectId::from_bytes([2; 16]);
+            let mut operations = vec![
+                Operation::InitializeWorkspace {
+                    root_id: ObjectId::from_bytes([1; 16]),
+                },
+                Operation::InitializeWorkspace { root_id: second },
+            ];
+            if create_second {
+                operations.push(Operation::CreateDirectory { object_id: second });
+            }
+            saved_changeset(&root, operations);
+            let open = OpenWorkspace::open(&root).unwrap();
+            assert!(!open.names_answered());
+            assert_eq!(open.conditions()[0].code(), "workspace-root-ambiguous");
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn an_explicit_root_does_not_override_another_inferred_root() {
+        use mesh_operations::{NormalizedName, ObjectId, Operation};
+        let root = scratch("declared-inferred-root-conflict");
+        saved_changeset(
+            &root,
+            vec![
+                Operation::InitializeWorkspace {
+                    root_id: ObjectId::from_bytes([1; 16]),
+                },
+                Operation::UnlinkDirectoryEntry {
+                    directory_id: ObjectId::from_bytes([2; 16]),
+                    name: NormalizedName::new("missing").unwrap(),
+                    object_id: ObjectId::from_bytes([3; 16]),
+                },
+            ],
+        );
+        let open = OpenWorkspace::open(&root).unwrap();
+        assert!(!open.names_answered());
+        assert_eq!(open.conditions()[0].code(), "workspace-root-ambiguous");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_empty_operations_do_not_invent_a_root() {
+        let root = scratch("legacy-empty-root");
+        saved_changeset(&root, vec![]);
+        let open = OpenWorkspace::open(&root).unwrap();
+        assert!(!open.names_answered());
+        assert_eq!(open.conditions()[0].code(), "workspace-root-missing");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

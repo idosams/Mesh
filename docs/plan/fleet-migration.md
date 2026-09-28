@@ -2339,3 +2339,18 @@ portable worker support, network authentication, provider execution, second-mach
 acceptance. No existing schema or dependencies changed; the additive worker-directory receipt is
 closed and refuses unknown versions. Worker workspace provenance, process supervision, terminal
 reconciliation, transport and saved-result recovery remain required.
+
+## R12 prerequisite: explicit workspace root declaration
+
+New canonical protocol increment based on merged #127 at
+`606fb9d901d655109eea674fc8f8e264ba765c99`; no preserved source commits are replaced.
+Draft [#128](https://github.com/idosams/Mesh/pull/128), head
+`2b3f1470d5d817c00e8c90a49267ff5756eb0de9`, retains the worker initialization integration
+and its failing empty-tree regression. That draft is not ready to merge. This separate prerequisite
+adds `InitializeWorkspace` so an empty saved tree can declare a real root without placeholder files
+or invented source history. Its [wire compatibility](execution-plan.md#explicit-empty-workspace-root)
+is additive and refuses on older readers. Same-root replay leaves existing state intact; mismatched
+roots refuse. Conflicting declarations cannot be hidden by directory creation. Native reopen and
+historical preview cover the empty-root journal. Local and hosted verification are pending.
+After this prerequisite merges, #128 will receive related main history by ordinary merge and adopt
+the declaration only for empty imports. No old histories or published commits will be rewritten.

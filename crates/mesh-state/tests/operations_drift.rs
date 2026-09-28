@@ -1,4 +1,4 @@
-//! `IdentityChange` is a projection of six of `mesh-operations`' eighteen verbs. This is what keeps
+//! `IdentityChange` is a projection of six of `mesh-operations`' nineteen verbs. This is what keeps
 //! it projecting them.
 //!
 //! # Why a source-text lint and not a dependency
@@ -14,7 +14,7 @@
 //! * each of the six members to still be declared there, so a rename turns this red;
 //! * the fields the projection reads to still be carried, so a *narrowed* operation is caught;
 //! * `MoveEntry` to still name no descendant, which is the whole subtree-move budget;
-//! * the vocabulary to still hold exactly eighteen members, so a nineteenth that touches identity
+//! * the vocabulary to still hold exactly nineteen members, so a twentieth that touches identity
 //!   cannot be added without somebody deciding whether it belongs in the projection.
 //!
 //! # What it is not
@@ -54,11 +54,12 @@ const PROJECTED: [(&str, &[&str]); 6] = [
     ),
 ];
 
-/// The twelve members that do not touch object identity, with the reason each is left out.
+/// The thirteen members that do not touch object identity, with the reason each is left out.
 ///
 /// A new member of the vocabulary must join one list or the other. Adding it to this one is a
 /// sentence somebody has to write, which is the friction that makes the choice deliberate.
-const NOT_PROJECTED: [(&str, &str); 12] = [
+const NOT_PROJECTED: [(&str, &str); 13] = [
+    ("InitializeWorkspace", "declares the immutable root supplied to materialization; it never mints or changes a register entry"),
     (
         "WriteFileVersion",
         "projected as WriteVersion, which carries the version and not the manifest: content is \
@@ -129,9 +130,9 @@ fn operations_source() -> String {
 
 /// The members of `OperationKind::ALL`, in declaration order.
 fn vocabulary(source: &str) -> Vec<String> {
-    let Some(start) = source.find("pub const ALL: [Self; 18]") else {
+    let Some(start) = source.find("pub const ALL: [Self; 19]") else {
         panic!(
-            "mesh-operations no longer declares OperationKind::ALL with eighteen members, so this \
+            "mesh-operations no longer declares OperationKind::ALL with nineteen members, so this \
              test is reading the wrong thing rather than checking it"
         );
     };
@@ -145,11 +146,11 @@ fn vocabulary(source: &str) -> Vec<String> {
 }
 
 #[test]
-fn the_vocabulary_still_has_eighteen_members_and_this_test_can_read_them() {
+fn the_vocabulary_still_has_nineteen_members_and_this_test_can_read_them() {
     let members = vocabulary(&operations_source());
     assert_eq!(
         members.len(),
-        18,
+        19,
         "read {} members out of OperationKind::ALL: {members:?}",
         members.len()
     );

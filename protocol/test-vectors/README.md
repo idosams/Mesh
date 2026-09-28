@@ -237,3 +237,10 @@ change the encoding; it breaks the build.
   published artifacts alone.
 * **The wire message set.** Requests, responses and errors are reserved by `docs/protocol.md` §7.3.
   `../proto/mesh/v0/records.proto` carries only the protobuf projection of the record types above.
+
+## Additive workspace root operation
+
+The independent [workspace root vector](v0/workspace-root.json) and
+[operation schema](../schemas/workspace-root-v0.json) extend the operation vocabulary.
+They do not replace the existing signed-record subset or its index. Older operation readers
+refuse the new domain; see the [operation contract](../../docs/plan/execution-plan.md#explicit-empty-workspace-root).

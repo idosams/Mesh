@@ -200,6 +200,7 @@ fn every_operation_kind_has_an_explicit_effect_or_named_rejection() {
             to_head: one_head,
             approval_id: ApprovalId::from_bytes([10; 32]),
         },
+        Operation::InitializeWorkspace { root_id: root },
     ];
 
     assert_eq!(
@@ -211,6 +212,7 @@ fn every_operation_kind_has_an_explicit_effect_or_named_rejection() {
         let mut state = WorkspaceState::empty(root);
         let outcome = apply_operation(&mut state, ChangeSetId::from_bytes([11; 32]), &operation);
         match operation.kind() {
+            OperationKind::InitializeWorkspace => assert_eq!(outcome, Ok(Effect::AlreadyInEffect)),
             OperationKind::CreateFile => assert_eq!(outcome, Ok(Effect::Applied)),
             OperationKind::CreateDirectory => assert_eq!(outcome, Ok(Effect::Applied)),
             OperationKind::WriteFileVersion => {
@@ -259,4 +261,58 @@ fn every_operation_kind_has_an_explicit_effect_or_named_rejection() {
             OperationKind::AdvanceCanonicalHead => assert_eq!(outcome, Ok(Effect::Applied)),
         }
     }
+}
+
+#[test]
+fn root_declaration_replay_preserves_existing_content_and_rejects_another_root() {
+    let root = object(0);
+    let file = object(1);
+    let record = ChangeSetId::from_bytes([4; 32]);
+    let mut state = WorkspaceState::empty(root);
+    let declaration = Operation::InitializeWorkspace { root_id: root };
+    assert_eq!(
+        apply_operation(&mut state, record, &declaration),
+        Ok(Effect::AlreadyInEffect)
+    );
+    for operation in [
+        Operation::CreateFile { object_id: file },
+        Operation::WriteFileVersion {
+            object_id: file,
+            version_id: version(2),
+            parent_versions: vec![],
+            manifest_id: ManifestId::from_bytes([3; 32]),
+            portable_metadata: PortableMetadata::default(),
+        },
+        Operation::LinkDirectoryEntry {
+            directory_id: root,
+            name: name("retained"),
+            object_id: file,
+            version_id: version(2),
+        },
+    ] {
+        assert_eq!(
+            apply_operation(&mut state, record, &operation),
+            Ok(Effect::Applied)
+        );
+    }
+    let before = state.clone();
+    for _ in 0..2 {
+        assert_eq!(
+            apply_operation(&mut state, record, &declaration),
+            Ok(Effect::AlreadyInEffect)
+        );
+        assert_eq!(state, before);
+    }
+    assert_eq!(
+        apply_operation(
+            &mut state,
+            record,
+            &Operation::InitializeWorkspace { root_id: file }
+        ),
+        Err(Rejection::RootIdentityMismatch {
+            expected: root,
+            declared: file
+        })
+    );
+    assert_eq!(state, before);
 }
