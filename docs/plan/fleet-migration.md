@@ -2246,3 +2246,12 @@ It does not close cold-start, external-harness, GUI, cost/resource, second-provi
 remote-machine or human-acceptance requirements. All seven hosted PR and combined-main
 checks passed for #120; all five receiving-materialization tests also passed locally.
 The separate older combined local gate is still active, not counted as passing.
+
+## R07 remote execution integration direction
+
+New planning increment based on #121 at
+`2a6759f92116b042845283f8b06bd40a05cd11ca`; no implementation commits are replaced.
+The [integration contract](fleet-remote-execution-contract.md) ties native receiving storage,
+durable launch ownership, independent worker history, authenticated transport and verified local
+result import into one required execution path. It records PR boundaries and decisive tests.
+This is design, not remote execution support or second-machine evidence.

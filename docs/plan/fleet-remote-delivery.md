@@ -5,6 +5,9 @@ They do not gain approval authority, own the user's working project, or cause lo
 runs to be adopted after a restart. This sequence implements Phase 6; it does not
 replace the required second-machine execution and disconnect/reconnect proof.
 
+The [execution integration contract](fleet-remote-execution-contract.md) specifies the remaining
+transport, worker ownership, source/worker identity mapping and result/reconnect boundaries.
+
 1. **Durable assignment and leases.** Before any transfer or launch, reserve the
    existing attempt for an objective-unique assignment, a natively admitted worker
    key, the exact lane input version and immutable transfer-bundle identity. Persist
