@@ -909,6 +909,35 @@ impl AttachmentHost {
         Ok(stored.to_json().encode())
     }
 
+    pub fn load_fleet_review_outbox(&self) -> Result<String, String> {
+        use mesh_daemon::project_attachment::FleetReviewOutbox;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let saved = match &state.storage {
+            Some(storage) => storage
+                .load_fleet_review_outbox()
+                .map_err(|_| "Pending review inputs need reconciliation")?,
+            None => FleetReviewOutbox {
+                revision: 0,
+                entries: Vec::new(),
+            },
+        };
+        Ok(saved.to_json().encode())
+    }
+    pub fn save_fleet_review_outbox(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot = mesh_daemon::project_attachment::FleetReviewOutbox::parse(snapshot)
+            .map_err(|_| "Invalid pending review inputs")?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        let saved = state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_fleet_review_outbox(snapshot.revision, snapshot.entries)
+            .map_err(|_| "Pending review inputs changed or could not be saved")?;
+        Ok(saved.to_json().encode())
+    }
+
     pub fn load_fleet_pins(&self) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         self.initialize(&mut state, false)?;
@@ -1107,6 +1136,66 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn pending_review_storage_restores_exact_inputs_without_opening_work() {
+        use mesh_daemon::project_attachment::FleetReviewOutbox;
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-review-outbox-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let host = AttachmentHost::new(&root);
+        assert_eq!(
+            FleetReviewOutbox::parse(&host.load_fleet_review_outbox().unwrap())
+                .unwrap()
+                .revision,
+            0
+        );
+        assert!(!root.join("attached-projects").exists());
+        assert!(host.save_fleet_review_outbox("{}").is_err());
+        assert!(!root.join("attached-projects").exists());
+        let entry = Json::object([
+            ("kind", Json::text("change")),
+            ("objective", Json::text(format!("fleet-{}", "a".repeat(64)))),
+            (
+                "selection",
+                Json::object([
+                    ("lane", Json::text("worker")),
+                    ("checkpoint", Json::text("saved")),
+                    ("version", Json::text("b".repeat(64))),
+                    ("bundle", Json::text("c".repeat(64))),
+                ]),
+            ),
+            (
+                "input",
+                Json::object([
+                    ("request", Json::text("d".repeat(32))),
+                    ("message", Json::text("Please revise.")),
+                ]),
+            ),
+        ]);
+        let snapshot = FleetReviewOutbox {
+            revision: 0,
+            entries: vec![entry],
+        };
+        let saved = host
+            .save_fleet_review_outbox(&snapshot.to_json().encode())
+            .unwrap();
+        drop(host);
+        let reopened = AttachmentHost::new(&root);
+        assert_eq!(reopened.load_fleet_review_outbox().unwrap(), saved);
+        assert!(reopened
+            .save_fleet_review_outbox(&snapshot.to_json().encode())
+            .is_err());
+        assert_eq!(reopened.load_fleet_review_outbox().unwrap(), saved);
+        assert_eq!(
+            Json::parse(&reopened.projects().unwrap())
+                .unwrap()
+                .get("projects"),
+            Some(&Json::Array(Vec::new()))
+        );
+        drop(reopened);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn fleet_pin_storage_reopens_without_creating_or_adopting_work() {

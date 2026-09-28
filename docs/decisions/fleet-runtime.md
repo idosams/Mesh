@@ -793,3 +793,13 @@ catalog identity and stale writers refuse. An incomplete first write refuses ins
 an empty outbox; an incomplete replacement leaves the previous committed snapshot readable and
 blocks another write. Evidence is retained for explicit reconciliation. Desktop commands and
 save-before-dispatch wiring are still required before UI request recovery is available.
+
+The desktop now exposes typed load/save commands for the outbox. A UI coordinator serializes
+compare-and-swap writes, verifies acknowledgments and saves exact inputs before either change-request
+or decision submission. Save failure prevents dispatch, including an uncertain save acknowledgment;
+an explicit retry reads the same retained token before proceeding. Verified operation receipts allow
+removing retry inputs. Restore and refresh only read; a separate pending-operations view survives
+closed panels and offers explicit retry. A decision may also be reconciled by explicitly reading
+verified current activity and removing its retry inputs without submitting a replacement decision.
+An in-flight operation remains guarded even after its panel closes. Native host, coordinator and
+persistence tests cover these paths; graphical recovery remains unverified.

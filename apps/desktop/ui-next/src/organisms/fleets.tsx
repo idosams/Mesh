@@ -8,7 +8,7 @@ type Lane = { id: string; parent: string | null; sourceProject: string | null; g
 type Fleet = { objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type Projection = { reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const states: Record<string, string> = { launching: "Starting", running: "Working", waiting: "Waiting", reconciling: "Needs recovery", stopping: "Stop requested · ownership reserved", succeeded: "Execution completed", failed: "Execution failed", cancelled: "Cancelled" };
@@ -65,6 +65,7 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
     {projection.feedback && <p role="status" className="break-words text-sm">{t(projection.feedback)}</p>}
     <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "refresh" })}>{t("Refresh fleets")}</Button>
     {!projection.fleets.length && <p className="text-sm text-muted-foreground">{t(projection.error ? "Saved fleets could not be loaded." : "No fleets yet. Manual work and externally run harnesses remain available below.")}</p>}
+    {projection.reviewOutbox && <FleetPendingReviewOperations value={projection.reviewOutbox} />}
     <FleetReviewPanels pins={projection.reviewPins ?? []} notice={projection.reviewNotice ?? ""} persistence={projection.reviewPersistence} />
     <FleetCards projection={projection} projects={projects} disabled={disabled} />
   </section>;
@@ -98,4 +99,21 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
       </article>;
     })}</div>
   );
+}
+
+export function FleetPendingReviewOperations({ value }: { value: NonNullable<Projection["reviewOutbox"]> }) {
+  const t = useTranslation();
+  return <section className="grid gap-2 rounded border border-border p-3" aria-label={t("Pending review operations")}>
+      <h4 className="font-semibold">{t("Pending review operations")}</h4>
+      <p className="text-xs">{t("Saved inputs survive closed panels and restarts. Refresh reads only; retry submits the exact saved request.")}</p>
+      <Button variant="secondary" disabled={value?.busy} onClick={() => send({ type: "refresh-review-outbox" })}>{t("Refresh pending operations")}</Button>
+      {value.error && <p role="alert">{t(value.error)}</p>}
+      {value.entries.map(entry => <div className="grid gap-2 text-xs" key={entry.input.operation ?? entry.input.request}>
+        <p>{t(entry.kind === "change" ? "Change request" : "Request decision")} · <bdi dir="ltr">{entry.selection.lane}</bdi> · <bdi dir="ltr">{entry.selection.checkpoint}</bdi></p>
+        <details className="break-all"><summary>{t("Exact pending inputs")}</summary><p>{t("Fleet")}: <bdi dir="ltr">{entry.objective}</bdi></p><p>{t("Version")}: <bdi dir="ltr">{entry.selection.version}</bdi></p><p>{t("Request")}: <bdi dir="ltr">{entry.input.request}</bdi></p>{entry.input.message && <p dir="auto" className="whitespace-pre-wrap">{entry.input.message}</p>}{entry.kind === "decision" && <><p>{t("Expected decision revision")}: <bdi dir="ltr">{entry.input.expected_revision}</bdi></p><p>{t("Proposed checkpoint")}: {entry.input.checkpoint === null ? t("Reopen request") : <bdi dir="ltr">{entry.input.checkpoint}</bdi>}</p><p>{t("Proposed version")}: {entry.input.version === null ? t("None") : <bdi dir="ltr">{entry.input.version}</bdi>}</p><p>{t("Proposed review")}: {entry.input.bundle === null ? t("None") : <bdi dir="ltr">{entry.input.bundle}</bdi>}</p></>}</details>
+        <Button variant="secondary" disabled={value?.busy} onClick={() => send({ type: "retry-pending-review", operation: entry.input.operation ?? entry.input.request })}>{t("Retry this exact operation")}</Button>
+        {entry.kind === "decision" && <Button variant="secondary" disabled={value?.busy} onClick={() => send({ type: "reconcile-pending-review", operation: entry.input.operation! })}>{t("Read current decisions and stop retrying this operation")}</Button>}
+      </div>)}
+      {value.loaded && !value.entries.length && <p className="text-xs">{t("No pending operations were returned by the last successful read.")}</p>}
+    </section>;
 }

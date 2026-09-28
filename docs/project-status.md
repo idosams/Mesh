@@ -519,3 +519,9 @@ foundation: desktop commands, save-before-dispatch and restart recovery UI remai
 The transferred pending-review storage tests require execution on the canonical branch. The local
 full gate is still live on the earlier compiler increment; no native or packaged completion is
 claimed for this new storage increment.
+
+Desktop review submissions now save exact pending inputs before dispatch through typed native
+outbox commands. Restart reads pending work without replay; an independent pending-operations view
+supports explicit retry after panels close. Lost save acknowledgments block dispatch until retry
+confirms the retained inputs. Verified receipts remove retry inputs; explicit decision reconciliation
+reads current activity before abandoning a retry. Graphical restart/recovery proof remains outstanding.

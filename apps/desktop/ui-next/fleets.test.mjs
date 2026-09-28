@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
-const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { FleetCards } from "./src/organisms/fleets.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports.setLocale = setLocale; module.exports.render = props => renderToStaticMarkup(React.createElement(FleetCards, props));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
+const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { FleetCards, FleetPendingReviewOperations } from "./src/organisms/fleets.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports.setLocale = setLocale; module.exports.pending = props => renderToStaticMarkup(React.createElement(FleetPendingReviewOperations, props)); module.exports.render = props => renderToStaticMarkup(React.createElement(FleetCards, props));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
 const module = { exports: {} };
 Function('require', 'module', 'exports', output.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
 const props = () => ({ disabled: false, projects: [], projection: { error: '', fleets: [{ objective: 'fleet-one', ownership: 'current-host', cancelled: false, lanes: [{ id: 'lane-one', parent: null, goal: '<script>private goal</script>', provider: 'codex', base: 'base-version', allocated: true, sourceProject: null, run: null }] }], activity: [] } });
@@ -131,5 +131,29 @@ test('Hebrew restored history remains reviewable while execution controls stay d
     assert.ok(html.includes('<bdi dir="ltr">fleet-one</bdi>'));
     value.projection.fleets[0].ownership = 'unavailable'; html = render(value);
     assert.match(html, /<button[^>]*disabled=""[^>]*>הצגת תוצאות שמורות<\/button>/);
+  } finally { module.exports.setLocale('en'); }
+});
+
+test('pending operations retain exact decision inputs and explicit recovery actions', () => {
+  const value = { busy: false, loaded: true, error: '', entries: [{ kind: 'decision', objective: 'fleet-test', selection: { lane: '<lane>', checkpoint: 'original', version: 'original-version' }, input: { operation: 'token', request: 'request', expected_revision: '2', checkpoint: 'revised', version: 'proposed-version', bundle: 'proposed-review' } }] };
+  let html = module.exports.pending({ value });
+  assert.match(html, /&lt;lane&gt;/); assert.match(html, /proposed-version/); assert.match(html, /proposed-review/);
+  assert.match(html, /Refresh reads only/); assert.match(html, /Retry this exact operation/); assert.match(html, /Read current decisions and stop retrying/);
+  value.busy = true; html = module.exports.pending({ value });
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Retry this exact operation/);
+  value.loaded = false; value.entries = []; value.error = 'Unavailable'; html = module.exports.pending({ value });
+  assert.doesNotMatch(html, /No pending operations/); assert.match(html, /Unavailable/);
+});
+
+test('Hebrew pending recovery keeps exact inputs literal and disables dispatch while busy', () => {
+  const value = { busy: true, loaded: true, error: '', entries: [{ kind: 'change', objective: 'fleet-test', selection: { lane: 'Pending review operations', checkpoint: 'saved', version: 'version-id' }, input: { request: 'request-id', message: 'Refresh pending operations' } }] };
+  module.exports.setLocale('he');
+  try {
+    const html = module.exports.pending({value});
+    assert.match(html, /aria-label="פעולות בדיקה ממתינות"/);
+    assert.match(html, /<bdi dir="ltr">Pending review operations<\/bdi>/);
+    assert.match(html, /<p dir="auto"[^>]*>Refresh pending operations<\/p>/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון נוסף לאותה פעולה בדיוק<\/button>/);
+    assert.match(html, /רענון קורא בלבד/);
   } finally { module.exports.setLocale('en'); }
 });

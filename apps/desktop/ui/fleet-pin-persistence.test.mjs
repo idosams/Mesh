@@ -44,6 +44,7 @@ function inputReply(p, after, selected) { return { schema: 'mesh.fleet-starting-
 test('restoration rechecks exact content, including an object outside the saved page, without writes or execution', async () => {
   const p = pin(), calls = [];
   const h = createFleetReviews({ laneFor: () => null, changed() {}, invoke: async (command, args) => {
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     calls.push({ command, args });
     if (command === 'load_fleet_pins') return snapshot([p], '7');
     if (command === 'inspect_fleet_saved_review') return reviewReply(p);
@@ -60,6 +61,7 @@ test('restoration rechecks exact content, including an object outside the saved 
 test('unavailable history keeps selectors, and closing the last restored panel persists empty state', async () => {
   const p = pin(); let stored = snapshot([p], '1'); const writes = [];
   const h = createFleetReviews({ laneFor: () => null, changed() {}, invoke: async (command, args) => {
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'load_fleet_pins') return stored;
     if (command === 'save_fleet_pins') { const value = JSON.parse(args.snapshot); writes.push(value); stored = { ...value, revision: '2' }; return stored; }
     throw new Error('History unavailable');
@@ -70,6 +72,7 @@ test('unavailable history keeps selectors, and closing the last restored panel p
 test('failed initial load cannot overwrite saved state, and disposal does not dispatch follow-up reads', async () => {
   let complete; const calls = [];
   const h = createFleetReviews({ laneFor: () => null, changed() {}, invoke: async (command, args) => {
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     calls.push(command);
     if (command === 'load_fleet_pins') return snapshot([pin()], '1');
     if (command === 'inspect_fleet_saved_review') throw new Error('Unavailable');
@@ -85,6 +88,7 @@ test('reloading a saved set ignores old content replies even when the display ke
   const first = pin(), second = { ...pin(), checkpoint: 'replacement', version: '9'.repeat(64) };
   let stored = snapshot([first], '1'); const pending = [], calls = [];
   const h = createFleetReviews({ laneFor: () => null, changed() {}, invoke: async (command, args) => {
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     calls.push(command);
     if (command === 'load_fleet_pins') return stored;
     return new Promise(resolve => pending.push({ command, args, resolve }));
@@ -103,6 +107,7 @@ test('reloading a saved set ignores old content replies even when the display ke
 test('layout edits during content reads persist selectors only and survive late content replies', async () => {
   const p = pin(), writes = []; let finish;
   const h = createFleetReviews({ laneFor: () => null, changed() {}, invoke: async (command, args) => {
+    if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'load_fleet_pins') return snapshot([p], '1');
     if (command === 'save_fleet_pins') { const value = JSON.parse(args.snapshot); writes.push(value); return { ...value, revision: '2' }; }
     if (command === 'inspect_fleet_saved_review') return new Promise(resolve => { finish = () => resolve(reviewReply(p)); });

@@ -1339,3 +1339,23 @@ capacity, nonprivate/oversized records, unchanged refusal evidence and restorati
 inputs. Focused native/mutation/full execution is queued behind preserved local verification;
 no native or graphical completion is claimed. This increment replaces only the listed source commit,
 not the remaining desktop recovery, deletion, integration, restoration or full acceptance obligations.
+
+## C04d desktop pending review recovery
+
+Transfers source `7497890ae6ae63a64974e958d720c4e446caf9ef` onto canonical PR #75
+at `a4c8f89a1efcba0aa3bf64ad420a8901820b41c7`. Typed native outbox commands validate exact
+history selectors. Desktop requests persist pending inputs before dispatch; lost save acknowledgments
+prevent submission until their exact inputs are verified. Restart only loads; explicit retry survives
+closed panels. Verified receipts remove retry inputs, and decision reconciliation reads current
+activity before discarding a retry without submitting another decision.
+
+Canonical adaptation preserves Hebrew controls and validation history. The new pending-operations
+view translates labels while retaining literal direction-isolated identifiers and user-authored text.
+Added a Hebrew regression for disabled recovery while busy and unchanged request content.
+All 45 focused coordinator/persistence/fleet tests pass. Skipping durable retention causes the
+save-before-dispatch regression to fail; restoring the implementation returns all 45 to passing.
+Repository (7), docs (5 plus links), license/storage self-tests, Rust formatting, TypeScript and
+whitespace checks pass. Focused renderer validation is running; native focused/full checks remain
+queued behind preserved local verification. Hosted and graphical restart/approval evidence remains
+required. Source deletion/integration/restoration and complete provider/remote/packaged/final-main
+acceptance continue after this published increment.

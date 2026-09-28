@@ -1,3 +1,4 @@
+import { createReviewOutbox, pendingReviewEntry, pendingDecision, operationToken } from './fleet-review-outbox.js';
 import { projectMappingMain, projectCandidateReceipt, projectCandidateReview, projectCandidateImport, importedProjectReview } from './fleet-project-comparison.js';
 import { reviewChangeMessage, reviewChangeReceipt, reviewDecisionReceipt, savedReviewChangeActivity } from './fleet-review-changes.js';
 import { loadFleetArtifact } from './fleet-artifact-preview.js';
@@ -59,9 +60,11 @@ export function savedFleetReview(raw, selection) {
 }
 
 export function createFleetReviews({ invoke, laneFor, changed, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
-  let queues = {}, pins = [], nextPin = 1n, nextRead = 1, disposed = false, notice = '';
+  let queues = {}, pins = [], nextPin = 1n, nextRead = 1, disposed = false, notice = '', recovering = false;
   let persistenceEnabled = false, controlBusy = false, editable = true, persistenceState = { phase: 'session', message: '' };
+  const inflightReviewOperations = new Set();
   const publish = () => { if (!disposed) changed(); };
+  const outbox = createReviewOutbox({ invoke, changed: publish });
   const persist = () => { if (persistenceEnabled) storage.changed(); };
   const storage = createFleetPinPersistence({ invoke,
     selectors: () => pins.map(pin => ({ key: pin.key, ...pin.selection, source_version: pin.startingInput, ...pin.view })),
@@ -210,11 +213,12 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     }
   }
   async function loadChanges(pin, reloadDecision = false) {
-    if (pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding) return;
+    if (recovering || pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding) return;
     const feedback = { ...pin.feedback, rows: pin.feedback?.rows ?? null, loading: true, error: '' };
     pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
     try {
       const activity = savedReviewChangeActivity(await invoke('fleet_review_changes', pin.selection), pin.selection);
+      if (reloadDecision && feedback.decisionPending) await outbox.release(pendingReviewEntry(pin.selection, 'decision', feedback.decisionPending));
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, ...activity, loaded: true, loading: false, ...(reloadDecision ? { decisionPending: null, decisionError: '', decisionNotice: 'Latest request decisions loaded.' } : {}) } } : value);
     } catch {
@@ -224,7 +228,7 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     publish();
   }
   async function decideChanges(pin, request, checkpoint, retry = false) {
-    if (pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding) return;
+    if (recovering || pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding) return;
     let pending = pin.feedback?.decisionPending;
     if (retry ? !pending : pending || !pin.feedback?.loaded || pin.feedback.error) return;
     if (!retry) {
@@ -237,9 +241,14 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     if (typeof pending.operation !== 'string' || !/^[a-f0-9]{32}$/.test(pending.operation)) return;
     const feedback = { ...pin.feedback, decisionPending: pending, deciding: true, decisionError: '', decisionNotice: '' };
     pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
+    inflightReviewOperations.add(pending.operation);
     try {
+      const retained = pendingReviewEntry(pin.selection, 'decision', pending);
+      await outbox.retain(retained);
+      if (disposed || !pins.some(value => value.selection === pin.selection)) return;
       const { version: _version, bundle: _bundle, ...args } = pending;
       const outcome = reviewDecisionReceipt(await invoke('decide_fleet_review_change', { ...pin.selection, ...args }), pin.selection, pending);
+      await outbox.release(retained);
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, deciding: false, decisionPending: null,
           decisions: [...(feedback.decisions ?? []).filter(value => value.request !== pending.request), outcome.current],
@@ -247,25 +256,56 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     } catch {
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, deciding: false, decisionError: 'Decision is unconfirmed. Retry the same operation or read the latest state before choosing again.' } } : value);
-    }
+    } finally { inflightReviewOperations.delete(pending.operation); publish(); }
     publish();
   }
   async function requestChanges(pin, message, retry) {
-    if (pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding || !pin.review?.content_complete) return;
+    if (recovering || pin.feedback?.loading || pin.feedback?.sending || pin.feedback?.deciding || !pin.review?.content_complete) return;
     if (retry ? !pin.feedback?.pending : pin.feedback?.pending || !reviewChangeMessage(message)) return;
     const pending = retry ? pin.feedback.pending : { request: requestId(), message };
     if (typeof pending.request !== 'string' || !/^[a-f0-9]{32}$/.test(pending.request)) return;
     const feedback = { ...pin.feedback, rows: pin.feedback?.rows ?? null, pending, sending: true, error: '' };
     pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
+    inflightReviewOperations.add(pending.request);
     try {
+      const retained = pendingReviewEntry(pin.selection, 'change', pending);
+      await outbox.retain(retained);
+      if (disposed || !pins.some(value => value.selection === pin.selection)) return;
       const row = reviewChangeReceipt(await invoke('request_fleet_review_changes', { ...pin.selection, ...pending }), pin.selection, pending);
+      await outbox.release(retained);
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, pending: null, sending: false, rows: [...(feedback.rows ?? []).filter(previous => previous.id !== row.id), row] } } : value);
     } catch {
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, sending: false, error: 'Recording is unconfirmed. Retry the same request to recover its receipt. Restored fleets require recovery before recording new requests.' } } : value);
-    }
+    } finally { inflightReviewOperations.delete(pending.request); publish(); }
     publish();
+  }
+  async function retryPending(token, reconcile = false) {
+    const entry = outbox.snapshot().entries.find(value => operationToken(value) === token);
+    if (!entry || (reconcile && entry.kind !== 'decision') || recovering || outbox.snapshot().busy || inflightReviewOperations.size > 0) return;
+    recovering = true; publish();
+    try {
+      await outbox.retain(entry);
+      if (disposed) return;
+      const selection = { objective: entry.objective, ...entry.selection };
+      if (reconcile) {
+        const activity = savedReviewChangeActivity(await invoke('fleet_review_changes', selection), selection);
+        if (!activity.decisions.some(decision => decision.request === entry.input.request)) throw new Error('Missing decision');
+      } else if (entry.kind === 'change') {
+        reviewChangeReceipt(await invoke('request_fleet_review_changes', { ...selection, ...entry.input }), selection, entry.input);
+      } else {
+        const pending = pendingDecision(entry.input);
+        const { version: _version, bundle: _bundle, ...args } = pending;
+        reviewDecisionReceipt(await invoke('decide_fleet_review_change', { ...selection, ...args }), selection, pending);
+      }
+      await outbox.release(entry);
+      if (disposed) return;
+      pins = pins.map(pin => same(pin.selection, selection) ? { ...pin, feedback: { ...pin.feedback,
+        ...(entry.kind === 'change' ? { pending: null, sending: false, error: '' } : { decisionPending: null, deciding: false, decisionError: '' }) } } : pin);
+      notice = reconcile ? 'Current decisions verified; the saved retry was removed. No decision was submitted.' : 'Exact pending operation confirmed. Refresh change requests to see the latest recorded state.';
+    } catch { if (!disposed) notice = 'The operation remains unconfirmed. Refresh pending operations or retry the same inputs.'; }
+    finally { recovering = false; publish(); }
   }
   async function loadArtifact(pin, object, page) {
     if (disposed || pin.artifact?.loading || pin.loading || pin.error || !pin.review?.content_complete) return;
@@ -300,13 +340,16 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     publish();
   }
   return {
-    snapshot: () => ({ reviewQueues: queues, reviewPins: pins.map(pin => ({ ...pin, projectSource: pin.view.candidate?.project ?? laneFor(pin.selection.objective, pin.selection.lane)?.sourceProject ?? null, candidateEnabled: persistenceEnabled && editable })), reviewNotice: notice, reviewPersistence: { ...persistenceState, editable, busy: controlBusy } }),
-    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return storage.ensureLoaded(); } },
-    dispose: () => { disposed = true; storage.dispose(); },
+    snapshot: () => ({ reviewOutbox: { ...outbox.snapshot(), busy: outbox.snapshot().busy || recovering || inflightReviewOperations.size > 0 }, reviewQueues: queues, reviewPins: pins.map(pin => ({ ...pin, projectSource: pin.view.candidate?.project ?? laneFor(pin.selection.objective, pin.selection.lane)?.sourceProject ?? null, candidateEnabled: persistenceEnabled && editable })), reviewNotice: notice, reviewPersistence: { ...persistenceState, editable, busy: controlBusy } }),
+    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return Promise.all([storage.ensureLoaded(), outbox.load().catch(() => {})]); } },
+    dispose: () => { disposed = true; storage.dispose(); outbox.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['candidate-import', 'candidate-import-read', 'candidate-import-review', 'candidate-import-retry', 'candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry', 'reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
+      if (!['reconcile-pending-review', 'refresh-review-outbox', 'retry-pending-review', 'candidate-import', 'candidate-import-read', 'candidate-import-review', 'candidate-import-retry', 'candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry', 'reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
+      if (value.type === 'refresh-review-outbox' && fields === 'type') { void outbox.load().catch(() => {}); return true; }
+      if (value.type === 'reconcile-pending-review' && fields === 'operation,type') { void retryPending(value.operation, true); return true; }
+      if (value.type === 'retry-pending-review' && fields === 'operation,type') { void retryPending(value.operation); return true; }
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {

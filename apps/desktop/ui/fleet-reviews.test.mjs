@@ -8,8 +8,12 @@ const page = (rows = [row(1)], after = null, total = rows.length, next = null) =
 const result = (n = 1) => ({ schema: 'mesh.fleet-saved-review/v1', objective, selection: Object.fromEntries(Object.entries(selection(n)).filter(([key]) => key !== 'objective')), review: { bundle: row(n).bundle, subject_operation: row(n).version, recorded: true, projection_authorizes_approval: false, content_complete: true, reviewed_head: 'd'.repeat(64), presentation_digest: 'e'.repeat(64), bundle_changes: [], bundle_changes_not_listed: 0, subject_operations_not_listed: 0, unavailable_code: null } });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
-  const calls = []; let changes = 0;
-  const controller = createFleetReviews({ invoke: (command, args) => new Promise((resolve, reject) => calls.push({ command, args, resolve, reject })), laneFor: (o, l) => o === objective && l === lane ? { goal: 'Existing work', base: 'f'.repeat(64) } : null, changed: () => changes++ });
+  const calls = []; let changes = 0; let outbox = { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
+  const controller = createFleetReviews({ invoke: (command, args) => {
+    if (command === 'load_fleet_review_outbox') return Promise.resolve(outbox);
+    if (command === 'save_fleet_review_outbox') { outbox = { ...JSON.parse(args.snapshot), revision: String(Number(outbox.revision) + 1) }; return Promise.resolve(outbox); }
+    return new Promise((resolve, reject) => calls.push({ command, args, resolve, reject }));
+  }, laneFor: (o, l) => o === objective && l === lane ? { goal: 'Existing work', base: 'f'.repeat(64) } : null, changed: () => changes++ });
   return { ...controller, calls, changes: () => changes, open: () => controller.handle({ type: 'reviews', objective, lane }), pin: n => controller.handle({ type: 'pin-review', ...selection(n) }) };
 }
 test('pages bind exact lane, cursor and ordered unique results', () => {
@@ -135,13 +139,13 @@ function feedbackReceipt(call) {
 }
 test('uncertain feedback retries the exact request and does not accept a replacement draft', async () => {
   const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
-  h.handle({ type: 'request-review-changes', pin: '1', message: 'Add the example.' });
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Add the example.' }); await settle();
   assert.equal(h.calls[2].command, 'request_fleet_review_changes');
   h.calls[2].reject(new Error('private native error')); await settle();
   const pending = h.snapshot().reviewPins[0].feedback.pending;
   assert.equal(pending.message, 'Add the example.'); assert.doesNotMatch(h.snapshot().reviewPins[0].feedback.error, /private native/);
   h.handle({ type: 'request-review-changes', pin: '1', message: 'Replacement' }); assert.equal(h.calls.length, 3);
-  h.handle({ type: 'retry-review-changes', pin: '1' }); assert.deepEqual(h.calls[3].args, h.calls[2].args);
+  h.handle({ type: 'retry-review-changes', pin: '1' }); await settle(); assert.deepEqual(h.calls[3].args, h.calls[2].args);
   h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
   const feedback = h.snapshot().reviewPins[0].feedback;
   assert.equal(feedback.pending, null); assert.equal(feedback.rows[0].status, 'recorded'); assert.equal(feedback.sending, false);
@@ -152,7 +156,7 @@ test('feedback reads are exact, and closing a panel never restores it from a lat
   const { objective: id, ...selected } = selection(1);
   h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v3', objective: id, selection: selected, activity: { changes: [], responses: [], decisions: [] } }); await settle();
   assert.equal(h.snapshot().reviewPins[0].feedback.loaded, true);
-  h.handle({ type: 'request-review-changes', pin: '1', message: 'Revise.' });
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Revise.' }); await settle();
   h.handle({ type: 'close-review', pin: '1' }); h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
   assert.equal(h.snapshot().reviewPins.length, 0);
 });
@@ -199,11 +203,11 @@ test('an uncertain decision retries exact native arguments and applies the lates
   const { h, request, reply } = await decisionHarness();
   const intent = { type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' };
   h.handle({ ...intent, checkpoint: 'invented' }); assert.equal(h.calls.length, 3);
-  h.handle(intent); assert.equal(h.calls[3].command, 'decide_fleet_review_change');
+  h.handle(intent); await settle(); assert.equal(h.calls[3].command, 'decide_fleet_review_change');
   assert.equal(h.calls[3].args.expectedRevision, 0); assert.equal(h.calls[3].args.proposedCheckpoint, 'revised');
   h.calls[3].reject(new Error('private failure')); await settle();
   h.handle(intent); assert.equal(h.calls.length, 4);
-  h.handle({ type: 'retry-review-decision', pin: '1' }); assert.deepEqual(h.calls[4].args, h.calls[3].args);
+  h.handle({ type: 'retry-review-decision', pin: '1' }); await settle(); assert.deepEqual(h.calls[4].args, h.calls[3].args);
   h.calls[4].resolve(reply(h.calls[4])); await settle();
   const feedback = h.snapshot().reviewPins[0].feedback;
   assert.equal(feedback.decisionPending, null); assert.equal(feedback.decisions[0].status, 'open'); assert.equal(feedback.decisions[0].revision, 2);
@@ -212,17 +216,28 @@ test('an uncertain decision retries exact native arguments and applies the lates
 test('cancelled confirmation clears its pending operation and a closed panel ignores late decision replies', async () => {
   const { h, request, reply } = await decisionHarness();
   const intent = { type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' };
-  h.handle(intent); h.calls[3].resolve(reply(h.calls[3], true)); await settle();
+  h.handle(intent); await settle(); h.calls[3].resolve(reply(h.calls[3], true)); await settle();
   assert.equal(h.snapshot().reviewPins[0].feedback.decisionPending, null);
   assert.match(h.snapshot().reviewPins[0].feedback.decisionNotice, /cancelled/);
-  h.handle(intent); h.handle({ type: 'close-review', pin: '1' }); h.calls[4].resolve(reply(h.calls[4])); await settle();
+  h.handle(intent); await settle(); h.handle({ type: 'close-review', pin: '1' }); h.calls[4].resolve(reply(h.calls[4])); await settle();
   assert.equal(h.snapshot().reviewPins.length, 0);
 });
 test('explicit reload abandons an uncertain retry only after current decisions verify', async () => {
   const { h, request, read } = await decisionHarness();
-  h.handle({ type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' }); h.calls[3].reject(new Error('lost')); await settle();
+  h.handle({ type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' }); await settle(); h.calls[3].reject(new Error('lost')); await settle();
   h.handle({ type: 'reload-review-decision', pin: '1' }); h.calls[4].reject(new Error('offline')); await settle();
   assert.ok(h.snapshot().reviewPins[0].feedback.decisionPending);
   h.handle({ type: 'reload-review-decision', pin: '1' }); h.calls[5].resolve(read); await settle();
   assert.equal(h.snapshot().reviewPins[0].feedback.decisionPending, null); assert.equal(h.snapshot().reviewPins[0].feedback.decisionError, '');
+});
+
+test('closing before durable preparation finishes retains the request without dispatch or stuck busy state', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Keep this exact request.' });
+  h.handle({ type: 'close-review', pin: '1' }); await settle();
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.snapshot().reviewOutbox.entries.length, 1);
+  assert.equal(h.snapshot().reviewOutbox.entries[0].input.message, 'Keep this exact request.');
+  assert.equal(h.snapshot().reviewOutbox.busy, false);
+  h.dispose();
 });
