@@ -1517,3 +1517,23 @@ failed receipts and durability, exclusions, genesis and mixed groups, malformed 
 inspection. Repository structural checks do not establish these runtime properties. Native focused,
 failing-before and full execution remains queued behind the preserved run. Source-reported
 3,273 Rust/666 desktop results are historical only.
+
+
+## I02c destination permissions for additions
+
+Transfers source `425f2e06e2ab9ce2c7f01ed8013416527d8c7d3f` onto PR #84 at
+`dea7d1c6bd0b7c468fe3e4cccbd43fd9a46751b4`. Staging preserves process umask without changing
+process-global state; macOS additions inherit the destination group and file ACL while clearing
+staging-folder ACL inheritance. Exact parent policy is checked before and after installation.
+Changed policy refuses or reports uncertainty while preserving work.
+
+New addition v2 receipts bind parent metadata digest and mode. Read-only recovery still accepts
+v1 receipts and exposes v2 policy mismatch without granting replay authority. Existing replacement,
+removal and restoration formats remain intact. Linux group handling is implemented, but default
+ACLs/extended attributes remain unsupported and must not silently lose metadata.
+
+Transferred tests compare macOS inheritance with kernel-created files, verify restrictive umask in
+an isolated process, refuse changed ACLs/modes, and inspect persisted policy after restart. Local
+native focused/failing-before/full verification remains queued behind the preserved run. Historical
+source reports of 3,279 Rust/666 desktop tests and its CAS lingering-handle diagnostic are retained
+as provenance only. Canonical runtime and packaged acceptance remains outstanding.

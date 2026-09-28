@@ -573,5 +573,13 @@ rename into an exact existing parent. Concurrent file creation preserves both th
 the staged approved content and stops later members. The first approved main can also supply
 additions; prospective paths obey current capture exclusions before staging. Transferred tests cover
 mixed groups, existing-file preservation, executable state, lost outcomes, malformed receipts and
-restart inspection; canonical native execution remains pending. Directory changes, absent-path restoration, destination-folder permission
-inheritance and grouped desktop proof remain.
+restart inspection; canonical native execution remains pending. Directory changes, absent-path
+restoration and grouped desktop proof remain.
+
+New native addition preparations now inherit the macOS destination parent's group and file ACL,
+remove staging-folder ACL inheritance and preserve the process umask. Permission policy is bound in
+v2 receipts and rechecked before and after installation; changed policy requires refusal or
+reconciliation. Read-only recovery retains v1 compatibility and exposes v2 policy mismatches.
+Transferred tests compare inheritance with kernel-created files and cover restrictive umasks and
+policy races; canonical execution remains pending. Linux default ACLs/extended attributes remain
+unsupported. No grouped packaged graphical proof is claimed by this increment.

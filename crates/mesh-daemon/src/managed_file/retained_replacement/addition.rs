@@ -1,6 +1,38 @@
 //! A private staged file can populate an absent attached path without replacing concurrent work.
 use super::*;
 
+pub(crate) fn parent_policy(
+    root: &PinnedWorkspaceRoot,
+    relative: &Path,
+) -> io::Result<(String, u32, String)> {
+    root.ensure_namespace_identity()?;
+    let (directory, _) = root
+        .filesystem()
+        .inspect_optional_entry_with_parent(relative)?;
+    let before = directory.metadata()?;
+    let policy = metadata_digest(&directory)?;
+    let (current, _) = root
+        .filesystem()
+        .inspect_optional_entry_with_parent(relative)?;
+    let same = |a: &fs::Metadata, b: &fs::Metadata| {
+        (a.dev(), a.ino(), a.mode(), a.ctime(), a.ctime_nsec())
+            == (b.dev(), b.ino(), b.mode(), b.ctime(), b.ctime_nsec())
+    };
+    if !same(&before, &directory.metadata()?) || !same(&before, &current.metadata()?) {
+        return Err(io::Error::other("parent policy changed during observation"));
+    }
+    root.ensure_namespace_identity()?;
+    Ok((
+        policy,
+        before.mode(),
+        ManagedDirectoryIdentity {
+            device: before.dev(),
+            inode: before.ino(),
+        }
+        .token(),
+    ))
+}
+
 pub(crate) struct RetainedAddition {
     source: PinnedWorkspaceRoot,
     relative: PathBuf,
@@ -10,6 +42,8 @@ pub(crate) struct RetainedAddition {
     installed: ManagedFileIdentity,
     mode: u32,
     metadata: String,
+    parent_metadata: String,
+    parent_mode: u32,
 }
 
 impl RetainedAddition {
@@ -21,7 +55,7 @@ impl RetainedAddition {
         bytes: Vec<u8>,
         executable: bool,
         recovery: PinnedWorkspaceRoot,
-        receipt: impl FnOnce(ManagedFileIdentity, u32, &str) -> io::Result<()>,
+        receipt: impl FnOnce(ManagedFileIdentity, u32, &str, &str, u32) -> io::Result<()>,
     ) -> io::Result<Self> {
         if absent_parent(&source, &relative)?.as_deref() != Some(&parent) {
             return Err(io::Error::other(
@@ -35,18 +69,24 @@ impl RetainedAddition {
             ));
         }
         let directory = recovery.try_clone_directory()?;
-        let mut stage = create_new_at(&directory, EXCHANGE)?;
-        // New files use the same portable creation modes as native export. There is no existing
-        // source metadata to copy; the actual staged native metadata is bound into the receipt.
-        stage.set_permissions(fs::Permissions::from_mode(if executable {
-            0o755
-        } else {
-            0o644
-        }))?;
+        // Let the kernel apply the process umask without reading or mutating process-global state.
+        let requested_mode = if executable { 0o755 } else { 0o644 };
+        let mut stage = create_new_at_mode(&directory, EXCHANGE, requested_mode)?;
+        let effective_mode = stage.metadata()?.mode() & 0o777;
+        let (parent_directory, entry) = source
+            .filesystem()
+            .inspect_optional_entry_with_parent(&relative)?;
+        if entry.is_some() {
+            return Err(io::Error::other(
+                "addition destination changed during staging",
+            ));
+        }
         stage.write_all(&bytes)?;
+        let (parent_metadata, parent_mode) =
+            metadata::inherit_new_file(&parent_directory, &stage, effective_mode)?;
         stage.sync_all()?;
         let mode = stage.metadata()?.mode();
-        if mode != if executable { 0o100755 } else { 0o100644 } {
+        if mode != (0o100000 | effective_mode) || (mode & 0o111 != 0) != executable {
             return Err(io::Error::other("addition mode was not preserved"));
         }
         let installed = managed_file_identity(&stage, &stage.metadata()?)?;
@@ -61,9 +101,17 @@ impl RetainedAddition {
             installed,
             mode,
             metadata,
+            parent_metadata,
+            parent_mode,
         };
         prepared.validate()?;
-        receipt(installed, mode, &prepared.metadata)?;
+        receipt(
+            installed,
+            mode,
+            &prepared.metadata,
+            &prepared.parent_metadata,
+            prepared.parent_mode,
+        )?;
         prepared.validate()?;
         Ok(prepared)
     }
@@ -94,6 +142,11 @@ impl RetainedAddition {
             return Err(io::Error::other(
                 "addition destination is occupied or replaced",
             ));
+        }
+        if metadata.mode() != self.parent_mode
+            || metadata_digest(&directory)? != self.parent_metadata
+        {
+            return Err(io::Error::other("addition parent permissions changed"));
         }
         self.recovery.ensure_namespace_identity()?;
         if metadata.dev() != self.recovery.identity()?.0 {
@@ -145,7 +198,18 @@ impl RetainedAddition {
             });
         // No undo or cleanup follows uncertainty. A user can edit or replace the newly created
         // path immediately, and any remaining stage may contain independent concurrent work.
+        let parent_current = self
+            .source
+            .filesystem()
+            .inspect_optional_entry_with_parent(&self.relative)
+            .is_ok_and(|(parent, _)| {
+                parent
+                    .metadata()
+                    .is_ok_and(|m| m.mode() == self.parent_mode)
+                    && metadata_digest(&parent).is_ok_and(|digest| digest == self.parent_metadata)
+            });
         Ok(source_durable
+            && parent_current
             && recovery_durable
             && installed_matches
             && absent_parent(&self.recovery, Path::new(EXCHANGE))
@@ -170,7 +234,7 @@ mod tests {
             b"approved".to_vec(),
             true,
             recovery.clone(),
-            |id, _, _| {
+            |id, _, _, _, _| {
                 recovery.filesystem().write_new_file(
                     Path::new("prepared"),
                     id.token().as_bytes(),
@@ -187,11 +251,13 @@ mod tests {
         let addition = prepare(&f);
         assert!(!f.source.join("new.txt").exists());
         assert_eq!(fs::read(f.recovery.join(EXCHANGE)).unwrap(), b"approved");
+        let staged_mode = fs::metadata(f.recovery.join(EXCHANGE)).unwrap().mode() & 0o777;
+        assert_ne!(staged_mode & 0o111, 0);
         assert!(addition.apply().unwrap());
         assert_eq!(fs::read(f.source.join("new.txt")).unwrap(), b"approved");
         assert_eq!(
             fs::metadata(f.source.join("new.txt")).unwrap().mode() & 0o777,
-            0o755
+            staged_mode
         );
         assert!(!f.recovery.join(EXCHANGE).exists());
         assert_eq!(fs::read(f.source.join("file")).unwrap(), b"before");
@@ -253,7 +319,7 @@ mod tests {
             b"approved".to_vec(),
             false,
             recovery,
-            |_, _, _| Ok(()),
+            |_, _, _, _, _| Ok(()),
         )
         .unwrap();
         fs::rename(f.source.join("nested"), f.source.join("original")).unwrap();
@@ -274,9 +340,111 @@ mod tests {
             b"approved".to_vec(),
             false,
             recovery,
-            |_, _, _| Err(io::Error::other("receipt failed"))
+            |_, _, _, _, _| Err(io::Error::other("receipt failed"))
         )
         .is_err());
+        assert!(!f.source.join("new.txt").exists());
+        assert_eq!(fs::read(f.recovery.join(EXCHANGE)).unwrap(), b"approved");
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn restrictive_umask_is_preserved_in_an_isolated_process() {
+        const CHILD: &str = "MESH_INHERITANCE_UMASK_TEST_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "managed_file::retained_replacement::addition::tests::restrictive_umask_is_preserved_in_an_isolated_process", "--test-threads=1"])
+                .env(CHILD, "1").output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            return;
+        }
+        #[cfg(target_os = "macos")]
+        type NativeMode = u16;
+        #[cfg(not(target_os = "macos"))]
+        type NativeMode = u32;
+        unsafe extern "C" {
+            fn umask(mode: NativeMode) -> NativeMode;
+        }
+        // SAFETY: only this explicitly isolated single-test child changes process-global umask.
+        unsafe {
+            umask(0o077);
+        }
+        for executable in [false, true] {
+            let f = Fixture::new();
+            let root = PinnedWorkspaceRoot::open(f.source.clone()).unwrap();
+            let relative = PathBuf::from("new.txt");
+            let parent = absent_parent(&root, &relative).unwrap().unwrap();
+            let recovery = PinnedWorkspaceRoot::open(f.recovery.clone()).unwrap();
+            let addition = RetainedAddition::prepare(
+                root,
+                relative,
+                parent,
+                b"approved".to_vec(),
+                executable,
+                recovery,
+                |_, mode, _, _, _| {
+                    assert_eq!(mode & 0o777, if executable { 0o700 } else { 0o600 });
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert!(addition.apply().unwrap());
+            assert_eq!(
+                fs::metadata(f.source.join("new.txt")).unwrap().mode() & 0o777,
+                if executable { 0o700 } else { 0o600 }
+            );
+        }
+    }
+
+    #[test]
+    fn parent_permission_changes_refuse_before_apply_and_require_reconciliation_after_rename() {
+        for at_rename in [false, true] {
+            let f = Fixture::new();
+            let addition = prepare(&f);
+            let original = fs::metadata(&f.source).unwrap().mode();
+            let changed = original ^ 0o010;
+            if !at_rename {
+                fs::set_permissions(&f.source, fs::Permissions::from_mode(changed)).unwrap();
+            }
+            let outcome = addition.apply_with_hooks(
+                || {
+                    if at_rename {
+                        fs::set_permissions(&f.source, fs::Permissions::from_mode(changed))
+                            .unwrap();
+                    }
+                },
+                || {},
+                File::sync_all,
+            );
+            if at_rename {
+                assert!(!outcome.unwrap());
+                assert_eq!(fs::read(f.source.join("new.txt")).unwrap(), b"approved");
+            } else {
+                assert!(outcome.is_err());
+                assert!(!f.source.join("new.txt").exists());
+                assert_eq!(fs::read(f.recovery.join(EXCHANGE)).unwrap(), b"approved");
+            }
+            fs::set_permissions(&f.source, fs::Permissions::from_mode(original)).unwrap();
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn changed_parent_acl_refuses_staged_addition() {
+        let f = Fixture::new();
+        let addition = prepare(&f);
+        assert!(std::process::Command::new("/bin/chmod")
+            .arg("+a")
+            .arg("everyone allow read,file_inherit,only_inherit")
+            .arg(&f.source)
+            .status()
+            .unwrap()
+            .success());
+        assert!(addition.apply().is_err());
         assert!(!f.source.join("new.txt").exists());
         assert_eq!(fs::read(f.recovery.join(EXCHANGE)).unwrap(), b"approved");
     }

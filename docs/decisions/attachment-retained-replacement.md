@@ -373,10 +373,9 @@ An already-present file with the accepted bytes and executable state is recorded
 its inode. A different current file refuses the group before staging.
 
 Preparation creates the complete approved content as `exchange` in a private external transaction.
-It uses the existing native export creation modes, 0644 or 0755 according to approved executable
-state, and binds the actual staged ownership/attributes/ACL metadata. No old source metadata exists
-to copy. The staged metadata moves unchanged; this does not synthesize destination-directory ACL
-inheritance. Stage and directory are flushed before the preparation receipt. Failure or abandonment
+The initial implementation used fixed creation modes, 0644 or 0755 according to approved executable
+state, and bound actual staged ownership/attributes/ACL metadata. The destination-permission
+extension below replaces those fixed modes and staging-folder inheritance for new preparations. Stage and directory are flushed before the preparation receipt. Failure or abandonment
 leaves the stage for inspection and never writes the attached project.
 
 `mesh.attachment-file-addition/v1` uses the existing ordered preparation keys. `source_file`,
@@ -407,10 +406,53 @@ Native tests cover mixed add/replace/remove groups, first-main additions, alread
 preservation, executable state, capture exclusions, source collisions before and at rename,
 parent/root replacement, stage changes, failed preparation receipts and directory barriers,
 partial-group stopping, lost outcomes, receipt tampering and restart inspection. Directory changes,
-restoration into absent paths, destination-inherited metadata semantics and the complete grouped
-desktop/packaged graphical journey remain unfinished.
+restoration into absent paths and the complete grouped desktop/packaged graphical journey remain
+unfinished. Destination-permission inheritance is addressed by the extension below.
 
 The original addition source reports 3,273 Rust tests (14 skipped) and 666 desktop tests.
 Those historical results do not validate this canonical transfer. Local focused, failing-before
 and full native verification is queued behind the preserved run. Grouped packaged graphical and
 platform-backed human-presence acceptance remains outstanding.
+
+## Destination permissions for newly added files
+
+New macOS preparations now configure staged additions using the actual destination parent's group
+and inheritable extended ACL. They clear the staging folder's inherited file ACL, preserve each
+applicable destination entry's principal, allow/deny rights and ordering, and apply native file
+inheritance flags. This uses descriptor-based native calls without creating a permission probe in
+the attached project. Native tests compare the result with files created directly by the kernel
+across allow/deny, file-only/directory-only, inheritance-control and mixed ACL cases. Separate tests
+compare destination group ownership. The behavior follows Apple's
+[filesystem permission model](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemDetails/FileSystemDetails.html)
+and [native ACL inheritance implementation](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/kern/kern_authorization.c).
+
+The initial private file creation requests 0644 or 0755 and lets the kernel apply the process umask.
+The resulting mode is retained while destination ownership and ACLs are configured. Production code
+never reads or changes the process-global umask. An isolated single-test child verifies restrictive
+077 behavior for both executable and non-executable additions. A mask that removes every requested
+execute bit refuses an executable addition instead of changing the approved executable state.
+
+New receipts use `mesh.attachment-file-addition/v2`, appending `parent_metadata_digest` and
+`parent_mode` to the existing ordered addition keys. Results use the corresponding addition-result
+v2 schema. Installed modes may reflect the process umask; trusted approval still verifies exact
+content and executable state. Existing v1 receipts remain readable with their original fixed-mode
+validation and without invented parent-policy evidence. Replacement, removal, approval and saved
+version encodings are unchanged. Older readers refuse the unknown v2 schema.
+
+Preparation binds the parent identity, mode and bounded native metadata digest. Apply rechecks the
+policy before rename and after installation. A pre-apply policy change refuses without source writes;
+a change at the rename boundary produces reconciliation evidence without undoing the installed file.
+Recovery reports `parent_policy_matches` as true, false or unavailable and requires attention for
+false/unavailable results while preserving the observed file arrangement. It never replays a write.
+Native tests cover policy changes, malformed policy receipts and legacy-v1 read-only recovery.
+
+Linux uses its setgid-parent or effective-process group rule, but the existing native metadata
+boundary still refuses extended attributes/default ACLs. This increment was exercised on macOS;
+it does not establish Linux runtime proof or complete portable ACL inheritance. Directory operations,
+restoration into absent paths and the grouped desktop/packaged graphical journey remain unfinished.
+
+The original source reports 3,279 Rust tests (14 skipped) and 666 desktop tests, including six
+new native/persistence regressions. It also records a lingering-handle diagnostic for an unrelated
+CAS test and a passing isolated rerun. These are historical source reports, not validation of the
+canonical transfer. Local focused, failing-before and full native execution remains queued behind
+the preserved run; packaged graphical and human-presence acceptance remains outstanding.

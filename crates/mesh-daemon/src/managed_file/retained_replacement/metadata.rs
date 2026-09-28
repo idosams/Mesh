@@ -5,6 +5,9 @@ use std::io;
 use std::os::unix::fs::MetadataExt as _;
 use std::os::unix::io::AsRawFd as _;
 
+mod creation;
+pub(super) use creation::inherit_new_file;
+
 const LIMIT: usize = 1024 * 1024;
 fn problem() -> io::Error {
     io::Error::other("native metadata unavailable, changed or exceeds budget")

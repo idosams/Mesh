@@ -1889,7 +1889,7 @@ fn integration_group_adds_replaces_and_removes_without_rewriting_already_present
     assert_eq!(addition.proposed_content(), b"approved new file");
     assert_eq!(
         addition.proposal().get("schema"),
-        Some(&Json::text("mesh.attachment-file-addition/v1"))
+        Some(&Json::text("mesh.attachment-file-addition/v2"))
     );
     for field in [
         "source_file",
@@ -2039,4 +2039,117 @@ fn initial_approved_main_can_add_regular_files_with_verified_restart_evidence() 
         fs::read(f.source.join("work.txt")).unwrap(),
         b"first accepted"
     );
+}
+
+#[test]
+fn addition_recovery_reads_v1_evidence_and_reports_v2_parent_policy_changes_without_replay() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let f = Fixture::new("addition-policy-recovery");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::write(f.source.join("new.txt"), "new approved").unwrap();
+    let target = f.capture();
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::remove_file(f.source.join("new.txt")).unwrap();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let group_path = prepared.recovery_path().to_owned();
+    let addition = prepared.files().next().unwrap();
+    let transaction = addition
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let receipt_path = addition.recovery_path().join("prepared.json");
+    let raw = fs::read_to_string(&receipt_path).unwrap();
+    let original = Json::parse(&raw).unwrap();
+    let inspect = || {
+        let reopened = f.storage.reopen(f.history.id()).unwrap();
+        let result = reopened
+            .inspect_integration_recovery(
+                &group_path,
+                Some(&transaction),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        result.get("entries").unwrap().as_array().unwrap()[0].clone()
+    };
+    assert_eq!(
+        inspect()
+            .get("details")
+            .unwrap()
+            .get("parent_policy_matches"),
+        Some(&Json::Bool(true))
+    );
+    // V1 never claimed destination inheritance. Its original field order and null source facts
+    // remain readable; no upgrade invents parent policy or gains replay authority.
+    let mut old = replace_json(
+        &original,
+        "schema",
+        Json::text("mesh.attachment-file-addition/v1"),
+    );
+    if let Json::Object(fields) = &mut old {
+        fields.retain(|(key, _)| !matches!(key.as_str(), "parent_metadata_digest" | "parent_mode"));
+    }
+    fs::write(&receipt_path, old.encode()).unwrap();
+    let inspected = inspect();
+    assert_eq!(
+        inspected.get("status"),
+        Some(&Json::text("prepared-arrangement"))
+    );
+    assert!(inspected
+        .get("details")
+        .unwrap()
+        .get("parent_policy_matches")
+        .is_none());
+    assert_eq!(inspected.get("automatic_replay"), Some(&Json::Bool(false)));
+    let malformed = replace_json(&original, "parent_mode", Json::Number(0o100644));
+    fs::write(&receipt_path, malformed.encode()).unwrap();
+    assert_eq!(
+        inspect().get("status"),
+        Some(&Json::text("invalid-receipt"))
+    );
+    fs::write(&receipt_path, &raw).unwrap();
+    let mode = fs::metadata(&f.source).unwrap().permissions().mode();
+    fs::set_permissions(&f.source, fs::Permissions::from_mode(mode ^ 0o010)).unwrap();
+    assert_eq!(
+        inspect()
+            .get("details")
+            .unwrap()
+            .get("parent_policy_matches"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(inspect().get("attention_required"), Some(&Json::Bool(true)));
+    assert!(prepared.apply(&trust).is_err());
+    assert!(!f.source.join("new.txt").exists());
+    fs::set_permissions(&f.source, fs::Permissions::from_mode(mode)).unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        prepared.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert_eq!(fs::read(f.source.join("new.txt")).unwrap(), b"new approved");
 }

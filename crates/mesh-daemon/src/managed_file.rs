@@ -2209,8 +2209,16 @@ fn open_read_at(_directory: &File, _name: &std::ffi::OsStr) -> io::Result<File> 
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-#[allow(unsafe_code)]
 fn create_new_at(directory: &File, name: &str) -> io::Result<File> {
+    create_new_at_mode(directory, name, 0o600)
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[allow(unsafe_code)]
+fn create_new_at_mode(directory: &File, name: &str, mode: u32) -> io::Result<File> {
+    if mode & !0o777 != 0 {
+        return Err(io::Error::other("invalid new-file mode"));
+    }
     unsafe extern "C" {
         fn openat(directory: i32, path: *const std::ffi::c_char, flags: i32, ...) -> i32;
     }
@@ -2222,7 +2230,7 @@ fn create_new_at(directory: &File, name: &str) -> io::Result<File> {
             directory.as_raw_fd(),
             name.as_ptr(),
             CREATE_FILE_FLAGS,
-            0o600_i32,
+            mode as i32,
         )
     };
     if descriptor < 0 {
@@ -2257,6 +2265,11 @@ fn mkdir_at(_directory: &File, _name: &str) -> io::Result<()> {
         io::ErrorKind::Unsupported,
         "descriptor-relative managed directory creation requires Unix",
     ))
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn create_new_at_mode(directory: &File, name: &str, _mode: u32) -> io::Result<File> {
+    create_new_at(directory, name)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]

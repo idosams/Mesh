@@ -318,12 +318,13 @@ pub(super) fn prepare_captured(
     let mut receipt = Json::Null;
     let mut record = |installed: Option<crate::managed_file::ManagedFileIdentity>,
                       installed_mode: u32,
-                      metadata_digest: &str| {
+                      metadata_digest: &str,
+                      parent_policy: Option<(&str, u32)>| {
         receipt = Json::object([
             (
                 "schema",
                 Json::text(if adding {
-                    "mesh.attachment-file-addition/v1"
+                    "mesh.attachment-file-addition/v2"
                 } else if removing {
                     "mesh.attachment-file-removal/v1"
                 } else {
@@ -393,6 +394,12 @@ pub(super) fn prepare_captured(
             ),
             ("automatic_replay", Json::Bool(false)),
         ]);
+        if let Some((metadata, mode)) = parent_policy {
+            if let Json::Object(fields) = &mut receipt {
+                fields.push(("parent_metadata_digest".into(), Json::text(metadata)));
+                fields.push(("parent_mode".into(), Json::Number(u64::from(mode))));
+            }
+        }
         recovery.filesystem().write_new_file(
             Path::new("prepared.json"),
             receipt.encode().as_bytes(),
@@ -407,14 +414,21 @@ pub(super) fn prepare_captured(
             proposed.clone(),
             executable,
             recovery.clone(),
-            |installed, mode, metadata| record(Some(installed), mode, metadata),
+            |installed, mode, metadata, parent_metadata, parent_mode| {
+                record(
+                    Some(installed),
+                    mode,
+                    metadata,
+                    Some((parent_metadata, parent_mode)),
+                )
+            },
         )?)
     } else if removing {
         PreparedFileChange::Remove(RetainedRemoval::prepare(
             source.ok_or_else(|| invalid("missing removal source"))?,
             expected,
             recovery.clone(),
-            |metadata| record(None, 0, metadata),
+            |metadata| record(None, 0, metadata, None),
         )?)
     } else {
         PreparedFileChange::Replace(RetainedReplacement::prepare(
@@ -423,7 +437,7 @@ pub(super) fn prepare_captured(
             proposed.clone(),
             mode,
             recovery.clone(),
-            |installed, metadata| record(Some(installed), mode, metadata),
+            |installed, metadata| record(Some(installed), mode, metadata, None),
         )?)
     };
     Ok(PreparedMainFileIntegration {

@@ -80,12 +80,18 @@ pub(super) fn is_restoration(value: &Json) -> bool {
 pub(super) fn is_removal(value: &Json) -> bool {
     value.get("schema") == Some(&Json::text("mesh.attachment-file-removal/v1"))
 }
+fn is_addition_v2(value: &Json) -> bool {
+    value.get("schema") == Some(&Json::text("mesh.attachment-file-addition/v2"))
+}
 pub(super) fn is_addition(value: &Json) -> bool {
-    value.get("schema") == Some(&Json::text("mesh.attachment-file-addition/v1"))
+    is_addition_v2(value)
+        || value.get("schema") == Some(&Json::text("mesh.attachment-file-addition/v1"))
 }
 pub(super) fn result_schema(value: &Json) -> &'static str {
     if is_restoration(value) {
         "mesh.attachment-file-restoration-result/v1"
+    } else if is_addition_v2(value) {
+        "mesh.attachment-file-addition-result/v2"
     } else if is_addition(value) {
         "mesh.attachment-file-addition-result/v1"
     } else if is_removal(value) {
@@ -142,7 +148,13 @@ pub(super) fn validate_receipt(
     let restoring = is_restoration(value);
     let removing = is_removal(value);
     let adding = is_addition(value);
-    let extra = if restoring { RESTORE_KEYS } else { &[] };
+    let extra: &[&str] = if restoring {
+        RESTORE_KEYS
+    } else if is_addition_v2(value) {
+        &["parent_metadata_digest", "parent_mode"]
+    } else {
+        &[]
+    };
     if !fields
         .iter()
         .map(|(key, _)| key.as_str())
@@ -241,9 +253,21 @@ pub(super) fn validate_receipt(
         || (!restoring && source_mode & !0o111 != installed_mode & !0o111)
         || (!adding
             && value.get("source_executable") != Some(&Json::Bool(source_mode & 0o111 != 0)))
-        || (adding && !matches!(installed_mode, 0o100644 | 0o100755))
+        || (adding
+            && if is_addition_v2(value) {
+                installed_mode & !0o100755 != 0
+            } else {
+                !matches!(installed_mode, 0o100644 | 0o100755)
+            })
     {
         return Err(invalid("invalid recovery mode"));
+    }
+    if is_addition_v2(value) {
+        digest(text(value, "parent_metadata_digest")?)?;
+        let mode = number(value, "parent_mode")?;
+        if mode & !0o047777 != 0 || mode & 0o040000 == 0 {
+            return Err(invalid("invalid addition parent mode"));
+        }
     }
     if restoring {
         for key in [
@@ -608,6 +632,20 @@ fn inspect(
     if recovery.ensure_namespace_identity().is_err() {
         return report(id, "unavailable-directory", Json::Null);
     }
+    let parent_policy_matches = if is_addition_v2(&value) {
+        crate::managed_file::retained_replacement::parent_policy(
+            &history.project().pinned,
+            Path::new(text(&value, "path").unwrap()),
+        )
+        .ok()
+        .map(|(digest, mode, parent)| {
+            parent == text(&value, "source_parent").unwrap()
+                && digest == text(&value, "parent_metadata_digest").unwrap()
+                && u64::from(mode) == number(&value, "parent_mode").unwrap()
+        })
+    } else {
+        None
+    };
     let mut details = Json::object([
         (
             "operation",
@@ -649,7 +687,26 @@ fn inspect(
             fields.push(("retained_absent".into(), Json::Bool(retained_absent)));
         }
     }
-    report(id, status, details)
+    if is_addition_v2(&value) {
+        if let Json::Object(fields) = &mut details {
+            fields.push((
+                "parent_policy_matches".into(),
+                parent_policy_matches.map_or(Json::Null, Json::Bool),
+            ));
+        }
+    }
+    let mut result = report(id, status, details);
+    if is_addition_v2(&value) && parent_policy_matches != Some(true) {
+        if let Json::Object(fields) = &mut result {
+            if let Some((_, attention)) = fields
+                .iter_mut()
+                .find(|(key, _)| key == "attention_required")
+            {
+                *attention = Json::Bool(true);
+            }
+        }
+    }
+    result
 }
 
 pub(super) fn inspect_recovery(

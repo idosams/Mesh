@@ -694,5 +694,14 @@ Native accepted-review groups now support regular-file additions as well as repl
 including the first approved main. Approved bytes stay in private staging until explicit native
 apply, which never overwrites a concurrent file. New paths pass the captured exclusion policy at
 every ancestor. Restart evidence distinguishes a prepared stage, an installed file and later edits
-without replay. Directory creation/removal, absent-path restoration, destination-folder permission
-inheritance, grouped desktop confirmation and recovery, and packaged graphical proof remain required.
+without replay. Directory creation/removal, absent-path restoration, grouped desktop confirmation
+and recovery, and packaged graphical proof remain required.
+
+
+New native addition preparations now inherit the macOS destination parent's group and file ACL,
+remove staging-folder ACL inheritance and preserve the process umask. Permission policy is bound in
+v2 receipts and rechecked before and after installation; changed policy requires refusal or
+reconciliation. Read-only recovery retains v1 compatibility and exposes v2 policy mismatches.
+Transferred tests compare inheritance with kernel-created files and cover restrictive umasks and
+policy races; canonical execution remains pending. Linux default ACLs/extended attributes remain
+unsupported. No grouped packaged graphical proof is claimed by this increment.
