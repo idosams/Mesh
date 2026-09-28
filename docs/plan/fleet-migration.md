@@ -5,39 +5,103 @@ historical evidence. The full [fleet objective](fleet-orchestration.md) is uncha
 
 ## Current delivery checkpoint (2026-09-28)
 
-The sections below retain the migration's historical observations. Later verified delivery supersedes
-earlier statements that no PR has merged or named human review is still required. The owner explicitly
-authorized merging without human review for this effort; required checks remain mandatory, and no
-self-approval or check bypass is authorized. Canonical main is verified through
-[PR #70](https://github.com/idosams/Mesh/pull/70) at
-`46d473879e07b24f51bef5e9a2bb816c1448b02e` (merged 2026-09-28 at 14:37:23 UTC).
-PRs #56–#70 were merged in dependency order after each exact head passed all seven hosted checks.
-Reconciliation preserved original commits and implementation trees. This checkpoint does not claim
-that the remaining source increments or acceptance journeys are complete.
+Canonical main is verified through [PR #116](https://github.com/idosams/Mesh/pull/116) at
+`9c4f7ee97de427aa5d57320ae61d54b4e8f8e401`, merged at 18:36:32 UTC. PRs #71–#116
+are now confirmed merged in dependency order. Every exact published head passed all seven hosted
+PR checks before its merge. Each merge rechecked canonical repository/base/head identity, clean
+worktree state and GitHub rules; non-force fast-forwards preserved the published commits. No
+self-approval, required-check bypass or repository settings change occurred.
 
-PR #70's focused compiler and delegated-catalog regressions executed successfully locally. An
-identity-substitution mutation failed the compiler regression; restoring the implementation passed.
-Its full local gate remains live: compilation completed, but test discovery is delayed before test
-code starts. A sampled process was at `_dyld_start`; the cause is not established. Preserve this run.
-The earlier full #69 run failed a macOS native-watcher test and remains unresolved in
-[issue #37](https://github.com/idosams/Mesh/issues/37); hosted success does not erase that failure.
+The owner explicitly authorized merging without human review for this effort. The historical
+increment notes below retain their original observations and source mappings; this checkpoint
+supersedes their older unmerged/pending-review statements. That authorization does not replace
+protected Mesh main's native human-presence approval or complete any product acceptance journey.
 
-[PR #71](https://github.com/idosams/Mesh/pull/71) is published at
-`985adffffd29b3202c6cff22e6964c7454820d2c`, replacing source
-`a8d3bd00105941a9ceb23bd9215b87d367645d5a`. Its Linux job executed 3,042 passing tests,
-including the signed pending-import, invalid/aliased receipt and nonprivate/oversized receipt
-regressions. Six checks are complete; the macOS job passed its test steps and is still finishing.
-Local native/mutation/full validation is queued behind #70. It is not merged at this checkpoint.
+### Validation and remaining boundaries
+
+- [PR #116 CI](https://github.com/idosams/Mesh/actions/runs/36463671508) passed all seven checks;
+  Linux took 6m32s and macOS 7m35s. Its complete local gate is still running on the same revision:
+  repository/docs/license/storage/format/lint checks passed and native compilation completed.
+  All native tests, desktop checks and the daemon demonstration have not yet completed in that run.
+- The new [combined-main run](https://github.com/idosams/Mesh/actions/runs/36466394886) was queued
+  at this checkpoint. Intermediate main-push runs were superseded by subsequent main pushes under
+  existing CI concurrency settings. Their cancellation is not a passing result; successful exact-head
+  PR checks were independently verified before every merge.
+- The earlier full #70 local run failed a native filesystem-event test. The preserved full #102
+  run passed both previously failing filesystem-event cases but failed the synthetic Codex launcher
+  test at its unchanged one-second deadline: 1,836 passed, one failed and 1,506 were not run.
+  The unchanged focused launcher then passed in 0.348s. Failed logs remain preserved; this neither
+  establishes a cause nor closes [issue #37](https://github.com/idosams/Mesh/issues/37).
+- Source transfer, desktop recovery/restoration and provider/remote foundations are merged. The
+  preserved whole-entry work is included through #103–#107, with its per-file provenance below.
+  Original dirty checkouts, source branches, private backups and superseded heads remain preserved.
+- Actual second-provider/four-worker evidence, manual and harness-led packaged journeys, native
+  signed confirmation, full private-dependency/fault acceptance and final combined-main validation
+  remain required. Remote export, authenticated transport, execution, results and real second-machine
+  reconnect/recovery are unfinished. See the unchanged [full plan](fleet-orchestration.md),
+  [remote sequence](fleet-remote-delivery.md) and [current status](../project-status.md).
+- [Mesh-internal #1488](https://github.com/idosams/Mesh-internal/pull/1488) remains open. Its CI
+  previously reported a payment/spending-limit restriction and its checks remain failed. No billing,
+  archival, deletion or settings change is authorized or performed. Canonical repository guidance
+  already identifies Mesh-internal as deprecated; its own deprecation PR is not merged delivery.
 
 PRs #14 and #16 were closed as superseded, not merged: their complete changed files are identical
-to canonical main at `5ea158f9d53b4d247d457f50a1808bb56489f02d`. Their branches and history remain
-preserved. The incorporated corrections remain traceable through the validation/source mappings below.
-Mesh-internal's deprecation PR remains open because its CI jobs could not start due to GitHub's
-reported payment/spending-limit restriction. No billing or repository settings were changed.
+to canonical main at `5ea158f9d53b4d247d457f50a1808bb56489f02d`. Their original branches and history
+remain preserved, with incorporated corrections traced through the mappings below.
 
-Remaining work includes desktop import/review and recovery, deletion, grouped integration,
-restoration, real second-provider/four-worker and remote acceptance, latest packaged/native approval
-journeys, resolution of local native failures and final combined-main validation.
+### Newly confirmed merge receipts
+
+All rows below were independently read back from GitHub after merge, and every listed head is
+an ancestor of the verified combined main above. Times are UTC on 2026-09-28.
+
+| PR | Preserved published head | Merged at |
+| --- | --- | --- |
+| [#71](https://github.com/idosams/Mesh/pull/71) | `985adffffd29b3202c6cff22e6964c7454820d2c` | 18:19:35 |
+| [#72](https://github.com/idosams/Mesh/pull/72) | `08bd13bc0bc734aa9d3e6ce607fa8fd950111d56` | 18:20:32 |
+| [#73](https://github.com/idosams/Mesh/pull/73) | `64f9278fdb0bb56c7a69a5fbf60d9e43f635c477` | 18:20:53 |
+| [#74](https://github.com/idosams/Mesh/pull/74) | `cd804ad3708b1056ae29e84019575dfe4e6b42bb` | 18:21:13 |
+| [#75](https://github.com/idosams/Mesh/pull/75) | `a4c8f89a1efcba0aa3bf64ad420a8901820b41c7` | 18:21:34 |
+| [#76](https://github.com/idosams/Mesh/pull/76) | `a87005e8db37bb917f43468a91c02d1dd9662d91` | 18:21:54 |
+| [#77](https://github.com/idosams/Mesh/pull/77) | `0e3c36b30354c11bb61c5aaa7fe80f17bbbf907d` | 18:22:14 |
+| [#78](https://github.com/idosams/Mesh/pull/78) | `35b20458158fce6f5d281906ef1a05845483080b` | 18:22:34 |
+| [#79](https://github.com/idosams/Mesh/pull/79) | `19e85e29f400f3974c4d72583e93d214f384570f` | 18:22:55 |
+| [#80](https://github.com/idosams/Mesh/pull/80) | `4e3daa214e7ccb63dac64622f34e571d53491ec5` | 18:23:16 |
+| [#81](https://github.com/idosams/Mesh/pull/81) | `c80d0fc70bfa573985d45ee1de875e90a005daf8` | 18:23:36 |
+| [#82](https://github.com/idosams/Mesh/pull/82) | `5f124dc2ac496e9c8e3e66353018e4498b41b8a0` | 18:23:58 |
+| [#83](https://github.com/idosams/Mesh/pull/83) | `04408cf8c89bef5d307fa13747282f347dbd43dc` | 18:24:19 |
+| [#84](https://github.com/idosams/Mesh/pull/84) | `dea7d1c6bd0b7c468fe3e4cccbd43fd9a46751b4` | 18:24:41 |
+| [#85](https://github.com/idosams/Mesh/pull/85) | `ec305a6ada14d5d3e33d64d9fdde33d8c06203b8` | 18:25:03 |
+| [#86](https://github.com/idosams/Mesh/pull/86) | `4e55abd227327f3b5bd7387d14e9a831b0d4a513` | 18:25:28 |
+| [#87](https://github.com/idosams/Mesh/pull/87) | `54ca0c3d991d90e4a0b88ac0dd29c2a3e5265f42` | 18:25:49 |
+| [#88](https://github.com/idosams/Mesh/pull/88) | `6150790f6c8144c61bc1411f9e96206e5cde7630` | 18:26:24 |
+| [#89](https://github.com/idosams/Mesh/pull/89) | `cd3405e3dd6f4604837e8c37ba04b2ef620908b1` | 18:26:46 |
+| [#90](https://github.com/idosams/Mesh/pull/90) | `3ab0dc58e1951a7c9cb4b1c63e13cacfe3b33d23` | 18:27:08 |
+| [#91](https://github.com/idosams/Mesh/pull/91) | `cb5a7cf4071e3702331d730529c01df29ea0d995` | 18:27:28 |
+| [#92](https://github.com/idosams/Mesh/pull/92) | `d2ea4b19edb588948b5b94e3ee363a0cceb0c536` | 18:27:51 |
+| [#93](https://github.com/idosams/Mesh/pull/93) | `c4b12ffc29c5ffc106fe89b0d2a4fec8ca6c88c0` | 18:28:14 |
+| [#94](https://github.com/idosams/Mesh/pull/94) | `eafef923292ffde5c717b0428ed3276afb045fe8` | 18:28:37 |
+| [#95](https://github.com/idosams/Mesh/pull/95) | `0f5a5b4276fc2a9a91193edca32a5226f7a7e95b` | 18:28:58 |
+| [#96](https://github.com/idosams/Mesh/pull/96) | `62de5dfaa3b441f90770594de2a91bfe539c7c36` | 18:29:19 |
+| [#97](https://github.com/idosams/Mesh/pull/97) | `43df0cdd173036d96aa8eb35d029b98207dec0ab` | 18:29:42 |
+| [#98](https://github.com/idosams/Mesh/pull/98) | `1a95c9c59e21a850ae53c1962fabe4362a68a0e7` | 18:30:03 |
+| [#99](https://github.com/idosams/Mesh/pull/99) | `c1cdf63721014eb774dc520d9b99df9a017571be` | 18:30:27 |
+| [#100](https://github.com/idosams/Mesh/pull/100) | `31b4330f547f83e40511c74576fcc657a2df5ec3` | 18:30:50 |
+| [#101](https://github.com/idosams/Mesh/pull/101) | `cdb7e6153208ab1ad7b3b46e7819a640fc4c4861` | 18:31:11 |
+| [#102](https://github.com/idosams/Mesh/pull/102) | `b50fe49f70bf81bd1ca60879e3a074be87f6d70f` | 18:31:31 |
+| [#103](https://github.com/idosams/Mesh/pull/103) | `30462d0d6c7226f6475cf73cc1084c2fd6c8e11e` | 18:31:52 |
+| [#104](https://github.com/idosams/Mesh/pull/104) | `ab46c6fed087af8a7e54418233a60cdef50e6339` | 18:32:13 |
+| [#105](https://github.com/idosams/Mesh/pull/105) | `1e17abc162c6d27f69c2589f49fe693a3207be7e` | 18:32:34 |
+| [#106](https://github.com/idosams/Mesh/pull/106) | `8df187fb55cbf38c7cccc83a8749c3ed5c54ab8e` | 18:32:56 |
+| [#107](https://github.com/idosams/Mesh/pull/107) | `673b62dcbbe015ddd83b32a5bcd172cdbf666c4f` | 18:33:18 |
+| [#108](https://github.com/idosams/Mesh/pull/108) | `6e4f5c64569bfc97f9a1384a4124819fd87f2a5d` | 18:33:40 |
+| [#109](https://github.com/idosams/Mesh/pull/109) | `f8ef047b01d0d25198f6bb5a1502d4f813132392` | 18:34:01 |
+| [#110](https://github.com/idosams/Mesh/pull/110) | `6dcff52b999ce4a7fa032edabeb6410eed5a424f` | 18:34:22 |
+| [#111](https://github.com/idosams/Mesh/pull/111) | `dee740c36a0bd8f535317ee7228d0687df547d76` | 18:34:44 |
+| [#112](https://github.com/idosams/Mesh/pull/112) | `82a218b89132002c4e00eb0f6ba6966a0f362e86` | 18:35:07 |
+| [#113](https://github.com/idosams/Mesh/pull/113) | `5c21f94bb6fc0cf5418a9ef8b15a84eb92d56ad4` | 18:35:29 |
+| [#114](https://github.com/idosams/Mesh/pull/114) | `02cad17eb9814ef5a53df9a1bee41a4e1f10dc36` | 18:35:51 |
+| [#115](https://github.com/idosams/Mesh/pull/115) | `cfde2e9e46094708655e5cb7e4b1c22c2a1a50de` | 18:36:12 |
+| [#116](https://github.com/idosams/Mesh/pull/116) | `9c4f7ee97de427aa5d57320ae61d54b4e8f8e401` | 18:36:32 |
 
 ## Verified reconciliation baseline
 
