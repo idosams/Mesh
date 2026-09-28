@@ -668,7 +668,12 @@ fn changing_a_history_binding_cannot_relabel_existing_signed_versions() {
     let binding_path = f.metadata.join("attachment-history.json");
     let binding = fs::read_to_string(&binding_path).unwrap();
     let parsed = Json::parse(&binding).unwrap();
-    let digest = parsed.get("exclusions").unwrap().as_text().unwrap();
+    assert_eq!(
+        parsed.get("schema").and_then(Json::as_text),
+        Some("mesh.attachment-history/v2")
+    );
+    let original = Json::parse(parsed.get("capture_basis").unwrap().as_text().unwrap()).unwrap();
+    let digest = original.get("exclusions").unwrap().as_text().unwrap();
     fs::write(&binding_path, binding.replace(digest, &"a".repeat(64))).unwrap();
     assert!(attached.saved_versions(&f.metadata).is_err());
     assert!(attached.saved_file(&f.metadata, first, "work").is_err());

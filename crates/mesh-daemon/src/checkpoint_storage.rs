@@ -704,6 +704,22 @@ pub(crate) fn save_authenticated_operations<F: DurableFs, D: HeadDerivation + ?S
     save_authenticated_checkpoint(workspace, cas, request, Vec::new(), derivation)
 }
 
+/// Verify the signature and derive the exact operation identity before recording an append intent.
+pub(crate) fn authenticated_checkpoint_identity<D: HeadDerivation + ?Sized>(
+    request: &AuthenticatedOperationCheckpointRequest,
+    derivation: &D,
+) -> Result<RecordDigest, AuthenticatedChangeSetError> {
+    let payload = AuthenticatedChangeSet::verified(
+        operation_checkpoint_payload(request, derivation),
+        request.actor_public_key,
+        request.signature,
+    )?
+    .canonical_bytes();
+    Ok(RecordDigest::from_bytes(
+        *Blake3::digest_bytes(&payload).as_bytes(),
+    ))
+}
+
 /// Commit all admitted file content and one signed operation set through the existing journal.
 /// Files are immutable prepared bytes; this path never reads a working directory. Acknowledgment
 /// follows all manifest records and the operation record, so an interrupted append cannot expose

@@ -1170,3 +1170,36 @@ Local repository (7 tests), docs (106 documents), license/storage self-tests, fo
 checks pass. Native focused/failing-before/full local execution is pending behind preserved #44 full
 verification; hosted CI must validate the new exact head. No packaged or integrated delivery claim
 follows. The complete fleet plan, human review, ordered merges and combined-main tests remain required.
+
+## C03b independent ordinary capture history
+
+C03a is published as #68 at `a32d18bec2484f5647bc065f5dd7c6602d5d3602`, replacing
+`3aef42a9373ff0ebb84fd482819d39536b022ab2`. Both #67 and #68 now have all seven hosted CI
+checks passing. The preserved #44 full local run completed successfully: 3,186 native tests
+(13 skipped), 603 desktop tests and 44 daemon-demo checks. That result covers #44 only; it is
+not evidence for this later head or combined main. No migration PR has merged.
+
+Preserved source `d3b34517d6f9f390f2834a141717254861bc5358` transfers onto published #68.
+Attachment capture now records its own exact predecessor and pending signed operation, derives
+file identities from that saved ancestry and lists only that observation line. Signed candidate
+branches cannot change unchanged-save results or become parents of later ordinary captures.
+An exact pending operation is recorded before append and resolved from journal truth after restart;
+read-only recovery does not rewrite it. Unexpected predecessors or partial journals refuse.
+
+The bounded private capture-line v1 record is bound to the original history configuration. Migration
+wraps the original identity seed in attachment-history v2 on save, retaining existing version IDs.
+Read-only legacy access does not migrate; branched legacy history cannot guess a capture tip. A v2
+history missing its position refuses, and old writers refuse v2 rather than resume all-tip capture.
+Recognized interrupted metadata transitions recover; conflicting or malformed evidence is retained.
+
+Transferred native tests cover signed branch separation, continuing human edits, exact pending-append
+recovery, unchanged no-op saves, legacy migration, missing/corrupt records, links and unexpected
+transitions. Added canonical coverage refuses nonprivate, oversized, history-rebound and extra-field
+records without changing their bytes/modes, history binding, journal or working file; restoring the
+original private record recovers the original no-op capture. Prior historical-authoring regressions
+are preserved. Local repository/docs/license/storage/format checks pass. Five native capture-line tests, two
+historical-authoring tests and all 31 attachment integration tests pass. The added refusal regression fails when the private-permissions
+guard is removed, then passes after exact source restoration. Full local verification is next.
+
+Candidate compilation/import and signable original-project review remain subsequent increments.
+Human review, ordered merges, latest packaged acceptance and combined-main testing remain required.

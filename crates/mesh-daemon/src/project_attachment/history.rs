@@ -5,14 +5,14 @@ use super::{
 };
 use crate::authenticated_changeset::CHANGESET_SIGNATURE_DOMAIN;
 use crate::checkpoint_storage::{
-    operation_checkpoint_signing_body, save_authenticated_checkpoint,
-    AuthenticatedOperationCheckpointRequest, PreparedCheckpointFile,
+    authenticated_checkpoint_identity, operation_checkpoint_signing_body,
+    save_authenticated_checkpoint, AuthenticatedOperationCheckpointRequest, PreparedCheckpointFile,
 };
 use crate::ipc::Json;
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::{ManagedAuthoringBasis, OpenWorkspace};
 use crate::ManifestPagingPolicy;
-use mesh_cas::Cas;
+use mesh_cas::{Cas, DurableFs as _};
 use mesh_chunking::ChunkingConfig;
 use mesh_crypto::SigningPayload;
 use mesh_operations::{
@@ -25,7 +25,7 @@ use mesh_types::{Blake3, ContentDigest as _, Digest32, PublicKey, Signature};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, Read as _};
-use std::os::unix::fs::PermissionsExt as _;
+use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 
 pub(super) const HISTORY: &str = "attachment-history.json";
@@ -90,7 +90,20 @@ impl ProjectAttachment {
         let workspace_id = WorkspaceId::from_bytes(short_id(configuration.as_bytes()));
         let mut workspace = OpenWorkspace::open_attachment_store(metadata, store.clone(), created)
             .map_err(error)?;
-        let basis = if workspace.operations() == 0 {
+        let line = super::capture_line::CaptureLine::load(&store, &workspace, &configuration)?;
+        line.persist(&store, &configuration)?;
+        self.enable_capture_line(&store, &configuration, &workspace, line.head)?;
+        let basis = if let Some(head) = line.head {
+            let basis = workspace
+                .historical_authoring_basis(head, actor)
+                .map_err(error)?;
+            if basis.workspace_id != workspace_id {
+                return Err(invalid(
+                    "attachment history identity differs from its binding",
+                ));
+            }
+            basis
+        } else {
             ManagedAuthoringBasis {
                 workspace_id,
                 actor_id: ActorId::from_bytes(*actor.as_bytes()),
@@ -101,33 +114,19 @@ impl ProjectAttachment {
                 policy_epoch: PolicyEpoch::new(1),
                 hybrid_logical_time: Hlc::new(0, 0),
             }
-        } else {
-            if !workspace.names_answered() {
-                return Err(invalid("attachment history is incomplete"));
-            }
-            let basis = workspace.managed_authoring_basis(actor).map_err(error)?;
-            if basis.workspace_id != workspace_id {
-                return Err(invalid(
-                    "attachment history identity differs from its binding",
-                ));
-            }
-            basis
         };
-        let (operations, files) = prepare_snapshot(&workspace, input, &basis)?;
+        let (operations, files) = prepare_snapshot(&workspace, input, &basis, line.head)?;
         if operations.is_empty() {
-            return workspace
-                .workspace_versions()
-                .last()
-                .map(|version| SavedAttachmentVersion {
-                    operation: version.operation(),
-                })
+            return line
+                .head
+                .map(|operation| SavedAttachmentVersion { operation })
                 .ok_or_else(|| {
                     invalid("an initial empty project has no representable history point yet")
                 });
         }
-        if workspace.operations() > 0 {
+        if let Some(head) = line.head {
             workspace
-                .validate_managed_operations(&operations)
+                .prepare_historical_operations(head, actor, &operations)
                 .map_err(error)?;
         }
         let make_request = |signature| {
@@ -168,14 +167,12 @@ impl ProjectAttachment {
         super::detachment::ensure_attached(&store)?;
         let cas =
             Cas::with_filesystem(metadata.to_path_buf(), store.filesystem()).map_err(error)?;
-        let saved = save_authenticated_checkpoint(
-            &mut workspace,
-            &cas,
-            make_request(signature),
-            files,
-            &CaptureHead,
-        )
-        .map_err(error)?;
+        let request = make_request(signature);
+        let exact = authenticated_checkpoint_identity(&request, &CaptureHead).map_err(error)?;
+        line.begin(exact, &store, &configuration)?;
+        let saved =
+            save_authenticated_checkpoint(&mut workspace, &cas, request, files, &CaptureHead)
+                .map_err(error)?;
         drop(workspace);
         let reopened =
             OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
@@ -191,16 +188,17 @@ impl ProjectAttachment {
             )
             .collect::<io::Result<BTreeSet<_>>>()?;
         let actual = reopened
-            .entries()
-            .iter()
-            .map(|entry| entry.path().to_owned())
+            .historical_capture_entries(saved.changeset_id())
+            .map_err(error)?
+            .into_keys()
             .collect::<BTreeSet<_>>();
-        if !reopened.names_answered()
+        if exact != saved.changeset_id()
             || expected != actual
             || !reopened.has_operation(&saved.changeset_id())
         {
             return Err(invalid("saved attachment history needs reconciliation"));
         }
+        line.finish(saved.changeset_id(), &store, &configuration)?;
         store.ensure_namespace_identity()?;
         Ok(SavedAttachmentVersion {
             operation: saved.changeset_id(),
@@ -229,12 +227,12 @@ impl ProjectAttachment {
         let workspace =
             OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
         verify_history_binding(&workspace, &configuration)?;
+        let line = super::capture_line::CaptureLine::load(&store, &workspace, &configuration)?;
         let versions = workspace
-            .workspace_versions()
+            .linear_history(line.head)
+            .map_err(error)?
             .into_iter()
-            .map(|version| SavedAttachmentVersion {
-                operation: version.operation(),
-            })
+            .map(|operation| SavedAttachmentVersion { operation })
             .collect();
         store.ensure_namespace_identity()?;
         Ok(versions)
@@ -270,6 +268,56 @@ impl ProjectAttachment {
         Ok(store)
     }
 
+    fn enable_capture_line(
+        &self,
+        store: &PinnedWorkspaceRoot,
+        configuration: &str,
+        workspace: &OpenWorkspace,
+        head: Option<RecordDigest>,
+    ) -> io::Result<()> {
+        let file = store.filesystem().inspect_entry(Path::new(HISTORY))?;
+        let mut bytes = String::new();
+        file.take(65_537).read_to_string(&mut bytes)?;
+        let next = capture_history_binding(configuration).encode();
+        if bytes == next {
+            return store.ensure_namespace_identity();
+        }
+        if bytes != configuration
+            || workspace.linear_history(head).map_err(error)?.len() != workspace.operations()
+        {
+            return Err(invalid("legacy capture history changed before separation"));
+        }
+        let temporary = Path::new("attachment-history.pending");
+        let filesystem = store.filesystem();
+        match filesystem.inspect_entry(temporary) {
+            Ok(file) => {
+                let metadata = file.metadata()?;
+                if !metadata.is_file()
+                    || metadata.nlink() != 1
+                    || metadata.permissions().mode() & 0o077 != 0
+                    || metadata.len() > 65_536
+                {
+                    return Err(invalid("history migration is not a bounded private file"));
+                }
+                let mut retained = String::new();
+                file.take(65_537).read_to_string(&mut retained)?;
+                if retained != next {
+                    return Err(invalid("history migration needs reconciliation"));
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => filesystem.write_new_file(
+                temporary,
+                next.as_bytes(),
+                fs::Permissions::from_mode(0o600),
+            )?,
+            Err(error) => return Err(error),
+        }
+        store.ensure_namespace_identity()?;
+        filesystem.rename(temporary, Path::new(HISTORY))?;
+        store.sync()?;
+        store.ensure_namespace_identity()
+    }
+
     pub(super) fn history_configuration(
         &self,
         store: &PinnedWorkspaceRoot,
@@ -290,6 +338,26 @@ impl ProjectAttachment {
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
             Err(e) => return Err(e),
         };
+        let previous = previous
+            .map(|previous| -> io::Result<String> {
+                let value = Json::parse(&previous).map_err(error)?;
+                if value.get("schema").and_then(Json::as_text) == Some("mesh.attachment-history/v2")
+                {
+                    let basis = value
+                        .get("capture_basis")
+                        .and_then(Json::as_text)
+                        .ok_or_else(|| invalid("missing original history binding"))?;
+                    if previous != capture_history_binding(basis).encode()
+                        || !super::capture_line::CaptureLine::exists(store)?
+                    {
+                        return Err(invalid("separated capture history needs reconciliation"));
+                    }
+                    Ok(basis.to_owned())
+                } else {
+                    Ok(previous)
+                }
+            })
+            .transpose()?;
         let policy = match (policy, previous.as_ref()) {
             (Some(policy), _) => policy.to_string(),
             (None, Some(previous)) => Json::parse(previous)
@@ -349,10 +417,18 @@ pub(super) fn verify_history_binding(
     Ok(())
 }
 
+fn capture_history_binding(configuration: &str) -> Json {
+    Json::object([
+        ("schema", Json::text("mesh.attachment-history/v2")),
+        ("capture_basis", Json::text(configuration)),
+    ])
+}
+
 fn prepare_snapshot(
     workspace: &OpenWorkspace,
     input: &CapturedProjectInput,
     basis: &ManagedAuthoringBasis,
+    predecessor: Option<RecordDigest>,
 ) -> io::Result<(Vec<Operation>, Vec<PreparedCheckpointFile>)> {
     let desired = input
         .directories()
@@ -365,10 +441,13 @@ fn prepare_snapshot(
                 .map(|file| Ok((path_text(file.path())?.to_owned(), false))),
         )
         .collect::<io::Result<BTreeMap<_, _>>>()?;
-    let existing = workspace
-        .entries()
+    let captured = predecessor
+        .map(|head| workspace.historical_capture_entries(head).map_err(error))
+        .transpose()?
+        .unwrap_or_default();
+    let existing = captured
         .iter()
-        .map(|entry| (entry.path(), entry.entry_type() == "folder"))
+        .map(|(path, entry)| (path.as_str(), entry.binding.is_directory))
         .collect::<BTreeMap<_, _>>();
     let mut removed = existing
         .iter()
@@ -378,10 +457,10 @@ fn prepare_snapshot(
     removed.sort_by_key(|path| std::cmp::Reverse((path.matches('/').count(), *path)));
     let mut operations = Vec::new();
     for path in removed {
-        let binding = workspace.managed_entry_basis(path).map_err(error)?;
+        let binding = &captured[path].binding;
         operations.push(Operation::UnlinkDirectoryEntry {
             directory_id: binding.parent_id,
-            name: binding.name,
+            name: binding.name.clone(),
             object_id: binding.object_id,
         });
     }
@@ -401,9 +480,7 @@ fn prepare_snapshot(
     let mut ids = BTreeMap::from([(PathBuf::new(), ROOT)]);
     for path in directories {
         if existing.get(path_text(&path)?) == Some(&true) {
-            let binding = workspace
-                .managed_entry_basis(path_text(&path)?)
-                .map_err(error)?;
+            let binding = &captured[path_text(&path)?].binding;
             ids.insert(path, binding.object_id);
             continue;
         }
@@ -420,39 +497,17 @@ fn prepare_snapshot(
     let mut files = Vec::new();
     for file in input.files() {
         let path = path_text(file.path())?;
-        let previous = if existing.get(path) == Some(&false) {
-            Some(
-                workspace
-                    .file_histories()
-                    .iter()
-                    .find(|history| history.path() == path)
-                    .ok_or_else(|| invalid("saved file history is missing"))?,
-            )
-        } else {
-            None
-        };
-        let previous_version = previous
-            .map(|history| {
-                history
-                    .current()
-                    .ok_or_else(|| invalid("saved file has no current version"))
-            })
-            .transpose()?;
-        if let Some(previous) = previous_version {
-            let manifest = workspace
-                .manifest_record(previous.manifest())
-                .ok_or_else(|| invalid("saved file manifest is missing"))?;
-            let metadata = workspace
-                .file_version_metadata(previous.version())
-                .ok_or_else(|| invalid("saved file mode is missing"))?;
-            if manifest.content_digest.as_bytes() == file.digest().as_bytes()
-                && metadata == PortableMetadata::new(file.executable())
-            {
+        let previous = captured
+            .get(path)
+            .filter(|entry| !entry.binding.is_directory);
+        let previous_version = previous.and_then(|entry| entry.file);
+        if let Some((_, digest, executable)) = previous_version {
+            if digest.as_bytes() == file.digest().as_bytes() && executable == file.executable() {
                 continue;
             }
         }
         let id = match previous {
-            Some(history) => history.object(),
+            Some(entry) => entry.binding.object_id,
             None => object(file.path(), 1)?,
         };
         let prepared = PreparedCheckpointFile::from_bytes(
@@ -472,7 +527,10 @@ fn prepare_snapshot(
         operations.push(Operation::WriteFileVersion {
             object_id: id,
             version_id: version,
-            parent_versions: previous_version.into_iter().map(|v| v.version()).collect(),
+            parent_versions: previous_version
+                .into_iter()
+                .map(|(version, _, _)| version)
+                .collect(),
             manifest_id: ManifestId::from_bytes(*prepared.manifest().id.as_bytes()),
             portable_metadata: PortableMetadata::new(file.executable()),
         });
@@ -522,3 +580,7 @@ impl HeadDerivation for CaptureHead {
         HeadId::from_bytes(*Blake3::digest_bytes(&commitment.canonical_bytes()).as_bytes())
     }
 }
+
+#[cfg(test)]
+#[path = "capture_line_tests.rs"]
+mod capture_line_tests;

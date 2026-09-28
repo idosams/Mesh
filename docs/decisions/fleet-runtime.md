@@ -635,10 +635,35 @@ saved trees (including explicit removal), while original ordinary files and prot
 unchanged. Reused actors outside ancestry refuse; a later policy epoch changes the plan while its
 historical base and clock remain fixed.
 
-This is the import foundation, not an enabled source-project importer. Before enabling candidate
-append, attachment observation needs an explicit durable capture-line cursor with interrupted-append
-recovery; choosing the latest operation or filtering by signer would mix candidate history into
-ongoing capture. The importer must then compile retained content through original-object
+This is the import foundation, not an enabled source-project importer. Attachment observation now
+uses the durable capture line described below, preserving independence from candidate branches.
+The importer must still compile retained content through original-object
 correspondence, bind source provenance and an exact retry receipt, use a separate native signing
 identity, and create the signable project review. Approval, dependency closure and guarded original
 folder application remain required. No desktop command or agent capability can append this plan.
+
+
+### Independent observation history
+
+Attachment saves now derive their predecessor, file identities and unchanged-content result from
+an explicit native capture position, independently of other branches in the project journal.
+Saved observation listings follow that exact ancestry. Signed regression fixtures prove that an
+agent candidate can change a file and add a directory while subsequent ordinary captures retain
+only the user's ongoing changes. Neither capture nor this separation advances protected main or
+writes the original project files. Candidate import remains unfinished.
+
+The external `mesh.attachment-capture-line/v1` record binds the original history configuration,
+last capture and optional exact pending signed operation. Native code persists intent before append.
+After restart, a complete journal resolves a committed intent to its saved operation or clears an
+absent operation without repeating it; incomplete journals or unexpected predecessors refuse.
+Read-only inspection resolves valid pending state without rewriting metadata. A subsequent save
+settles it. Atomic staging accepts only recognized transitions; malformed, linked, substituted or
+conflicting records are preserved and refused.
+
+On the next save, a legacy complete linear history migrates to `mesh.attachment-history/v2`, which
+wraps the exact original configuration as `capture_basis`. This preserves workspace/version identity
+and prevents older writers from silently resuming all-tip capture. Read-only legacy access does not
+migrate. Missing position records in v2 refuse; branched legacy history cannot guess a capture tip.
+Existing signed operations and approval records are unchanged. Native migration and recovery tests
+cover identity preservation, lost acknowledgement, interrupted metadata staging, linked records and
+corruption. This evidence is source-level; packaged graphical verification remains outstanding.

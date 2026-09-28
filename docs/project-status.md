@@ -454,10 +454,25 @@ required review, ordered merges and combined-main verification remain outstandin
 Native historical operation preparation now validates a proposal against one saved predecessor
 without absorbing later journal branches. Signed journal regression tests cover independent trees,
 explicit removal, actor-sequence refusal, policy changes and unchanged ordinary files/main. This
-read-only foundation does not enable source candidate import: durable capture-line separation,
-provenance-bound import receipts, signable review and integration remain outstanding.
+read-only foundation does not enable source candidate import: provenance-bound import receipts,
+signable review and integration remain outstanding.
+
+
+Attachment observation now follows a durable capture line independently of signed candidate
+branches. Native tests cover unchanged saves, later human edits, exact interrupted-append recovery,
+legacy identity-preserving migration and refusal of missing, malformed or linked position records.
+Legacy histories migrate on save to a v2 wrapper retaining the original identity seed; old writers
+refuse that wrapper. Original project files and protected main remain unchanged. Candidate operation
+import and signable review remain incomplete; this change has no packaged graphical proof yet.
 
 Canonical historical-authoring transfer adds partial-plan and oversized-plan refusal coverage with
 unchanged durable history and repeatable context across restart. Repository/docs/license/storage and
 format checks pass. Native/full local execution and packaged acceptance remain pending; no migration
 PR is merged and combined-main verification remains required.
+
+Canonical capture-line transfer adds refusal checks for public permissions, size, history binding
+and unexpected fields, preserving retained metadata, journal and working files. Repository/docs/
+license/storage/format checks and 38 focused native tests pass. The new refusal regression fails without its permission guard and passes after exact restoration.
+Full verification is pending. Previous #44 full local
+verification passed, while #67 and #68 have green hosted CI. These are separate revision scopes;
+required review, migration merges and final combined-main verification remain outstanding.

@@ -650,6 +650,11 @@ impl HistoricalOperationPlan {
     }
 }
 
+pub(crate) struct HistoricalCaptureEntry {
+    pub binding: ManagedEntryBasis,
+    pub file: Option<(VersionId, RecordDigest, bool)>,
+}
+
 /// Exact existing entry identity and binding resolved from complete durable materialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ManagedEntryBasis {
@@ -3729,13 +3734,36 @@ impl OpenWorkspace {
         actor_public_key: PublicKey,
         operations: &[Operation],
     ) -> Result<HistoricalOperationPlan, String> {
+        if operations.is_empty() || operations.len() > 100_000 {
+            return Err("historical operation plan is empty or exceeds its limit".into());
+        }
+        let basis = self.historical_authoring_basis(target, actor_public_key)?;
+        let (mut state, _) = self
+            .historical_workspace_materialization(target)
+            .map_err(|error| format!("historical materialization is unavailable: {error:?}"))?;
+        let validation_change = mesh_materializer::ChangeSetId::from_bytes([0xA5; 32]);
+        for operation in operations {
+            mesh_materializer::apply_operation(&mut state, validation_change, operation)
+                .map_err(|error| format!("historical operation was refused: {error}"))?;
+        }
+        self.ensure_physical_root()
+            .map_err(|error| error.to_string())?;
+        Ok(HistoricalOperationPlan {
+            target,
+            basis,
+            operations: operations.to_vec(),
+        })
+    }
+
+    pub(crate) fn historical_authoring_basis(
+        &self,
+        target: RecordDigest,
+        actor_public_key: PublicKey,
+    ) -> Result<ManagedAuthoringBasis, String> {
         self.ensure_physical_root()
             .map_err(|error| error.to_string())?;
         if self.managed_mutation_recovery_needed() {
             return Err("an interrupted local file change needs reconciliation".into());
-        }
-        if operations.is_empty() || operations.len() > 100_000 {
-            return Err("historical operation plan is empty or exceeds its limit".into());
         }
         let ready = self.record_index.causally_ready_operations();
         if !ready.contains(&target) {
@@ -3752,28 +3780,103 @@ impl OpenWorkspace {
         let selected_ids = selected.keys().copied().collect::<Vec<_>>();
         let workspace = self.workspace_id_for_operations(&selected_ids)?;
         let head = review_head_for_records(&selected)?;
-        let basis = self.authoring_basis_for_history(
+        self.authoring_basis_for_history(
             actor_public_key,
             workspace,
             &selected_ids,
             CausalParents::after(ChangeSetId::from_bytes(*target.as_bytes()), Vec::new()),
             HeadId::from_bytes(*head.as_bytes()),
-        )?;
-        let (mut state, _) = self
-            .historical_workspace_materialization(target)
-            .map_err(|error| format!("historical materialization is unavailable: {error:?}"))?;
-        let validation_change = mesh_materializer::ChangeSetId::from_bytes([0xA5; 32]);
-        for operation in operations {
-            mesh_materializer::apply_operation(&mut state, validation_change, operation)
-                .map_err(|error| format!("historical operation was refused: {error}"))?;
+        )
+    }
+
+    /// Exact linear ancestry, used only by the native observation cursor. No newest-tip inference.
+    pub(crate) fn linear_history(
+        &self,
+        target: Option<RecordDigest>,
+    ) -> Result<Vec<RecordDigest>, String> {
+        let Some(mut current) = target else {
+            return Ok(Vec::new());
+        };
+        let ready = self
+            .record_index
+            .causally_ready_operations()
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        let mut seen = BTreeSet::new();
+        let mut history = Vec::new();
+        loop {
+            if !ready.contains(&current) || !seen.insert(current) {
+                return Err("capture ancestry is incomplete".into());
+            }
+            history.push(current);
+            let record = self
+                .record_index
+                .operation(&current)
+                .ok_or("capture record is missing")?;
+            match record.parents.as_slice() {
+                [] => break,
+                [parent] => current = *parent,
+                _ => return Err("capture ancestry is not a single observation line".into()),
+            }
         }
-        self.ensure_physical_root()
+        history.reverse();
+        Ok(history)
+    }
+
+    pub(crate) fn historical_capture_entries(
+        &self,
+        target: RecordDigest,
+    ) -> Result<BTreeMap<String, HistoricalCaptureEntry>, String> {
+        let (state, entries) = self
+            .historical_workspace_materialization(target)
             .map_err(|error| error.to_string())?;
-        Ok(HistoricalOperationPlan {
-            target,
-            basis,
-            operations: operations.to_vec(),
-        })
+        entries
+            .into_iter()
+            .map(|entry| {
+                let mut components = managed_path_components(&entry.path, false)?;
+                let name = components.pop().ok_or("capture path is empty")?;
+                let parent_id = resolve_directory(&state, &components)?;
+                let binding = state
+                    .directory(parent_id)
+                    .and_then(|dir| dir.entry(&name))
+                    .ok_or("capture binding is missing")?;
+                let object = state
+                    .object(binding.object_id())
+                    .ok_or("capture object is missing")?;
+                let is_directory = object.kind() == mesh_materializer::ObjectKind::Directory;
+                let file = if is_directory {
+                    None
+                } else {
+                    let version = object
+                        .current_version()
+                        .ok_or("capture file version is missing")?;
+                    let value = state
+                        .file_version(version)
+                        .ok_or("capture file metadata is missing")?;
+                    let manifest = self
+                        .record_index
+                        .manifest(&RecordDigest::from_bytes(*value.manifest_id().as_bytes()))
+                        .ok_or("capture manifest is missing")?;
+                    Some((
+                        version,
+                        manifest.content_digest,
+                        value.portable_metadata().is_executable(),
+                    ))
+                };
+                Ok((
+                    entry.path,
+                    HistoricalCaptureEntry {
+                        binding: ManagedEntryBasis {
+                            object_id: binding.object_id(),
+                            parent_id,
+                            name,
+                            is_directory,
+                        },
+                        file,
+                    },
+                ))
+            })
+            .collect()
     }
 
     pub(crate) fn managed_checkpoint_basis(

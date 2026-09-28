@@ -29,6 +29,7 @@ pub use provisioning::{AttachmentStorage, ProvisionedAttachment, RegisteredAttac
 mod background;
 mod candidate_review;
 mod candidates;
+mod capture_line;
 pub use background::{
     AttachmentCaptureService, CaptureOutcome, CapturePhase, CaptureSchedule, CaptureStatus,
     NativeSignalState,
