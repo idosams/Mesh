@@ -118,3 +118,19 @@ The daemon host test additionally proves observation-only ticks do not dispatch 
 when a slot opens. Catalogue tests refuse execution lookup for reconstructed services; IPC registration
 tests permit only exact-instance retries. These tests do not consume model usage, exercise Tauri's
 renderer commands, establish process-tree shutdown, or prove graphical interaction.
+
+## Shared stream protocol boundary
+
+`fleet::provider::protocol` decodes external provider events separately from Mesh
+IPC. Codex's live pipe reader uses it; Claude stream-json decoding is covered by
+protocol fixtures but has no process adapter yet. Provider fractional cost/usage
+values are accepted and redacted. Duplicate keys, oversized/deep events, malformed
+identity and identity replacement fail closed. An assistant error or Claude
+`is_error=true` is failure even when the result subtype says `success`; a later
+result cannot erase it. EOF and unknown events never imply completion.
+
+The existing Codex process outcome still requires successful exit, complete pipe
+closure, a completed turn and no protocol failure. No protocol event grants
+checkpoint, review, custody release or shared-main authority. New conformance tests
+live beside the shared decoder and run in the daemon unit suite. Live Claude
+launch/configuration/custody tests and successful authenticated runs remain required.

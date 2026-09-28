@@ -85,6 +85,10 @@ mesh-crypto = { path = "../mesh-crypto", version = "=0.0.0" }
 # the IPC surface; the binary reads one exact 0600 file and sends only canonical receipt bytes.
 ed25519-dalek = { version = "=2.1.1", default-features = false, features = ["std", "zeroize"] }
 
+# External provider JSON includes fractional usage/cost fields; Mesh IPC stays integer-only.
+serde = "=1.0.229"
+serde_json = "=1.0.151"
+
 [dev-dependencies]
 mesh-bench = { path = "../mesh-bench", version = "=0.0.0" }
 ring = { version = "=0.17.14", default-features = false, features = ["std"] }

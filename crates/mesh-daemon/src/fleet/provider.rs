@@ -22,24 +22,12 @@ pub struct CodexAdapter {
     desktop_bridge: bool,
 }
 
-/// Bounded activity metadata. Provider message bodies and raw stderr are not retained here.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct CodexObservation {
-    /// Provider-assigned thread identity, when acknowledged.
-    pub thread: Option<String>,
-    /// Number of stdout events consumed, including ignored future event types.
-    pub events: u64,
-    /// Number of stderr lines consumed; these are not necessarily failures.
-    pub stderr_lines: u64,
-    /// Last recognized activity category, with no command text or file contents.
-    pub activity: Option<String>,
-    /// A completed turn was reported by the provider.
-    pub turn_completed: bool,
-    /// Explicit provider failure, malformed output or transport-reader failure.
-    pub failed: bool,
-    /// Both pipes closed. Process exit alone does not imply this.
-    pub streams_closed: bool,
-}
+/// Redacted stream protocols shared by native provider adapters.
+pub mod protocol;
+/// Compatibility name for existing Codex host consumers.
+pub use protocol::ProviderObservation as CodexObservation;
+use protocol::ProviderProtocol;
+
 #[derive(Default)]
 struct Output {
     observation: CodexObservation,
@@ -255,45 +243,7 @@ fn consume(reader: impl io::Read, output: Arc<Mutex<Output>>, stderr: bool) {
             state.observation.stderr_lines = state.observation.stderr_lines.saturating_add(1);
             continue;
         }
-        state.observation.events = state.observation.events.saturating_add(1);
-        let Some(event) = std::str::from_utf8(&line)
-            .ok()
-            .and_then(|line| Json::parse(line.trim()).ok())
-        else {
-            state.observation.failed = true;
-            continue;
-        };
-        match event.get("type").and_then(Json::as_text) {
-            Some("thread.started") => {
-                if let Some(id) = event.get("thread_id").and_then(Json::as_text).filter(|id| {
-                    id.len() == 36
-                        && id.bytes().enumerate().all(|(index, b)| {
-                            if [8, 13, 18, 23].contains(&index) {
-                                b == b'-'
-                            } else {
-                                b.is_ascii_hexdigit()
-                            }
-                        })
-                }) {
-                    state.observation.thread = Some(id.into());
-                } else {
-                    state.observation.failed = true;
-                }
-            }
-            Some("turn.completed") => {
-                state.observation.turn_completed = true;
-            }
-            Some("turn.failed" | "error") => {
-                state.observation.failed = true;
-            }
-            Some(kind @ ("turn.started" | "item.started" | "item.updated" | "item.completed")) => {
-                state.observation.activity = Some(kind.into());
-            }
-            Some(_) => {} // Future event types do not grant success or change authority.
-            None => {
-                state.observation.failed = true;
-            }
-        }
+        ProviderProtocol::Codex.observe(&line, &mut state.observation);
     }
     let mut state = output
         .lock()

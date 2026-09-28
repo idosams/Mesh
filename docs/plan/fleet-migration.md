@@ -1949,3 +1949,27 @@ it returns all 35 to passing. The preceding #106 full desktop run passed 162
 renderer and 575 source/controller tests. This increment's full desktop gate remains
 pending. #102's full native run is still active; actual native dialogs, packaged
 restoration and final combined-main acceptance remain unverified.
+
+## I08a shared provider event decoding
+
+New canonical implementation based on #107 at
+`673b62dcbbe015ddd83b32a5bcd172cdbf666c4f`; no preserved source commit is replaced.
+Codex's pipe reader now delegates to a bounded external-provider decoder. Mesh IPC
+remains integer-only, while provider cost and usage numbers may be fractional or
+signed. Existing locked serde/serde_json versions are reused as direct daemon
+edges, with no package version changes. Duplicate keys, malformed JSON, excessive
+nesting/size and changing session identities refuse.
+
+Claude stream-json observation distinguishes an explicit successful result from
+`subtype=success,is_error=true` and assistant authentication errors. Errors remain
+sticky across later successful results. Shared protocol tests cover both formats;
+raw message bodies and numeric values do not enter observations. The existing
+Codex observation name remains a compatibility alias. This does not launch Claude,
+change durable dispatch/custody, or claim a second successful real provider.
+
+Repository/docs/license/storage checks pass. Focused source tests are running in
+an isolated harness to avoid mutating the target used by the active #102 full
+native run. Full canonical validation, mutation evidence and live Claude execution
+remain pending. The #107 hosted checks all pass, but its local desktop build is
+still waiting in native module loading. No source or branch result substitutes
+for the full acceptance journeys and merged combined-main checks.

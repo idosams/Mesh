@@ -1857,6 +1857,8 @@ dependencies = [
  "mesh-store",
  "mesh-types",
  "ring",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
