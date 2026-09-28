@@ -69,3 +69,11 @@ This proves explicit local capture, restart, review, and software-key publicatio
 not prove protected approval in an eligible signed build, remote collaboration, or a clean-Mac
 installation. See the [phase assessment](phase-assessment.md) for the candidate's validation status
 and the [user playbooks](user-playbooks.md) for the operational journey.
+
+## Pending checkpoint shutdown correction
+
+The current branch drains idle-checkpoint workers before daemon destruction returns, preserving
+database identity checks during immediate workspace restart. A focused native regression passed
+normal and unwinding worker exits, failed under the original shutdown behavior, and passed again
+after restoration. All 26 checkpoint-save integration cases passed on macOS. Full validation,
+hosted Linux confirmation and merged delivery remain pending; this does not resolve the separate attachment event-registration startup issue.
