@@ -173,3 +173,29 @@ and grant a non-replayable launch permit only for the original successful insert
 lost after commit, the call returns an error; a later receipt recovery remains replay and cannot be
 used to infer that no process started or to authorize another launch. A separate pre-read is not an
 atomic substitute, because concurrent identical requests can both miss an earlier receipt.
+
+## Receiving admission implementation
+
+The native `RemoteAdmissionRegistry` now records immutable work before input materialization in a
+shared worker ledger. Coordinator key and objective define the stream; assignment identity defines
+uniqueness within it. Changing the worker, lane, run, task, provider, source input/bundle, initial
+lease or allocation cannot create another reservation for that assignment. Native configuration
+supplies keys, objective limits and the ledger; these values are correlation, not authentication.
+The supervisor must use the same guarded worker ledger across connections and allocations.
+
+The original committed insertion produces a non-cloneable input reservation, consumed by the native
+receiver's `materialize_reserved` operation. Exact replay returns only retained facts, even after
+restart or expiry. A failed or lost materialization consumes the reservation and requires explicit
+reconciliation. It never frees the slot or creates a second reservation. Concurrent admissions use
+the ledger revision transaction to enforce the objective's concurrency cap. This first lifecycle
+increment conservatively retains every admitted slot and refuses another attempt for the same lane;
+terminal reconciliation and authorized retry are still required before production execution.
+
+This API integrates durable admission with pinned file materialization, but is not exposed to peers.
+Native provisioning of the shared worker ledger, current authentication/capability admission,
+initial worker history binding, process launch/acknowledgment, terminal receipts, bidirectional
+transport authentication and result recovery remain unfinished. An input reservation cannot launch a
+provider or advance protected main. Existing lower-level materialization remains available to trusted
+native callers; the worker transport must use the registry path rather than treating a folder name
+as admission. The additive closed canonical `mesh.remote-admission/v1` record lives in separate fleet
+event streams; unknown fields/versions or changed retained configuration refuse without migration.

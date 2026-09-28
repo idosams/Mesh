@@ -2268,8 +2268,9 @@ it does not implement transport, launch ownership or remote execution.
 
 Four native regressions cover transfer/resume/exclusive ownership and materialization, store
 replacement without writes into the replacement, links/oversized partial objects with retained
-external bytes, and ancestor-alias movement into a protected project. Native execution and full
-CI are pending. The [execution contract](fleet-remote-execution-contract.md) retains crash/space,
+external bytes, and ancestor-alias movement into a protected project. All eleven input-transfer native
+tests passed locally; all seven exact-head CI checks passed and #123 is merged. The
+[execution contract](fleet-remote-execution-contract.md) retains crash/space,
 authentication, receiving lifecycle, result reconciliation and actual second-machine requirements.
 
 ## R09 atomic insertion provenance for receiving ownership
@@ -2280,6 +2281,27 @@ The existing transactional fleet store now exposes inserted-versus-replayed outc
 changing its schema, receipt encoding or legacy append behavior. This supplies a required building
 block for the receiving attempt registry; it is not the registry, a launch permit, or remote execution.
 Three added regressions cover identical concurrent requests, restart/later-write replay, and authority
-loss after independently observed durable commit. Native execution/full CI remain pending. The
+loss after independently observed durable commit. All thirteen fleet-store tests passed locally;
+an isolated replay-as-insertion mutation failed the concurrency regression as expected. All seven
+exact-head checks passed and #124 is merged. The
 [execution contract](fleet-remote-execution-contract.md) retains all receiving lifecycle and acceptance
 requirements.
+
+## R10 durable remote admission before allocation
+
+New canonical implementation based on #124 at
+`e3dc216585a82d849edf100c9edf100236b3ea30`; no preserved source commits are replaced.
+A shared worker ledger reserves immutable coordinator/objective/assignment work before native
+materialization. Only the original atomic insertion returns a single-use input reservation; replay
+returns facts, including after restart or expiry. Changing allocation or assignment fields cannot
+evade uniqueness. Concurrent requests cannot overbook the objective's retained concurrency slots.
+The pinned receiver consumes the reservation and checks the complete assignment before materializing.
+
+Six native regressions passed locally: identical and distinct concurrent connections, retained
+restart/expiry claims, changed work/allocation refusal, configuration/history validation, closed
+canonical records and actual pinned materialization with no regrant after refusal. The current
+store and daemon test crate were rebuilt in independent output locations using unchanged dependency
+artifacts. This is focused native evidence, not a full local Cargo gate; complete hosted CI is pending.
+No existing fleet event schema or dependency changes. The additive admission record refuses unknown
+formats. Shared native ledger provisioning, terminal reconciliation/retry, worker history binding,
+launch ownership, authenticated transport and actual second-machine execution remain required.

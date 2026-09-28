@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 /// Nothing here launches a provider, adopts an attempt or approves protected main.
 pub struct NativeRemoteInputReceiver<'a> {
     manifest: RemoteInputManifest,
+    assignment: RemoteAssignment,
     cas: Cas<ReceivingFs<'a>>,
     destination: &'a RemoteInputDestination,
     _lock: File,
@@ -36,6 +37,7 @@ impl<'a> NativeRemoteInputReceiver<'a> {
         destination.verify().map_err(store_error)?;
         Ok(Self {
             manifest,
+            assignment: assignment.clone(),
             cas,
             destination,
             _lock: lock,
@@ -76,6 +78,18 @@ impl<'a> NativeRemoteInputReceiver<'a> {
     pub fn materialize(&mut self, allocation_id: &str) -> io::Result<RemoteInputAllocation> {
         self.destination.verify()?;
         self.receiver().materialize(self.destination, allocation_id)
+    }
+    /// Consume the original durable admission reservation. Replay cannot construct this value.
+    /// Failure consumes it too: retained partial work requires reconciliation, never reallocation.
+    /// This verifies the exact assigned input and native destination, but does not start a provider.
+    pub fn materialize_reserved(
+        &mut self,
+        reservation: crate::fleet::RemoteInputReservation,
+    ) -> io::Result<RemoteInputAllocation> {
+        let allocation = reservation
+            .consume(&self.assignment)
+            .map_err(|_| io::Error::other("remote input reservation does not match assignment"))?;
+        self.materialize(&allocation)
     }
 }
 fn store_error(_: io::Error) -> Error {
@@ -277,6 +291,73 @@ mod tests {
             .unwrap();
         assert_eq!(fs::read(allocation.path().join("note")).unwrap(), b"hello");
         assert!(allocation.path().join("empty").is_dir());
+        allocation.verify().unwrap();
+    }
+
+    #[test]
+    fn durable_reservation_materializes_once_and_failure_never_regrants() {
+        use crate::fleet::{Limits, RemoteAdmissionOutcome, RemoteAdmissionRegistry, RemoteWork};
+        use mesh_store::fleet::FleetStore;
+        let fixture = Fixture::new();
+        let mut registry = RemoteAdmissionRegistry::new(
+            FleetStore::open(fixture.0.join("worker.sqlite")).unwrap(),
+            &"cd".repeat(32),
+            &"ab".repeat(32),
+            "objective",
+            Limits {
+                lanes: 2,
+                concurrency: 2,
+                depth: 0,
+                retries: 0,
+            },
+        )
+        .unwrap();
+        let work = RemoteWork {
+            lane: "lane".into(),
+            run: "run".into(),
+            assignment: assignment(&manifest()),
+            provider: "codex".into(),
+            goal: "Task".into(),
+        };
+        let id = "0123456789abcdef0123456789abcdef";
+        let destination = fixture.destination();
+        let mut receiver = open(&destination);
+        let RemoteAdmissionOutcome::Reserved(reservation) =
+            registry.reserve(work.clone(), id, 100).unwrap()
+        else {
+            panic!("new admission")
+        };
+        receiver
+            .accept(Blake3::digest_bytes(b"hello"), 0, b"hello", true)
+            .unwrap();
+        let allocation = receiver.materialize_reserved(reservation).unwrap();
+        assert_eq!(fs::read(allocation.path().join("note")).unwrap(), b"hello");
+        assert!(matches!(
+            registry.reserve(work.clone(), id, 100),
+            Ok(RemoteAdmissionOutcome::Retained(_))
+        ));
+
+        let mut changed = work;
+        changed.assignment.id = "second".into();
+        changed.lane = "second-lane".into();
+        changed.run = "second-run".into();
+        let second_id = "a".repeat(32);
+        let RemoteAdmissionOutcome::Reserved(reservation) =
+            registry.reserve(changed.clone(), &second_id, 100).unwrap()
+        else {
+            panic!("second admission")
+        };
+        // Matching input bytes alone are insufficient: the full attempt must also match.
+        assert!(receiver.materialize_reserved(reservation).is_err());
+        assert!(!fixture
+            .0
+            .join("wrapper/allocations")
+            .join(format!("input-{second_id}"))
+            .exists());
+        assert!(matches!(
+            registry.reserve(changed, &second_id, 100),
+            Ok(RemoteAdmissionOutcome::Retained(_))
+        ));
         allocation.verify().unwrap();
     }
     #[test]

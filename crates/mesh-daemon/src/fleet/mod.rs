@@ -20,6 +20,11 @@ mod file_deletions;
 #[cfg(unix)]
 pub mod provider;
 mod remote;
+mod remote_admission;
+pub use remote_admission::{
+    RemoteAdmissionOutcome, RemoteAdmissionReceipt, RemoteAdmissionRegistry,
+    RemoteInputReservation, RemoteWork,
+};
 mod remote_input;
 #[cfg(unix)]
 pub use remote_input::NativeRemoteInputReceiver;
