@@ -20,8 +20,8 @@ accepted result to the original folder is a separate, explicitly confirmed nativ
 
 ## Implemented source coverage
 
-The combined implementation assessed here is `9c4f7ee97de427aa5d57320ae61d54b4e8f8e401`
-([PR #116](https://github.com/idosams/Mesh/pull/116)). Its source includes:
+The combined implementation assessed here is `b08674d4f5ec963204984d2e09e6dacda884fd66`
+([PR #120](https://github.com/idosams/Mesh/pull/120)). Its source includes:
 
 - Durable SQLite records, signed private checkpoints, exact saved versions, review bundles and
   guarded native approval/publication. Native code retains filesystem, identity and custody authority.
@@ -44,11 +44,14 @@ The combined implementation assessed here is `9c4f7ee97de427aa5d57320ae61d54b4e8
   deletion, directory, type-conversion and grouped application; retained recovery and whole-entry
   restoration controls. Group application can have partial outcomes. Inspection never authorizes
   replay or cleanup, and restoration preserves displaced work instead of erasing it.
-- A four-worker serial/parallel measurement driver that checks exact saved results and observed
-  overlap. It is an acceptance tool, not a measured speedup or evidence that the journey ran.
+- A real Codex four-worker comparison with exact saved results and acknowledged worker overlap:
+  168.531 s serial and 57.748 s parallel in one completed native pair. The
+  [measurement record](plan/fleet-native-measurements.md) retains a failed startup attempt and
+  the successful later attempt. These results do not establish GUI or human-review performance.
 - Remote assignment/lease records, a single-use signed worker challenge, and bounded immutable
-  input manifests with resumable CAS receipt and complete-file verification. These are foundations;
-  they do not establish an authenticated connection or execute a remote worker.
+  input manifests with resumable CAS receipt, exact attached/managed saved-input export and
+  create-only private materialization with complete output verification. These foundations do not
+  establish an authenticated connection or execute a remote worker.
 
 Source behavior and automated coverage must not be confused with the packaged graphical journey.
 Restored fleet history is readable without adopting a worker or recreating execution authority.
@@ -56,7 +59,7 @@ Uncertain ownership still requires native reconciliation before further executio
 
 ## Verification and unfinished acceptance
 
-All seven hosted checks passed for the exact #116 revision, including Linux and macOS native suites,
+All seven hosted PR checks and combined-main CI passed for the exact #120 revision, including Linux and macOS native suites,
 desktop/docs, lint, formatting, dependency and license checks. The latest combined local gate is
 separately tracked in the delivery ledger. Hosted success does not close the intermittent local
 native startup/stop concern in [issue #37](https://github.com/idosams/Mesh/issues/37).
@@ -70,13 +73,14 @@ The complete plan remains open. Required evidence still includes:
 - Revision-bound graphical fleet journeys, parallel review during continued work, restart/recovery,
   native confirmation and human-presence approval in an eligible signed build. Source/renderer tests
   and older packaged binaries do not prove the current revision. Do not install over the user's app.
-- Successful execution with a second real provider, four concurrent workers and a comparable serial
-  baseline. Record provider versions, event/review responsiveness, resource use, cost, time to accepted
-  result and human coordination time. The plan's velocity targets remain hypotheses, not results.
+- Successful execution with a second real provider and a matched external-harness baseline. Extend
+  the completed four-worker native pair with renderer/event responsiveness, resource use, cost, time
+  to accepted result and human coordination measurements. Resolve startup reliability and repeat the
+  experiment before making general velocity claims.
 - The full fault, private-dependency and retention acceptance audit required by the plan, including
   uncertain process ownership, revocation, replaced directories and storage exhaustion.
-- Native immutable input export, mutually authenticated transport, remote materialization and durable
-  executor ownership, verified result transfer and reconnect reconciliation. A real second machine
+- Integration of native input export and materialization with mutually authenticated transport,
+  durable executor ownership, verified result transfer and reconnect reconciliation. A real second machine
   must execute, disconnect and reconnect without duplicate execution or lost acknowledged work.
   See the [remote sequence](plan/fleet-remote-delivery.md); loopback and mock results are insufficient.
 
@@ -108,19 +112,10 @@ See the [user guide](user-guide.md), [architecture](architecture.md),
 [public-alpha guide](launch/public-alpha.md), [phase assessment](phase-assessment.md),
 [user playbooks](user-playbooks.md) and [measurement contract](plan/fleet-native-measurements.md).
 
-## Attached-input export increment
+## Remote input validation
 
-Native source now includes an exact saved attached-version export handle with bounded verified
-chunk reads. Its inspection lock is released before transfer, allowing later capture while old
-saved content remains selected. This addition is under native validation; transport, managed-lane
-export integration and actual remote execution remain unfinished. See the [delivery ledger](plan/fleet-migration.md).
-
-Native managed-review export now binds the complete recorded selection and retains physical lane
-ancestry checks in its read handle, including history-only reopening. Its new native regressions
-are pending. Exporting readable saved bytes does not authorize private-dependency use or remote
-execution; the remaining transport, executor and acceptance requirements are unchanged.
-
-Receiving-side source now provides create-only private tree materialization with complete output
-verification and preservation of failed allocations. Native regressions are pending. A materialized
-tree is not an executor claim: workspace initialization, authenticated remote execution, restart
-reconciliation and second-machine acceptance remain unfinished.
+Exact saved attached/managed export and private receiving materialization are merged through #120.
+All five new materialization regressions passed on hosted Linux/macOS and locally in a focused run.
+Hosted coverage includes the earlier export/history regressions. The combined local full gate remains
+separate and unfinished. These tests do not prove authenticated remote dispatch, workspace
+initialization, executor ownership, restart reconciliation or second-machine acceptance.

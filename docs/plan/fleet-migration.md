@@ -2235,3 +2235,14 @@ non-private storage and retained allocation escape. Repository/docs/license/stor
 new native regression execution and complete CI remain pending. The previous combined-main native
 run is preserved. All remaining remote execution and acceptance requirements remain in the
 [remote sequence](fleet-remote-delivery.md).
+
+## M02 recorded real four-worker comparison
+
+New evidence-only increment based on merged #120 at
+`b08674d4f5ec963204984d2e09e6dacda884fd66`; no preserved implementation is replaced.
+The [measurement record](fleet-native-measurements.md) records one completed native
+Codex serial/parallel pair, exact binary hashes, retained failure and validation scope.
+It does not close cold-start, external-harness, GUI, cost/resource, second-provider,
+remote-machine or human-acceptance requirements. All seven hosted PR and combined-main
+checks passed for #120; all five receiving-materialization tests also passed locally.
+The separate older combined local gate is still active, not counted as passing.

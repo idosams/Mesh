@@ -43,3 +43,44 @@ improvements. Cost, renderer lag and human coordination time remain null, not ze
 CPU/memory measurement, a matched external-harness baseline, interactive parallel
 review and actual human acceptance remain required. The driver's source and CI do
 not establish that paid-provider or packaged acceptance has run.
+
+## Recorded native run: 2026-09-28
+
+The [revision-bound measurement record](evidence/fleet-four-worker-2026-09-28.json) records
+a completed real Codex comparison at `b08674d4f5ec963204984d2e09e6dacda884fd66`
+([PR #120](https://github.com/idosams/Mesh/pull/120)) on macOS 26.6.1 arm64, using
+`codex-cli 0.155.0-alpha.16`. The daemon, bridge and integration driver were built from
+that same revision in a separate directory, reusing existing dependency artifacts after
+checking the dependency source and lockfile were unchanged. This avoided altering an
+already-running full verification target; it is not a fresh Cargo full-gate result.
+Binary hashes and preserved raw-log hashes are included in the record.
+
+| Measurement | Serial | Parallel |
+| --- | ---: | ---: |
+| Native execution | 168.531 s | 57.748 s |
+| Peak acknowledged unfinished workers | 1 | 4 |
+| Host tick p95 | 1.045 ms | 1.158 ms |
+| State read p95 | 0.253 ms | 0.277 ms |
+| All four saved reviews inspected | 41.376 ms | 41.783 ms |
+
+Both phases verified one attempt per child lane, exact reconstructed saved results,
+and unchanged original files/source state. The successful test completed in 226.40 s.
+These are native observations and sequential review reconstruction timings, not GUI
+latency or human review measurements. Cost, renderer lag and human coordination remain
+unknown. One serial/parallel pair does not establish a repeatable percentage speed gain.
+
+The first acceptance attempt failed at coordinator startup after 31.93 s of test time,
+before serial completion. Its provider body was not retained. A separate tool-free
+Codex diagnostic reproduced a required Mesh MCP handshake timeout at 30 s. Direct
+bridge initialization then succeeded in 0.0076 s and a follow-up tool-free Codex start
+succeeded in 8.68 s. The separately recorded second acceptance attempt passed with
+the same binaries. No timeout, assertion or worker limit was changed. This points to
+a startup-readiness concern but does not prove the original discarded error or resolve
+cold-start reliability. The failed attempt remains part of the evidence.
+
+The command inside the separate test bundle was the compiled `fleet-agent` integration
+binary with `actual_four_workers_compare_serial_and_parallel_saved_reviews --ignored
+--exact --nocapture`, and the explicit `MESH_TEST_CODEX` and matching `MESH_TEST_MCP`
+paths. The Cargo command above remains the ordinary reproduction route. The matched
+external-harness baseline, resource/cost measurements, packaged interactive review,
+second-provider run and human acceptance requirements remain open.
