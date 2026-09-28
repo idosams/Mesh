@@ -139,3 +139,11 @@ stale/foreign/reused authority before journal mutation, and revalidate current m
 custody. The source folder and Git state remain untouched. Verification uses fixture credentials;
 this is not native human-presence or packaged graphical approval proof. Desktop approval controls
 now use this path on an unmerged increment; source integration remains pending.
+
+## Pending checkpoint shutdown correction
+
+The current branch drains idle-checkpoint workers before daemon destruction returns, preserving
+database identity checks during immediate workspace restart. A focused native regression passed
+normal and unwinding worker exits, failed under the original shutdown behavior, and passed again
+after restoration. All 26 checkpoint-save integration cases passed on macOS. Full validation,
+hosted Linux confirmation and merged delivery remain pending; this does not resolve the separate attachment event-registration startup issue.
