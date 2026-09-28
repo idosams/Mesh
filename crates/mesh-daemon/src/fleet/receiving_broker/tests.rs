@@ -403,3 +403,56 @@ fn total_byte_budget_refuses_next_frame_before_it_can_initialize_storage() {
     s.assert_empty_store();
     assert!(session.connect().is_ok());
 }
+
+// Exercise the real authenticated stream boundary for receiving/host integration tests.
+// Keep the Setup alive outside this function so its private storage outlives the native handoff.
+pub(in crate::fleet) fn received_handoff(
+    setup: &Setup,
+    lose_final_reply: bool,
+) -> Box<RemoteReceivedHandoff> {
+    let mut runtime = setup.f.runtime(true);
+    let mut session = setup.session();
+    let (mut client, server) = pair();
+    let handoff = std::thread::scope(|scope| {
+        let worker = scope.spawn(|| {
+            let output: Box<dyn Write> = if lose_final_reply {
+                Box::new(LoseFinalReply {
+                    stream: server.try_clone().unwrap(),
+                    replies: 0,
+                })
+            } else {
+                Box::new(server.try_clone().unwrap())
+            };
+            let outcome = serve_remote_receiving(&mut session, server, output).unwrap();
+            let RemoteReceivingBrokerOutcome::Materialized {
+                handoff,
+                reply_written,
+            } = outcome
+            else {
+                panic!("original native handoff expected")
+            };
+            assert_eq!(reply_written, !lose_final_reply);
+            handoff
+        });
+        authenticate(setup, &mut runtime, &mut client);
+        send(&mut client, setup.manifest_frame());
+        response(&mut client, "manifest");
+        send(&mut client, setup.part(0, setup.bytes.len()));
+        response(&mut client, "chunk");
+        finish(&mut client);
+        if lose_final_reply {
+            assert!(RemoteFrameReader::new(&mut client)
+                .read_frame()
+                .unwrap()
+                .is_none());
+        } else {
+            let reply = response(&mut client, "materialized");
+            assert_eq!(reply.get("request").and_then(Json::as_text), Some("finish"));
+        }
+        drop(client);
+        worker.join().unwrap()
+    });
+    assert!(session.connect().is_err());
+    assert_eq!(handoff.registry.receipts().unwrap().len(), 1);
+    handoff
+}

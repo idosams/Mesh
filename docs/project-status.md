@@ -168,7 +168,15 @@ results/recovery and actual second-machine operation remain unfinished. Evidence
 [ledger](plan/fleet-migration.md#r19-bounded-receiving-broker-loop) and
 [remote execution contract](plan/fleet-remote-execution-contract.md).
 
-The macOS pull-request/main job now invokes the complete `npm test` gate, retaining the separate
-renderer step and all seven existing jobs. This aligns hosted and contributor validation commands;
-the new workflow still needs its own successful run. Preserved local runs and their failures remain
+[PR #138](https://github.com/idosams/Mesh/pull/138) merged the complete macOS `npm test` gate at
+`5941f60e81b1be60599aa2b2194dc507e060ae9c`, retaining the separate renderer step and all seven jobs.
+The literal full gate and all seven exact-head checks passed. Preserved local runs and failures remain
 separate evidence. See [R20](plan/fleet-migration.md#r20-complete-hosted-validation-gate).
+
+The next increment connects the original broker handoff to native workspace initialization,
+durable launch intent and `ReceivedWorkerHost`. Integration tests exercise authenticated stream
+transfer followed by one fixture-provider process, scoped IPC reconnect, signed checkpoint and saved
+review, including loss of the broker's final reply. Changed input must refuse before launch intent.
+Validation is pending. This is local native composition; resident deployment, SSH, signed remote
+result recovery and second-machine acceptance remain open. See
+[R21](plan/fleet-migration.md#r21-broker-handoff-to-native-provider).

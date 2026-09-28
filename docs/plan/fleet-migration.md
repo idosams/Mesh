@@ -2632,3 +2632,25 @@ stages run after a failed Rust command. No test is ignored, removed or relaxed. 
 results must be verified at the exact revision before merging; configuration alone is not a pass.
 Local repository, docs, license and storage checks and their mutation/regression tests passed.
 Earlier local processes and failed logs are preserved, not replaced by a hosted success claim.
+
+## R21 broker handoff to native provider
+
+New canonical integration on merged #138; no preserved source commits are replaced.
+`ReceivedWorkerHost::start_received` consumes the broker's original native allocation and guarded
+registry, verifies and initializes the independent workspace, commits launch intent using the current
+native clock, and starts the admitted adapter through the existing scoped host. Native configuration
+supplies the adapter, endpoint, signer factory, reviewers and checkpoint policy. Receipt replay cannot
+construct a handoff or a launch reservation. Failure preserves work and committed intent for
+reconciliation; it never clears a slot or authorizes another launch.
+
+The integration tests connect real Unix streams, coordinator signature verification, native input
+receipt/materialization, workspace initialization, one fixture-provider process, scoped IPC reconnect,
+signed checkpoint history and saved review. Both a received final reply and deterministic final-reply
+write failure follow that path. Another case changes the materialized input and requires preservation
+and refusal before launch intent or endpoint creation. Existing host tests share their full saved-review
+assertions with these integration cases. Validation is pending.
+
+This is neither a real-provider acceptance run nor deployed SSH/second-machine evidence. The embedding
+resident service must retain and poll the host independently of the broker. Initial worker-proof
+transport, client reply validation, native key/host provisioning, authenticated result lookup after
+reconnect/restart, signed result export/import and final packaged acceptance remain unfinished.

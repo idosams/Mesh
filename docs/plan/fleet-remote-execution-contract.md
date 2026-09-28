@@ -427,3 +427,18 @@ never durable peer receipt. The supervisor must retain or reconcile that handoff
 connection; it must not replay allocation to recover a missing reply. Before handoff, EOF/errors drop
 connection authentication while retaining the native session. Deployed lifecycle and authenticated
 lookup of completed handoffs/results after reconnect or supervisor restart still require integration.
+
+## Broker handoff to native execution
+
+The native embedding owner can pass the original `RemoteReceivedHandoff` to
+`ReceivedWorkerHost::start_received`. This consumes its allocation and guarded registry to initialize
+the exact independent workspace, commit one durable launch intent and enter the existing provider host.
+Native configuration supplies execution parameters. No wire reply, replayed receipt or arbitrary path
+is accepted in place of the original handoff. A retained launch outcome refuses instead of spawning.
+
+The path works with the original handoff even when `reply_written` is false; that flag describes
+transport I/O, not execution authority. An error preserves input/history and any committed intent,
+consumes the handed-off capability and requires reconciliation. It never implies that retry is safe.
+The embedding owner must retain and poll the returned host after connection loss. This API does not
+install a resident service, expose SSH or add remote result/status recovery. Local integration tests
+use real processes with a fixture provider; deployed and actual-provider evidence remain separate.

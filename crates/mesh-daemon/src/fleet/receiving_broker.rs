@@ -205,4 +205,4 @@ fn refused() -> io::Error {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;

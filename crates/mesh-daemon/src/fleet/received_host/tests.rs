@@ -120,7 +120,7 @@ fn received_host_keeps_one_attempt_across_connections_and_serves_signed_checkpoi
     let reservation = fixture.session_reservation();
     let root = std::path::PathBuf::from(reservation.workspace().binding().root());
     let receipt = reservation.receipt().clone();
-    let mut worker = ReceivedWorkerHost::start(
+    let worker = ReceivedWorkerHost::start(
         *reservation,
         adapter(&fixture),
         &fixture.0.join("s"),
@@ -128,7 +128,11 @@ fn received_host_keeps_one_attempt_across_connections_and_serves_signed_checkpoi
     )
     .unwrap();
     assert!(worker.receipt() == &receipt);
-    wait_started(&root);
+    verify_saved_review(worker, &fixture, &root);
+}
+
+fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: &Path) {
+    wait_started(root);
     let objective = worker.service.objective().unwrap();
     let credential = worker.host.test_owned_credential("lane").to_owned();
     let mut connection = Client::open(worker.endpoint());
@@ -288,4 +292,89 @@ fn failed_signer_or_endpoint_does_not_start_or_release_an_attempt() {
             assert_eq!(fs::read(&endpoint).unwrap(), b"preserved existing file");
         }
     }
+}
+
+fn broker_worker_journey(lose_final_reply: bool) {
+    use crate::fleet::receiving_broker::tests::received_handoff;
+    use crate::fleet::receiving_session::tests::Setup;
+    let setup = Setup::new();
+    let handoff = received_handoff(&setup, lose_final_reply);
+    let fixture = Fixture::new();
+    let worker = ReceivedWorkerHost::start_received(
+        *handoff,
+        adapter(&fixture),
+        &fixture.0.join("s"),
+        Arc::new(Signers),
+        crate::TrustedReviewers::default(),
+        crate::CheckpointRuntimeParameters::selected_defaults(),
+    )
+    .unwrap();
+    let receipt = worker.receipt().clone();
+    assert!(receipt.admission().work() == &setup.f.work);
+    assert_ne!(receipt.initial_operation(), setup.manifest.input());
+    let state = worker.service.native_state().unwrap();
+    let binding = state.lanes["lane"].workspace.as_ref().unwrap();
+    let root = std::path::PathBuf::from(binding.root());
+    assert_eq!(fs::read(root.join("result.txt")).unwrap(), setup.bytes);
+    assert_eq!(setup.f.registry().receipts().unwrap().len(), 1);
+    assert!(
+        setup
+            .f
+            .registry()
+            .launch_receipt("assignment")
+            .unwrap()
+            .as_ref()
+            == Some(&receipt)
+    );
+    // This reconnects scoped IPC, checkpoints signed history, reviews it, observes completion,
+    // and asserts exactly one provider launch and one retained run after every connection is gone.
+    verify_saved_review(worker, &fixture, &root);
+    assert!(
+        setup
+            .f
+            .registry()
+            .launch_receipt("assignment")
+            .unwrap()
+            .as_ref()
+            == Some(&receipt)
+    );
+}
+
+#[test]
+fn broker_handoff_runs_one_provider_and_retains_saved_review_after_connections_close() {
+    broker_worker_journey(false);
+}
+
+#[test]
+fn lost_broker_final_reply_still_runs_original_handoff_once_and_retains_saved_review() {
+    broker_worker_journey(true);
+}
+
+#[test]
+fn changed_broker_input_is_preserved_and_refused_before_launch_intent() {
+    use crate::fleet::receiving_broker::tests::received_handoff;
+    use crate::fleet::receiving_session::tests::Setup;
+    let setup = Setup::new();
+    let handoff = received_handoff(&setup, true);
+    let input = handoff.allocation.path().join("result.txt");
+    fs::write(&input, b"preserved changed input").unwrap();
+    let fixture = Fixture::new();
+    assert!(ReceivedWorkerHost::start_received(
+        *handoff,
+        adapter(&fixture),
+        &fixture.0.join("s"),
+        Arc::new(Signers),
+        crate::TrustedReviewers::default(),
+        crate::CheckpointRuntimeParameters::selected_defaults(),
+    )
+    .is_err());
+    assert_eq!(fs::read(input).unwrap(), b"preserved changed input");
+    assert_eq!(setup.f.registry().receipts().unwrap().len(), 1);
+    assert!(setup
+        .f
+        .registry()
+        .launch_receipt("assignment")
+        .unwrap()
+        .is_none());
+    assert!(!fixture.0.join("s").exists());
 }

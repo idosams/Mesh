@@ -2,7 +2,10 @@
 use super::host::{NativeFleetHost, WorkerObservation, WorkerSignerFactory};
 use super::provider::NativeAdapter;
 use super::service::FleetService;
-use super::{Command, RemoteLaunchReceipt, RemoteLaunchReservation};
+use super::{
+    Command, RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation,
+    RemoteReceivedHandoff,
+};
 use crate::ipc::{
     nothing_to_recover, IpcServer, Json, Operations, ServerHandle, StartupSummary, Unavailable,
 };
@@ -48,6 +51,41 @@ impl Operations for ScopedRouter {
 }
 
 impl ReceivedWorkerHost {
+    /// Consume the broker's original native handoff, initialize its independent workspace, commit
+    /// launch intent and start one provider. Native policy supplies every execution parameter.
+    /// The broker's final reply status is deliberately not an execution permission: this same
+    /// original handoff survives a lost reply, while wire replies and retained receipts cannot
+    /// construct it. The caller must retain the returned owner independently of any connection.
+    ///
+    /// Any failure preserves files and committed receipts for reconciliation. It consumes the
+    /// handoff, never erases intent or reconstructs a reservation, and does not authorize a retry.
+    pub fn start_received(
+        handoff: RemoteReceivedHandoff,
+        adapter: impl Into<NativeAdapter>,
+        endpoint: &Path,
+        signers: Arc<dyn WorkerSignerFactory>,
+        reviewers: crate::TrustedReviewers,
+        checkpoint: crate::CheckpointRuntimeParameters,
+    ) -> Result<Self, Unavailable> {
+        let adapter = adapter.into();
+        let workspace = handoff
+            .allocation
+            .into_worker_workspace(reviewers, checkpoint)
+            .map_err(|_| unavailable("remote-host-input-refused"))?;
+        let reservation = handoff
+            .registry
+            .reserve_launch(
+                workspace,
+                adapter.provider(),
+                super::service::received_clock()?,
+            )
+            .map_err(|_| unavailable("remote-host-launch-refused"))?;
+        let RemoteLaunchOutcome::Reserved(reservation) = reservation else {
+            return Err(unavailable("remote-host-launch-retained"));
+        };
+        Self::start(*reservation, adapter, endpoint, signers)
+    }
+
     /// Bind native-configured private local IPC and launch the one originally admitted attempt.
     /// The endpoint and signer factory are native policy, never peer-selected input. The caller
     /// must retain this owner and poll it even when a broker connection disappears.
