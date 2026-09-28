@@ -1,7 +1,7 @@
 # Independent work from attached saved versions
 
-Status: native allocation and desktop source implemented; packaged graphical proof and connection
-to the managed fleet scheduler remain incomplete.
+Status: ordinary lane allocation and desktop source implemented. Native managed fleet allocation
+is connected; desktop fleet controls and packaged graphical proof remain incomplete.
 
 ## Decision
 
@@ -67,3 +67,33 @@ exercise exact selectors, lost acknowledgements, unchanged saved views and path-
 This does not complete fleet orchestration. Managed provider dispatch, authenticated existing-session
 correlation, shared project review/integration, allocation crash reconciliation, empty-project initial
 history, four-worker performance measurements and revision-bound graphical journeys remain required.
+
+
+## Managed fleet entry
+
+`FleetService::create_root_from_attachment` is a separate native entry point for an explicitly
+requested managed agent lane. It validates the retained attachment and exact saved operation,
+records the source project in the fleet ledger, and allocates an additional folder through
+`NativeLaneAllocator`. It does not convert the original project or ordinary attached lanes to
+exclusive custody. Existing non-exclusive source capture and open editor descriptors remain valid.
+
+The allocator checks that its pinned directory is outside the original project and protected roots
+before writing. The shared bounded materializer streams verified saved content into a private
+`source` staging directory. An import without original-folder writeback authority creates a managed
+workspace. Before admitting it to a new independent daemon, the native service verifies the exact
+historical content, current file tree and initial recovery state using the existing version-fork
+predicates. Granting a worker still requires the normal fleet custody/session boundary.
+
+The staging directory is retained; this first bridge does not automatically delete it or reconcile
+partial allocations. Durable intent without a workspace binding and completed bindings without a
+live native context require recovery. Retrying a completed request in the same host reuses its lane
+and preserves later edits; changing project/version/goal/provider under that request refuses.
+Descendants inherit source-project correlation, not source authorship or approval. Their managed
+versions remain separate histories. Integration of results into the original project's main,
+desktop scheduler hosting and live fleet controls remain unfinished.
+
+Native tests allocate from an older attached version, preserve a continuing editor, binary content,
+empty directories and executable state, delegate through the normal scoped agent surface, replay
+project correlation, preserve edits across retries, and refuse source-overlapping destinations,
+unknown versions, incomplete allocations and unreattached contexts after restart. These are native
+source tests, not graphical or real-provider proof of this attachment entry point.

@@ -189,7 +189,7 @@ Native allocation records source project/version ancestry and supports completed
 overwriting subsequent work. Desktop source shows these manual/harness lines with independent capture,
 versions and comparison controls, while the original project/session stays in place. No provider is
 required and no authorship is inferred. This is source-level progress on the work-centered overview;
-managed fleet scheduling, project-main integration, incomplete-allocation reconciliation and packaged
+desktop fleet scheduling, project-main integration, incomplete-allocation reconciliation and packaged
 graphical verification remain required. See [the lane decision](../decisions/attachment-version-lanes.md).
 
 ## Phase 2: durable orchestration
@@ -299,3 +299,10 @@ file identities, distinguishes prepared/applied arrangements from changed or inc
 and retains explicit missing or contradictory outcomes. Bounded catalogues expose an overflow flag
 and direct transaction lookup. No receipt grants replay, cleanup or source-write authority. Human
 restoration, graphical recovery and killed-process campaigns remain required.
+
+Native attachment-to-fleet bridge: exact saved attachment versions can now allocate managed root
+lanes through `FleetService::create_root_from_attachment`. Source project correlation persists and
+follows delegated children. Existing source folders and ordinary capture remain independent;
+managed sessions still use exact custody grants. Native tests verify allocation, delegation,
+correlation replay and preservation on retry/refusal. Desktop hosting/controls, real-provider proof
+of this attached entry point, allocation reconciliation and project-main integration remain open.

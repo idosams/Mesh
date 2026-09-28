@@ -9067,6 +9067,65 @@ impl LiveDaemon {
         ])))
     }
 
+    /// Install a freshly imported attached snapshot into an independent, still-empty lane daemon.
+    /// This is native-only and carries no original-folder writeback authority.
+    pub(crate) fn install_attached_lane(
+        &self,
+        prepared: crate::PreparedFolderImport,
+        snapshot: &HistoricalWorkspacePreview,
+    ) -> Result<WorkspaceSummary, Unavailable> {
+        let (confirmed, _) = prepared
+            .confirm_into_workspace_without_origin()
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        let presented = confirmed.destination();
+        let _custody =
+            crate::workspace_custody::lock_workspace_path_initialization(presented, false)
+                .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        let index = workspace_storage_root(presented)
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?
+            .join(DATABASE_FILE_NAME);
+        if !SqliteRecoveryState::quiesce_default_isolated(
+            recovery_database(&index),
+            &index,
+            LIVE_WORKSPACE_VIEW,
+        )
+        .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?
+        {
+            return Err(workspace_version_refusal("fleet-attachment-import-failed"));
+        }
+        let candidate =
+            OpenWorkspace::reopen_with_trusted_reviewers(presented, &self.trusted_reviewers)
+                .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        if !workspace_version_candidate_is_exact(&candidate, snapshot, None) {
+            return Err(workspace_version_refusal(
+                "fleet-attachment-content-changed",
+            ));
+        }
+        let _open_serial = self
+            .workspace_open
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let _managed_serial = self
+            .managed_edit
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut checkpoint = self
+            .checkpoint
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut held = self.held();
+        if held.is_some() {
+            return Err(workspace_version_refusal(
+                "fleet-attachment-context-not-empty",
+            ));
+        }
+        let (workspace, startup) = self
+            .install_opened_workspace(&mut checkpoint, &mut held, candidate)
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        *self.startup.lock().unwrap_or_else(PoisonError::into_inner) = startup;
+        Ok(workspace)
+    }
+
     /// Recover a confirmed first import that became durable before the native application could
     /// publish its recent-workspace and stable-folder navigation.
     ///

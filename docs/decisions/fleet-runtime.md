@@ -130,3 +130,16 @@ Allocation uses service-generated identities and descriptor-pinned parent creati
 export and final import verify the admitted parent object before writing. An occupied reservation
 or ambiguous allocation is preserved and reported for recovery, never deleted or silently reused.
 This does not claim operating-system isolation from every other process owned by the same user.
+
+
+## Attached project roots
+
+The additive `create-attached-lane` command stores a canonical native project registration identity
+alongside the existing lane goal, provider and exact source operation. Existing `create-lane` bytes
+are unchanged and replay with no source project. Older runtimes refuse the new unknown command;
+there is no silent downgrade to a provider-only lane. The current decoder rejects additional fields,
+unknown event variants and noncanonical encodings. Root creation validates the project identity and
+normal lane limits; children inherit the original project from their parent. Correlation does not
+authenticate edits, convey permission to write the original project, or approve protected main.
+The native entry point separately verifies actual retained attachment authority and immutable
+history membership before committing creation. A replayed origin is metadata, not a new path grant.

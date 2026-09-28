@@ -248,3 +248,10 @@ the exact request and preserves edits made after a completed allocation. Incompl
 allocations are retained and refused; they are not silently replaced. If ancestry cannot be
 verified, the line remains visible with that uncertainty. Packaged graphical acceptance and the
 managed fleet connection remain pending.
+
+The subsequent managed-fleet bridge is a native development API. It can start an additional managed
+lane from an exact attached saved version, retaining correlation to the original project through
+child delegation. It does not relocate your original folder or convert your existing harness
+session to managed custody. Desktop fleet launch controls and real-provider acceptance for this
+entry point are still pending; the ordinary **Create line from this version** action remains usable
+without selecting a provider.

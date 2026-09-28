@@ -238,3 +238,227 @@ fn concurrent_request_retries_share_one_lane_and_do_not_change_saved_history() {
         1
     );
 }
+
+fn fleet_allocator(
+    path: &std::path::Path,
+) -> std::sync::Arc<mesh_daemon::fleet::service::NativeLaneAllocator> {
+    fs::create_dir(path).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+    std::sync::Arc::new(
+        mesh_daemon::fleet::service::NativeLaneAllocator::open(
+            path,
+            mesh_daemon::TrustedReviewers::default(),
+            mesh_daemon::CheckpointRuntimeParameters {
+                idle_interval: Some(std::time::Duration::from_millis(10)),
+                maximum_uncheckpointed_bytes: Some(65_536),
+                maximum_uncheckpointed_interval: Some(std::time::Duration::from_secs(60)),
+            },
+            vec![],
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn attached_fleet_roots_delegate_from_saved_bytes_and_replay_project_correlation() {
+    use mesh_daemon::fleet::service::FleetService;
+    use mesh_daemon::fleet::{Command, Limits, Runtime};
+    use mesh_store::{fleet::FleetStore, RecordDigest};
+    let f = Fixture::new("managed-fleet");
+    fs::write(f.source.join("work.txt"), "saved input\n").unwrap();
+    fs::create_dir_all(f.source.join("empty/subdir")).unwrap();
+    fs::write(f.source.join("binary"), [0, 255, 1]).unwrap();
+    fs::set_permissions(f.source.join("work.txt"), fs::Permissions::from_mode(0o755)).unwrap();
+    let version = RecordDigest::parse_hex(&f.save()).unwrap();
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    editor.write_all(b"ongoing source edits\n").unwrap();
+    let allocation = fleet_allocator(&f.root.join("managed"));
+    let db = f.root.join("fleet.sqlite");
+    let mut runtime = Runtime::open(FleetStore::open(&db).unwrap(), "attached-objective").unwrap();
+    runtime
+        .record(
+            "start",
+            Command::Start {
+                goal: "Coordinate attached work".into(),
+                limits: Limits {
+                    lanes: 4,
+                    concurrency: 3,
+                    depth: 1,
+                    retries: 1,
+                },
+            },
+        )
+        .unwrap();
+    let service = FleetService::new(
+        runtime,
+        allocation.clone(),
+        std::collections::BTreeSet::from(["codex".into(), "authorized-other".into()]),
+    )
+    .unwrap();
+    let lane = service
+        .create_root_from_attachment("root", "Coordinate", "codex", &f.history, version)
+        .unwrap();
+    let state = service.native_state().unwrap();
+    assert_eq!(
+        state.lanes[&lane].source_project.as_deref(),
+        Some(f.history.id())
+    );
+    let root = PathBuf::from(state.lanes[&lane].workspace.as_ref().unwrap().root());
+    assert_eq!(fs::read(root.join("work.txt")).unwrap(), b"saved input\n");
+    assert_eq!(fs::read(root.join("binary")).unwrap(), [0, 255, 1]);
+    assert!(root.join("empty/subdir").is_dir());
+    assert_ne!(
+        fs::metadata(root.join("work.txt"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o111,
+        0
+    );
+    fs::write(root.join("work.txt"), "lane continues\n").unwrap();
+    assert_eq!(
+        service
+            .create_root_from_attachment("root", "Coordinate", "codex", &f.history, version)
+            .unwrap(),
+        lane
+    );
+    assert_eq!(
+        fs::read(root.join("work.txt")).unwrap(),
+        b"lane continues\n"
+    );
+    let before_refusals = service.native_state().unwrap();
+    let allocated_before = fs::read_dir(f.root.join("managed")).unwrap().count();
+    for (goal, provider) in [
+        ("Different task", "codex"),
+        ("Coordinate", "authorized-other"),
+        ("Coordinate", "unauthorized"),
+    ] {
+        assert!(service
+            .create_root_from_attachment("root", goal, provider, &f.history, version)
+            .is_err());
+        assert_eq!(service.native_state().unwrap(), before_refusals);
+    }
+    let other = Fixture::new("managed-other-project");
+    fs::write(other.source.join("work.txt"), "other project").unwrap();
+    let other_version = RecordDigest::parse_hex(&other.save()).unwrap();
+    assert!(service
+        .create_root_from_attachment("root", "Coordinate", "codex", &other.history, other_version)
+        .is_err());
+    assert_eq!(service.native_state().unwrap(), before_refusals);
+    assert_eq!(
+        fs::read_dir(f.root.join("managed")).unwrap().count(),
+        allocated_before
+    );
+    assert_eq!(
+        fs::read(root.join("work.txt")).unwrap(),
+        b"lane continues\n"
+    );
+    let latest = RecordDigest::parse_hex(&f.save()).unwrap();
+    assert!(service
+        .create_root_from_attachment("root", "Coordinate", "codex", &f.history, latest)
+        .is_err());
+    service
+        .native_command(
+            "dispatch",
+            Command::Dispatch {
+                lane: lane.clone(),
+                run: "run".into(),
+            },
+        )
+        .unwrap();
+    let credential = service.grant(&lane, "run", "actor", "session").unwrap();
+    let context = service
+        .agent_call(
+            credential.transport_value(),
+            "context",
+            &Json::empty_object(),
+        )
+        .unwrap();
+    let input = context
+        .get("workspace")
+        .unwrap()
+        .get("workspace_versions")
+        .unwrap()
+        .as_array()
+        .unwrap()[0]
+        .get("operation")
+        .unwrap()
+        .clone();
+    let child = service
+        .agent_call(
+            credential.transport_value(),
+            "delegate",
+            &Json::object([
+                ("request", Json::text("child")),
+                ("goal", Json::text("Independent worker")),
+                ("provider", Json::text("codex")),
+                ("version", input),
+            ]),
+        )
+        .unwrap();
+    assert_eq!(
+        child.get("source_project"),
+        Some(&Json::text(f.history.id()))
+    );
+    let child_id = child.get("id").unwrap().as_text().unwrap();
+    let state = service.native_state().unwrap();
+    let child_root = state.lanes[child_id].workspace.as_ref().unwrap().root();
+    assert_eq!(
+        fs::read(std::path::Path::new(child_root).join("work.txt")).unwrap(),
+        b"saved input\n"
+    );
+    editor.write_all(b"still open\n").unwrap();
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"saved input\nongoing source edits\nstill open\n"
+    );
+    let replay = Runtime::open(FleetStore::open(&db).unwrap(), "attached-objective").unwrap();
+    assert_eq!(replay.state(), &state);
+    let restarted = FleetService::new(
+        replay,
+        allocation,
+        std::collections::BTreeSet::from(["codex".into()]),
+    )
+    .unwrap();
+    assert!(restarted
+        .create_root_from_attachment("root", "Coordinate", "codex", &f.history, version)
+        .is_err());
+    assert_eq!(
+        fs::read(root.join("work.txt")).unwrap(),
+        b"lane continues\n"
+    );
+}
+
+#[test]
+fn attached_fleet_allocator_refuses_source_overlap_unknown_versions_and_partial_retry() {
+    use mesh_daemon::fleet::service::LaneAllocator as _;
+    use mesh_store::RecordDigest;
+    let f = Fixture::new("managed-refuse");
+    fs::write(f.source.join("work"), "saved").unwrap();
+    let version = RecordDigest::parse_hex(&f.save()).unwrap();
+    let inside = fleet_allocator(&f.source.join("allocation"));
+    let lane = format!("lane-{}", "a".repeat(64));
+    assert!(inside
+        .allocate_attached(&lane, &f.history, version)
+        .is_err());
+    assert_eq!(
+        fs::read_dir(f.source.join("allocation")).unwrap().count(),
+        0
+    );
+    let outside = fleet_allocator(&f.root.join("managed"));
+    assert!(outside
+        .allocate_attached(&lane, &f.history, RecordDigest::from_bytes([0; 32]))
+        .is_err());
+    assert_eq!(fs::read_dir(f.root.join("managed")).unwrap().count(), 0);
+    let partial = f.root.join("managed").join(&lane);
+    fs::create_dir(&partial).unwrap();
+    fs::write(partial.join("keep"), "uncertain work").unwrap();
+    assert!(outside
+        .allocate_attached(&lane, &f.history, version)
+        .is_err());
+    assert_eq!(fs::read(partial.join("keep")).unwrap(), b"uncertain work");
+    assert!(!partial.join("source").exists());
+}

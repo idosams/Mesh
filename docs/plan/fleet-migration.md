@@ -493,3 +493,28 @@ component is restored byte-for-byte before rerunning. Native/full/hosted validat
 acceptance remain pending until recorded against this increment. Source checkouts and prior failed
 verification are preserved. The full fleet objective, human review and combined-main testing remain
 required.
+
+## L01b attached saved versions enter managed fleet lanes
+
+Preserved source `c728c41c9831e636a6bdfbb9b0212739ad6ba974` transfers on #44 at
+`857ec2836071e7d29d8d11d234437fd04b93da8c`. It adds a native managed-lane entry point,
+exact staged-content admission and durable source-project correlation inherited by delegated
+children. The original project keeps non-exclusive capture and ordinary editor access. Managed
+workers receive authority through the existing scoped custody/session mechanism. The shared
+materializer retains L01a's entry-type race refusal; #40's shutdown drain remains intact.
+
+Canonical adaptation retains accumulated project status, acceptance criteria and provenance.
+Additional regression assertions verify that changing a completed request's goal, provider or
+source project refuses without changing fleet state, allocating another folder or replacing lane
+edits. Neither this bridge nor its parent is merged. Desktop fleet hosting, scoped command-line
+entry and real-provider acceptance follow as separate increments, including preserved source
+`e987565983cc7f57be33fe211f9f4bb4d290fad2`.
+
+Parent #44 passed three native lane integration tests, the entry-type race regression and the
+independent desktop capture/restart test. A names-only inventory mutation failed the race test;
+byte-exact restoration passed. The shared-target stale-method compilation failure is retained;
+rebuilding unchanged current source resolved it. Parent UI type/build, 113 rendering tests,
+38 coordinator tests and docs passed. Its full local gate and hosted Linux/macOS checks are running.
+For this bridge, native regressions, the full gate and hosted validation remain pending. All
+original histories, dirty work and verification records remain preserved. Required human review,
+packaged journeys, every remaining fleet phase, merges and combined-main validation are outstanding.

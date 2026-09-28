@@ -162,23 +162,7 @@ impl AttachmentStorage {
                 let snapshot = workspace
                     .historical_workspace_preview(operation)
                     .map_err(failure)?;
-                if snapshot
-                    .files
-                    .len()
-                    .saturating_add(snapshot.directories.len())
-                    > limits.entries
-                    || snapshot
-                        .files
-                        .iter()
-                        .any(|file| file.byte_length > limits.file_bytes)
-                    || snapshot
-                        .files
-                        .iter()
-                        .try_fold(0_u64, |bytes, file| bytes.checked_add(file.byte_length))
-                        .is_none_or(|bytes| bytes > limits.bytes)
-                {
-                    return Err(invalid("saved lane content exceeds the allocation budget"));
-                }
+                check_budget(&snapshot, limits)?;
                 self.pinned.ensure_namespace_identity()?;
                 let lanes = private_child(&self.pinned, ROOT)?;
                 let allocation_name = name(source.id(), request);
@@ -212,59 +196,7 @@ impl AttachmentStorage {
                 let started = intent(&allocation, source.id(), version, request)?;
                 write(&allocation, INTENT, &started)?;
                 let files = allocation.create_child_directory(OsStr::new("files"))?;
-                let mut directories = snapshot.directories.iter().collect::<Vec<_>>();
-                directories.sort_by_key(|directory| directory.path.split('/').count());
-                for directory in &directories {
-                    files
-                        .filesystem()
-                        .create_dir_all(Path::new(&directory.path))?;
-                }
-                for file in &snapshot.files {
-                    files.filesystem().write_new_file_with(
-                        Path::new(&file.path),
-                        fs::Permissions::from_mode(if file.executable { 0o700 } else { 0o600 }),
-                        |output| {
-                            workspace
-                                .write_historical_workspace_file(file, output)
-                                .map_err(|_| {
-                                    invalid(
-                                        "saved lane content could not be verified while writing",
-                                    )
-                                })
-                        },
-                    )?;
-                }
-                #[cfg(test)]
-                AFTER_COPY.with(|hook| {
-                    if let Some(change) = hook.borrow_mut().take() {
-                        change(&path);
-                    }
-                });
-                let expected: BTreeMap<_, _> = snapshot
-                    .directories
-                    .iter()
-                    .map(|entry| (entry.path.clone(), true))
-                    .chain(
-                        snapshot
-                            .files
-                            .iter()
-                            .map(|entry| (entry.path.clone(), false)),
-                    )
-                    .collect();
-                if inventory(&files, limits.entries)? != expected {
-                    return Err(invalid("lane entries changed during allocation"));
-                }
-                for file in &snapshot.files {
-                    let observed = observe_file(&files, Path::new(&file.path), limits.file_bytes)?;
-                    if observed.digest != file.content_digest.to_string()
-                        || observed.bytes != file.byte_length
-                        || (observed.mode & 0o111 != 0) != file.executable
-                    {
-                        return Err(invalid("lane content changed during allocation"));
-                    }
-                }
-                files.sync()?;
-                files.ensure_namespace_identity()?;
+                materialize(workspace, &snapshot, &files, &path, limits)?;
                 let child = self.provision(&path)?;
                 write(&allocation, READY, &ready(&child, &started.encode())?)?;
                 files.ensure_namespace_identity()?;
@@ -315,6 +247,144 @@ impl AttachmentStorage {
             ("attribution", Json::text("unknown")),
             ("provider", Json::Null),
         ])))
+    }
+}
+
+fn check_budget(
+    snapshot: &crate::workspace::HistoricalWorkspacePreview,
+    limits: ObservationLimits,
+) -> io::Result<()> {
+    if snapshot
+        .files
+        .len()
+        .saturating_add(snapshot.directories.len())
+        > limits.entries
+        || snapshot
+            .files
+            .iter()
+            .any(|file| file.byte_length > limits.file_bytes)
+        || snapshot
+            .files
+            .iter()
+            .try_fold(0_u64, |bytes, file| bytes.checked_add(file.byte_length))
+            .is_none_or(|bytes| bytes > limits.bytes)
+    {
+        return Err(invalid("saved lane content exceeds the allocation budget"));
+    }
+    Ok(())
+}
+
+fn materialize(
+    workspace: &crate::workspace::OpenWorkspace,
+    snapshot: &crate::workspace::HistoricalWorkspacePreview,
+    files: &PinnedWorkspaceRoot,
+    path: &Path,
+    limits: ObservationLimits,
+) -> io::Result<()> {
+    #[cfg(not(test))]
+    let _ = path;
+    let mut directories = snapshot.directories.iter().collect::<Vec<_>>();
+    directories.sort_by_key(|directory| directory.path.split('/').count());
+    for directory in &directories {
+        files
+            .filesystem()
+            .create_dir_all(Path::new(&directory.path))?;
+    }
+    for file in &snapshot.files {
+        files.filesystem().write_new_file_with(
+            Path::new(&file.path),
+            fs::Permissions::from_mode(if file.executable { 0o700 } else { 0o600 }),
+            |output| {
+                workspace
+                    .write_historical_workspace_file(file, output)
+                    .map_err(|_| invalid("saved lane content could not be verified while writing"))
+            },
+        )?;
+    }
+    #[cfg(test)]
+    AFTER_COPY.with(|hook| {
+        if let Some(change) = hook.borrow_mut().take() {
+            change(path);
+        }
+    });
+    let expected: BTreeMap<_, _> = snapshot
+        .directories
+        .iter()
+        .map(|entry| (entry.path.clone(), true))
+        .chain(
+            snapshot
+                .files
+                .iter()
+                .map(|entry| (entry.path.clone(), false)),
+        )
+        .collect();
+    if inventory(files, limits.entries)? != expected {
+        return Err(invalid("lane entries changed during allocation"));
+    }
+    for file in &snapshot.files {
+        let observed = observe_file(files, Path::new(&file.path), limits.file_bytes)?;
+        if observed.digest != file.content_digest.to_string()
+            || observed.bytes != file.byte_length
+            || (observed.mode & 0o111 != 0) != file.executable
+        {
+            return Err(invalid("lane content changed during allocation"));
+        }
+    }
+    files.sync()?;
+    files.ensure_namespace_identity()?;
+    Ok(())
+}
+
+impl ProvisionedAttachment {
+    pub(crate) fn validate_lane_version(&self, version: &str) -> io::Result<()> {
+        self.attachment.inspect_saved(
+            self.metadata_path(),
+            self.store.clone(),
+            version,
+            |workspace, operation| {
+                let snapshot = workspace
+                    .historical_workspace_preview(operation)
+                    .map_err(failure)?;
+                check_budget(&snapshot, ObservationLimits::default())
+            },
+        )
+    }
+
+    pub(crate) fn protected_source(&self) -> io::Result<crate::ProtectedWorkspaceRoot> {
+        self.attachment.ensure_current()?;
+        crate::ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{:016x}:{:016x}",
+            self.attachment.device, self.attachment.inode
+        ))
+    }
+
+    /// Internal create-only export for managed agents. The verified snapshot remains the authority
+    /// for subsequent import verification; changed staging bytes cannot become a different input.
+    pub(crate) fn materialize_saved_version(
+        &self,
+        version: &str,
+        files: &PinnedWorkspaceRoot,
+        path: &Path,
+    ) -> io::Result<crate::workspace::HistoricalWorkspacePreview> {
+        if files.is_within(self.protected_source()?)? {
+            return Err(invalid(
+                "agent allocation must remain outside the original project",
+            ));
+        }
+        let limits = ObservationLimits::default();
+        self.attachment.inspect_saved(
+            self.metadata_path(),
+            self.store.clone(),
+            version,
+            |workspace, operation| {
+                let snapshot = workspace
+                    .historical_workspace_preview(operation)
+                    .map_err(failure)?;
+                check_budget(&snapshot, limits)?;
+                materialize(workspace, &snapshot, files, path, limits)?;
+                Ok(snapshot)
+            },
+        )
     }
 }
 

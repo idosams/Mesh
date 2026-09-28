@@ -144,6 +144,8 @@ pub struct Lane {
     pub parent: Option<String>,
     /// Agent identity responsible for delegation, absent for native-created root lanes.
     pub created_by: Option<AgentOrigin>,
+    /// Original attached project shared by this lane and its descendants, if any.
+    pub source_project: Option<String>,
     /// Work requested of this lane.
     pub goal: String,
     /// Configured adapter identity.
@@ -232,6 +234,19 @@ pub enum Command {
         /// Configured provider adapter.
         provider: String,
         /// Exact immutable input version.
+        base: RecordDigest,
+    },
+    /// Native-created root from an attached project; correlation is not authorship or approval.
+    CreateAttachedLane {
+        /// Objective-unique lane identity.
+        id: String,
+        /// Exact native registration identity.
+        project: String,
+        /// Work requested of the lane.
+        goal: String,
+        /// Native-authorized provider.
+        provider: String,
+        /// Exact saved input operation.
         base: RecordDigest,
     },
     /// Delegate from a current parent run, retaining exact actor/session attribution.
@@ -530,6 +545,31 @@ impl State {
                     lane.saved = Some(result.version);
                 }
             }
+            Command::CreateAttachedLane {
+                id,
+                project,
+                goal,
+                provider,
+                base,
+            } => {
+                if RecordDigest::parse_hex(project).is_err()
+                    || project.len() != 64
+                    || project.bytes().any(|b| b.is_ascii_uppercase())
+                {
+                    return refuse("attachment-project-invalid");
+                }
+                self.apply(&Command::CreateLane {
+                    id: id.clone(),
+                    parent: None,
+                    goal: goal.clone(),
+                    provider: provider.clone(),
+                    base: *base,
+                })?;
+                self.lanes
+                    .get_mut(id)
+                    .ok_or(Error::Refused("lane-missing"))?
+                    .source_project = Some(project.clone());
+            }
             Command::CreateLane {
                 id,
                 parent,
@@ -567,6 +607,10 @@ impl State {
                     Lane {
                         id: id.clone(),
                         parent: parent.clone(),
+                        source_project: parent
+                            .as_ref()
+                            .and_then(|id| self.lanes.get(id))
+                            .and_then(|lane| lane.source_project.clone()),
                         created_by: None,
                         goal: goal.clone(),
                         provider: provider.clone(),

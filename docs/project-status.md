@@ -169,5 +169,12 @@ now use this path on an unmerged increment; source integration remains pending.
 The current branch drains idle-checkpoint workers before daemon destruction returns, preserving
 database identity checks during immediate workspace restart. A focused native regression passed
 normal and unwinding worker exits, failed under the original shutdown behavior, and passed again
-after restoration. All 26 checkpoint-save integration cases passed on macOS. Full validation,
-hosted Linux confirmation and merged delivery remain pending; this does not resolve the separate attachment event-registration startup issue.
+after restoration. All 26 checkpoint-save integration cases passed on macOS. PR #40 now also passed its full local gate (3,038 Rust tests, 543 desktop tests and 44 daemon checks) and all seven hosted checks. Required review and merged delivery remain pending; this does not resolve the separate attachment event-registration startup issue.
+
+The native fleet service now accepts exact saved versions of retained attached projects as managed
+root-lane inputs. It creates additional workspaces without relocating or taking custody of the
+original project, persists source-project correlation, and carries that correlation through normal
+scoped delegation. Native tests verify frozen content, continuing editor writes, retries, replay,
+partial-allocation preservation and source-overlap refusal. This is not yet exposed through desktop
+fleet controls. Retained staging, interrupted allocation/context recovery, original-main integration,
+real-provider validation of this entry point and packaged graphical proof remain incomplete.

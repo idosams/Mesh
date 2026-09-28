@@ -64,6 +64,22 @@ pub(super) fn encode(command: &Command) -> String {
                 ("retries", Json::Number(limits.retries)),
             ],
         ),
+        Command::CreateAttachedLane {
+            id,
+            project,
+            goal,
+            provider,
+            base,
+        } => (
+            "create-attached-lane",
+            vec![
+                ("id", Json::text(id)),
+                ("project", Json::text(project)),
+                ("goal", Json::text(goal)),
+                ("provider", Json::text(provider)),
+                ("base", Json::text(base.to_string())),
+            ],
+        ),
         Command::CreateLane {
             id,
             parent,
@@ -214,6 +230,13 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
                 retries: number("retries")?,
             },
         },
+        Some("create-attached-lane") => Command::CreateAttachedLane {
+            id: text("id")?,
+            project: text("project")?,
+            goal: text("goal")?,
+            provider: text("provider")?,
+            base: digest("base")?,
+        },
         Some("create-lane") => Command::CreateLane {
             id: text("id")?,
             parent: match fields.get("parent") {
@@ -293,5 +316,40 @@ fn parse_state(value: &str) -> Result<RunState, Error> {
         "failed" => Ok(RunState::Failed),
         "cancelled" => Ok(RunState::Cancelled),
         _ => Err(Error::InvalidHistory),
+    }
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+
+    #[test]
+    fn attached_lane_encoding_is_additive_canonical_and_closed() {
+        let version = RecordDigest::from_bytes([7; 32]);
+        let attached = Command::CreateAttachedLane {
+            id: "lane-one".into(),
+            project: "a".repeat(64),
+            goal: "Work".into(),
+            provider: "codex".into(),
+            base: version,
+        };
+        let encoded = encode(&attached);
+        assert_eq!(encode(&decode(&encoded).unwrap()), encoded);
+        assert!(encoded.contains("create-attached-lane"));
+        assert!(decode(&encoded.replacen("\"project\":", "\"unknown\":", 1)).is_err());
+        assert!(
+            decode(&encoded.replacen("create-attached-lane", "create-attached-lane-v2", 1))
+                .is_err()
+        );
+        let legacy = Command::CreateLane {
+            id: "lane-one".into(),
+            parent: None,
+            goal: "Work".into(),
+            provider: "codex".into(),
+            base: version,
+        };
+        let old = encode(&legacy);
+        assert!(!old.contains("project"));
+        assert_eq!(encode(&decode(&old).unwrap()), old);
     }
 }

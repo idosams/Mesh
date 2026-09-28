@@ -126,6 +126,70 @@ impl LaneWorkspace {
         })
     }
 
+    pub(super) fn from_attachment(
+        source: &crate::project_attachment::ProvisionedAttachment,
+        version: RecordDigest,
+        allocation: &crate::root_authority::PinnedWorkspaceRoot,
+        path: &Path,
+        reviewers: TrustedReviewers,
+        checkpoint: CheckpointRuntimeParameters,
+        protected: &[crate::ProtectedWorkspaceRoot],
+    ) -> Result<Self, Unavailable> {
+        let refusal = || {
+            Unavailable::new("fleet-attachment-allocation-unavailable", "The attached version could not be allocated. Retained files require recovery before retrying.")
+        };
+        let files = allocation
+            .create_child_directory(std::ffi::OsStr::new("source"))
+            .map_err(|_| refusal())?;
+        let snapshot_path = path.join("source");
+        let snapshot = source
+            .materialize_saved_version(&version.to_string(), &files, &snapshot_path)
+            .map_err(|_| refusal())?;
+        let (device, inode) = allocation.identity().map_err(|_| refusal())?;
+        let parent = crate::ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{device:016x}:{inode:016x}"
+        ))
+        .map_err(|_| refusal())?;
+        let prepared = crate::PreparedFolderImport::prepare_presented_with_parent(
+            &snapshot_path,
+            &path.join("workspace.mesh"),
+            protected,
+            Some(parent),
+        )
+        .map_err(|_| refusal())?;
+        let daemon = Arc::new(
+            LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+                StartupSummary::from(&nothing_to_recover()),
+                reviewers,
+                checkpoint,
+            )
+            .map_err(|_| refusal())?,
+        );
+        let state = daemon.install_attached_lane(prepared, &snapshot)?;
+        source.protected_source().map_err(|_| refusal())?;
+        files.ensure_namespace_identity().map_err(|_| refusal())?;
+        allocation
+            .ensure_namespace_identity()
+            .map_err(|_| refusal())?;
+        let receipt = Json::object([
+            ("schema", Json::text("mesh.fleet-attachment-allocation/v1")),
+            ("source_project", Json::text(source.id())),
+            ("source_version", Json::text(version.to_string())),
+            ("workspace", state.to_json()),
+        ]);
+        let binding = super::WorkspaceBinding {
+            source_version: version,
+            root: state.root,
+            digest: state.digest,
+            installation: state.installation,
+        };
+        Ok(Self {
+            daemon,
+            receipt,
+            binding,
+        })
+    }
+
     /// Verified allocation identity to commit before any dispatch intent.
     pub fn binding(&self) -> &super::WorkspaceBinding {
         &self.binding
@@ -144,5 +208,86 @@ impl LaneWorkspace {
     /// Current lane state without consulting the desktop-selected workspace.
     pub fn state(&self) -> Result<WorkspaceSummary, Unavailable> {
         self.daemon.workspace_state()
+    }
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+    use crate::project_attachment::{AttachmentStorage, ObservationLimits};
+    use crate::root_authority::PinnedWorkspaceRoot;
+    use ed25519_dalek::{Signer as _, SigningKey};
+    use std::{fs, time::Duration};
+
+    #[test]
+    fn changed_staging_is_preserved_but_never_admitted_as_the_saved_input() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-fleet-staging-race-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let original = root.join("original");
+        let metadata = root.join("metadata");
+        let staging = root.join("staging");
+        for path in [&original, &metadata, &staging] {
+            fs::create_dir(path).unwrap();
+        }
+        fs::write(original.join("work"), "saved input").unwrap();
+        let source = AttachmentStorage::open(&metadata)
+            .unwrap()
+            .provision(&original)
+            .unwrap();
+        let inputs = source
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let key = SigningKey::from_bytes(&[19; 32]);
+        let version = source
+            .project()
+            .save_capture(
+                source.metadata_path(),
+                &inputs,
+                mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+                |body| {
+                    Ok::<_, String>(mesh_types::Signature::from_bytes(
+                        key.sign(body.as_bytes()).to_bytes(),
+                    ))
+                },
+            )
+            .unwrap()
+            .operation()
+            .to_string();
+        let pinned = PinnedWorkspaceRoot::open(staging.clone()).unwrap();
+        let snapshot = source
+            .materialize_saved_version(&version, &pinned, &staging)
+            .unwrap();
+        fs::write(staging.join("work"), "concurrent staging change").unwrap();
+        let prepared = crate::PreparedFolderImport::prepare_presented_with_parent(
+            &staging,
+            &root.join("workspace.mesh"),
+            &[],
+            None,
+        )
+        .unwrap();
+        let daemon = LiveDaemon::with_checkpoint_runtime(
+            StartupSummary::from(&nothing_to_recover()),
+            CheckpointRuntimeParameters {
+                idle_interval: Some(Duration::from_millis(10)),
+                maximum_uncheckpointed_bytes: Some(65_536),
+                maximum_uncheckpointed_interval: Some(Duration::from_secs(60)),
+            },
+        )
+        .unwrap();
+        let result = daemon.install_attached_lane(prepared, &snapshot);
+        assert!(
+            result.is_err(),
+            "a valid import is insufficient: it must match the saved attachment"
+        );
+        assert!(daemon.workspace_state().is_err());
+        assert_eq!(
+            fs::read(staging.join("work")).unwrap(),
+            b"concurrent staging change"
+        );
+        assert_eq!(fs::read(original.join("work")).unwrap(), b"saved input");
+        assert!(root.join("workspace.mesh").exists());
+        fs::remove_dir_all(root).unwrap();
     }
 }
