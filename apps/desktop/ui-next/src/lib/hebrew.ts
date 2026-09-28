@@ -1,5 +1,22 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Request changes to this saved result": "בקשת שינויים בתוצאה השמורה הזו",
+"Requests stay tied to this checkpoint. The originating agent can read them when it next checks its context. Recorded does not mean delivered or addressed, and does not restart a worker.": "הבקשות נשארות משויכות לנקודת השמירה הזו. הסוכן במסלול המקורי יוכל לקרוא אותן בבדיקת ההקשר הבאה שלו. רישום אינו מעיד על מסירה או טיפול ואינו מפעיל סוכן מחדש.",
+"Read recorded change requests": "קריאת בקשות שינוי שנרשמו",
+"Recording the exact change request…": "רושם את בקשת השינוי המדויקת…",
+"Reading recorded requests…": "קורא בקשות שנרשמו…",
+"Read recorded change requests to load any earlier feedback for this result.": "קראו את בקשות השינוי שנרשמו כדי לטעון משוב קודם לתוצאה הזו.",
+"Recorded request": "בקשה שנרשמה",
+"No recorded requests for this result.": "אין בקשות שנרשמו לתוצאה הזו.",
+"Pending receipt": "ממתין לאישור רישום",
+"Retry this exact change request": "ניסיון נוסף לאותה בקשת שינוי",
+"Requested changes": "השינויים המבוקשים",
+"Enter non-empty text within 8 KiB, without hidden control or direction characters.": "יש להזין טקסט שאינו ריק, עד 8 KiB, ללא תווי בקרה או כיווניות נסתרים.",
+"Up to 8 KiB of text. Saved requests remain available after restart. Closing this panel does not cancel a submitted request.": "עד 8 KiB של טקסט. בקשות שנשמרו נשארות זמינות לאחר הפעלה מחדש. סגירת החלונית אינה מבטלת בקשה שנשלחה.",
+"Record change request": "רישום בקשת שינוי",
+"Saved change requests could not be verified. Retry reading the same review.": "לא ניתן לאמת את בקשות השינוי השמורות. נסו לקרוא שוב את אותה הסקירה.",
+"Recording is unconfirmed. Retry the same request to recover its receipt. Restored fleets require recovery before recording new requests.": "הרישום טרם אושר. נסו שוב את אותה הבקשה כדי לשחזר את אישור הרישום שלה. ציים שנטענו מחדש דורשים שחזור לפני רישום בקשות חדשות.",
+
 "Earlier version": "גרסה קודמת",
 "Current version": "גרסה נוכחית",
 

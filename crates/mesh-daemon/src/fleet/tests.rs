@@ -546,3 +546,180 @@ fn legacy_starting_version_remains_absent_after_replay_and_refuses_backfill() {
     drop(restored);
     assert_eq!(fixture.runtime().state(), &state);
 }
+
+fn reviewed_checkpoint(runtime: &mut Runtime) -> ReviewChangeRequest {
+    send(runtime, start());
+    register_lane(runtime, "worker", None);
+    send(runtime, dispatch("worker", "run"));
+    send(
+        runtime,
+        Command::BeginCheckpoint {
+            id: "capture".into(),
+            lane: "worker".into(),
+            origin: AgentOrigin {
+                actor: "actor".into(),
+                session: "session".into(),
+                run: "run".into(),
+                generation: "a".repeat(32),
+            },
+            input_digest: "b".repeat(32),
+        },
+    );
+    let version = RecordDigest::from_bytes([4; 32]);
+    send(
+        runtime,
+        Command::FinishCheckpoint {
+            id: "capture".into(),
+            result: CheckpointResult {
+                complete: true,
+                version,
+                workspace_digest: "c".repeat(32),
+                saved_changes: 1,
+                issue: None,
+            },
+        },
+    );
+    let bundle = RecordDigest::from_bytes([5; 32]);
+    send(
+        runtime,
+        Command::SubmitReview {
+            checkpoint: "capture".into(),
+            bundle,
+        },
+    );
+    ReviewChangeRequest {
+        id: "feedback".into(),
+        lane: "worker".into(),
+        checkpoint: "capture".into(),
+        version,
+        bundle,
+        message: "Please preserve the existing opening paragraph.\nAdd the requested example."
+            .into(),
+    }
+}
+
+#[test]
+fn review_changes_survive_restart_retry_and_cancel_without_scheduling_or_changing_saved_work() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let request = reviewed_checkpoint(&mut runtime);
+    send(&mut runtime, Command::Cancel);
+    let before = runtime.state().clone();
+    let command = Command::RequestReviewChanges(request.clone());
+    let event = runtime.record("feedback", command.clone()).unwrap();
+    assert_eq!(runtime.state().lanes, before.lanes);
+    assert_eq!(runtime.state().checkpoints, before.checkpoints);
+    assert!(runtime.state().cancelled);
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(runtime.state().review_change_requests["feedback"], request);
+    assert_eq!(runtime.record("feedback", command).unwrap(), event);
+    let mut changed = request;
+    changed.message = "Different request".into();
+    assert!(runtime
+        .record("feedback", Command::RequestReviewChanges(changed))
+        .is_err());
+    assert_eq!(runtime.state().revision, event.revision);
+}
+
+#[test]
+fn review_changes_refuse_wrong_selection_and_unbounded_or_unsafe_feedback() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let original = reviewed_checkpoint(&mut runtime);
+    for field in ["lane", "checkpoint", "version", "bundle"] {
+        let mut request = original.clone();
+        match field {
+            "lane" => request.lane = "other".into(),
+            "checkpoint" => request.checkpoint = "other".into(),
+            "version" => request.version = RecordDigest::from_bytes([9; 32]),
+            _ => request.bundle = RecordDigest::from_bytes([9; 32]),
+        }
+        let before = runtime.state().clone();
+        assert!(runtime
+            .record("invalid", Command::RequestReviewChanges(request))
+            .is_err());
+        assert_eq!(runtime.state(), &before);
+    }
+    for message in [
+        "".into(),
+        "  \n".into(),
+        "a".repeat(8193),
+        "😀".repeat(2049),
+        "carriage\rreturn".into(),
+        "hidden\u{0085}control".into(),
+        "hidden\0text".into(),
+        "misleading\u{202e}text".into(),
+    ] {
+        let mut request = original.clone();
+        request.message = message;
+        refuses(
+            &mut runtime,
+            Command::RequestReviewChanges(request),
+            "invalid-review-change-message",
+        );
+    }
+    for n in 0..32 {
+        let mut request = original.clone();
+        request.id = format!("request-{n}");
+        send(&mut runtime, Command::RequestReviewChanges(request));
+    }
+    refuses(
+        &mut runtime,
+        Command::RequestReviewChanges(original),
+        "review-change-request-limit",
+    );
+    assert_eq!(fixture.runtime().state().review_change_requests.len(), 32);
+}
+
+#[test]
+fn review_change_wire_is_closed_and_keeps_existing_command_encoding() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let command = Command::RequestReviewChanges(reviewed_checkpoint(&mut runtime));
+    let encoded = wire::encode(&command);
+    assert_eq!(wire::decode(&encoded).unwrap(), command);
+    assert!(
+        wire::decode(&encoded.replace("\"message\":", "\"unexpected\":true,\"message\":")).is_err()
+    );
+    assert!(wire::decode(&encoded.replace("\"schema\":1", "\"schema\":2")).is_err());
+    assert_eq!(
+        wire::encode(&Command::Cancel),
+        "{\"schema\":1,\"kind\":\"cancel\",\"fields\":{}}"
+    );
+}
+
+#[test]
+fn review_change_utf8_boundary_is_preserved_exactly_across_replay() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let mut request = reviewed_checkpoint(&mut runtime);
+    request.message = "😀".repeat(2048);
+    assert_eq!(request.message.len(), 8192);
+    let event = runtime
+        .record(
+            "unicode-feedback",
+            Command::RequestReviewChanges(request.clone()),
+        )
+        .unwrap();
+    drop(runtime);
+    let mut restored = fixture.runtime();
+    assert_eq!(
+        restored.state().review_change_requests[&request.id],
+        request
+    );
+    assert_eq!(
+        restored
+            .record(
+                "unicode-feedback",
+                Command::RequestReviewChanges(request.clone())
+            )
+            .unwrap(),
+        event
+    );
+    request.message.push('!');
+    assert!(restored
+        .record("oversized-feedback", Command::RequestReviewChanges(request))
+        .is_err());
+    assert_eq!(restored.state().revision, event.revision);
+}

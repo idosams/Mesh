@@ -172,6 +172,23 @@ pub struct Lane {
     pub saved: Option<RecordDigest>,
 }
 
+/// A native-requested revision of one immutable review. Recording is not delivery or approval.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewChangeRequest {
+    /// Objective-unique retry identity.
+    pub id: String,
+    /// Only this originating lane may retrieve the request through agent context.
+    pub lane: String,
+    /// Exact completed checkpoint.
+    pub checkpoint: String,
+    /// Saved content reviewed by the caller.
+    pub version: RecordDigest,
+    /// Exact recorded review bundle.
+    pub bundle: RecordDigest,
+    /// Bounded user feedback, stored privately and never included in diagnostic summaries.
+    pub message: String,
+}
+
 /// Reconstructable objective control state.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct State {
@@ -187,11 +204,15 @@ pub struct State {
     pub lanes: BTreeMap<String, Lane>,
     /// Acknowledged capture intents and immutable outcomes, retained across restart.
     pub checkpoints: BTreeMap<String, Checkpoint>,
+    /// Durable requests remain readable independently of worker attempts.
+    pub review_change_requests: BTreeMap<String, ReviewChangeRequest>,
 }
 
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
+    /// Native-only feedback bound to a completed, recorded review. No scheduling side effects.
+    RequestReviewChanges(ReviewChangeRequest),
     /// Claim a dispatch exactly once before performing its external process launch.
     ClaimLaunch {
         /// Exact lane.
@@ -456,6 +477,40 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::RequestReviewChanges(request) => {
+                id_valid(&request.id)?;
+                id_valid(&request.lane)?;
+                id_valid(&request.checkpoint)?;
+                review_change_message_valid(&request.message)?;
+                if self.review_change_requests.contains_key(&request.id) {
+                    return refuse("review-change-request-exists");
+                }
+                if self.review_change_requests.len() >= 256
+                    || self
+                        .review_change_requests
+                        .values()
+                        .filter(|previous| previous.lane == request.lane)
+                        .count()
+                        >= 32
+                {
+                    return refuse("review-change-request-limit");
+                }
+                let checkpoint = self
+                    .checkpoints
+                    .get(&request.checkpoint)
+                    .ok_or(Error::Refused("checkpoint-missing"))?;
+                if checkpoint.lane != request.lane
+                    || checkpoint.review != Some(request.bundle)
+                    || !checkpoint
+                        .result
+                        .as_ref()
+                        .is_some_and(|result| result.complete && result.version == request.version)
+                {
+                    return refuse("review-change-selection-mismatch");
+                }
+                self.review_change_requests
+                    .insert(request.id.clone(), request.clone());
+            }
             Command::ClaimLaunch { lane, run, owner } => {
                 id_valid(owner)?;
                 if self.cancelled {
@@ -837,6 +892,14 @@ fn id_valid(value: &str) -> Result<(), Error> {
             .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
     {
         return refuse("invalid-identity");
+    }
+    Ok(())
+}
+fn review_change_message_valid(message: &str) -> Result<(), Error> {
+    if message.trim().is_empty() || message.len() > 8192
+        || message.chars().any(|ch| (ch.is_control() && ch != '\n' && ch != '\t')
+            || matches!(ch, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')) {
+        return refuse("invalid-review-change-message");
     }
     Ok(())
 }

@@ -1,3 +1,4 @@
+import { reviewChangeMessage, reviewChangeReceipt, savedReviewChanges } from './fleet-review-changes.js';
 import { loadFleetArtifact } from './fleet-artifact-preview.js';
 import { reviewArtifactKind } from './review-artifact-validation.js';
 import { createFleetPinPersistence, defaultFleetView } from './fleet-pin-persistence.js';
@@ -56,7 +57,7 @@ export function savedFleetReview(raw, selection) {
     projection_authorizes_approval: false, bundle_changes: item.bundle_changes };
 }
 
-export function createFleetReviews({ invoke, laneFor, changed }) {
+export function createFleetReviews({ invoke, laneFor, changed, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
   let queues = {}, pins = [], nextPin = 1n, nextRead = 1, disposed = false, notice = '';
   let persistenceEnabled = false, controlBusy = false, editable = true, persistenceState = { phase: 'session', message: '' };
   const publish = () => { if (!disposed) changed(); };
@@ -124,6 +125,37 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     }
     publish();
   }
+  async function loadChanges(pin) {
+    if (pin.feedback?.loading || pin.feedback?.sending) return;
+    const feedback = { ...pin.feedback, rows: pin.feedback?.rows ?? null, loading: true, error: '' };
+    pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
+    try {
+      const rows = savedReviewChanges(await invoke('fleet_review_changes', pin.selection), pin.selection);
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
+        ? { ...value, feedback: { ...feedback, rows, loaded: true, loading: false } } : value);
+    } catch {
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
+        ? { ...value, feedback: { ...feedback, loading: false, error: 'Saved change requests could not be verified. Retry reading the same review.' } } : value);
+    }
+    publish();
+  }
+  async function requestChanges(pin, message, retry) {
+    if (pin.feedback?.loading || pin.feedback?.sending || !pin.review?.content_complete) return;
+    if (retry ? !pin.feedback?.pending : pin.feedback?.pending || !reviewChangeMessage(message)) return;
+    const pending = retry ? pin.feedback.pending : { request: requestId(), message };
+    if (typeof pending.request !== 'string' || !/^[a-f0-9]{32}$/.test(pending.request)) return;
+    const feedback = { ...pin.feedback, rows: pin.feedback?.rows ?? null, pending, sending: true, error: '' };
+    pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
+    try {
+      const row = reviewChangeReceipt(await invoke('request_fleet_review_changes', { ...pin.selection, ...pending }), pin.selection, pending);
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
+        ? { ...value, feedback: { ...feedback, pending: null, sending: false, rows: [...(feedback.rows ?? []).filter(previous => previous.id !== row.id), row] } } : value);
+    } catch {
+      if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
+        ? { ...value, feedback: { ...feedback, sending: false, error: 'Recording is unconfirmed. Retry the same request to recover its receipt. Restored fleets require recovery before recording new requests.' } } : value);
+    }
+    publish();
+  }
   async function loadArtifact(pin, object, page) {
     if (disposed || pin.artifact?.loading || pin.loading || pin.error || !pin.review?.content_complete) return;
     const change = pin.review.bundle_changes.find(change => change.object_id === object);
@@ -162,12 +194,21 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview'].includes(value.type)) return false;
+      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
         notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (['review-changes', 'retry-review-changes'].includes(value.type) && fields === 'pin,type') {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (pin) { if (value.type === 'review-changes') void loadChanges(pin); else void requestChanges(pin, null, true); }
+        return true;
+      }
+      if (value.type === 'request-review-changes' && fields === 'message,pin,type') {
+        const pin = pins.find(pin => pin.key === value.pin); if (pin) void requestChanges(pin, value.message, false);
+        return true;
       }
       if (value.type === 'artifact-preview' && fields === 'object,page,pin,type' && typeof value.page === 'string' && /^[1-9][0-9]?$/.test(value.page)) {
         const pin = pins.find(pin => pin.key === value.pin);

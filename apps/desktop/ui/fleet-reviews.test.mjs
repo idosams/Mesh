@@ -127,3 +127,32 @@ test('artifact selection is bounded and failures remain retryable without exposi
   h.handle(previewIntent('1')); h.calls[3].resolve(imagePreview(1)); await settle();
   assert.equal(h.snapshot().reviewPins[0].artifact.loading, false); assert.ok(h.snapshot().reviewPins[0].artifact.envelope);
 });
+
+function feedbackReceipt(call) {
+  const { objective: id, request, message, ...selected } = call.args;
+  return { schema: 'mesh.fleet-review-change-receipt/v1', objective: id, selection: selected, request,
+    change: { ...selected, id: `review-change-${'f'.repeat(64)}`, message, status: 'recorded', approval_authority: false } };
+}
+test('uncertain feedback retries the exact request and does not accept a replacement draft', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Add the example.' });
+  assert.equal(h.calls[2].command, 'request_fleet_review_changes');
+  h.calls[2].reject(new Error('private native error')); await settle();
+  const pending = h.snapshot().reviewPins[0].feedback.pending;
+  assert.equal(pending.message, 'Add the example.'); assert.doesNotMatch(h.snapshot().reviewPins[0].feedback.error, /private native/);
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Replacement' }); assert.equal(h.calls.length, 3);
+  h.handle({ type: 'retry-review-changes', pin: '1' }); assert.deepEqual(h.calls[3].args, h.calls[2].args);
+  h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
+  const feedback = h.snapshot().reviewPins[0].feedback;
+  assert.equal(feedback.pending, null); assert.equal(feedback.rows[0].status, 'recorded'); assert.equal(feedback.sending, false);
+});
+test('feedback reads are exact, and closing a panel never restores it from a late request acknowledgment', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  h.handle({ type: 'review-changes', pin: '1' }); assert.equal(h.calls[2].command, 'fleet_review_changes');
+  const { objective: id, ...selected } = selection(1);
+  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v1', objective: id, selection: selected, changes: [] }); await settle();
+  assert.equal(h.snapshot().reviewPins[0].feedback.loaded, true);
+  h.handle({ type: 'request-review-changes', pin: '1', message: 'Revise.' });
+  h.handle({ type: 'close-review', pin: '1' }); h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
+  assert.equal(h.snapshot().reviewPins.length, 0);
+});

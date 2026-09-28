@@ -358,3 +358,34 @@ no writes to retained lane files, missing indexes without durable rebuilding, mi
 without recreation, replaced roots, revoked old credentials, refused new grants and pending mutations
 left untouched. This is history access, not process recovery, execution adoption or main integration.
 The packaged graphical restart journey remains required.
+
+## Exact review change requests
+
+The additive `request-review-changes` event records a native-requested message against one completed
+checkpoint and its exact lane, saved operation and recorded bundle. The private runtime ledger retains
+it independently of run lifetime. The native service verifies retained review history before recording;
+replay also requires the same completed checkpoint and bundle. Existing command bytes and database
+schema are unchanged. Older binaries refuse this unknown command; rollback of a fleet with feedback
+requires a compatible binary. Unknown fields and versions refuse rather than discard feedback.
+
+Messages contain 1–8192 UTF-8 bytes of nonblank text, with control and direction characters refused
+except line feed and tab. The ledger bounds requests to 32 per lane and 256 per objective; no automatic
+retirement is implemented. A caller retry identity hashes to an objective-scoped request identity.
+Identical retries recover the original receipt even after later events; altered content or selection
+with the same identity refuses. Recording does not modify versions, review state, main, cancellation,
+run state or custody. It does not dispatch a process, acknowledge delivery or establish human signing
+identity. Feedback is ordinary native-requested work input, never an approval receipt.
+
+Authenticated `context` exposes only the current lane's recorded requests, each carrying its exact
+checkpoint/version/bundle. Child lanes do not inherit parent feedback. Agents cannot invoke the native
+recording method through their scoped action router. Historical read access exposes feedback after
+restart without adopting execution authority. The desktop uses current-host ownership for recording;
+restored fleets remain read-only until recovery. The existing MCP context tool's additive response
+field requires no new tool or agent mutation permission.
+
+Desktop panels retain an uncertain request identity and message for explicit exact retry, reject
+substituted receipts, and ignore late responses after the panel closes or is replaced. Stored rows
+remain durable; drafts and unconfirmed desktop retry identities are session-only. After closing or
+restarting during an uncertain request, read recorded requests before creating another. There is no
+automatic provider interruption, resume, completion acknowledgment, or claim that the agent has read
+or addressed feedback. These lifecycle extensions and packaged graphical verification remain work.

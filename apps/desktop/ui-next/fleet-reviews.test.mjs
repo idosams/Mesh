@@ -246,3 +246,36 @@ test('Hebrew saved artifact failures remain localized in visual and content view
     assert.match(html, /לא ניתן לאמת את התצוגה המקדימה של הפריט השמור המדויק/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('review feedback distinguishes recorded requests from delivery and retains an uncertain exact retry', () => {
+  const value = pin(); value.feedback = { loaded: true, rows: [{ id: 'request', message: '<script>Feedback</script>', status: 'recorded' }], pending: { request: 'pending', message: 'Original pending message' }, sending: false, error: 'Recording is unconfirmed.' };
+  const html = render({ pins: [value], notice: '' });
+  assert.match(html, /Recorded does not mean delivered or addressed/);
+  assert.match(html, /&lt;script&gt;Feedback&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /Original pending message/); assert.match(html, /Retry this exact change request/);
+  assert.doesNotMatch(html, /<textarea/);
+});
+
+test('Hebrew feedback translates recording state and keeps the original request text literal', () => {
+  const value = pin(); value.feedback = {loaded:true,rows:[{id:'request',message:'Record change request',status:'recorded'}],pending:{request:'pending',message:'משוב <script>original</script>'},sending:false,error:'Recording is unconfirmed. Retry the same request to recover its receipt. Restored fleets require recovery before recording new requests.'};
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /בקשת שינויים בתוצאה השמורה הזו/);
+    assert.match(html, /רישום אינו מעיד על מסירה או טיפול/);
+    assert.match(html, /הרישום טרם אושר/);
+    assert.match(html, /ניסיון נוסף לאותה בקשת שינוי/);
+    assert.match(html, /<bdi dir="auto">Record change request<\/bdi>/);
+    assert.match(html, /<bdi dir="auto">משוב &lt;script&gt;original&lt;\/script&gt;<\/bdi>/);
+    assert.doesNotMatch(html, /<script>|<textarea/);
+    value.feedback.sending = true;
+    html = render({pins:[value],notice:''});
+    assert.match(html, /רושם את בקשת השינוי המדויקת/);
+    assert.match(html, /disabled=""[^>]*>ניסיון נוסף לאותה בקשת שינוי/);
+    value.feedback = undefined;
+    html = render({pins:[value],notice:'',persistence:{phase:'loading',message:'',editable:false}});
+    assert.match(html, /השינויים המבוקשים/);
+    assert.match(html, /<textarea dir="auto"[^>]*disabled=""/);
+    assert.match(html, /disabled=""[^>]*>רישום בקשת שינוי/);
+  } finally { module.exports.setLocale('en'); }
+});

@@ -1945,3 +1945,117 @@ fn restarted_history_reads_preserve_work_and_never_restore_execution_authority()
     fs::rename(&retained, &root).unwrap();
     assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
 }
+
+#[test]
+fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_originating_lane() {
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    let mut f = Fixture::new("review-change-requests");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "review-feedback-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x68; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::write(root.join("note.txt"), "saved result\n").unwrap();
+    let checkpoint = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("result"))]),
+        )
+        .unwrap();
+    let review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", checkpoint.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &f.lane,
+        text(&checkpoint, "checkpoint"),
+        text(&checkpoint, "version"),
+        text(&review, "bundle"),
+    )
+    .unwrap();
+    let before = f.service.native_state().unwrap();
+    let message = "Preserve the previous introduction and add an example.";
+    let receipt = f
+        .service
+        .request_review_changes("reviewer-request", &selection, message)
+        .unwrap();
+    assert_eq!(text(&receipt, "status"), "recorded");
+    assert_eq!(receipt.get("approval_authority"), Some(&Json::Bool(false)));
+    assert_eq!(
+        f.service
+            .request_review_changes("reviewer-request", &selection, message)
+            .unwrap(),
+        receipt
+    );
+    assert!(f
+        .service
+        .request_review_changes("reviewer-request", &selection, "Different feedback")
+        .is_err());
+    let after = f.service.native_state().unwrap();
+    assert_eq!(before.lanes, after.lanes);
+    assert_eq!(before.checkpoints, after.checkpoints);
+    assert_eq!(after.revision, before.revision + 1);
+    assert_eq!(
+        f.service.saved_review_changes(&selection).unwrap(),
+        Json::Array(vec![receipt.clone()])
+    );
+    assert_eq!(
+        f.context().get("review_change_requests"),
+        Some(&Json::Array(vec![receipt]))
+    );
+    assert!(f
+        .call(
+            "request_review_changes",
+            &Json::object([("message", Json::text("Agent cannot impersonate review"))])
+        )
+        .is_err());
+    let child = f.call("delegate", &f.delegate("feedback-child")).unwrap();
+    let child_id = text(&child, "id");
+    f.service
+        .native_command(
+            "dispatch-feedback-child",
+            Command::Dispatch {
+                lane: child_id.into(),
+                run: "child-run".into(),
+            },
+        )
+        .unwrap();
+    let child_credential = f
+        .service
+        .grant(child_id, "child-run", "child-actor", "child-session")
+        .unwrap();
+    let child_context = f
+        .service
+        .agent_call(
+            child_credential.transport_value(),
+            "context",
+            &Json::empty_object(),
+        )
+        .unwrap();
+    assert_eq!(
+        child_context.get("review_change_requests"),
+        Some(&Json::Array(vec![]))
+    );
+    fs::write(root.join("note.txt"), "newer unreviewed work\n").unwrap();
+    assert_eq!(
+        text(
+            &f.service
+                .saved_review_changes(&selection)
+                .unwrap()
+                .as_array()
+                .unwrap()[0],
+            "version"
+        ),
+        text(&checkpoint, "version")
+    );
+}

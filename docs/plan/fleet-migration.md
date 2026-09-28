@@ -843,3 +843,33 @@ both platforms. #57 native validation remains running. Correspondence, candidate
 integration and remaining recovery phases follow in ledger order. Second-provider/four-worker/remote
 and packaged acceptance, named human review, eventual merges and final combined-main tests remain
 required. No original work or running verification was discarded and no PR has been merged.
+
+## R03a exact review change requests for the originating lane
+
+Preserved source `76d24877696474f2383429ca0b80c8eeab3ba3f4` transfers on published #58 at
+`18fcb17ef850428afd032ec4099dc1ad78ea13fd`. The additive native event records bounded feedback
+against one completed checkpoint, saved version and review bundle. Identical retries recover the same
+receipt; changed content or selection under the same request identity refuses. Feedback changes neither
+saved work nor scheduling/custody/approval state. Authenticated agent context exposes only the originating
+lane's requests; child lanes cannot read their parent's feedback or invoke native reviewer recording.
+Restored history can read durable requests, while desktop recording still requires current ownership.
+
+Messages are nonblank UTF-8 text up to 8 KiB, with hidden controls/direction characters refused except
+line feed and tab. Limits are 32 requests per lane and 256 per objective. Older binaries reject the new
+event; existing event encodings/database envelope remain unchanged. Recorded feedback is not evidence
+of delivery, work completion or human signing identity. Desktop drafts and uncertain retry identities
+remain session-only; explicit retry preserves the original message, and late replies cannot reopen a
+closed panel. Provider wakeup/resume and request resolution remain subsequent work.
+
+The canonical adaptation preserves English/Hebrew controls, literal feedback and all earlier native
+regressions. Added Hebrew rendering coverage detects the unlocalized source and coordinator regressions
+detect the previous missing feedback route; byte-exact restoration passes. Local type/build, 141
+interface and 534 desktop tests pass, along with docs/vocabulary/format/diff checks. Added native UTF-8
+boundary coverage preserves exactly 8,192 bytes through restart/retry and refuses the next byte; extra
+refusals cover oversized multibyte text, carriage return and C1 controls. Native/failing-before/full
+execution remains queued behind the preserved #44 gate and this increment needs its own hosted checks.
+Parent #58 has six passing checks with macOS pending. Original work and verification are preserved.
+
+Candidates, decisions, original-main integration, remaining recovery phases, complete provider/four-
+worker/remote and packaged acceptance, named human review, eventual merges and final combined-main
+verification remain required. No migration PR has been merged.

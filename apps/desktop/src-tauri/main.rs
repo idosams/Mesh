@@ -844,6 +844,78 @@ mod desktop {
         .map_err(|_| "Saved fleet review could not be loaded".to_owned())?
     }
 
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn request_fleet_review_changes(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        message: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            let receipt = host
+                .current_fleet(&objective)?
+                .request_review_changes(&request, &selection, &message)
+                .map_err(|_| "Review change request could not be recorded")?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.fleet-review-change-receipt/v1")),
+                ("objective", Json::text(objective)),
+                ("selection", selection.to_json()),
+                ("request", Json::text(request)),
+                ("change", receipt),
+            ])
+            .encode())
+        })
+        .await
+        .map_err(|_| "Review change request did not finish".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn fleet_review_changes(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            let changes = host
+                .fleet_history(&objective)?
+                .saved_review_changes(&selection)
+                .map_err(|_| "Saved review change requests are unavailable")?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.fleet-review-changes/v1")),
+                ("objective", Json::text(objective)),
+                ("selection", selection.to_json()),
+                ("changes", changes),
+            ])
+            .encode())
+        })
+        .await
+        .map_err(|_| "Review change requests could not be read".to_owned())?
+    }
+
     // Only exact saved identities cross this boundary. Neither paths nor execution authority
     // are accepted, and restored history uses the same authenticated artifact reader.
     #[allow(clippy::too_many_arguments)]
@@ -7239,6 +7311,8 @@ mod desktop {
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
                 render_fleet_review_artifact,
+                request_fleet_review_changes,
+                fleet_review_changes,
                 inspect_fleet_starting_comparison,
                 start_attached_fleet,
                 stop_attached_fleet,

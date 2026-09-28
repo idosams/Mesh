@@ -334,3 +334,14 @@ Starting-version comparison after restart requires the starting identity recorde
 older allocations can still expose their recorded review, but Mesh does not guess a starting version.
 Missing or replaced history remains unavailable without being recreated. The complete packaged graphical
 interaction remains unverified.
+
+Within a pinned fleet review, expand **Request changes to this saved result**. Read recorded requests
+before adding feedback, then enter the requested revision and choose **Record change request**.
+The request names that exact saved result. The originating agent can read it on its next context call;
+Mesh does not claim delivery or restart a stopped agent. Up to 32 requests per lane are retained.
+If recording is unconfirmed, use **Retry this exact change request**. The original message and request
+identity are retained while the panel remains open. Closing does not cancel a submitted request.
+After a restart or reload, read recorded requests before submitting another: saved feedback is durable,
+but draft text and unconfirmed retry identities are session-only. Restored fleets support reading;
+recording new requests requires recovered native ownership. This interaction still needs packaged
+visual verification.

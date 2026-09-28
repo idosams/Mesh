@@ -402,3 +402,10 @@ contain no rendered content. Unsupported formats retain metadata, failures remai
 closed panels ignore late replies. Existing native rendering and presentation validation are shared
 with workspace reviews. This grants no approval, export, execution or original-project integration
 authority. Packaged graphical verification remains outstanding.
+
+Review revision-loop increment: native-requested feedback is now durably bound to exact recorded
+results and surfaced to the originating lane through authenticated context. Desktop source provides
+record/read/exact-retry controls per pin. Feedback does not restart workers or assert receipt or
+completion. Native replay, authority, bounded-message and renderer race checks cover the foundation;
+provider wakeup/resume, addressed-result linkage, durable pending desktop requests and the actual
+packaged change-request journey remain phase requirements.

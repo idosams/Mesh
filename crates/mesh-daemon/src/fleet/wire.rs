@@ -1,10 +1,24 @@
 //! Versioned deterministic command encoding. Unknown fields/versions refuse during replay.
-use super::{AgentOrigin, CheckpointResult, Command, Error, Limits, RunState, WorkspaceBinding};
+use super::{
+    AgentOrigin, CheckpointResult, Command, Error, Limits, ReviewChangeRequest, RunState,
+    WorkspaceBinding,
+};
 use crate::ipc::Json;
 use mesh_store::RecordDigest;
 
 pub(super) fn encode(command: &Command) -> String {
     let (kind, fields) = match command {
+        Command::RequestReviewChanges(request) => (
+            "request-review-changes",
+            vec![
+                ("id", Json::text(&request.id)),
+                ("lane", Json::text(&request.lane)),
+                ("checkpoint", Json::text(&request.checkpoint)),
+                ("version", Json::text(request.version.to_string())),
+                ("bundle", Json::text(request.bundle.to_string())),
+                ("message", Json::text(&request.message)),
+            ],
+        ),
         Command::ClaimLaunch { lane, run, owner } => (
             "claim-launch",
             vec![
@@ -190,6 +204,14 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     };
     let digest = |key| RecordDigest::parse_hex(&text(key)?).map_err(|_| Error::InvalidHistory);
     let command = match json.get("kind").and_then(Json::as_text) {
+        Some("request-review-changes") => Command::RequestReviewChanges(ReviewChangeRequest {
+            id: text("id")?,
+            lane: text("lane")?,
+            checkpoint: text("checkpoint")?,
+            version: digest("version")?,
+            bundle: digest("bundle")?,
+            message: text("message")?,
+        }),
         Some("claim-launch") => Command::ClaimLaunch {
             lane: text("lane")?,
             run: text("run")?,

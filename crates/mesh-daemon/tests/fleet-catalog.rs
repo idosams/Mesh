@@ -369,6 +369,13 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
         text(&reviewed, "bundle"),
     )
     .unwrap();
+    let feedback = service
+        .request_review_changes(
+            "native-review-feedback",
+            &selection,
+            "Add the missing example without replacing the opening.",
+        )
+        .unwrap();
     let expected = service.saved_review(&selection).unwrap();
     let input = service
         .saved_starting_comparison(&selection, None, None)
@@ -384,6 +391,10 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
     let before = restored.snapshot().unwrap();
     assert_eq!(history.saved_reviews(&lane, None).unwrap(), page);
     assert_eq!(history.saved_review(&selection).unwrap(), expected);
+    assert_eq!(
+        history.saved_review_changes(&selection).unwrap(),
+        Json::Array(vec![feedback])
+    );
     assert_eq!(
         history
             .saved_starting_comparison(&selection, None, None)

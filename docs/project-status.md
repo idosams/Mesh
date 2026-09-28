@@ -327,3 +327,17 @@ preview failures in both visual and content views. Local type/build, 139 interfa
 tests pass; rendered regressions reject the previous missing-preview and untranslated-error behavior.
 Native, full and exact packaged verification remain separately tracked. Passing source tests or hosted
 checks do not establish packaged acceptance or merged delivery.
+
+Exact review change requests now have native and desktop source support. A pinned result can record
+bounded feedback against its exact checkpoint/version/bundle, recover an uncertain receipt through
+an identical retry, and read durable requests after restart. Authenticated agents see only their own
+lane's requests on their next context call. Recording preserves saved content and run state and never
+implies approval, delivery or completion. Restored fleets expose reads; new requests require current
+native ownership. Desktop drafts/retry identities remain session-only, and provider wakeup, feedback
+resolution and packaged graphical verification remain incomplete.
+
+The canonical feedback transfer preserves localized controls and literal user messages. Local type/build,
+141 interface and 534 desktop tests pass; regressions reject the unlocalized source and previous absent
+feedback routing. Added native UTF-8 boundary/replay and hidden-control cases still require native/hosted
+execution on this revision. Full local and packaged acceptance remain separately tracked, as do named
+human review, eventual merges and final combined-main verification.

@@ -296,6 +296,13 @@ impl FleetHistory {
     pub fn saved_review(&self, selection: &SavedReviewSelection) -> Result<Json, Unavailable> {
         self.0.saved_review(selection)
     }
+    /// Read exact saved feedback without adopting execution authority.
+    pub fn saved_review_changes(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<Json, Unavailable> {
+        self.0.saved_review_changes(selection)
+    }
     /// Compare a result with its verified local starting version.
     pub fn saved_starting_comparison(
         &self,
@@ -873,6 +880,19 @@ impl FleetService {
                         Json::text(&inner.runtime.state().lanes[&grant.lane].goal),
                     ),
                     ("workspace", state.to_json()),
+                    (
+                        "review_change_requests",
+                        Json::Array(
+                            inner
+                                .runtime
+                                .state()
+                                .review_change_requests
+                                .values()
+                                .filter(|request| request.lane == grant.lane)
+                                .map(review_change_json)
+                                .collect(),
+                        ),
+                    ),
                 ]))
             }
             "children" => {
@@ -1026,6 +1046,59 @@ impl FleetService {
             ),
             ("reviews", Json::Array(rows)),
         ]))
+    }
+
+    /// Record native-requested feedback against authenticated saved history. Agents cannot call
+    /// this method through their scoped action router. No worker is launched or marked notified.
+    pub fn request_review_changes(
+        &self,
+        request: &str,
+        selection: &SavedReviewSelection,
+        message: &str,
+    ) -> Result<Json, Unavailable> {
+        super::id_valid(request).map_err(runtime_error)?;
+        super::review_change_message_valid(message).map_err(runtime_error)?;
+        self.with_saved_review(selection, |_open, _binding| Ok(()))?;
+        let id = format!("review-change-{}", token_key(request));
+        let changes = super::ReviewChangeRequest {
+            id: id.clone(),
+            lane: selection.lane.clone(),
+            checkpoint: selection.checkpoint.clone(),
+            version: selection.version,
+            bundle: selection.bundle,
+            message: message.to_owned(),
+        };
+        let mut inner = self.lock()?;
+        inner
+            .runtime
+            .record(&id, Command::RequestReviewChanges(changes.clone()))
+            .map_err(runtime_error)?;
+        Ok(review_change_json(&changes))
+    }
+
+    /// Read recorded feedback for an exact saved selection, without worker or approval authority.
+    pub fn saved_review_changes(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<Json, Unavailable> {
+        self.with_saved_review(selection, |_open, _binding| Ok(()))?;
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        Ok(Json::Array(
+            inner
+                .runtime
+                .state()
+                .review_change_requests
+                .values()
+                .filter(|request| {
+                    request.lane == selection.lane
+                        && request.checkpoint == selection.checkpoint
+                        && request.version == selection.version
+                        && request.bundle == selection.bundle
+                })
+                .map(review_change_json)
+                .collect(),
+        ))
     }
 
     /// Verify the immutable review for one saved checkpoint without navigating or reading live files.
@@ -1342,6 +1415,18 @@ fn lane_identity(objective: &str, parent: &str, request: &str) -> Result<String,
         "lane-{}",
         Blake3::digest_bytes(framed.as_bytes()).to_hex()
     ))
+}
+fn review_change_json(request: &super::ReviewChangeRequest) -> Json {
+    Json::object([
+        ("id", Json::text(&request.id)),
+        ("lane", Json::text(&request.lane)),
+        ("checkpoint", Json::text(&request.checkpoint)),
+        ("version", Json::text(request.version.to_string())),
+        ("bundle", Json::text(request.bundle.to_string())),
+        ("message", Json::text(&request.message)),
+        ("status", Json::text("recorded")),
+        ("approval_authority", Json::Bool(false)),
+    ])
 }
 fn lane_summary(lane: &Lane) -> Json {
     Json::object([
