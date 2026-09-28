@@ -2411,29 +2411,31 @@ fn managed_private_save_preserves_recovery_at_maximum_before_idle() {
 #[test]
 fn managed_recovery_stability_uses_the_configured_idle_interval() {
     let (parent, _source, managed) = imported("configured-recovery-idle");
+    let idle = Duration::from_millis(250);
     let mut configured = parameters();
-    configured.idle_interval = Some(Duration::from_millis(250));
+    configured.idle_interval = Some(idle);
     let daemon = LiveDaemon::with_checkpoint_runtime(startup(), configured).expect("config");
     daemon.open_at_start(&managed).expect("open");
 
-    let path = managed.join("docs/note.txt");
-    let mutate = std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(125));
-        fs::write(path, "changed during configured idle\n").expect("concurrent local edit");
-    });
+    // Measure the configured minimum directly. A second thread sleeping 125 ms can mutate
+    // before preservation starts or after its final read when the host delays either thread.
+    // External edits during settling have their own observable-replacement regression below.
+    let digest = inspected_digest(&daemon, "docs/note.txt");
+    let executable = inspected_executable(&daemon, "docs/note.txt");
+    let started = std::time::Instant::now();
     let preserved = daemon
-        .preserve_managed_text_edit(
-            "docs/note.txt",
-            "candidate recovery\n",
-            inspected_digest(&daemon, "docs/note.txt"),
-            inspected_executable(&daemon, "docs/note.txt"),
-        )
+        .preserve_managed_text_edit("docs/note.txt", "candidate recovery\n", digest, executable)
         .expect("recovery preservation");
-    mutate.join().expect("concurrent editor");
+    let elapsed = started.elapsed();
 
     assert!(
-        !preserved.stable_after_idle(),
-        "recovery stability returned after the separate 50 ms constant instead of the configured 250 ms interval"
+        elapsed >= idle,
+        "recovery stability returned in {elapsed:?}, before the configured {idle:?} idle interval"
+    );
+    assert!(preserved.stable_after_idle());
+    assert_eq!(
+        fs::read(managed.join("docs/note.txt")).expect("preserved bytes"),
+        b"candidate recovery\n"
     );
     fs::remove_dir_all(parent).expect("cleanup");
 }
