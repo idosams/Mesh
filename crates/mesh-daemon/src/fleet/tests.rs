@@ -854,3 +854,90 @@ fn review_change_proposals_refuse_original_checkpoint_wrong_session_and_cancelle
     refuses(&mut runtime, command, "objective-cancelled");
     assert!(runtime.state().review_change_responses.is_empty());
 }
+
+#[test]
+fn review_decisions_are_reversible_revision_bound_and_do_not_approve_or_change_work() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let feedback = reviewed_checkpoint(&mut runtime);
+    send(&mut runtime, Command::RequestReviewChanges(feedback));
+    let proposal = response_checkpoint(&mut runtime, 0);
+    runtime.record("proposal", proposal.clone()).unwrap();
+    let before = runtime.state().clone();
+    let close = Command::SetReviewChangeDecision {
+        request: "feedback".into(),
+        expected_revision: 0,
+        checkpoint: Some("revision-0".into()),
+    };
+    let receipt = runtime.record("decision", close.clone()).unwrap();
+    assert_eq!(runtime.state().lanes, before.lanes);
+    assert_eq!(runtime.state().checkpoints, before.checkpoints);
+    assert_eq!(
+        runtime.state().review_change_requests,
+        before.review_change_requests
+    );
+    assert_eq!(
+        runtime.state().review_change_responses,
+        before.review_change_responses
+    );
+    let next_proposal = response_checkpoint(&mut runtime, 1);
+    refuses(
+        &mut runtime,
+        next_proposal,
+        "review-change-request-addressed",
+    );
+    assert!(runtime.record("proposal", proposal).is_ok());
+    send(
+        &mut runtime,
+        Command::SetReviewChangeDecision {
+            request: "feedback".into(),
+            expected_revision: 1,
+            checkpoint: None,
+        },
+    );
+    assert_eq!(
+        runtime.state().review_change_decisions["feedback"],
+        ReviewChangeDecision {
+            revision: 2,
+            checkpoint: None
+        }
+    );
+    refuses(&mut runtime, close.clone(), "review-change-decision-stale");
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(runtime.record("decision", close.clone()).unwrap(), receipt);
+    assert_eq!(
+        runtime.state().review_change_decisions["feedback"].revision,
+        2
+    );
+    assert_eq!(wire::decode(&wire::encode(&close)).unwrap(), close);
+    refuses(
+        &mut runtime,
+        Command::SetReviewChangeDecision {
+            request: "feedback".into(),
+            expected_revision: 2,
+            checkpoint: Some("unknown".into()),
+        },
+        "review-change-proposal-missing",
+    );
+    send(&mut runtime, Command::Cancel); // Work decisions remain usable after agent cancellation.
+    for expected_revision in 2..64 {
+        send(
+            &mut runtime,
+            Command::SetReviewChangeDecision {
+                request: "feedback".into(),
+                expected_revision,
+                checkpoint: (expected_revision % 2 == 0).then(|| "revision-0".into()),
+            },
+        );
+    }
+    refuses(
+        &mut runtime,
+        Command::SetReviewChangeDecision {
+            request: "feedback".into(),
+            expected_revision: 64,
+            checkpoint: Some("revision-0".into()),
+        },
+        "review-change-decision-limit",
+    );
+}

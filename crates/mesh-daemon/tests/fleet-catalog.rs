@@ -401,6 +401,16 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
             ]),
         )
         .unwrap();
+    service
+        .decide_review_change(
+            &selection,
+            text(&feedback, "id"),
+            "history-decision",
+            0,
+            Some(text(&revised, "checkpoint")),
+            |_| true,
+        )
+        .unwrap();
     let activity = service.saved_review_change_activity(&selection).unwrap();
     let expected = service.saved_review(&selection).unwrap();
     let input = service

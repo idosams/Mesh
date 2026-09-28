@@ -204,6 +204,15 @@ pub struct ReviewChangeResponse {
     pub origin: AgentOrigin,
 }
 
+/// Native-confirmed work decision, distinct from shared-state approval.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ReviewChangeDecision {
+    /// Per-request revision prevents stale decisions, including address/reopen cycles.
+    pub revision: u64,
+    /// Proposed checkpoint marked as addressing the request, or None for an open request.
+    pub checkpoint: Option<String>,
+}
+
 /// Reconstructable objective control state.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct State {
@@ -223,6 +232,8 @@ pub struct State {
     pub review_change_requests: BTreeMap<String, ReviewChangeRequest>,
     /// Append-ordered proposals, bounded to eight per request. No resolution is inferred.
     pub review_change_responses: BTreeMap<String, Vec<ReviewChangeResponse>>,
+    /// Explicit native-confirmed work decisions; absent entries are open at revision zero.
+    pub review_change_decisions: BTreeMap<String, ReviewChangeDecision>,
 }
 
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
@@ -230,6 +241,15 @@ pub struct State {
 pub enum Command {
     /// Native-only feedback bound to a completed, recorded review. No scheduling side effects.
     RequestReviewChanges(ReviewChangeRequest),
+    /// Native-only decision after exact confirmation; this never approves shared state.
+    SetReviewChangeDecision {
+        /// Original request identity.
+        request: String,
+        /// Exact per-request revision shown before confirmation.
+        expected_revision: u64,
+        /// A recorded proposal, or None to reopen the request.
+        checkpoint: Option<String>,
+    },
     /// Propose an exact reviewed checkpoint; the native caller authenticates this session.
     ProposeReviewChangeResult {
         /// Original native-requested feedback identity.
@@ -406,6 +426,14 @@ impl Runtime {
         &self.objective
     }
 
+    /// Recover an existing exact command receipt without performing a mutation.
+    pub(super) fn recorded(&mut self, request: &str) -> Result<Option<FleetEvent>, Error> {
+        self.refresh()?;
+        self.store
+            .request(&self.objective, request)
+            .map_err(Into::into)
+    }
+
     /// Native orchestration helper: recover an identical command or submit at the latest revision.
     /// A competing writer still causes a typed stale-revision refusal.
     pub fn record(&mut self, request: &str, command: Command) -> Result<FleetEvent, Error> {
@@ -503,6 +531,48 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::SetReviewChangeDecision {
+                request,
+                expected_revision,
+                checkpoint,
+            } => {
+                if !self.review_change_requests.contains_key(request) {
+                    return refuse("review-change-request-missing");
+                }
+                let before = self
+                    .review_change_decisions
+                    .get(request)
+                    .cloned()
+                    .unwrap_or_default();
+                if before.revision != *expected_revision {
+                    return refuse("review-change-decision-stale");
+                }
+                if before.revision >= 64 {
+                    return refuse("review-change-decision-limit");
+                }
+                if &before.checkpoint == checkpoint {
+                    return refuse("review-change-decision-unchanged");
+                }
+                if checkpoint.as_ref().is_some_and(|checkpoint| {
+                    !self
+                        .review_change_responses
+                        .get(request)
+                        .is_some_and(|responses| {
+                            responses
+                                .iter()
+                                .any(|response| &response.checkpoint == checkpoint)
+                        })
+                }) {
+                    return refuse("review-change-proposal-missing");
+                }
+                self.review_change_decisions.insert(
+                    request.clone(),
+                    ReviewChangeDecision {
+                        revision: before.revision + 1,
+                        checkpoint: checkpoint.clone(),
+                    },
+                );
+            }
             Command::ProposeReviewChangeResult {
                 request,
                 checkpoint,
@@ -510,6 +580,13 @@ impl State {
             } => {
                 if self.cancelled {
                     return refuse("objective-cancelled");
+                }
+                if self
+                    .review_change_decisions
+                    .get(request)
+                    .is_some_and(|decision| decision.checkpoint.is_some())
+                {
+                    return refuse("review-change-request-addressed");
                 }
                 let feedback = self
                     .review_change_requests

@@ -584,6 +584,53 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             .as_text(),
         Some(text(&captured, "version"))
     );
+    // This fixture confirms through the native API; it is not graphical human-presence proof.
+    service
+        .decide_review_change(
+            &selection,
+            feedback_id,
+            "native-decision",
+            0,
+            Some(text(revision, "checkpoint")),
+            |_| true,
+        )
+        .unwrap();
+    let decided = call(
+        &mut stdin,
+        &mut stdout,
+        19,
+        "tools/call",
+        tool("mesh_fleet_context", Json::empty_object()),
+        token,
+    );
+    let decided = decided
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    assert_eq!(
+        text(
+            &decided
+                .get("review_change_decisions")
+                .unwrap()
+                .as_array()
+                .unwrap()[0],
+            "status"
+        ),
+        "addressed"
+    );
+    let denied_decision = call(
+        &mut stdin,
+        &mut stdout,
+        20,
+        "tools/call",
+        tool("mesh_fleet_decide_review_change", Json::empty_object()),
+        token,
+    );
+    assert!(denied_decision.get("error").is_some());
+    service
+        .decide_review_change(&selection, feedback_id, "native-reopen", 1, None, |_| true)
+        .unwrap();
     service.revoke(&credential).unwrap();
     let revoked = call(
         &mut stdin,
@@ -604,7 +651,7 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             fs::read(root.join("source/note.txt")).unwrap(),
             b"original work continues\n"
         );
-        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, exact retry and revoked-session refusal; graphical=false");
+        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, native work decision, exact retry and revoked-session refusal; graphical=false");
     }
     server.shutdown();
 }

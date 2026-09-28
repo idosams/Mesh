@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewChangeMessage, savedReviewChanges, savedReviewChangeActivity, reviewChangeReceipt } from './fleet-review-changes.js';
+import { reviewChangeMessage, savedReviewChanges, savedReviewChangeActivity, reviewChangeReceipt, reviewDecisionReceipt } from './fleet-review-changes.js';
 const selection = { objective: `fleet-${'a'.repeat(64)}`, lane: 'worker', checkpoint: 'saved', version: 'b'.repeat(64), bundle: 'c'.repeat(64) };
 const entry = () => ({ id: `review-change-${'d'.repeat(64)}`, lane: selection.lane, checkpoint: selection.checkpoint, version: selection.version, bundle: selection.bundle, message: 'Please add an example.', status: 'recorded', approval_authority: false });
-const response = () => ({ schema: 'mesh.fleet-review-changes/v2', objective: selection.objective,
-  selection: Object.fromEntries(Object.entries(selection).filter(([key]) => key !== 'objective')), activity: { changes: [entry()], responses: [] } });
+const decision = () => ({ request: entry().id, revision: 0, status: 'open', checkpoint: null, version: null, bundle: null, approval_authority: false });
+const response = () => ({ schema: 'mesh.fleet-review-changes/v3', objective: selection.objective,
+  selection: Object.fromEntries(Object.entries(selection).filter(([key]) => key !== 'objective')), activity: { changes: [entry()], responses: [], decisions: [decision()] } });
 test('feedback messages bound UTF-8 bytes and reject invisible controls while allowing plain lines', () => {
   assert.equal(reviewChangeMessage('Example\n\tDetail'), true);
   assert.equal(reviewChangeMessage('a'.repeat(8192)), true);
@@ -38,4 +39,29 @@ test('proposals must refer to a loaded request and a distinct exact result in th
   }
   valid.activity.responses = Array.from({ length: 9 }, (_, n) => ({ ...proposed(), checkpoint: `revision-${n}` }));
   assert.throws(() => savedReviewChangeActivity(valid, selection));
+});
+
+test('decision activity requires one exact decision per request and addressed decisions bind a proposal', () => {
+  const value = response(); value.activity.responses = [proposed()];
+  value.activity.decisions = [{ ...decision(), revision: 1, status: 'addressed', checkpoint: 'revised', version: proposed().version, bundle: proposed().bundle }];
+  assert.equal(savedReviewChangeActivity(value, selection).decisions[0].status, 'addressed');
+  for (const mutate of [v => v.activity.decisions = [], v => v.activity.decisions[0].version = '0'.repeat(64),
+    v => v.activity.decisions[0].request = 'unknown', v => v.activity.decisions[0].revision = 65,
+    v => v.activity.decisions[0].approval_authority = true, v => v.activity.decisions[0].status = 'approved']) {
+    const bad = structuredClone(value); mutate(bad); assert.throws(() => savedReviewChangeActivity(bad, selection));
+  }
+});
+test('decision receipt recovery shows a newer reopened state rather than reapplying its older receipt', () => {
+  const pending = { operation: '1'.repeat(32), request: entry().id, expectedRevision: 0, proposedCheckpoint: 'revised', version: proposed().version, bundle: proposed().bundle };
+  const { activity: _activity, ...base } = response();
+  const receipt = { ...decision(), revision: 1, status: 'addressed', checkpoint: 'revised', version: proposed().version, bundle: proposed().bundle };
+  const value = { ...base, schema: 'mesh.fleet-review-decision/v1', operation: pending.operation, request: pending.request,
+    outcome: { cancelled: false, receipt, current: { ...decision(), revision: 2 } } };
+  assert.equal(reviewDecisionReceipt(value, selection, pending).current.status, 'open');
+  for (const mutate of [v => v.operation = 'other', v => v.outcome.receipt.version = '0'.repeat(64),
+    v => v.outcome.current.revision = 0, v => v.outcome.current.revision = 1, v => v.outcome.cancelled = true, v => v.request = 'unknown']) {
+    const bad = structuredClone(value); mutate(bad); assert.throws(() => reviewDecisionReceipt(bad, selection, pending));
+  }
+  value.outcome = { cancelled: true, receipt: null, current: decision() };
+  assert.equal(reviewDecisionReceipt(value, selection, pending).cancelled, true);
 });

@@ -420,3 +420,37 @@ restart; unavailable content keeps an unavailable pin. The original panel never 
 automatically. Pin limits and persistence are shared with ordinary saved results. Linking a result does
 not mark the request addressed, wake a provider, or permit publication; human resolution and original
 project integration remain separate work.
+
+## Reversible native-confirmed request decisions
+
+The additive `set-review-change-decision` event records an explicit work decision for a request:
+addressed by one of its exact proposed checkpoints, or open again. A per-request revision starts at
+zero and increments on every change, including reopen. Native confirmation binds that revision and
+both original/proposed saved identities; a stale choice refuses even after an address/reopen cycle.
+Each request permits at most 64 decisions. Existing event encodings, database schema and workspace
+formats remain unchanged. Older binaries refuse the new unknown event rather than discard decisions.
+
+`FleetService::decide_review_change` is native-only. It verifies immutable review identities, releases
+the fleet lock before invoking confirmation, revalidates the retained identities afterward, and appends
+through revision/idempotency checks. Other lanes continue progressing while the dialog is open.
+Cancelled confirmation appends nothing. Stable operation identities recover existing exact receipts
+without showing another dialog; changed parameters under a recorded operation refuse. An old receipt
+returns its original decision and the fresh current decision separately, so retry cannot undo a later
+reopen. Receipts can be recovered without rereading missing artifact bytes after the accepted action.
+
+This is ordinary work status, not a signed human approval receipt or verified semantic judgment.
+Neither addressing nor reopening changes main, workspace bytes, review content, run state or custody.
+The native desktop dialog states that distinction and displays the exact request and version identities.
+Agent credentials cannot invoke this operation. Agent context exposes the latest per-request decisions;
+new proposals for addressed requests refuse until a native reviewer reopens them. Already recorded
+proposal retries remain idempotent. Work decisions remain available after execution cancellation.
+
+The closed desktop activity projection is `mesh.fleet-review-changes/v3`, adding one decision per
+request. Mutation receipts remain separate, and the new decision envelope is
+`mesh.fleet-review-decision/v1`. The renderer verifies original selection, operation, desired result,
+receipt revision and monotonic current state, then displays current state rather than an old receipt.
+A failed response retains exact retry arguments. Explicit reload clears them only after current state
+verifies; a closed panel ignores late replies. Pending desktop operations remain session-only.
+Tests cover cancellation, competing confirmation, stale revisions, reversible replay, root relocation
+during confirmation, agent denial and old-receipt recovery. Packaged graphical confirmation and signed
+main approval are separate required evidence; native callback fixtures do not prove user presence.

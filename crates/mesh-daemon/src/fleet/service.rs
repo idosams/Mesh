@@ -970,6 +970,14 @@ impl FleetService {
                     ),
                     ("workspace", state.to_json()),
                     (
+                        "review_change_decisions",
+                        Json::Array(review_change_decision_rows(
+                            inner.runtime.state(),
+                            &grant.lane,
+                            None,
+                        )),
+                    ),
+                    (
                         "review_change_responses",
                         Json::Array(review_change_response_rows(
                             inner.runtime.state(),
@@ -1173,6 +1181,131 @@ impl FleetService {
         Ok(review_change_json(&changes))
     }
 
+    /// Native-confirmed, reversible work decision. Confirmation runs without the fleet lock;
+    /// retained identities and the exact per-request revision are checked again before append.
+    pub fn decide_review_change(
+        &self,
+        selection: &SavedReviewSelection,
+        request: &str,
+        operation: &str,
+        expected_revision: u64,
+        checkpoint: Option<&str>,
+        confirm: impl FnOnce(&str) -> bool,
+    ) -> Result<Json, Unavailable> {
+        super::id_valid(operation).map_err(runtime_error)?;
+        if expected_revision >= 64 {
+            return Err(refusal("fleet-review-decision-limit"));
+        }
+        let command = Command::SetReviewChangeDecision {
+            request: request.into(),
+            expected_revision,
+            checkpoint: checkpoint.map(str::to_owned),
+        };
+        let id = format!("review-decision-{}", token_key(operation));
+        let (message, proposed) = {
+            let mut inner = self.lock()?;
+            inner.runtime.refresh().map_err(runtime_error)?;
+            let feedback = inner
+                .runtime
+                .state()
+                .review_change_requests
+                .get(request)
+                .filter(|feedback| {
+                    feedback.lane == selection.lane
+                        && feedback.checkpoint == selection.checkpoint
+                        && feedback.version == selection.version
+                        && feedback.bundle == selection.bundle
+                })
+                .cloned()
+                .ok_or_else(|| refusal("fleet-review-change-selection-mismatch"))?;
+            if let Some(receipt) = inner.runtime.recorded(&id).map_err(runtime_error)? {
+                if receipt.payload != super::wire::encode(&command) {
+                    return Err(refusal("fleet-review-decision-operation-conflict"));
+                }
+                return Ok(review_decision_outcome(
+                    inner.runtime.state(),
+                    request,
+                    false,
+                    Some(expected_revision + 1),
+                    checkpoint,
+                ));
+            }
+            let before = inner
+                .runtime
+                .state()
+                .review_change_decisions
+                .get(request)
+                .cloned()
+                .unwrap_or_default();
+            if before.revision != expected_revision
+                || before.revision >= 64
+                || before.checkpoint.as_deref() == checkpoint
+            {
+                return Err(refusal("fleet-review-decision-stale-or-unchanged"));
+            }
+            let proposed = checkpoint
+                .map(|checkpoint| {
+                    let response = inner
+                        .runtime
+                        .state()
+                        .review_change_responses
+                        .get(request)
+                        .and_then(|responses| {
+                            responses
+                                .iter()
+                                .find(|response| response.checkpoint == checkpoint)
+                        })
+                        .ok_or_else(|| refusal("fleet-review-proposal-unavailable"))?;
+                    SavedReviewSelection::new(
+                        &selection.lane,
+                        checkpoint,
+                        &response.version.to_string(),
+                        &response.bundle.to_string(),
+                    )
+                })
+                .transpose()?;
+            (feedback.message, proposed)
+        };
+        self.with_saved_review(selection, |_open, _binding| Ok(()))?;
+        if let Some(proposed) = &proposed {
+            self.with_saved_review(proposed, |_open, _binding| Ok(()))?;
+        }
+        let action = proposed.as_ref().map_or_else(
+            || "Reopen this change request".to_owned(),
+            |proposed| {
+                format!(
+                    "Mark this change request addressed by saved version {}\nReview: {}",
+                    proposed.version, proposed.bundle
+                )
+            },
+        );
+        let prompt = format!("{action}\n\nRequest: {request}\nLane: {}\nOriginal saved version: {}\nOriginal review: {}\nDecision revision: {expected_revision}\n\nRequested changes:\n{message}\n\nThis changes only the request's work status. It does not approve, publish, apply files, or start an agent.", selection.lane, selection.version, selection.bundle);
+        if !confirm(&prompt) {
+            let mut inner = self.lock()?;
+            inner.runtime.refresh().map_err(runtime_error)?;
+            return Ok(review_decision_outcome(
+                inner.runtime.state(),
+                request,
+                true,
+                None,
+                None,
+            ));
+        }
+        self.with_saved_review(selection, |_open, _binding| Ok(()))?;
+        if let Some(proposed) = &proposed {
+            self.with_saved_review(proposed, |_open, _binding| Ok(()))?;
+        }
+        let mut inner = self.lock()?;
+        inner.runtime.record(&id, command).map_err(runtime_error)?;
+        Ok(review_decision_outcome(
+            inner.runtime.state(),
+            request,
+            false,
+            Some(expected_revision + 1),
+            checkpoint,
+        ))
+    }
+
     /// Read recorded feedback for an exact saved selection, without worker or approval authority.
     pub fn saved_review_changes(
         &self,
@@ -1208,6 +1341,14 @@ impl FleetService {
         inner.runtime.refresh().map_err(runtime_error)?;
         let state = inner.runtime.state();
         Ok(Json::object([
+            (
+                "decisions",
+                Json::Array(review_change_decision_rows(
+                    state,
+                    &selection.lane,
+                    Some(selection),
+                )),
+            ),
             (
                 "changes",
                 Json::Array(
@@ -1549,6 +1690,111 @@ fn lane_identity(objective: &str, parent: &str, request: &str) -> Result<String,
         "lane-{}",
         Blake3::digest_bytes(framed.as_bytes()).to_hex()
     ))
+}
+fn review_change_decision_json(
+    state: &super::State,
+    request: &str,
+    revision: u64,
+    checkpoint: Option<&str>,
+) -> Json {
+    let response = checkpoint.and_then(|checkpoint| {
+        state
+            .review_change_responses
+            .get(request)
+            .and_then(|responses| {
+                responses
+                    .iter()
+                    .find(|response| response.checkpoint == checkpoint)
+            })
+    });
+    Json::object([
+        ("request", Json::text(request)),
+        ("revision", Json::Number(revision)),
+        (
+            "status",
+            Json::text(if checkpoint.is_some() {
+                "addressed"
+            } else {
+                "open"
+            }),
+        ),
+        ("checkpoint", checkpoint.map_or(Json::Null, Json::text)),
+        (
+            "version",
+            response.map_or(Json::Null, |response| {
+                Json::text(response.version.to_string())
+            }),
+        ),
+        (
+            "bundle",
+            response.map_or(Json::Null, |response| {
+                Json::text(response.bundle.to_string())
+            }),
+        ),
+        ("approval_authority", Json::Bool(false)),
+    ])
+}
+fn review_decision_outcome(
+    state: &super::State,
+    request: &str,
+    cancelled: bool,
+    receipt: Option<u64>,
+    checkpoint: Option<&str>,
+) -> Json {
+    let current = state
+        .review_change_decisions
+        .get(request)
+        .cloned()
+        .unwrap_or_default();
+    Json::object([
+        ("cancelled", Json::Bool(cancelled)),
+        (
+            "receipt",
+            receipt.map_or(Json::Null, |revision| {
+                review_change_decision_json(state, request, revision, checkpoint)
+            }),
+        ),
+        (
+            "current",
+            review_change_decision_json(
+                state,
+                request,
+                current.revision,
+                current.checkpoint.as_deref(),
+            ),
+        ),
+    ])
+}
+fn review_change_decision_rows(
+    state: &super::State,
+    lane: &str,
+    selection: Option<&SavedReviewSelection>,
+) -> Vec<Json> {
+    state
+        .review_change_requests
+        .values()
+        .filter(|request| {
+            request.lane == lane
+                && selection.is_none_or(|selected| {
+                    request.checkpoint == selected.checkpoint
+                        && request.version == selected.version
+                        && request.bundle == selected.bundle
+                })
+        })
+        .map(|request| {
+            let current = state
+                .review_change_decisions
+                .get(&request.id)
+                .cloned()
+                .unwrap_or_default();
+            review_change_decision_json(
+                state,
+                &request.id,
+                current.revision,
+                current.checkpoint.as_deref(),
+            )
+        })
+        .collect()
 }
 fn review_change_response_rows(
     state: &super::State,

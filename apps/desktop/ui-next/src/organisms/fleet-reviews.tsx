@@ -11,7 +11,8 @@ export type FleetReviewSelection = { objective: string; lane: string; checkpoint
 type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
 export type FleetReviewView = { input_open: boolean; input_after: string | null; input_object: string | null; input_layout: "inline" | "split"; review_object: string | null; review_mode: "content" | "visual"; review_layout: "inline" | "split" };
 export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
-type ReviewChanges = { responses?: { request: string; lane: string; checkpoint: string; version: string; bundle: string; status: "proposed"; approval_authority: false }[]; loaded?: boolean; rows: { id: string; message: string; status: "recorded" }[] | null; loading?: boolean; sending?: boolean; error: string; pending?: { request: string; message: string } | null };
+type ReviewDecision = { request: string; revision: number; status: "open" | "addressed"; checkpoint: string | null; version: string | null; bundle: string | null; approval_authority: false };
+type ReviewChanges = { decisions?: ReviewDecision[]; deciding?: boolean; decisionPending?: { operation: string; request: string; expectedRevision: number; proposedCheckpoint: string | null; version: string | null; bundle: string | null } | null; decisionError?: string; decisionNotice?: string; responses?: { request: string; lane: string; checkpoint: string; version: string; bundle: string; status: "proposed"; approval_authority: false }[]; loaded?: boolean; rows: { id: string; message: string; status: "recorded" }[] | null; loading?: boolean; sending?: boolean; error: string; pending?: { request: string; message: string } | null };
 export type FleetReviewPin = { feedback?: ReviewChanges; artifact?: { generation: number; object: string; page: number; loading: boolean; error: string; envelope: unknown }; view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
@@ -57,19 +58,29 @@ function ChangeRequests({ pin, editable }: { pin: FleetReviewPin; editable: bool
   const feedback = pin.feedback;
   const validMessage = Boolean(message.trim()) && new TextEncoder().encode(message).length <= 8192
     && !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(message);
-  const busy = Boolean(feedback?.loading || feedback?.sending);
+  const busy = Boolean(feedback?.loading || feedback?.sending || feedback?.deciding);
   return <details><summary className="font-semibold">{t("Request changes to this saved result")}</summary>
     <div className="grid gap-2 py-2 text-sm">
       <p>{t("Requests stay tied to this checkpoint. The originating agent can read them when it next checks its context. Recorded does not mean delivered or addressed, and does not restart a worker.")}</p>
       <Button variant="secondary" disabled={busy} onClick={() => send({ type: "review-changes", pin: pin.key })}>{t("Read recorded change requests")}</Button>
-      {busy && <p role="status">{t(feedback?.sending ? "Recording the exact change request…" : "Reading recorded requests…")}</p>}
+      {busy && <p role="status">{t(feedback?.deciding ? "Waiting for the native decision confirmation…" : feedback?.sending ? "Recording the exact change request…" : "Reading recorded requests…")}</p>}
       {feedback?.error && <p role="alert">{t(feedback.error)}</p>}
+      {feedback?.decisionNotice && <p role="status">{t(feedback.decisionNotice)}</p>}
+      {feedback?.decisionError && <p role="alert">{t(feedback.decisionError)}</p>}
+      {feedback?.decisionPending && <div className="grid gap-2"><p>{t("Keep the original decision retry, or read the latest state to choose again. Reloading does not cancel a native confirmation already in progress.")}</p>
+        <Button variant="secondary" disabled={busy || !editable} onClick={() => send({ type: "retry-review-decision", pin: pin.key })}>{t("Retry this exact decision")}</Button>
+        <Button variant="quiet" disabled={busy || !editable} onClick={() => send({ type: "reload-review-decision", pin: pin.key })}>{t("Read latest state and choose again")}</Button>
+      </div>}
       {feedback?.rows && !feedback.loaded && <p>{t("Read recorded change requests to load any earlier feedback for this result.")}</p>}
       {feedback?.rows && (feedback.rows.length ? <ul className="grid gap-2">{feedback.rows.map(row => <li key={row.id} className="whitespace-pre-wrap break-words border-t border-border pt-2"><strong>{t("Recorded request")}: </strong><bdi dir="auto">{row.message}</bdi>
+        {feedback.decisions?.find(decision => decision.request === row.id)?.status === "addressed" ? <div className="grid gap-1 text-xs"><p>{t("Request marked addressed. This is not approval or integration into main.")}</p>
+          <Button variant="quiet" disabled={busy || !editable || Boolean(feedback.decisionPending) || Boolean(feedback.error) || (feedback.decisions.find(decision => decision.request === row.id)?.revision ?? 64) >= 64} onClick={() => send({ type: "decide-review-change", pin: pin.key, request: row.id, checkpoint: "" })}>{t("Reopen change request")}</Button>
+        </div> : <p className="text-xs">{t(feedback.decisions?.some(decision => decision.request === row.id) ? "Request open." : "Read the current decision before choosing a result.")}</p>}
         {feedback.responses?.filter(response => response.request === row.id).map(response => <div key={response.checkpoint} className="mt-2 grid gap-1 rounded border border-border p-2 text-xs">
           <p className="break-all">{t("Proposed saved result")}: <bdi dir="ltr">{response.version}</bdi></p>
           <p>{t("This proposal does not resolve the request or approve the result.")}</p>
           <Button variant="secondary" disabled={busy || !editable || Boolean(feedback.error)} onClick={() => send({ type: "pin-review-response", pin: pin.key, request: row.id, checkpoint: response.checkpoint })}>{t("Pin proposed result beside this review")}</Button>
+          <Button variant="secondary" disabled={busy || !editable || Boolean(feedback.decisionPending) || Boolean(feedback.error) || !feedback.decisions?.some(decision => decision.request === row.id && decision.checkpoint !== response.checkpoint && decision.revision < 64)} onClick={() => send({ type: "decide-review-change", pin: pin.key, request: row.id, checkpoint: response.checkpoint })}>{t("Mark request addressed by this result")}</Button>
         </div>)}
       </li>)}</ul> : <p>{t("No recorded requests for this result.")}</p>)}
       {feedback?.pending ? <><p className="whitespace-pre-wrap break-words">{t("Pending receipt")}: <bdi dir="auto">{feedback.pending.message}</bdi></p><Button variant="secondary" disabled={busy || !editable} onClick={() => send({ type: "retry-review-changes", pin: pin.key })}>{t("Retry this exact change request")}</Button></> :

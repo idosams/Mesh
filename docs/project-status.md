@@ -356,3 +356,18 @@ identities. Local type/build, 143 interface and 536 desktop tests pass. Rendered
 regressions detect untranslated proposal controls and the absent separate-panel route, then pass after
 byte-exact restoration. Native/full, real-provider and packaged evidence remain separately tracked;
 proposed results do not resolve feedback or approve main, and migration PRs remain unmerged.
+
+Review change requests now have native-confirmed work decisions in source: mark a request addressed
+by an exact proposed result, or reopen it. Per-request revisions prevent stale choices from overwriting
+later decisions, and exact operation receipts recover uncertain acknowledgments without replaying the
+change. Confirmation runs outside the fleet lock and retained identities are checked again afterward.
+The desktop displays current state, offers explicit retry/reload, and never treats a work decision as
+main approval. Agents can observe decisions but cannot set them. New proposals to an addressed request
+refuse until it is reopened. Graphical confirmation remains unverified while native tests use explicit
+callback fixtures; automatic provider wakeup and main integration remain separate unfinished work.
+
+The canonical decision transfer retains English/Hebrew presentation and literal feedback. Local
+interface type/build plus 145 interface and 541 desktop tests pass; mutation checks detect missing
+localized decisions and the previous coordinator route. Added native selection-substitution cases
+must refuse before confirmation without state changes. Native/full local execution and packaged
+confirmation remain pending; this source implementation is not merged or packaged acceptance.

@@ -185,9 +185,9 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | R02 | `b6b388caf30c7ffb1cc4d23f09f7175e0a220089` | Persist verified lane starting versions for history recovery | Pending transfer |
 | R02 | `ce73d00a2a762eb514d47fbb429e79673157e3e3` | Reopen saved fleet history without adopting execution | Pending transfer |
 | R02 | `e961781d941c938de408b38866c4b43cee36f7fe` | feat(desktop): preview exact saved artifacts in parallel fleet reviews | Pending transfer |
-| R03 | `76d24877696474f2383429ca0b80c8eeab3ba3f4` | feat(fleet): record exact review change requests for originating lanes | Pending transfer |
-| R03 | `367ec923ba6e1bcd3d15d62429ddec7ca49bda06` | feat(fleet): link proposed saved results to review change requests | Pending transfer |
-| R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | Pending transfer |
+| R03 | `76d24877696474f2383429ca0b80c8eeab3ba3f4` | feat(fleet): record exact review change requests for originating lanes | [Mesh PR #59](https://github.com/idosams/Mesh/pull/59), `27ce54b6912dd2da9aafae628cadfec52537e30e`; exact feedback; stacked on #58; not merged |
+| R03 | `367ec923ba6e1bcd3d15d62429ddec7ca49bda06` | feat(fleet): link proposed saved results to review change requests | [Mesh PR #60](https://github.com/idosams/Mesh/pull/60), `dc315053ac01b86cc5125155644a4f726a2be2b6`; proposed results; stacked on #59; not merged |
+| R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | This increment, R03c; native-confirmed reversible decisions; stacked on published #60; not merged |
 | C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | Pending transfer |
 | C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | Pending transfer |
 | C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | Pending transfer |
@@ -905,3 +905,35 @@ tests, 44 daemon checks and all 668 desktop/interface tests. #59 native validati
 decisions, candidates, original-main integration, remaining recovery phases, second-provider/four-worker/
 remote and packaged acceptance, required human review, eventual merges and final combined-main tests
 remain in scope. Original work and running verification are preserved; nothing has been merged.
+
+## R03c reversible decisions on exact review requests
+
+Preserved source `f14d5344ebb5826a63aa9f2878902676e6f0140a` transfers onto published #60 at
+`dc315053ac01b86cc5125155644a4f726a2be2b6`. A native confirmation marks feedback addressed by
+an exact recorded proposal, or reopens it. Per-request revisions reject stale choices, including
+address/reopen cycles. Confirmation runs without the fleet lock; original and proposed retained
+identities are verified again before append. Exact operation receipts recover lost acknowledgments
+without another confirmation, while reporting the latest state separately from the earlier receipt.
+Agents can observe decisions but cannot record them; no worker starts and main is unchanged.
+
+Decision history is bounded to 64 revisions per request. Addressed requests reject new proposals
+until reopened; exact prior proposal retries remain recoverable. The additive persisted event is
+rejected by older binaries; rollback needs a compatible binary. Activity projection v3 requires one
+validated current decision per request; original feedback receipts remain v1. Restored history shows
+decisions but does not grant current-host decision authority. UI retries retain exact operation
+identity, explicit reload permits a new choice only after state validation, and closed panels ignore
+late replies. A work decision is separate from approval and integration.
+
+Canonical adaptation retains localized controls, literal user feedback and all previous corrections.
+Local type/build, 145 interface and 541 desktop tests pass (686 total). The Hebrew decision regression
+fails against the unlocalized source and coordinator decision tests fail against the previous route;
+byte-exact restoration returns them to passing. Added native wrong checkpoint/version/bundle cases
+require refusal before confirmation and unchanged state. Transferred native coverage checks stale
+concurrent choices, cancellation, operation reuse, workspace replacement during confirmation, replay,
+limits and agent denial. Native/failing-before/full local execution remains pending behind preserved
+#44 verification; hosted checks for this exact increment and graphical confirmation remain required.
+
+Parent #59 now has all seven hosted checks passing. Parent #60 has five passing checks while Linux
+and macOS continue. Candidate/integration/recovery migration, second-provider/four-worker/remote and
+packaged acceptance, named human review, eventual merges and final combined-main testing remain in
+scope. Original histories, dirty work and running verification remain preserved. Nothing has merged.

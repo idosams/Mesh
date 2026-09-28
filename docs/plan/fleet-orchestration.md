@@ -416,3 +416,11 @@ replay and retry, and do not replace the original review or imply resolution. De
 these proposed results beside the request's original saved result. The existing standalone/packaged
 bridge journey now includes feedback retrieval, checkpoint/review creation, proposal and retry. Actual
 packaged graphical use, human resolution, provider wakeup and original-main integration remain required.
+
+Request-decision increment: reviewers can explicitly mark a change request addressed by one exact
+proposed result or reopen it through native confirmation. Per-request revision checks and durable
+operation receipts prevent stale overwrites and duplicate effects, while historical reviews remain
+fixed and agents retain no decision or publication authority. Native replay/race/identity checks and
+desktop retry/current-state presentation cover this work-status foundation. Packaged graphical
+confirmation, automatic worker wakeup, durable pending UI operations and original-main integration
+remain required for the full review and orchestration journey.

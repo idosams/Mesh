@@ -882,6 +882,45 @@ mod desktop {
         .map_err(|_| "Review change request did not finish".to_owned())?
     }
 
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command(async)]
+    fn decide_fleet_review_change(
+        app: tauri::AppHandle,
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        operation: String,
+        expected_revision: u64,
+        proposed_checkpoint: Option<String>,
+    ) -> Result<String, String> {
+        let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+            &lane,
+            &checkpoint,
+            &version,
+            &bundle,
+        )
+        .map_err(|_| "Saved review selection is invalid")?;
+        let outcome = host.current_fleet(&objective)?.decide_review_change(&selection, &request, &operation,
+            expected_revision, proposed_checkpoint.as_deref(), |prompt| app.dialog().message(prompt)
+                .title("Change request decision")
+                .buttons(MessageDialogButtons::OkCancelCustom("Confirm request decision".into(), "Cancel".into()))
+                .blocking_show())
+            .map_err(|_| "Request decision was not confirmed. Read its current state before choosing again, or retry the same operation to recover an existing receipt.")?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.fleet-review-decision/v1")),
+            ("objective", Json::text(objective)),
+            ("selection", selection.to_json()),
+            ("operation", Json::text(operation)),
+            ("request", Json::text(request)),
+            ("outcome", outcome),
+        ])
+        .encode())
+    }
+
     #[tauri::command]
     async fn fleet_review_changes(
         host: State<'_, Arc<AttachmentHost>>,
@@ -905,7 +944,7 @@ mod desktop {
                 .saved_review_change_activity(&selection)
                 .map_err(|_| "Saved review change requests are unavailable")?;
             Ok(Json::object([
-                ("schema", Json::text("mesh.fleet-review-changes/v2")),
+                ("schema", Json::text("mesh.fleet-review-changes/v3")),
                 ("objective", Json::text(objective)),
                 ("selection", selection.to_json()),
                 ("activity", activity),
@@ -7312,6 +7351,7 @@ mod desktop {
                 inspect_fleet_saved_review,
                 render_fleet_review_artifact,
                 request_fleet_review_changes,
+                decide_fleet_review_change,
                 fleet_review_changes,
                 inspect_fleet_starting_comparison,
                 start_attached_fleet,

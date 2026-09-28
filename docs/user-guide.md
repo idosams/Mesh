@@ -352,3 +352,14 @@ this review** to inspect one independently. The original review stays fixed. Up 
 be recorded for each request, within the existing eight-panel limit. A proposed result is not marked
 resolved or approved, and a stopped agent is not restarted automatically. Unsupported or unavailable
 history is reported when Mesh verifies the new pin.
+
+After inspecting a proposed result, choose **Mark request addressed by this result**. Mesh asks for
+native confirmation naming the original request and exact saved result. This changes the request's
+work status; approval and integration into main remain separate. Use **Reopen change request** if
+further work is needed. Agents see the recorded decision on their next context check.
+
+If the decision response is unconfirmed, **Retry this exact decision** recovers the original receipt.
+Mesh still shows the latest decision if someone has since reopened the request. **Read latest state
+and choose again** abandons the pending retry only after verifying current history. Reloading or
+closing a panel does not cancel a native confirmation already in progress. Pending retry identities
+are session-only, and the native graphical confirmation journey remains unverified.

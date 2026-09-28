@@ -150,7 +150,7 @@ test('feedback reads are exact, and closing a panel never restores it from a lat
   const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
   h.handle({ type: 'review-changes', pin: '1' }); assert.equal(h.calls[2].command, 'fleet_review_changes');
   const { objective: id, ...selected } = selection(1);
-  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v2', objective: id, selection: selected, activity: { changes: [], responses: [] } }); await settle();
+  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v3', objective: id, selection: selected, activity: { changes: [], responses: [], decisions: [] } }); await settle();
   assert.equal(h.snapshot().reviewPins[0].feedback.loaded, true);
   h.handle({ type: 'request-review-changes', pin: '1', message: 'Revise.' });
   h.handle({ type: 'close-review', pin: '1' }); h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
@@ -165,8 +165,8 @@ test('a proposed result opens beside its original review only from verified feed
   h.handle(intent); assert.equal(h.calls.length, 2);
   h.handle({ type: 'review-changes', pin: '1' });
   const { objective: objectiveId, ...selected } = selection(1);
-  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v2', objective: objectiveId, selection: selected,
-    activity: { changes: [{ ...selected, id, message: 'Add the example.', status: 'recorded', approval_authority: false }],
+  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v3', objective: objectiveId, selection: selected,
+    activity: { decisions: [{ request: id, revision: 0, status: 'open', checkpoint: null, version: null, bundle: null, approval_authority: false }], changes: [{ ...selected, id, message: 'Add the example.', status: 'recorded', approval_authority: false }],
       responses: [{ request: id, lane, checkpoint: 'revised', version: '8'.repeat(64), bundle: '9'.repeat(64), status: 'proposed', approval_authority: false }] } });
   await settle();
   h.handle({ ...intent, path: '/tmp' }); h.handle({ ...intent, checkpoint: 'invented' }); assert.equal(h.calls.length, 3);
@@ -178,4 +178,51 @@ test('a proposed result opens beside its original review only from verified feed
   h.handle(intent); assert.equal(h.snapshot().reviewPins.length, 2); assert.equal(h.calls.length, 4);
   h.calls[3].reject(new Error('missing retained result')); await settle();
   assert.equal(h.snapshot().reviewPins[0].error, ''); assert.match(h.snapshot().reviewPins[1].error, /could not be verified/);
+});
+
+async function decisionHarness() {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  h.handle({ type: 'review-changes', pin: '1' });
+  const { objective: objectiveId, ...selected } = selection(1), request = `review-change-${'f'.repeat(64)}`;
+  const current = { request, revision: 0, status: 'open', checkpoint: null, version: null, bundle: null, approval_authority: false };
+  const activity = { changes: [{ ...selected, id: request, message: 'Add example.', status: 'recorded', approval_authority: false }],
+    responses: [{ request, lane, checkpoint: 'revised', version: '8'.repeat(64), bundle: '9'.repeat(64), status: 'proposed', approval_authority: false }], decisions: [current] };
+  const read = { schema: 'mesh.fleet-review-changes/v3', objective: objectiveId, selection: selected, activity };
+  h.calls[2].resolve(read); await settle();
+  const reply = (call, cancelled = false) => ({ schema: 'mesh.fleet-review-decision/v1', objective: objectiveId, selection: selected,
+    request, operation: call.args.operation, outcome: { cancelled,
+      receipt: cancelled ? null : { ...current, revision: 1, status: 'addressed', checkpoint: 'revised', version: '8'.repeat(64), bundle: '9'.repeat(64) },
+      current: cancelled ? current : { ...current, revision: 2 } } });
+  return { h, request, current, read, reply };
+}
+test('an uncertain decision retries exact native arguments and applies the latest recorded state', async () => {
+  const { h, request, reply } = await decisionHarness();
+  const intent = { type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' };
+  h.handle({ ...intent, checkpoint: 'invented' }); assert.equal(h.calls.length, 3);
+  h.handle(intent); assert.equal(h.calls[3].command, 'decide_fleet_review_change');
+  assert.equal(h.calls[3].args.expectedRevision, 0); assert.equal(h.calls[3].args.proposedCheckpoint, 'revised');
+  h.calls[3].reject(new Error('private failure')); await settle();
+  h.handle(intent); assert.equal(h.calls.length, 4);
+  h.handle({ type: 'retry-review-decision', pin: '1' }); assert.deepEqual(h.calls[4].args, h.calls[3].args);
+  h.calls[4].resolve(reply(h.calls[4])); await settle();
+  const feedback = h.snapshot().reviewPins[0].feedback;
+  assert.equal(feedback.decisionPending, null); assert.equal(feedback.decisions[0].status, 'open'); assert.equal(feedback.decisions[0].revision, 2);
+  assert.doesNotMatch(feedback.decisionError, /private/);
+});
+test('cancelled confirmation clears its pending operation and a closed panel ignores late decision replies', async () => {
+  const { h, request, reply } = await decisionHarness();
+  const intent = { type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' };
+  h.handle(intent); h.calls[3].resolve(reply(h.calls[3], true)); await settle();
+  assert.equal(h.snapshot().reviewPins[0].feedback.decisionPending, null);
+  assert.match(h.snapshot().reviewPins[0].feedback.decisionNotice, /cancelled/);
+  h.handle(intent); h.handle({ type: 'close-review', pin: '1' }); h.calls[4].resolve(reply(h.calls[4])); await settle();
+  assert.equal(h.snapshot().reviewPins.length, 0);
+});
+test('explicit reload abandons an uncertain retry only after current decisions verify', async () => {
+  const { h, request, read } = await decisionHarness();
+  h.handle({ type: 'decide-review-change', pin: '1', request, checkpoint: 'revised' }); h.calls[3].reject(new Error('lost')); await settle();
+  h.handle({ type: 'reload-review-decision', pin: '1' }); h.calls[4].reject(new Error('offline')); await settle();
+  assert.ok(h.snapshot().reviewPins[0].feedback.decisionPending);
+  h.handle({ type: 'reload-review-decision', pin: '1' }); h.calls[5].resolve(read); await settle();
+  assert.equal(h.snapshot().reviewPins[0].feedback.decisionPending, null); assert.equal(h.snapshot().reviewPins[0].feedback.decisionError, '');
 });

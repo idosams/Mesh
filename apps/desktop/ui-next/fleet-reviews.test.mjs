@@ -306,3 +306,40 @@ test('Hebrew proposed results preserve exact versions and feedback while exposin
     assert.match(html, /<button[^>]*disabled=""[^>]*>הצמדת התוצאה המוצעת לצד הסקירה הזו<\/button>/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('request decisions are explicit and reversible without changing main approval controls', () => {
+  const value = pin(); value.feedback = { loaded: true, rows: [{ id: 'request', message: 'Add example.', status: 'recorded' }], responses: [{ request: 'request', lane: value.selection.lane, checkpoint: 'revised', version: '9'.repeat(64), bundle: 'a'.repeat(64), status: 'proposed', approval_authority: false }], decisions: [{ request: 'request', revision: 1, status: 'addressed', checkpoint: 'revised', version: '9'.repeat(64), bundle: 'a'.repeat(64), approval_authority: false }], error: '' };
+  let html = render({ pins: [value], notice: '' });
+  assert.match(html, /Request marked addressed/); assert.match(html, /Reopen change request/); assert.match(html, /not approval or integration into main/);
+  assert.match(html, /disabled=""[^>]*>Mark request addressed by this result/);
+  value.feedback.decisionPending = { operation: 'pending', request: 'request', expectedRevision: 1, proposedCheckpoint: null, version: null, bundle: null };
+  html = render({ pins: [value], notice: '' }); assert.match(html, /Retry this exact decision/); assert.match(html, /Read latest state and choose again/);
+  assert.match(html, /disabled=""[^>]*>Reopen change request/);
+});
+
+
+test('Hebrew request decisions retain raw feedback and disable new choices during uncertain confirmation', () => {
+  const value = pin();
+  value.feedback = { loaded: true, rows: [{id:'request',message:'Request open.',status:'recorded'}],
+    responses:[{request:'request',lane:value.selection.lane,checkpoint:'revised',version:'9'.repeat(64),bundle:'a'.repeat(64),status:'proposed',approval_authority:false}],
+    decisions:[{request:'request',revision:1,status:'addressed',checkpoint:'revised',version:'9'.repeat(64),bundle:'a'.repeat(64),approval_authority:false}],error:'' };
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /הבקשה סומנה כטופלה/);
+    assert.match(html, /פעולה זו אינה אישור או שילוב בגרסה הראשית/);
+    assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>פתיחת בקשת השינוי מחדש<\/button>/);
+    assert.match(html, /<bdi dir="auto">Request open.<\/bdi>/);
+    value.feedback.decisionPending = {operation:'pending',request:'request',expectedRevision:1,proposedCheckpoint:null,version:null,bundle:null};
+    value.feedback.decisionError = 'Decision is unconfirmed. Retry the same operation or read the latest state before choosing again.';
+    html = render({pins:[value],notice:''});
+    assert.match(html, /ההחלטה לא אומתה/);
+    assert.match(html, /ניסיון נוסף לאותה החלטה/);
+    assert.match(html, /קריאת המצב העדכני ובחירה מחדש/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>פתיחת בקשת השינוי מחדש<\/button>/);
+    value.feedback.deciding = true;
+    html = render({pins:[value],notice:''});
+    assert.match(html, /ממתין לאישור ההחלטה בחלון המערכת/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>ניסיון נוסף לאותה החלטה<\/button>/);
+  } finally { module.exports.setLocale('en'); }
+});

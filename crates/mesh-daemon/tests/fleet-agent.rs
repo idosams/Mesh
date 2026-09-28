@@ -2125,6 +2125,177 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
             .get("review_change_responses"),
         Some(&Json::Array(vec![]))
     );
+    let target = text(&revised, "checkpoint");
+    let before_decision = f.service.native_state().unwrap();
+    for wrong in [
+        SavedReviewSelection::new(
+            &f.lane,
+            "wrong-checkpoint",
+            &selection.version.to_string(),
+            &selection.bundle.to_string(),
+        )
+        .unwrap(),
+        SavedReviewSelection::new(
+            &f.lane,
+            &selection.checkpoint,
+            &"0".repeat(64),
+            &selection.bundle.to_string(),
+        )
+        .unwrap(),
+        SavedReviewSelection::new(
+            &f.lane,
+            &selection.checkpoint,
+            &selection.version.to_string(),
+            &"0".repeat(64),
+        )
+        .unwrap(),
+    ] {
+        assert!(f
+            .service
+            .decide_review_change(
+                &wrong,
+                &feedback_id,
+                "wrong-selection",
+                0,
+                Some(target),
+                |_| panic!("substituted selection must not reach confirmation")
+            )
+            .is_err());
+        assert_eq!(f.service.native_state().unwrap(), before_decision);
+    }
+    let cancelled = f
+        .service
+        .decide_review_change(
+            &selection,
+            &feedback_id,
+            "cancel-decision",
+            0,
+            Some(target),
+            |prompt| {
+                assert!(prompt.contains(message));
+                assert!(prompt.contains(text(&revised, "version")));
+                assert!(prompt.contains(text(&new_review, "bundle")));
+                assert_eq!(f.service.native_state().unwrap(), before_decision); // Confirmation holds no fleet lock.
+                false
+            },
+        )
+        .unwrap();
+    assert_eq!(cancelled.get("cancelled"), Some(&Json::Bool(true)));
+    assert_eq!(f.service.native_state().unwrap(), before_decision);
+    // A competing confirmed choice wins while the first native dialog is open.
+    let stale = f.service.decide_review_change(
+        &selection,
+        &feedback_id,
+        "stale-decision",
+        0,
+        Some(target),
+        |_| {
+            f.service
+                .decide_review_change(
+                    &selection,
+                    &feedback_id,
+                    "winning-decision",
+                    0,
+                    Some(target),
+                    |_| true,
+                )
+                .unwrap();
+            true
+        },
+    );
+    assert!(stale.is_err());
+    let receipt = f
+        .service
+        .decide_review_change(
+            &selection,
+            &feedback_id,
+            "winning-decision",
+            0,
+            Some(target),
+            |_| panic!("retry must not reconfirm"),
+        )
+        .unwrap();
+    assert_eq!(text(receipt.get("current").unwrap(), "status"), "addressed");
+    assert_eq!(
+        receipt.get("current").unwrap().get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert!(f
+        .call("decide_review_change", &Json::empty_object())
+        .is_err());
+    f.service
+        .decide_review_change(&selection, &feedback_id, "reopen-decision", 1, None, |_| {
+            true
+        })
+        .unwrap();
+    let late = f
+        .service
+        .decide_review_change(
+            &selection,
+            &feedback_id,
+            "winning-decision",
+            0,
+            Some(target),
+            |_| panic!("receipt recovery must not reconfirm"),
+        )
+        .unwrap();
+    assert_eq!(text(late.get("receipt").unwrap(), "status"), "addressed");
+    assert_eq!(text(late.get("current").unwrap(), "status"), "open");
+    assert_eq!(
+        late.get("current")
+            .unwrap()
+            .get("revision")
+            .and_then(Json::as_u64),
+        Some(2)
+    );
+    assert!(f
+        .service
+        .decide_review_change(
+            &selection,
+            &feedback_id,
+            "winning-decision",
+            2,
+            Some(target),
+            |_| panic!("reused operation must refuse")
+        )
+        .is_err());
+    let after_decision = f.service.native_state().unwrap();
+    assert_eq!(before_decision.lanes, after_decision.lanes);
+    assert_eq!(before_decision.checkpoints, after_decision.checkpoints);
+    assert_eq!(
+        before_decision.review_change_requests,
+        after_decision.review_change_requests
+    );
+    assert_eq!(
+        before_decision.review_change_responses,
+        after_decision.review_change_responses
+    );
+    assert_eq!(
+        f.context()
+            .get("review_change_decisions")
+            .unwrap()
+            .as_array()
+            .unwrap()[0]
+            .get("revision")
+            .and_then(Json::as_u64),
+        Some(2)
+    );
+    let before_replacement = f.service.native_state().unwrap();
+    let moved = f.path.join("decision-moved-workspace");
+    let replaced = f.service.decide_review_change(
+        &selection,
+        &feedback_id,
+        "replaced-during-confirmation",
+        2,
+        Some(target),
+        |_| {
+            fs::rename(&root, &moved).unwrap();
+            true
+        },
+    );
+    fs::rename(&moved, &root).unwrap();
+    assert!(replaced.is_err());
+    assert_eq!(f.service.native_state().unwrap(), before_replacement);
     fs::write(root.join("note.txt"), "newer unreviewed work\n").unwrap();
     assert_eq!(
         text(
