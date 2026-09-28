@@ -11789,6 +11789,56 @@ fn run_mesh_mcp_if_requested() -> Option<Result<(), String>> {
     Some(result)
 }
 
+/// This mode never falls back to the selected workspace or the graphical application.
+#[cfg(unix)]
+fn parse_mesh_fleet_mcp_invocation(args: &[String]) -> Result<Option<std::path::PathBuf>, String> {
+    if args.first().map(String::as_str) != Some("--mesh-fleet-mcp") {
+        return Ok(None);
+    }
+    if args.len() != 3
+        || args[1] != "--endpoint"
+        || !std::path::Path::new(&args[2]).is_absolute()
+        || args[2].contains('\0')
+    {
+        return Err("Usage: Mesh --mesh-fleet-mcp --endpoint <absolute-local-socket>".into());
+    }
+    Ok(Some(std::path::PathBuf::from(&args[2])))
+}
+
+#[cfg(unix)]
+fn desktop_fleet_provider(
+    endpoint: std::path::PathBuf,
+    objective: Option<String>,
+    credential: Option<String>,
+) -> Result<mesh_mcp::DaemonWorkspaceState, String> {
+    let (Some(objective), Some(credential)) = (objective, credential) else {
+        return Err("A complete native fleet session is required".into());
+    };
+    mesh_mcp::DaemonWorkspaceState::fleet(endpoint, objective, credential)
+}
+
+#[cfg(unix)]
+fn run_mesh_fleet_mcp_if_requested() -> Option<Result<(), String>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let endpoint = match parse_mesh_fleet_mcp_invocation(&args) {
+        Ok(Some(endpoint)) => endpoint,
+        Ok(None) => return None,
+        Err(error) => return Some(Err(error)),
+    };
+    Some((|| {
+        let provider = DesktopMcpWorkspaceState::new(desktop_fleet_provider(
+            endpoint,
+            std::env::var("MESH_FLEET_OBJECTIVE").ok(),
+            std::env::var("MESH_FLEET_CREDENTIAL").ok(),
+        )?);
+        mesh_mcp::serve(
+            std::io::BufReader::new(std::io::stdin().lock()),
+            std::io::stdout().lock(),
+            &provider,
+        )
+    })())
+}
+
 /// Attach the exact desktop build identity to the daemon projection handed to an agent.
 ///
 /// The MCP package version describes the wire producer and intentionally remains `0.0.0` during
@@ -11812,29 +11862,53 @@ impl<P> DesktopMcpWorkspaceState<P> {
 impl<P: mesh_mcp::WorkspaceStateProvider> mesh_mcp::WorkspaceStateProvider
     for DesktopMcpWorkspaceState<P>
 {
-    fn workspace_state(&self) -> Result<mesh_mcp::json::Json, String> {
-        use mesh_mcp::json::Json;
-
-        let Json::Object(mut fields) = self.inner.workspace_state()? else {
-            return Err("Mesh workspace state was not an object".to_owned());
-        };
-        for name in ["mesh_desktop_build_revision", "mesh_desktop_build_exact"] {
-            if fields.iter().any(|(field, _)| field == name) {
-                return Err(format!(
-                    "Mesh workspace state unexpectedly supplied reserved agent field `{name}`"
-                ));
-            }
-        }
-        fields.push((
-            "mesh_desktop_build_revision".to_owned(),
-            Json::text(env!("MESH_BUILD_REVISION")),
-        ));
-        fields.push((
-            "mesh_desktop_build_exact".to_owned(),
-            Json::Bool(env!("MESH_BUILD_REVISION") != "development"),
-        ));
-        Ok(Json::Object(fields))
+    fn fleet_enabled(&self) -> bool {
+        self.inner.fleet_enabled()
     }
+
+    fn fleet_call(
+        &self,
+        action: &str,
+        arguments: &mesh_mcp::json::Json,
+    ) -> Result<mesh_mcp::json::Json, String> {
+        let result = self.inner.fleet_call(action, arguments)?;
+        if action == "context" {
+            desktop_agent_build_identity(result)
+        } else {
+            Ok(result)
+        }
+    }
+
+    fn workspace_state(&self) -> Result<mesh_mcp::json::Json, String> {
+        desktop_agent_build_identity(self.inner.workspace_state()?)
+    }
+}
+
+#[cfg(unix)]
+fn desktop_agent_build_identity(
+    value: mesh_mcp::json::Json,
+) -> Result<mesh_mcp::json::Json, String> {
+    use mesh_mcp::json::Json;
+
+    let Json::Object(mut fields) = value else {
+        return Err("Mesh workspace state was not an object".to_owned());
+    };
+    for name in ["mesh_desktop_build_revision", "mesh_desktop_build_exact"] {
+        if fields.iter().any(|(field, _)| field == name) {
+            return Err(format!(
+                "Mesh workspace state unexpectedly supplied reserved agent field `{name}`"
+            ));
+        }
+    }
+    fields.push((
+        "mesh_desktop_build_revision".to_owned(),
+        Json::text(env!("MESH_BUILD_REVISION")),
+    ));
+    fields.push((
+        "mesh_desktop_build_exact".to_owned(),
+        Json::Bool(env!("MESH_BUILD_REVISION") != "development"),
+    ));
+    Ok(Json::Object(fields))
 }
 
 #[cfg(unix)]
@@ -11889,6 +11963,136 @@ mod mesh_mcp_mode_tests {
         ] {
             assert!(parse_mesh_mcp_invocation(&args(&values)).is_err());
         }
+    }
+
+    #[test]
+    fn fleet_mode_requires_exact_arguments_and_a_complete_native_session() {
+        assert!(parse_mesh_fleet_mcp_invocation(&args(&["--mesh-mcp"]))
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            parse_mesh_fleet_mcp_invocation(&args(&[
+                "--mesh-fleet-mcp",
+                "--endpoint",
+                "/private/run/fleet.sock"
+            ]))
+            .unwrap(),
+            Some(std::path::PathBuf::from("/private/run/fleet.sock"))
+        );
+        for values in [
+            vec!["--mesh-fleet-mcp"],
+            vec!["--mesh-fleet-mcp", "--endpoint", "relative"],
+            vec![
+                "--mesh-fleet-mcp",
+                "--endpoint",
+                "/one",
+                "--endpoint",
+                "/two",
+            ],
+            vec!["--mesh-fleet-mcp", "--credential", "not-on-command-line"],
+            vec![
+                "--mesh-fleet-mcp",
+                "--endpoint",
+                "/one",
+                "--expected-workspace-root",
+                "/other",
+            ],
+        ] {
+            assert!(parse_mesh_fleet_mcp_invocation(&args(&values)).is_err());
+        }
+        let endpoint = std::path::PathBuf::from("/private/run/fleet.sock");
+        for (objective, credential) in [
+            (None, None),
+            (Some("objective".into()), None),
+            (None, Some("a".repeat(64))),
+            (Some("invalid/name".into()), Some("a".repeat(64))),
+            (
+                Some("objective".into()),
+                Some("secret-invalid-token".into()),
+            ),
+        ] {
+            let error =
+                desktop_fleet_provider(endpoint.clone(), objective, credential).unwrap_err();
+            assert!(!error.contains("secret-invalid-token"));
+        }
+        let provider =
+            desktop_fleet_provider(endpoint, Some("objective".into()), Some("a".repeat(64)))
+                .unwrap();
+        assert!(DesktopMcpWorkspaceState::new(provider).fleet_enabled());
+    }
+
+    struct FixedFleetState {
+        reserved_field: Option<&'static str>,
+    }
+    impl mesh_mcp::WorkspaceStateProvider for FixedFleetState {
+        fn workspace_state(&self) -> Result<mesh_mcp::json::Json, String> {
+            Err("no selected workspace".into())
+        }
+        fn fleet_enabled(&self) -> bool {
+            true
+        }
+        fn fleet_call(
+            &self,
+            action: &str,
+            arguments: &mesh_mcp::json::Json,
+        ) -> Result<mesh_mcp::json::Json, String> {
+            if action == "context" {
+                let mut fields = vec![(
+                    "lane".to_owned(),
+                    mesh_mcp::json::Json::text("assigned-lane"),
+                )];
+                if let Some(name) = self.reserved_field {
+                    fields.push((
+                        name.to_owned(),
+                        mesh_mcp::json::Json::text("untrusted-build"),
+                    ));
+                }
+                Ok(mesh_mcp::json::Json::Object(fields))
+            } else {
+                Ok(arguments.clone())
+            }
+        }
+    }
+
+    #[test]
+    fn fleet_wrapper_keeps_scoped_calls_and_exact_build_identity_without_selection() {
+        use mesh_mcp::json::Json;
+        let provider = DesktopMcpWorkspaceState::new(FixedFleetState {
+            reserved_field: None,
+        });
+        assert!(provider.fleet_enabled());
+        assert!(provider.workspace_state().is_err());
+        let context = provider
+            .fleet_call("context", &Json::empty_object())
+            .unwrap();
+        assert_eq!(context.get("lane"), Some(&Json::text("assigned-lane")));
+        assert_eq!(
+            context.get("mesh_desktop_build_revision"),
+            Some(&Json::text(env!("MESH_BUILD_REVISION")))
+        );
+        let saved = Json::object([("request", Json::text("stable-request"))]);
+        assert_eq!(provider.fleet_call("checkpoint", &saved).unwrap(), saved);
+        assert!(!DesktopMcpWorkspaceState::new(FixedWorkspaceState {
+            reserved_field: false
+        })
+        .fleet_enabled());
+    }
+
+    #[test]
+    fn fleet_context_refuses_reserved_build_fields_without_using_selected_workspace() {
+        use mesh_mcp::json::Json;
+        for field in ["mesh_desktop_build_revision", "mesh_desktop_build_exact"] {
+            let provider = DesktopMcpWorkspaceState::new(FixedFleetState {
+                reserved_field: Some(field),
+            });
+            let error = provider
+                .fleet_call("context", &Json::empty_object())
+                .unwrap_err();
+            assert!(error.contains("reserved agent field"));
+            assert!(!error.contains("untrusted-build"));
+            assert!(provider.workspace_state().is_err());
+        }
+        assert!(desktop_agent_build_identity(Json::Null).is_err());
     }
 
     struct FixedWorkspaceState {
@@ -11951,6 +12155,10 @@ fn main() {
         }
         return;
     }
+    if let Some(result) = run_mesh_fleet_mcp_if_requested() {
+        finish_mesh_mcp_mode(result);
+        return;
+    }
     if let Some(result) = run_mesh_mcp_if_requested() {
         finish_mesh_mcp_mode(result);
         return;
@@ -11969,6 +12177,10 @@ fn main() {
             eprintln!("Mesh attachment: {problem}");
             std::process::exit(1);
         }
+        return;
+    }
+    if let Some(result) = run_mesh_fleet_mcp_if_requested() {
+        finish_mesh_mcp_mode(result);
         return;
     }
     if let Some(result) = run_mesh_mcp_if_requested() {

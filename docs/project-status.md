@@ -178,3 +178,11 @@ scoped delegation. Native tests verify frozen content, continuing editor writes,
 partial-allocation preservation and source-overlap refusal. This is not yet exposed through desktop
 fleet controls. Retained staging, interrupted allocation/context recovery, original-main integration,
 real-provider validation of this entry point and packaged graphical proof remain incomplete.
+
+
+The desktop source also includes an explicit fleet MCP entry point, and the native Codex adapter can
+select it with a fixed argument prefix. A complete scoped session is required; selected-workspace
+inspection remains a separate mode. Native tests cover closed parsing, forwarding and credential
+omission. A revision-bound packaged bridge test is available for attached input, delegation,
+checkpoint/review retry and revocation. Desktop scheduling, live controls and graphical fleet proof
+remain incomplete; this entry point alone does not launch a fleet.

@@ -255,3 +255,10 @@ child delegation. It does not relocate your original folder or convert your exis
 session to managed custody. Desktop fleet launch controls and real-provider acceptance for this
 entry point are still pending; the ordinary **Create line from this version** action remains usable
 without selecting a provider.
+
+The scoped desktop fleet bridge is a development integration mode for a native fleet host. The host
+supplies a lane-bound session and local endpoint; the bridge never substitutes whichever workspace
+is selected in the desktop. It can use the desktop executable instead of a separate development MCP
+binary. This does not yet provide a desktop button to start a fleet, adopt an existing agent session,
+or approve work. See the [provider verification procedure](../crates/mesh-daemon/tests/README-provider.md)
+for the required exact-build checks and current acceptance limits.

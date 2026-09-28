@@ -518,3 +518,25 @@ rebuilding unchanged current source resolved it. Parent UI type/build, 113 rende
 For this bridge, native regressions, the full gate and hosted validation remain pending. All
 original histories, dirty work and verification records remain preserved. Required human review,
 packaged journeys, every remaining fleet phase, merges and combined-main validation are outstanding.
+
+## L01c desktop executable scoped fleet bridge
+
+Preserved source `e987565983cc7f57be33fe211f9f4bb4d290fad2` transfers on #45 at
+`630176fda577b58f5cae57dac8c218e6ad3055ab`. The desktop executable gains a dedicated fleet MCP
+mode before graphical startup, requiring complete native session credentials and an absolute local
+endpoint. The fixed native provider adapter can use that executable; the existing standalone bridge
+and selected-workspace read-only mode remain available. Fleet context carries the exact embedded
+build identity and refuses reserved-field collisions. No approval authority is added.
+
+Canonical adaptation preserves the earlier build-identity mode and provider verification evidence.
+An additional native regression covers both reserved fleet-context build fields and non-object
+context refusal. The packaged procedure now requires before/after bundle verification and retained
+executable identity; its opt-in test alone proves runtime behavior/revision, not the resource seal.
+No packaged or real-provider result is claimed before running that procedure on this revision.
+
+Parent #44 passed all seven hosted checks: 2,994 Linux and 3,186 macOS native tests, four separate
+macOS tests and 44 daemon checks. Its full local gate remains running. Parent #45 passed its Linux
+2,998-test native gate, including attached-root delegation/replay and changed task/provider/project
+refusals; macOS was still running at transfer. Local native/full verification for this increment
+waits for the shared target. Named human review, merges, packaged graphical/native approval,
+real-provider/four-worker/remote acceptance and final combined-main validation remain outstanding.

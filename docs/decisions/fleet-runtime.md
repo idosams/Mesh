@@ -143,3 +143,25 @@ normal lane limits; children inherit the original project from their parent. Cor
 authenticate edits, convey permission to write the original project, or approve protected main.
 The native entry point separately verifies actual retained attachment authority and immutable
 history membership before committing creation. A replayed origin is metadata, not a new path grant.
+
+
+## Packaged agent bridge
+
+The desktop executable has a separate `--mesh-fleet-mcp --endpoint <absolute-local-socket>` mode,
+handled before AppKit/Tauri starts. It requires both native fleet environment fields and refuses
+missing, partial or malformed sessions. It never falls back to the selected workspace, accepts
+credentials on the command line, or adds human-approval tools. The existing `--mesh-mcp` mode retains
+its required workspace identity and read-only behavior.
+
+`CodexAdapter::with_desktop_bridge` selects this fixed native argument prefix; the renderer cannot
+provide generic command arguments. The original standalone bridge constructor remains compatible.
+Both paths pass session credentials through the provider's private environment configuration.
+Fleet context from the packaged bridge includes its embedded build revision and exact-build flag;
+reserved-field collisions refuse rather than replacing native context. Other scoped results retain
+their original identities and encodings.
+
+The packaged bridge is an execution dependency for desktop fleet hosting, not a claim that the
+application has a live scheduling loop or fleet controls. An opt-in native IPC test exercises the
+actual packaged executable from attached saved input, delegation, signed capture, pinned review,
+retry and revocation. It requires an exact expected build revision and verifies unchanged source
+work and desktop selection. That test does not launch a model or prove graphical interaction.

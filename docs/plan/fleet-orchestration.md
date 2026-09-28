@@ -306,3 +306,10 @@ follows delegated children. Existing source folders and ordinary capture remain 
 managed sessions still use exact custody grants. Native tests verify allocation, delegation,
 correlation replay and preservation on retry/refusal. Desktop hosting/controls, real-provider proof
 of this attached entry point, allocation reconciliation and project-main integration remain open.
+
+
+Packaged fleet execution dependency: desktop source now exposes an explicit scoped MCP mode and
+`CodexAdapter::with_desktop_bridge` selects it without a development bridge installation. Exact-build
+context and fail-closed session parsing have source coverage, with an opt-in packaged attached-input
+journey. The next host work still includes native provider admission, durable objective discovery,
+application-lifetime scheduling, process reconciliation and live lane/review presentation.

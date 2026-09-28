@@ -19,6 +19,7 @@ const MAX_EVENT_BYTES: usize = 1024 * 1024;
 pub struct CodexAdapter {
     executable: PathBuf,
     bridge: PathBuf,
+    desktop_bridge: bool,
 }
 
 /// Bounded activity metadata. Provider message bodies and raw stderr are not retained here.
@@ -64,6 +65,17 @@ impl CodexAdapter {
         Ok(Self {
             executable: executable_path(executable)?,
             bridge: executable_path(bridge)?,
+            desktop_bridge: false,
+        })
+    }
+
+    /// Use the packaged desktop executable's explicit fleet bridge mode. The mode prefix is
+    /// fixed native configuration, never a renderer-supplied argument or shell command.
+    pub fn with_desktop_bridge(executable: &Path, desktop: &Path) -> io::Result<Self> {
+        Ok(Self {
+            executable: executable_path(executable)?,
+            bridge: executable_path(desktop)?,
+            desktop_bridge: true,
         })
     }
 
@@ -90,6 +102,11 @@ impl CodexAdapter {
         let endpoint = endpoint
             .to_str()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid endpoint path"))?;
+        let mut bridge_args = Vec::new();
+        if self.desktop_bridge {
+            bridge_args.push(Json::text("--mesh-fleet-mcp"));
+        }
+        bridge_args.extend([Json::text("--endpoint"), Json::text(endpoint)]);
         let mut command = Command::new(&self.executable);
         command
             .current_dir(root)
@@ -113,7 +130,7 @@ impl CodexAdapter {
                 "-c",
                 &format!(
                     "mcp_servers.mesh.args={}",
-                    Json::Array(vec![Json::text("--endpoint"), Json::text(endpoint)]).encode()
+                    Json::Array(bridge_args).encode()
                 ),
             ])
             .args([

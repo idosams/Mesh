@@ -63,7 +63,49 @@ fn tool(name: &str, arguments: Json) -> Json {
 
 #[test]
 fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
-    let root = std::path::PathBuf::from(format!("/private/tmp/mf-mcp-{}", std::process::id()));
+    bridge_journey(std::path::Path::new(env!("CARGO_BIN_EXE_mesh-mcp")), None);
+}
+
+#[test]
+#[ignore = "requires exact packaged MESH_TEST_DESKTOP and MESH_TEST_DESKTOP_REVISION"]
+fn packaged_desktop_bridge_delegates_and_reviews_attached_versions() {
+    let executable = std::env::var_os("MESH_TEST_DESKTOP").expect("MESH_TEST_DESKTOP");
+    let revision = std::env::var("MESH_TEST_DESKTOP_REVISION").expect("MESH_TEST_DESKTOP_REVISION");
+    assert_eq!(revision.len(), 40);
+    assert!(revision.bytes().all(|b| b.is_ascii_hexdigit()));
+    for arguments in [
+        vec!["--mesh-fleet-mcp"],
+        vec!["--mesh-fleet-mcp", "--endpoint", "relative"],
+        vec![
+            "--mesh-fleet-mcp",
+            "--endpoint",
+            "/private/tmp/unused-fleet.sock",
+        ],
+        vec!["--mesh-fleet-mcp", "--credential", "sensitive-test-value"],
+    ] {
+        let output = Process::new(&executable)
+            .args(arguments)
+            .env_remove("MESH_FLEET_OBJECTIVE")
+            .env("MESH_FLEET_CREDENTIAL", "sensitive-test-value")
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("sensitive-test-value"));
+    }
+    bridge_journey(std::path::Path::new(&executable), Some(&revision));
+}
+
+fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>) {
+    let root = std::path::PathBuf::from(format!(
+        "/private/tmp/mf-mcp-{}-{}",
+        std::process::id(),
+        if packaged_revision.is_some() {
+            "packaged"
+        } else {
+            "standalone"
+        }
+    ));
     fs::create_dir(&root).unwrap();
     struct Cleanup(std::path::PathBuf);
     impl Drop for Cleanup {
@@ -145,9 +187,46 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
         )
         .unwrap(),
     );
-    let lane = service
-        .create_root("root", "Coordinate", "codex", &input)
-        .unwrap();
+    let lane = if packaged_revision.is_some() {
+        use mesh_daemon::project_attachment::{AttachmentStorage, ObservationLimits};
+        use mesh_daemon::CheckpointSigner as _;
+        let metadata = root.join("attachments");
+        fs::create_dir(&metadata).unwrap();
+        let attached = AttachmentStorage::open(&metadata)
+            .unwrap()
+            .provision(&root.join("source"))
+            .unwrap();
+        let captured = attached
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let signer = NativeSigner(ed25519_dalek::SigningKey::from_bytes(&[0x72; 32]));
+        let version = attached
+            .project()
+            .save_capture(
+                attached.metadata_path(),
+                &captured,
+                signer.public_key(),
+                |payload| signer.sign(payload),
+            )
+            .unwrap()
+            .operation();
+        fs::write(root.join("source/note.txt"), "original work continues\n").unwrap();
+        let lane = service
+            .create_root_from_attachment("root", "Coordinate", "codex", &attached, version)
+            .unwrap();
+        assert_eq!(
+            service.native_state().unwrap().lanes[&lane]
+                .source_project
+                .as_deref(),
+            Some(attached.id())
+        );
+        lane
+    } else {
+        service
+            .create_root("root", "Coordinate", "codex", &input)
+            .unwrap()
+    };
     service
         .native_command(
             "dispatch",
@@ -173,7 +252,11 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
         .unwrap()
         .spawn(desktop.clone())
         .unwrap();
-    let mut child = Process::new(env!("CARGO_BIN_EXE_mesh-mcp"))
+    let mut command = Process::new(executable);
+    if packaged_revision.is_some() {
+        command.arg("--mesh-fleet-mcp");
+    }
+    let mut child = command
         .args(["--endpoint", endpoint.to_str().unwrap()])
         .env("MESH_FLEET_OBJECTIVE", "objective")
         .env("MESH_FLEET_CREDENTIAL", credential.transport_value())
@@ -227,6 +310,17 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
         .get("structuredContent")
         .unwrap();
     assert_eq!(text(context, "lane"), lane);
+    if let Some(revision) = packaged_revision {
+        assert_eq!(
+            context.get("mesh_desktop_build_revision"),
+            Some(&Json::text(revision))
+        );
+        assert_eq!(
+            context.get("mesh_desktop_build_exact"),
+            Some(&Json::Bool(true))
+        );
+    }
+
     let version = context
         .get("workspace")
         .unwrap()
@@ -383,5 +477,12 @@ fn real_agent_bridge_creates_two_child_versions_with_scoped_credentials() {
     );
     drop(stdin);
     assert!(child.wait().unwrap().success());
+    if packaged_revision.is_some() {
+        assert_eq!(
+            fs::read(root.join("source/note.txt")).unwrap(),
+            b"original work continues\n"
+        );
+        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, retry and revoked-session refusal; graphical=false");
+    }
     server.shutdown();
 }

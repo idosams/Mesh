@@ -78,3 +78,30 @@ daemon checks. The skipped provider checks are separate from the successful expl
 proof. This verifies native scheduling and provider/MCP integration on disposable data, not packaged
 UI, human approval, process-tree reconciliation, a second provider or remote execution. The PR remains
 unmerged until separately authorized; local evidence does not replace hosted checks or human review.
+
+
+## Packaged fleet bridge
+
+The desktop executable now includes the scoped fleet MCP mode. A native desktop host can construct
+`CodexAdapter::with_desktop_bridge(provider, desktop_executable)` without requiring a separately
+installed development `mesh-mcp` binary. Application scheduling and live fleet UI remain unfinished.
+
+After building a clean revision-bound local app, verify its bundle using
+`apps/desktop/scripts/verify-local-app.mjs --app <app-path> --revision <exact-revision>` before and
+after the journey, retaining both results and the executable hash. The bridge test checks runtime
+revision and behavior; it does not itself verify the bundle seal. Then exercise its stdio bridge
+through native IPC:
+
+```sh
+MESH_TEST_DESKTOP=/absolute/path/to/Mesh.app/Contents/MacOS/mesh-desktop \
+MESH_TEST_DESKTOP_REVISION=<exact-40-character-build-revision> \
+cargo test -p mesh-mcp --test fleet packaged_desktop_bridge -- --ignored --nocapture
+```
+
+This opt-in test uses disposable attached input and a test-only native signing identity. It verifies
+that the packaged bridge reports the expected exact revision, delegates two independent children,
+checkpoints a change, submits an immutable review, replays exact requests, and refuses revoked
+credentials. Original source edits and the desktop-selected workspace remain unchanged. Invalid
+fleet arguments and incomplete environment credentials exit before graphical startup and do not
+print the test credential. No real model is launched, no provider usage is consumed, and no shared
+main is approved. This is packaged non-graphical bridge evidence, not an end-to-end desktop fleet.

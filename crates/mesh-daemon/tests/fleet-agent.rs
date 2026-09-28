@@ -562,8 +562,21 @@ fn incomplete_checkpoint_cannot_be_submitted_for_review() {
 
 #[test]
 fn codex_adapter_uses_native_lane_and_never_relaunches_a_claimed_run() {
+    codex_adapter_journey(false);
+}
+
+#[test]
+fn codex_adapter_selects_the_explicit_packaged_fleet_bridge_mode() {
+    codex_adapter_journey(true);
+}
+
+fn codex_adapter_journey(packaged: bool) {
     use mesh_daemon::fleet::provider::CodexAdapter;
-    let f = Fixture::new("provider-launch");
+    let f = Fixture::new(if packaged {
+        "provider-packaged"
+    } else {
+        "provider-launch"
+    });
     let child = f.call("delegate", &f.delegate("provider-child")).unwrap();
     let lane = text(&child, "id");
     let root = PathBuf::from(text(child.get("workspace").unwrap(), "root"));
@@ -585,6 +598,7 @@ fn codex_adapter_uses_native_lane_and_never_relaunches_a_claimed_run() {
         &executable,
         r#"#!/bin/sh
 case "$*" in *"$MESH_FLEET_CREDENTIAL"*) exit 17;; esac
+printf '%s\n' "$@" > provider-args.txt
 pwd > provider-working-root.txt
 cat > provider-prompt.txt
 printf 'one\n' >> provider-launch-count.txt
@@ -595,7 +609,12 @@ printf '%s\n' '{"type":"turn.completed"}'
     )
     .unwrap();
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
-    let adapter = CodexAdapter::new(&executable, &executable).unwrap();
+    let adapter = if packaged {
+        CodexAdapter::with_desktop_bridge(&executable, &executable)
+    } else {
+        CodexAdapter::new(&executable, &executable)
+    }
+    .unwrap();
     let mut process = f
         .service
         .start_codex(&credential, &adapter, &f.path.join("daemon.sock"))
@@ -632,6 +651,9 @@ printf '%s\n' '{"type":"turn.completed"}'
         fs::read_to_string(root.join("provider-launch-count.txt")).unwrap(),
         "one\n"
     );
+    let arguments = fs::read_to_string(root.join("provider-args.txt")).unwrap();
+    assert_eq!(arguments.contains("--mesh-fleet-mcp"), packaged);
+    assert!(!arguments.contains(credential.transport_value()));
     let prompt = fs::read_to_string(root.join("provider-prompt.txt")).unwrap();
     assert!(prompt.contains("Implement provider-child"));
     assert!(!prompt.contains(credential.transport_value()));
