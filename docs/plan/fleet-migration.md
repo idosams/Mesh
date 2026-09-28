@@ -2068,3 +2068,17 @@ pending controls and saved choices, with their execution still pending at public
 Repository, docs, license, storage and vocabulary checks pass.
 Full combined native, actual Claude, remote recovery and packaged acceptance remain
 separate pending gates. This increment does not claim merged delivery.
+
+## I09 four-worker native measurement driver
+
+New canonical implementation based on #112 at
+`82a218b89132002c4e00eb0f6ba6966a0f362e86`; no preserved source commit is replaced.
+The existing real two-worker journey now shares its exact-result and unchanged-source
+checks with a four-task serial/parallel driver. It retains provider version and native
+timing samples, reconstructs every saved review, and refuses parallel acceptance when
+four-worker overlap was not observed. The [measurement contract](fleet-native-measurements.md)
+separates these native timings from still-required human/renderer/resource/cost evidence.
+A normal pure percentile regression covers empty and small samples, rank boundaries
+and ordered inputs. Actual provider execution, whole integration compilation and full
+combined-native validation remain pending; this is a published acceptance driver,
+not a performance claim or completion of Phase 5.

@@ -12,6 +12,8 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+#[path = "support/fleet_measurements.rs"]
+mod fleet_measurements;
 
 struct Fixture {
     path: PathBuf,
@@ -32,6 +34,26 @@ impl Fixture {
         goal: &str,
         mark_running: bool,
         providers: BTreeSet<String>,
+    ) -> Self {
+        Self::with_limits(
+            name,
+            goal,
+            mark_running,
+            providers,
+            Limits {
+                lanes: 4,
+                concurrency: 3,
+                depth: 1,
+                retries: 1,
+            },
+        )
+    }
+    fn with_limits(
+        name: &str,
+        goal: &str,
+        mark_running: bool,
+        providers: BTreeSet<String>,
+        limits: Limits,
     ) -> Self {
         let path =
             std::env::temp_dir().join(format!("mesh-fleet-agent-{name}-{}", std::process::id()));
@@ -77,13 +99,8 @@ impl Fixture {
             .record(
                 "start",
                 Command::Start {
-                    goal: "Coordinate two workers".into(),
-                    limits: Limits {
-                        lanes: 4,
-                        concurrency: 3,
-                        depth: 1,
-                        retries: 1,
-                    },
+                    goal: goal.into(),
+                    limits,
                 },
             )
             .unwrap();
@@ -1142,6 +1159,35 @@ fn native_host_schedules_children_within_limits_and_preserves_cancelled_slots() 
 #[test]
 #[ignore = "requires installed provider login and MESH_TEST_CODEX/MESH_TEST_MCP"]
 fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
+    actual_fleet_measurement("actual-fleet", &["worker-one", "worker-two"], 3);
+}
+
+#[test]
+#[ignore = "requires paid provider execution, installed login and MESH_TEST_CODEX/MESH_TEST_MCP"]
+fn actual_four_workers_compare_serial_and_parallel_saved_reviews() {
+    let workers = ["worker-one", "worker-two", "worker-three", "worker-four"];
+    // Both modes perform the same immutable-input tasks. This measures native orchestration,
+    // not human review, renderer event lag or an externally operated harness baseline.
+    let serial = actual_fleet_measurement("four-serial", &workers, 1);
+    let parallel = actual_fleet_measurement("four-parallel", &workers, 5);
+    let report = Json::object([
+        ("schema", Json::text("mesh.fleet-four-worker-comparison/v1")),
+        ("serial", serial),
+        ("parallel", parallel),
+        (
+            "acceptance",
+            Json::text("private saved reviews only; no main approval"),
+        ),
+    ]);
+    let path = std::env::temp_dir().join(format!(
+        "mesh-four-worker-comparison-{}.json",
+        std::process::id()
+    ));
+    fs::write(&path, report.encode()).unwrap();
+    eprintln!("four-worker comparison retained at {}", path.display());
+}
+
+fn actual_fleet_measurement(name: &str, workers: &[&str], concurrency: u64) -> Json {
     use mesh_daemon::fleet::host::CodexFleetHost;
     use mesh_daemon::fleet::provider::CodexAdapter;
     use mesh_daemon::ipc::IpcServer;
@@ -1150,7 +1196,27 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
         &PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP")),
     )
     .unwrap();
-    let f = std::mem::ManuallyDrop::new(Fixture::with_goal("actual-fleet", "Call mesh_fleet_context. Use mesh_fleet_delegate to create exactly two child lanes with provider codex, request worker-one and worker-two, and the saved operation version from your context. For each child, set its goal to: replace note.txt with the exact text 'worker-one' or 'worker-two' respectively followed by newline, save with mesh_fleet_checkpoint, submit the returned checkpoint with mesh_fleet_submit_review, and do not delegate further. Do not edit your own workspace. After both delegations succeed, finish your task. The native host will run the children.", false));
+    let provider_version = std::process::Command::new(std::env::var_os("MESH_TEST_CODEX").unwrap())
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(provider_version.status.success());
+    let provider_version = String::from_utf8(provider_version.stdout).unwrap();
+    assert!(provider_version.len() <= 256 && !provider_version.trim().is_empty());
+    let goal = format!("Call mesh_fleet_context. Use mesh_fleet_delegate to create exactly {} child lanes with provider codex, distinct request identifiers {}, and the saved operation version from your context. For each child, spell out its exact request identifier in the child goal and instruct it to replace note.txt with exactly that literal identifier followed by newline, save with mesh_fleet_checkpoint, submit the returned checkpoint with mesh_fleet_submit_review, and do not delegate further. Do not edit your own workspace. After all delegations succeed, finish your task. The native host will run the children.", workers.len(), workers.join(", "));
+    let started = std::time::Instant::now();
+    let f = std::mem::ManuallyDrop::new(Fixture::with_limits(
+        name,
+        &goal,
+        false,
+        BTreeSet::from(["codex".into()]),
+        Limits {
+            lanes: (workers.len() + 1) as u64,
+            concurrency,
+            depth: 1,
+            retries: 0,
+        },
+    ));
     let before = f.desktop.workspace_state().unwrap();
     let credential = f
         .service
@@ -1164,7 +1230,7 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
         )
         .unwrap();
     let socket_dir = PathBuf::from(format!(
-        "/private/tmp/mesh-fleet-ipc-{}",
+        "/private/tmp/mesh-fleet-{name}-{}",
         std::process::id()
     ));
     fs::create_dir(&socket_dir).unwrap();
@@ -1187,8 +1253,34 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
     .unwrap();
     let deadline = std::time::Instant::now() + Duration::from_secs(240);
     let mut coordinator_done = false;
+    let mut ticks = Vec::new();
+    let mut reads = Vec::new();
+    let mut first_events = BTreeMap::new();
+    let mut peak_workers = 0;
     loop {
-        host.tick().unwrap();
+        let tick_started = std::time::Instant::now();
+        let observations = host.tick().unwrap();
+        ticks.push(tick_started.elapsed().as_micros() as u64);
+        // Saved run state alone does not prove live provider overlap. Count only
+        // acknowledged provider sessions with no observed completion or failure.
+        let observed_active = observations
+            .iter()
+            .filter(|observation| {
+                observation.outcome.is_none()
+                    && observation.activity.thread.is_some()
+                    && !observation.activity.turn_completed
+                    && !observation.activity.failed
+                    && !observation.activity.streams_closed
+            })
+            .count();
+        peak_workers = peak_workers.max(observed_active);
+        for observation in observations {
+            if observation.activity.events > 0 {
+                first_events
+                    .entry(observation.lane)
+                    .or_insert(started.elapsed().as_millis() as u64);
+            }
+        }
         if !coordinator_done {
             if let Some(success) = coordinator.poll().unwrap().1 {
                 assert!(success, "coordinator failed");
@@ -1206,9 +1298,25 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
                 coordinator_done = true;
             }
         }
+        let read_started = std::time::Instant::now();
         let state = f.service.native_state().unwrap();
+        reads.push(read_started.elapsed().as_micros() as u64);
+        let active = state
+            .lanes
+            .values()
+            .filter(|lane| {
+                lane.id != f.lane
+                    && lane.runs.last().is_some_and(|run| {
+                        matches!(
+                            run.state,
+                            RunState::Launching | RunState::Running | RunState::Waiting
+                        )
+                    })
+            })
+            .count();
+        assert!(active <= concurrency as usize);
         if coordinator_done
-            && state.lanes.len() == 3
+            && state.lanes.len() == workers.len() + 1
             && state.lanes.values().all(|l| {
                 l.runs
                     .last()
@@ -1230,7 +1338,9 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
         }
         std::thread::sleep(Duration::from_millis(100));
     }
+    let execution_ms = started.elapsed().as_millis() as u64;
     let state = f.service.native_state().unwrap();
+    let review_started = std::time::Instant::now();
     let mut results = Vec::new();
     for lane in state.lanes.values().filter(|l| l.id != f.lane) {
         assert_eq!(lane.parent.as_deref(), Some(f.lane.as_str()));
@@ -1253,10 +1363,62 @@ fn actual_coordinator_delegates_two_workers_and_host_saves_both_reviews() {
         );
     }
     results.sort();
-    assert_eq!(results, ["worker-one\n", "worker-two\n"]);
+    let mut expected: Vec<_> = workers.iter().map(|name| format!("{name}\n")).collect();
+    expected.sort();
+    assert_eq!(results, expected);
     assert_eq!(f.desktop.workspace_state().unwrap(), before);
+    assert_eq!(
+        fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
+        "immutable input\n"
+    );
+    let review_inspection_us = review_started.elapsed().as_micros() as u64;
     server.shutdown();
+    let report = Json::object([
+        ("schema", Json::text("mesh.fleet-native-measurement/v1")),
+        ("provider_version", Json::text(provider_version.trim())),
+        ("workers", Json::Number(workers.len() as u64)),
+        ("concurrency_limit", Json::Number(concurrency)),
+        ("peak_workers_observed", Json::Number(peak_workers as u64)),
+        ("four_workers_observed", Json::Bool(peak_workers >= 4)),
+        ("execution_ms", Json::Number(execution_ms)),
+        ("tick_samples", Json::Number(ticks.len() as u64)),
+        (
+            "tick_p95_us",
+            Json::Number(fleet_measurements::p95(&ticks).unwrap()),
+        ),
+        (
+            "state_read_p95_us",
+            Json::Number(fleet_measurements::p95(&reads).unwrap()),
+        ),
+        (
+            "saved_review_inspection_us",
+            Json::Number(review_inspection_us),
+        ),
+        (
+            "first_worker_event_ms",
+            Json::Array(
+                first_events
+                    .iter()
+                    .map(|(lane, elapsed)| {
+                        Json::object([
+                            ("lane", Json::text(lane)),
+                            ("elapsed_ms", Json::Number(*elapsed)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("cost", Json::Null),
+        ("renderer_event_lag_ms", Json::Null),
+        ("human_coordination_ms", Json::Null),
+        ("evidence_directory", Json::text(f.path.to_str().unwrap())),
+    ]);
+    fs::write(f.path.join("measurement.json"), report.encode()).unwrap();
     eprintln!("actual fleet evidence retained at {}", f.path.display());
+    if workers.len() == 4 && concurrency == 5 {
+        assert_eq!(peak_workers, 4, "four-worker overlap not observed; timing evidence is retained but acceptance is incomplete");
+    }
+    report
 }
 
 fn assert_saved_worker_review(
