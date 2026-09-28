@@ -90,12 +90,19 @@ pub fn group_confirmation(
         .collect();
     let trees: Vec<_> = prepared
         .directories()
-        .map(|tree| (tree.proposal(), tree.confirmation_files().collect()))
+        .map(|tree| {
+            (
+                tree.proposal(),
+                tree.confirmation_files().collect(),
+                tree.current_files().collect(),
+            )
+        })
         .collect();
     group_prompt_with_trees(project, root, prepared.proposal(), &files, &trees)
 }
 
-type DirectoryContents<'a> = (&'a Json, Vec<(&'a str, &'a [u8], bool)>);
+type FrozenFiles<'a> = Vec<(&'a str, &'a [u8], bool)>;
+type DirectoryContents<'a> = (&'a Json, FrozenFiles<'a>, FrozenFiles<'a>);
 
 #[cfg(test)]
 fn group_prompt(
@@ -153,17 +160,35 @@ fn group_prompt_with_trees(
     for member in members {
         if trees
             .iter()
-            .any(|(tree, _)| tree.get("path") == member.get("path"))
+            .any(|(tree, ..)| tree.get("path") == member.get("path"))
         {
-            let (tree, content) = tree_iter.next().ok_or_else(fail)?;
+            let (tree, content, before) = tree_iter.next().ok_or_else(fail)?;
             if tree.get("path") != member.get("path") {
                 return Err(fail());
             }
             let entries = tree.get("tree").and_then(Json::as_array).ok_or_else(fail)?;
-            remaining_entries = remaining_entries
-                .checked_sub(entries.len())
-                .ok_or_else(fail)?;
-            prompt.push_str(&directory_prompt(tree, content)?);
+            let converted =
+                tree.get("schema") == Some(&Json::text("mesh.attachment-entry-conversion/v1"));
+            let count = if converted {
+                let original = tree
+                    .get("before_tree")
+                    .and_then(Json::as_array)
+                    .ok_or_else(fail)?;
+                original
+                    .iter()
+                    .chain(entries)
+                    .map(|entry| entry.get("path").and_then(Json::as_text).ok_or_else(fail))
+                    .collect::<Result<std::collections::BTreeSet<_>, _>>()?
+                    .len()
+            } else {
+                entries.len()
+            };
+            remaining_entries = remaining_entries.checked_sub(count).ok_or_else(fail)?;
+            prompt.push_str(&if converted {
+                conversion_prompt(tree, before, content)?
+            } else {
+                directory_prompt(tree, content)?
+            });
             if prompt.len() > MAX_PROMPT {
                 return Err(fail());
             }
@@ -234,7 +259,6 @@ fn group_prompt_with_trees(
 }
 
 fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<String, String> {
-    use mesh_types::ContentDigest as _;
     let fail =
         || "The complete directory tree cannot be shown in native text confirmation".to_owned();
     let removed =
@@ -255,12 +279,26 @@ fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<
     if entries.is_empty() || entries.len() > 64 {
         return Err(fail());
     }
-    let mut files = content.iter();
     let mut prompt = if removed {
         format!("\nREMOVE DIRECTORY TREE {root:?}\nThe complete existing tree below will move to retained recovery. Files are never individually deleted. Open file and directory handles remain attached to that retained tree. Changed or extra entries require another review; no automatic cleanup or replay occurs.\n")
     } else {
         format!("\nCREATE DIRECTORY TREE {root:?}\nDestination absent; a concurrent entry will not be replaced. The complete tree is installed together.\n")
     };
+    prompt.push_str(&entries_prompt(entries, content)?);
+    if prompt.len() > MAX_PROMPT {
+        return Err(fail());
+    }
+    Ok(prompt)
+}
+
+fn entries_prompt(entries: &[Json], content: &[(&str, &[u8], bool)]) -> Result<String, String> {
+    use mesh_types::ContentDigest as _;
+    let fail = || "Complete entry content is unavailable for native confirmation".to_owned();
+    if entries.is_empty() || entries.len() > 64 {
+        return Err(fail());
+    }
+    let mut files = content.iter();
+    let mut prompt = String::new();
     for entry in entries {
         let path = entry.get("path").and_then(Json::as_text).ok_or_else(fail)?;
         let mode = entry.get("mode").and_then(Json::as_u64).ok_or_else(fail)?;
@@ -298,6 +336,48 @@ fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<
         }
     }
     if files.next().is_some() {
+        return Err(fail());
+    }
+    Ok(prompt)
+}
+
+fn conversion_prompt(
+    proposal: &Json,
+    before: &[(&str, &[u8], bool)],
+    after: &[(&str, &[u8], bool)],
+) -> Result<String, String> {
+    let fail = || "The complete conversion cannot be shown in native confirmation".to_owned();
+    if proposal.get("schema") != Some(&Json::text("mesh.attachment-entry-conversion/v1")) {
+        return Err(fail());
+    }
+    let root = proposal
+        .get("path")
+        .and_then(Json::as_text)
+        .ok_or_else(fail)?;
+    let original = proposal
+        .get("before_tree")
+        .and_then(Json::as_array)
+        .ok_or_else(fail)?;
+    let replacement = proposal
+        .get("tree")
+        .and_then(Json::as_array)
+        .ok_or_else(fail)?;
+    let direction = match (
+        original
+            .first()
+            .and_then(|entry| entry.get("kind"))
+            .and_then(Json::as_text),
+        replacement
+            .first()
+            .and_then(|entry| entry.get("kind"))
+            .and_then(Json::as_text),
+    ) {
+        (Some("file"), Some("directory")) => "FILE TO FOLDER",
+        (Some("directory"), Some("file")) => "FOLDER TO FILE",
+        _ => return Err(fail()),
+    };
+    let prompt = format!("\nCONVERT {direction} {root:?}\nCURRENT ENTRY TO RETAIN\n{}\nREPLACEMENT TO INSTALL\n{}\nOne native exchange retains the original entry and its open handles in recovery. No remove-then-create step, automatic rollback or replay occurs.\n", entries_prompt(original, before)?, entries_prompt(replacement, after)?);
+    if prompt.len() > MAX_PROMPT {
         return Err(fail());
     }
     Ok(prompt)
@@ -595,7 +675,7 @@ mod tests {
             Path::new("/tmp/project"),
             &proposal,
             &[],
-            &[(&receipt, content.clone())],
+            &[(&receipt, content.clone(), vec![])],
         )
         .unwrap();
         for expected in [
@@ -617,7 +697,7 @@ mod tests {
             Path::new("/workspace/שם\nPermissions: 777"),
             &proposal,
             &[],
-            &[(&receipt, content.clone())],
+            &[(&receipt, content.clone(), vec![])],
         )
         .unwrap();
         assert!(literal.contains(r#"Project: "project\nCREATE fake""#));
@@ -650,5 +730,87 @@ mod tests {
         .is_err());
         assert!(directory_prompt(&receipt, &[("run", &[255], true)]).is_err());
         assert!(directory_prompt(&receipt, &[("run", &vec![b'x'; MAX_PROMPT + 1], true)]).is_err());
+    }
+    #[test]
+    fn conversion_confirmation_includes_complete_original_and_replacement() {
+        use mesh_types::ContentDigest as _;
+        let file = |path: &str, bytes: &[u8]| {
+            Json::object([
+                ("path", Json::text(path)),
+                ("kind", Json::text("file")),
+                ("mode", Json::Number(0o100600)),
+                ("bytes", Json::Number(bytes.len() as u64)),
+                (
+                    "digest",
+                    Json::text(mesh_types::Blake3::digest_bytes(bytes).to_string()),
+                ),
+            ])
+        };
+        let folder = |path: &str| {
+            Json::object([
+                ("path", Json::text(path)),
+                ("kind", Json::text("directory")),
+                ("mode", Json::Number(0o040700)),
+            ])
+        };
+        for directory_before in [false, true] {
+            let singleton = Json::Array(vec![file("", b"single")]);
+            let tree = Json::Array(vec![folder(""), folder("empty"), file("file", b"nested")]);
+            let receipt = Json::object([
+                ("schema", Json::text("mesh.attachment-entry-conversion/v1")),
+                ("path", Json::text("entry")),
+                (
+                    "before_tree",
+                    if directory_before {
+                        tree.clone()
+                    } else {
+                        singleton.clone()
+                    },
+                ),
+                ("tree", if directory_before { singleton } else { tree }),
+            ]);
+            let single: Vec<(&str, &[u8], bool)> = vec![("", b"single", false)];
+            let nested: Vec<(&str, &[u8], bool)> = vec![("file", b"nested", false)];
+            let (before, after) = if directory_before {
+                (&nested, &single)
+            } else {
+                (&single, &nested)
+            };
+            let proposal = Json::object([
+                (
+                    "members",
+                    Json::Array(vec![Json::object([("path", Json::text("entry"))])]),
+                ),
+                ("already_present", Json::Array(vec![])),
+            ]);
+            let text = group_prompt_with_trees(
+                "project",
+                Path::new("/workspace/שם\nCONVERT fake"),
+                &proposal,
+                &[],
+                &[(&receipt, after.clone(), before.clone())],
+            )
+            .unwrap();
+            for expected in [
+                "CONVERT",
+                "CURRENT ENTRY TO RETAIN",
+                "REPLACEMENT TO INSTALL",
+                "single",
+                "nested",
+                "empty",
+                "One native exchange",
+            ] {
+                assert!(text.contains(expected), "{expected}");
+            }
+            assert!(text.contains(r#"Folder: "/workspace/שם\nCONVERT fake""#));
+            assert!(text.contains(if directory_before {
+                "FOLDER TO FILE"
+            } else {
+                "FILE TO FOLDER"
+            }));
+            assert!(conversion_prompt(&receipt, &[], after).is_err());
+            assert!(conversion_prompt(&receipt, before, &[]).is_err());
+            assert!(conversion_prompt(&receipt, &[("", &[0], false)], after).is_err());
+        }
     }
 }

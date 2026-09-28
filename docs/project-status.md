@@ -698,3 +698,11 @@ while retaining original objects and open handles. It verifies both complete sid
 and reports uncertain outcomes without automatic replay or cleanup. Native tests
 are transferred pending local execution. Complete desktop confirmation, localized
 conversion recovery, whole-entry restoration and packaged proof remain outstanding.
+
+### Complete conversion confirmation (unmerged increment)
+
+Native source now presents both original and replacement entries in conversion
+confirmation with exact frozen content and empty directories. It refuses incomplete
+or unrenderable sides and retains literal project/folder identity. Native runtime
+checks, localized conversion recovery, whole-entry restoration and packaged
+graphical acceptance remain unfinished.

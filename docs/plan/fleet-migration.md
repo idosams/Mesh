@@ -1835,3 +1835,18 @@ desktop directory confirmation rejects the conversion schema until complete
 two-sided presentation is added. Local native focused/failing-before/full execution
 is pending behind the preserved run. Source historical 3,318 Rust/680 desktop
 tests with 14 skips are provenance only, not canonical runtime proof.
+
+## I06b complete two-sided conversion confirmation
+
+Transfers native `apps/desktop/src-tauri/attachment_recovery.rs` from source
+`6ec9c8ccf9e273de25d1a84c323c0cd4f3f4b821` onto PR #100 at
+`31b4330f547f83e40511c74576fcc657a2df5ec3`. Seven daemon paths are in #100;
+four renderer paths and final source-document accounting still follow.
+
+Confirmation lists the original entry to retain and replacement to install, with
+every file and empty directory, exact frozen bytes/digests/modes and conversion
+direction. Shared-root coverage is counted once in the bounded group. Missing,
+binary or oversized sides refuse. Conflict resolution preserves canonical root
+arguments and escaped project/folder tests; conversion tests additionally use a
+misleading newline/non-Latin folder. Native focused/failing-before/full tests
+remain queued behind preserved verification; packaged dialog proof is pending.

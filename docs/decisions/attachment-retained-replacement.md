@@ -788,3 +788,15 @@ both orientations, late handles, source/stage changes, durability, approved hist
 budgets, version/overlap refusal and historical recovery. They await canonical
 local execution. Whole-entry restoration and packaged graphical acceptance remain
 required; historical source test counts do not establish completion.
+
+### Complete conversion confirmation
+
+The native group prompt now shows both complete conversion sides: original work
+to retain and replacement to install, including empty directories and exact frozen
+file content, digests and permissions. It names the direction and explains the
+single preserving exchange. Missing, extra, mismatched, binary or oversized content
+refuses the prompt rather than omitting a side. Expanded group accounting counts
+shared root paths once and preserves execution order. Native authority is still
+revalidated after consent. Separate escaped project/folder identity is preserved.
+Localized recovery and packaged graphical proof remain pending; transferred native
+confirmation regressions do not establish that an actual OS dialog was exercised.
