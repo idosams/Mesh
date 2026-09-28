@@ -20,6 +20,10 @@ mod file_deletions;
 #[cfg(unix)]
 pub mod provider;
 mod remote;
+mod remote_input;
+pub use remote_input::{
+    RemoteInputChunk, RemoteInputEntry, RemoteInputManifest, RemoteInputReceiver,
+};
 #[cfg(unix)]
 mod remote_peer;
 #[cfg(unix)]

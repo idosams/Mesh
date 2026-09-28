@@ -2108,3 +2108,16 @@ cannot grant another launch. Tests use actual Ed25519 signatures and SQLite reco
 for durable success and nonce/key/domain/bundle/context/time/cancellation refusal.
 The source exposes no network or renderer entry point and does not claim mutual
 transport authentication, verified input transfer or actual remote execution.
+
+## R03 bounded immutable fleet input transfer
+
+New canonical implementation based on #115 at
+`cfde2e9e46094708655e5cb7e4b1c22c2a1a50de`; no preserved source commit is replaced.
+A canonical tree manifest binds the saved input and bundle identity, complete-file
+hashes, ordered chunk lengths and portable executable metadata. A serial receiver
+uses existing resumable CAS receipt, rejects undeclared/out-of-bound parts and verifies
+whole-file reconstruction before reporting complete availability. Tests cover restart,
+lost acknowledgments, corrupt chunks, incomplete input, changed identities, closed
+encoding, path conflicts, bounds and complete-file integrity. The remote delivery plan
+records the bounds and remaining native authority, export, transport, allocation and
+actual second-machine obligations. No network or remote execution is claimed here.

@@ -72,3 +72,36 @@ protect a transport, prove transfer completeness, spawn a process, authorize a l
 renewal, trust results or approve main. Native peer/key provisioning, mutual transport
 authentication and the remaining delivery steps above are still required. The lower
 level ledger commands remain trusted-native primitives; a peer reply cannot call them.
+
+## Immutable input transfer contract
+
+The transfer increment defines `mesh.remote-input/v1`: exact saved input identity,
+explicit relative directories (including empty ones), and regular files with portable
+executable metadata, ordered chunk lengths/hashes and a complete-file hash. A separate
+BLAKE3 domain binds the canonical manifest to the assignment's bundle identity. Decoder
+input must match both native expected identities; reordered/noncanonical data, unknown
+fields or kinds, traversal, missing directory parents and duplicate paths refuse.
+No link, device, socket or other special-file representation is admitted.
+
+Bounds are part of this first protocol version: 1 MiB canonical manifest, 4,096 entries,
+16,384 chunk references, 4 MiB per chunk, 2 GiB total reconstructed content, 64 KiB per
+received part, 4,096 UTF-8 bytes per relative path and 255 per component. These are
+resource limits, not measured performance or filesystem portability claims. A native
+sender must report a refused input without dropping unsupported entries or altering
+the user's project. Native materialization still owns volume-specific collision and
+identity checks.
+
+The receiver constructor also checks the manifest against the retained native assignment.
+It composes the existing CAS's durable partial offsets, integrity checking,
+atomic promotion and corruption handling. Only declared chunks and exact bounded
+contiguous parts are admitted. A lost acknowledgment is recovered by reading the
+verified complete status or durable offset; it never appends the same prefix twice.
+Whole-file reconstruction hashes must also match before the receiver reports complete
+input availability. Empty files and directories remain represented.
+
+The caller must own and revalidate a private store, exclude competing receivers, and
+bind the receiver to an authenticated assignment. No network listener or arbitrary
+store-path input is exposed. Verified availability is a read-time fact, not permanent
+materialization authority: native allocation must recheck store/destination identity
+and the actual output. Source-version export, authenticated transport, receiving-side
+allocation/execution and second-machine acceptance remain separate required steps.

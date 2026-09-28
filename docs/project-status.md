@@ -774,3 +774,7 @@ A native single-use worker challenge now binds the configured peer key to the ex
 pending remote assignment before recording its claim. It verifies signatures and
 freshness but does not establish a mutually authenticated connection or start a
 remote process. Full remote transfer/execution/reconnect acceptance remains pending.
+Remote input source now includes a bounded canonical tree manifest and a receiver
+composed with existing resumable CAS transfer. It checks exact input/bundle identities,
+chunk and whole-file integrity, and retains resume offsets across restart. Native
+export, authenticated transport and remote materialization/execution remain unfinished.
