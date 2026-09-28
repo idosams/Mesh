@@ -741,3 +741,9 @@ after restart, independently of current file observations. Missing, inconsistent
 or changing records cannot authorize a retry. Localized desktop presentation is
 a separate increment; canonical runtime and packaged graphical acceptance remain
 pending. See the migration ledger for source-path accounting.
+
+The localized saved-execution view now distinguishes historical outcomes, absent
+records and unreliable evidence after restart. It validates proposal/member
+identity without replaying changes. This completes source transfer of that view,
+not full fleet acceptance: directory integration, large/binary confirmation, real
+providers, remote recovery and packaged graphical journeys remain required.

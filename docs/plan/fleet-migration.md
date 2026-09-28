@@ -1670,3 +1670,22 @@ persisted formats remain unchanged; inspection adds a versioned projection.
 Native focused, failing-before and full execution are queued behind the preserved
 canonical run. Required hosted checks must pass before merge. Neither historical
 source results nor structural checks establish current native or packaged proof.
+
+## I03g localized saved execution recovery
+
+Completes source `9bfc1f43466ec5a45082a854e51421dab2ae32d2` accounting on PR #91
+at `cb5a7cf4071e3702331d730529c01df29ea0d995`: four renderer paths transferred,
+with canonical Hebrew translations and literal left-to-right identifiers retained.
+The three native paths are in #91. The source's three documentation changes are
+reconciled here and in the fleet plan, project status and retained-file decision.
+Its historical 3,290 Rust/676 desktop tests and 14 skips are provenance only, not
+verification of this canonical tree.
+
+The controller binds saved outcomes to the proposal and ordered membership,
+rejects inconsistent attempt order and authority flags, and reopens without writes.
+The view separates historical execution from current file observations, translates
+missing/invalid/changing evidence and hides unreliable attempts. Old projections
+remain readable with an explicit unavailable state. Local controller tests: 47
+pass; removing the proposal-digest guard makes the identity regression fail, and
+restoring it returns all 47 to passing. TypeScript/rendered verification is running;
+full native and packaged acceptance remain pending.

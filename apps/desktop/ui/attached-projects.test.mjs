@@ -1095,3 +1095,47 @@ test('lost group replies retain discovery references and never automatically app
   assert.equal(calls.filter(call => call.command === 'apply_attached_main_group').length, 1);
   h.dispose();
 });
+
+function savedExecutionReply() {
+  const value = groupRecoveryReply();
+  const outcome = groupChangeReply().outcome;
+  outcome.members = [{transaction, status: 'reconciliation-required'}];
+  value.execution = {schema: 'mesh.attachment-integration-group-execution/v1', status: 'recorded',
+    attempts: [{transaction, status: 'recorded'}], outcome,
+    historical: true, observation_final: false, automatic_replay: false, write_authority: false};
+  return value;
+}
+test('saved group execution is bound to the exact proposal and ordered membership', () => {
+  const valid = attachedGroupRecovery(savedExecutionReply(), id, groupId);
+  assert.equal(valid.execution.outcome.members[0].status, 'reconciliation-required');
+  assert.equal(attachedGroupRecovery(groupRecoveryReply(), id, groupId).execution, null);
+  for (const mutate of [
+    value => { value.execution.historical = false; },
+    value => { value.execution.write_authority = true; },
+    value => { value.execution.automatic_replay = true; },
+    value => { value.execution.attempts = []; },
+    value => { value.execution.attempts[0].transaction = restoredTransaction; },
+    value => { value.execution.outcome.proposal_digest = 'd'.repeat(64); },
+    value => { value.execution.outcome.members[0].transaction = restoredTransaction; },
+    value => { value.execution.status = 'changed'; },
+    value => { value.execution.status = 'invalid'; },
+  ]) { const value = savedExecutionReply(); mutate(value); assert.throws(() => attachedGroupRecovery(value, id, groupId)); }
+  for (const status of ['no-outcome', 'invalid', 'changed']) {
+    const value = savedExecutionReply(); value.execution.status = status; value.execution.outcome = null;
+    assert.equal(attachedGroupRecovery(value, id, groupId).execution.outcome, null);
+  }
+});
+test('a fresh controller reopens durable group execution without applying or restoring files', async () => {
+  const calls = [];
+  const h = harness(async (command, args) => {
+    calls.push({command, args});
+    if (command === 'inspect_attached_group_recovery') return savedExecutionReply();
+    return reply();
+  });
+  await settle();
+  h.intent({type: 'lookup-group', id, group: groupId}); await settle();
+  assert.equal(h.projections.at(-1).groupRecoveries[id].execution.outcome.status, 'reconciliation-required');
+  assert.equal(h.projections.at(-1).groupOutcomes[id], undefined);
+  assert.ok(!calls.some(call => /apply_|restore_/.test(call.command)));
+  h.dispose();
+});

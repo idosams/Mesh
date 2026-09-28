@@ -601,3 +601,16 @@ corrupt and linked outcomes, contradictory ordering and changing records. These
 are transferred tests, pending canonical runtime verification. Desktop parsing
 and localized display of this evidence are a following increment; packaged
 graphical acceptance remains outstanding.
+
+### Localized saved execution view
+
+The desktop now reopens execution evidence without a previous apply reply, validates
+exact proposal and ordered-member identities, and labels historical outcomes
+separately from current file observations. Missing outcomes do not imply unchanged
+files. Unreliable execution details are hidden while independent member recovery
+remains available. English and Hebrew labels preserve literal file identifiers.
+Old projections without execution evidence remain readable with an unavailable
+message. No refresh or restart initiates a write. A reconciliation-required
+aggregate may still contain all observed members when its final check failed.
+Controller identity and no-mutation tests pass; rendered and packaged acceptance
+remain separate verification requirements.

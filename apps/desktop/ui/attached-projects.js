@@ -301,7 +301,29 @@ export function attachedGroupRecovery(raw, id, group) {
   const moreRestorations = value.more_restoration_references_may_exist ?? true;
   if (!Array.isArray(restorations) || restorations.length > 32 || new Set(restorations).size !== restorations.length
     || restorations.some(tx => !recoveryTransaction(tx) || !tx.startsWith('restoration-')) || typeof moreRestorations !== 'boolean') throw new Error('Invalid group restoration references');
-  return { group, entries, alreadyPresent: [...paths], restorations: [...restorations], moreRestorations };
+  let execution = null;
+  if (value.execution !== undefined) {
+    const record = value.execution;
+    if (record?.schema !== 'mesh.attachment-integration-group-execution/v1' || !['recorded', 'no-outcome', 'invalid', 'changed'].includes(record.status)
+      || record.historical !== true || record.observation_final !== false || record.automatic_replay !== false || record.write_authority !== false
+      || !Array.isArray(record.attempts) || record.attempts.length !== entries.length
+      || record.attempts.some((item, index) => item?.transaction !== entries[index].transaction || !['recorded', 'absent', 'invalid'].includes(item.status))) throw new Error('Invalid group execution evidence');
+    if (['recorded', 'no-outcome'].includes(record.status)) {
+      let gap = false;
+      for (const attempt of record.attempts) {
+        if (attempt.status === 'invalid' || (gap && attempt.status === 'recorded')) throw new Error('Inconsistent group attempt order');
+        gap ||= attempt.status === 'absent';
+      }
+    }
+    let outcome = null;
+    if (record.status === 'recorded') {
+      outcome = attachedGroupChange({ schema: 'mesh.desktop-attachment-group-change/v1', project: id, group, outcome: record.outcome }, id);
+      if (record.outcome.proposal_digest !== value.proposal_digest || outcome.members.length !== entries.length
+        || outcome.members.some((item, index) => item.transaction !== entries[index].transaction)) throw new Error('Group execution membership mismatch');
+    } else if (record.outcome !== null) throw new Error('Unverified group execution outcome');
+    execution = { status: record.status, attempts: record.attempts.map(item => ({transaction: item.transaction, status: item.status})), outcome };
+  }
+  return { group, entries, alreadyPresent: [...paths], restorations: [...restorations], moreRestorations, execution };
 }
 
 export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {

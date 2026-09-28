@@ -59,3 +59,50 @@ test("Hebrew group recovery preserves literal paths and identities and refuses s
     assert.match(html, /disabled=""[^>]*>סקירה לפני שחזור הקובץ שנשמר/);
   } finally { setLocale("en"); }
 });
+
+test("reopened group execution shows historical outcomes and distinguishes missing or changing evidence", () => {
+  const entry = {group, transaction, status: "changed-files", path: "later.txt", attention: true, operation: "apply-approved", retainedAvailable: true, recordedOutcome: "applied-observed"};
+  const execution = {status: "recorded", attempts: [{transaction, status: "recorded"}],
+    outcome: {group, status: "applied-observed", members: [{transaction, status: "applied-observed"}]}};
+  const render = () => renderToStaticMarkup(React.createElement(FileRecovery, {
+    project: "project", disabled: false, detached: false,
+    group: {group, alreadyPresent: [], entries: [entry], execution},
+  }));
+  let html = render();
+  for (const text of ["Saved group execution", "not a fresh verification", "Attempt record found", "Recorded result: change observed", "Files changed since"]) assert.ok(html.includes(text), text);
+  execution.status = "no-outcome"; execution.outcome = null;
+  html = render();
+  assert.ok(html.includes("No final group outcome record"));
+  assert.ok(html.includes("does not prove that files were unchanged"));
+  assert.ok(!html.includes("Recorded result"));
+  for (const status of ["invalid", "changed"]) {
+    execution.status = status; html = render();
+    assert.ok(html.includes('role="alert"'));
+    assert.ok(!html.includes("Attempt record found"));
+    assert.ok(html.includes("Files changed since"));
+  }
+});
+
+test("Hebrew saved execution keeps literal paths and translates uncertainty without exposing unreliable attempts", () => {
+  setLocale("he");
+  try {
+    const execution = { status: "no-outcome", attempts: [{ transaction, status: "recorded" }], outcome: null };
+    const render = () => renderToStaticMarkup(React.createElement(FileRecovery, {
+      project: "project", disabled: false, detached: false,
+      group: { group, alreadyPresent: [], entries: [{ group, transaction, status: "changed-files", path: "שם/UNCHANGED.txt", attention: true, operation: "apply-approved", retainedAvailable: true, recordedOutcome: null }], execution },
+    }));
+    let html = render();
+    assert.ok(html.includes("רישום ביצוע הקבוצה שנשמר"));
+    assert.ok(html.includes("לא נמצא רישום תוצאה סופית"));
+    assert.ok(html.includes("לעולם אינם מתירים ניסיון חוזר"));
+    assert.ok(html.includes('<bdi dir="ltr">שם/UNCHANGED.txt</bdi>'));
+    assert.ok(!html.includes("No final group outcome"));
+    for (const status of ["invalid", "changed"]) {
+      execution.status = status; html = render();
+      assert.ok(html.includes('role="alert"'));
+      assert.ok(!html.includes("נמצא רישום ניסיון"));
+      assert.ok(html.includes('<bdi dir="ltr">שם/UNCHANGED.txt</bdi>'));
+      assert.ok(!html.includes("Execution records"));
+    }
+  } finally { setLocale("en"); }
+});

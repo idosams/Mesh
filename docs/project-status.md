@@ -622,3 +622,13 @@ records are explicit and never authorize replay; independent member observations
 remain available. Native regression tests are transferred but local execution is
 pending behind the preserved full run. Localized display and current packaged
 acceptance remain separate outstanding work.
+
+### Localized saved execution recovery (unmerged increment)
+
+Desktop source now displays durable group execution independently of current file
+observations, including explicit missing/invalid/changing states in English and
+Hebrew. A fresh controller reopens evidence without applying or restoring files.
+All 47 controller tests pass, including a demonstrated failing-before identity
+regression. TypeScript and rendered checks are running. Historical source results
+(3,290 Rust, 676 desktop, 14 Rust skips) do not validate this canonical revision.
+Full native and packaged graphical recovery proof remain outstanding.

@@ -22,7 +22,8 @@ type IntegrationPreview = { head: string; bundle: string; target: string; base_h
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
 type RecoveryEntry = { group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
 type Recovery = { entries: RecoveryEntry[]; more: boolean };
-type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; moreRestorations?: boolean };
+type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; moreRestorations?: boolean;
+  execution?: { status: string; attempts: {transaction: string; status: string}[]; outcome: GroupOutcome | null } | null };
 type GroupOutcome = { group: string; status: string; members: { transaction: string; status: string }[] };
 type Projection = { groupRecoveries?: Record<string, GroupRecovery>; groupOutcomes?: Record<string, GroupOutcome>; groupRecoveryErrors?: Record<string, string>; reviewNavigation?: { id: string; bundle: string; target: string; sequence: number } | null; laneRequests?: Record<string, { request: string; version: string }>; laneFeedback?: Record<string, string>; recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
@@ -336,6 +337,20 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
       <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-group", id: project, group: groupOutcome.group })}>{t("Inspect group outcome")}</Button></div>}
     {group && <div aria-label={t("Group recovery")}><p className="break-all text-sm">{t("Recovery group:")} <bdi dir="ltr">{group.group}</bdi></p>
       <p className="text-xs">{t("These are separate file observations, not an atomic snapshot. Nothing is retried automatically.")}</p>
+      <div aria-label={t("Saved group execution")} className="grid gap-2 py-2">
+        <p className="text-sm font-medium">{t("Saved group execution")}</p>
+        {!group.execution && <p className="text-xs">{t("Saved execution evidence is unavailable in this view.")}</p>}
+        {group.execution?.status === "invalid" && <p role="alert" className="text-sm">{t("Execution records are unreadable or inconsistent. Use the independent file observations below; no group outcome is verified.")}</p>}
+        {group.execution?.status === "changed" && <p role="alert" className="text-sm">{t("Execution records changed during inspection. Inspect the group again before relying on its saved outcome.")}</p>}
+        {group.execution && ["recorded", "no-outcome"].includes(group.execution.status) && <>
+          <p className="text-xs">{group.execution.status === "no-outcome" ? t("No final group outcome record was found. This does not prove that files were unchanged.") : t("This is the saved execution record, not a fresh verification of the working folder.")}</p>
+          <ul>{group.execution.attempts.map((attempt, index) => <li key={attempt.transaction} className="break-all text-xs">
+            <bdi dir="ltr">{group.entries[index]?.path ?? attempt.transaction}</bdi>: {attempt.status === "recorded" ? t("Attempt record found") : t("No attempt record found")}
+            {group.execution?.outcome && <> · {t("Recorded result:")} {t({"applied-observed": "change observed", "reconciliation-required": "uncertain", "not-attempted": "not attempted"}[group.execution.outcome.members[index].status])}</>}
+          </li>)}</ul>
+          <p className="text-xs">{t("An attempt record alone does not prove a file changed. Missing records never authorize retry.")}</p>
+        </>}
+      </div>
       <ul>{group.entries.map(entry => row(entry, `${group.group}-${entry.transaction}`))}</ul>
       {(group.restorations ?? []).length > 0 && <div><p className="text-sm">{t("Restoration records in this group")}</p><ul>{group.restorations?.map(transaction => <li key={transaction} className="break-all text-xs"><bdi dir="ltr">{transaction}</bdi>
         <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-group-file", id: project, group: group.group, transaction })}>{t("Inspect restoration record")}</Button></li>)}</ul></div>}
