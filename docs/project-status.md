@@ -125,9 +125,15 @@ exclusive receiving ownership, bounded reads and replacement/protected-root chec
 are pending. This closes a storage-authority integration gap before network exposure; it does not
 establish remote transport or execution readiness.
 
-## Empty worker workspace prerequisite
+## Received worker history and launch ownership
 
-A dedicated protocol increment adds an explicit immutable root declaration for empty saved trees.
-The corrected [draft #128](https://github.com/idosams/Mesh/pull/128) uses the declaration
-for empty received-worker initialization; its exact-head validation is pending. Delivery is tracked in the
-[delivery ledger](plan/fleet-migration.md#r12-prerequisite-explicit-workspace-root-declaration).
+[PR #129](https://github.com/idosams/Mesh/pull/129) and
+[PR #128](https://github.com/idosams/Mesh/pull/128) are merged with all required exact-head checks
+passing. Received trees, including empty trees, now initialize independent native history with
+an explicit durable source-to-worker mapping. This does not claim a remote provider ran.
+
+The next increment records durable launch ownership and retains the worker ledger and workspace
+for native supervisor composition. Its validation is in progress. It adds no network authentication,
+process adoption, automatic retries or protected-main authority. Delivery evidence and remaining
+work are tracked in the [ledger](plan/fleet-migration.md#r13-durable-remote-launch-ownership) and
+[remote execution contract](plan/fleet-remote-execution-contract.md).

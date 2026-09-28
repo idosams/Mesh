@@ -307,3 +307,8 @@ impl RemoteAdmissionRegistry {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(unix)]
+mod launch;
+#[cfg(unix)]
+pub use launch::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};

@@ -25,6 +25,8 @@ pub use remote_admission::{
     RemoteAdmissionOutcome, RemoteAdmissionReceipt, RemoteAdmissionRegistry,
     RemoteInputReservation, RemoteWork,
 };
+#[cfg(unix)]
+pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
 #[cfg(target_os = "macos")]
 mod worker_directory;
 #[cfg(target_os = "macos")]

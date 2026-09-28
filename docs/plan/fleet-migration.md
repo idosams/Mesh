@@ -2384,3 +2384,37 @@ operation, and its retained regression additionally reopens the native saved his
 #128 macOS run passed 3,420 tests with one empty-tree failure and 16 skips; Linux stopped at the
 same failure after 1,016 passes. Those logs remain retained. Corrected exact-head validation is
 pending, not reported as passing. No preserved source commits are replaced or rewritten.
+
+### R12 delivered baseline and root prerequisite
+
+[#129](https://github.com/idosams/Mesh/pull/129) merged at
+`22ffefce875cc509bd0993ab836049736415d91b`; [#128](https://github.com/idosams/Mesh/pull/128)
+then merged at `d57c512161a7ce5bf75d7c35d384f43c0a79b971`. Both had all seven required
+exact-head checks passing. The worker integration's macOS gate passed 3,429 native tests, including
+empty initialization/reopen, plus renderer and real daemon demo checks. The earlier draft entries
+above preserve failures and the normal merge sequence; they do not describe current merge status.
+Root schema/vector publication now belongs to `mesh-operations` under `protocol/operations`, with
+exact generated-artifact and recursive inventory tests. The older signed-record compatibility gate
+is unchanged. Its earlier artifact-ownership and literal-expectation failures remain preserved.
+
+## R13 durable remote launch ownership
+
+New canonical implementation based on merged #128 at
+`d57c512161a7ce5bf75d7c35d384f43c0a79b971`; no preserved source commits are replaced.
+A launch intent binds the exact retained admission, workspace initialization receipt digest, worker
+initial operation, native installation and native-generated owner. The same guarded worker ledger
+commits it before any future provider launch. Only the original atomic insert returns a reservation;
+identical replay, expired/restarted claims and lost acknowledgments recover facts without regrant.
+Changed mappings and admissions refuse. The reservation owns its registry connection and workspace,
+retaining directory authority even after the outer native worker-directory wrapper is dropped.
+
+Verification covers concurrent claims, restart/expiry replay, changed identities, malformed/unknown
+records, actual received-workspace binding, wrong providers/coordinators, retained native directory
+ownership and independently observed post-commit authority loss. Focused native and lint checks are
+running; full exact-head CI remains required. The additive closed `mesh.remote-launch-intent/v1`
+record uses the existing fleet-store schema. No existing event or protocol encoding changes.
+
+This increment does not start a provider, issue agent credentials, adopt an old process, release
+capacity or authenticate a network connection. The next composition must connect retained ownership
+to native session/custody admission and supervised process lifetime, then implement terminal/result
+reconciliation and authenticated transport. Full second-machine and packaged acceptance remain open.

@@ -224,7 +224,7 @@ release uncertain slots, own a provider process or satisfy actual second-machine
 The supervisor must retain one configured worker directory across connections; a network request
 must never choose a different ledger to evade assignment uniqueness.
 
-## Worker baseline integration in progress
+## Worker baseline initialization
 
 The received-workspace implementation now retains coordinator/objective scope from the original
 admission through materialization. It consumes the admitted allocation, writes a create-only
@@ -238,6 +238,26 @@ Empty received inputs now emit the explicit `InitializeWorkspace` operation from
 [#129](https://github.com/idosams/Mesh/pull/129). This records a real initial version without
 placeholder project files. The retained empty-tree regression also reopens the native workspace and
 checks its saved initial operation. Ordinary user imports retain their no-importable-entries refusal.
-Exact-head checks for this integration are pending; it is not ready to merge until all pass.
+All seven exact-head checks passed and #128/#129 are merged.
 The original draft failure logs are preserved. No process execution or second-machine claim follows
 from workspace initialization alone.
+
+## Durable launch intent before supervisor composition
+
+The launch reservation consumes the originally initialized native workspace and an objective view
+of the shared worker ledger. It matches the configured provider and exact retained admission before
+writing a closed `mesh.remote-launch-intent/v1` event in an assignment-specific stream. The record
+binds admission content and revision, complete initialization-receipt digest, actual worker initial
+operation, installation and a native-generated owner identity. The original atomic insertion alone
+returns a reservation. Replay and restart expose retained facts, even after expiry; changed workspace
+or admission data refuses. Post-commit authority loss returns no reservation and preserves intent.
+
+The reservation owns the guarded registry connection and initialized workspace. It keeps native
+worker-directory ownership alive and supports revalidation against the native clock, retained
+intent, immutable input/history and custody. This is not a provider credential or a fresh inventory
+of mutable working files. Subsequent native session admission must perform its own exact workspace
+and custody checks immediately before spawn. No receipt, PID, expired lease or lost acknowledgment
+can manufacture another reservation or release the concurrency slot.
+
+Provider/session composition, independent supervisor lifetime, process acknowledgment, terminal
+reconciliation, signed results and actual authenticated second-machine operation remain required.
