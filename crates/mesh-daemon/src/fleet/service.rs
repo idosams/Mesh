@@ -284,7 +284,7 @@ impl SavedReviewSelection {
     }
 }
 
-/// Saved-result access without methods for execution, custody or workspace adoption.
+/// Retained-result access and explicit source-project import/review, without worker adoption.
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
@@ -301,6 +301,51 @@ impl FleetHistory {
         self.0
             .review_project_candidate(selection, source, trusted, request, expected_main, page)
     }
+    /// Read retained import identity and outcome without loading a private signing key.
+    pub fn recorded_project_candidate_import(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<Option<(mesh_types::PublicKey, Json)>, Unavailable> {
+        self.0
+            .recorded_project_candidate_import(selection, source, trusted, request, expected_main)
+    }
+    /// Explicit source-project authoring with a native signer; never adopts fleet execution.
+    pub fn import_saved_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        signer: &dyn super::CandidateImportSigner,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .import_project_candidate(selection, source, trusted, request, expected_main, signer)
+    }
+    /// Explicit source-project review creation, or read-only recovery when create is false.
+    pub fn review_imported_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        create: bool,
+    ) -> Result<Json, Unavailable> {
+        self.0.review_imported_project_candidate(
+            selection,
+            source,
+            trusted,
+            request,
+            expected_main,
+            create,
+        )
+    }
+
     /// Recover exact import status from retained history without adopting execution or signing.
     pub fn inspect_project_candidate_import(
         &self,
@@ -1689,6 +1734,62 @@ impl FleetService {
             )
             .map_err(|_| refusal("fleet-candidate-staging-unavailable"))?;
         history.verify()?;
+        Ok(result)
+    }
+
+    /// Recover a public import identity only from verified retained proof. No key creation or signing.
+    pub fn recorded_project_candidate_import(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+    ) -> Result<Option<(mesh_types::PublicKey, Json)>, Unavailable> {
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let result = self.with_saved_review(selection, |open, _| {
+            let snapshot = open
+                .historical_workspace_preview(selection.version)
+                .map_err(|_| refusal("fleet-candidate-content-unavailable"))?;
+            source
+                .recorded_fleet_import(request, &candidate, &snapshot, trusted)
+                .map_err(|_| refusal("fleet-candidate-import-unavailable"))
+        })?;
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-import-input-changed"));
+        }
+        Ok(result)
+    }
+
+    /// Open or inspect the actual imported review against the candidate's fixed, verified main base.
+    /// An explicit historical review may be stale; it grants no approval or implicit rebase.
+    pub fn review_imported_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        create: bool,
+    ) -> Result<Json, Unavailable> {
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let result = self.with_saved_review(selection, |open, _| {
+            let snapshot = open
+                .historical_workspace_preview(selection.version)
+                .map_err(|_| refusal("fleet-candidate-content-unavailable"))?;
+            source
+                .review_fleet_import(request, &candidate, &snapshot, trusted, create)
+                .map_err(|_| refusal("fleet-candidate-import-review-unavailable"))
+        })?;
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-import-input-changed"));
+        }
         Ok(result)
     }
 

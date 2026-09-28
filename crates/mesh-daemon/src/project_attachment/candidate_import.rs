@@ -20,6 +20,7 @@ use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::Path;
 
 const RECORD: &str = "import.json";
+const BINDING: &str = "import-binding.json";
 const LIMIT: u64 = 131_072;
 const DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v0.fleet-project-import");
 struct DerivedHead;
@@ -79,6 +80,37 @@ fn expected_main(candidate: &Json) -> io::Result<Option<String>> {
         _ => Err(invalid("missing candidate base")),
     }
 }
+fn read_import_file(root: &PinnedWorkspaceRoot, name: &str) -> io::Result<Option<(Json, String)>> {
+    let file = match root.filesystem().inspect_entry(Path::new(name)) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    let metadata = file.metadata()?;
+    if !metadata.is_file()
+        || metadata.nlink() != 1
+        || metadata.permissions().mode() & 0o077 != 0
+        || metadata.len() > LIMIT
+    {
+        return Err(invalid("import receipt is not a bounded private record"));
+    }
+    let mut raw = String::new();
+    file.take(LIMIT + 1).read_to_string(&mut raw)?;
+    if raw.len() as u64 > LIMIT {
+        return Err(invalid("import receipt exceeds limit"));
+    }
+    let value = Json::parse(&raw).map_err(error)?;
+    Ok(Some((value, raw)))
+}
+
+fn read_import_record(root: &PinnedWorkspaceRoot) -> io::Result<Option<(Json, String)>> {
+    let record = read_import_file(root, RECORD)?;
+    if record.is_none() && read_import_file(root, BINDING)?.is_some() {
+        return Err(invalid("retained import receipt is missing"));
+    }
+    Ok(record)
+}
+
 struct Receipt {
     statement: Json,
     signature: Signature,
@@ -94,30 +126,42 @@ impl Receipt {
         ])
         .encode()
     }
+    fn binding(&self, actor: PublicKey) -> Json {
+        Json::object([
+            ("schema", Json::text("mesh.fleet-project-import-binding/v1")),
+            (
+                "receipt_digest",
+                Json::text(Blake3::digest_bytes(self.encoded().as_bytes()).to_string()),
+            ),
+            ("operation", Json::text(self.operation.to_string())),
+            ("actor", Json::text(hex(actor.as_bytes()))),
+        ])
+    }
+    fn bind(&self, root: &PinnedWorkspaceRoot, actor: PublicKey) -> io::Result<()> {
+        let expected = self.binding(actor).encode();
+        match read_import_file(root, BINDING)? {
+            Some((_, raw)) if raw == expected => {}
+            Some(_) => return Err(invalid("import identity binding changed")),
+            None => {
+                root.filesystem().write_new_file(
+                    Path::new(BINDING),
+                    expected.as_bytes(),
+                    fs::Permissions::from_mode(0o600),
+                )?;
+                root.sync()?;
+            }
+        }
+        root.ensure_namespace_identity()
+    }
+
     fn read(
         root: &PinnedWorkspaceRoot,
         candidate: &Json,
         actor: PublicKey,
     ) -> io::Result<Option<Self>> {
-        let file = match root.filesystem().inspect_entry(Path::new(RECORD)) {
-            Ok(file) => file,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
+        let Some((value, raw)) = read_import_record(root)? else {
+            return Ok(None);
         };
-        let metadata = file.metadata()?;
-        if !metadata.is_file()
-            || metadata.nlink() != 1
-            || metadata.permissions().mode() & 0o077 != 0
-            || metadata.len() > LIMIT
-        {
-            return Err(invalid("import receipt is not a bounded private record"));
-        }
-        let mut raw = String::new();
-        file.take(LIMIT + 1).read_to_string(&mut raw)?;
-        if raw.len() as u64 > LIMIT {
-            return Err(invalid("import receipt exceeds limit"));
-        }
-        let value = Json::parse(&raw).map_err(error)?;
         let statement = value
             .get("statement")
             .ok_or_else(|| invalid("missing import statement"))?
@@ -147,9 +191,33 @@ impl Receipt {
             &receipt.signature,
         )
         .map_err(error)?;
+        if read_import_file(root, BINDING)?
+            .is_some_and(|(_, raw)| raw != receipt.binding(actor).encode())
+        {
+            return Err(invalid("import identity binding changed"));
+        }
         root.ensure_namespace_identity()?;
         Ok(Some(receipt))
     }
+    fn recover(
+        root: &PinnedWorkspaceRoot,
+        candidate: &Json,
+    ) -> io::Result<Option<(PublicKey, Self)>> {
+        let Some((value, _)) = read_import_record(root)? else {
+            return Ok(None);
+        };
+        let actor = PublicKey::from_bytes(bytes(text(
+            value
+                .get("statement")
+                .ok_or_else(|| invalid("missing import statement"))?,
+            "actor",
+        )?)?);
+        // The public identity is only returned after the complete retained proof verifies.
+        let receipt = Self::read(root, candidate, actor)?
+            .ok_or_else(|| invalid("import receipt disappeared"))?;
+        Ok(Some((actor, receipt)))
+    }
+
     fn outcome(
         &self,
         open: &OpenWorkspace,
@@ -215,6 +283,114 @@ impl Receipt {
     }
 }
 impl ProvisionedAttachment {
+    pub(crate) fn recorded_fleet_import(
+        &self,
+        request: &str,
+        candidate: &Json,
+        snapshot: &HistoricalWorkspacePreview,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<Option<(PublicKey, Json)>> {
+        self.attachment.with_review_history(
+            self.metadata_path(),
+            self.store.clone(),
+            trusted,
+            |open, _| {
+                let allocation = self.retain_import_candidate(request, candidate, snapshot)?;
+                Receipt::recover(&allocation, candidate)?
+                    .map(|(actor, receipt)| {
+                        Ok((actor, receipt.outcome(open, candidate, actor, snapshot)?))
+                    })
+                    .transpose()
+            },
+        )
+    }
+
+    pub(crate) fn review_fleet_import(
+        &self,
+        request: &str,
+        candidate: &Json,
+        snapshot: &HistoricalWorkspacePreview,
+        trusted: &TrustedReviewers,
+        create: bool,
+    ) -> io::Result<Json> {
+        self.attachment.with_review_history(
+            self.metadata_path(),
+            self.store.clone(),
+            trusted,
+            |open, store| {
+                let allocation = self.retain_import_candidate(request, candidate, snapshot)?;
+                let (actor, receipt) = Receipt::recover(&allocation, candidate)?
+                    .ok_or_else(|| invalid("candidate has no signed import"))?;
+                let imported = receipt.outcome(open, candidate, actor, snapshot)?;
+                if imported.get("state") != Some(&Json::text("imported")) {
+                    return Err(invalid("candidate import is pending"));
+                }
+                let base = expected_main(candidate)?
+                    .map(|value| bytes(&value).map(mesh_approval::HeadId::from_bytes))
+                    .transpose()?
+                    .unwrap_or(crate::publication::GENESIS_SHARED_HEAD);
+                let bundle = open
+                    .saved_publication_review_bundle_at(receipt.operation, base)
+                    .map_err(error)?;
+                if open.review(&bundle).is_none() && create {
+                    super::detachment::ensure_attached(store)?;
+                    open.append_record(&mesh_store::StoredRecord::Review(
+                        mesh_store::ReviewRecord {
+                            bundle,
+                            subject_operation: receipt.operation,
+                            opened_by: RecordDigest::from_bytes(
+                                *actor.actor_id::<Blake3>().digest().as_bytes(),
+                            ),
+                        },
+                    ))?;
+                }
+                let reopened = OpenWorkspace::open_attachment_store_with_trusted_reviewers(
+                    self.metadata_path(),
+                    store.clone(),
+                    false,
+                    trusted,
+                )
+                .map_err(error)?;
+                let review = if let Some(record) = reopened.review(&bundle) {
+                    if record.subject_operation != receipt.operation {
+                        return Err(invalid("import review target changed"));
+                    }
+                    super::reviews::summary(
+                        reopened
+                            .recorded_review_item(bundle)
+                            .ok_or_else(|| invalid("import review unavailable"))?,
+                    )?
+                } else {
+                    Json::Null
+                };
+                self.retain_import_candidate(request, candidate, snapshot)?;
+                if Receipt::read(&allocation, candidate, actor)?
+                    .is_none_or(|current| current.encoded() != receipt.encoded())
+                {
+                    return Err(invalid("import receipt changed during review"));
+                }
+                Ok(Json::object([
+                    ("schema", Json::text("mesh.fleet-project-import-review/v1")),
+                    ("import", imported),
+                    ("review", review),
+                    (
+                        "expected_main",
+                        expected_main(candidate)?.map_or(Json::Null, Json::text),
+                    ),
+                    (
+                        "base_is_current",
+                        Json::Bool(
+                            super::approval::main_head(&reopened)?
+                                .unwrap_or(crate::publication::GENESIS_SHARED_HEAD)
+                                == base,
+                        ),
+                    ),
+                    ("approval_authority", Json::Bool(false)),
+                ]))
+            },
+        )
+    }
+
     pub(crate) fn inspect_fleet_import(
         &self,
         request: &str,
@@ -417,6 +593,7 @@ impl ProvisionedAttachment {
                     }
                 }
                 allocation.ensure_namespace_identity()?;
+                receipt.bind(&allocation, actor)?;
                 // Fault boundary after durable intent, before any imported operation is appended.
                 before_append()?;
                 let cas = mesh_cas::Cas::with_filesystem(

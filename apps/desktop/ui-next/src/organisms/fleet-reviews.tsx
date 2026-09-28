@@ -1,4 +1,4 @@
-import { FleetProjectComparison, type ProjectComparison, type CandidateSelector } from "./fleet-project-comparison";
+import { FleetProjectComparison, type ProjectComparison, type CandidateSelector, type ProjectImport } from "./fleet-project-comparison";
 import { reviewArtifactPreviewEnvelope } from "../models/review-artifact-preview";
 import { useMemo, useState } from "react";
 import { useTranslation } from "../lib/localization";
@@ -14,7 +14,7 @@ export type FleetReviewView = { candidate?: CandidateSelector | null; input_open
 export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
 type ReviewDecision = { request: string; revision: number; status: "open" | "addressed"; checkpoint: string | null; version: string | null; bundle: string | null; approval_authority: false };
 type ReviewChanges = { decisions?: ReviewDecision[]; deciding?: boolean; decisionPending?: { operation: string; request: string; expectedRevision: number; proposedCheckpoint: string | null; version: string | null; bundle: string | null } | null; decisionError?: string; decisionNotice?: string; responses?: { request: string; lane: string; checkpoint: string; version: string; bundle: string; status: "proposed"; approval_authority: false }[]; loaded?: boolean; rows: { id: string; message: string; status: "recorded" }[] | null; loading?: boolean; sending?: boolean; error: string; pending?: { request: string; message: string } | null };
-export type FleetReviewPin = { candidate?: ProjectComparison; projectSource?: string | null; candidateEnabled?: boolean; feedback?: ReviewChanges; artifact?: { generation: number; object: string; page: number; loading: boolean; error: string; envelope: unknown }; view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
+export type FleetReviewPin = { candidate?: ProjectComparison; projectImport?: ProjectImport; projectSource?: string | null; candidateEnabled?: boolean; feedback?: ReviewChanges; artifact?: { generation: number; object: string; page: number; loading: boolean; error: string; envelope: unknown }; view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 
@@ -110,7 +110,7 @@ export function FleetReviewPanel({ pin, editable = true }: { pin: FleetReviewPin
       <p>{t("Recorded base head")}: {pin.review?.reviewed_head ? <bdi dir="ltr">{pin.review.reviewed_head}</bdi> : t("Unavailable")}</p><p>{t("Lane starting input")}: <bdi dir="ltr">{pin.startingInput}</bdi></p></details>
     {pin.view?.input_object && !pin.input?.file && <p className="break-all text-xs">{t("Saved changed-object selection")}: <bdi dir="ltr">{pin.view.input_object}</bdi>. {t("Content must be verified before display.")}</p>}
     <FleetInputComparison pin={pin.key} input={pin.input} layout={pin.view?.input_layout} editable={editable} />
-    <FleetProjectComparison pin={pin.key} pending={pin.view?.candidate} comparison={pin.candidate} enabled={editable && Boolean(pin.candidateEnabled)} project={pin.projectSource} />
+    <FleetProjectComparison pin={pin.key} pending={pin.view?.candidate} comparison={pin.candidate} imported={pin.projectImport} enabled={editable && Boolean(pin.candidateEnabled)} project={pin.projectSource} />
     <ChangeRequests pin={pin} editable={editable} />
     <details><summary className="font-semibold">{t("Recorded review against its original review base")}</summary>
     {pin.loading && <p role="status" className="text-sm">{t("Reading the exact saved result\u2026")}</p>}

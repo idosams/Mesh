@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectCandidateReview, projectCandidateReceipt, projectMappingMain } from './fleet-project-comparison.js';
+import { projectCandidateReview, projectCandidateReceipt, projectMappingMain, projectCandidateImport, importedProjectReview } from './fleet-project-comparison.js';
 import { createFleetReviews } from './fleet-reviews.js';
 import { defaultFleetView, fleetPinSnapshot } from './fleet-pin-persistence.js';
 const hex = c => c.repeat(64), project = hex('1');
@@ -65,6 +65,7 @@ function harness(pins = [pin()], intercept = () => undefined) {
       if (command === 'inspect_fleet_saved_review') throw new Error('Separate recorded review unavailable');
       if (command === 'fleet_project_mapping') return mapping(p);
       const input = { project: args.project, request: args.request, expected_main: args.expectedMain };
+      if (command === 'import_fleet_project_candidate') return importEnvelope(p, input, null);
       if (command === 'prepare_fleet_project_candidate') return receipt(p, input);
       if (command === 'review_fleet_project_candidate') return review(p, input, args.after, args.selected);
       throw new Error(`Unexpected ${command}`);
@@ -132,4 +133,81 @@ test('reloading during base discovery prevents the old request from persisting o
   h.handle({ type: 'reload-saved-reviews' }); await settle(); finish(mapping(pin())); await settle();
   assert.equal(h.calls.some(c => ['save_fleet_pins', 'prepare_fleet_project_candidate'].includes(c.command)), false);
   assert.equal(h.snapshot().reviewPins[0].view.candidate, null); h.dispose();
+});
+
+function importOutcome(p, input, state = 'imported') {
+  return { schema: 'mesh.fleet-project-import/v1', candidate: receipt(p, input).result, receipt_digest: hex('5'), target: hex('4'), state, approval_authority: false };
+}
+function importEnvelope(p, input, outcome = importOutcome(p, input)) {
+  return { ...envelope(p, input, outcome), schema: 'mesh.desktop-fleet-candidate-import/v1' };
+}
+function importReview(p, input, saved = true) {
+  return { ...envelope(p, input, {
+    schema: 'mesh.fleet-project-import-review/v1', import: importOutcome(p, input), expected_main: input.expected_main, base_is_current: true, approval_authority: false,
+    review: saved ? { bundle: hex('6'), target: hex('4'), reviewed_head: hex('7'), presentation: hex('8'), complete: true, unavailable: null, changes: [], changes_not_listed: 0, operations_not_listed: 0, author_attribution: 'unknown', approval_authority: false } : null,
+  }), schema: 'mesh.desktop-fleet-import-review/v1' };
+}
+test('import projections bind exact candidate, monotonic outcome and fixed project review', () => {
+  const p = pin(), input = pending(), value = importEnvelope(p, input);
+  const outcome = projectCandidateImport(value, p, input);
+  assert.equal(outcome.target, hex('4'));
+  assert.equal(importedProjectReview(importReview(p, input), p, input, outcome).review.bundle, hex('6'));
+  for (const mutate of [v => v.request = '0'.repeat(32), v => v.result.candidate.provenance.origin.actor = '', v => v.result.approval_authority = true, v => v.result.receipt_digest = hex('9'), v => v.result.state = 'pending', v => v.result.target = hex('9')]) {
+    const changed = structuredClone(value); mutate(changed); assert.throws(() => projectCandidateImport(changed, p, input, outcome));
+  }
+  assert.throws(() => projectCandidateImport(importEnvelope(p, input, null), p, input, outcome));
+  for (const mutate of [v => v.result.review.target = hex('9'), v => v.result.expected_main = hex('9'), v => v.result.import.receipt_digest = hex('9'), v => v.result.review.approval_authority = true]) {
+    const changed = importReview(p, input); mutate(changed); assert.throws(() => importedProjectReview(changed, p, input, outcome));
+  }
+});
+test('saving and creating review are explicit while restore only inspects retained progress', async () => {
+  const p = pin(); p.view.candidate = pending(); let saved = false, reviewed = false;
+  const handler = (command, args) => {
+    if (command === 'import_fleet_project_candidate') { if (args.create) saved = true; return importEnvelope(p, pending(), saved ? importOutcome(p, pending()) : null); }
+    if (command === 'review_imported_fleet_project_candidate') { if (args.create) reviewed = true; return importReview(p, pending(), reviewed); }
+  };
+  const h = harness([p], handler); await h.loadSaved(); await settle();
+  assert.equal(saved, false); assert.equal(reviewed, false);
+  h.handle({ type: 'candidate-import', pin: '1' }); await settle();
+  assert.equal(h.snapshot().reviewPins[0].projectImport.outcome.state, 'imported'); assert.equal(reviewed, false);
+  h.handle({ type: 'candidate-import-review', pin: '1' }); await settle();
+  assert.equal(h.snapshot().reviewPins[0].projectImport.review.bundle, hex('6'));
+  const exact = h.calls.filter(c => c.command === 'import_fleet_project_candidate');
+  assert.ok(exact.every(c => c.args.request === pending().request && c.args.expectedMain === null));
+  h.dispose(); const restored = harness([p], handler); await restored.loadSaved(); await settle();
+  assert.equal(restored.snapshot().reviewPins[0].projectImport.review.bundle, hex('6'));
+  assert.ok(restored.calls.filter(c => c.command.includes('project_candidate')).every(c => c.args.create !== true)); restored.dispose();
+});
+test('lost import acknowledgement retries exact inputs and isolates parallel panels', async () => {
+  const first = pin(), second = pin('2'); first.view.candidate = pending(); second.view.candidate = { ...pending(), request: '3'.repeat(32) };
+  let lose = true;
+  const h = harness([first, second], (command, args) => {
+    if (command === 'import_fleet_project_candidate' && args.create) {
+      if (lose) { lose = false; return Promise.reject(new Error('lost reply')); }
+      return importEnvelope(first, pending());
+    }
+    if (command === 'review_imported_fleet_project_candidate') return importReview(first, pending(), false);
+  });
+  await h.loadSaved(); await settle(); h.handle({ type: 'candidate-import', pin: '1' }); await settle();
+  assert.match(h.snapshot().reviewPins[0].projectImport.error, /could not be confirmed/);
+  assert.equal(h.snapshot().reviewPins[1].projectImport.error, '');
+  h.handle({ type: 'candidate-import-retry', pin: '1' }); await settle();
+  const requests = h.calls.filter(c => c.command === 'import_fleet_project_candidate' && c.args.create);
+  assert.equal(requests.length, 2); assert.deepEqual(requests[0].args, requests[1].args);
+  assert.equal(h.snapshot().reviewPins[0].projectImport.outcome.state, 'imported'); h.dispose();
+});
+test('late imports do not recreate closed panels and failed review reads retain confirmed imports', async () => {
+  const p = pin(); p.view.candidate = pending(); let finish;
+  const h = harness([p], (command, args) => {
+    if (command === 'import_fleet_project_candidate' && args.create) return new Promise(resolve => { finish = () => resolve(importEnvelope(p, pending())); });
+  });
+  await h.loadSaved(); await settle(); h.handle({ type: 'candidate-import', pin: '1' }); await settle();
+  h.handle({ type: 'close-review', pin: '1' }); finish(); await settle(); assert.equal(h.snapshot().reviewPins.length, 0); h.dispose();
+  const failed = harness([p], (command, args) => {
+    if (command === 'import_fleet_project_candidate' && args.create) return importEnvelope(p, pending());
+    if (command === 'review_imported_fleet_project_candidate') return Promise.reject(new Error('review unavailable'));
+  });
+  await failed.loadSaved(); await settle(); failed.handle({ type: 'candidate-import', pin: '1' }); await settle();
+  assert.equal(failed.snapshot().reviewPins[0].projectImport.outcome.state, 'imported');
+  assert.match(failed.snapshot().reviewPins[0].projectImport.error, /could not be confirmed/); failed.dispose();
 });

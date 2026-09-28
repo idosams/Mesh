@@ -248,6 +248,45 @@ fn pending_signed_import_is_read_only_until_explicit_retry_and_never_resigns() {
         .is_err());
     assert_eq!(signer.calls.load(Ordering::SeqCst), 2);
     let receipt = fs::read(f.receipt()).unwrap();
+    let identity = f
+        .history
+        .recorded_fleet_import(
+            &"a".repeat(32),
+            &f.candidate,
+            &f.snapshot,
+            &TrustedReviewers::default(),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(identity.0, actor);
+    let binding = f.receipt().with_file_name(BINDING);
+    assert!(binding.exists());
+    fs::remove_file(f.receipt()).unwrap();
+    assert!(f
+        .history
+        .recorded_fleet_import(
+            &"a".repeat(32),
+            &f.candidate,
+            &f.snapshot,
+            &TrustedReviewers::default()
+        )
+        .is_err());
+    fs::write(f.receipt(), &receipt).unwrap();
+    fs::set_permissions(f.receipt(), fs::Permissions::from_mode(0o600)).unwrap();
+    // Earlier v1 imports lacked the public guard. Read them without mutation; retry adds it.
+    fs::remove_file(&binding).unwrap();
+    assert!(f
+        .history
+        .recorded_fleet_import(
+            &"a".repeat(32),
+            &f.candidate,
+            &f.snapshot,
+            &TrustedReviewers::default()
+        )
+        .unwrap()
+        .is_some());
+    assert!(!binding.exists());
+
     let pending = f.inspect(actor).unwrap().unwrap();
     assert_eq!(text(&pending, "state").unwrap(), "pending");
     assert_eq!(fs::read(f.receipt()).unwrap(), receipt);
@@ -275,6 +314,45 @@ fn pending_signed_import_is_read_only_until_explicit_retry_and_never_resigns() {
         )
         .unwrap();
     assert_eq!(text(&imported, "state").unwrap(), "imported");
+    assert!(binding.exists());
+    let review_read = f
+        .history
+        .review_fleet_import(
+            &"a".repeat(32),
+            &f.candidate,
+            &f.snapshot,
+            &TrustedReviewers::default(),
+            false,
+        )
+        .unwrap();
+    assert_eq!(review_read.get("review"), Some(&Json::Null));
+    let review = f
+        .history
+        .review_fleet_import(
+            &"a".repeat(32),
+            &f.candidate,
+            &f.snapshot,
+            &TrustedReviewers::default(),
+            true,
+        )
+        .unwrap();
+    assert_eq!(
+        review.get("review").unwrap().get("target"),
+        imported.get("target")
+    );
+    assert_eq!(
+        f.history
+            .review_fleet_import(
+                &"a".repeat(32),
+                &f.candidate,
+                &f.snapshot,
+                &TrustedReviewers::default(),
+                false
+            )
+            .unwrap(),
+        review
+    );
+
     assert_eq!(imported.get("target"), pending.get("target"));
     assert_eq!(retry.calls.load(Ordering::SeqCst), 0);
     assert_eq!(f.inspect(actor).unwrap(), Some(imported.clone()));

@@ -1,6 +1,6 @@
 //! Native desktop attachment sessions. The renderer supplies a source selection, never store paths.
 
-use crate::attachment_capture::NativeCaptureSigner;
+use crate::attachment_capture::{NativeCaptureSigner, NativeImportSigner};
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
     AttachmentCaptureService, AttachmentPinState, AttachmentStorage, CaptureOutcome, CapturePhase,
@@ -57,6 +57,30 @@ impl Project {
         ])
     }
 }
+fn fleet_candidate_envelope(
+    schema: &str,
+    project: &str,
+    objective: &str,
+    selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+    request: &str,
+    expected_main: Option<&str>,
+    result: Json,
+) -> String {
+    Json::object([
+        ("schema", Json::text(schema)),
+        ("project", Json::text(project)),
+        ("objective", Json::text(objective)),
+        ("selection", selection.to_json()),
+        ("request", Json::text(request)),
+        (
+            "expected_main",
+            expected_main.map_or(Json::Null, Json::text),
+        ),
+        ("result", result),
+    ])
+    .encode()
+}
+
 impl AttachmentHost {
     pub fn new(application_data: &Path) -> Self {
         Self {
@@ -396,6 +420,93 @@ impl AttachmentHost {
                 "The exact project candidate could not be prepared; retain the request for retry"
                     .into()
             })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn import_fleet_candidate(
+        &self,
+        project: &str,
+        objective: &str,
+        selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+        trusted: &mesh_daemon::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        create: bool,
+    ) -> Result<String, String> {
+        let source = self.review_history(project)?;
+        let history = self.fleet_history(objective)?;
+        let recorded = history
+            .recorded_project_candidate_import(selection, &source, trusted, request, expected_main)
+            .map_err(|_| "The retained import could not be verified; its inputs were preserved")?;
+        let result = if !create {
+            recorded.map_or(Json::Null, |(_, result)| result)
+        } else if let Some((actor, result)) = &recorded {
+            if result.get("state") == Some(&Json::text("imported")) {
+                result.clone()
+            } else {
+                let signer = NativeImportSigner::recorded(*actor);
+                history
+                    .import_saved_project_candidate(
+                        selection,
+                        &source,
+                        trusted,
+                        request,
+                        expected_main,
+                        &signer,
+                    )
+                    .map_err(|_| {
+                        "The exact pending import could not resume; keep its inputs for retry"
+                    })?
+            }
+        } else {
+            let signer = NativeImportSigner::fresh()?;
+            history
+                .import_saved_project_candidate(
+                    selection,
+                    &source,
+                    trusted,
+                    request,
+                    expected_main,
+                    &signer,
+                )
+                .map_err(|_| {
+                    "The private project version could not be confirmed; keep its inputs for retry"
+                })?
+        };
+        Ok(fleet_candidate_envelope(
+            "mesh.desktop-fleet-candidate-import/v1",
+            project,
+            objective,
+            selection,
+            request,
+            expected_main,
+            result,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn review_imported_fleet_candidate(
+        &self,
+        project: &str,
+        objective: &str,
+        selection: &mesh_daemon::fleet::service::SavedReviewSelection,
+        trusted: &mesh_daemon::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        create: bool,
+    ) -> Result<String, String> {
+        let source = self.review_history(project)?;
+        let result = self.fleet_history(objective)?.review_imported_project_candidate(selection, &source, trusted, request, expected_main, create)
+            .map_err(|_| "The fixed imported review could not be verified; the imported version was preserved")?;
+        Ok(fleet_candidate_envelope(
+            "mesh.desktop-fleet-import-review/v1",
+            project,
+            objective,
+            selection,
+            request,
+            expected_main,
+            result,
+        ))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1749,6 +1860,53 @@ mod tests {
         let reopened = AttachmentHost::new(&root);
         reopened.projects().unwrap();
         assert!(reopened.current_fleet(objective).is_err());
+        let empty = Json::parse(
+            &reopened
+                .import_fleet_candidate(id, objective, &selection, &trust, &request, None, false)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(empty.get("result"), Some(&Json::Null));
+        let imported = reopened
+            .import_fleet_candidate(id, objective, &selection, &trust, &request, None, true)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .import_fleet_candidate(id, objective, &selection, &trust, &request, None, true)
+                .unwrap(),
+            imported
+        );
+        assert_eq!(reopened.versions(id, None).unwrap(), versions);
+        let inspection = Json::parse(
+            &reopened
+                .review_imported_fleet_candidate(
+                    id, objective, &selection, &trust, &request, None, false,
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            inspection.get("result").unwrap().get("review"),
+            Some(&Json::Null)
+        );
+        let imported_review = reopened
+            .review_imported_fleet_candidate(
+                id, objective, &selection, &trust, &request, None, true,
+            )
+            .unwrap();
+        assert_eq!(
+            reopened
+                .review_imported_fleet_candidate(
+                    id, objective, &selection, &trust, &request, None, false
+                )
+                .unwrap(),
+            imported_review
+        );
+        assert!(reopened
+            .import_fleet_candidate(other_id, objective, &selection, &trust, &request, None, true)
+            .is_err());
+        assert!(reopened.current_fleet(objective).is_err());
+
         assert_eq!(
             reopened
                 .prepare_fleet_candidate(id, objective, &selection, &trust, &request, None)
@@ -1773,12 +1931,36 @@ mod tests {
             .prepare_fleet_candidate(id, objective, &selection, &trust, &"d".repeat(32), None)
             .is_err());
         assert!(reopened.current_fleet(objective).is_err());
+        drop(reopened);
+        let again = AttachmentHost::new(&root);
+        again.projects().unwrap();
+        assert_eq!(
+            again
+                .import_fleet_candidate(id, objective, &selection, &trust, &request, None, false)
+                .unwrap(),
+            imported
+        );
+        assert_eq!(
+            again
+                .import_fleet_candidate(id, objective, &selection, &trust, &request, None, true)
+                .unwrap(),
+            imported
+        );
+        assert_eq!(
+            again
+                .review_imported_fleet_candidate(
+                    id, objective, &selection, &trust, &request, None, true
+                )
+                .unwrap(),
+            imported_review
+        );
+        assert!(again.current_fleet(objective).is_err());
         assert_eq!(fs::read_to_string(source.join("work")).unwrap(), "original");
         assert_eq!(
             fs::read_to_string(working.join("work")).unwrap(),
             "later live work"
         );
-        drop(reopened);
+        drop(again);
         fs::remove_dir_all(root).unwrap();
     }
 

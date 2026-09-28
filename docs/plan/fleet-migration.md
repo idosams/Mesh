@@ -1279,3 +1279,29 @@ permissions and oversized receipts checks unchanged bytes, modes, journal, worki
 count, then recovers the original pending receipt. Canonical native focused/full/hosted checks remain
 pending behind #70's active full run; this is not a packaged acceptance claim. Remaining desktop import/review, deletion, grouped integration and
 restoration increments, complete provider/remote/packaged journeys and final-main validation remain.
+
+## C04a desktop project import and fixed review
+
+Transfers source `3a3b0da0139b16fb527de4bf8a9ece0d9772f523` onto the published canonical
+PR #72 at `08bd13bc0bc734aa9d3e6ce607fa8fd950111d56`, following signed import PR #71.
+Pinned comparisons gain explicit saving as a project version and creation of a fixed project review.
+Refresh/restoration inspect retained outcomes without signing, appending or restarting workers.
+Public-only actor recovery reuses retained signatures; private bounded import bindings refuse missing
+or substituted receipts. Imported reviews remain bound to their original base after main advances.
+None of these actions approves or integrates a result or writes ordinary project files.
+
+Canonical conflict resolution preserves the newer localized controls, nullable goals and historical
+validation failures. Added Hebrew import labels and a renderer regression keep file paths literal,
+isolate their direction, show stale/incomplete reviews and disable review creation while selections
+are unconfirmed. The earlier receipt permission/bounds regression is retained.
+
+Repository (7), documentation (5 plus 106-document link check), license/storage self-tests and Rust
+format checks pass. All 13 focused coordinator tests pass. Desktop validation is running: its
+launcher was sampled at `_dyld_start` before application code. A direct TypeScript invocation passed;
+the focused renderer command remains running. These are not completed full-desktop results.
+Native focused/mutation/full verification is
+queued behind the preserved #70 full run, which remains live in test discovery. No concurrent native
+build or packaged acceptance claim is made. #71 has all seven hosted checks passing, including
+3,042 Linux and 3,260 macOS native tests and four renderer tests; it is still awaiting additional local
+verification. Remaining direct review, pending-input recovery, deletion, integration and restoration
+source increments and the full provider/remote/packaged/final-main acceptance scope remain required.

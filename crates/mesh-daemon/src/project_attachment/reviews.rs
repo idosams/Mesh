@@ -39,7 +39,7 @@ fn relative_review_path(value: Option<&Json>) -> io::Result<Json> {
     }
     Ok(Json::text(path))
 }
-fn summary(item: Json) -> io::Result<Json> {
+pub(super) fn summary(item: Json) -> io::Result<Json> {
     let field = |name| {
         item.get(name)
             .cloned()

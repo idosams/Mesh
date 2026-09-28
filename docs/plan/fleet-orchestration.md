@@ -612,6 +612,48 @@ Native fault tests stop after durable intent and prove read-only pending inspect
 without signing, preserved user edits and later independent capture. Service tests cover delegated
 import, provenance tampering, recovery with signing disabled, history-only restart, existing native
 review creation, completed retry after verified main advancement and stale fresh-import refusal.
-Desktop signing-identity provisioning, durable user-facing import selectors, review orchestration,
-packaged import invocation and graphical/OS approval proof remain outstanding. The native signer
-must keep independent actor sequences for independent candidate branches.
+Desktop import identity, controls and fixed-review orchestration are described below. Packaged
+import invocation, graphical/OS approval proof and the complete integration journey remain
+outstanding. Independent candidate branches keep independent actor sequences.
+
+
+### Desktop import and fixed project review
+
+The desktop now offers explicit save-as-project-version and create-project-review actions per pinned
+candidate. Its existing durable project/request/expected-main selectors are acknowledged before
+mutation. Refresh and panel restoration only inspect retained status and reviews; they never stage,
+sign, append, create a review or adopt a worker. Parallel panels keep independent pending requests,
+errors and verified outcomes. A lost response retries the same selectors; a confirmed imported
+version stays visible even when reading its review fails. Closed/replaced panels ignore late replies.
+
+New native commands are `import_fleet_project_candidate` and
+`review_imported_fleet_project_candidate`; `create: false` is inspection-only. They resolve registered
+project and fleet history, with native trust, before proceeding. Retained fleet history can explicitly
+author a source-project import using a supplied native signer without restoring execution ownership.
+The `mesh.desktop-fleet-candidate-import/v1` and `mesh.desktop-fleet-import-review/v1` envelopes bind
+all selectors; the renderer validates those bindings and never supplies a signer, private key or path.
+
+Each first import gets a fresh in-memory `SoftwareActorCustody`. Only its signed receipt and public
+identity persist. `NativeImportSigner::recorded` has no signing capability: pending retries reuse the
+exact stored signatures, and completed retries read journal truth. Native public-identity discovery
+returns only after candidate, receipt signature and journal outcome verification. The new private,
+single-link `import-binding.json` (`mesh.fleet-project-import-binding/v1`) binds the receipt digest,
+operation and public actor before append; a missing receipt beside that retained binding refuses
+instead of minting a new identity. Earlier v1 receipts without this guard remain readable without
+migration, and an explicit pending retry adds the guard. Partial or conflicting guards are preserved
+and refused. These are retained metadata proofs, not a backup for loss of the entire candidate store.
+No private-key export or new custody backend was introduced, and software actors still cannot approve.
+
+An imported review is derived against the candidate's recorded base, restricted to genesis or native
+verified main history. The native journal stores the exact review bundle; reopening recomputes that
+same base rather than using the newest main. `mesh.fleet-project-import-review/v1` keeps the review,
+import receipt and separate `base_is_current` observation together. A historical review can be read
+or explicitly recorded after main advances, but stale main cannot be approved implicitly. If the
+imported target does not descend from its recorded non-genesis base, native review creation refuses;
+rebase/integration remains explicit future work. Import and review creation never advance main.
+
+Native tests cover first import after restart, public-only identity recovery, missing/aliased receipts,
+fixed review after verified main advancement and no worker adoption. Coordinator and static-render
+tests cover explicit mutation, read-only restoration, exact lost-response retry, independent panels,
+late replies, incomplete reviews and substituted identities. These transferred tests require execution on this canonical increment; packaged import invocation
+and graphical approval are not established by source tests.

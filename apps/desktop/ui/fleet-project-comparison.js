@@ -1,3 +1,4 @@
+import { attachedReview } from './attached-projects.js';
 // Presentation validation only. Native history owns file identities, content and main authority.
 const check = value => { if (!value) throw new Error('Fixed project comparison could not be verified'); };
 const hex = (value, size = 64) => typeof value === 'string' && new RegExp(`^[a-f0-9]{${size}}$`).test(value);
@@ -43,14 +44,39 @@ function provenance(value, pin, pending) {
   const leaf = value.lineage.at(-1);
   check(leaf.lane === pin.selection.lane && leaf.result_version === pin.selection.version && leaf.source_version === pin.startingInput);
 }
-export function projectCandidateReceipt(raw, pin, pending) {
-  const value = envelope(raw, pin, pending, 'mesh.desktop-fleet-candidate/v1');
+function candidate(value, pin, pending) {
   check(keys(value, 'schema,candidate,project,provenance,content_digest,files,directories,bytes,state,approval_authority')
     && value.schema === 'mesh.fleet-project-candidate/v1' && /^candidate-[a-f0-9]{64}$/.test(value.candidate)
     && value.project === pending.project && hex(value.content_digest) && [value.files, value.directories, value.bytes].every(count)
     && value.state === 'staged' && value.approval_authority === false);
   provenance(value.provenance, pin, pending);
   return { candidate: value.candidate, contentDigest: value.content_digest };
+}
+export function projectCandidateReceipt(raw, pin, pending) {
+  return candidate(envelope(raw, pin, pending, 'mesh.desktop-fleet-candidate/v1'), pin, pending);
+}
+function imported(value, pin, pending, prior = null) {
+  if (value === null) { check(prior === null); return null; }
+  check(keys(value, 'schema,candidate,receipt_digest,target,state,approval_authority')
+    && value.schema === 'mesh.fleet-project-import/v1' && ['pending', 'imported'].includes(value.state)
+    && hex(value.receipt_digest) && hex(value.target) && value.approval_authority === false);
+  const retained = candidate(value.candidate, pin, pending);
+  if (prior) check(value.receipt_digest === prior.receiptDigest && value.target === prior.target && retained.candidate === prior.candidate
+    && !(prior.state === 'imported' && value.state !== 'imported'));
+  return { ...retained, receiptDigest: value.receipt_digest, target: value.target, state: value.state };
+}
+export function projectCandidateImport(raw, pin, pending, prior = null) {
+  return imported(envelope(raw, pin, pending, 'mesh.desktop-fleet-candidate-import/v1'), pin, pending, prior);
+}
+export function importedProjectReview(raw, pin, pending, outcome) {
+  const value = envelope(raw, pin, pending, 'mesh.desktop-fleet-import-review/v1');
+  check(keys(value, 'schema,import,review,expected_main,base_is_current,approval_authority')
+    && value.schema === 'mesh.fleet-project-import-review/v1' && value.expected_main === pending.expected_main
+    && typeof value.base_is_current === 'boolean' && value.approval_authority === false);
+  const verified = imported(value.import, pin, pending, outcome);
+  check(verified?.state === 'imported');
+  const review = value.review === null ? null : attachedReview({ schema: 'mesh.desktop-attachment-review/v1', project: pending.project, review: value.review }, pending.project, verified.target);
+  return { review, baseIsCurrent: value.base_is_current };
 }
 function side(value, path, selected) {
   if (value === null) return null;

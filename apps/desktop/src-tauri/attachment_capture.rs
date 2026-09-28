@@ -35,6 +35,47 @@ impl CheckpointSigner for NativeCaptureSigner {
     }
 }
 
+/// A new import gets an ephemeral actor. Retried imports use only verified public proof.
+/// No import private key is serialized or restored, and neither form can approve main.
+pub(crate) struct NativeImportSigner(ImportIdentity);
+enum ImportIdentity {
+    Fresh(Box<SoftwareActorCustody>),
+    Recorded(PublicKey),
+}
+impl NativeImportSigner {
+    pub(crate) fn fresh() -> Result<Self, String> {
+        SoftwareActorCustody::generate()
+            .map(|key| Self(ImportIdentity::Fresh(Box::new(key))))
+            .map_err(|_| "The private import identity could not be created".into())
+    }
+    pub(crate) fn recorded(actor: PublicKey) -> Self {
+        Self(ImportIdentity::Recorded(actor))
+    }
+}
+impl CheckpointSigner for NativeImportSigner {
+    fn public_key(&self) -> PublicKey {
+        match &self.0 {
+            ImportIdentity::Fresh(key) => key.public_key().public_key(),
+            ImportIdentity::Recorded(actor) => *actor,
+        }
+    }
+    fn sign(&self, payload: &SigningPayload) -> Result<Signature, String> {
+        match &self.0 {
+            ImportIdentity::Fresh(key) => key
+                .sign(payload)
+                .map_err(|_| "The private import could not be signed".into()),
+            ImportIdentity::Recorded(_) => {
+                Err("Retained import identity cannot sign a new operation".into())
+            }
+        }
+    }
+}
+impl mesh_daemon::fleet::CandidateImportSigner for NativeImportSigner {
+    fn sign_import_provenance(&self, payload: &SigningPayload) -> Result<Signature, String> {
+        self.sign(payload)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Action {
     Capture,
@@ -237,6 +278,23 @@ mod tests {
     use super::*;
     use std::fs;
     use std::io::Cursor;
+
+    #[test]
+    fn imported_public_identity_recovers_without_any_signing_capability() {
+        use mesh_daemon::fleet::CandidateImportSigner;
+        let first = NativeImportSigner::fresh().unwrap();
+        let second = NativeImportSigner::fresh().unwrap();
+        assert_ne!(first.public_key(), second.public_key());
+        let recovered = NativeImportSigner::recorded(first.public_key());
+        let payload = SigningPayload::new(
+            mesh_crypto::DomainSeparator::new("mesh.v0.fleet-project-import"),
+            b"test receipt",
+        );
+        assert_eq!(recovered.public_key(), first.public_key());
+        assert!(recovered.sign(&payload).is_err());
+        assert!(recovered.sign_import_provenance(&payload).is_err());
+        assert!(first.sign_import_provenance(&payload).is_ok());
+    }
 
     #[test]
     fn invocation_is_explicit_and_refuses_ambiguous_arguments() {

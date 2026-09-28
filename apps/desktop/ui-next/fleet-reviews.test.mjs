@@ -385,3 +385,34 @@ test('Hebrew project comparisons preserve raw paths and text and disable prepara
     assert.match(html, /<pre dir="ltr"[^>]*>Fixed project main<\/pre>/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('import panels distinguish saving, pending recovery and fixed project review without approval', () => {
+  const value = pin(); value.candidateEnabled = true; value.view = { candidate: { project: '9'.repeat(64), request: 'a'.repeat(32), expected_main: null } };
+  value.candidate = { loading: false, error: '', fixed: { review: 'b'.repeat(64), baseIsCurrent: true, observedMain: null, context: { target_version: value.selection.version }, changes: [] } };
+  let html = render({ pins: [value], notice: '' }); assert.match(html, /Save as a project version/);
+  value.projectImport = { loading: false, error: '', outcome: { state: 'pending', target: 'c'.repeat(64) } };
+  html = render({ pins: [value], notice: '' }); assert.match(html, /Retry saving this project version/); assert.match(html, /Refresh only reads its status/);
+  value.projectImport.outcome.state = 'imported'; html = render({ pins: [value], notice: '' }); assert.match(html, /Create project review/); assert.doesNotMatch(html, /Save as a project version/);
+  value.projectImport.review = { bundle: 'd'.repeat(64), target: 'c'.repeat(64), complete: true, changes: [{ before: 'old', after: '<new>', effect: 'moved' }], changes_not_listed: 0 };
+  value.projectImport.baseIsCurrent = false;
+  html = render({ pins: [value], notice: '' }); assert.match(html, /This review keeps its original base/); assert.match(html, /&lt;new&gt;/); assert.match(html, /Approval remains a separate human action/);
+});
+
+ test('Hebrew imported review keeps paths literal and pending actions disabled while selection is unconfirmed', () => {
+  const value = pin(); value.candidateEnabled = false;
+  value.view = { candidate: { project: '9'.repeat(64), request: 'a'.repeat(32), expected_main: null } };
+  value.projectImport = { loading:false,error:'',outcome:{state:'imported',target:'c'.repeat(64)},baseIsCurrent:false,
+    review:{bundle:'d'.repeat(64),target:'c'.repeat(64),complete:false,changes:[{before:'Create project review',after:'<new>',effect:'moved'}],changes_not_listed:1} };
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value],notice:''});
+    assert.match(html,/aria-label="גרסת פרויקט שמורה ובדיקה"/);
+    assert.match(html,/<bdi dir="ltr">Create project review<\/bdi>/);
+    assert.match(html,/<bdi dir="ltr">&lt;new&gt;<\/bdi>/);
+    assert.match(html,/האישור אינו זמין/);
+    assert.match(html,/בדיקה זו שומרת על הבסיס המקורי/);
+    value.projectImport.review = null;
+    html = render({pins:[value],notice:''});
+    assert.match(html,/<button[^>]*disabled=""[^>]*>יצירת בדיקת פרויקט<\/button>/);
+  } finally { module.exports.setLocale('en'); }
+});

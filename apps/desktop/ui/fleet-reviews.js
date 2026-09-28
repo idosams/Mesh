@@ -1,4 +1,4 @@
-import { projectMappingMain, projectCandidateReceipt, projectCandidateReview } from './fleet-project-comparison.js';
+import { projectMappingMain, projectCandidateReceipt, projectCandidateReview, projectCandidateImport, importedProjectReview } from './fleet-project-comparison.js';
 import { reviewChangeMessage, reviewChangeReceipt, reviewDecisionReceipt, savedReviewChangeActivity } from './fleet-review-changes.js';
 import { loadFleetArtifact } from './fleet-artifact-preview.js';
 import { reviewArtifactKind } from './review-artifact-validation.js';
@@ -170,12 +170,43 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
       }
       const comparison = projectCandidateReview(await invoke('review_fleet_project_candidate', { ...args, after, selected }), pin, pending,
         after, selected, operation.fixed ?? operation.page, receipt);
-      if (currentCandidate(pin, operation)) candidateState(pin, operation, { loading: false, receipt, fixed: comparison,
-        ...(selected === null ? { page: comparison } : { file: comparison.changes[0] }) });
+      if (currentCandidate(pin, operation)) {
+        candidateState(pin, operation, { loading: false, receipt, fixed: comparison,
+          ...(selected === null ? { page: comparison } : { file: comparison.changes[0] }) });
+        if (after === null && selected === null) {
+          const current = pins.find(value => value.selection === pin.selection);
+          if (current) void importRequest(current, 'read');
+        }
+      }
     } catch {
       if (currentCandidate(pin, operation)) candidateState(pin, operation, { loading: false,
         error: prepare ? 'Preparation is unconfirmed. Keep the saved request and retry its exact inputs. Resolve any saved-selection error first.'
           : 'This fixed comparison is unavailable. Its saved inputs and any previously verified content are retained. Preparing missing content requires an explicit retry.' });
+    }
+  }
+  async function importRequest(pin, mode) {
+    const pending = pin.view.candidate;
+    if (disposed || !pending || pin.projectImport?.loading || (mode !== 'read' && (!persistenceEnabled || !editable))) return;
+    const operation = { ...pin.projectImport, loading: true, error: '', lastMode: mode, outcome: pin.projectImport?.outcome ?? null, review: pin.projectImport?.review ?? null };
+    pins = pins.map(value => value.selection === pin.selection ? { ...value, projectImport: operation } : value); publish();
+    const current = () => !disposed && pins.some(value => value.selection === pin.selection && value.projectImport === operation);
+    const finish = patch => { if (current()) { pins = pins.map(value => value.selection === pin.selection ? { ...value, projectImport: { ...operation, ...patch } } : value); publish(); } };
+    let verifiedOutcome = operation.outcome;
+    try {
+      if (mode !== 'read' && !await storage.confirmed()) throw new Error('Import inputs are not durably saved');
+      if (!current()) return;
+      const args = { ...pin.selection, project: pending.project, request: pending.request, expectedMain: pending.expected_main };
+      const outcome = projectCandidateImport(await invoke('import_fleet_project_candidate', { ...args, create: mode === 'import' }), pin, pending, operation.outcome);
+      if (!current()) return;
+      verifiedOutcome = outcome;
+      let reviewed = { review: null };
+      if (outcome?.state === 'imported') {
+        reviewed = importedProjectReview(await invoke('review_imported_fleet_project_candidate', { ...args, create: mode === 'review' }), pin, pending, outcome);
+        if (operation.review && (!reviewed.review || reviewed.review.bundle !== operation.review.bundle)) throw new Error('Fixed project review changed');
+      }
+      finish({ loading: false, outcome, ...reviewed });
+    } catch {
+      finish({ loading: false, outcome: verifiedOutcome, error: 'The saved version or its review could not be confirmed. Keep these exact inputs and retry, or refresh to inspect retained progress.' });
     }
   }
   async function loadChanges(pin, reloadDecision = false) {
@@ -274,12 +305,21 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry', 'reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
+      if (!['candidate-import', 'candidate-import-read', 'candidate-import-review', 'candidate-import-retry', 'candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry', 'reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response', 'decide-review-change', 'retry-review-decision', 'reload-review-decision'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
         notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (['candidate-import', 'candidate-import-read', 'candidate-import-review', 'candidate-import-retry'].includes(value.type)) {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (fields !== 'pin,type' || !pin || !pin.view.candidate || pin.projectImport?.loading) return true;
+        if (value.type === 'candidate-import-read') void importRequest(pin, 'read');
+        if (value.type === 'candidate-import' && pin.candidate?.fixed && !pin.candidate.error) void importRequest(pin, 'import');
+        if (value.type === 'candidate-import-review' && pin.projectImport?.outcome?.state === 'imported') void importRequest(pin, 'review');
+        if (value.type === 'candidate-import-retry' && pin.projectImport?.error) void importRequest(pin, pin.projectImport.lastMode ?? 'read');
+        return true;
       }
       if (['candidate-prepare', 'candidate-read', 'candidate-page', 'candidate-file', 'candidate-retry'].includes(value.type)) {
         const pin = pins.find(pin => pin.key === value.pin);

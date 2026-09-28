@@ -2087,6 +2087,19 @@ impl OpenWorkspace {
             .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
     }
 
+    /// Derive a fixed review only against genesis or a head admitted by the trusted approval fold.
+    pub(crate) fn saved_publication_review_bundle_at(
+        &self,
+        target: RecordDigest,
+        base: mesh_approval::HeadId,
+    ) -> Result<RecordDigest, String> {
+        if base != crate::publication::GENESIS_SHARED_HEAD && !self.has_verified_shared_head(base) {
+            return Err("import review base is not verified main history".into());
+        }
+        self.publication_review(target, base, false)
+            .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
+    }
+
     /// Resolve durable review identity from the complete index, never a bounded UI projection.
     pub(crate) fn recorded_review_for_actor(
         &self,

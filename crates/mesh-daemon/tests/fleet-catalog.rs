@@ -1250,6 +1250,16 @@ fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
             &signer,
         )
         .unwrap();
+    let imported_review = service
+        .review_imported_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            true,
+        )
+        .unwrap();
     let unimported_request = "d".repeat(32);
     service
         .stage_project_candidate(
@@ -1319,6 +1329,42 @@ fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
         .unwrap()
         .operation();
     let next_main = approve(&next.to_string(), 2).to_string();
+    let old_review = service
+        .review_imported_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            false,
+        )
+        .unwrap();
+    assert_eq!(old_review.get("review"), imported_review.get("review"));
+    assert_eq!(old_review.get("base_is_current"), Some(&Json::Bool(false)));
+    assert_eq!(
+        service
+            .review_imported_project_candidate(
+                &selection,
+                &f.history,
+                &trust,
+                &request,
+                Some(&first_main),
+                true
+            )
+            .unwrap(),
+        old_review
+    );
+    assert!(service
+        .review_imported_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &request,
+            Some(&first_main),
+            true
+        )
+        .is_err());
+
     let retry = ImportSigner {
         key: SigningKey::from_bytes(&[124; 32]),
         calls: std::sync::atomic::AtomicUsize::new(0),

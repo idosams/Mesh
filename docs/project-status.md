@@ -489,9 +489,18 @@ final combined-main, hosted and packaged validation remain incomplete.
 
 Native fleet import now persists a signed provenance receipt before appending the exact private
 project operation. Read-only restart inspection distinguishes pending from imported work; explicit
-retries reuse the retained signature and completed retries recover after main advances. Transferred
-source and fault tests cover preserved ordinary files, independent capture, tampered/aliased receipt
-refusal, unsigned retries, delegated import and the explicit project-review API. Canonical native
-execution of this newly transferred importer remains pending. Import grants no approval and does
-not create a review automatically. Desktop signer provisioning, import/review controls and packaged
-graphical/OS approval proof remain unfinished.
+retries reuse the retained signature and completed retries recover after main advances. Source and
+fault tests cover preserved ordinary files, independent capture, tampered/aliased receipt refusal,
+unsigned retries, delegated import and compatibility with the existing explicit project-review API.
+Import grants no approval and does not create a review automatically. Desktop controls and public-only
+signer recovery are described below; packaged graphical/OS approval proof remains unfinished.
+
+
+Desktop pinned candidates now expose explicit project-version saving and fixed project-review
+creation. Existing durable selectors bind retries; refresh/restart only reads retained progress.
+New imports use independent ephemeral native actor keys; recovered public identities cannot sign,
+and native code reuses the exact retained signatures. A public import binding guards a missing
+receipt. Retained fleet history can import without adopting worker execution. Transferred tests cover native restart, verified main, coordinator behavior and static rendering;
+execution on this canonical increment remains pending. The panels show
+confirmed imported versions, pending recovery, exact review identity and stale-base observations.
+The complete graphical approval/integration journey and packaged import invocation remain unverified.

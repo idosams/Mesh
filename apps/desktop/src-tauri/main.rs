@@ -918,6 +918,84 @@ mod desktop {
 
     #[allow(clippy::too_many_arguments)]
     #[tauri::command]
+    async fn import_fleet_project_candidate(
+        host: State<'_, Arc<AttachmentHost>>,
+        project: String,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        expected_main: Option<String>,
+        create: bool,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.import_fleet_candidate(
+                &project,
+                &objective,
+                &selection,
+                &attachment_review_trust(),
+                &request,
+                expected_main.as_deref(),
+                create,
+            )
+        })
+        .await
+        .map_err(|_| {
+            "The import operation did not finish; keep its exact inputs for retry".to_owned()
+        })?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn review_imported_fleet_project_candidate(
+        host: State<'_, Arc<AttachmentHost>>,
+        project: String,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        request: String,
+        expected_main: Option<String>,
+        create: bool,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.review_imported_fleet_candidate(
+                &project,
+                &objective,
+                &selection,
+                &attachment_review_trust(),
+                &request,
+                expected_main.as_deref(),
+                create,
+            )
+        })
+        .await
+        .map_err(|_| {
+            "The import operation did not finish; keep its exact inputs for retry".to_owned()
+        })?
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
     async fn review_fleet_project_candidate(
         host: State<'_, Arc<AttachmentHost>>,
         project: String,
@@ -7463,6 +7541,8 @@ mod desktop {
                 inspect_fleet_saved_review,
                 fleet_project_mapping,
                 prepare_fleet_project_candidate,
+                import_fleet_project_candidate,
+                review_imported_fleet_project_candidate,
                 review_fleet_project_candidate,
                 render_fleet_review_artifact,
                 request_fleet_review_changes,
