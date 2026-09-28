@@ -1,5 +1,6 @@
 //! Single-use proof of a configured worker key for one pending remote assignment.
-//! This neither authenticates the coordinator to the worker nor transfers or launches anything.
+//! Optional signed dispatch authenticates coordinator intent before the worker proves its key.
+//! Neither direction transfers input or launches a provider.
 use super::{refuse, wire, Command, Error, Lane, RemoteAssignment, RunState, Runtime};
 use crate::ipc::Json;
 use mesh_crypto::{DomainSeparator, Ed25519, SignatureScheme, SigningPayload};
@@ -10,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v1.fleet-worker-assignment-proof");
 const LIFETIME_MS: u64 = 30_000;
+mod dispatch;
+pub use dispatch::{RemoteDispatch, RemoteDispatchPolicy, VerifiedRemoteDispatch};
 
 /// Native-created, non-cloneable challenge. Consuming a reply consumes its nonce even on refusal.
 /// The caller supplies an independently configured worker key, never a key chosen by the reply.
@@ -20,6 +23,7 @@ pub struct RemotePeerChallenge {
     command: Command,
     peer: PublicKey,
     payload: SigningPayload,
+    body: Json,
     issued_ms: u64,
     expires_ms: u64,
 }
@@ -108,14 +112,14 @@ impl RemotePeerChallenge {
             ),
             ("issued_ms", Json::Number(issued_ms)),
             ("expires_ms", Json::Number(expires_ms)),
-        ])
-        .encode();
+        ]);
         Ok(Self {
             objective: runtime.objective().into(),
             lane: selected.clone(),
             command,
             peer: configured_peer,
-            payload: SigningPayload::new(DOMAIN, body.as_bytes()),
+            payload: SigningPayload::new(DOMAIN, body.encode().as_bytes()),
+            body,
             issued_ms,
             expires_ms,
         })

@@ -77,7 +77,9 @@ pub use remote_materialization::{
 #[cfg(unix)]
 mod remote_peer;
 #[cfg(unix)]
-pub use remote_peer::RemotePeerChallenge;
+pub use remote_peer::{
+    RemoteDispatch, RemoteDispatchPolicy, RemotePeerChallenge, VerifiedRemoteDispatch,
+};
 #[cfg(unix)]
 pub mod service;
 mod wire;
@@ -641,16 +643,7 @@ impl State {
                 return refuse("already-started");
             }
             goal_valid(goal)?;
-            if limits.lanes == 0
-                || limits.lanes > 1024
-                || limits.concurrency == 0
-                || limits.concurrency > 64
-                || limits.concurrency > limits.lanes
-                || limits.depth > 32
-                || limits.retries > 10
-            {
-                return refuse("invalid-limits");
-            }
+            limits_valid(limits)?;
             self.goal = Some(goal.clone());
             self.limits = Some(limits.clone());
             return Ok(());
@@ -1246,6 +1239,19 @@ fn review_change_message_valid(message: &str) -> Result<(), Error> {
         || message.chars().any(|ch| (ch.is_control() && ch != '\n' && ch != '\t')
             || matches!(ch, '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')) {
         return refuse("invalid-review-change-message");
+    }
+    Ok(())
+}
+fn limits_valid(limits: &Limits) -> Result<(), Error> {
+    if limits.lanes == 0
+        || limits.lanes > 1024
+        || limits.concurrency == 0
+        || limits.concurrency > 64
+        || limits.concurrency > limits.lanes
+        || limits.depth > 32
+        || limits.retries > 10
+    {
+        return refuse("invalid-limits");
     }
     Ok(())
 }

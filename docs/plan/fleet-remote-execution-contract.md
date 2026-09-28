@@ -463,3 +463,26 @@ worker retained its handoff; the client neither infers completion nor retries au
 unsigned input replies are not remote result signatures or launch permits. The embedding owner still
 must provide authenticated streams, deadlines, cancellation, initial worker proof and bounded stderr.
 This client does not launch SSH, install a worker, admit keys or implement remote result recovery.
+
+## Authenticated dispatch bootstrap
+
+Before asking a worker to sign, the coordinator can send `mesh.remote-dispatch/v1`: a canonical
+envelope containing `body` and a lowercase hexadecimal `signature`. The body binds configured
+coordinator/worker keys, objective limits and the unchanged canonical v1 worker challenge. The
+signature uses the distinct `mesh.v1.fleet-coordinator-dispatch` domain. The native coordinator
+revalidates its pending attempt and limits around signing; the envelope grants no external effect.
+
+`RemoteDispatchPolicy` comes from native worker configuration, never the message. It supplies both
+expected keys, the admitted provider, maximum objective limits and maximum remaining assignment lease.
+Verification checks the configured coordinator signature, all policy bounds, the exact closed command
+and challenge fields, and the original challenge's at-most-30-second freshness window. Only then can
+the worker produce `mesh.worker-dispatch-reply/v1` with that challenge's nonce and its worker signature.
+The original worker-proof bytes/domain stay unchanged. Both new controls have a 64 KiB bound;
+unknown versions, fields, commands and noncanonical encodings refuse.
+
+The coordinator consumes its original single-use challenge when verifying the reply and claiming the
+pending attempt. A verified dispatch, repeated reply or replayed envelope is not a receiving or launch
+permit. The worker still needs the fresh coordinator-admission proof before its durable reservation,
+including exact matching limits. No native key, path, executable or endpoint is selected by the peer.
+The real-stream test composes this bootstrap with immutable input transfer; deployment and resident
+supervisor lifetime remain separate work.

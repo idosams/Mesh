@@ -183,10 +183,18 @@ All six focused native host tests passed. This is local native composition; resi
 result recovery and second-machine acceptance remain open. See
 [R21](plan/fleet-migration.md#r21-broker-handoff-to-native-provider).
 
-The coordinator input client now connects a native saved-history export to the receiving broker,
+[PR #140](https://github.com/idosams/Mesh/pull/140) merged at
+`2b27bd3b561141831133db621c6ffa1e7c171647` with all seven exact-head checks passing.
+The coordinator input client connects a native saved-history export to the receiving broker,
 verifies canonical reply correlation, checks native authority during transfer and resumes from
 confirmed offsets. Lost final replies remain uncertain; retained-only admission sends no input.
 All seven focused native transfer tests passed, including preservation of continued live project edits.
-Full hosted CI is pending. This remains an embedding API requiring
+This remains an embedding API requiring
 authenticated transport, not a deployed remote worker. See
 [R22](plan/fleet-migration.md#r22-coordinator-immutable-input-transfer).
+
+The next increment authenticates a coordinator-signed dispatch before worker proof signing. Native
+keys, provider and budget/lease policy constrain the request. A real-stream test connects that
+handshake to saved-input transfer; all 20 focused proof/transfer cases passed. Full hosted validation
+is pending. No resident endpoint, key provisioning or signed remote result recovery is claimed. See
+[R23](plan/fleet-migration.md#r23-authenticated-dispatch-before-worker-proof).

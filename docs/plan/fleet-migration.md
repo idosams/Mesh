@@ -2680,3 +2680,30 @@ file; it was corrected to use actual saved manifest boundaries, preserving the f
 focused tests passed, including continued live project edits preserved while transferring the earlier
 saved version. Full hosted validation is pending. Deployment, initial worker-proof transport, SSH/key provisioning, signed output transfer
 and local result import/reconnect recovery remain unfinished.
+
+## R23 authenticated dispatch before worker proof
+
+New canonical bootstrap on merged #140; no preserved source commits are replaced. The coordinator
+signs the exact original pending worker challenge and native objective limits using a separate
+dispatch domain. Native lane/cancellation/freshness and limits are checked before and after signing;
+a wrong signer refuses. The worker verifies its configured coordinator key and worker identity,
+provider, objective limits, lease cap, freshness and closed canonical body before deriving a worker
+proof reply. Peer-provided paths, executables and key selection are absent from the message.
+
+The new `mesh.remote-dispatch/v1` envelope and `mesh.worker-dispatch-reply/v1` control reply are
+bounded to 64 KiB and reject unknown/noncanonical data. The existing v1 worker challenge bytes and
+signing domain remain unchanged. The new coordinator domain is `mesh.v1.fleet-coordinator-dispatch`.
+A verified dispatch carries authenticated work facts, not a reservation. Repeated worker replies
+cannot recreate the original coordinator challenge or create receiving/launch authority. The
+subsequent fresh coordinator admission proof, including exact objective limits, remains mandatory.
+
+All 20 focused native proof/transfer tests passed: six new dispatch cases, six unchanged worker-proof
+cases and eight transfer cases. The new real-stream journey sends the signed dispatch, checks the
+worker reply and coordinator claim, then transfers an actual saved-history input on the same stream
+into exactly one native handoff. Refusals cover wrong keys/domain/provider/budgets/lease, malformed or
+changed requests, wrong reply nonce, cancellation during signing and expired proofs. The existing
+objective-limit validation was extracted without changing its rules. Full hosted checks are pending.
+
+This supplies bootstrap messages and native verification APIs, not a deployed listener or key store.
+Resident worker lifecycle, transport admission, key provisioning, signed results/local import and
+reconnect/restart recovery still require integration and actual second-machine acceptance.

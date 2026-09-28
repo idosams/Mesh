@@ -467,3 +467,108 @@ fn receipt_only_peer_returns_retained_without_sending_manifest_or_allocating_aga
     assert_eq!(setup.f.registry().receipts().unwrap().len(), 1);
     setup.assert_empty_store();
 }
+
+#[test]
+fn coordinator_signed_bootstrap_then_saved_input_transfer_share_one_authenticated_stream() {
+    use crate::fleet::{
+        RemoteDispatch, RemoteDispatchPolicy, RemotePeerChallenge, RemoteReceivingSession,
+    };
+    let export = Export::new();
+    let setup = export.setup();
+    let mut runtime = setup.f.runtime(false);
+    let challenge = RemotePeerChallenge::issue(
+        &mut runtime,
+        "lane",
+        "run",
+        setup.f.work.assignment.clone(),
+        PublicKey::from_bytes(setup.f.worker.verifying_key().to_bytes()),
+    )
+    .unwrap();
+    let dispatch = challenge
+        .signed_dispatch(
+            &mut runtime,
+            &PublicKey::from_bytes(setup.f.coordinator.verifying_key().to_bytes()),
+            |body| sign(&setup, body),
+        )
+        .unwrap();
+    let maximum = runtime.state().limits.clone().unwrap();
+    let (mut client, mut server) = pair();
+    std::thread::scope(|scope| {
+        let worker = scope.spawn(|| {
+            let Some(RemoteFrame::Control(bytes)) =
+                RemoteFrameReader::new(&mut server).read_frame().unwrap()
+            else {
+                panic!("dispatch expected")
+            };
+            let dispatch = RemoteDispatch::decode(std::str::from_utf8(&bytes).unwrap()).unwrap();
+            let verified = dispatch
+                .verify(&RemoteDispatchPolicy {
+                    coordinator: PublicKey::from_bytes(
+                        setup.f.coordinator.verifying_key().to_bytes(),
+                    ),
+                    worker: PublicKey::from_bytes(setup.f.worker.verifying_key().to_bytes()),
+                    provider: "codex",
+                    maximum,
+                    max_lease_ms: 120_000,
+                })
+                .unwrap();
+            assert_eq!(verified.objective(), "objective");
+            assert!(setup.f.registry().receipts().unwrap().is_empty());
+            let reply = verified
+                .worker_reply(|body| {
+                    Ok(Signature::from_bytes(
+                        setup.f.worker.sign(body.as_bytes()).to_bytes(),
+                    ))
+                })
+                .unwrap();
+            RemoteFrameWriter::new(&mut server)
+                .write_frame(&reply)
+                .unwrap();
+            // Authenticated dispatch supplies work facts, but the subsequent fresh coordinator
+            // proof and original durable receiving reservation are still mandatory.
+            let mut session = RemoteReceivingSession::new(
+                setup.f.registry(),
+                verified.work().clone(),
+                "0123456789abcdef0123456789abcdef",
+                &setup.destination,
+            );
+            let RemoteReceivingBrokerOutcome::Materialized {
+                handoff,
+                reply_written,
+            } = serve_remote_receiving(&mut session, server.try_clone().unwrap(), server).unwrap()
+            else {
+                panic!("native handoff expected")
+            };
+            assert!(reply_written);
+            export.verify(&handoff);
+        });
+        RemoteFrameWriter::new(&mut client)
+            .write_frame(&dispatch.frame().unwrap())
+            .unwrap();
+        let Some(RemoteFrame::Control(bytes)) =
+            RemoteFrameReader::new(&mut client).read_frame().unwrap()
+        else {
+            panic!("worker proof expected")
+        };
+        challenge
+            .verify_dispatch_reply(
+                &mut runtime,
+                "bootstrap-worker",
+                std::str::from_utf8(&bytes).unwrap(),
+            )
+            .unwrap();
+        assert!(matches!(
+            transfer_remote_input(
+                request(&setup, &mut runtime, &export),
+                client.try_clone().unwrap(),
+                client,
+                |body| sign(&setup, body)
+            )
+            .unwrap(),
+            RemoteInputTransferOutcome::Materialized(_)
+        ));
+        worker.join().unwrap();
+    });
+    assert_eq!(setup.f.registry().receipts().unwrap().len(), 1);
+    assert_eq!(runtime.state().lanes["lane"].runs.len(), 1);
+}
