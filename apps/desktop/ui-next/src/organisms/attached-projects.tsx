@@ -2,7 +2,7 @@ import { useTranslation } from "../lib/localization";
 import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
-type Project = { nativeSignalState?: string; nativeEvents?: boolean; detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
+type Project = { lane?: { unavailable: boolean; sourceProject?: string; sourceVersion?: string } | null; nativeSignalState?: string; nativeEvents?: boolean; detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
 type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null; digest: string | null; executable: boolean | null };
 type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
 type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
@@ -21,7 +21,7 @@ type IntegrationPreview = { head: string; bundle: string; target: string; base_h
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
 type RecoveryEntry = { transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
 type Recovery = { entries: RecoveryEntry[]; more: boolean };
-type Projection = { recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
+type Projection = { laneRequests?: Record<string, { request: string; version: string }>; laneFeedback?: Record<string, string>; recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
 const empty: Projection = { pinStatus: "loading", pinError: "", pins: [], bases: {}, comparisons: {}, inspections: {}, histories: {}, projects: [], busy: false, error: "", available: false };
 const send = (detail: Record<string, string | null>) => document.dispatchEvent(new CustomEvent("mesh:attachments-intent", { detail }));
 const phases: Record<string, string> = {
@@ -83,15 +83,22 @@ export function AttachedProjects() {
       </article>)}</div>
       <p className="text-xs text-muted-foreground">{t("Each pin keeps its own version pair, page and file selection. Saved selections return when Mesh opens; content is verified again from history.")}</p>
     </section>}
-    {projection.projects.map((project) => {
+    <div className="grid items-start gap-4 xl:grid-cols-2">{projection.projects.map((project) => {
       const terminal = project.phase === "stopped" || project.phase === "failed";
       return <article key={project.id} className="grid gap-2 rounded-lg border border-border p-4">
+        <h4 className="text-base font-semibold">{t(project.lane ? "Independent line of work" : "Existing project")}</h4>
         <p className="break-all text-sm font-medium"><bdi dir="ltr">{project.root}</bdi></p>
+        {project.lane && (project.lane.unavailable ? <p role="alert" className="text-sm">{t("Lane ancestry could not be verified. Its files and history are retained.")}</p> : <>
+          <p className="break-all text-xs">{t("Created from:")} <bdi dir="ltr">{projection.projects.find(source => source.id === project.lane?.sourceProject)?.root ?? project.lane.sourceProject}</bdi></p>
+          <p className="break-all text-xs">{t("Starting saved version:")} <bdi dir="ltr">{project.lane.sourceVersion}</bdi></p>
+          <p className="text-xs text-muted-foreground">{t("Use this folder with your editor or harness. No Mesh-managed agent is assigned. Allocation ancestry does not identify who makes later changes.")}</p>
+        </>)}
         <p className="text-sm">{t(projection.error ? "Status may be out of date" : project.detached ? "Detached · saved history retained" : phases[project.phase])} · {t(project.detached ? "Reattach to enable capture controls" : project.recovery === "restored-stopped" ? "Saved history restored; resume when ready" : project.recovery === "unavailable" ? "Project or history needs reconciliation" : outcomes[project.outcome])}</p>
         {project.nativeSignalState === "stopping" ? <p className="text-xs text-muted-foreground">{t("File-change monitoring is still stopping.")}</p> : !terminal && project.phase !== "stopping" && !project.detached && <p className="text-xs text-muted-foreground">{t(project.nativeSignalState === "starting" ? "Preparing file-change monitoring; periodic checks continue." : project.nativeEvents ? "File-change signals active, with periodic checks for missed changes." : "Using periodic checks for file changes.")}</p>}
         <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t(project.recovery === "unavailable" ? "Saved version unavailable until history is verified" : "No saved version yet")}</p>
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "open-folder", id: project.id })}>{t("Open folder")}</Button>
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
             onClick={() => send({ type: "versions", id: project.id, before: null })}>{t("Show latest versions")}</Button>
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
@@ -104,7 +111,7 @@ export function AttachedProjects() {
             onClick={() => send({ type: "control", id: project.id, generation: project.generation, action: project.detached ? "reattach" : "detach" })}>{t(project.detached ? "Reattach project" : "Detach Mesh")}</Button>
         </div>
         {project.detached && <p className="text-xs text-muted-foreground">{t("Capture is disabled. Your files, Git workflow and saved history are retained. Reattach, then resume capture when ready.")}</p>}
-        <section aria-label={t("Mesh main")} className="grid gap-2 rounded-lg border border-border p-3">
+        {!project.lane && <section aria-label={t("Mesh main")} className="grid gap-2 rounded-lg border border-border p-3">
           <h4 className="text-sm font-semibold">{t("Mesh main · last checked")}</h4>
           <p className="text-xs text-muted-foreground">{t("The accepted saved version in Mesh. Your current files and Git branch can keep changing independently.")}</p>
           {!projection.approvalStates?.[project.id] ? <p className="text-sm">{t("Main and approval availability have not been verified.")}</p>
@@ -119,20 +126,26 @@ export function AttachedProjects() {
           {projection.approvalStates?.[project.id]?.available && !projection.approvalStates[project.id].enrolled && <Button disabled={disabled}
             onClick={() => send({ type: "enroll-approval", id: project.id })}>{t("Set up approvals on this Mac")}</Button>}
           {projection.approvalFeedback?.[project.id] && <p role="status" className="text-sm">{t(projection.approvalFeedback[project.id])}</p>}
-        </section>
+        </section>}
+        {project.lane && <p className="text-xs text-muted-foreground">{t("Project main stays in the original project. Integrating this line’s saved result into project main is not available here yet.")}</p>}
         {projection.integrationErrors?.[project.id] && <p role="alert" className="text-sm">{t(projection.integrationErrors[project.id])}</p>}
         {projection.integrationPreviews?.[project.id] && <IntegrationPreviewCard project={project.id} preview={projection.integrationPreviews[project.id]} disabled={disabled || Boolean(project.detached) || Boolean(projection.integrationErrors?.[project.id]) || projection.approvalStates?.[project.id]?.main?.head !== projection.integrationPreviews[project.id].head} />}
         <FileRecovery project={project.id} recovery={projection.recoveries?.[project.id]} selected={projection.selectedRecovery?.[project.id]}
           error={projection.recoveryErrors?.[project.id]} feedback={projection.fileChangeFeedback?.[project.id]} disabled={disabled} detached={Boolean(project.detached)} />
+        {projection.laneFeedback?.[project.id] && <p role="status" className="break-all text-sm">{t(projection.laneFeedback[project.id])}</p>}
+        {projection.laneRequests?.[project.id] && <Button variant="secondary" disabled={disabled}
+          onClick={() => send({ type: "retry-lane", id: project.id })}>{t("Retry creating this line")}</Button>}
         {projection.histories[project.id] && <section aria-label={`${t("Saved versions for")} \u2068${project.root}\u2069`} className="grid gap-2">
           <p className="text-sm font-medium">{t("Saved versions · newest first")}</p>
-          <p className="text-xs text-muted-foreground">{t("Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
+          <p className="text-xs text-muted-foreground">{t(project.lane ? "Lane review requests describe private saved work. Integration with the original project’s main is still unavailable." : "Review requests use Mesh’s accepted main version as their base, or the empty starting state before its first approval.")}</p>
           <p className="break-all text-xs text-muted-foreground">{projection.bases[project.id] && <>{t("Selected comparison base:")} <bdi dir="ltr">{projection.bases[project.id]}</bdi></>}</p>
           <ol className="max-h-64 overflow-auto text-xs">
             {projection.histories[project.id].versions.map((version) => <li key={version} className="break-all border-b border-border py-2"><button className="text-left underline" disabled={disabled}
               onClick={() => send({ type: "inspect", id: project.id, operation: version })}><bdi dir="ltr">{version}</bdi></button>
               <div className="mt-1 flex gap-3"><button className="underline" disabled={disabled}
                 onClick={() => send({ type: "set-base", id: project.id, operation: version })}>{t("Use as base")}</button>
+              <button className="underline" disabled={disabled || Boolean(projection.laneRequests?.[project.id])}
+                onClick={() => send({ type: "create-lane", id: project.id, version })}>{t("Create line from this version")}</button>
               <button className="underline" disabled={disabled}
                 onClick={() => send({ type: "request-review", id: project.id, target: version })}>{t("Request review")}</button>
               <button className="underline" disabled={disabled || !projection.bases[project.id]}
@@ -149,11 +162,11 @@ export function AttachedProjects() {
             onClick={() => send({ type: "open-review", id: project.id, bundle: review.bundle, target: review.target })}>{t("Open review")} <bdi dir="ltr">{review.bundle}</bdi></button>)}
           {projection.reviewQueues[project.id].notListed > 0 && <p className="text-xs">{projection.reviewQueues[project.id].notListed} {t("more requests are outside this page. Request review from a saved version to reopen its exact request.")}</p>}
         </section>}
-        {projection.selectedReviews?.[project.id] && <AttachmentReview project={project.id} review={projection.selectedReviews[project.id]} disabled={disabled} approval={projection.approvalStates?.[project.id]} />}
+        {projection.selectedReviews?.[project.id] && <AttachmentReview project={project.id} review={projection.selectedReviews[project.id]} disabled={disabled} approval={project.lane ? undefined : projection.approvalStates?.[project.id]} />}
         {projection.comparisons[project.id] && <SavedComparison project={project.id} comparison={projection.comparisons[project.id]} disabled={disabled} canPin={projection.pins.length < 8 && projection.pinStatus !== "loading" && !projection.pinError} />}
         {projection.inspections[project.id] && <SavedInspection project={project.id} inspection={projection.inspections[project.id]} disabled={disabled} />}
       </article>;
-    })}
+    })}</div>
     <p className="text-xs text-muted-foreground">{t("Registered projects return when Mesh opens. Recovered projects remain stopped until you resume capture.")} {t("Applying main currently supports one existing text file at a time, after native confirmation. Additions, deletions and grouped changes are not available here yet.")}</p>
   </section>;
 }

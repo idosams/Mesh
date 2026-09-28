@@ -15,7 +15,7 @@ fn error(problem: impl std::fmt::Display) -> io::Error {
     io::Error::other(problem.to_string())
 }
 impl ProjectAttachment {
-    fn inspect_saved<T>(
+    pub(super) fn inspect_saved<T>(
         &self,
         metadata: &Path,
         store: PinnedWorkspaceRoot,

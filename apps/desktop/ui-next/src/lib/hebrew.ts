@@ -1,5 +1,18 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Independent line of work":"קו עבודה עצמאי",
+"Existing project":"פרויקט קיים",
+"Lane ancestry could not be verified. Its files and history are retained.":"לא ניתן לאמת את מקור קו העבודה. הקבצים וההיסטוריה שלו נשמרו.",
+"Created from:":"נוצר מתוך:",
+"Starting saved version:":"גרסה שמורה התחלתית:",
+"Use this folder with your editor or harness. No Mesh-managed agent is assigned. Allocation ancestry does not identify who makes later changes.":"אפשר לעבוד בתיקייה זו עם העורך או עם כלי הסוכנים שלכם. לא הוקצה סוכן בניהול Mesh. רישום המקור אינו מזהה מי מבצע שינויים בהמשך.",
+"Project main stays in the original project. Integrating this line’s saved result into project main is not available here yet.":"הגרסה הראשית נשארת בפרויקט המקורי. שילוב התוצאה השמורה של קו עבודה זה בגרסה הראשית עדיין אינו זמין כאן.",
+"Retry creating this line":"ניסיון חוזר ליצירת קו העבודה",
+"Lane review requests describe private saved work. Integration with the original project’s main is still unavailable.":"בקשות הסקירה של קו העבודה מתארות עבודה פרטית שנשמרה. שילוב בגרסה הראשית של הפרויקט המקורי עדיין אינו זמין.",
+"Create line from this version":"יצירת קו עבודה מגרסה זו",
+"Independent line created. Its folder and history appear below.":"נוצר קו עבודה עצמאי. התיקייה וההיסטוריה שלו מופיעות בהמשך.",
+"The line could not be confirmed. Retry the same request to avoid duplicating it. Partial work is retained.":"לא ניתן לאשר שקו העבודה נוצר. נסו שוב את אותה בקשה כדי למנוע כפילות. עבודה חלקית נשמרת.",
+
 "Needs attention":"דורש טיפול",
 "Unavailable":"לא זמין",
 "Applying main currently supports one existing text file at a time, after native confirmation. Additions, deletions and grouped changes are not available here yet.":"החלת הגרסה הראשית נתמכת כעת בקובץ טקסט קיים אחד בכל פעם, לאחר אישור בחלון של היישום. הוספות, מחיקות ושינויים קבוצתיים עדיין אינם זמינים כאן.",

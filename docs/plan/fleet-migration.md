@@ -466,3 +466,30 @@ remain pending. Preserved full-gate session 4896 still owns the shared native bu
 parallel native build was started. Actual packaged confirmation/recovery, eligible approval,
 non-disruptive manual and agent journeys, remaining fleet phases and combined-main testing remain
 required. Original checkouts, staged restoration and historical failed verification are preserved.
+
+## L01a independent attached-version lanes
+
+Preserved source `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` transfers on #43 at
+`80e5eda24f8d56e5207a6ed2a01eb47fbd1ac9ec`. Native allocation, exact stable retries, bounded
+content/type verification, independent capture and identity-bound folder opening are retained.
+The transfer preserves the canonical English/Hebrew UI, literal identifiers, #41's independent
+monitoring state and #43's native-mode recovery parser. Dynamic success copy becomes a localized
+message; the allocated project remains independently validated and appears in the refreshed list.
+This opens ordinary lines for users and existing harnesses. Managed fleet linkage remains L01b
+(`c728c41c9831e636a6bdfbb9b0212739ad6ba974`), followed by scoped agent dispatch
+(`e987565983cc7f57be33fe211f9f4bb4d290fad2`). Neither prerequisite nor this increment is merged.
+
+All seven hosted checks passed for #43: 2,990 Linux and 3,181 macOS native tests, four separate
+macOS tests, 599 desktop tests and all 44 daemon checks. Local UI type/build, 111 rendering tests,
+36 coordinator tests and docs passed; its local native/full and packaged confirmation proof remain
+pending. #40 completed its local full gate: 3,038 Rust tests (10 skips), 543 desktop tests and all
+44 daemon checks passed. It is ready for human review, with all seven hosted checks green.
+
+For L01a, 38 coordinator tests passed, including lost-reply retries without duplicate allocation,
+source-version identity refusals and retained pinned views. New bilingual render tests cover
+independent ancestry, unavailable history, pending retries, preserved capture status and source-only
+main controls. The new lane rendering regression fails on the previous component; the adapted
+component is restored byte-for-byte before rerunning. Native/full/hosted validation and packaged
+acceptance remain pending until recorded against this increment. Source checkouts and prior failed
+verification are preserved. The full fleet objective, human review and combined-main testing remain
+required.

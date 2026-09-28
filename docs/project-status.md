@@ -108,6 +108,18 @@ running the local daemon and desktop application against a disposable or backed-
   capture while the application is stopped is not claimed.
 - Git export is explicit and guarded. Mesh is not a general Git hosting replacement.
 
+Attached saved versions now have a native and desktop-source path to create independent ordinary
+lines of work. The allocator streams verified saved content to native-owned private folders, records
+source project/version ancestry, and registers independent capture without moving the original
+project or changing its capture session. Stable requests recover completed allocations without
+replacing later lane edits; incomplete allocations remain retained and refuse automatic replay.
+The desktop shows these lines alongside existing projects and uses the same version/comparison
+controls, with explicit unknown authorship and no required provider setup. Native folder opening
+uses the admitted directory identity. Native/host/coordinator tests cover sibling isolation, ongoing
+editor/Git work, retries, independent capture, restart and offline ancestry. This is not a packaged
+graphical proof or a connection to managed fleet dispatch. Lane history is private; integration into
+the original project's main remains unfinished. See the [lane decision](decisions/attachment-version-lanes.md).
+
 ## Planned, not shipped
 
 - Hosted synchronization and multi-device collaboration.

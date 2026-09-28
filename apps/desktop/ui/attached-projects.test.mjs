@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, attachedLane, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -842,4 +842,61 @@ test('recovery accepts native regular-file modes and refuses permission-only or 
       assert.throws(() => attachedRecovery(invalid, id));
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('lane ancestry is explicit and cannot invent a provider, authorship or source version', () => {
+  const value = reply();
+  value.projects[0].lane = { schema: 'mesh.attachment-lane-origin/v1', source_project: 'd'.repeat(64),
+    source_version: operation, request: 'c'.repeat(32), attribution: 'unknown', provider: null };
+  assert.equal(attachedProjectList(value)[0].lane.sourceVersion, operation);
+  for (const [field, invalid] of [['source_version', '../outside'], ['source_project', null], ['request', 'wrong'], ['provider', 'codex'], ['attribution', 'agent']]) {
+    const broken = structuredClone(value); broken.projects[0].lane[field] = invalid;
+    assert.throws(() => attachedProjectList(broken));
+  }
+  value.projects[0].lane = { schema: 'mesh.attachment-lane-unavailable/v1' };
+  assert.equal(attachedProjectList(value)[0].lane.unavailable, true);
+  const result = { schema: 'mesh.desktop-attachment-lane/v1', source_project: id, source_version: operation, request: 'c'.repeat(32), project: 'e'.repeat(64) };
+  assert.equal(attachedLane(result, id, operation, 'c'.repeat(32)), 'e'.repeat(64));
+  assert.throws(() => attachedLane({ ...result, source_version: 'f'.repeat(64) }, id, operation, 'c'.repeat(32)));
+  assert.throws(() => attachedLane({ ...result, project: id }, id, operation, 'c'.repeat(32)));
+});
+test('lane creation retains a request after a lost reply and leaves saved views pinned while the new lane appears', async () => {
+  const calls = []; let first = true; let allocated = false; let request;
+  const child = 'e'.repeat(64);
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_project_versions') return { schema: 'mesh.attachment-versions/v1', project: id, before: null, versions: [operation], next_before: null };
+    if (command === 'open_attached_version_lane') {
+      allocated = true;
+      if (first) { first = false; request = args.request; throw new Error('lost native reply'); }
+      assert.equal(args.request, request);
+      return { schema: 'mesh.desktop-attachment-lane/v1', source_project: id, source_version: operation, request, project: child };
+    }
+    const value = reply();
+    if (allocated) value.projects.push({ ...structuredClone(value.projects[0]), id: child, root: '/native/lane/files',
+      lane: { schema: 'mesh.attachment-lane-origin/v1', source_project: id, source_version: operation, request, attribution: 'unknown', provider: null } });
+    return value;
+  });
+  await settle();
+  h.intent({ type: 'create-lane', id, version: operation }); await settle();
+  assert.equal(calls.some(call => call.command === 'open_attached_version_lane'), false);
+  h.intent({ type: 'versions', id, before: null }); await settle();
+  const pinned = h.projections.at(-1).histories[id];
+  h.intent({ type: 'create-lane', id, version: operation, destination: '/outside' }); await settle();
+  assert.equal(calls.some(call => call.command === 'open_attached_version_lane'), false);
+  h.intent({ type: 'create-lane', id, version: operation }); await settle();
+  assert.match(request, /^[a-f0-9]{32}$/);
+  assert.equal(h.projections.at(-1).laneRequests[id].request, request);
+  h.intent({ type: 'create-lane', id, version: operation }); await settle();
+  assert.equal(calls.filter(call => call.command === 'open_attached_version_lane').length, 1);
+  h.intent({ type: 'retry-lane', id }); await settle();
+  assert.equal(h.projections.at(-1).laneRequests[id], undefined);
+  assert.equal(h.projections.at(-1).projects.length, 2);
+  assert.equal(h.projections.at(-1).histories[id], pinned);
+  const before = calls.length;
+  h.intent({ type: 'open-folder', id: child, path: '/outside' });
+  assert.equal(calls.length, before);
+  h.intent({ type: 'open-folder', id: child }); await settle();
+  assert.deepEqual(calls.find(call => call.command === 'open_attached_folder').args, { id: child });
+  h.dispose();
 });

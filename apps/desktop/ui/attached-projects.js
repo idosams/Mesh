@@ -6,6 +6,22 @@ const OUTCOMES = new Set(['pending', 'saved', 'unchanged', 'incomplete', 'source
 const safeText = (value, maximum) => typeof value === 'string' && value.length > 0
   && value.length <= maximum && !/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
 
+function laneOrigin(value) {
+  if (value === null || value === undefined) return null;
+  if (value.schema === 'mesh.attachment-lane-unavailable/v1') return { unavailable: true };
+  if (value.schema !== 'mesh.attachment-lane-origin/v1' || !/^[a-f0-9]{64}$/.test(value.source_project)
+    || !/^[a-f0-9]{64}$/.test(value.source_version) || !/^[a-f0-9]{32}$/.test(value.request)
+    || value.attribution !== 'unknown' || value.provider !== null) throw new Error('Invalid lane ancestry');
+  return { unavailable: false, sourceProject: value.source_project, sourceVersion: value.source_version };
+}
+export function attachedLane(raw, id, version, request) {
+  const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (value?.schema !== 'mesh.desktop-attachment-lane/v1' || value.source_project !== id
+    || value.source_version !== version || value.request !== request
+    || !/^[a-f0-9]{64}$/.test(value.project) || value.project === id) throw new Error('Lane allocation identity mismatch');
+  return value.project;
+}
+
 export function attachedProjectList(raw) {
   const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
   if (value?.schema !== 'mesh.desktop-attachments/v1' || !Array.isArray(value.projects)
@@ -32,7 +48,7 @@ export function attachedProjectList(raw) {
       throw new Error('Invalid attachment status');
     }
     ids.add(project.id);
-    return Object.freeze({ nativeSignalState: capture.native_signal_state ?? (capture.native_events ? 'active' : 'unavailable'), nativeEvents: capture.native_events ?? false, detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
+    return Object.freeze({ lane: laneOrigin(project.lane), nativeSignalState: capture.native_signal_state ?? (capture.native_events ? 'active' : 'unavailable'), nativeEvents: capture.native_events ?? false, detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
       phase: capture.phase, outcome: capture.last_outcome, savedVersion: capture.saved_version,
       captureAgeMs: capture.last_complete_capture_age_ms, recovery: project.recovery ?? null });
   });
@@ -252,7 +268,7 @@ export function attachedFileChange(raw, id, restoration) {
   return { transaction: value.transaction, status: outcome.status };
 }
 
-export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout }) {
+export function startAttachedProjects({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
   let projects = [];
   let histories = {};
   let inspections = {};
@@ -268,6 +284,8 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let selectedRecovery = {};
   let recoveryErrors = {};
   let fileChangeFeedback = {};
+  let laneRequests = {};
+  let laneFeedback = {};
   let pins = [];
   let nextPin = 1n;
   let pinStatus = 'loading';
@@ -279,9 +297,19 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
   let timer = null;
   const publish = () => {
     if (!disposed) document.dispatchEvent(new CustomEvent('mesh:attachments-projection', {
-      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
+      detail: { projects, histories, inspections, bases, comparisons, reviewQueues, selectedReviews, approvalStates, approvalFeedback, integrationPreviews, integrationErrors, recoveries, selectedRecovery, recoveryErrors, fileChangeFeedback, laneRequests, laneFeedback, pins, pinStatus, pinError, busy, error, available: typeof invoke === 'function' },
     }));
   };
+  async function createLane(id, pending) {
+    try {
+      attachedLane(await invoke('open_attached_version_lane', { id, version: pending.version, request: pending.request }),
+        id, pending.version, pending.request);
+      laneFeedback = { ...laneFeedback, [id]: 'Independent line created. Its folder and history appear below.' };
+      laneRequests = { ...laneRequests }; delete laneRequests[id];
+    } catch {
+      laneFeedback = { ...laneFeedback, [id]: 'The line could not be confirmed. Retry the same request to avoid duplicating it. Partial work is retained.' };
+    }
+  }
   async function readRecovery(id, transaction = null) {
     const observation = attachedRecovery(await invoke('inspect_attached_recovery', { id, transaction }), id, transaction);
     if (transaction === null) recoveries = { ...recoveries, [id]: observation };
@@ -394,6 +422,20 @@ export function startAttachedProjects({ document, invoke, CustomEvent, schedule 
       return;
     }
     if ('id' in value && !projects.some((project) => project.id === value.id)) return;
+    if (value.type === 'open-folder' && Object.keys(value).length === 2 && projects.some(project => project.id === value.id)) {
+      void run(() => invoke('open_attached_folder', { id: value.id })); return;
+    }
+    if (value.type === 'create-lane' && Object.keys(value).length === 3
+      && histories[value.id]?.versions.includes(value.version) && !laneRequests[value.id]) {
+      const request = requestId();
+      if (typeof request !== 'string' || !/^[a-f0-9]{32}$/.test(request)) return;
+      const pending = { request, version: value.version };
+      laneRequests = { ...laneRequests, [value.id]: pending };
+      void run(() => createLane(value.id, pending)); return;
+    }
+    if (value.type === 'retry-lane' && Object.keys(value).length === 2 && laneRequests[value.id]) {
+      void run(() => createLane(value.id, laneRequests[value.id])); return;
+    }
     if (value.type === 'refresh' && Object.keys(value).length === 1) { void run(); return; }
     if (value.type === 'choose' && Object.keys(value).length === 1) {
       void run(async () => {

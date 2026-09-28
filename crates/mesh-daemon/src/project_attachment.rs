@@ -34,6 +34,7 @@ mod approval;
 mod history;
 mod inspection;
 mod integration;
+mod lanes;
 mod recovery;
 mod restoration;
 pub use restoration::PreparedRetainedRestoration;
@@ -142,6 +143,18 @@ impl ProjectAttachment {
     pub fn ensure_current(&self) -> io::Result<()> {
         self.pinned.ensure_identity(self.device, self.inode)?;
         self.pinned.ensure_namespace_identity()
+    }
+
+    /// Native-only stable folder reference for an OS opener. No renderer-selected path is used.
+    pub fn native_folder_reference(&self) -> io::Result<PathBuf> {
+        self.ensure_current()?;
+        let reference = ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{:016x}:{:016x}",
+            self.device, self.inode,
+        ))?
+        .stable_reference()?;
+        self.ensure_current()?;
+        Ok(reference)
     }
 
     /// Native registration status. Observation/capture availability is explicit, not inferred.

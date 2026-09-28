@@ -16,16 +16,16 @@ use std::sync::Arc;
 /// An existing host-owned storage directory, retained by native directory identity.
 /// The host supplies this directory from its own configuration, never a renderer-selected path.
 pub struct AttachmentStorage {
-    path: PathBuf,
+    pub(super) path: PathBuf,
     pub(super) pinned: PinnedWorkspaceRoot,
 }
 
 /// A registered project and its exact native store authority, ready for capture.
 #[derive(Clone)]
 pub struct ProvisionedAttachment {
-    attachment: ProjectAttachment,
+    pub(super) attachment: ProjectAttachment,
     metadata: PathBuf,
-    store: PinnedWorkspaceRoot,
+    pub(super) store: PinnedWorkspaceRoot,
     id: String,
 }
 

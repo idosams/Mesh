@@ -184,6 +184,14 @@ session generation checks preserve the authority boundary. Binary or large conte
 defaults, offline recovery and grouped changes remain unsupported by this increment; actual
 packaged confirmation and recovery proof are still required.
 
+Attached-version lanes now connect saved project history to additional independent ordinary folders.
+Native allocation records source project/version ancestry and supports completed-request retry without
+overwriting subsequent work. Desktop source shows these manual/harness lines with independent capture,
+versions and comparison controls, while the original project/session stays in place. No provider is
+required and no authorship is inferred. This is source-level progress on the work-centered overview;
+managed fleet scheduling, project-main integration, incomplete-allocation reconciliation and packaged
+graphical verification remain required. See [the lane decision](../decisions/attachment-version-lanes.md).
+
 ## Phase 2: durable orchestration
 
 Persist objective limits, lanes, run attempts, input versions, event cursors, pending commands and

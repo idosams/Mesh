@@ -1902,6 +1902,34 @@ mod desktop {
         }).await.map_err(|_| "Working-folder comparison stopped".to_owned())?
     }
 
+    #[tauri::command(async)]
+    fn open_attached_folder(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+    ) -> Result<(), String> {
+        let history = host.review_history(&id)?;
+        let reference = history
+            .project()
+            .native_folder_reference()
+            .map_err(|_| "The original project folder is unavailable or its identity changed")?;
+        open_native_folder(&reference)
+    }
+
+    #[tauri::command]
+    async fn open_attached_version_lane(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        version: String,
+        request: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.open_version_lane(&id, &version, &request)
+        })
+        .await
+        .map_err(|_| "Lane allocation stopped; retry the same request".to_owned())?
+    }
+
     #[tauri::command]
     async fn inspect_attached_recovery(
         host: State<'_, Arc<AttachmentHost>>,
@@ -6980,6 +7008,8 @@ mod desktop {
                 approve_attached_review,
                 preview_attached_main_integration,
                 inspect_attached_recovery,
+                open_attached_version_lane,
+                open_attached_folder,
                 restore_attached_retained_file,
                 apply_attached_main_file,
                 load_attachment_pins,

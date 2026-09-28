@@ -230,3 +230,21 @@ response is uncertain, refresh main before retrying; an uncertain response does 
 was rolled back. A main change requires a new review against the current main. Ineligible builds and
 unverified main status keep approval unavailable. This development flow still needs packaged graphical
 and actual platform-presence acceptance evidence.
+
+## Open an attached version as an independent line (development builds)
+
+In the unmerged lane increment, choose **Show latest versions**, then **Create line from this
+version**. Mesh creates a separate ordinary folder from those exact saved bytes and displays it
+alongside the original project. **Open folder** opens the native-verified folder for your editor or
+existing agent harness. The original project, Git checkout and open editor files stay in place.
+
+Each line has its own capture controls, saved versions and comparisons. Its recorded source is
+allocation ancestry, not proof of who makes later changes. This increment assigns no managed agent.
+The original project's accepted main remains separate; integrating a line's result is not yet
+available here. Recovered lines remain stopped until you resume capture.
+
+If creation cannot be confirmed, use **Retry creating this line** in the same session. Mesh reuses
+the exact request and preserves edits made after a completed allocation. Incomplete or changed
+allocations are retained and refused; they are not silently replaced. If ancestry cannot be
+verified, the line remains visible with that uncertainty. Packaged graphical acceptance and the
+managed fleet connection remain pending.

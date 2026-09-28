@@ -33,6 +33,7 @@ struct Project {
     history: Option<ProvisionedAttachment>,
     recovered: CaptureStatus,
     recovery: Option<&'static str>,
+    lane: Json,
 }
 impl Project {
     fn status(&self) -> CaptureStatus {
@@ -48,6 +49,7 @@ impl Project {
             ("root", Json::text(self.source.to_string_lossy())),
             ("capture", self.status().to_json()),
             ("recovery", self.recovery.map_or(Json::Null, Json::text)),
+            ("lane", self.lane.clone()),
         ])
     }
 }
@@ -82,6 +84,11 @@ impl AttachmentHost {
         if registrations.len() > MAX_PROJECTS {
             return Err("The desktop attachment limit has been reached".into());
         }
+        let lane_root = self
+            .storage_path
+            .canonicalize()
+            .map_err(|_| UNAVAILABLE)?
+            .join("work-lanes");
         let mut recovered = BTreeMap::new();
         let mut generation = state.generation;
         for registration in registrations {
@@ -97,6 +104,16 @@ impl AttachmentHost {
             recovered.insert(
                 registration.id().to_owned(),
                 Project {
+                    lane: history.as_ref().map_or_else(
+                        || {
+                            if registration.root().starts_with(&lane_root) {
+                                unavailable_lane()
+                            } else {
+                                Json::Null
+                            }
+                        },
+                        |history| lane_origin(&storage, history),
+                    ),
                     detached: registration.detached(),
                     source: registration.root().to_owned(),
                     generation,
@@ -147,6 +164,7 @@ impl AttachmentHost {
             .map_err(|_| UNAVAILABLE)?;
         state.generation = generation;
         let project = Project {
+            lane: lane_origin(state.storage.as_ref().ok_or(UNAVAILABLE)?, &provisioned),
             detached: false,
             source,
             generation,
@@ -158,6 +176,69 @@ impl AttachmentHost {
         let response = project.projection(&id).encode();
         state.projects.insert(id, project);
         Ok(response)
+    }
+
+    pub fn open_version_lane(
+        &self,
+        id: &str,
+        version: &str,
+        request: &str,
+    ) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let source = state
+            .projects
+            .get(id)
+            .ok_or("This attachment is not open")?
+            .history
+            .clone()
+            .ok_or("Saved history is unavailable")?;
+        // Reserve room before allocating. A retry for a registered child is still permitted.
+        if state.projects.len() >= MAX_PROJECTS {
+            let known = state.projects.values().any(|project| {
+                project.lane.get("source_project") == Some(&Json::text(id))
+                    && project.lane.get("request") == Some(&Json::text(request))
+            });
+            if !known {
+                return Err("The desktop attachment limit has been reached".into());
+            }
+        }
+        let storage = state.storage.as_ref().ok_or(UNAVAILABLE)?;
+        let child = storage.open_version_lane(&source, version, request,
+            mesh_daemon::project_attachment::ObservationLimits::default())
+            .map_err(|_| "This lane could not be confirmed. Retry the same request; partial work is retained and will not be overwritten.")?;
+        let child_id = child.id().to_owned();
+        let lane = lane_origin(storage, &child);
+        if !state.projects.contains_key(&child_id) {
+            let generation = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
+            let service = child
+                .start_capture(NativeCaptureSigner::generate()?, CaptureSchedule::default())
+                .map_err(|_| {
+                    "The lane is retained, but capture could not start. Retry the same request."
+                })?;
+            state.generation = generation;
+            state.projects.insert(
+                child_id.clone(),
+                Project {
+                    detached: false,
+                    source: child.project().root().to_owned(),
+                    generation,
+                    service: Some(service),
+                    history: Some(child),
+                    recovered: stopped_status(),
+                    recovery: None,
+                    lane,
+                },
+            );
+        }
+        Ok(Json::object([
+            ("schema", Json::text("mesh.desktop-attachment-lane/v1")),
+            ("source_project", Json::text(id)),
+            ("source_version", Json::text(version)),
+            ("request", Json::text(request)),
+            ("project", Json::text(child_id)),
+        ])
+        .encode())
     }
 
     pub fn projects(&self) -> Result<String, String> {
@@ -537,6 +618,7 @@ impl AttachmentHost {
                     return Err("Wait for capture to stop before resuming".into());
                 }
                 let source = project.source.clone();
+                let lane = project.lane.clone();
                 let history = match &project.history {
                     Some(history) => history.clone(),
                     None => state
@@ -554,6 +636,7 @@ impl AttachmentHost {
                 state.projects.insert(
                     id.to_owned(),
                     Project {
+                        lane,
                         detached: false,
                         source,
                         generation: next,
@@ -573,6 +656,17 @@ impl AttachmentHost {
             .projection(id)
             .encode())
     }
+}
+
+fn unavailable_lane() -> Json {
+    Json::object([("schema", Json::text("mesh.attachment-lane-unavailable/v1"))])
+}
+
+fn lane_origin(storage: &AttachmentStorage, history: &ProvisionedAttachment) -> Json {
+    storage.lane_origin(history).map_or_else(
+        |_| unavailable_lane(),
+        |origin| origin.unwrap_or(Json::Null),
+    )
 }
 
 fn stopped_status() -> CaptureStatus {
@@ -597,6 +691,117 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn manual_lanes_capture_independently_recover_ancestry_and_preserve_the_source_session() {
+        fn wait_saved(host: &AttachmentHost, id: &str, previous: Option<String>) -> String {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                let state = host.state.lock().unwrap();
+                let service = state.projects.get(id).unwrap().service.as_ref().unwrap();
+                let status = service.status();
+                if let Some(version) = status
+                    .saved_version
+                    .map(|value| value.operation().to_string())
+                {
+                    if Some(&version) != previous.as_ref() {
+                        return version;
+                    }
+                }
+                assert!(Instant::now() < deadline);
+                service.wait_for_update(status.revision, Duration::from_millis(50));
+            }
+        }
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-manual-lanes-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "saved source").unwrap();
+        let host = AttachmentHost::new(&root);
+        let attached = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = attached.get("id").unwrap().as_text().unwrap();
+        let generation = attached.get("generation").unwrap().as_text().unwrap();
+        let version = wait_saved(&host, id, None);
+        fs::write(source.join("work"), "source continues").unwrap();
+        let result = host
+            .open_version_lane(id, &version, &"a".repeat(32))
+            .unwrap();
+        let result = Json::parse(&result).unwrap();
+        let child = result.get("project").unwrap().as_text().unwrap();
+        let initial = wait_saved(&host, child, None);
+        let child_history = host.review_history(child).unwrap();
+        assert_eq!(
+            fs::read(child_history.project().root().join("work")).unwrap(),
+            b"saved source"
+        );
+        fs::write(
+            child_history.project().root().join("work"),
+            "independent work",
+        )
+        .unwrap();
+        {
+            let state = host.state.lock().unwrap();
+            state.projects[child]
+                .service
+                .as_ref()
+                .unwrap()
+                .request_capture();
+        }
+        wait_saved(&host, child, Some(initial));
+        assert_eq!(child_history.saved_versions().unwrap().len(), 2);
+        let repeated = Json::parse(
+            &host
+                .open_version_lane(id, &version, &"a".repeat(32))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(repeated.get("project"), Some(&Json::text(child)));
+        assert_eq!(
+            fs::read(child_history.project().root().join("work")).unwrap(),
+            b"independent work"
+        );
+        assert_eq!(fs::read(source.join("work")).unwrap(), b"source continues");
+        {
+            let mut state = host.state.lock().unwrap();
+            assert_eq!(state.projects[id].generation.to_string(), generation);
+            assert_eq!(
+                state.projects[child].lane.get("source_version"),
+                Some(&Json::text(&version))
+            );
+            for (_, mut project) in std::mem::take(&mut state.projects) {
+                if let Some(service) = project.service.take() {
+                    service.stop_and_join().unwrap();
+                }
+            }
+        }
+        drop(host);
+        let restarted = AttachmentHost::new(&root);
+        restarted.projects().unwrap();
+        {
+            let state = restarted.state.lock().unwrap();
+            assert_eq!(state.projects.len(), 2);
+            assert!(state.projects[child].service.is_none());
+            assert_eq!(
+                state.projects[child].lane.get("source_project"),
+                Some(&Json::text(id))
+            );
+        }
+        drop(restarted);
+        fs::rename(child_history.project().root(), root.join("offline-lane")).unwrap();
+        let offline = AttachmentHost::new(&root);
+        offline.projects().unwrap();
+        assert_eq!(
+            offline.state.lock().unwrap().projects[child].lane,
+            unavailable_lane()
+        );
+        assert_eq!(
+            fs::read(root.join("offline-lane/work")).unwrap(),
+            b"independent work"
+        );
+        drop(offline);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn file_recovery_inspection_does_not_provision_and_detach_invalidates_confirmation() {

@@ -461,3 +461,54 @@ test('attached file controls require current main and preserve detached and unce
   const ui = await loadLocalization(projection);
   assert.doesNotMatch(ui.renderAttachments(), /Review applying this file|Review restoring retained file/);
 });
+
+test('independent lanes localize ancestry, retain literal identities and keep project main on the source', async () => {
+  const id = 'a'.repeat(64), child = 'e'.repeat(64), version = 'b'.repeat(64);
+  const project = { id, generation: '1', root: '/Users/משפחה/Original', phase: 'waiting', detached: false,
+    recovery: null, nativeSignalState: 'starting', nativeEvents: false, outcome: 'saved', savedVersion: version, captureAgeMs: 12 };
+  const projection = { projects: [project, { ...project, id: child, root: '/native/קווים/files',
+    lane: { unavailable: false, sourceProject: id, sourceVersion: version } }],
+    histories: { [id]: { versions: [version], nextBefore: null }, [child]: { versions: [version], nextBefore: null } },
+    bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '', busy: false, error: '', available: true,
+    laneRequests: { [id]: { request: 'f'.repeat(32), version } },
+    laneFeedback: { [id]: 'The line could not be confirmed. Retry the same request to avoid duplicating it. Partial work is retained.' } };
+  const ui = await loadLocalization(projection);
+  for (const locale of ['en', 'he']) {
+    ui.setLocale(locale);
+    const html = ui.renderAttachments();
+    const cards = html.match(/<article\b[\s\S]*?<\/article>/g);
+    assert.equal(cards.length, 2);
+    const [source, lane] = cards;
+    for (const label of ['Independent line of work', 'Created from:', 'Starting saved version:',
+      'Use this folder with your editor or harness. No Mesh-managed agent is assigned. Allocation ancestry does not identify who makes later changes.',
+      'Project main stays in the original project. Integrating this line’s saved result into project main is not available here yet.',
+      'Lane review requests describe private saved work. Integration with the original project’s main is still unavailable.',
+      'Create line from this version', 'Open folder']) {
+      assert.ok(lane.includes(ui.translate(locale, label)), label);
+      if (locale === 'he') assert.ok(!lane.includes(label), label);
+    }
+    assert.ok(lane.includes('<bdi dir="ltr">/Users/משפחה/Original</bdi>'));
+    assert.ok(lane.includes('<bdi dir="ltr">' + version + '</bdi>'));
+    assert.ok(source.includes('aria-label="' + ui.translate(locale, 'Mesh main') + '"'));
+    assert.ok(!lane.includes('aria-label="' + ui.translate(locale, 'Mesh main') + '"'));
+    assert.ok(source.includes(ui.translate(locale, 'Retry creating this line')));
+    assert.ok(source.includes(ui.translate(locale, projection.laneFeedback[id])));
+    const button = source.match(/<button[^>]*>[^<]*<\/button>/g).find(value => value.includes(ui.translate(locale, 'Create line from this version')));
+    assert.match(button, /disabled=""/);
+    assert.ok(lane.includes(ui.translate(locale, 'Preparing file-change monitoring; periodic checks continue.')));
+  }
+});
+
+test('unavailable lane ancestry retains the folder and stopped history without inventing a source', async () => {
+  const id = 'e'.repeat(64);
+  const ui = await loadLocalization({ projects: [{ id, generation: '2', root: '/native/retained/files', phase: 'stopped',
+    detached: false, recovery: 'unavailable', lane: { unavailable: true }, outcome: 'pending', savedVersion: null, captureAgeMs: null }],
+    histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '', busy: false, error: '', available: true });
+  for (const locale of ['en', 'he']) {
+    ui.setLocale(locale); const html = ui.renderAttachments();
+    assert.ok(html.includes(ui.translate(locale, 'Lane ancestry could not be verified. Its files and history are retained.')));
+    assert.ok(html.includes('<bdi dir="ltr">/native/retained/files</bdi>'));
+    assert.ok(!html.includes(ui.translate(locale, 'Created from:')));
+    assert.ok(!html.includes('aria-label="' + ui.translate(locale, 'Mesh main') + '"'));
+  }
+});
