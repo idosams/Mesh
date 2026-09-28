@@ -330,3 +330,14 @@ restored objectives cannot silently relaunch. Native fixture-process tests cover
 Next: connect provisioning and activity to the real fleet presentation, add independent immutable lane
 review readers, and prove the packaged graphical journey. Process-tree/context reconciliation remains
 required; this increment does not complete the local fleet phase.
+
+
+Initial fleet presentation is connected to the native commands in the attached-project view. Users
+select an immutable input, set limits, provision, explicitly start agents, and observe all retained
+lanes without changing desktop selection. Stop remains a request with retained uncertain ownership.
+The coordinator validates bounded native schemas, retains uncertain provisioning input for same-session
+retry, and never launches through polling. Restored fleets expose saved state without execution
+controls. Result review and recovery are explicitly unavailable until their independent native readers
+and context reconciliation are connected. Pending-intent persistence across renderer reload, parallel
+fleet review and packaged graphical proof (previously blocked by the locked Mac) remain next work; manual attachment review
+and its existing pins remain available.

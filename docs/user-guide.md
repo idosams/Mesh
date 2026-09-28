@@ -276,3 +276,26 @@ dispatch; recorded observations keep their timestamps. Stop requests cancellatio
 all descendant processes have exited or release uncertain work. Restored fleets remain unavailable
 for execution until reconciliation. Graphical controls and packaged scheduling acceptance are separate
 from these development commands.
+
+## Optional local fleets from an attached project
+
+The development desktop's existing-project view includes an **Agent fleets** section. This interface
+has source tests; its complete packaged graphical journey is not yet verified.
+
+1. Attach your existing project and let Mesh save a version. Your editor, terminal and harness keep
+   using the original folder.
+2. Expand **Provision a fleet from saved work**, choose the project and an exact saved version, and
+   describe the goal. To choose older input, load the project's saved-version list below.
+3. Set the maximum lanes (including the coordinator), simultaneous agents, and delegation depth.
+   **Provision fleet** creates additional work; it does not start a provider.
+4. Inspect the fleet, then choose **Start agents**. This uses the installed Codex provider and account.
+   The lane cards show execution status and the time each worker was last observed.
+5. **Stop agents** stops scheduling and requests direct-worker termination. Recovery is still required
+   before uncertain worker ownership can be released. A completed agent has not approved main.
+
+If provisioning is unconfirmed, use **Retry this provisioning request**. It preserves the same input,
+goal, limits and request within this app view instead of creating another fleet. After an app/renderer
+restart, inspect retained fleet state before creating another request; pending-intent recovery across
+renderer reload is not implemented. Restored fleets cannot restart workers automatically. Fleet result
+review, worker recovery and integration into the original project's main remain unavailable in this
+view. Existing project history, manual lanes and their comparisons remain independently usable.

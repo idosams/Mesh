@@ -1,5 +1,6 @@
 import { useTranslation } from "../lib/localization";
 import { useEffect, useState } from "react";
+import { Fleets } from "./fleets";
 import { Button } from "../atoms/button";
 
 type Project = { lane?: { unavailable: boolean; sourceProject?: string; sourceVersion?: string } | null; nativeSignalState?: string; nativeEvents?: boolean; detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
@@ -66,6 +67,7 @@ export function AttachedProjects() {
       <Button variant="secondary" disabled={projection.busy || !projection.available} onClick={() => send({ type: "refresh" })}>{t("Refresh status")}</Button>
       <span role="status" className="text-sm text-muted-foreground">{t(projection.busy ? "Updating…" : projection.error ? "Status may be out of date" : "")}</span>
     </div>
+    <Fleets projects={projection.projects} histories={projection.histories} sourceError={projection.error} />
     <p role="status" className="text-xs text-muted-foreground">{t(projection.pinStatus === "loading" ? "Restoring saved comparisons…" : projection.pinStatus === "saving" ? "Saving comparison selections…" : projection.pinStatus === "saved" ? "Comparison selections saved" : "")}</p>
     {projection.pinError && <div role="alert" className="grid gap-2 text-sm"><p>{t(projection.pinError)}</p>
       <Button disabled={projection.busy} onClick={() => send({ type: "retry-pin-save" })}>{t("Retry saving or loading pins")}</Button>

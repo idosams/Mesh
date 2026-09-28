@@ -586,3 +586,31 @@ The graphical control increment remains preserved source
 `c7922b3d74cae8715066e2868533ba714d67ddb0`, followed by the remaining review/integration/recovery
 phases. Original source work, logs and histories are preserved. Every PR remains unmerged until
 required review/checks pass, and final combined-main plus full fleet acceptance remain required.
+
+## L02c live fleet controls in the existing-project view
+
+Preserved source `c7922b3d74cae8715066e2868533ba714d67ddb0` transfers on #48 at
+`f1578135da3da1aca14d77612117caf8ac031620`. Users choose the exact saved input and limits,
+provision an independent fleet, then explicitly start or stop its agents. Polling reads bounded
+native facts and never replays commands. Unconfirmed provisioning retains the same request, input,
+goal and limits for explicit retry within the renderer session. Saved/restored state never grants
+execution authority or claims live observation. Worker activity joins the exact objective/lane/run.
+
+The canonical adaptation keeps the English/Hebrew interface and original-project controls. Paths,
+versions, identifiers and provider activity remain literal and direction-isolated; user goals retain
+their own direction. Three added rendered regressions cover translated live/stale/restored states,
+raw identities/activity, timestamp uncertainty and frozen provisioning input. They fail against the
+preserved unlocalized component, which was restored byte-for-byte after the check. Provisioning
+success feedback is a static translatable message; the receipt still validates the exact objective
+and the catalogue shows its identity.
+
+All 500 desktop coordinator/host tests and 120 interface tests pass locally, including type/build
+checks. The sandboxed desktop run failed when creating required Unix sockets; its log is retained,
+and the permitted rerun passed. Repository (seven tests), docs (106 documents), vocabulary, formatting
+and diff checks also pass. The full native
+gate is queued behind the preserved #44 run; hosted checks and exact-revision packaged graphical
+acceptance must still be recorded. Parents #46, #47 and #48 have all seven hosted checks passing;
+none is merged. Pending-intent recovery across renderer reload, result review, worker/context
+recovery and original-main integration remain separate increments. Continue with the preserved
+review phases after publishing this increment, retaining the complete second-provider, four-worker,
+remote-executor, human-review, merge and final combined-main acceptance obligations.

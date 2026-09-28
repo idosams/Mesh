@@ -192,7 +192,7 @@ allocation receipts and guarded ledger access. Reopening a missing or empty ledg
 initialize new history. Saved fleet facts remain discoverable while source projects are offline;
 restored services are explicitly unattached and cannot recreate previously allocated contexts.
 Desktop native commands can provision a fleet from an attached version and read its catalogue while
-ordinary source capture continues. They can now start workers through the native commands described below; fleet UI controls remain unfinished.
+ordinary source capture continues. They can now start workers through the native commands described below; the first fleet UI controls are connected below.
 Context/process reconciliation and graphical verification remain incomplete.
 
 
@@ -203,5 +203,19 @@ redacted execution facts. Duplicate starts keep one loop, restored fleets refuse
 errors suspend new dispatch while owned-process observation continues. Cancellation retains uncertain
 process-tree slots and custody. Native fixture tests cover these cases and unchanged original work and
 desktop selection. No new real-provider, graphical fleet or packaged scheduling proof is claimed for
-this increment. UI controls, exact review presentation, process/context recovery and full shutdown
-reconciliation remain open.
+this native increment. The initial UI is connected below; exact review presentation, process/context
+recovery and full shutdown reconciliation remain open.
+
+
+The attached-project view now includes optional fleet provisioning from an exact saved version,
+explicit lane/concurrency/delegation limits, separate Start agents and Stop agents actions, and native
+fleet/lane observations. Ordinary attachment controls and harness work stay independent. Unconfirmed
+provisioning retains its request and input in the current renderer session for explicit retry; polling
+never resubmits commands. The view retains stale observations with their timestamps, disables new
+starts after failed refresh, and refuses start/stop controls for restored or unavailable owners.
+Worker facts join only the exact objective/lane/attempt. Presentation and coordinator tests cover these
+boundaries. Canonical controls and status preserve English/Hebrew presentation, with literal native
+identities and user goals. Packaged graphical interaction is not verified; the last attempted Mac
+acceptance was blocked by the locked session. Renderer-reload
+recovery of pending intent, fleet result review, context/process recovery and original-main integration
+remain incomplete; this is not the completed fleet phase.
