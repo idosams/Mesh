@@ -6,8 +6,6 @@ use std::cell::Cell;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use ed25519_dalek::{Signer as _, SigningKey};
@@ -716,50 +714,9 @@ fn empty_folder_delete_refuses_an_entry_created_during_confirmation() {
     let _ = fs::remove_dir_all(parent);
 }
 
-#[test]
-fn a_newer_os_change_during_move_settling_stays_working() {
-    let (parent, managed) = workspace("move-settling");
-    let key = SigningKey::from_bytes(&[0x63; 32]);
-    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
-    let daemon = Arc::new(open_daemon(&managed));
-    daemon
-        .create_managed_text_file("draft.txt", "durable bytes\n", public, signer(&key))
-        .expect("initial file");
-
-    let target = managed.join("final.txt");
-    let displaced = managed.join("externally-moved.txt");
-    let observer = thread::spawn({
-        let target = target.clone();
-        let displaced = displaced.clone();
-        move || {
-            while !target.exists() {
-                thread::sleep(Duration::from_millis(1));
-            }
-            thread::sleep(Duration::from_millis(15));
-            fs::rename(&target, &displaced).expect("external move");
-            fs::create_dir(&target).expect("newer external folder");
-        }
-    });
-    let moved = daemon
-        .move_managed_entry_privately("draft.txt", "final.txt", public, signer(&key))
-        .expect("durable move");
-    observer.join().expect("external observer");
-
-    assert!(!moved.meaningful_saved());
-    assert!(target.is_dir());
-    assert_eq!(fs::read(displaced).unwrap(), b"durable bytes\n");
-    assert!(daemon
-        .checkpoint_snapshot()
-        .expect("checkpoint")
-        .open_window()
-        .is_some());
-    let state = daemon.workspace_state().expect("working state");
-    assert!(
-        state.review_items.is_empty(),
-        "a newer unsettled operating-system change must suppress the stale automatic card"
-    );
-    let _ = fs::remove_dir_all(parent);
-}
+// The move-settling replacement regression lives in live.rs unit tests so a test-only hook
+// places the external change after durable move publication and before settling. An observer
+// thread racing a 15 ms sleep against the 50 ms idle interval cannot establish that ordering.
 
 #[test]
 fn invalid_signature_and_confined_refusals_change_no_folder_or_journal_byte() {
