@@ -2002,7 +2002,7 @@ before merge, alongside the unresolved native and packaged acceptance gates.
 ## I08c durable native provider policy
 
 New canonical implementation based on #109 at
-`fcbac1482178362f388e9887313c7435d8ecd917`; no preserved source commit is replaced.
+`f8ef047b01d0d25198f6bb5a1502d4f813132392`; no preserved source commit is replaced.
 Native allocation can now bind a coordinator provider and a closed set containing
 Codex, Claude, or both. The original creation API remains Codex-only. Explicit
 policy creation rejects unknown/duplicate providers and excluded coordinators
