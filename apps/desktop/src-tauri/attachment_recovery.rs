@@ -88,14 +88,31 @@ pub fn group_confirmation(
             )
         })
         .collect();
-    group_prompt(project, root, prepared.proposal(), &files)
+    let trees: Vec<_> = prepared
+        .directories()
+        .map(|tree| (tree.proposal(), tree.proposed_files().collect()))
+        .collect();
+    group_prompt_with_trees(project, root, prepared.proposal(), &files, &trees)
 }
 
+type DirectoryContents<'a> = (&'a Json, Vec<(&'a str, &'a [u8], bool)>);
+
+#[cfg(test)]
 fn group_prompt(
     project: &str,
     root: &Path,
     proposal: &Json,
     files: &[(&Json, &[u8], &[u8])],
+) -> Result<String, String> {
+    group_prompt_with_trees(project, root, proposal, files, &[])
+}
+
+fn group_prompt_with_trees(
+    project: &str,
+    root: &Path,
+    proposal: &Json,
+    files: &[(&Json, &[u8], &[u8])],
+    trees: &[DirectoryContents<'_>],
 ) -> Result<String, String> {
     let fail = || "The complete group cannot be shown in native confirmation".to_owned();
     let members = proposal
@@ -106,7 +123,10 @@ fn group_prompt(
         .get("already_present")
         .and_then(Json::as_array)
         .ok_or_else(fail)?;
-    if files.is_empty() || files.len() != members.len() || files.len() + present.len() > 64 {
+    if members.is_empty()
+        || files.len() + trees.len() != members.len()
+        || members.len() + present.len() > 64
+    {
         return Err(fail());
     }
     let mut prompt = format!("Apply accepted changes to the working folder\n\nProject: {project:?}\nFolder: {root:?}\n\nEvery change below belongs to one accepted review. Changes are applied one at a time. Concurrent work can stop the group after some files have changed. Displaced files remain in recovery, including later writes from open editors. No automatic rollback or retry occurs. Mesh main and Git are unchanged.\n");
@@ -127,7 +147,30 @@ fn group_prompt(
             "Digest: {digest}\nPermissions: {mode:o}\n{content:?}"
         ))
     };
-    for ((receipt, current, proposed), member) in files.iter().zip(members) {
+    let mut file_iter = files.iter();
+    let mut tree_iter = trees.iter();
+    let mut remaining_entries = 64usize.saturating_sub(present.len());
+    for member in members {
+        if trees
+            .iter()
+            .any(|(tree, _)| tree.get("path") == member.get("path"))
+        {
+            let (tree, content) = tree_iter.next().ok_or_else(fail)?;
+            if tree.get("path") != member.get("path") {
+                return Err(fail());
+            }
+            let entries = tree.get("tree").and_then(Json::as_array).ok_or_else(fail)?;
+            remaining_entries = remaining_entries
+                .checked_sub(entries.len())
+                .ok_or_else(fail)?;
+            prompt.push_str(&directory_prompt(tree, content)?);
+            if prompt.len() > MAX_PROMPT {
+                return Err(fail());
+            }
+            continue;
+        }
+        remaining_entries = remaining_entries.checked_sub(1).ok_or_else(fail)?;
+        let (receipt, current, proposed) = file_iter.next().ok_or_else(fail)?;
         let path = receipt
             .get("path")
             .and_then(Json::as_text)
@@ -174,6 +217,9 @@ fn group_prompt(
             return Err(fail());
         }
     }
+    if file_iter.next().is_some() || tree_iter.next().is_some() {
+        return Err(fail());
+    }
     for item in present {
         prompt.push_str(&format!(
             "\nALREADY PRESENT (no write): {:?}\n",
@@ -182,6 +228,68 @@ fn group_prompt(
     }
     prompt.push_str("\nExact inputs are checked again after confirmation and before each change. Cancel leaves the working folder unchanged and retains prepared recovery records.");
     if prompt.len() > MAX_PROMPT {
+        return Err(fail());
+    }
+    Ok(prompt)
+}
+
+fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<String, String> {
+    use mesh_types::ContentDigest as _;
+    let fail =
+        || "The complete directory tree cannot be shown in native text confirmation".to_owned();
+    if proposal.get("schema") != Some(&Json::text("mesh.attachment-directory-addition/v1")) {
+        return Err(fail());
+    }
+    let root = proposal
+        .get("path")
+        .and_then(Json::as_text)
+        .ok_or_else(fail)?;
+    let entries = proposal
+        .get("tree")
+        .and_then(Json::as_array)
+        .ok_or_else(fail)?;
+    if entries.is_empty() || entries.len() > 64 {
+        return Err(fail());
+    }
+    let mut files = content.iter();
+    let mut prompt = format!("\nCREATE DIRECTORY TREE {root:?}\nDestination absent; a concurrent entry will not be replaced. The complete tree is installed together.\n");
+    for entry in entries {
+        let path = entry.get("path").and_then(Json::as_text).ok_or_else(fail)?;
+        let mode = entry.get("mode").and_then(Json::as_u64).ok_or_else(fail)?;
+        match entry.get("kind").and_then(Json::as_text) {
+            Some("directory") => {
+                prompt.push_str(&format!("DIRECTORY {path:?} Permissions: {mode:o}\n"))
+            }
+            Some("file") => {
+                let (file_path, bytes, executable) = files.next().ok_or_else(fail)?;
+                if *file_path != path
+                    || bytes.len() > MAX_PROMPT
+                    || bytes.contains(&0)
+                    || *executable != (mode & 0o111 != 0)
+                    || entry.get("bytes") != Some(&Json::Number(bytes.len() as u64))
+                    || entry.get("digest")
+                        != Some(&Json::text(
+                            mesh_types::Blake3::digest_bytes(bytes).to_string(),
+                        ))
+                {
+                    return Err(fail());
+                }
+                let text = std::str::from_utf8(bytes).map_err(|_| fail())?;
+                prompt.push_str(&format!(
+                    "FILE {path:?}\nDigest: {}\nPermissions: {mode:o}\n{text:?}\n",
+                    entry
+                        .get("digest")
+                        .and_then(Json::as_text)
+                        .ok_or_else(fail)?
+                ));
+            }
+            _ => return Err(fail()),
+        }
+        if prompt.len() > MAX_PROMPT {
+            return Err(fail());
+        }
+    }
+    if files.next().is_some() {
         return Err(fail());
     }
     Ok(prompt)
@@ -434,5 +542,88 @@ mod tests {
             &[files[1], files[0], files[2]]
         )
         .is_err());
+    }
+    #[test]
+    fn directory_confirmation_covers_empty_folders_and_every_frozen_file() {
+        use mesh_types::ContentDigest as _;
+        let directory = |path: &str| {
+            Json::object([
+                ("path", Json::text(path)),
+                ("kind", Json::text("directory")),
+                ("mode", Json::Number(0o040700)),
+            ])
+        };
+        let file = Json::object([
+            ("path", Json::text("run")),
+            ("kind", Json::text("file")),
+            ("mode", Json::Number(0o100700)),
+            ("bytes", Json::Number(4)),
+            (
+                "digest",
+                Json::text(mesh_types::Blake3::digest_bytes(b"text").to_string()),
+            ),
+        ]);
+        let receipt = Json::object([
+            (
+                "schema",
+                Json::text("mesh.attachment-directory-addition/v1"),
+            ),
+            ("path", Json::text("new")),
+            (
+                "tree",
+                Json::Array(vec![directory(""), directory("empty"), file]),
+            ),
+        ]);
+        let proposal = Json::object([
+            (
+                "members",
+                Json::Array(vec![Json::object([("path", Json::text("new"))])]),
+            ),
+            ("already_present", Json::Array(vec![])),
+        ]);
+        let content: Vec<(&str, &[u8], bool)> = vec![("run", b"text", true)];
+        let prompt = group_prompt_with_trees(
+            "project",
+            Path::new("/tmp/project"),
+            &proposal,
+            &[],
+            &[(&receipt, content.clone())],
+        )
+        .unwrap();
+        for expected in [
+            "CREATE DIRECTORY TREE",
+            "DIRECTORY \"empty\"",
+            "FILE \"run\"",
+            "text",
+            "100700",
+            "concurrent entry will not be replaced",
+        ] {
+            assert!(prompt.contains(expected), "{expected}");
+        }
+        assert!(
+            group_prompt_with_trees("project", Path::new("/tmp/project"), &proposal, &[], &[])
+                .is_err()
+        );
+        let literal = group_prompt_with_trees(
+            "project\nCREATE fake",
+            Path::new("/workspace/שם\nPermissions: 777"),
+            &proposal,
+            &[],
+            &[(&receipt, content.clone())],
+        )
+        .unwrap();
+        assert!(literal.contains(r#"Project: "project\nCREATE fake""#));
+        assert!(literal.contains(r#"Folder: "/workspace/שם\nPermissions: 777""#));
+        assert!(!literal.contains("\nCREATE fake\n"));
+        assert!(directory_prompt(&receipt, &[]).is_err());
+        assert!(directory_prompt(&receipt, &[("run", b"edit", true)]).is_err());
+        assert!(directory_prompt(&receipt, &[("run", b"text", false)]).is_err());
+        assert!(directory_prompt(
+            &receipt,
+            &[("run", b"text", true), ("extra", b"extra", false)]
+        )
+        .is_err());
+        assert!(directory_prompt(&receipt, &[("run", &[255], true)]).is_err());
+        assert!(directory_prompt(&receipt, &[("run", &vec![b'x'; MAX_PROMPT + 1], true)]).is_err());
     }
 }

@@ -678,3 +678,15 @@ require exact native inspection; the file catalogue does not discover them.
 Native regressions cover interruption, races, late writes, staged changes, policy,
 trust, budget and recovery boundaries. They are transferred pending canonical
 runtime verification; packaged graphical approval remains outstanding.
+
+### Complete-tree native confirmation
+
+The native group prompt now includes staged directories in execution order rather
+than omitting them. Every empty directory and frozen file is listed, with exact
+file content, digest, executable state and permissions checked against the tree
+receipt. Member accounting includes expanded tree entries. Missing or extra content,
+mismatched identity/digest/mode, binary text and oversized prompts refuse the whole
+group. Project and folder labels stay separately escaped. The native operation
+still revalidates after consent; the renderer cannot supply write authority.
+Localized directory recovery display and packaged graphical approval remain
+pending. Source confirmation regressions are present, awaiting native execution.

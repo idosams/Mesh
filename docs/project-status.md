@@ -657,3 +657,11 @@ Uncertain results preserve work without automatic replay or cleanup. Native test
 are transferred but local execution remains pending. Desktop complete-tree
 confirmation and localized recovery display follow separately; existing prompts
 refuse directory groups. No packaged graphical acceptance is claimed.
+
+### Complete-tree confirmation (unmerged native increment)
+
+Native group confirmation now includes complete staged trees, including empty
+directories and exact frozen text. It refuses incomplete, mismatched, binary or
+oversized presentations and retains literal project/folder labels. Native tests
+are transferred pending execution. Localized recovery and actual packaged dialog
+acceptance remain outstanding.

@@ -1748,3 +1748,19 @@ parents/policy, receipts/trust/budgets, restrictive umask, late descriptor write
 partial groups and restart inspection. Native focused/failing-before/full execution
 remains pending behind the preserved canonical run. Historical source claims
 (3,304 Rust/678 desktop, 14 Rust skips) are not evidence on this tree.
+
+## I04d complete-tree native confirmation
+
+Transfers `apps/desktop/src-tauri/attachment_recovery.rs` from source
+`c711c6531220f61bfe5e9994f12df19c4450bd2c` onto PR #95 at
+`0f5a5b4276fc2a9a91193edca32a5226f7a7e95b`. The three native foundation
+increments already contain its directory executor and permission dependencies.
+Four renderer paths and remaining source-document accounting still follow.
+
+The prompt includes every directory (including empty ones) and frozen file with
+exact content/digest/mode in group order. Missing, mismatched, binary or oversized
+content refuses the whole prompt; expanded membership shares the 64-entry bound.
+Conflict resolution preserves the canonical separate escaped project/root labels
+and all existing confirmation tests. The new tree test also covers misleading
+newlines and non-Latin folder identity. Native focused/failing-before/full tests
+remain pending behind the preserved run; no actual OS dialog proof is claimed.
