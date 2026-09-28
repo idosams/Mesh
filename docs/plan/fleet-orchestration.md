@@ -373,3 +373,9 @@ reads and fleet polling. The existing text-diff viewer supports explicitly label
 independent layouts. Source tests verify exact identity/cursor handling and concurrent response order.
 This closes the initial current-session presentation connection; persistent pins, restart reattachment,
 artifact previews, changes requested from lanes and original-main integration remain phase requirements.
+
+Renderer fleet pin persistence now saves and restores the exact review set and independent view choices.
+Reopening rechecks native history and retains unavailable selections without starting workers. Regression
+coverage includes closes during writes, lost acknowledgements, conflicts, late replies after replacing
+the saved set, and failed initial loads. This advances parallel review continuity; full app restart
+context recovery, artifacts, original-main integration and packaged graphical proof remain required.

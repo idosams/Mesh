@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "../lib/localization";
-import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetReviewQueue } from "./fleet-reviews";
+import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetReviewQueue, type FleetReviewPersistence } from "./fleet-reviews";
 import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
@@ -8,7 +8,7 @@ type Lane = { id: string; parent: string | null; sourceProject: string | null; g
 type Fleet = { objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type Projection = { reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const states: Record<string, string> = { launching: "Starting", running: "Working", waiting: "Waiting", reconciling: "Needs recovery", stopping: "Stop requested · ownership reserved", succeeded: "Execution completed", failed: "Execution failed", cancelled: "Cancelled" };
@@ -65,7 +65,7 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
     {projection.feedback && <p role="status" className="break-words text-sm">{t(projection.feedback)}</p>}
     <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "refresh" })}>{t("Refresh fleets")}</Button>
     {!projection.fleets.length && <p className="text-sm text-muted-foreground">{t(projection.error ? "Saved fleets could not be loaded." : "No fleets yet. Manual work and externally run harnesses remain available below.")}</p>}
-    <FleetReviewPanels pins={projection.reviewPins ?? []} notice={projection.reviewNotice ?? ""} />
+    <FleetReviewPanels pins={projection.reviewPins ?? []} notice={projection.reviewNotice ?? ""} persistence={projection.reviewPersistence} />
     <FleetCards projection={projection} projects={projects} disabled={disabled} />
   </section>;
 }

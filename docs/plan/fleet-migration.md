@@ -741,3 +741,27 @@ local full gate remains active on the shared build target. Renderer save/restore
 published increment; visible pins currently remain renderer-session-only. Original work and tests are
 preserved. Restored history/artifacts, correspondence, integration/recovery, full provider/package/
 remote acceptance, required review, eventual merges and final combined-main testing remain required.
+
+## R01f restore exact fleet review selections
+
+Preserved source `20b01d6023616e02e2c9e5cabdc82dc39bb82c3b` transfers on published #54 at
+`7333c588b2cfbcd49f000c21771b555f0e744163`. The renderer saves at most eight exact fleet review
+selectors and independent page/object/mode/layout choices through the native selector store. Loading
+rechecks immutable native history; unavailable history retains its selection without adopting or
+starting workers. Serial writes retain closes during pending saves. Unconfirmed acknowledgements and
+conflicts expose explicit retry or replacement from the saved set; failed initial loading cannot
+replace stored selections. Reload ignores earlier content replies even when panel keys are reused.
+
+The canonical adaptation retains English/Hebrew presentation, literal identities and user goals,
+saved-context comparisons and independent accessible panel headings. A missing restored goal receives
+a translated fallback without translating a user's identically worded goal. The added Hebrew
+regression fails against the unlocalized preserved source, then passes after byte-exact restoration.
+Local type/build and all 135 interface tests pass, along with all 523 desktop tests, including existing
+attachment persistence and nine fleet persistence regressions. Docs, vocabulary, formatting and diff
+checks pass. Full local native validation remains queued behind the preserved #44 gate; no packaged
+proof is claimed. Parent #53 has all seven hosted checks passing; #54 has six passing with macOS pending.
+
+This increment still needs its own hosted validation. Durable starting-version bindings and restored
+history follow before artifacts/correspondence/integration and the remaining recovery phases. Required
+human review, second-provider/four-worker/remote and packaged acceptance, eventual merges and testing
+of the final combined canonical main remain required. Original source work and verification are preserved.

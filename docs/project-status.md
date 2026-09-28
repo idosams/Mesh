@@ -226,8 +226,8 @@ readable after newer saves, unsaved edits, cancellation and credential revocatio
 wrong tuples and invalid artifact selectors refuse. A bounded saved-review list covers all pages in
 checkpoint-id order; it is not an atomic chronological feed. Native desktop commands expose the list
 and exact review projection. Tests verify fifty-three results and immutable bytes across navigation.
-Visible fleet result panels, desktop artifact rendering for these readers, restored-context access,
-main approval/integration and packaged graphical proof remain unfinished.
+The following increments connect visible result panels and persisted navigation. Desktop artifact
+rendering, restored-context access, main approval/integration and packaged graphical proof remain open.
 
 
 Desktop source now connects current-session fleet saved-result lists to up to eight independent pinned
@@ -236,9 +236,9 @@ reopen panels, and fleet refresh does not block review reads or closing. Existin
 presentation supplies independent file/layout state with approval and export disabled. Accessible folder
 heading identities are unique across concurrent panels of the same objects. Coordinator and rendered
 presentation tests cover these boundaries, incomplete content, exact-base labeling and cached results.
-Pins remain renderer-session-only. Starting-input comparison, artifact rendering, restored-context
-access, original-main integration and packaged graphical proof remain required; this does not complete
-the parallel review phase.
+Subsequent increments below add starting-input comparison and persistent selectors. Artifact rendering,
+restored-context access, original-main integration and packaged graphical proof remain required; this
+does not complete the parallel review phase.
 
 The canonical parallel fleet-review transfer preserves English/Hebrew controls and warnings, literal
 saved identities and file contents, and distinct accessible folder headings across panels. Local
@@ -250,8 +250,7 @@ it to a selected recorded checkpoint. It distinguishes the original source versi
 import operation, pages changed object identities, and reads bounded selected before/after text from
 verified history. Existing source edits and newer lane edits do not enter the comparison. A typed
 desktop command exposes this read without approval authority. Native tests cover attached-source
-mapping and immutable historical reads; the visible panels still use their labeled recorded review
-base until this separate comparison is connected. Restart reconstruction of this binding, full artifact
+mapping and immutable historical reads; the presentation connection is described below. Restart reconstruction of this binding, full artifact
 presentation, original-main integration and packaged graphical proof remain required.
 
 
@@ -261,8 +260,9 @@ Responses bind exact source/local-base/result identities; page/detail retries pr
 and recorded-review responses cannot overwrite concurrent comparison results. The shared bounded text
 diff viewer now labels saved-versus-saved comparisons explicitly while retaining working-copy labels
 for its existing use. Tests cover response order, closing pending reads, multiple panels, cursor and
-identity substitution, absent/empty sides and unavailable text. Native pin persistence, restored-context
-reads, artifacts and original-main integration remain unfinished; no packaged graphical proof is claimed.
+identity substitution, absent/empty sides and unavailable text. Pin persistence is described below;
+restored-context reads, artifacts and original-main integration remain unfinished. No packaged graphical
+proof is claimed.
 
 The canonical starting-comparison panels preserve English/Hebrew labels and literal saved content,
 with separate wording for saved comparisons and the existing working-copy view. Local type/build,
@@ -273,5 +273,16 @@ Native fleet pin persistence now stores bounded exact selectors and view choices
 record with revision checks and atomic publication. It preserves compatibility with attachment pins.
 Native tests cover reopen/removal, concurrent writers, malformed selectors, copied/corrupt/linked
 records and interrupted staging. Desktop commands load/save selectors without creating fleet history,
-opening projects or adopting workers. Renderer save/restore is not connected yet, so current visible
-fleet pins still last only for the app view. Context recovery and packaged graphical proof remain open.
+opening projects or adopting workers. Renderer save/restore now connects these selectors to the review
+panels, including page/object selections and comparison layouts. Content is reverified through native
+history; unavailable pins remain visible. Serial writes preserve closes during pending saves, lost
+acknowledgements require explicit retry, and conflicting saved sets require explicit reload. Tests cover
+late content after reload, independent activity refresh, initial-load refusal, selector-only writes and
+failed-save recovery. Full app restart restores selectors but cannot yet reopen native lane contexts,
+so restored content access and packaged graphical proof remain open.
+
+The canonical selector-restoration transfer preserves localized persistence controls and literal saved
+identities/user goals. Its added rendered regression detects the unlocalized source; local type/build,
+135 interface tests and 523 desktop tests pass, including prior attachment persistence behavior. Full
+local native validation remains queued behind the preserved earlier gate. Hosted checks and packaged
+acceptance are tracked separately; published increments remain unmerged pending required review.

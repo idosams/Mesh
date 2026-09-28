@@ -5,6 +5,7 @@ const id = 'a'.repeat(64), version = 'b'.repeat(64), objective = `fleet-${'c'.re
 const catalogue = () => ({ schema: 'mesh.native-fleets/v1', fleets: [{ objective, ownership: 'current-host', state: {
   objective, revision: 3, cancelled: false, lanes: [{ id: lane, parent: null, source_project: id, goal: 'Coordinate', provider: 'codex', base: version, allocated: true, workspace: { root: '/native/lane', installation: 'native-installation' }, run: null }],
 } }] });
+const savedPins = () => ({ schema: 'mesh.desktop-fleet-pin-selectors/v1', revision: '0', pins: [] });
 const activity = () => ({ schema: 'mesh.desktop-fleet-activity/v1', fleets: [] });
 const live = () => ({ objective, status: 'monitoring', stop_requested: false, observed_at: '1000', workers: [{ lane, run: 'run-one', observed_at: '1000', thread: null, activity: 'working', events: '2', stderr_lines: '0', turn_completed: false, failed: false, streams_closed: false, outcome: null }] });
 class CustomEvent extends Event { constructor(type, init = {}) { super(type); this.detail = init.detail; } }
@@ -56,6 +57,7 @@ test('uncertain provisioning retains exact input and request; polling never retr
   const calls = []; let fail = true;
   const h = harness(async (command, args) => {
     calls.push({ command, args });
+    if (command === 'load_fleet_pins') return savedPins();
     if (command === 'attached_fleets') return catalogue();
     if (command === 'fleet_activity') return activity();
     if (command === 'provision_attached_fleet') {
@@ -79,7 +81,7 @@ test('uncertain provisioning retains exact input and request; polling never retr
   h.dispose();
 });
 test('closed intents cannot supply paths, invalid budgets or unknown project identities', async () => {
-  const calls = []; const h = harness(async (command) => { calls.push(command); return command === 'attached_fleets' ? catalogue() : activity(); });
+  const calls = []; const h = harness(async (command) => { calls.push(command); if (command === 'load_fleet_pins') return savedPins(); return command === 'attached_fleets' ? catalogue() : activity(); });
   await settle(); const before = calls.length;
   for (const mutation of [{ path: '/elsewhere' }, { id: version }, { lanes: '0' }, { concurrency: '5' }, { depth: '33' }, { goal: ' ' }, { goal: 'é'.repeat(8192) }, { version: '../' }, { lanes: '04' }]) h.intent({ ...provision, ...mutation });
   assert.equal(calls.length, before); h.dispose();
@@ -88,6 +90,7 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
   let value = catalogue(), observations = activity(), fail = false; const calls = [];
   const h = harness(async (command, args) => {
     calls.push({ command, args });
+    if (command === 'load_fleet_pins') return savedPins();
     if (command === 'start_attached_fleet') {
       value.fleets[0].state.lanes[0].run = { id: 'run-one', state: 'running' };
       observations.fleets = [live()]; return observations;
@@ -96,7 +99,7 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
     if (fail) throw new Error('credential-secret');
     return command === 'attached_fleets' ? value : observations;
   });
-  await settle(); h.intent({ type: 'start', objective, path: '/wrong' }); assert.equal(calls.length, 2);
+  await settle(); h.intent({ type: 'start', objective, path: '/wrong' }); assert.equal(calls.length, 3);
   h.intent({ type: 'start', objective }); await settle(); h.intent({ type: 'start', objective }); await settle();
   assert.equal(calls.filter(call => call.command === 'start_attached_fleet').length, 1);
   fail = true; h.intent({ type: 'refresh' }); await settle();
@@ -108,14 +111,15 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
 });
 test('restored or unavailable fleets cannot request execution and hidden/disposed views stop polling', async () => {
   const value = catalogue(); value.fleets[0].ownership = 'restored-unattached'; const calls = [];
-  const h = harness(async command => { calls.push(command); return command === 'attached_fleets' ? value : activity(); });
-  await settle(); h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); assert.equal(calls.length, 2);
+  const h = harness(async command => { calls.push(command); if (command === 'load_fleet_pins') return savedPins(); return command === 'attached_fleets' ? value : activity(); });
+  await settle(); h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); assert.equal(calls.length, 3);
   assert.equal(h.timers.size, 1); h.emit('mesh:fleets-visible', false); assert.equal(h.timers.size, 0);
-  h.intent(provision); assert.equal(calls.length, 2); h.dispose(); h.emit('mesh:fleets-visible', true); assert.equal(calls.length, 2);
+  h.intent(provision); assert.equal(calls.length, 3); h.dispose(); h.emit('mesh:fleets-visible', true); assert.equal(calls.length, 3);
 });
 test('partial refresh failure retains a coherent prior projection and disposal ignores a late reply', async () => {
   let release; let hold = false;
   const h = harness(async command => {
+    if (command === 'load_fleet_pins') return savedPins();
     if (hold && command === 'attached_fleets') return new Promise(resolve => { release = resolve; });
     return command === 'attached_fleets' ? catalogue() : activity();
   });
@@ -125,7 +129,7 @@ test('partial refresh failure retains a coherent prior projection and disposal i
 
 test('failed start remains visible after a later successful poll and is never replayed automatically', async () => {
   const calls = []; const h = harness(async command => {
-    calls.push(command);
+    calls.push(command); if (command === 'load_fleet_pins') return savedPins();
     if (command === 'start_attached_fleet') throw new Error('private native error');
     return command === 'attached_fleets' ? catalogue() : activity();
   });
@@ -141,6 +145,7 @@ test('failed start remains visible after a later successful poll and is never re
 test('an explicitly retained saved input does not drift when source capture advances', async () => {
   const calls = []; const h = harness(async (command, args) => {
     calls.push({ command, args });
+    if (command === 'load_fleet_pins') return savedPins();
     if (command === 'provision_attached_fleet') return { schema: 'mesh.desktop-attached-fleet/v1', project: id, request: args.request, objective, started: false };
     return command === 'attached_fleets' ? catalogue() : activity();
   });
@@ -155,6 +160,8 @@ test('saved-result reads and closing panels remain independent of an active flee
   const commands = [], bundle = 'f'.repeat(64);
   const h = harness(async (command, args) => {
     commands.push(command);
+    if (command === 'load_fleet_pins') return savedPins();
+    if (command === 'save_fleet_pins') { const value = JSON.parse(args.snapshot); return { ...value, revision: String(BigInt(value.revision) + 1n) }; }
     if (command === 'attached_fleets') return holdRefresh ? new Promise(resolve => { pendingCatalogue = resolve; }) : catalogue();
     if (command === 'fleet_activity') return activity();
     if (command === 'fleet_saved_reviews') return { schema: 'mesh.fleet-saved-reviews/v1', objective, lane, revision: 1, after: null, total: 1, next_after: null, order: 'checkpoint-id', reviews: [{ checkpoint: 'checkpoint-one', version, bundle, run: 'run-one' }] };

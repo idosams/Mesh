@@ -1,3 +1,4 @@
+import { createFleetPinPersistence, defaultFleetView } from './fleet-pin-persistence.js';
 import { fleetInputComparison } from './fleet-input-comparison.js';
 // Immutable saved-result selection and independent presentation requests. No publication authority.
 const identity = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
@@ -54,8 +55,47 @@ export function savedFleetReview(raw, selection) {
 }
 
 export function createFleetReviews({ invoke, laneFor, changed }) {
-  let queues = {}, pins = [], nextPin = 1, nextRead = 1, disposed = false, notice = '';
+  let queues = {}, pins = [], nextPin = 1n, nextRead = 1, disposed = false, notice = '';
+  let persistenceEnabled = false, controlBusy = false, editable = true, persistenceState = { phase: 'session', message: '' };
   const publish = () => { if (!disposed) changed(); };
+  const persist = () => { if (persistenceEnabled) storage.changed(); };
+  const storage = createFleetPinPersistence({ invoke,
+    selectors: () => pins.map(pin => ({ key: pin.key, ...pin.selection, source_version: pin.startingInput, ...pin.view })),
+    restore(saved) {
+      pins = saved.map(value => ({ key: value.key, selection: Object.fromEntries(selectorFields.map(field => [field, value[field]])),
+        startingInput: value.source_version, goal: laneFor(value.objective, value.lane)?.goal ?? null,
+        view: Object.fromEntries(Object.keys(defaultFleetView()).map(field => [field, value[field]])), review: null, loading: false, error: '' }));
+      nextPin = pins.reduce((max, pin) => BigInt(pin.key) >= max ? BigInt(pin.key) + 1n : max, nextPin);
+      notice = ''; publish();
+      for (const pin of pins) {
+        void loadPin(pin);
+        if (pin.view.input_open) void restoreInput(pin);
+      }
+    },
+    status(phase, message) {
+      if (phase === 'loading') editable = false;
+      if (phase === 'saved') editable = true;
+      persistenceState = { phase, message }; publish();
+    },
+  });
+  async function controlStorage(action) {
+    if (controlBusy) return;
+    controlBusy = true; publish();
+    try { await action(); } finally { controlBusy = false; publish(); }
+  }
+  function remember(pin, patch) {
+    const updated = { ...pin, view: { ...pin.view, ...patch } };
+    pins = pins.map(value => value.key === pin.key ? updated : value); persist(); publish(); return updated;
+  }
+  async function restoreInput(pin) {
+    await loadInput(pin, pin.view.input_after);
+    const current = pins.find(value => value.key === pin.key && value.selection === pin.selection);
+    if (!disposed && current && !current.input?.error && pin.view.input_object) await loadInput(current, null, pin.view.input_object);
+  }
+  function requestInput(pin, after = null, selected = null) {
+    const updated = remember(pin, { input_open: true, ...(selected === null ? { input_after: after } : { input_object: selected }) });
+    void loadInput(updated, after, selected);
+  }
   async function loadPage(objective, lane, after) {
     const id = key(objective, lane), existing = queues[id];
     if (existing?.loading) return;
@@ -71,6 +111,7 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     publish();
   }
   async function loadPin(pin) {
+    if (disposed) return;
     const loading = { ...pin, loading: true, error: '', reviewRequest: nextRead++ };
     pins = pins.map(value => value === pin ? loading : value); publish();
     try {
@@ -82,6 +123,7 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     publish();
   }
   async function loadInput(pin, after = null, selected = null) {
+    if (disposed) return;
     if (pin.input?.loading) return;
     const loading = { ...pin.input, page: pin.input?.page ?? null, file: pin.input?.file ?? null, loading: true, error: '', requestedAfter: after, requestedObject: selected };
     pins = pins.map(value => value.key === pin.key ? { ...value, input: loading } : value); publish();
@@ -96,26 +138,40 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     publish();
   }
   return {
-    snapshot: () => ({ reviewQueues: queues, reviewPins: pins, reviewNotice: notice }),
-    dispose: () => { disposed = true; },
+    snapshot: () => ({ reviewQueues: queues, reviewPins: pins, reviewNotice: notice, reviewPersistence: { ...persistenceState, editable, busy: controlBusy } }),
+    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return storage.ensureLoaded(); } },
+    dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input'].includes(value.type)) return false;
+      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
+      if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
+      if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
+      if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
+        notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (value.type === 'input-layout' && fields === 'layout,pin,type' && ['inline', 'split'].includes(value.layout)) {
+        const pin = pins.find(pin => pin.key === value.pin); if (pin) remember(pin, { input_layout: value.layout }); return true;
+      }
+      if (value.type === 'review-view' && fields === 'layout,mode,object,pin,type' && ['inline', 'split'].includes(value.layout) && ['visual', 'content'].includes(value.mode)) {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (pin?.review?.bundle_changes.some(change => change.object_id === value.object)) remember(pin, { review_object: value.object, review_mode: value.mode, review_layout: value.layout });
+        return true;
+      }
       if (['close-review', 'retry-review'].includes(value.type) && fields === 'pin,type') {
         const pin = pins.find(pin => pin.key === value.pin);
         if (!pin) return true;
-        if (value.type === 'close-review') { pins = pins.filter(value => value !== pin); notice = ''; publish(); }
+        if (value.type === 'close-review') { pins = pins.filter(value => value !== pin); notice = ''; persist(); publish(); }
         else if (!pin.loading) void loadPin(pin);
         return true;
       }
       if (['input-review', 'input-page', 'input-file', 'retry-input'].includes(value.type)) {
         const pin = pins.find(pin => pin.key === value.pin);
         if (!pin || pin.input?.loading) return true;
-        if (value.type === 'input-review' && fields === 'pin,type') void loadInput(pin);
-        if (value.type === 'retry-input' && fields === 'pin,type' && pin.input?.error) void loadInput(pin, pin.input.requestedAfter, pin.input.requestedObject);
-        if (value.type === 'input-page' && fields === 'after,pin,type' && typeof value.after === 'string' && value.after === pin.input?.page?.nextAfter) void loadInput(pin, value.after);
-        if (value.type === 'input-file' && fields === 'object,pin,type' && pin.input?.page?.changes.some(change => change.object === value.object)) void loadInput(pin, null, value.object);
+        if (value.type === 'input-review' && fields === 'pin,type') requestInput(pin);
+        if (value.type === 'retry-input' && fields === 'pin,type' && pin.input?.error) { if (pin.input.requestedObject === null && pin.view.input_object && !pin.input.file) void restoreInput(pin); else void loadInput(pin, pin.input.requestedAfter, pin.input.requestedObject); }
+        if (value.type === 'input-page' && fields === 'after,pin,type' && typeof value.after === 'string' && value.after === pin.input?.page?.nextAfter) requestInput(pin, value.after);
+        if (value.type === 'input-file' && fields === 'object,pin,type' && pin.input?.page?.changes.some(change => change.object === value.object)) requestInput(pin, null, value.object);
         return true;
       }
       const id = key(value.objective, value.lane);
@@ -133,8 +189,9 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
         if (pins.some(pin => same(pin.selection, row))) { notice = 'This exact result is already pinned.'; publish(); return true; }
         if (pins.length >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return true; }
         const selection = Object.fromEntries(selectorFields.map(field => [field, row[field]]));
-        const pin = { key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };
-        pins = [...pins, pin]; notice = ''; void loadPin(pin);
+        if (nextPin > 18446744073709551615n) { notice = 'Review display keys are exhausted.'; publish(); return true; }
+        const pin = { view: defaultFleetView(), key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };
+        pins = [...pins, pin]; notice = ''; persist(); void loadPin(pin);
       }
       return true;
     },

@@ -20,7 +20,7 @@ export function pinSnapshot(raw) {
   return { schema: value.schema, revision: value.revision, pins };
 }
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
-export function createPinPersistence({ invoke, selectors, restore, status }) {
+export function createPinPersistence({ invoke, selectors, restore, status, parseSnapshot = pinSnapshot, schema = 'mesh.desktop-pin-selectors/v1', loadCommand = 'load_attachment_pins', saveCommand = 'save_attachment_pins' }) {
   let revision = '0';
   let acknowledged = [];
   let attempted = false;
@@ -35,7 +35,7 @@ export function createPinPersistence({ invoke, selectors, restore, status }) {
     attempted = true;
     report('loading');
     try {
-      const snapshot = pinSnapshot(await invoke('load_attachment_pins'));
+      const snapshot = parseSnapshot(await invoke(loadCommand));
       if (disposed) return;
       await restore(snapshot.pins);
       if (disposed) return;
@@ -52,9 +52,9 @@ export function createPinPersistence({ invoke, selectors, restore, status }) {
     try {
       while (dirty && !disposed) {
         dirty = false;
-        const snapshot = pinSnapshot({ schema: 'mesh.desktop-pin-selectors/v1', revision, pins: selectors() });
+        const snapshot = parseSnapshot({ schema, revision, pins: selectors() });
         report('saving');
-        const stored = pinSnapshot(await invoke('save_attachment_pins', { snapshot: JSON.stringify(snapshot) }));
+        const stored = parseSnapshot(await invoke(saveCommand, { snapshot: JSON.stringify(snapshot) }));
         if (!same(stored.pins, snapshot.pins)
           || (stored.revision !== revision && BigInt(stored.revision) !== BigInt(revision) + 1n)) throw new Error('Pin acknowledgement mismatch');
         revision = stored.revision; acknowledged = stored.pins;
@@ -72,7 +72,7 @@ export function createPinPersistence({ invoke, selectors, restore, status }) {
       await active;
       if (!ready || disposed) { if (!disposed) active = load(); return active; }
       try {
-        const stored = pinSnapshot(await invoke('load_attachment_pins'));
+        const stored = parseSnapshot(await invoke(loadCommand));
         if (same(stored.pins, selectors())) {
           revision = stored.revision; acknowledged = stored.pins; dirty = false; failed = false; report('saved'); return;
         }

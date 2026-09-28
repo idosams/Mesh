@@ -1,5 +1,19 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Saved lane review": "סקירת מסלול שמורה",
+"Saved changed-object selection": "בחירת אובייקט ששונה ונשמרה",
+"Content must be verified before display.": "יש לאמת את התוכן לפני הצגתו.",
+"The saved file selection is unavailable in this review. Showing the first available change; the saved selection is retained.": "בחירת הקובץ השמורה אינה זמינה בסקירה זו. מוצג השינוי הזמין הראשון; הבחירה השמורה נשמרת.",
+"Saved selections contain no file content. Reopening rechecks exact history; unavailable lanes remain listed and never restart agents.": "הבחירות השמורות אינן מכילות תוכן קבצים. פתיחה מחדש בודקת שוב את ההיסטוריה המדויקת; מסלולים שאינם זמינים נשארים ברשימה ולעולם אינם מפעילים סוכנים מחדש.",
+"Loading saved review selections…": "טוען בחירות סקירה שמורות…",
+"Saving review selections…": "שומר בחירות סקירה…",
+"Review selections saved.": "בחירות הסקירה נשמרו.",
+"Review selections have not loaded yet.": "בחירות הסקירה טרם נטענו.",
+"Retry saving or loading review selections": "ניסיון נוסף לשמירה או לטעינה של בחירות סקירה",
+"Reload saved review set": "טעינה מחדש של קבוצת הסקירות השמורה",
+"Reload replaces local selections with the saved set, including any unsaved local choices.": "טעינה מחדש מחליפה את הבחירות המקומיות בקבוצה השמורה, לרבות בחירות מקומיות שלא נשמרו.",
+"Load the saved review set before changing its selections.": "יש לטעון את קבוצת הסקירות השמורה לפני שינוי הבחירות שלה.",
+
 "Independent line of work":"קו עבודה עצמאי",
 "Existing project":"פרויקט קיים",
 "Lane ancestry could not be verified. Its files and history are retained.":"לא ניתן לאמת את מקור קו העבודה. הקבצים וההיסטוריה שלו נשמרו.",

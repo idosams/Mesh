@@ -13,7 +13,7 @@ test('panels render verified text, exact base and disabled authority', () => {
   const value = pin(), model = fleetSavedReviewModel(value.review), html = render({ pins: [value], notice: '' });
   assert.match(html, /saved &lt;text&gt;/); assert.match(html, /&lt;script&gt;goal/); assert.doesNotMatch(html, /<script>/);
   assert.match(html, /Comparison base: the recorded review/); assert.match(html, /starting-version comparison below/);
-  assert.match(html, /not restored after an app reload/); assert.match(html, new RegExp(value.review.reviewed_head));
+  assert.match(html, /Reopening rechecks exact history/); assert.match(html, new RegExp(value.review.reviewed_head));
   for (const field of ['canApprove', 'canApproveAndExport', 'canExportGit', 'canExportPrivateCopy', 'canRecordReview', 'canRenderArtifactPreview', 'canInspectExactCopies']) assert.equal(model[field], false);
   assert.strictEqual(reduceReviewWorkbench(model, { type: 'approve-version' }), model);
 });
@@ -28,9 +28,9 @@ test('incomplete and malformed content cannot look like a complete empty result'
 test('file and layout state are independent and survive same-result refresh', () => {
   const first = fleetSavedReviewModel(review()), second = fleetSavedReviewModel(review());
   let selected = reduceReviewWorkbench(first, { type: 'select-change', changeId: first.changes[1].id });
-  selected = reduceReviewWorkbench(selected, { type: 'change-diff-layout', layout: 'unified' });
+  selected = reduceReviewWorkbench(selected, { type: 'change-diff-layout', layout: 'inline' });
   const refreshed = reconcileReviewWorkbenchProjection(selected, fleetSavedReviewModel(review()));
-  assert.equal(refreshed.selectedChangeId, first.changes[1].id); assert.equal(refreshed.diffLayout, 'unified');
+  assert.equal(refreshed.selectedChangeId, first.changes[1].id); assert.equal(refreshed.diffLayout, 'inline');
   assert.equal(second.selectedChangeId, second.changes[0].id); assert.equal(second.diffLayout, 'split');
 });
 test('pending or failed reads keep independent close controls and cached evidence', () => {
@@ -158,5 +158,48 @@ test('Hebrew saved comparison distinguishes identical text from metadata and una
     html = render({pins:[value],notice:''});
     assert.match(html, /אינו קיים בגרסה זו/);
     assert.match(html, /300000 בתים/);
+  } finally { module.exports.setLocale('en'); }
+});
+
+test('persistence status remains visible without pins and initial loading disables selector changes', () => {
+  let html = render({ pins: [], notice: '', persistence: { phase: 'error', message: 'Save is unconfirmed.', editable: true, busy: true } });
+  assert.match(html, /Save is unconfirmed/); assert.match(html, /disabled=""[^>]*>Retry saving or loading review selections/);
+  assert.match(html, /Reload replaces local selections/);
+  html = render({ pins: [pin()], notice: '', persistence: { phase: 'loading', message: '', editable: false } });
+  assert.match(html, /Loading saved review selections/); assert.match(html, /disabled=""[^>]*>Close review <bdi dir="ltr">1<\/bdi>/);
+  html = render({ pins: [], notice: '', persistence: { phase: 'saved', message: '', editable: true } });
+  assert.match(html, /Review selections saved/);
+});
+
+test('saved object choice is restored, and an unavailable choice remains explicitly retained', () => {
+  const value = { ...pin(), view: { input_open: false, input_after: null, input_object: null, input_layout: 'split', review_object: 'b'.repeat(32), review_mode: 'content', review_layout: 'inline' } };
+  let html = render({ pins: [value], notice: '' });
+  assert.match(html, /data-mesh-change-path="file-b.txt"/);
+  value.view.review_object = 'f'.repeat(32);
+  html = render({ pins: [value], notice: '' });
+  assert.match(html, /saved file selection is unavailable/); assert.match(html, /saved selection is retained/);
+  assert.match(html, /data-mesh-change-path="file-a.txt"/);
+});
+
+test('Hebrew restored reviews translate persistence status and retain literal goals and identities', () => {
+  const value = {...pin(), goal: 'Saved lane review', review: null, view: {input_open: true, input_after: null, input_object: 'e'.repeat(32), input_layout: 'split', review_object: null, review_mode: 'content', review_layout: 'inline'}};
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value], notice:'', persistence:{phase:'loading',message:'',editable:false}});
+    assert.match(html, /טוען בחירות סקירה שמורות/);
+    assert.match(html, /disabled=""[^>]*>סגירת סקירה/);
+    assert.match(html, /disabled=""[^>]*>השוואה לגרסת ההתחלה/);
+    assert.match(html, /יש לאמת את התוכן לפני הצגתו/);
+    assert.ok(html.includes(`<bdi dir="ltr">${value.view.input_object}</bdi>`));
+    assert.match(html, />Saved lane review<\/h4>/);
+    value.goal = null;
+    html = render({pins:[value],notice:'',persistence:{phase:'error',message:'Saved pins could not be loaded. Their stored record has not been replaced.',editable:false,busy:true}});
+    assert.match(html, /סקירת מסלול שמורה/);
+    assert.match(html, /הרשומה השמורה שלהן לא הוחלפה/);
+    assert.match(html, /disabled=""[^>]*>ניסיון נוסף לשמירה או לטעינה/);
+    assert.match(html, /disabled=""[^>]*>טעינה מחדש של קבוצת הסקירות השמורה/);
+    assert.match(html, /לרבות בחירות מקומיות שלא נשמרו/);
+    html = render({pins:[],notice:'',persistence:{phase:'saved',message:'',editable:true}});
+    assert.match(html, /בחירות הסקירה נשמרו/);
   } finally { module.exports.setLocale('en'); }
 });

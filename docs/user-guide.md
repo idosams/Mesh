@@ -321,13 +321,10 @@ previously verified content and can retry the same request.
 Expand **Recorded review against its original review base** to inspect the existing review bundle.
 That base can differ from the lane's starting version. Both comparisons remain pinned while agents
 work. Artifact rendering, main approval and integration are not yet connected. Incomplete content
-and omitted changes are labeled explicitly. Pins are retained only in the current app view, not after
-reload. The complete packaged graphical interaction remains unverified.
-
-
-A subsequent native development increment can persist up to eight exact fleet review selectors and
-view choices outside your project, independently of existing attachment comparisons. Saved selectors
-contain no file contents and must be verified against native history before use. Concurrent or
-uncertain writes preserve the last acknowledged snapshot and refuse replacement when reconciliation
-is needed. Loading selectors does not open a project, adopt a worker or approve anything. The renderer
-save/restore connection follows separately; the panels described above still remain session-only.
+and omitted changes are labeled explicitly. Exact pin selections, selected objects, pages and comparison
+layouts are saved outside the project. Reopening the view reloads those selections and rechecks content
+through native history. Failed saves retain local selections and expose retry or explicit reload;
+reloading replaces local choices with the saved set. Unavailable history keeps its pin visible.
+After a full app restart, restored fleet contexts are still unavailable: selections reopen, but their
+content cannot yet be read. Reopening never starts workers. The complete packaged graphical interaction
+remains unverified.

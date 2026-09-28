@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "../lib/localization";
 import { Button } from "../atoms/button";
 import { FleetInputComparison, type InputComparison } from "./fleet-input-comparison";
 import { ArtifactReview } from "./artifact-review";
 import { reviewWorkbenchFromProjection } from "../models/review-workbench-adapter";
-import { reconcileReviewWorkbenchProjection, reduceReviewWorkbench, type ReviewWorkbenchModel } from "../models/review-workbench";
+import { reduceReviewWorkbench, type ReviewWorkbenchModel } from "../models/review-workbench";
 
 export type FleetReviewSelection = { objective: string; lane: string; checkpoint: string; version: string; bundle: string };
 type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
-export type FleetReviewPin = { input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
+export type FleetReviewView = { input_open: boolean; input_after: string | null; input_object: string | null; input_layout: "inline" | "split"; review_object: string | null; review_mode: "content" | "visual"; review_layout: "inline" | "split" };
+export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
+export type FleetReviewPin = { view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 
@@ -20,19 +22,24 @@ export function fleetSavedReviewModel(review: SavedReview): ReviewWorkbenchModel
     approvalReason: "Read-only saved result. Approval and integration into the original project's main are not available here.",
   });
 }
-function ReviewContent({ initial }: { initial: ReviewWorkbenchModel }) {
+function ReviewContent({ initial, pin, editable }: { initial: ReviewWorkbenchModel; pin: FleetReviewPin; editable: boolean }) {
   const t = useTranslation();
-  const [model, setModel] = useState(initial);
-  useEffect(() => setModel(previous => reconcileReviewWorkbenchProjection(previous, initial)), [initial]);
+  const model = useMemo(() => ({ ...initial,
+    selectedChangeId: initial.changes.some(change => change.id === pin.view?.review_object) ? pin.view!.review_object! : initial.selectedChangeId,
+    mode: pin.view?.review_mode ?? initial.mode, diffLayout: pin.view?.review_layout ?? initial.diffLayout,
+  }), [initial, pin.view]);
   return <ArtifactReview model={{ ...model, workspaceName: t(model.workspaceName), versionLabel: t(model.versionLabel), approvalReason: t(model.approvalReason) }} controls={{ countLabel: `${model.changes.length} ${t("changes in this saved review")}`, overflowLabel: null,
     canSetupApproval: false, setupApprovalLabel: t("Approval unavailable"), setupApprovalReason: t(model.approvalReason),
     canRecordReview: false, recordReviewLabel: t("Review already recorded"), recordReviewReason: t("This panel shows an existing immutable review."), earlierReviews: [] }}
     onIntent={intent => {
       // Local presentation only. This panel never routes mutation, approval or export intents.
-      if (["select-change", "change-mode", "change-diff-layout"].includes(intent.type)) setModel(previous => reduceReviewWorkbench(previous, intent));
+      if (editable && ["select-change", "change-mode", "change-diff-layout"].includes(intent.type)) {
+        const next = reduceReviewWorkbench(model, intent);
+        send({ type: "review-view", pin: pin.key, object: next.selectedChangeId, mode: next.mode, layout: next.diffLayout });
+      }
     }} />;
 }
-export function FleetReviewPanel({ pin }: { pin: FleetReviewPin }) {
+export function FleetReviewPanel({ pin, editable = true }: { pin: FleetReviewPin; editable?: boolean }) {
   const t = useTranslation();
   const model = useMemo(() => {
     if (!pin.review?.content_complete || pin.review.bundle_changes.length === 0) return null;
@@ -41,12 +48,13 @@ export function FleetReviewPanel({ pin }: { pin: FleetReviewPin }) {
   const empty = pin.review?.content_complete && pin.review.bundle_changes.length === 0
     && pin.review.bundle_changes_not_listed === 0 && pin.review.subject_operations_not_listed === 0 && pin.review.unavailable_code === null;
   return <article className="grid min-w-0 gap-3 rounded-lg border border-border p-3" aria-label={`${t("Pinned fleet review")} ${pin.key}`} data-mesh-fleet-review={pin.key}>
-    <div className="flex items-start justify-between gap-2"><h4 dir="auto" className="whitespace-pre-wrap break-words font-semibold">{pin.goal}</h4>
-      <Button variant="secondary" onClick={() => send({ type: "close-review", pin: pin.key })}>{t("Close review")} <bdi dir="ltr">{pin.key}</bdi></Button></div>
+    <div className="flex items-start justify-between gap-2"><h4 dir="auto" className="whitespace-pre-wrap break-words font-semibold">{pin.goal ?? t("Saved lane review")}</h4>
+      <Button variant="secondary" disabled={!editable} onClick={() => send({ type: "close-review", pin: pin.key })}>{t("Close review")} <bdi dir="ltr">{pin.key}</bdi></Button></div>
     <p className="text-xs text-muted-foreground">{t("Comparison base: the recorded review uses its original lane review base. Use the starting-version comparison below to inspect what this lane changed.")}</p>
     <details className="break-all text-xs"><summary>{t("Exact saved selection and base")}</summary><p>{t("Fleet")}: <bdi dir="ltr">{pin.selection.objective}</bdi></p><p>{t("Lane")}: <bdi dir="ltr">{pin.selection.lane}</bdi></p><p>{t("Checkpoint")}: <bdi dir="ltr">{pin.selection.checkpoint}</bdi></p><p>{t("Saved operation")}: <bdi dir="ltr">{pin.selection.version}</bdi></p><p>{t("Review")}: <bdi dir="ltr">{pin.selection.bundle}</bdi></p>
       <p>{t("Recorded base head")}: {pin.review?.reviewed_head ? <bdi dir="ltr">{pin.review.reviewed_head}</bdi> : t("Unavailable")}</p><p>{t("Lane starting input")}: <bdi dir="ltr">{pin.startingInput}</bdi></p></details>
-    <FleetInputComparison pin={pin.key} input={pin.input} />
+    {pin.view?.input_object && !pin.input?.file && <p className="break-all text-xs">{t("Saved changed-object selection")}: <bdi dir="ltr">{pin.view.input_object}</bdi>. {t("Content must be verified before display.")}</p>}
+    <FleetInputComparison pin={pin.key} input={pin.input} layout={pin.view?.input_layout} editable={editable} />
     <details><summary className="font-semibold">{t("Recorded review against its original review base")}</summary>
     {pin.loading && <p role="status" className="text-sm">{t("Reading the exact saved result\u2026")}</p>}
     {pin.error && <p role="alert" className="text-sm">{t(pin.error)} {t("Any content below is the previously verified cached result.")}</p>}
@@ -54,17 +62,23 @@ export function FleetReviewPanel({ pin }: { pin: FleetReviewPin }) {
     {pin.review && !pin.review.content_complete && <p role="alert" className="text-sm">{t("This review is incomplete or unavailable.")} {pin.review.bundle_changes_not_listed} {t("changes and")} {pin.review.subject_operations_not_listed} {t("operations are not listed. No complete comparison is shown.")}</p>}
     {pin.review?.content_complete && !model && !empty && <p role="alert" className="text-sm">{t("The saved comparison could not be safely displayed. Its exact selection is retained.")}</p>}
     {empty && <p className="text-sm">{t("No file changes in this recorded comparison.")}</p>}
-    {model && <ReviewContent initial={model} />}
+    {model && pin.view?.review_object && !model.changes.some(change => change.id === pin.view?.review_object) && <p role="status">{t("The saved file selection is unavailable in this review. Showing the first available change; the saved selection is retained.")}</p>}
+    {model && <ReviewContent initial={model} pin={pin} editable={editable} />}
     </details>
   </article>;
 }
-export function FleetReviewPanels({ pins, notice }: { pins: FleetReviewPin[]; notice: string }) {
+export function FleetReviewPanels({ pins, notice, persistence }: { pins: FleetReviewPin[]; notice: string; persistence?: FleetReviewPersistence }) {
   const t = useTranslation();
-  if (pins.length === 0 && !notice) return null;
+  if (pins.length === 0 && !notice && (!persistence || persistence.phase === "session")) return null;
   return <section className="grid gap-3" aria-label={t("Pinned fleet reviews")}><h3 className="text-lg font-semibold">{t("Pinned fleet reviews")} · {pins.length} / 8</h3>
     {notice && <p role="status" className="text-sm">{t(notice)}</p>}
-    <p className="text-xs text-muted-foreground">{t("Panels keep independent file selections and comparison layouts while agents continue working. Pins currently stay in this app view; they are not restored after an app reload.")}</p>
-    <div className="grid items-start gap-4 xl:grid-cols-2">{pins.map(pin => <FleetReviewPanel key={pin.key} pin={pin} />)}</div>
+    <p className="text-xs text-muted-foreground">{t("Saved selections contain no file content. Reopening rechecks exact history; unavailable lanes remain listed and never restart agents.")}</p>
+    {persistence && <div className="grid gap-2 text-sm" role="status">
+      <p>{t(persistence.phase === "loading" ? "Loading saved review selections…" : persistence.phase === "saving" ? "Saving review selections…" : persistence.phase === "saved" ? "Review selections saved." : persistence.phase === "session" ? "Review selections have not loaded yet." : persistence.message)}</p>
+      {persistence.phase === "error" && <Button variant="secondary" disabled={persistence.busy} onClick={() => send({ type: "retry-saved-reviews" })}>{t("Retry saving or loading review selections")}</Button>}
+      {["saved", "error"].includes(persistence.phase) && <><Button variant="quiet" disabled={persistence.busy} onClick={() => send({ type: "reload-saved-reviews" })}>{t("Reload saved review set")}</Button><p className="text-xs text-muted-foreground">{t("Reload replaces local selections with the saved set, including any unsaved local choices.")}</p></>}
+    </div>}
+    <div className="grid items-start gap-4 xl:grid-cols-2">{pins.map(pin => <FleetReviewPanel key={pin.key} pin={pin} editable={persistence?.editable ?? true} />)}</div>
   </section>;
 }
 export function FleetSavedResults({ objective, lane, queue, available }: { objective: string; lane: string; queue?: FleetReviewQueue; available: boolean }) {
