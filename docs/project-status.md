@@ -278,8 +278,8 @@ panels, including page/object selections and comparison layouts. Content is reve
 history; unavailable pins remain visible. Serial writes preserve closes during pending saves, lost
 acknowledgements require explicit retry, and conflicting saved sets require explicit reload. Tests cover
 late content after reload, independent activity refresh, initial-load refusal, selector-only writes and
-failed-save recovery. Full app restart restores selectors but cannot yet reopen native lane contexts,
-so restored content access and packaged graphical proof remain open.
+failed-save recovery. Full app restart content access is implemented by the history-only increment below; packaged graphical
+proof remains open.
 
 The canonical selector-restoration transfer preserves localized persistence controls and literal saved
 identities/user goals. Its added rendered regression detects the unlocalized source; local type/build,
@@ -292,5 +292,23 @@ New fleet allocations now durably bind the exact local initial import to their s
 no oldest-version inference or history rewrite is performed. Canonical encoding and runtime replay
 tests cover compatibility and refusal to replace an existing binding, while native allocation tests
 check that the recorded local identity matches the actual verified import. This removes the in-memory
-only starting-point limitation for newly allocated lanes. History-only context reopening after restart
-is still unfinished; neither worker recovery nor original-main integration is added by this change.
+only starting-point limitation for newly allocated lanes. The following increment adds history-only
+reopening after restart; worker recovery and original-main integration remain separate work.
+
+
+Native history-only reopening now connects retained fleet reviews after restart to desktop lists and
+pins, including when the original source project is offline. The reader verifies exact recorded
+selection and allocation identity, uses a transient index and preserves pending edits without installing
+checkpoint timers or execution contexts. Tests cover recorded reviews, starting-version comparisons,
+artifact bytes, original work preservation, absent/linked journals, replaced directories and unavailable
+execution credentials. Read-only storage refuses missing-directory creation and corrupt-chunk quarantine;
+physical ancestry is rechecked so ancestor aliases cannot conceal a move outside the lane. Restored owners can review results but still cannot start or stop agents.
+New allocations provide durable starting-version evidence; legacy bindings cannot infer that comparison
+base. Source and renderer tests do not establish the still-unverified packaged graphical restart journey,
+worker recovery, full artifact presentation or original-main integration.
+
+The canonical history-reopening transfer preserves English/Hebrew review controls and literal lane
+identities. Local type/build, 137 interface and 524 desktop tests pass; rendered regressions reject the
+old restored-review restriction. Added native assertions require reopened history to refuse mismatched
+checkpoint/version/bundle selections without changing retained bytes. Native/full and packaged proof
+are tracked separately. All migration increments remain unmerged pending required review.

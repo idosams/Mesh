@@ -1624,6 +1624,50 @@ mod tests {
     }
 
     #[test]
+    fn history_reopen_preserves_pending_work_that_normal_reopen_would_reconcile() {
+        use crate::workspace::OpenWorkspace;
+        let root = scratch("history-only-reopen");
+        let initialized = OpenWorkspace::open(&root).unwrap();
+        let installation = initialized.installation();
+        let (device, inode) = initialized.pinned_root().identity().unwrap();
+        let parent = crate::ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{device:016x}:{inode:016x}"
+        ))
+        .unwrap();
+        drop(initialized);
+        let mut intent = ManagedMutationIntent::begin_create_file(
+            &root,
+            "notes.txt",
+            digest(1),
+            b"pending draft",
+        )
+        .unwrap();
+        fs::write(root.join("notes.txt"), b"pending draft").unwrap();
+        intent.bind_created(&root.join("notes.txt")).unwrap();
+        let marker = fs::read(intent.marker()).unwrap();
+        let history = OpenWorkspace::reopen_history(
+            &root,
+            &installation,
+            parent,
+            &crate::TrustedReviewers::default(),
+        )
+        .unwrap();
+        assert_eq!(fs::read(root.join("notes.txt")).unwrap(), b"pending draft");
+        assert_eq!(fs::read(intent.marker()).unwrap(), marker);
+        drop(history);
+        drop(
+            OpenWorkspace::reopen_with_trusted_reviewers(
+                &root,
+                &crate::TrustedReviewers::default(),
+            )
+            .unwrap(),
+        );
+        assert!(!root.join("notes.txt").exists());
+        assert!(!intent.marker().exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn create_file_rolls_back_without_journal_and_completes_with_journal() {
         let root = scratch("create-file");
         let mut intent =

@@ -90,7 +90,7 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
             <p className="font-medium">{t(lane.parent ? "Worker lane" : "Coordinator lane")} · <bdi dir="ltr">{lane.provider}</bdi></p><p dir="auto" className="whitespace-pre-wrap break-words">{lane.goal}</p>
             <p>{lane.run ? <>{!worker && <>{t("Last saved state")}: </>}{t(states[lane.run.state])}</> : t(!current ? "Saved lane · recovery required" : lane.allocated ? "Waiting to start" : "Allocation needs attention")}</p>
             {worker && <p className="text-xs">{age(worker.observedAt, t)} · {worker.activity ? <bdi dir="ltr">{worker.activity}</bdi> : t("No activity reported")} · {worker.events} {t("events")}</p>}
-            <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && current} />
+            <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable"} />
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
           </li>;
         })}</ul>

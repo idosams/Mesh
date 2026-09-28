@@ -528,9 +528,30 @@ fn attached_fleet_roots_delegate_from_saved_bytes_and_replay_project_correlation
         fs::read(f.source.join("work.txt")).unwrap(),
         b"saved input\nongoing source edits\nstill open\n"
     );
+    let retained_state = restarted.native_state().unwrap();
+    assert_eq!(
+        restarted
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        comparison
+    );
+    assert_eq!(
+        restarted
+            .saved_starting_comparison(&selection, None, Some(object))
+            .unwrap(),
+        detail
+    );
+    assert_eq!(restarted.native_state().unwrap(), retained_state);
     assert!(restarted
-        .saved_starting_comparison(&selection, None, None)
+        .agent_call(signed.transport_value(), "context", &Json::empty_object())
         .is_err());
+    assert!(restarted
+        .grant(&lane, "run", "restarted-actor", "restarted-session")
+        .is_err());
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"saved input\nongoing source edits\nstill open\n"
+    );
 }
 
 #[test]

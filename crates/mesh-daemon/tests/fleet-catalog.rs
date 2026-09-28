@@ -308,3 +308,95 @@ fn maximum_encoded_goal_remains_readable_after_restart() {
         "restored-unattached"
     );
 }
+
+struct HistorySigner(SigningKey);
+impl mesh_daemon::fleet::service::CheckpointSigner for HistorySigner {
+    fn public_key(&self) -> mesh_types::PublicKey {
+        mesh_types::PublicKey::from_bytes(self.0.verifying_key().to_bytes())
+    }
+    fn sign(&self, payload: &mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String> {
+        Ok(mesh_types::Signature::from_bytes(
+            self.0.sign(payload.as_bytes()).to_bytes(),
+        ))
+    }
+}
+#[test]
+fn history_discovery_reopens_attached_results_offline_without_execution_or_reallocation() {
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    let f = Fixture::new("history-offline");
+    let catalog = f.open().unwrap();
+    let service = catalog.create_attached(&f.history, &f.request).unwrap();
+    let objective = service.objective().unwrap();
+    let state = service.native_state().unwrap();
+    let lane = state.lanes.keys().next().unwrap().clone();
+    let working = PathBuf::from(state.lanes[&lane].workspace.as_ref().unwrap().root());
+    service
+        .native_command(
+            "dispatch",
+            Command::Dispatch {
+                lane: lane.clone(),
+                run: "saved-run".into(),
+            },
+        )
+        .unwrap();
+    let credential = service
+        .grant_with_signer(
+            &lane,
+            "saved-run",
+            "saved-session",
+            std::sync::Arc::new(HistorySigner(SigningKey::from_bytes(&[63; 32]))),
+        )
+        .unwrap();
+    fs::write(working.join("work.txt"), "saved agent result\n").unwrap();
+    let saved = service
+        .agent_call(
+            credential.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("save"))]),
+        )
+        .unwrap();
+    let reviewed = service
+        .agent_call(
+            credential.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        text(&reviewed, "bundle"),
+    )
+    .unwrap();
+    let expected = service.saved_review(&selection).unwrap();
+    let input = service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    let page = service.saved_reviews(&lane, None).unwrap();
+    fs::write(working.join("work.txt"), "unsaved work survives\n").unwrap();
+    drop(service);
+    drop(catalog);
+    fs::rename(&f.source, f.root.join("offline-original")).unwrap();
+    let restored = f.open().unwrap();
+    // A pinned review may load before the overview performs discovery.
+    let history = restored.history(&objective).unwrap();
+    let before = restored.snapshot().unwrap();
+    assert_eq!(history.saved_reviews(&lane, None).unwrap(), page);
+    assert_eq!(history.saved_review(&selection).unwrap(), expected);
+    assert_eq!(
+        history
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        input
+    );
+    assert_eq!(restored.snapshot().unwrap(), before);
+    assert!(restored.current_service(&objective).is_err());
+    assert_eq!(text(&rows(&before)[0], "ownership"), "restored-unattached");
+    assert_eq!(
+        fs::read(working.join("work.txt")).unwrap(),
+        b"unsaved work survives\n"
+    );
+    assert_eq!(fs::read_dir(&f.catalog).unwrap().count(), 1);
+    assert!(restored.history("unknown").is_err());
+}

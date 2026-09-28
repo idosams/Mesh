@@ -1667,3 +1667,281 @@ fn starting_comparison_pages_changes_and_bounds_selected_content() {
         b"immutable input\n"
     );
 }
+
+#[test]
+fn restarted_history_reads_preserve_work_and_never_restore_execution_authority() {
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    fn files(root: &std::path::Path) -> BTreeMap<PathBuf, Vec<u8>> {
+        fn visit(
+            root: &std::path::Path,
+            path: &std::path::Path,
+            result: &mut BTreeMap<PathBuf, Vec<u8>>,
+        ) {
+            for entry in fs::read_dir(path).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let kind = entry.file_type().unwrap();
+                if kind.is_dir() {
+                    visit(root, &path, result);
+                } else if kind.is_file() {
+                    result.insert(
+                        path.strip_prefix(root).unwrap().into(),
+                        fs::read(&path).unwrap(),
+                    );
+                } else {
+                    panic!("unexpected fixture entry");
+                }
+            }
+        }
+        let mut result = BTreeMap::new();
+        visit(root, root, &mut result);
+        result
+    }
+    let mut f = Fixture::new("history-restart");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "history-session",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x51; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    fs::write(root.join("note.txt"), "saved result\n").unwrap();
+    let saved = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("saved"))]),
+        )
+        .unwrap();
+    let review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &f.lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        text(&review, "bundle"),
+    )
+    .unwrap();
+    let frozen = f.service.saved_review(&selection).unwrap();
+    let comparison = f
+        .service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    let object = text(
+        &comparison
+            .get("input")
+            .unwrap()
+            .get("comparison")
+            .unwrap()
+            .get("changes")
+            .unwrap()
+            .as_array()
+            .unwrap()[0],
+        "object",
+    )
+    .to_owned();
+    let detail = f
+        .service
+        .saved_starting_comparison(&selection, None, Some(&object))
+        .unwrap();
+    let artifact = f
+        .service
+        .saved_review_artifact(&selection, &object, "after")
+        .unwrap();
+    fs::write(root.join("note.txt"), "uncheckpointed editor work\n").unwrap();
+    let state = f.service.native_state().unwrap();
+    // Drop the original registry and lane service; the new host receives only durable history.
+    f.desktop = Arc::new(LiveDaemon::new(StartupSummary::from(&nothing_to_recover())));
+    let parameters = CheckpointRuntimeParameters {
+        idle_interval: Some(Duration::from_millis(10)),
+        maximum_uncheckpointed_bytes: Some(65_536),
+        maximum_uncheckpointed_interval: Some(Duration::from_secs(60)),
+    };
+    f.service = Arc::new(
+        FleetService::new(
+            Runtime::open(
+                FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+                "objective",
+            )
+            .unwrap(),
+            Arc::new(
+                NativeLaneAllocator::open(
+                    &f.path.join("allocations"),
+                    TrustedReviewers::default(),
+                    parameters,
+                    vec![],
+                )
+                .unwrap(),
+            ),
+            BTreeSet::from(["codex".into()]),
+        )
+        .unwrap(),
+    );
+    fs::rename(
+        f.path.join("source.mesh"),
+        f.path.join("offline-source.mesh"),
+    )
+    .unwrap();
+    let before = files(&f.path.join("allocations"));
+    // Restored history must preserve the exact recorded tuple, just like a current context.
+    for (checkpoint, version, bundle) in [
+        (
+            text(&saved, "checkpoint"),
+            text(&saved, "version"),
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        ),
+        (
+            "unknown-checkpoint",
+            text(&saved, "version"),
+            text(&review, "bundle"),
+        ),
+        (
+            text(&saved, "checkpoint"),
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            text(&review, "bundle"),
+        ),
+    ] {
+        let wrong = SavedReviewSelection::new(&f.lane, checkpoint, version, bundle).unwrap();
+        assert!(f.service.saved_review(&wrong).is_err());
+        assert!(f
+            .service
+            .saved_starting_comparison(&wrong, None, None)
+            .is_err());
+        assert!(f
+            .service
+            .saved_review_artifact(&wrong, &object, "after")
+            .is_err());
+    }
+    assert_eq!(files(&f.path.join("allocations")), before);
+    assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
+    assert_eq!(
+        f.service
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        comparison
+    );
+    assert_eq!(
+        f.service
+            .saved_starting_comparison(&selection, None, Some(&object))
+            .unwrap(),
+        detail
+    );
+    assert_eq!(
+        f.service
+            .saved_review_artifact(&selection, &object, "after")
+            .unwrap(),
+        artifact
+    );
+    assert_eq!(f.service.native_state().unwrap(), state);
+    assert_eq!(files(&f.path.join("allocations")), before);
+    let allocation = f.path.join("allocations");
+    let index = allocation.join(
+        before
+            .keys()
+            .find(|path| {
+                path.file_name() == Some(std::ffi::OsStr::new(mesh_store::DATABASE_FILE_NAME))
+            })
+            .unwrap(),
+    );
+    let retained_index = f.path.join("retained-index");
+    fs::rename(&index, &retained_index).unwrap();
+    assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
+    assert!(
+        !index.exists(),
+        "history inspection must not rebuild the durable index"
+    );
+    fs::rename(&retained_index, &index).unwrap();
+    let journal = allocation.join(
+        before
+            .keys()
+            .find(|path| {
+                path.file_name() == Some(std::ffi::OsStr::new(mesh_daemon::RECORD_FILE_NAME))
+            })
+            .unwrap(),
+    );
+    let retained_journal = f.path.join("retained-journal");
+    fs::rename(&journal, &retained_journal).unwrap();
+    assert!(f.service.saved_review(&selection).is_err());
+    assert!(!journal.exists(), "missing history must not be recreated");
+    std::os::unix::fs::symlink(&retained_journal, &journal).unwrap();
+    assert!(f.service.saved_review(&selection).is_err());
+    fs::remove_file(&journal).unwrap();
+    fs::rename(&retained_journal, &journal).unwrap();
+    assert_eq!(files(&allocation), before);
+    let storage = journal.parent().unwrap();
+    let scratch = storage.join("scratch");
+    let retained_scratch = f.path.join("retained-scratch");
+    fs::rename(&scratch, &retained_scratch).unwrap();
+    assert!(f.service.saved_review(&selection).is_err());
+    assert!(
+        !scratch.exists(),
+        "inspection cannot recreate CAS directories"
+    );
+    fs::rename(&retained_scratch, &scratch).unwrap();
+    let chunk = before
+        .iter()
+        .find(|(path, bytes)| {
+            path.components().any(|part| part.as_os_str() == "chunks")
+                && bytes.as_slice() == b"saved result\n"
+        })
+        .map(|(path, _)| allocation.join(path))
+        .unwrap();
+    let saved_chunk = fs::read(&chunk).unwrap();
+    fs::write(&chunk, b"corrupt retained bytes").unwrap();
+    let corrupt = files(&allocation);
+    assert!(f
+        .service
+        .saved_review_artifact(&selection, &object, "after")
+        .is_err());
+    assert_eq!(
+        files(&allocation),
+        corrupt,
+        "read errors must not quarantine retained chunks"
+    );
+    fs::write(&chunk, saved_chunk).unwrap();
+    assert_eq!(
+        f.service
+            .saved_review_artifact(&selection, &object, "after")
+            .unwrap(),
+        artifact
+    );
+
+    assert!(f
+        .service
+        .agent_call(
+            f.credential.transport_value(),
+            "context",
+            &Json::empty_object()
+        )
+        .is_err());
+    assert!(f
+        .service
+        .grant(&f.lane, "root-run", "new-actor", "new-session")
+        .is_err());
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"uncheckpointed editor work\n"
+    );
+    let retained = root.with_file_name("retained-history");
+    fs::rename(&root, &retained).unwrap();
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("note.txt"), "replacement").unwrap();
+    assert!(f.service.saved_review(&selection).is_err());
+    assert!(f
+        .service
+        .saved_starting_comparison(&selection, None, None)
+        .is_err());
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+    fs::remove_dir_all(&root).unwrap();
+    fs::rename(&retained, &root).unwrap();
+    assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
+}

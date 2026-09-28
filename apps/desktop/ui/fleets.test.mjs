@@ -179,3 +179,20 @@ test('saved-result reads and closing panels remain independent of an active flee
   assert.equal(commands.filter(command => command === 'inspect_fleet_saved_review').length, 1);
   h.dispose();
 });
+
+test('restored fleets expose saved result reads while execution stays unavailable', async () => {
+  const value = catalogue(); value.fleets[0].ownership = 'restored-unattached'; const calls = [];
+  const h = harness(async command => {
+    calls.push(command);
+    if (command === 'attached_fleets') return value;
+    if (command === 'fleet_activity') return activity();
+    if (command === 'load_fleet_pins') return savedPins();
+    if (command === 'fleet_saved_reviews') return { schema: 'mesh.fleet-saved-reviews/v1', objective, lane, revision: 1, after: null, total: 0, next_after: null, order: 'checkpoint-id', reviews: [] };
+    throw new Error(`Unexpected command ${command}`);
+  });
+  await settle(); h.intent({ type: 'reviews', objective, lane }); await settle();
+  assert.equal(h.projections.at(-1).reviewQueues[`${objective}/${lane}`].page.total, 0);
+  h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); await settle();
+  assert.deepEqual(calls.sort(), ['attached_fleets', 'fleet_activity', 'fleet_saved_reviews', 'load_fleet_pins'].sort());
+  h.dispose();
+});

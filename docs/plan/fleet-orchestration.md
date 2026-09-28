@@ -382,6 +382,14 @@ context recovery, artifacts, original-main integration and packaged graphical pr
 
 Restart review prerequisite: new native allocations persist their verified source/local-import binding
 as `bind-workspace-v2`. Existing command bytes remain valid and carry no inferred local starting point.
-The next recovery boundary must validate retained directory and installation identity, open historical
-content without recovering working files or checkpoint timers, and keep restored lanes unavailable for
+The history-only boundary below validates retained directory and installation identity, opens historical
+content without recovering working files or checkpoint timers, and keeps restored lanes unavailable for
 execution. Persistence of the binding alone does not satisfy the restart review exit criterion.
+
+
+History-only restart access now reconstructs exact saved fleet reviews through native allocation and
+installation checks without restoring execution contexts. The desktop admits result lists and pinned
+reads for retained owners while start/stop remain unavailable. Pending work and durable lane files stay
+unchanged during inspection, and missing history is not initialized. Native and renderer tests cover
+these boundaries; packaged graphical restart proof, worker recovery and original-main integration remain
+phase exit requirements. Legacy bindings expose recorded reviews but cannot guess a starting-version base.

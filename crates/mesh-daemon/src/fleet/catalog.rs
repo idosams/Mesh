@@ -385,6 +385,24 @@ impl NativeFleetDirectory {
         Ok(entry.service.clone())
     }
 
+    /// Discover saved history without granting a current-session execution service.
+    pub fn history(&self, objective: &str) -> io::Result<super::service::FleetHistory> {
+        self.owner.check()?;
+        if !self
+            .fleets
+            .lock()
+            .map_err(|_| unavailable())?
+            .contains_key(objective)
+        {
+            self.snapshot()?;
+        }
+        let held = self.fleets.lock().map_err(|_| unavailable())?;
+        let entry = held.get(objective).ok_or_else(unavailable)?;
+        entry.service.native_state().map_err(|_| unavailable())?;
+        self.owner.check()?;
+        Ok(super::service::FleetHistory(entry.service.clone()))
+    }
+
     /// Recover bounded saved facts without requiring source projects online or launching workers.
     /// Unreadable/incomplete entries stay visible; restored lanes have no adopted live context.
     pub fn snapshot(&self) -> io::Result<Json> {

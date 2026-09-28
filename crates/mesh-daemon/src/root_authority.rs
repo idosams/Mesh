@@ -171,6 +171,7 @@ impl PinnedWorkspaceRoot {
         PinnedRootFs {
             namespace: self.namespace.clone(),
             directory: Arc::clone(&self.directory),
+            read_only: false,
         }
     }
 
@@ -327,17 +328,36 @@ impl PinnedWorkspaceRoot {
 pub(crate) struct PinnedRootFs {
     namespace: PathBuf,
     directory: Arc<File>,
+    read_only: bool,
 }
 
 impl PartialEq for PinnedRootFs {
     fn eq(&self, other: &Self) -> bool {
-        self.namespace == other.namespace && Arc::ptr_eq(&self.directory, &other.directory)
+        self.namespace == other.namespace
+            && self.read_only == other.read_only
+            && Arc::ptr_eq(&self.directory, &other.directory)
     }
 }
 
 impl Eq for PinnedRootFs {}
 
 impl PinnedRootFs {
+    pub(crate) fn read_only(mut self) -> Self {
+        self.read_only = true;
+        self
+    }
+
+    fn require_writable(&self) -> io::Result<()> {
+        if self.read_only {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "history filesystem is read only",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     fn relative(&self, path: &Path) -> io::Result<Vec<OsString>> {
         let path = if path.is_absolute() {
             path.strip_prefix(&self.namespace).map_err(|_| {
@@ -386,18 +406,32 @@ impl PinnedRootFs {
     }
 
     fn open_append_create(&self, path: &Path) -> io::Result<File> {
+        self.require_writable()?;
         let (parent, leaf) = self.parent_and_leaf(path)?;
         openat(&parent, &leaf, APPEND_CREATE_FLAGS, 0o600)
     }
 
     fn open_append_existing(&self, path: &Path) -> io::Result<File> {
+        self.require_writable()?;
         let (parent, leaf) = self.parent_and_leaf(path)?;
         openat(&parent, &leaf, APPEND_EXISTING_FLAGS, 0)
     }
 
     pub(crate) fn read_file(&self, path: &Path) -> io::Result<File> {
         let (parent, leaf) = self.parent_and_leaf(path)?;
-        openat(&parent, &leaf, OPEN_READ_FLAGS, 0)
+        let flags = if self.read_only {
+            OPEN_INSPECT_FLAGS
+        } else {
+            OPEN_READ_FLAGS
+        };
+        let file = openat(&parent, &leaf, flags, 0)?;
+        if self.read_only && !file.metadata()?.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "history requires a regular file",
+            ));
+        }
+        Ok(file)
     }
 
     /// Open one final entry without following any path component and without blocking on a FIFO.
@@ -484,6 +518,7 @@ impl PinnedRootFs {
         write: impl FnOnce(&mut File) -> io::Result<()>,
     ) -> io::Result<()> {
         let (parent, leaf) = self.parent_and_leaf(path)?;
+        self.require_writable()?;
         let mut file = openat(&parent, &leaf, CREATE_NEW_FLAGS, 0o600)?;
         write(&mut file)?;
         file.set_permissions(permissions)?;
@@ -495,6 +530,10 @@ impl PinnedRootFs {
 impl DurableFs for PinnedRootFs {
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         let components = self.relative(path)?;
+        if self.read_only {
+            self.open_directory_components(&components)?;
+            return Ok(());
+        }
         let mut directory = self.directory.try_clone()?;
         for component in components {
             match mkdirat(&directory, &component) {
@@ -508,6 +547,7 @@ impl DurableFs for PinnedRootFs {
     }
 
     fn stage(&self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        self.require_writable()?;
         let (parent, leaf) = self.parent_and_leaf(path)?;
         let mut file = openat(&parent, &leaf, CREATE_NEW_FLAGS, 0o600)?;
         file.write_all(bytes)
@@ -518,16 +558,19 @@ impl DurableFs for PinnedRootFs {
     }
 
     fn sync_file(&self, path: &Path) -> io::Result<()> {
+        self.require_writable()?;
         let (parent, leaf) = self.parent_and_leaf(path)?;
         openat(&parent, &leaf, OPEN_WRITE_FLAGS, 0)?.sync_all()
     }
 
     fn sync_dir(&self, path: &Path) -> io::Result<()> {
+        self.require_writable()?;
         let components = self.relative(path)?;
         self.open_directory_components(&components)?.sync_all()
     }
 
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
+        self.require_writable()?;
         let (from_parent, from_leaf) = self.parent_and_leaf(from)?;
         let (to_parent, to_leaf) = self.parent_and_leaf(to)?;
         renameat(&from_parent, &from_leaf, &to_parent, &to_leaf)
@@ -548,6 +591,7 @@ impl DurableFs for PinnedRootFs {
     }
 
     fn remove_file(&self, path: &Path) -> io::Result<()> {
+        self.require_writable()?;
         let (parent, leaf) = self.parent_and_leaf(path)?;
         unlinkat(&parent, &leaf)
     }
@@ -781,6 +825,39 @@ mod tests {
                 std::fs::copy(entry.path(), target).expect("copy file");
             }
         }
+    }
+
+    #[test]
+    fn read_only_filesystem_preserves_missing_names_and_refuses_every_write_entrypoint() {
+        use std::fs;
+        let root = scratch("read-only");
+        let pinned = PinnedWorkspaceRoot::open(root.clone()).unwrap();
+        fs::create_dir(root.join("existing")).unwrap();
+        fs::write(root.join("saved"), b"saved").unwrap();
+        let filesystem = pinned.filesystem().read_only();
+        assert_eq!(filesystem.read(Path::new("saved")).unwrap(), b"saved");
+        filesystem.create_dir_all(Path::new("existing")).unwrap();
+        assert!(filesystem.create_dir_all(Path::new("missing")).is_err());
+        assert!(filesystem.stage(Path::new("staged"), b"new").is_err());
+        assert!(filesystem.append(Path::new("saved"), b"new").is_err());
+        assert!(filesystem.open_append_existing(Path::new("saved")).is_err());
+        assert!(filesystem
+            .rename(Path::new("saved"), Path::new("moved"))
+            .is_err());
+        assert!(filesystem.remove_file(Path::new("saved")).is_err());
+        assert!(filesystem
+            .write_new_file(
+                Path::new("new"),
+                b"new",
+                fs::metadata(root.join("saved")).unwrap().permissions()
+            )
+            .is_err());
+        assert!(filesystem.sync_file(Path::new("saved")).is_err());
+        assert!(filesystem.sync_dir(Path::new("existing")).is_err());
+        assert!(filesystem.read(Path::new("existing")).is_err());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 2);
+        assert_eq!(fs::read(root.join("saved")).unwrap(), b"saved");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

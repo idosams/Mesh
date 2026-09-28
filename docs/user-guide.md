@@ -299,11 +299,10 @@ restart, inspect retained fleet state before creating another request; pending-i
 renderer reload is not implemented. Restored fleets cannot restart workers automatically. Worker
 recovery and integration into the original project's main remain unavailable in this view. Existing project history, manual lanes and their comparisons remain independently usable.
 
-Saved fleet results remain independent of newer agent edits and desktop navigation. They remain
-readable after cancellation or session revocation while their native lane context is attached.
-Missing or replaced contexts refuse; restored-context access follows separately.
+Saved fleet results remain independent of newer agent edits and desktop navigation, including after
+cancellation or session revocation. Missing or replaced history refuses without changing working files.
 
-For a current-session fleet lane, choose **Show saved results**, then **Pin saved review**. Up to eight
+For an available fleet lane, including retained fleets after restart, choose **Show saved results**, then **Pin saved review**. Up to eight
 panels can remain open while fleet activity refreshes and agents keep working. Each panel keeps an
 exact checkpoint/version/review selection and independent file and comparison-layout controls.
 Result pages stay fixed until refreshed; they are ordered by checkpoint identifier, not creation time.
@@ -325,6 +324,9 @@ and omitted changes are labeled explicitly. Exact pin selections, selected objec
 layouts are saved outside the project. Reopening the view reloads those selections and rechecks content
 through native history. Failed saves retain local selections and expose retry or explicit reload;
 reloading replaces local choices with the saved set. Unavailable history keeps its pin visible.
-After a full app restart, restored fleet contexts are still unavailable: selections reopen, but their
-content cannot yet be read. Reopening never starts workers. The complete packaged graphical interaction
-remains unverified.
+After a full app restart, saved results are reverified through retained native history, including when
+the original project is offline. Inspection preserves uncheckpointed work and does not restart workers.
+Starting-version comparison after restart requires the starting identity recorded by newer allocations;
+older allocations can still expose their recorded review, but Mesh does not guess a starting version.
+Missing or replaced history remains unavailable without being recreated. The complete packaged graphical
+interaction remains unverified.

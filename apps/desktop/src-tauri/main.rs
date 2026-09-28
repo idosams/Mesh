@@ -808,7 +808,7 @@ mod desktop {
     ) -> Result<String, String> {
         let host = Arc::clone(host.inner());
         tauri::async_runtime::spawn_blocking(move || {
-            host.current_fleet(&objective)?
+            host.fleet_history(&objective)?
                 .saved_reviews(&lane, after.as_deref())
                 .map(|value| value.encode())
                 .map_err(|_| "Saved fleet results are unavailable".into())
@@ -835,7 +835,7 @@ mod desktop {
                 &bundle,
             )
             .map_err(|_| "Saved review selection is invalid")?;
-            host.current_fleet(&objective)?
+            host.fleet_history(&objective)?
                 .saved_review(&selection)
                 .map(|value| value.encode())
                 .map_err(|_| "The exact saved review is unavailable".into())
@@ -866,7 +866,7 @@ mod desktop {
                 &bundle,
             )
             .map_err(|_| "Saved review selection is invalid")?;
-            host.current_fleet(&objective)?
+            host.fleet_history(&objective)?
                 .saved_starting_comparison(&selection, after.as_deref(), selected.as_deref())
                 .map(|value| value.encode())
                 .map_err(|_| "The exact starting-version comparison is unavailable".into())

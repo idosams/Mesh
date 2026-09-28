@@ -69,7 +69,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   let sources = { projects: [], histories: {}, error: '' };
   function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot() } })); }
   const reviews = createFleetReviews({ invoke, changed: publish, laneFor: (objective, lane) =>
-    fleets.find(fleet => fleet.objective === objective && fleet.ownership === 'current-host')?.lanes.find(value => value.id === lane) });
+    fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
   const plan = () => {
     if (timer !== null) cancel(timer);
     timer = visible && !disposed ? schedule(() => { timer = null; void refresh(); }, 2000) : null;

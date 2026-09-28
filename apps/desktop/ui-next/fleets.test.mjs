@@ -108,3 +108,28 @@ test('unconfirmed provisioning freezes new input and exposes exact input and exp
     }
   }
 });
+
+test('restored history can be reviewed while start and stop remain disabled', () => {
+  const value = props(); value.projection.available = true; value.projection.fleets[0].ownership = 'restored-unattached';
+  let html = render(value);
+  assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>Show saved results<\/button>/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Start agents<\/button>/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Stop agents<\/button>/);
+  value.projection.fleets[0].ownership = 'unavailable'; html = render(value);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Show saved results<\/button>/);
+});
+
+
+test('Hebrew restored history remains reviewable while execution controls stay disabled', () => {
+  const value = props(); value.projection.available = true; value.projection.fleets[0].ownership = 'restored-unattached';
+  module.exports.setLocale('he');
+  try {
+    let html = render(value);
+    assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>הצגת תוצאות שמורות<\/button>/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>הפעלת סוכנים<\/button>/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>עצירת סוכנים<\/button>/);
+    assert.ok(html.includes('<bdi dir="ltr">fleet-one</bdi>'));
+    value.projection.fleets[0].ownership = 'unavailable'; html = render(value);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>הצגת תוצאות שמורות<\/button>/);
+  } finally { module.exports.setLocale('en'); }
+});

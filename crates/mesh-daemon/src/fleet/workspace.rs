@@ -27,6 +27,40 @@ pub struct VersionInput {
     pub version: RecordDigest,
 }
 
+/// Retained native history with no live daemon, credentials, checkpoint timers or execution custody.
+/// Only the native allocator can construct this read context.
+pub struct LaneHistory {
+    pub(super) open: crate::workspace::OpenWorkspace,
+    pub(super) parents: Vec<crate::root_authority::PinnedWorkspaceRoot>,
+    pub(super) allocation: crate::ProtectedWorkspaceRoot,
+}
+impl LaneHistory {
+    pub(super) fn verify(&self) -> Result<(), Unavailable> {
+        for parent in &self.parents {
+            parent.ensure_namespace_identity().map_err(|_| {
+                Unavailable::new(
+                    "fleet-history-root-changed",
+                    "The retained lane directory changed.",
+                )
+            })?;
+        }
+        for root in [self.open.pinned_root(), self.open.storage_pinned_root()] {
+            if !root.is_within(self.allocation).unwrap_or(false) {
+                return Err(Unavailable::new(
+                    "fleet-history-root-changed",
+                    "The retained history left its allocated lane.",
+                ));
+            }
+        }
+        self.open.ensure_physical_root().map_err(|_| {
+            Unavailable::new(
+                "fleet-history-root-changed",
+                "The retained lane directory changed.",
+            )
+        })
+    }
+}
+
 /// A lane's independent service instance and the native receipt describing its allocation.
 ///
 /// Allocation does not launch a process or acquire agent custody. The scheduler must do those
@@ -206,11 +240,6 @@ impl LaneWorkspace {
         })
     }
 
-    /// Exact local import version verified against the requested immutable source at allocation.
-    pub(super) fn starting_version(&self) -> Option<RecordDigest> {
-        self.binding.starting_version()
-    }
-
     /// Verified allocation identity to commit before any dispatch intent.
     pub fn binding(&self) -> &super::WorkspaceBinding {
         &self.binding
@@ -239,6 +268,47 @@ mod attachment_tests {
     use crate::root_authority::PinnedWorkspaceRoot;
     use ed25519_dalek::{Signer as _, SigningKey};
     use std::{fs, time::Duration};
+
+    #[test]
+    fn retained_history_refuses_ancestor_alias_after_directory_leaves_its_lane() {
+        use crate::workspace::OpenWorkspace;
+        let root =
+            std::env::temp_dir().join(format!("mesh-history-ancestor-{}", std::process::id()));
+        let lane = root.join("lane");
+        let wrapper = lane.join("wrapper");
+        let working = wrapper.join("working");
+        fs::create_dir_all(&working).unwrap();
+        let initialized = OpenWorkspace::open(&working).unwrap();
+        let installation = initialized.installation();
+        drop(initialized);
+        let pinned = PinnedWorkspaceRoot::open(lane.clone()).unwrap();
+        let (device, inode) = pinned.identity().unwrap();
+        let allocation = crate::ProtectedWorkspaceRoot::from_directory_token(&format!(
+            "{device:016x}:{inode:016x}"
+        ))
+        .unwrap();
+        let history = LaneHistory {
+            open: OpenWorkspace::reopen_history(
+                &working,
+                &installation,
+                allocation,
+                &TrustedReviewers::default(),
+            )
+            .unwrap(),
+            parents: vec![pinned],
+            allocation,
+        };
+        history.verify().unwrap();
+        let outside = root.join("outside");
+        fs::rename(&wrapper, &outside).unwrap();
+        std::os::unix::fs::symlink(&outside, &wrapper).unwrap();
+        assert!(
+            history.open.ensure_physical_root().is_ok(),
+            "final directory identities alone do not prove retained ancestry"
+        );
+        assert!(history.verify().is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn changed_staging_is_preserved_but_never_admitted_as_the_saved_input() {

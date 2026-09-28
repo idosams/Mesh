@@ -11,7 +11,7 @@ use std::io::Read as _;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use super::workspace::{LaneWorkspace, VersionInput};
+use super::workspace::{LaneHistory, LaneWorkspace, VersionInput};
 use super::{Command, Lane, RunState, Runtime};
 use crate::ipc::{Json, Unavailable, WorkspaceSummary};
 use crate::{CheckpointRuntimeParameters, ProtectedWorkspaceRoot, TrustedReviewers};
@@ -24,6 +24,14 @@ pub use crate::CheckpointSigner;
 pub trait LaneAllocator: Send + Sync {
     /// Create a folder for a service-generated lane identity and verified immutable source.
     fn allocate(&self, lane: &str, input: &VersionInput) -> Result<LaneWorkspace, Unavailable>;
+    /// Open verified retained history without attaching an execution context.
+    fn reopen_history(
+        &self,
+        _lane: &str,
+        _binding: &super::WorkspaceBinding,
+    ) -> Result<LaneHistory, Unavailable> {
+        Err(refusal("fleet-history-reopen-unsupported"))
+    }
     /// Native-only attached source allocation. Custom allocators must opt in explicitly.
     fn allocate_attached(
         &self,
@@ -78,6 +86,47 @@ impl NativeLaneAllocator {
     }
 }
 impl LaneAllocator for NativeLaneAllocator {
+    fn reopen_history(
+        &self,
+        lane: &str,
+        binding: &super::WorkspaceBinding,
+    ) -> Result<LaneHistory, Unavailable> {
+        if !lane.starts_with("lane-")
+            || lane.len() != 69
+            || !lane[5..].bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err(refusal("fleet-allocation-identity"));
+        }
+        self.root
+            .ensure_namespace_identity()
+            .map_err(|_| refusal("fleet-root-unavailable"))?;
+        let child = self
+            .root
+            .open_child_directory(std::ffi::OsStr::new(lane))
+            .map_err(|_| refusal("fleet-lane-unavailable"))?;
+        let path = Path::new(binding.root());
+        let (device, inode) = child
+            .identity()
+            .map_err(|_| refusal("fleet-lane-unavailable"))?;
+        let parent =
+            ProtectedWorkspaceRoot::from_directory_token(&format!("{device:016x}:{inode:016x}"))
+                .map_err(|_| refusal("fleet-lane-unavailable"))?;
+        let open = crate::workspace::OpenWorkspace::reopen_history(
+            path,
+            binding.installation(),
+            parent,
+            &self.reviewers,
+        )
+        .map_err(|_| refusal("fleet-history-unavailable"))?;
+        let history = LaneHistory {
+            open,
+            parents: vec![self.root.clone(), child],
+            allocation: parent,
+        };
+        history.verify()?;
+        Ok(history)
+    }
+
     fn allocate_attached(
         &self,
         lane: &str,
@@ -232,6 +281,38 @@ impl SavedReviewSelection {
             ("version", Json::text(self.version.to_string())),
             ("bundle", Json::text(self.bundle.to_string())),
         ])
+    }
+}
+
+/// Saved-result access without methods for execution, custody or workspace adoption.
+#[derive(Clone)]
+pub struct FleetHistory(pub(crate) Arc<FleetService>);
+impl FleetHistory {
+    /// List durable saved-result identities.
+    pub fn saved_reviews(&self, lane: &str, after: Option<&str>) -> Result<Json, Unavailable> {
+        self.0.saved_reviews(lane, after)
+    }
+    /// Inspect one exact recorded result.
+    pub fn saved_review(&self, selection: &SavedReviewSelection) -> Result<Json, Unavailable> {
+        self.0.saved_review(selection)
+    }
+    /// Compare a result with its verified local starting version.
+    pub fn saved_starting_comparison(
+        &self,
+        selection: &SavedReviewSelection,
+        after: Option<&str>,
+        selected: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        self.0.saved_starting_comparison(selection, after, selected)
+    }
+    /// Read verified historical bytes for a selected artifact side.
+    pub fn saved_review_artifact(
+        &self,
+        selection: &SavedReviewSelection,
+        object: &str,
+        side: &str,
+    ) -> Result<crate::ReviewArtifact, Unavailable> {
+        self.0.saved_review_artifact(selection, object, side)
     }
 }
 
@@ -949,13 +1030,9 @@ impl FleetService {
 
     /// Verify the immutable review for one saved checkpoint without navigating or reading live files.
     pub fn saved_review(&self, selection: &SavedReviewSelection) -> Result<Json, Unavailable> {
-        let review = self.with_saved_review(selection, |workspace| {
-            workspace.daemon().recorded_lane_review(
-                workspace.binding().root(),
-                workspace.binding().installation(),
-                selection.bundle,
-                selection.version,
-            )
+        let review = self.with_saved_review(selection, |open, _binding| {
+            open.recorded_review_item(selection.bundle)
+                .ok_or_else(|| refusal("fleet-review-unavailable"))
         })?;
         Ok(Json::object([
             ("schema", Json::text("mesh.fleet-saved-review/v1")),
@@ -973,22 +1050,20 @@ impl FleetService {
         after: Option<&str>,
         selected: Option<&str>,
     ) -> Result<Json, Unavailable> {
-        let comparison = self.with_saved_review(selection, |workspace| {
-            let comparison = workspace.daemon().recorded_lane_starting_comparison(
-                workspace.binding().root(),
-                workspace.binding().installation(),
-                selection.bundle,
-                selection.version,
-                workspace
+        let comparison = self.with_saved_review(selection, |open, binding| {
+            let comparison = super::comparison::compare(
+                open,
+                binding
                     .starting_version()
                     .ok_or_else(|| refusal("fleet-starting-version-unbound"))?,
+                selection.version,
                 after,
                 selected,
             )?;
             Ok(Json::object([
                 (
                     "source_version",
-                    Json::text(workspace.binding().source_version.to_string()),
+                    Json::text(binding.source_version.to_string()),
                 ),
                 ("comparison", comparison),
             ]))
@@ -1009,34 +1084,75 @@ impl FleetService {
         object: &str,
         side: &str,
     ) -> Result<crate::ReviewArtifact, Unavailable> {
-        self.with_saved_review(selection, |workspace| {
-            workspace.daemon().recorded_lane_artifact(
-                workspace.binding().root(),
-                workspace.binding().installation(),
-                selection.bundle,
-                selection.version,
-                object,
-                side,
-            )
+        let object = mesh_materializer::ObjectId::parse(object)
+            .map_err(|_| refusal("fleet-review-object-invalid"))?;
+        let side = match side {
+            "before" => crate::workspace::ReviewArtifactSide::Before,
+            "after" => crate::workspace::ReviewArtifactSide::After,
+            _ => return Err(refusal("fleet-review-side-invalid")),
+        };
+        self.with_saved_review(selection, |open, _binding| {
+            let artifact = open
+                .verified_review_artifact(selection.bundle, selection.version, object, side)
+                .map_err(|_| refusal("fleet-review-artifact-unavailable"))?;
+            Ok(crate::ReviewArtifact::from_verified(artifact))
         })
     }
 
     fn with_saved_review<T>(
         &self,
         selection: &SavedReviewSelection,
-        read: impl FnOnce(&LaneWorkspace) -> Result<T, Unavailable>,
+        read: impl FnOnce(
+            &crate::workspace::OpenWorkspace,
+            &super::WorkspaceBinding,
+        ) -> Result<T, Unavailable>,
     ) -> Result<T, Unavailable> {
-        let workspace = {
+        let (binding, workspace) = {
             let mut inner = self.lock()?;
             inner.runtime.refresh().map_err(runtime_error)?;
-            saved_review_workspace(&inner, selection)?
+            let binding = saved_review_binding(&inner, selection)?.clone();
+            let workspace = inner.workspaces.get(&selection.lane).cloned();
+            if workspace
+                .as_ref()
+                .is_some_and(|workspace| workspace.binding() != &binding)
+            {
+                return Err(refusal("fleet-review-workspace-changed"));
+            }
+            (binding, workspace)
         };
-        // Do not hold the fleet-wide lock while reconstructing artifacts; other lanes keep working.
-        let result = read(&workspace)?;
+        // History reads do not hold the fleet lock or insert a recovered execution context.
+        let result = if let Some(workspace) = &workspace {
+            workspace.daemon().with_recorded_lane_review(
+                binding.root(),
+                binding.installation(),
+                selection.bundle,
+                selection.version,
+                |open| read(open, &binding),
+            )?
+        } else {
+            let history = self.allocator.reopen_history(&selection.lane, &binding)?;
+            history.verify()?;
+            history
+                .open
+                .review(&selection.bundle)
+                .filter(|review| {
+                    review.subject_operation == selection.version
+                        && review.bundle == selection.bundle
+                })
+                .ok_or_else(|| refusal("fleet-review-not-recorded"))?;
+            let result = read(&history.open, &binding)?;
+            history.verify()?;
+            result
+        };
         let mut inner = self.lock()?;
         inner.runtime.refresh().map_err(runtime_error)?;
-        let current = saved_review_workspace(&inner, selection)?;
-        if !Arc::ptr_eq(&workspace, &current) {
+        if saved_review_binding(&inner, selection)? != &binding
+            || match (&workspace, inner.workspaces.get(&selection.lane)) {
+                (Some(before), Some(after)) => !Arc::ptr_eq(before, after),
+                (None, None) => false,
+                _ => true,
+            }
+        {
             return Err(refusal("fleet-review-workspace-changed"));
         }
         Ok(result)
@@ -1113,10 +1229,10 @@ impl FleetService {
     }
 }
 
-fn saved_review_workspace(
-    inner: &Inner,
+fn saved_review_binding<'a>(
+    inner: &'a Inner,
     selection: &SavedReviewSelection,
-) -> Result<Arc<LaneWorkspace>, Unavailable> {
+) -> Result<&'a super::WorkspaceBinding, Unavailable> {
     let checkpoint = inner
         .runtime
         .state()
@@ -1131,21 +1247,13 @@ fn saved_review_workspace(
                     .is_some_and(|result| result.complete && result.version == selection.version)
         })
         .ok_or_else(|| refusal("fleet-review-selection-mismatch"))?;
-    let workspace = inner
-        .workspaces
-        .get(&checkpoint.lane)
-        .ok_or_else(|| refusal("fleet-lane-needs-reattachment"))?;
-    if inner
+    inner
         .runtime
         .state()
         .lanes
         .get(&checkpoint.lane)
         .and_then(|lane| lane.workspace.as_ref())
-        != Some(workspace.binding())
-    {
-        return Err(refusal("fleet-review-workspace-changed"));
-    }
-    Ok(workspace.clone())
+        .ok_or_else(|| refusal("fleet-lane-needs-reattachment"))
 }
 
 fn review_summary(checkpoint: &str, version: RecordDigest, bundle: RecordDigest) -> Json {

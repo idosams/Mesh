@@ -297,6 +297,15 @@ pub struct ReviewArtifact {
 }
 
 impl ReviewArtifact {
+    pub(crate) fn from_verified(artifact: crate::workspace::VerifiedReviewArtifact) -> Self {
+        Self {
+            path: artifact.path,
+            version: artifact.version,
+            digest: artifact.digest,
+            bytes: artifact.bytes,
+        }
+    }
+
     /// Reviewed relative path, used only to select a closed artifact family and file suffix.
     #[must_use]
     pub fn path(&self) -> &str {
@@ -3457,86 +3466,7 @@ impl LiveDaemon {
         })
     }
 
-    /// Read only a durable review through native lane identity. The mutable working fold is not
-    /// approval input here: newer private saves cannot retarget this immutable review selection.
-    pub(crate) fn recorded_lane_review(
-        &self,
-        root: &str,
-        installation: &str,
-        bundle: RecordDigest,
-        target: RecordDigest,
-    ) -> Result<crate::ipc::Json, Unavailable> {
-        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
-            open.recorded_review_item(bundle).ok_or_else(|| {
-                publication_refusal(
-                    "fleet-review-unavailable",
-                    "The exact saved lane review is unavailable.",
-                )
-            })
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn recorded_lane_starting_comparison(
-        &self,
-        root: &str,
-        installation: &str,
-        bundle: RecordDigest,
-        target: RecordDigest,
-        base: RecordDigest,
-        after: Option<&str>,
-        selected: Option<&str>,
-    ) -> Result<crate::ipc::Json, Unavailable> {
-        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
-            crate::fleet::comparison::compare(open, base, target, after, selected)
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn recorded_lane_artifact(
-        &self,
-        root: &str,
-        installation: &str,
-        bundle: RecordDigest,
-        target: RecordDigest,
-        object: &str,
-        side: &str,
-    ) -> Result<ReviewArtifact, Unavailable> {
-        let object = ObjectId::parse(object).map_err(|_| {
-            publication_refusal(
-                "fleet-review-object-invalid",
-                "The saved review object is invalid.",
-            )
-        })?;
-        let side = match side {
-            "before" => ReviewArtifactSide::Before,
-            "after" => ReviewArtifactSide::After,
-            _ => {
-                return Err(publication_refusal(
-                    "fleet-review-side-invalid",
-                    "The saved review side is invalid.",
-                ))
-            }
-        };
-        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
-            let artifact = open
-                .verified_review_artifact(bundle, target, object, side)
-                .map_err(|_| {
-                    publication_refusal(
-                        "fleet-review-artifact-unavailable",
-                        "The exact saved lane artifact could not be verified.",
-                    )
-                })?;
-            Ok(ReviewArtifact {
-                path: artifact.path,
-                version: artifact.version,
-                digest: artifact.digest,
-                bytes: artifact.bytes,
-            })
-        })
-    }
-
-    fn with_recorded_lane_review<T>(
+    pub(crate) fn with_recorded_lane_review<T>(
         &self,
         root: &str,
         installation: &str,

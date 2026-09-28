@@ -292,8 +292,8 @@ or reinterpret the publication bundle's base. Object identity preserves move/rep
 pages are ordered by object ID, and selected text is bounded and content-verified.
 
 This increment changes no durable events or workspace encoding. The retained base belongs to the
-current native context. Restored unattached fleets still refuse reads; recovery must re-establish the
-verified source-to-local-import binding rather than guess from a current or oldest visible version.
+current native context. Restart reads use the history-only boundary described below and the durable
+source-to-local-import binding; legacy records never infer it from a current or oldest visible version.
 The comparison is read-only and is not an approval statement or dependency-closure proof.
 
 
@@ -308,7 +308,7 @@ At most eight distinct exact objective/lane/checkpoint/version/bundle selections
 original input identity, object cursors/selections and closed layout choices. No source path, file
 content, prompt, credential or approval is stored. Syntactically valid selectors may refer to offline
 or unavailable work: native history must reverify them before displaying content, and restoring them
-must not provision contexts, adopt workers or restart execution.
+must not provision execution contexts, adopt workers or restart execution.
 
 Native reads/writes hold the existing catalogue lock. Saves require the current revision, stage a
 private create-only file, publish atomically and acknowledge only after file/directory durability and
@@ -332,3 +332,29 @@ requires retaining a compatible binary for fleets containing v2 bindings; ordina
 attachment pin formats are unchanged. Wire tests cover both encodings and replay tests cover the
 immutable binding. This change persists evidence only: it does not reopen lane contexts, recover
 workers, acquire execution custody or establish that a starting version remains available.
+
+
+## History-only restart access
+
+Saved-result readers can reconstruct an unavailable live context through the native allocator without
+inserting that context into execution state. A separate `FleetHistory` interface exposes only saved
+result lists, exact review projections, starting-version comparisons and verified artifact bytes.
+The catalogue discovers retained fleets lazily for pinned reads. `current_service` still refuses
+restored owners; history access never grants credentials, starts workers or clears uncertain runs.
+
+The allocator pins the admitted lane directory and validates both working and private-store physical
+identities against the durable installation before opening history. Both directories must remain
+inside that lane's native allocation. History opens an existing journal only, builds a transient index,
+and skips managed-file reconciliation and checkpoint-runtime installation. Its payload filesystem
+refuses writes, directory creation and corruption quarantine; absent directories and corrupt bytes
+remain untouched. Journal access uses a read-only regular-file descriptor. Reads check the exact
+recorded checkpoint/review/version, physical directories and durable binding before returning. Descriptor ancestry is rechecked after the read, so an ancestor
+alias cannot conceal a directory moved outside its allocated lane. Existing
+live readers retain their context and use the same immutable selection contract. No fleet-wide lock is
+held while reconstructing saved content.
+
+Tests cover fresh-host reads with the source offline, unchanged uncheckpointed files and native state,
+no writes to retained lane files, missing indexes without durable rebuilding, missing/linked journals
+without recreation, replaced roots, revoked old credentials, refused new grants and pending mutations
+left untouched. This is history access, not process recovery, execution adoption or main integration.
+The packaged graphical restart journey remains required.

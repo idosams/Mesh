@@ -315,6 +315,27 @@ impl AttachmentHost {
         })
     }
 
+    /// Saved history access is independent of execution ownership after restart.
+    pub fn fleet_history(
+        &self,
+        objective: &str,
+    ) -> Result<mesh_daemon::fleet::service::FleetHistory, String> {
+        #[cfg(target_os = "macos")]
+        {
+            self.with_fleets(false, |directory| {
+                directory
+                    .ok_or("Fleet history is unavailable")?
+                    .history(objective)
+                    .map_err(|_| "Fleet history could not be verified".into())
+            })
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = objective;
+            Err("Native fleet history is unavailable on this platform".into())
+        }
+    }
+
     pub fn fleets(&self) -> Result<String, String> {
         #[cfg(target_os = "macos")]
         {

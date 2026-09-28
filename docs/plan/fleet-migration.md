@@ -789,3 +789,31 @@ not native runtime evidence. Native/failing-before/full validation remains queue
 History-only context reopening follows separately, before artifacts/correspondence/integration/recovery.
 Required human review, complete provider/four-worker/remote and packaged acceptance, eventual merges
 and final combined-main testing remain part of completion.
+
+## R02b reopen retained fleet history without execution adoption
+
+Preserved source `ce73d00a2a762eb514d47fbb429e79673157e3e3` transfers on published #56 at
+`e05637926fb11b7d7da48fd4a253e298f6b75d28`. A separate saved-history interface discovers retained
+fleets and reconstructs exact lane reviews, starting comparisons and artifact bytes without inserting
+live execution contexts. Native allocation/root/store identities and retained ancestry are checked
+before and after reads. Existing journals open read-only, indexes remain transient and payload access
+refuses mutation or quarantine. Missing history stays missing; pending working-file recovery is skipped.
+The desktop can list/pin retained results while start/stop remain unavailable for restored owners.
+
+The canonical adaptation preserves localized controls, literal identities and all prior native fixes.
+Added English/Hebrew render checks reject the old current-owner-only review restriction, then pass
+after byte-exact restoration. The added native refusal assertions exercise wrong checkpoint, version
+and bundle tuples against the reopened-history path for review, comparison and artifact reads, while
+requiring unchanged retained bytes. Source tests cover offline originals, preserved unsaved work,
+missing durable indexes, missing/linked journals, unavailable CAS directories, corrupt chunks without
+quarantine, replaced roots, ancestor substitution, denied credentials/grants and pending mutation
+preservation. Current-context readers retain the same exact immutable selection contract.
+
+Local type/build, 137 interface tests and 524 desktop tests pass. Docs, vocabulary, Rust formatting and
+diff checks pass. Native/failing-before/full execution remains queued behind the preserved #44 gate;
+this increment requires its own hosted checks. Parent #55 passed all seven checks: Linux 3,006/macOS
+3,217, four separate macOS renderer tests, 44 daemon checks and all 658 desktop/interface tests. Parent
+#56 checks are still running. Full graphical restart acceptance, worker recovery, artifact presentation,
+correspondence, original-main integration and remaining recovery increments are separate obligations.
+Required named human review, second-provider/four-worker/remote acceptance, eventual merges and final
+combined-main testing remain required. Original work and running verification are preserved.

@@ -1066,6 +1066,13 @@ pub struct OpenWorkspace {
     names_answered: bool,
 }
 
+#[derive(Clone, Copy)]
+enum WorkspaceOpenRecovery {
+    WorkingFiles,
+    MetadataOnly,
+    HistoryOnly,
+}
+
 impl OpenWorkspace {
     /// Maximum review cards returned in one workspace-state response.
     const MAX_REVIEW_ITEMS: usize = 32;
@@ -1196,6 +1203,43 @@ impl OpenWorkspace {
         Self::open_layout(root, None, trusted_reviewers, false)
     }
 
+    /// Reconstruct retained history with an ephemeral index and no working-file recovery.
+    /// The expected installation is checked before opening journal or payload storage.
+    pub(crate) fn reopen_history(
+        root: &Path,
+        expected_installation: &str,
+        parent: crate::ProtectedWorkspaceRoot,
+        trusted: &crate::TrustedReviewers,
+    ) -> Result<Self, OpenFailure> {
+        let pinned =
+            PinnedWorkspaceRoot::open(root.to_path_buf()).map_err(OpenFailure::Unreachable)?;
+        let storage_path = workspace_storage_root(root).map_err(OpenFailure::Unreachable)?;
+        let storage =
+            PinnedWorkspaceRoot::open(storage_path.clone()).map_err(OpenFailure::Unreachable)?;
+        let installation = workspace_installation(
+            pinned.identity().map_err(OpenFailure::Unreachable)?,
+            storage.identity().map_err(OpenFailure::Unreachable)?,
+        );
+        if installation != expected_installation
+            || !pinned.is_within(parent).map_err(OpenFailure::Unreachable)?
+            || !storage
+                .is_within(parent)
+                .map_err(OpenFailure::Unreachable)?
+        {
+            return Err(OpenFailure::Unreachable(io::Error::other(
+                "saved lane installation changed",
+            )));
+        }
+        Self::open_layout_inner(
+            root,
+            Some(&storage_path),
+            trusted,
+            false,
+            Some((pinned, storage)),
+            WorkspaceOpenRecovery::HistoryOnly,
+        )
+    }
+
     /// Open a newly prepared workspace through directory descriptors already held by its creator.
     ///
     /// Folder import uses this path between copy verification and receipt publication. Reopening
@@ -1214,7 +1258,7 @@ impl OpenWorkspace {
             trusted_reviewers,
             true,
             Some((pinned_root, storage_pinned_root)),
-            true,
+            WorkspaceOpenRecovery::WorkingFiles,
         )
     }
 
@@ -1230,7 +1274,7 @@ impl OpenWorkspace {
             trusted_reviewers,
             create_missing,
             None,
-            true,
+            WorkspaceOpenRecovery::WorkingFiles,
         )
     }
 
@@ -1261,7 +1305,7 @@ impl OpenWorkspace {
             trusted,
             create_missing,
             Some((pinned.clone(), pinned)),
-            false,
+            WorkspaceOpenRecovery::MetadataOnly,
         )
     }
 
@@ -1271,7 +1315,7 @@ impl OpenWorkspace {
         trusted_reviewers: &crate::TrustedReviewers,
         create_missing: bool,
         prepared: Option<(PinnedWorkspaceRoot, PinnedWorkspaceRoot)>,
-        recover_working_files: bool,
+        recovery: WorkspaceOpenRecovery,
     ) -> Result<Self, OpenFailure> {
         let started = Instant::now();
         if create_missing && prepared.is_none() {
@@ -1392,6 +1436,15 @@ impl OpenWorkspace {
         })?;
         let mut file = if create_missing {
             RecordFile::open_pinned(&storage_pinned_root, record_relative, record_file.clone())
+        } else if matches!(recovery, WorkspaceOpenRecovery::HistoryOnly) {
+            storage_pinned_root
+                .filesystem()
+                .read_only()
+                .read_file(record_relative)
+                .map(|file| RecordFile {
+                    path: record_file.clone(),
+                    file,
+                })
         } else {
             RecordFile::open_existing_pinned(
                 &storage_pinned_root,
@@ -1440,11 +1493,14 @@ impl OpenWorkspace {
         let digest = index.default_digest();
         let record_index = index.clone();
 
-        let payload_store = Cas::<_, mesh_cas::Blake3>::with_filesystem(
-            storage_path,
-            storage_pinned_root.filesystem(),
-        )
-        .map_err(OpenFailure::PayloadStore)?;
+        let filesystem = storage_pinned_root.filesystem();
+        let filesystem = if matches!(recovery, WorkspaceOpenRecovery::HistoryOnly) {
+            filesystem.read_only()
+        } else {
+            filesystem
+        };
+        let payload_store = Cas::<_, mesh_cas::Blake3>::with_filesystem(storage_path, filesystem)
+            .map_err(OpenFailure::PayloadStore)?;
         let names = materialize_names(index, &payload_store);
         let private_version = version_state::fold(index);
         let shared_version = publication::fold(&records, &payload_store, trusted_reviewers);
@@ -1515,7 +1571,7 @@ impl OpenWorkspace {
         opened.shared_version = shared_version.version;
         opened.shared_history = shared_version.heads;
         opened.review_base_hints = shared_version.review_bases;
-        if recover_working_files {
+        if matches!(recovery, WorkspaceOpenRecovery::WorkingFiles) {
             match crate::managed_mutation::reconcile_pending_mutation(root, |id| {
                 opened.has_operation(id)
             }) {
