@@ -182,14 +182,29 @@ impl PinnedWorkspaceRoot {
     /// pathname is kept only for display and later namespace agreement checks; all writes can use
     /// the returned descriptor.
     pub(crate) fn create_child_directory(&self, name: &OsStr) -> io::Result<Self> {
-        if name.is_empty() || name.as_bytes().contains(&b'/') {
+        self.create_child_directory_with_mode(name, 0o700)
+    }
+
+    /// Allocate a new child with a requested ordinary mode. The kernel applies the process umask;
+    /// reading or changing that process-global mask would race unrelated user/agent work.
+    pub(crate) fn create_child_directory_with_mode(
+        &self,
+        name: &OsStr,
+        mode: u32,
+    ) -> io::Result<Self> {
+        if mode & !0o777 != 0
+            || name.is_empty()
+            || name == OsStr::new(".")
+            || name == OsStr::new("..")
+            || name.as_bytes().contains(&b'/')
+        {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "child directory name is not one ordinary component",
             ));
         }
         self.ensure_namespace_identity()?;
-        mkdirat(&self.directory, name)?;
+        mkdirat(&self.directory, name, mode)?;
         self.directory.sync_all()?;
         let directory = openat(&self.directory, name, OPEN_DIRECTORY_FLAGS, 0)?;
         if !directory.metadata()?.is_dir() {
@@ -551,7 +566,7 @@ impl DurableFs for PinnedRootFs {
         }
         let mut directory = self.directory.try_clone()?;
         for component in components {
-            match mkdirat(&directory, &component) {
+            match mkdirat(&directory, &component, 0o700) {
                 Ok(()) => directory.sync_all()?,
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
                 Err(error) => return Err(error),
@@ -749,14 +764,14 @@ fn openat(directory: &File, name: &OsStr, flags: i32, mode: i32) -> io::Result<F
 }
 
 #[allow(unsafe_code)]
-fn mkdirat(directory: &File, name: &OsStr) -> io::Result<()> {
+fn mkdirat(directory: &File, name: &OsStr, mode: u32) -> io::Result<()> {
     unsafe extern "C" {
         fn mkdirat(directory: i32, path: *const std::ffi::c_char, mode: NativeMode) -> i32;
     }
     let name = CString::new(name.as_bytes())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "name contains a NUL byte"))?;
     // SAFETY: `name` is a live C string and `directory` is an owned directory descriptor.
-    if unsafe { mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700 as NativeMode) } != 0 {
+    if unsafe { mkdirat(directory.as_raw_fd(), name.as_ptr(), mode as NativeMode) } != 0 {
         return Err(io::Error::last_os_error());
     }
     Ok(())
@@ -840,6 +855,63 @@ mod tests {
                 std::fs::copy(entry.path(), target).expect("copy file");
             }
         }
+    }
+
+    #[test]
+    fn directory_creation_is_create_only_confined_and_keeps_requested_mode_subject_to_umask() {
+        use std::os::unix::fs::DirBuilderExt as _;
+        let root = scratch("directory-modes");
+        let pinned = PinnedWorkspaceRoot::open(root.clone()).unwrap();
+        for (index, mode) in [0o700, 0o750, 0o777].into_iter().enumerate() {
+            let name = format!("stage-{index}");
+            let reference = root.join(format!("reference-{index}"));
+            std::fs::DirBuilder::new()
+                .mode(mode)
+                .create(&reference)
+                .unwrap();
+            let created = pinned
+                .create_child_directory_with_mode(OsStr::new(&name), mode)
+                .unwrap();
+            assert_eq!(
+                created
+                    .try_clone_directory()
+                    .unwrap()
+                    .metadata()
+                    .unwrap()
+                    .mode(),
+                std::fs::metadata(reference).unwrap().mode()
+            );
+            std::fs::write(root.join(&name).join("user-work"), b"preserve").unwrap();
+            assert!(pinned
+                .create_child_directory_with_mode(OsStr::new(&name), mode)
+                .is_err());
+            assert_eq!(
+                std::fs::read(root.join(&name).join("user-work")).unwrap(),
+                b"preserve"
+            );
+        }
+        let count = std::fs::read_dir(&root).unwrap().count();
+        for name in ["", ".", "..", "one/two", "/outside"] {
+            assert!(pinned
+                .create_child_directory_with_mode(OsStr::new(name), 0o777)
+                .is_err());
+        }
+        for mode in [0o1000, 0o2000, 0o4000, 0o40777, u32::MAX] {
+            assert!(pinned
+                .create_child_directory_with_mode(OsStr::new("invalid-mode"), mode)
+                .is_err());
+        }
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), count);
+        let moved = root.with_extension("moved");
+        std::fs::rename(&root, &moved).unwrap();
+        std::fs::create_dir(&root).unwrap();
+        assert!(pinned
+            .create_child_directory_with_mode(OsStr::new("redirected"), 0o777)
+            .is_err());
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+        assert!(!moved.join("redirected").exists());
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(moved).unwrap();
     }
 
     #[test]

@@ -1689,3 +1689,21 @@ remain readable with an explicit unavailable state. Local controller tests: 47
 pass; removing the proposal-digest guard makes the identity regression fail, and
 restoring it returns all 47 to passing. TypeScript/rendered verification is running;
 full native and packaged acceptance remain pending.
+
+## I04a confined directory creation foundation
+
+Partially transfers source `c711c6531220f61bfe5e9994f12df19c4450bd2c` onto
+PR #92 at `d2ea4b19edb588948b5b94e3ee363a0cceb0c536`: only
+`crates/mesh-daemon/src/root_authority.rs`. The remaining retained-tree primitive,
+metadata inheritance, directory executor, group integration, desktop confirmation,
+renderer and source documentation changes remain following increments.
+
+Pinned directory creation accepts only ordinary single-component names and modes.
+The kernel applies the existing process umask; Mesh neither reads nor changes that
+process-global setting. Existing private allocation remains mode 0700. New creation
+is create-only and validates pinned namespace identity. The transferred regression
+compares ordinary kernel-created directory modes, preserves existing child work,
+rejects traversal/special modes and refuses a replaced parent. Native focused,
+failing-before and full execution remain queued behind the preserved canonical
+run; structural checks are not runtime proof. No durable formats or public write
+commands change in this foundation.

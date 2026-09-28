@@ -747,3 +747,11 @@ records and unreliable evidence after restart. It validates proposal/member
 identity without replaying changes. This completes source transfer of that view,
 not full fleet acceptance: directory integration, large/binary confirmation, real
 providers, remote recovery and packaged graphical journeys remain required.
+
+### Directory integration delivery sequence
+
+The directory source increment is being transferred as confined directory creation,
+retained subtree staging/metadata, native group execution/recovery, then localized
+complete-tree confirmation and controls. Each increment has its own PR and source
+accounting. The first primitive does not establish working directory integration
+or packaged acceptance; those remain required outcomes of this sequence.

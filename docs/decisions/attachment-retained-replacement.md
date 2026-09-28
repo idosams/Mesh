@@ -614,3 +614,14 @@ message. No refresh or restart initiates a write. A reconciliation-required
 aggregate may still contain all observed members when its final check failed.
 Controller identity and no-mutation tests pass; rendered and packaged acceptance
 remain separate verification requirements.
+
+### Directory creation foundation
+
+Retained directory staging needs ordinary child directories with destination
+permissions subject to the existing process umask. The pinned-root primitive now
+accepts requested ordinary modes without modifying process-global settings. It
+rejects empty, dot, parent, multi-component and special-mode requests, refuses
+existing children and revalidates the pinned parent namespace. Existing private
+child creation retains its 0700 request. This primitive alone does not expose
+directory integration, approval, replay or deletion authority; the tree executor
+and end-to-end confirmation are separate increments. Runtime validation is pending.

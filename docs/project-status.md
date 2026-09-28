@@ -632,3 +632,11 @@ All 47 controller tests pass, including a demonstrated failing-before identity
 regression. TypeScript and rendered checks are running. Historical source results
 (3,290 Rust, 676 desktop, 14 Rust skips) do not validate this canonical revision.
 Full native and packaged graphical recovery proof remain outstanding.
+
+### Confined directory creation (unmerged foundation)
+
+The native pinned-parent helper can create ordinary child directories with kernel
+umask handling, create-only behavior and namespace checks. Existing private
+allocation behavior remains. Regressions for modes, preserved children, invalid
+names and replaced parents are transferred pending native execution. Directory
+integration and complete-tree native confirmation remain following increments.
