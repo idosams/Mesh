@@ -1604,3 +1604,15 @@ TypeScript passes. All three group rendering tests pass, including Hebrew litera
 disabled stale restoration. The new Hebrew assertion initially used different wording from the
 existing translation; it was corrected to the established label without changing the disabled-state
 assertion. Full desktop verification is running; native full and packaged acceptance remain pending.
+
+### PR #88 localization correction propagation
+
+The desktop gate in run `36444262284` exposed two stale localization
+expectations after group application and absent-path restoration were delivered.
+The correction from `e3472d8e7fe1c9e9f43a00d633e26efbfc97313e` (PR #90) is
+applied here without rewriting the original PR #88 commit or its active local
+verification tree. It updates the expected safety copy and checks the translated
+group action while retaining literal-identifier, inert-markup and disabled-action
+assertions. The corrected downstream desktop gate passed in run `36445006220`;
+this branch must independently pass its required checks before merge. PR #89 and
+#90 will reconcile this correction through ordinary history-preserving merges.
