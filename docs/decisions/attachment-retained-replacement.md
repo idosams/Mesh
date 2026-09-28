@@ -915,3 +915,20 @@ Existing desktop inspection commands reach this dispatch without accepting a
 renderer-supplied filesystem path. Older renderers can ignore the additive arrays;
 whole-entry presentation and actions require the following renderer increment.
 Discovery never provisions recovery storage, applies changes or advances main.
+
+## Typed whole-entry recovery controller
+
+The controller reads bounded whole-entry references separately from ordinary file
+restorations and validates source, retained and original observations. A restored
+root can be a file or directory; children must have an observed directory parent.
+A complete selected observation can offer native review, but cannot authorize a
+write. Prepared, unavailable or contradictory observations cannot request restoration.
+
+The dedicated `restore-entry` intent contains only project, exact transaction and
+optional group. Extra paths/content, unknown projects, detached sessions, stale
+inspection errors and unobserved selections refuse. The native result must retain
+the original entry, match project/group, and name a canonical new restoration record.
+The controller inspects that exact record after success. An uncertain response or
+inspection leaves a visible error, preserves prior observations and does not retry.
+Selecting the newly displaced record uses the same explicit native review for undo;
+it never invokes the ordinary retained-file command or approves Mesh main.

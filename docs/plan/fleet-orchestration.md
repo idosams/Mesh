@@ -811,3 +811,8 @@ Native restart discovery now includes bounded whole-entry references and exact
 validated inspection for direct and grouped recovery. The next increment connects
 localized recovery presentation and restoration/undo actions; this source work does
 not satisfy packaged restart or complete fleet acceptance by itself.
+
+Typed whole-entry recovery and dedicated native restoration/undo intents now exist
+in the desktop controller with English/Hebrew feedback. Visible controls, full
+desktop/native verification and packaged user acceptance remain the next steps.
+No recovery observation grants approval of Mesh main.

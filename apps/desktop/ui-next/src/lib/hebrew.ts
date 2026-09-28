@@ -742,4 +742,8 @@ export const hebrew: Readonly<Record<string, string>> = Object.freeze({
 "File to folder":"מקובץ לתיקייה",
 "The original entry and open handles remain in recovery. These observations never authorize replay, cleanup or automatic restoration.":"הפריט המקורי והידיות הפתוחות נשארים באזור השחזור. תצפיות אלו לעולם אינן מתירות ביצוע חוזר, ניקוי או שחזור אוטומטי.",
 "Retained entry":"הפריט שנשמר",
+"The retained entry was restored as a fresh copy. Original and displaced work remain in recovery; Mesh main is unchanged.":"הפריט שנשמר שוחזר כעותק חדש. העבודה המקורית והעבודה שהוחלפה נשארות באזור השחזור; הגרסה הראשית של Mesh לא השתנתה.",
+"Entry restoration needs reconciliation. Inspect recovery before continuing; retained work remains available.":"שחזור הפריט דורש בדיקה. יש לבדוק את אזור השחזור לפני שממשיכים; העבודה שנשמרה עדיין זמינה.",
+"Entry restoration or its inspection was not confirmed. Refresh recovery before retrying; working entries may have changed.":"שחזור הפריט או בדיקתו לא אושרו. יש לרענן את אזור השחזור לפני ניסיון נוסף; ייתכן שפריטי העבודה השתנו.",
+"Entry restoration was not confirmed or was cancelled. No automatic retry was attempted.":"שחזור הפריט לא אושר או בוטל. לא בוצע ניסיון חוזר אוטומטי.",
 });

@@ -1919,3 +1919,18 @@ both exact record types, unchanged Mesh history, bounded listing, and canonical
 names without valid receipts. Names remain references, not authority. Native
 execution and failing-before proof are pending behind #102's live full validation;
 renderer presentation and packaged acceptance still follow.
+
+## I07d whole-entry recovery controller
+
+New canonical implementation based on #105 at
+`1e17abc162c6d27f69c2589f49fe693a3207be7e`. Adds typed discovery, three-side
+restoration observations, dedicated native result validation and explicit
+restoration/undo intents without renderer filesystem authority. English/Hebrew
+feedback is included; visible controls follow separately.
+
+All 52 controller tests pass, including direct/grouped selection, missing receipts,
+invalid identities, forged authority, unobserved/prepared selection, stale errors,
+extra path injection and no automatic retry. Removing original-retention result
+validation makes its regression fail; restoring it returns all 52 to passing.
+Full desktop validation is pending, as is combined native validation still running
+on #102. Source/controller proof does not establish packaged restoration acceptance.

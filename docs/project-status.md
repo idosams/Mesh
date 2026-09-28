@@ -741,3 +741,12 @@ ordinary file restorations and inspect an exact selected record through its nati
 validator. Listings are bounded and do not treat names as trusted receipts. The
 existing desktop inspection commands use this path; renderer controls are still
 pending. Native regression execution and packaged restart evidence remain required.
+
+### Whole-entry restoration controller (unmerged increment)
+
+The desktop controller can validate whole-entry recovery, request exact native
+restoration and inspect the new transaction for explicit undo. It rejects injected
+paths, stale observations and wrong result identities, and never automatically
+retries uncertain operations. All 52 controller tests pass with a demonstrated
+failing-before result-validation regression. Localized visible controls and packaged
+end-to-end proof remain required.

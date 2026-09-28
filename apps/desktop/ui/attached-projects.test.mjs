@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, attachedGroupChange, attachedGroupRecovery, attachedLane, startAttachedProjects } from './attached-projects.js';
+import { attachedProjectList, attachedVersionPage, attachedEntries, attachedText, attachedComparison, attachedReview, attachedReviews, attachedMain, attachedApproval, attachedIntegration, attachedRecovery, attachedFileChange, attachedEntryChange, attachedGroupChange, attachedGroupRecovery, attachedLane, startAttachedProjects } from './attached-projects.js';
 class CustomEvent extends Event {
   constructor(type, init = {}) { super(type); this.detail = init.detail; }
 }
@@ -1188,4 +1188,111 @@ test('directory group observations retain complete bounded trees without offerin
   assert.equal(attachedGroupChange(outcome, id).members[0].transaction, tx);
   // Directory references never acquire the existing retained-file restoration path.
   assert.throws(() => attachedRecovery(recoveryReply(), id, tx, groupId));
+});
+
+const entryTx = `entry-restoration-${'d'.repeat(32)}`;
+const nextEntryTx = `entry-restoration-${'e'.repeat(32)}`;
+function entryRecoveryReply(tx = entryTx, group = null) {
+  const tree = { state: 'observed', tree: [{ path: '', kind: 'file', installation: 'original-object',
+    mode: 0o100600, metadata: 'a'.repeat(64), digest: 'b'.repeat(64), bytes: 4 }] };
+  return { schema: 'mesh.desktop-attachment-recovery/v1', project: id, ...(group === null ? {} : {group}), recovery: {
+    schema: 'mesh.attachment-entry-restoration-recovery/v1', project: id, transaction: tx, path: 'שם/work',
+    status: 'applied-arrangement', recorded_outcome: 'applied-observed', source: structuredClone(tree), stage: structuredClone(tree), origin: structuredClone(tree),
+    parent_identity_matches: true, parent_policy_matches: true, live_content_budget_remaining: 100,
+    observation_final: false, automatic_replay: false, write_authority: false, cleanup_authority: false,
+  } };
+}
+function entryChangeReply(group = null) {
+  return { schema: 'mesh.desktop-attachment-entry-change/v1', project: id, transaction: nextEntryTx, group,
+    outcome: {schema: 'mesh.attachment-entry-restoration-result/v1', proposal_digest: 'a'.repeat(64),
+      status: 'applied-observed', origin_entry_retained: true, displaced_entry_retained: true, observation_final: false} };
+}
+test('whole-entry observations bind exact references, preserve origin and never acquire file restoration', () => {
+  const parsed = attachedRecovery(entryRecoveryReply(), id, entryTx).entries[0];
+  assert.equal(parsed.operation, 'restore-entry');
+  assert.equal(parsed.entryRestorationReviewable, true);
+  assert.equal(parsed.retainedAvailable, false);
+  assert.equal(parsed.originTree.entries[0].kind, 'file');
+  for (const mutate of [
+    value => { value.recovery.transaction = nextEntryTx; },
+    value => { value.recovery.project = 'f'.repeat(64); },
+    value => { value.recovery.write_authority = true; },
+    value => { value.recovery.origin.tree[0].digest = null; },
+    value => { value.recovery.origin = undefined; },
+    value => { value.recovery.origin.tree.push({...value.recovery.origin.tree[0], path: 'child'}); },
+    value => { value.recovery.stage.state = 'absent'; },
+    value => { value.recovery.path = '../private'; },
+  ]) { const value = entryRecoveryReply(); mutate(value); assert.throws(() => attachedRecovery(value, id, entryTx)); }
+  for (const status of ['prepared-arrangement', 'incomplete-observation', 'source-parent-changed', 'invalid-outcome']) {
+    const value = entryRecoveryReply(); value.recovery.status = status;
+    assert.equal(attachedRecovery(value, id, entryTx).entries[0].entryRestorationReviewable, false);
+  }
+  const absent = entryRecoveryReply(); absent.recovery.stage = {state: 'absent', tree: null};
+  assert.equal(attachedRecovery(absent, id, entryTx).entries[0].entryRestorationReviewable, false);
+  assert.throws(() => attachedRecovery(entryRecoveryReply(), id, transaction));
+});
+test('whole-entry discovery references remain bounded and separate from ordinary restoration', () => {
+  const value = recoveryReply(); value.recovery.entry_references = [entryTx, `directory-${'c'.repeat(32)}`];
+  assert.deepEqual(attachedRecovery(value, id).entryReferences, value.recovery.entry_references);
+  for (const refs of [[entryTx, entryTx], ['../escape'], [transaction], Array.from({length: 32}, (_, i) => `entry-restoration-${i.toString(16).padStart(32, '0')}`)]) {
+    const changed = structuredClone(value); changed.recovery.entry_references = refs;
+    assert.throws(() => attachedRecovery(changed, id));
+  }
+  const group = groupRecoveryReply(); group.entry_restoration_references = [entryTx];
+  assert.deepEqual(attachedGroupRecovery(group, id, groupId).entryRestorations, [entryTx]);
+  group.entry_restoration_references = [restoredTransaction];
+  assert.throws(() => attachedGroupRecovery(group, id, groupId));
+});
+test('whole-entry results bind native retention, project and group without approval authority', () => {
+  assert.equal(attachedEntryChange(entryChangeReply(), id).transaction, nextEntryTx);
+  assert.equal(attachedEntryChange(entryChangeReply(groupId), id, groupId).status, 'applied-observed');
+  for (const mutate of [
+    value => { value.outcome.origin_entry_retained = false; },
+    value => { value.group = groupId; },
+    value => { value.transaction = restoredTransaction; },
+    value => { value.project = 'f'.repeat(64); },
+    value => { value.outcome.observation_final = true; },
+    value => { value.outcome.displaced_entry_retained = null; },
+    value => { value.outcome.proposal_digest = 'invalid'; },
+  ]) { const value = entryChangeReply(); mutate(value); assert.throws(() => attachedEntryChange(value, id)); }
+});
+test('explicit whole-entry restoration and undo use exact observed references and never retry automatically', async () => {
+  for (const group of [null, groupId]) {
+    const calls = []; let inspectFailure = false; let restoreFailure = false; let prepared = true;
+    const h = harness(async (command, args) => {
+      calls.push({command, args});
+      if (command === 'attached_projects') return reply();
+      if (command === 'inspect_attached_recovery' || command === 'inspect_attached_group_file') {
+        if (inspectFailure) throw new Error('private diagnostic');
+        if (!args.transaction) return recoveryReply();
+        const value = entryRecoveryReply(args.transaction, args.group ?? null);
+        if (prepared) value.recovery.status = 'prepared-arrangement';
+        return value;
+      }
+      if (command === 'inspect_attached_group_recovery') return groupRecoveryReply();
+      if (command === 'restore_attached_retained_entry') { if (restoreFailure) throw new Error('cancelled'); return entryChangeReply(group); }
+      throw new Error(`unexpected ${command}`);
+    });
+    await settle();
+    const lookup = () => h.intent(group === null ? {type: 'lookup-recovery', id, transaction: entryTx} : {type: 'lookup-group-file', id, group, transaction: entryTx});
+    const restore = (transaction = entryTx) => h.intent({type: 'restore-entry', id, transaction, group});
+    restore(); await settle(); assert.equal(calls.some(call => call.command === 'restore_attached_retained_entry'), false);
+    lookup(); await settle(); restore(); await settle(); assert.equal(calls.some(call => call.command === 'restore_attached_retained_entry'), false);
+    prepared = false; lookup(); await settle();
+    h.intent({type: 'restore-retained', id, transaction: entryTx});
+    h.intent({type: 'restore-entry', id, transaction: entryTx, group, path: '/injected'});
+    await settle(); assert.equal(calls.some(call => call.command.startsWith('restore_')), false);
+    inspectFailure = true; lookup(); await settle(); restore(); await settle();
+    assert.equal(calls.some(call => call.command === 'restore_attached_retained_entry'), false);
+    inspectFailure = false; lookup(); await settle(); restore(); await settle();
+    assert.deepEqual(calls.find(call => call.command === 'restore_attached_retained_entry').args, {id, transaction: entryTx, group});
+    assert.equal(h.projections.at(-1).selectedRecovery[id].transaction, nextEntryTx);
+    restoreFailure = true; restore(nextEntryTx); await settle();
+    assert.ok(h.projections.at(-1).recoveryErrors[id]);
+    const count = calls.filter(call => call.command === 'restore_attached_retained_entry').length;
+    restore(nextEntryTx); h.intent({type: 'refresh'}); await settle();
+    assert.equal(calls.filter(call => call.command === 'restore_attached_retained_entry').length, count);
+    assert.ok(!JSON.stringify(h.projections).includes('private diagnostic'));
+    h.dispose();
+  }
 });
