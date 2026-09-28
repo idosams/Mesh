@@ -90,7 +90,7 @@ pub fn group_confirmation(
         .collect();
     let trees: Vec<_> = prepared
         .directories()
-        .map(|tree| (tree.proposal(), tree.proposed_files().collect()))
+        .map(|tree| (tree.proposal(), tree.confirmation_files().collect()))
         .collect();
     group_prompt_with_trees(project, root, prepared.proposal(), &files, &trees)
 }
@@ -237,7 +237,11 @@ fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<
     use mesh_types::ContentDigest as _;
     let fail =
         || "The complete directory tree cannot be shown in native text confirmation".to_owned();
-    if proposal.get("schema") != Some(&Json::text("mesh.attachment-directory-addition/v1")) {
+    let removed =
+        proposal.get("schema") == Some(&Json::text("mesh.attachment-directory-removal/v1"));
+    if !removed
+        && proposal.get("schema") != Some(&Json::text("mesh.attachment-directory-addition/v1"))
+    {
         return Err(fail());
     }
     let root = proposal
@@ -252,7 +256,11 @@ fn directory_prompt(proposal: &Json, content: &[(&str, &[u8], bool)]) -> Result<
         return Err(fail());
     }
     let mut files = content.iter();
-    let mut prompt = format!("\nCREATE DIRECTORY TREE {root:?}\nDestination absent; a concurrent entry will not be replaced. The complete tree is installed together.\n");
+    let mut prompt = if removed {
+        format!("\nREMOVE DIRECTORY TREE {root:?}\nThe complete existing tree below will move to retained recovery. Files are never individually deleted. Open file and directory handles remain attached to that retained tree. Changed or extra entries require another review; no automatic cleanup or replay occurs.\n")
+    } else {
+        format!("\nCREATE DIRECTORY TREE {root:?}\nDestination absent; a concurrent entry will not be replaced. The complete tree is installed together.\n")
+    };
     for entry in entries {
         let path = entry.get("path").and_then(Json::as_text).ok_or_else(fail)?;
         let mode = entry.get("mode").and_then(Json::as_u64).ok_or_else(fail)?;
@@ -615,6 +623,23 @@ mod tests {
         assert!(literal.contains(r#"Project: "project\nCREATE fake""#));
         assert!(literal.contains(r#"Folder: "/workspace/שם\nPermissions: 777""#));
         assert!(!literal.contains("\nCREATE fake\n"));
+        let Json::Object(fields) = receipt.clone() else {
+            panic!("receipt object")
+        };
+        let removal = Json::object(fields.into_iter().map(|(key, value)| {
+            let value = if key == "schema" {
+                Json::text("mesh.attachment-directory-removal/v1")
+            } else {
+                value
+            };
+            (key, value)
+        }));
+        let removal_prompt = directory_prompt(&removal, &content).unwrap();
+        assert!(removal_prompt.contains("REMOVE DIRECTORY TREE"));
+        assert!(removal_prompt.contains("move to retained recovery"));
+        assert!(removal_prompt.contains("Open file and directory handles"));
+        assert!(removal_prompt.contains("empty"));
+        assert!(!removal_prompt.contains("CREATE DIRECTORY TREE"));
         assert!(directory_prompt(&receipt, &[]).is_err());
         assert!(directory_prompt(&receipt, &[("run", b"edit", true)]).is_err());
         assert!(directory_prompt(&receipt, &[("run", b"text", false)]).is_err());

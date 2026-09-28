@@ -769,3 +769,9 @@ restoration authority for additions. Native directory source transfer is complet
 across the staged PRs; native runtime, complete packaged confirmation/recovery,
 directory removal/type replacement and full provider/remote acceptance remain
 required. Published source increments do not establish merged delivery.
+
+Native directory removal now retains the whole approved tree, including late writes
+through open descriptors, and uses group v3 with complete removal confirmation.
+This unmerged transfer still needs native verification and localized recovery
+presentation. Whole-tree restoration, file/directory conversion, packaged graphical
+acceptance and full fleet/provider/remote acceptance remain required.

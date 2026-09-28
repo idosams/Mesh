@@ -1685,10 +1685,12 @@ fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_
     f.history
         .inspect_main_integration_group(&root, &group_id, &trust, ObservationLimits::default())
         .unwrap();
-    // Directory removal still requires its own retained-tree executor; never skip it.
+    // File/directory conversion still requires its own retained exchange; never skip it.
     fs::remove_dir_all(f.source.join("new-folder")).unwrap();
+    fs::write(f.source.join("new-folder"), "converted to file").unwrap();
     let fourth = f.save("fourth");
     let fourth_bundle = accept(&f, &signer, &trust, &fourth, 4);
+    fs::remove_file(f.source.join("new-folder")).unwrap();
     fs::create_dir(f.source.join("new-folder")).unwrap();
     fs::write(f.source.join("new-folder/new.txt"), "new accepted").unwrap();
     fs::write(f.source.join("work.txt"), "third").unwrap();
@@ -3055,4 +3057,265 @@ fn directory_group_recovers_complete_coverage_and_preserves_concurrent_destinati
     assert!(reopened
         .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
         .is_err());
+}
+
+fn approved_directory_removal(
+    name: &str,
+) -> (
+    Fixture,
+    TestSigner,
+    TrustedReviewers,
+    String,
+    String,
+    PathBuf,
+) {
+    let f = Fixture::new(name);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::create_dir_all(f.source.join("old/sub/empty")).unwrap();
+    fs::write(f.source.join("old/sub/file"), "original tree").unwrap();
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::remove_dir_all(f.source.join("old")).unwrap();
+    let target = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::create_dir_all(f.source.join("old/sub/empty")).unwrap();
+    fs::write(f.source.join("old/sub/file"), "original tree").unwrap();
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let root = recovery_root(&f);
+    (f, signer, trust, bundle, target, root)
+}
+
+#[test]
+fn approved_directory_removal_group_retains_late_writes_and_reopens_without_replay() {
+    let (f, _, trust, bundle, target, root) = approved_directory_removal("remove-tree-group");
+    f.git(&["init", "--quiet"]);
+    let git_before = f.git(&["status", "--porcelain=v1", "--untracked-files=all"]);
+    let journal = f.journal();
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("old/sub/file"))
+        .unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        prepared.proposal().get("schema"),
+        Some(&Json::text("mesh.attachment-integration-group/v3"))
+    );
+    let tree = prepared.directories().next().unwrap();
+    assert_eq!(tree.confirmation_files().count(), 1);
+    assert_eq!(tree.proposed_files().count(), 0);
+    let retained = tree.recovery_path().join("exchange");
+    let group = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert!(!retained.exists());
+    let prepared_observation = f
+        .history
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .unwrap();
+    let members = prepared_observation
+        .get("members")
+        .and_then(Json::as_array)
+        .unwrap();
+    assert_eq!(
+        members[0].get("recovery").unwrap().get("status"),
+        Some(&Json::text("prepared-arrangement"))
+    );
+    assert_eq!(
+        f.git(&["status", "--porcelain=v1", "--untracked-files=all"]),
+        git_before
+    );
+    let result = prepared.apply(&trust).unwrap();
+    assert_eq!(result.get("status"), Some(&Json::text("applied-observed")));
+    assert!(!f.source.join("old").exists());
+    assert!(retained.join("sub/empty").is_dir());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    let inspect = || {
+        reopened
+            .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(
+        inspect().get("members").and_then(Json::as_array).unwrap()[0]
+            .get("recovery")
+            .unwrap()
+            .get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    editor.write_all(b" late editor").unwrap();
+    assert_eq!(
+        fs::read(retained.join("sub/file")).unwrap(),
+        b"original tree late editor"
+    );
+    assert_eq!(
+        inspect().get("members").and_then(Json::as_array).unwrap()[0]
+            .get("recovery")
+            .unwrap()
+            .get("status"),
+        Some(&Json::text("changed-entries"))
+    );
+    assert_eq!(f.journal(), journal);
+    let receipt = root.join(group).join("group-prepared.json");
+    let text = fs::read_to_string(&receipt).unwrap();
+    fs::write(
+        &receipt,
+        text.replace(
+            "mesh.attachment-integration-group/v3",
+            "mesh.attachment-integration-group/v2",
+        ),
+    )
+    .unwrap();
+    assert!(reopened
+        .inspect_main_integration_group(
+            &root,
+            receipt
+                .parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+}
+
+#[test]
+fn directory_removal_refuses_ignored_extra_changed_and_linked_work() {
+    for variant in ["extra", "ignored", "symlink", "changed", "after-prepare"] {
+        let (f, _, trust, bundle, target, root) =
+            approved_directory_removal(&format!("remove-tree-{variant}"));
+        let change = || match variant {
+            "ignored" => {
+                fs::create_dir(f.source.join("old/.git")).unwrap();
+                fs::write(f.source.join("old/.git/config"), b"keep").unwrap();
+            }
+            "symlink" => {
+                std::os::unix::fs::symlink(f.source.join("work.txt"), f.source.join("old/link"))
+                    .unwrap()
+            }
+            "changed" => fs::write(f.source.join("old/sub/file"), b"user edit").unwrap(),
+            _ => fs::write(f.source.join("old/user"), b"keep").unwrap(),
+        };
+        if variant != "after-prepare" {
+            change();
+        }
+        let prepared = f.history.prepare_main_integration(
+            &bundle,
+            &target,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        );
+        if variant == "after-prepare" {
+            let prepared = prepared.unwrap();
+            change();
+            assert!(prepared.apply(&trust).is_err());
+        } else {
+            assert!(prepared.is_err(), "{variant}");
+        }
+        assert!(f.source.join("old/sub/empty").is_dir());
+        assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"base");
+    }
+}
+
+#[test]
+fn native_directory_removal_checks_operation_kind_and_retention_receipt() {
+    let (f, signer, trust, bundle, target, root) = approved_directory_removal("remove-tree-native");
+    assert!(f
+        .history
+        .prepare_main_directory_addition(
+            &bundle,
+            &target,
+            "old",
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    assert!(f
+        .history
+        .prepare_main_directory_removal(
+            &bundle,
+            &target,
+            "old",
+            &root,
+            &TrustedReviewers::new([]),
+            ObservationLimits::default()
+        )
+        .is_err());
+    let prepared = f
+        .history
+        .prepare_main_directory_removal(
+            &bundle,
+            &target,
+            "old",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let record = prepared.recovery_path().to_owned();
+    let id = record.file_name().unwrap().to_str().unwrap();
+    let outcome = prepared.apply(&trust).unwrap();
+    assert_eq!(
+        outcome.get("displaced_entry_retained"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        outcome.get("schema"),
+        Some(&Json::text("mesh.attachment-directory-removal-result/v1"))
+    );
+    // Historical read remains valid after a later accepted main, and never replays removal.
+    let newer = f.save("new accepted");
+    accept(&f, &signer, &trust, &newer, 3);
+    let inspect = || {
+        f.history
+            .inspect_directory_change(&root, id, &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(
+        inspect().get("status"),
+        Some(&Json::text("applied-arrangement"))
+    );
+    fs::write(
+        record.join("observed.json"),
+        outcome.encode().replace(
+            "\"displaced_entry_retained\":true",
+            "\"displaced_entry_retained\":false",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        inspect().get("status"),
+        Some(&Json::text("invalid-outcome"))
+    );
+    fs::remove_file(record.join("observed.json")).unwrap();
+    assert_eq!(
+        inspect().get("recorded_outcome"),
+        Some(&Json::text("absent"))
+    );
+    fs::create_dir(f.source.join("old")).unwrap();
+    fs::write(f.source.join("old/user"), b"keep").unwrap();
+    inspect();
+    assert_eq!(fs::read(f.source.join("old/user")).unwrap(), b"keep");
+    assert_eq!(
+        fs::read(record.join("exchange/sub/file")).unwrap(),
+        b"original tree"
+    );
 }

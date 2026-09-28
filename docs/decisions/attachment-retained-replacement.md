@@ -706,3 +706,36 @@ The source directory feature is fully accounted for across #93–#97, but source
 transfer is not acceptance. Directory removal/type replacement, larger/binary
 confirmation and packaged graphical approval/recovery remain unfinished. Historical
 source gate counts are recorded only as provenance in the migration ledger.
+
+### Native retained whole-directory removal
+
+A wholly removed approved subtree is one native group member. Preparation verifies
+a raw bounded source tree against the approved base, including empty directories.
+Extra/ignored entries, links, missing descendants, changed content or executable
+states refuse. Frozen base bytes support confirmation; current source identity,
+metadata and parent policy bind the operation. Preparation only writes external
+recovery records. An already absent root beneath the exact parent is accounted for
+without a new operation.
+
+Apply rechecks main, trust, exclusions, receipt, parent and tree, then moves the
+root into an empty recovery exchange name using descriptor-relative no-replace
+rename. No recursive unlink occurs. The actual tree remains named; open file and
+directory descriptors can continue writing or creating descendants there. Both
+durability barriers are attempted. Races, recreated source entries, changed policy
+and uncertain durability require reconciliation, never automatic undo or cleanup.
+
+Removal receipt/result/recovery v1 binds the complete original tree against the
+approved base and reports displaced-entry retention. Recovery independently
+observes source and retained trees; missing outcomes grant no replay authority.
+Group v3 supports removal members, while v1/v2 remain readable and older readers
+reject v3. Addition type naming remains a compatibility alias, but addition
+preparation still refuses removal. Confirmation files describe frozen base content;
+proposed files remain empty for removal. Existing journals/signatures are unchanged.
+
+Native confirmation explicitly describes REMOVE DIRECTORY TREE and retained open
+handles, retaining complete-text limits. Localized removal recovery follows in a
+separate increment; its previous addition-only parser refuses the new schema. Whole
+tree restoration and file/directory conversion remain unfinished. Transferred tests
+cover late writes, collisions, substitution, recreation, durability, unknown/ignored
+children, trust/receipt bindings, group version refusal, mixed-group interruption
+and historical recovery. Native runtime and packaged graphical proof are pending.

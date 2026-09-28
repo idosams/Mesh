@@ -1782,3 +1782,21 @@ tests: 48 pass. Removing the write-authority refusal makes the directory regress
 fail; restoring it returns all 48 to passing. TypeScript and all 28 rendering/localization tests pass; full desktop, native and
 packaged proof remain pending. Directory removal/type
 replacement, large/binary confirmation and the full fleet acceptance remain open.
+
+## I05a retained directory removal and native confirmation
+
+Partially transfers source `a02b33d8c7454a440d3ca94ae22f34e762913cc6` onto
+PR #97 at `43df0cdd173036d96aa8eb35d029b98207dec0ab`: eight daemon paths
+(retained removal module/export, directory writeback/export, group integration/tests,
+provisioning and approval tests) and native desktop confirmation. Four renderer
+paths and final source-document accounting follow separately. Canonical escaped
+project/root labels and newline regressions are retained through the test conflict.
+
+The operation verifies the complete approved base tree and retains the actual root
+and descendants through a no-replace move into recovery. Open file and directory
+handles preserve later writes. Unknown/ignored/changed entries refuse; uncertain
+races and durability retain evidence without replay or cleanup. Group v3 requires
+removal receipts while v1/v2 remain readable. Native confirmation distinguishes
+removal from creation and lists frozen base content. Local native focused,
+failing-before and full execution remain pending behind preserved verification.
+Historical 3,311 Rust/679 desktop tests and 14 skips are provenance only.

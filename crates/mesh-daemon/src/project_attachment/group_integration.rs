@@ -30,11 +30,12 @@ struct Plan {
     ready: Vec<String>,
     present: Vec<String>,
     trees: BTreeSet<String>,
+    removed_trees: BTreeSet<String>,
 }
 
 /// Native-only single-use group. Every changed path in the accepted review must be accounted for.
-/// Supports regular-file changes and complete new directory subtrees. Directory removal and
-/// type replacement refuse the whole group before staging. Applying never claims filesystem-wide atomicity.
+/// Supports regular-file changes and complete directory addition/removal. File/directory type
+/// replacement refuses the whole group before staging. Applying never claims filesystem-wide atomicity.
 pub struct PreparedMainIntegration {
     history: ProvisionedAttachment,
     store: PinnedWorkspaceRoot,
@@ -130,6 +131,7 @@ fn plan(
         ready: vec![],
         present: vec![],
         trees: BTreeSet::new(),
+        removed_trees: BTreeSet::new(),
     };
     let paths: BTreeSet<_> = before.keys().chain(after.keys()).collect();
     let changed: Vec<_> = paths
@@ -208,11 +210,63 @@ fn plan(
             }
             continue;
         }
+        if b.is_none() && a.is_some_and(|entry| entry.kind == "folder") {
+            let prefix = format!("{path}/");
+            let subtree: Vec<_> = before
+                .iter()
+                .filter(|(member, _)| *member == path || member.starts_with(&prefix))
+                .collect();
+            for (member, _) in &subtree {
+                if after.contains_key(*member) || !captured.admits_file_path(member)? {
+                    return Err(invalid(
+                        "removed tree contains surviving or excluded members",
+                    ));
+                }
+                covered.insert((*member).clone());
+            }
+            if crate::managed_file::retained_replacement::absent_parent(
+                &history.project().pinned,
+                Path::new(path),
+            )?
+            .is_some()
+            {
+                result
+                    .present
+                    .extend(subtree.iter().map(|(path, _)| (*path).clone()));
+            } else {
+                for (member, entry) in subtree {
+                    let matches = if entry.kind == "folder" {
+                        captured
+                            .directories()
+                            .iter()
+                            .any(|directory| directory == Path::new(member))
+                    } else {
+                        captured.files().iter().any(|file| {
+                            file.path() == Path::new(member)
+                                && entry
+                                    .digest
+                                    .is_some_and(|d| d.to_string() == file.digest().to_string())
+                                && entry.executable == Some(file.executable())
+                                && entry.bytes == Some(file.bytes().len() as u64)
+                        })
+                    };
+                    if !matches {
+                        return Err(invalid(
+                            "removed directory contains divergent or unavailable work",
+                        ));
+                    }
+                }
+                result.trees.insert(path.clone());
+                result.removed_trees.insert(path.clone());
+                result.ready.push(path.clone());
+            }
+            continue;
+        }
         if a.is_some_and(|entry| entry.kind != "file")
             || b.is_some_and(|entry| entry.kind != "file")
         {
             return Err(invalid(
-                "group contains a directory removal or type change requiring another executor",
+                "group contains a file/directory type change requiring another executor",
             ));
         }
         if !captured.admits_file_path(path)? {
@@ -307,7 +361,7 @@ pub(super) fn prepare(
                 files.push(if planned.trees.contains(relative) {
                     Member::Directory(Box::new(super::directory_writeback::prepare_captured(
                         &history, workspace, store, bundle, target, relative, &path, trusted,
-                        limits, &captured,
+                        limits, &captured, None,
                     )?))
                 } else {
                     Member::File(Box::new(super::writeback::prepare_captured(
@@ -344,7 +398,9 @@ pub(super) fn prepare(
     let proposal = Json::object([
         (
             "schema",
-            Json::text(if planned.trees.is_empty() {
+            Json::text(if !planned.removed_trees.is_empty() {
+                "mesh.attachment-integration-group/v3"
+            } else if planned.trees.is_empty() {
                 "mesh.attachment-integration-group/v1"
             } else {
                 "mesh.attachment-integration-group/v2"
@@ -418,8 +474,8 @@ impl PreparedMainIntegration {
             _ => None,
         })
     }
-    /// Complete newly created subtrees, including frozen file content and empty-directory evidence.
-    pub fn directories(&self) -> impl Iterator<Item = &super::PreparedMainDirectoryAddition> {
+    /// Complete added or removed subtrees, including frozen confirmation content and empty directories.
+    pub fn directories(&self) -> impl Iterator<Item = &super::PreparedMainDirectoryChange> {
         self.files.iter().filter_map(|member| match member {
             Member::Directory(tree) => Some(tree.as_ref()),
             _ => None,
@@ -610,7 +666,9 @@ pub(super) fn inspect(
     if !matches!(&proposal, Json::Object(pairs) if pairs.len() == fields.len() && fields.iter().all(|key| proposal.get(key).is_some()))
         || !matches!(
             text(&proposal, "schema")?,
-            "mesh.attachment-integration-group/v1" | "mesh.attachment-integration-group/v2"
+            "mesh.attachment-integration-group/v1"
+                | "mesh.attachment-integration-group/v2"
+                | "mesh.attachment-integration-group/v3"
         )
         || text(&proposal, "project")? != history.id()
         || proposal.get("attachment") != Some(&history.project().receipt()?)
@@ -632,7 +690,7 @@ pub(super) fn inspect(
     if members.is_empty() || members.len() + present.len() > MAX_FILES {
         return Err(invalid("group membership exceeds limit"));
     }
-    let directory_members = text(&proposal, "schema")? == "mesh.attachment-integration-group/v2";
+    let directory_members = text(&proposal, "schema")? != "mesh.attachment-integration-group/v1";
     let mut paths = BTreeSet::new();
     let mut transactions = BTreeSet::new();
     let mut receipts = Vec::new();
@@ -675,11 +733,21 @@ pub(super) fn inspect(
         trusted,
         |workspace, _| {
             for receipt in &receipts {
-                if receipt.get("schema")
-                    == Some(&Json::text("mesh.attachment-directory-addition/v1"))
-                {
+                if matches!(
+                    receipt.get("schema").and_then(Json::as_text),
+                    Some(
+                        "mesh.attachment-directory-addition/v1"
+                            | "mesh.attachment-directory-removal/v1"
+                    )
+                ) {
                     if !directory_members {
                         return Err(invalid("directory member requires group v2"));
+                    }
+                    if receipt.get("schema")
+                        == Some(&Json::text("mesh.attachment-directory-removal/v1"))
+                        && text(&proposal, "schema")? != "mesh.attachment-integration-group/v3"
+                    {
+                        return Err(invalid("directory removal requires group v3"));
                     }
                     super::directory_writeback::verify_tree(receipt, workspace, trusted)?;
                     let root = text(receipt, "path")?;

@@ -8,10 +8,12 @@ mod addition;
 mod metadata;
 mod removal;
 mod tree_addition;
+mod tree_removal;
 pub(crate) use addition::{parent_policy, RetainedAddition};
 use metadata::{copy_metadata, metadata_digest};
 pub(crate) use removal::{absent_parent, RetainedRemoval};
 pub(crate) use tree_addition::{observe_tree, open_tree, RetainedTreeAddition, TreeInput};
+pub(crate) use tree_removal::RetainedTreeRemoval;
 
 /// Bounded live recovery evidence. This is not a write/replay capability or an atomic snapshot.
 #[derive(PartialEq, Eq)]

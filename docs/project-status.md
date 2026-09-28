@@ -673,3 +673,12 @@ changed parent identity/permissions in English and Hebrew. Directory additions
 never offer retained-file restoration. All 48 controller tests pass; removing the
 write-authority refusal makes its regression fail. TypeScript and all 28 rendering/localization tests pass. Full desktop, native and
 packaged graphical acceptance remain pending.
+
+### Native retained directory removal (unmerged increment)
+
+Approved complete directory removals now move the tree into retained recovery
+without recursive deletion. Complete native confirmation uses frozen base content
+and explains retained open handles. Unknown or changed entries refuse; uncertain
+results do not trigger replay or cleanup. Native regressions are transferred but
+not locally executed yet. Localized removal recovery and whole-tree restoration
+remain outstanding, along with packaged graphical acceptance.

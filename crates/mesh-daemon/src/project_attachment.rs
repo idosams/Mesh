@@ -52,7 +52,7 @@ pub use restoration::PreparedRetainedRestoration;
 mod writeback;
 pub use writeback::PreparedMainFileIntegration;
 mod directory_writeback;
-pub use directory_writeback::PreparedMainDirectoryAddition;
+pub use directory_writeback::{PreparedMainDirectoryAddition, PreparedMainDirectoryChange};
 mod reviews;
 pub use history::SavedAttachmentVersion;
 

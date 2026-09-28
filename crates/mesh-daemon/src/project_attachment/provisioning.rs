@@ -423,11 +423,53 @@ impl ProvisionedAttachment {
             recovery_root,
             trusted,
             limits,
+            false,
         )
     }
 
-    /// Observe one exact directory-addition transaction without replay or cleanup authority.
+    /// Prepare an approved whole-directory removal; application retains the original tree after explicit native confirmation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_main_directory_removal(
+        &self,
+        bundle: &str,
+        target: &str,
+        relative: &str,
+        recovery_root: &Path,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedMainDirectoryChange> {
+        super::directory_writeback::prepare(
+            self.clone(),
+            self.store.clone(),
+            bundle,
+            target,
+            relative,
+            recovery_root,
+            trusted,
+            limits,
+            true,
+        )
+    }
+
+    /// Compatibility lookup for exact native directory transactions without replay or cleanup authority.
     pub fn inspect_directory_addition(
+        &self,
+        recovery_root: &Path,
+        transaction: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        super::directory_writeback::inspect(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+    /// Observe one exact directory transaction without replay or cleanup authority.
+    pub fn inspect_directory_change(
         &self,
         recovery_root: &Path,
         transaction: &str,
