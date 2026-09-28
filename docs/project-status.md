@@ -119,3 +119,8 @@ Native managed-review export now binds the complete recorded selection and retai
 ancestry checks in its read handle, including history-only reopening. Its new native regressions
 are pending. Exporting readable saved bytes does not authorize private-dependency use or remote
 execution; the remaining transport, executor and acceptance requirements are unchanged.
+
+Receiving-side source now provides create-only private tree materialization with complete output
+verification and preservation of failed allocations. Native regressions are pending. A materialized
+tree is not an executor claim: workspace initialization, authenticated remote execution, restart
+reconciliation and second-machine acceptance remain unfinished.

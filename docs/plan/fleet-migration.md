@@ -2219,3 +2219,19 @@ proves that matching final directory identities alone cannot retain export autho
 execution and full CI are pending; repository/docs/license/storage/format/whitespace checks pass.
 Current dependency authorization and all remaining remote execution/acceptance obligations remain
 required, as described in the [remote sequence](fleet-remote-delivery.md).
+
+## R06 receiving-side private input materialization
+
+New canonical implementation based on #119 at
+`1a0ce397bbef5af825bddd6818cff315089a36f2`; no preserved source commit is replaced.
+The receiver now materializes exact transferred content through native-admitted private storage,
+using create-only allocation and bounded descriptor-based chunk reads. Complete tree verification
+checks inventory, file hashes, modes, hard links and physical ancestry. Failed or interrupted
+allocations remain named and refuse automatic retry or adoption. No provider starts here.
+
+Native regressions cover exact content and empty entries, changed bytes/modes/extra entries,
+incomplete and corrupt input, oversized chunks, links, storage substitution, protected directories,
+non-private storage and retained allocation escape. Repository/docs/license/storage checks pass;
+new native regression execution and complete CI remain pending. The previous combined-main native
+run is preserved. All remaining remote execution and acceptance requirements remain in the
+[remote sequence](fleet-remote-delivery.md).

@@ -366,6 +366,17 @@ impl<'a> RemoteInputReceiver<'a> {
         }
         Ok(())
     }
+    /// Create a fresh private working tree through native-admitted storage. Existing or partial
+    /// allocations refuse; this neither launches a provider nor grants execution ownership.
+    #[cfg(unix)]
+    pub fn materialize(
+        &self,
+        destination: &super::RemoteInputDestination,
+        allocation_id: &str,
+    ) -> std::io::Result<super::RemoteInputAllocation> {
+        destination.materialize(&self.manifest, self.cas, allocation_id)
+    }
+
     fn declared(&self, digest: Digest32) -> Result<u64, Error> {
         self.manifest
             .chunks

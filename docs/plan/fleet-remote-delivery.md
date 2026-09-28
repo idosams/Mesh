@@ -149,3 +149,25 @@ launch it remotely. The caller must separately verify the current dependency clo
 state, assignment and peer policy. Remote dispatch integration, authenticated transport, receiving
 materialization/execution, result/reconnect reconciliation and real second-machine proof remain open.
 No agent or renderer command exposes this native export API.
+
+## Receiving-side working trees
+
+The native receiver can materialize its exact manifest into a fresh private allocation. Native
+configuration supplies existing store/parent directories and their retained installation identities;
+peer and renderer paths confer no authority. Storage must be private, nonoverlapping and outside
+all supplied protected user-project roots. The native caller must still admit the authenticated
+assignment, enforce dependency policy and exclude competing receivers.
+
+Allocation uses a native 32-character request identity and create-only directories. An existing or
+partial allocation refuses; no retry deletes, adopts or overwrites it. Its canonical manifest is
+retained beside the working folder for later reconciliation. Chunk reads are descriptor-confined,
+bounded to declared length plus one and checked by digest before writing. Final verification checks
+the complete bounded inventory, complete-file hashes, executable metadata, hard links and physical
+allocation ancestry. Empty files and directories remain explicit. Unrepresentable names or volume
+collisions refuse through the exact output inventory instead of silently changing the input.
+
+The returned handle can revalidate the tree before a later executor claim. It is not a persistent
+readiness or launch receipt, does not initialize a workspace or spawn a provider, and cannot be
+reopened after restart without native reconciliation. Failures preserve partial work for inspection.
+Authenticated transport, durable receiving ownership, workspace initialization, result transfer and
+real second-machine acceptance remain required.

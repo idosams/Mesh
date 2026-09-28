@@ -22,10 +22,14 @@ pub mod provider;
 mod remote;
 mod remote_input;
 #[cfg(unix)]
+mod remote_materialization;
+#[cfg(unix)]
 pub use crate::workspace::RemoteInputSource;
 pub use remote_input::{
     RemoteInputChunk, RemoteInputEntry, RemoteInputManifest, RemoteInputReceiver,
 };
+#[cfg(unix)]
+pub use remote_materialization::{RemoteInputAllocation, RemoteInputDestination};
 #[cfg(unix)]
 mod remote_peer;
 #[cfg(unix)]
