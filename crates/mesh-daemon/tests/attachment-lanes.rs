@@ -430,6 +430,107 @@ fn attached_fleet_roots_delegate_from_saved_bytes_and_replay_project_correlation
         fs::read(root.join("work.txt")).unwrap(),
         b"lane continues\n"
     );
+    struct LaneSigner(SigningKey);
+    impl mesh_daemon::fleet::service::CheckpointSigner for LaneSigner {
+        fn public_key(&self) -> mesh_types::PublicKey {
+            mesh_types::PublicKey::from_bytes(self.0.verifying_key().to_bytes())
+        }
+        fn sign(
+            &self,
+            body: &mesh_crypto::SigningPayload,
+        ) -> Result<mesh_types::Signature, String> {
+            Ok(mesh_types::Signature::from_bytes(
+                self.0.sign(body.as_bytes()).to_bytes(),
+            ))
+        }
+    }
+    service
+        .native_command(
+            "running",
+            Command::Observe {
+                lane: lane.clone(),
+                run: "run".into(),
+                state: mesh_daemon::fleet::RunState::Running,
+            },
+        )
+        .unwrap();
+    let signed = service
+        .grant_with_signer(
+            &lane,
+            "run",
+            "signed",
+            std::sync::Arc::new(LaneSigner(SigningKey::from_bytes(&[64; 32]))),
+        )
+        .unwrap();
+    let saved = service
+        .agent_call(
+            signed.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("input-comparison"))]),
+        )
+        .unwrap();
+    let reviewed = service
+        .agent_call(
+            signed.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+        &lane,
+        saved.get("checkpoint").unwrap().as_text().unwrap(),
+        saved.get("version").unwrap().as_text().unwrap(),
+        reviewed.get("bundle").unwrap().as_text().unwrap(),
+    )
+    .unwrap();
+    let comparison = service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    let input = comparison.get("input").unwrap();
+    assert_eq!(
+        input.get("source_version"),
+        Some(&Json::text(version.to_string()))
+    );
+    let changes = input
+        .get("comparison")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        changes.len(),
+        1,
+        "unchanged folders, binary files and imported contents are not lane changes"
+    );
+    let object = changes[0].get("object").unwrap().as_text().unwrap();
+    let detail = service
+        .saved_starting_comparison(&selection, None, Some(object))
+        .unwrap();
+    let changed = &detail
+        .get("input")
+        .unwrap()
+        .get("comparison")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap()[0];
+    assert_eq!(
+        changed.get("before").unwrap().get("text"),
+        Some(&Json::text("saved input\n"))
+    );
+    assert_eq!(
+        changed.get("after").unwrap().get("text"),
+        Some(&Json::text("lane continues\n"))
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"saved input\nongoing source edits\nstill open\n"
+    );
+    assert!(restarted
+        .saved_starting_comparison(&selection, None, None)
+        .is_err());
 }
 
 #[test]

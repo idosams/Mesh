@@ -175,9 +175,9 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | L01 | `e987565983cc7f57be33fe211f9f4bb4d290fad2` | Expose scoped fleet MCP through the packaged desktop app | [Mesh PR #46](https://github.com/idosams/Mesh/pull/46), `1434d269759e0ca62d9bc14b62ec6202580133a5`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
 | L02 | `877188898d0151d958bb06230b2e3797611a5ff2` | Persist native fleet discovery without adopting uncertain workers | [Mesh PR #47](https://github.com/idosams/Mesh/pull/47), `046ba075efc9290f9402ca2f3e4269610d1053fb`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
 | L02 | `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` | Connect desktop-owned fleet scheduling and activity | [Mesh PR #48](https://github.com/idosams/Mesh/pull/48), `f1578135da3da1aca14d77612117caf8ac031620`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
-| L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | [Mesh PR #49](https://github.com/idosams/Mesh/pull/49), `4a6126868cbe26b59c751488e2aa56f4dbe5072f`; 620 local desktop/interface tests passed; hosted checks running; local full/package validation and human review pending; not merged |
-| R01 | `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` | Read pinned fleet reviews independently of live work | [Mesh PR #50](https://github.com/idosams/Mesh/pull/50), `c2c625a1ff7fe9bfc0acd42f0655e637890f24d7`; hosted validation running; local native/full and packaged checks pending; not merged |
-| R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | Pending transfer |
+| L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | [Mesh PR #49](https://github.com/idosams/Mesh/pull/49), `4a6126868cbe26b59c751488e2aa56f4dbe5072f`; 620 local desktop/interface tests passed; all seven hosted checks passed; local full/package validation and human review pending; not merged |
+| R01 | `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` | Read pinned fleet reviews independently of live work | [Mesh PR #50](https://github.com/idosams/Mesh/pull/50), `c2c625a1ff7fe9bfc0acd42f0655e637890f24d7`; all seven hosted checks passed; local native/full and packaged checks pending; not merged |
+| R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | [Mesh PR #51](https://github.com/idosams/Mesh/pull/51), `35f486661ed4aa82ea59327da7cec75e3a2da8f5`; 634 local desktop/interface tests passed; hosted checks running; not merged |
 | R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | Pending transfer |
 | R01 | `5a553e78177cc045f10af15a2da86bdb32c95bf0` | Show starting-version comparisons in pinned fleet reviews | Pending transfer |
 | R01 | `5b9f758c2db294b636bc2bfd9b4eb867a2fcb2ff` | Persist exact fleet review selectors through native storage | Pending transfer |
@@ -665,3 +665,29 @@ This view uses the recorded review base; comparison against the lane's verified 
 the next distinct native/presentation increment. Selector persistence, restored history/artifacts,
 correspondence and integration/recovery retain their source-ledger order. Required review, actual
 provider/package/remote acceptance, eventual merges and final combined-main testing remain open.
+
+## R01c verified lane starting-version comparison
+
+Preserved source `b1a166da5cfb714c6677b02b0343e816ea47fcf4` transfers on published #51 at
+`35f486661ed4aa82ea59327da7cec75e3a2da8f5`. Allocation retains the verified single local import
+operation separately from the requested source operation. Native comparison binds both that input
+and the exact recorded result, pages up to 200 changed object identities, and reads selected text
+only from immutable history. Text is bounded to 256 KiB per side; unsafe text/binary/large contents
+remain labeled metadata. Object identity, path, content digest, size and executable state preserve
+change distinctions. This read neither creates a publication bundle nor grants approval authority.
+
+The canonical transfer preserves the independent saved-review reader and its extra refusal coverage.
+Those assertions now also exercise the comparison API with a substituted recorded bundle, missing
+checkpoint and absent-but-valid object. Transferred journeys cover attached-source/local-import
+correlation, later edits/navigation/cancellation, changed roots, 205 changed entries across pages,
+metadata-only differences and bounded binary/unsafe/large-file presentation. Restart reconstruction
+of the starting-version binding remains the distinct R02 source increment; it must not guess a base.
+
+Parents #49 and #50 passed all seven hosted checks at their published revisions. The #50 saved-result
+and 53-result pagination journeys passed on hosted macOS in 0.400 and 0.489 seconds. #51 is published
+with hosted validation running. This increment still needs native/failing-before/full and hosted
+validation; the preserved #44 full gate continues to own the shared native target. Source coverage
+alone does not establish runtime or packaged acceptance. The next increment connects this exact
+starting-input comparison to the parallel panels. All later selector/history/artifact, correspondence,
+integration/recovery, provider/package/remote, required-review, merge and combined-main obligations
+remain intact. Original work and verification are preserved.

@@ -36,6 +36,7 @@ pub struct LaneWorkspace {
     daemon: Arc<LiveDaemon>,
     receipt: Json,
     binding: super::WorkspaceBinding,
+    starting_version: RecordDigest,
 }
 impl LaneWorkspace {
     /// Create an independent folder using the existing exact-version native transaction.
@@ -113,6 +114,13 @@ impl LaneWorkspace {
         };
         let receipt = daemon.fork_workspace_version_protected(request)?;
         let state = daemon.workspace_state()?;
+        let [initial] = state.workspace_versions.as_slice() else {
+            return Err(Unavailable::new(
+                "fleet-initial-version-unavailable",
+                "The lane initial version could not be bound.",
+            ));
+        };
+        let starting_version = initial.operation();
         let binding = super::WorkspaceBinding {
             source_version: input.version,
             root: state.root,
@@ -123,6 +131,7 @@ impl LaneWorkspace {
             daemon,
             receipt,
             binding,
+            starting_version,
         })
     }
 
@@ -177,6 +186,13 @@ impl LaneWorkspace {
             ("source_version", Json::text(version.to_string())),
             ("workspace", state.to_json()),
         ]);
+        let [initial] = state.workspace_versions.as_slice() else {
+            return Err(Unavailable::new(
+                "fleet-initial-version-unavailable",
+                "The lane initial version could not be bound.",
+            ));
+        };
+        let starting_version = initial.operation();
         let binding = super::WorkspaceBinding {
             source_version: version,
             root: state.root,
@@ -187,7 +203,13 @@ impl LaneWorkspace {
             daemon,
             receipt,
             binding,
+            starting_version,
         })
+    }
+
+    /// Exact local import version verified against the requested immutable source at allocation.
+    pub(super) fn starting_version(&self) -> RecordDigest {
+        self.starting_version
     }
 
     /// Verified allocation identity to commit before any dispatch intent.

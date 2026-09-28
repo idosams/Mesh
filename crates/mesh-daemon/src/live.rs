@@ -3477,6 +3477,22 @@ impl LiveDaemon {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub(crate) fn recorded_lane_starting_comparison(
+        &self,
+        root: &str,
+        installation: &str,
+        bundle: RecordDigest,
+        target: RecordDigest,
+        base: RecordDigest,
+        after: Option<&str>,
+        selected: Option<&str>,
+    ) -> Result<crate::ipc::Json, Unavailable> {
+        self.with_recorded_lane_review(root, installation, bundle, target, |open| {
+            crate::fleet::comparison::compare(open, base, target, after, selected)
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn recorded_lane_artifact(
         &self,
         root: &str,

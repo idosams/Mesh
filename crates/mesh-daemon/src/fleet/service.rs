@@ -965,6 +965,41 @@ impl FleetService {
         ]))
     }
 
+    /// Compare a recorded result to the exact local copy of its original lane input.
+    /// This read never creates a publication bundle or advances main. Cursors select changed objects.
+    pub fn saved_starting_comparison(
+        &self,
+        selection: &SavedReviewSelection,
+        after: Option<&str>,
+        selected: Option<&str>,
+    ) -> Result<Json, Unavailable> {
+        let comparison = self.with_saved_review(selection, |workspace| {
+            let comparison = workspace.daemon().recorded_lane_starting_comparison(
+                workspace.binding().root(),
+                workspace.binding().installation(),
+                selection.bundle,
+                selection.version,
+                workspace.starting_version(),
+                after,
+                selected,
+            )?;
+            Ok(Json::object([
+                (
+                    "source_version",
+                    Json::text(workspace.binding().source_version.to_string()),
+                ),
+                ("comparison", comparison),
+            ]))
+        })?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.fleet-starting-comparison/v1")),
+            ("objective", Json::text(self.objective()?)),
+            ("selection", selection.to_json()),
+            ("input", comparison),
+            ("approval_authority", Json::Bool(false)),
+        ]))
+    }
+
     /// Read an exact historical artifact; object identity and side select content, never a path.
     pub fn saved_review_artifact(
         &self,

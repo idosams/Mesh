@@ -280,3 +280,18 @@ The returned presentation uses the review's recorded canonical head. It does not
 an attached-source operation as the managed lane's review base. Input-relative comparison and mapping
 lane results back to the original project's main remain separate required work; the eventual UI must
 identify the actual comparison base.
+
+
+## Starting-version comparison
+
+Fresh native lane allocation retains the single local import operation after verifying its content
+against the requested immutable source. The source operation and local import operation are distinct
+identities. Input-relative comparison reads that local operation and the exact recorded result from
+immutable history under the retained lane context. It does not manufacture an approved main version
+or reinterpret the publication bundle's base. Object identity preserves move/replacement distinctions;
+pages are ordered by object ID, and selected text is bounded and content-verified.
+
+This increment changes no durable events or workspace encoding. The retained base belongs to the
+current native context. Restored unattached fleets still refuse reads; recovery must re-establish the
+verified source-to-local-import binding rather than guess from a current or oldest visible version.
+The comparison is read-only and is not an approval statement or dependency-closure proof.

@@ -6,7 +6,7 @@ use mesh_daemon::fleet::{Command, Limits, RunState, Runtime};
 use mesh_daemon::ipc::{nothing_to_recover, Json, Operations, StartupSummary};
 use mesh_daemon::{CheckpointRuntimeParameters, LiveDaemon, TrustedReviewers};
 use mesh_store::fleet::FleetStore;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::PathBuf;
@@ -1224,6 +1224,63 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
         text(&first_review, "bundle"),
     )
     .unwrap();
+    let input_comparison = f
+        .service
+        .saved_starting_comparison(&selection, None, None)
+        .unwrap();
+    let compared = input_comparison
+        .get("input")
+        .unwrap()
+        .get("comparison")
+        .unwrap();
+    assert_eq!(compared.get("total").and_then(Json::as_u64), Some(1));
+    let change = &compared.get("changes").unwrap().as_array().unwrap()[0];
+    assert_eq!(
+        change.get("effect").and_then(Json::as_text),
+        Some("modified")
+    );
+    let input_object = text(change, "object").to_owned();
+    let input_detail = f
+        .service
+        .saved_starting_comparison(&selection, None, Some(&input_object))
+        .unwrap();
+    let detail = &input_detail
+        .get("input")
+        .unwrap()
+        .get("comparison")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap()[0];
+    assert_eq!(
+        detail
+            .get("before")
+            .unwrap()
+            .get("text")
+            .and_then(Json::as_text),
+        Some("immutable input\n")
+    );
+    assert_eq!(
+        detail
+            .get("after")
+            .unwrap()
+            .get("text")
+            .and_then(Json::as_text),
+        Some("pinned first result\n")
+    );
+    assert_eq!(
+        input_detail.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert!(f
+        .service
+        .saved_starting_comparison(&selection, None, Some("../note.txt"))
+        .is_err());
+    assert!(f
+        .service
+        .saved_starting_comparison(&selection, Some(&input_object), Some(&input_object))
+        .is_err());
     let frozen = f.service.saved_review(&selection).unwrap();
     assert_eq!(frozen.get("selection"), Some(&selection.to_json()));
     let item = frozen.get("review").unwrap();
@@ -1304,6 +1361,10 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
         assert!(f.service.saved_review(&wrong).is_err());
         assert!(f
             .service
+            .saved_starting_comparison(&wrong, None, None)
+            .is_err());
+        assert!(f
+            .service
             .saved_review_artifact(&wrong, object, "after")
             .is_err());
     }
@@ -1312,7 +1373,15 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
     assert_ne!(absent_object, object);
     assert!(f
         .service
+        .saved_starting_comparison(&selection, None, Some(&absent_object))
+        .is_err());
+    assert!(f
+        .service
         .saved_review_artifact(&selection, &absent_object, "after")
+        .is_err());
+    assert!(f
+        .service
+        .saved_starting_comparison(&wrong, None, None)
         .is_err());
     let wrong = SavedReviewSelection::new(
         "different-lane",
@@ -1322,6 +1391,10 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
     )
     .unwrap();
     assert!(f.service.saved_review(&wrong).is_err());
+    assert!(f
+        .service
+        .saved_starting_comparison(&wrong, None, None)
+        .is_err());
     assert!(f
         .service
         .saved_review_artifact(&selection, "../note.txt", "after")
@@ -1368,6 +1441,18 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
     assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
     assert_eq!(
         f.service
+            .saved_starting_comparison(&selection, None, None)
+            .unwrap(),
+        input_comparison
+    );
+    assert_eq!(
+        f.service
+            .saved_starting_comparison(&selection, None, Some(&input_object))
+            .unwrap(),
+        input_detail
+    );
+    assert_eq!(
+        f.service
             .saved_review_artifact(&selection, object, "after")
             .unwrap()
             .bytes(),
@@ -1394,6 +1479,10 @@ fn native_saved_review_readers_pin_exact_results_across_new_edits_navigation_and
     fs::create_dir(&root).unwrap();
     fs::write(root.join("note.txt"), "foreign replacement").unwrap();
     assert!(f.service.saved_review(&selection).is_err());
+    assert!(f
+        .service
+        .saved_starting_comparison(&selection, None, None)
+        .is_err());
     assert!(f
         .service
         .saved_review_artifact(&selection, object, "after")
@@ -1458,4 +1547,123 @@ fn saved_review_pages_are_bounded_and_cover_every_checkpoint_without_duplicates(
         .unwrap();
     assert!(end.get("reviews").unwrap().as_array().unwrap().is_empty());
     assert_eq!(end.get("next_after"), Some(&Json::Null));
+}
+
+#[test]
+fn starting_comparison_pages_changes_and_bounds_selected_content() {
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    let mut f = Fixture::new("starting-comparison-pages");
+    f.credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "input-comparison",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x7b; 32],
+            ))),
+        )
+        .unwrap();
+    let context = f.context();
+    let root = PathBuf::from(text(context.get("workspace").unwrap(), "root"));
+    for index in 0..201 {
+        fs::write(
+            root.join(format!("added-{index:03}.txt")),
+            "added content\n",
+        )
+        .unwrap();
+    }
+    fs::write(root.join("binary"), [0xff, 0, 1]).unwrap();
+    fs::write(root.join("large"), vec![b'x'; 262_145]).unwrap();
+    fs::write(root.join("unsafe"), "text\u{202e}hidden").unwrap();
+    fs::set_permissions(root.join("note.txt"), fs::Permissions::from_mode(0o755)).unwrap();
+    let saved = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("input-page"))]),
+        )
+        .unwrap();
+    let review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &f.lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        text(&review, "bundle"),
+    )
+    .unwrap();
+    let mut after = None;
+    let mut seen = BTreeSet::new();
+    let mut details = BTreeMap::new();
+    loop {
+        let response = f
+            .service
+            .saved_starting_comparison(&selection, after.as_deref(), None)
+            .unwrap();
+        let page = response.get("input").unwrap().get("comparison").unwrap();
+        assert_eq!(page.get("total").and_then(Json::as_u64), Some(205));
+        let changes = page.get("changes").unwrap().as_array().unwrap();
+        assert!(changes.len() <= 200);
+        for change in changes {
+            let object = text(change, "object");
+            assert!(seen.insert(object.to_owned()));
+            let side = change.get("after").unwrap();
+            assert_eq!(side.get("text"), Some(&Json::Null));
+            if ["binary", "large", "unsafe", "note.txt"].contains(&text(side, "path")) {
+                details.insert(text(side, "path").to_owned(), object.to_owned());
+            }
+        }
+        after = page.get("next_after").unwrap().as_text().map(str::to_owned);
+        if after.is_none() {
+            break;
+        }
+    }
+    assert_eq!(seen.len(), 205);
+    for (path, expected) in [
+        ("binary", "binary-or-unsafe-text"),
+        ("large", "too-large"),
+        ("unsafe", "binary-or-unsafe-text"),
+        ("note.txt", "text"),
+    ] {
+        let detail = f
+            .service
+            .saved_starting_comparison(&selection, None, Some(&details[path]))
+            .unwrap();
+        let changes = detail
+            .get("input")
+            .unwrap()
+            .get("comparison")
+            .unwrap()
+            .get("changes")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(
+            text(changes[0].get("after").unwrap(), "content_state"),
+            expected
+        );
+        if path == "note.txt" {
+            assert_eq!(
+                changes[0].get("before").unwrap().get("executable"),
+                Some(&Json::Bool(false))
+            );
+            assert_eq!(
+                changes[0].get("after").unwrap().get("executable"),
+                Some(&Json::Bool(true))
+            );
+        }
+    }
+    assert!(f
+        .service
+        .saved_starting_comparison(&selection, Some(&"0".repeat(32)), None)
+        .is_err());
+    assert_eq!(
+        fs::read(f.path.join("original/note.txt")).unwrap(),
+        b"immutable input\n"
+    );
 }

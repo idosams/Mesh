@@ -315,3 +315,11 @@ starting input. They show verified text and binary metadata; artifact rendering,
 comparison, main approval and integration are not yet connected. Incomplete content and omitted
 changes are labeled explicitly. Pins are retained only in the current app view, not after reload.
 The complete packaged graphical interaction remains unverified.
+
+
+The subsequent native starting-version comparison reads the lane's verified initial import and the
+exact selected saved result. The original project's saved version is reported separately from that
+local import identity. It lists changed objects and can read bounded before/after text without using
+later source or lane edits. Binary, unsafe or large text remains labeled metadata. This is a read-only
+development API; connecting it to the parallel panels and reopening its binding after restart are
+separate increments. It grants no main approval authority.

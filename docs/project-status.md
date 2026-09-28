@@ -244,3 +244,12 @@ The canonical parallel fleet-review transfer preserves English/Hebrew controls a
 saved identities and file contents, and distinct accessible folder headings across panels. Local
 interface and coordinator checks pass; native full and packaged graphical acceptance remain pending.
 This remains unmerged development work and does not add main approval authority.
+
+Native input-relative fleet comparison now retains the exact verified initial lane import and compares
+it to a selected recorded checkpoint. It distinguishes the original source version from the local
+import operation, pages changed object identities, and reads bounded selected before/after text from
+verified history. Existing source edits and newer lane edits do not enter the comparison. A typed
+desktop command exposes this read without approval authority. Native tests cover attached-source
+mapping and immutable historical reads; the visible panels still use their labeled recorded review
+base until this separate comparison is connected. Restart reconstruction of this binding, full artifact
+presentation, original-main integration and packaged graphical proof remain required.

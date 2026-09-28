@@ -7,6 +7,8 @@
 #[cfg(target_os = "macos")]
 pub mod catalog;
 #[cfg(unix)]
+pub(crate) mod comparison;
+#[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
 pub mod provider;

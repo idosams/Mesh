@@ -844,6 +844,37 @@ mod desktop {
         .map_err(|_| "Saved fleet review could not be loaded".to_owned())?
     }
 
+    // Tauri binds the exact selection and bounded comparison selectors as named arguments.
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn inspect_fleet_starting_comparison(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        checkpoint: String,
+        version: String,
+        bundle: String,
+        after: Option<String>,
+        selected: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+                &lane,
+                &checkpoint,
+                &version,
+                &bundle,
+            )
+            .map_err(|_| "Saved review selection is invalid")?;
+            host.current_fleet(&objective)?
+                .saved_starting_comparison(&selection, after.as_deref(), selected.as_deref())
+                .map(|value| value.encode())
+                .map_err(|_| "The exact starting-version comparison is unavailable".into())
+        })
+        .await
+        .map_err(|_| "Starting-version comparison could not be loaded".to_owned())?
+    }
+
     #[tauri::command]
     async fn fleet_activity(
         hosts: State<'_, Arc<crate::fleet_host::FleetHosts>>,
@@ -7129,6 +7160,7 @@ mod desktop {
                 fleet_activity,
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
+                inspect_fleet_starting_comparison,
                 start_attached_fleet,
                 stop_attached_fleet,
                 attached_project_versions,
