@@ -158,10 +158,17 @@ at `a915612ad8e32273bf0ed7585c74db6755bd8496`; all seven exact-head and combined
 All 15 focused local receiving/authentication tests passed. Partial input and the original reservation
 survive connection loss; saved receipts alone cannot recreate a reservation after supervisor restart.
 
-The next increment adds the bounded broker command loop around that session. It routes authentication,
+[PR #137](https://github.com/idosams/Mesh/pull/137) merged the bounded broker command loop at
+`fb9a93c61fa4d36736383fed9ad8d3bc56959d04`, with all seven exact-head checks passing. It routes authentication,
 manifest/chunk receipt, confirmed offsets and one materialization handoff. A failed final reply retains
-the native handoff for the supervisor. Seven focused local broker tests passed; full CI is pending.
+the native handoff for the supervisor. Seven focused local broker tests passed. Hosted Linux passed
+3,223 tests; macOS passed 3,477 tests, all four renderer cases and the 44-check daemon demo.
 A deployed worker, initial worker-proof transport, configured SSH, client reply verification, signed
 results/recovery and actual second-machine operation remain unfinished. Evidence is tracked in the
 [ledger](plan/fleet-migration.md#r19-bounded-receiving-broker-loop) and
 [remote execution contract](plan/fleet-remote-execution-contract.md).
+
+The macOS pull-request/main job now invokes the complete `npm test` gate, retaining the separate
+renderer step and all seven existing jobs. This aligns hosted and contributor validation commands;
+the new workflow still needs its own successful run. Preserved local runs and their failures remain
+separate evidence. See [R20](plan/fleet-migration.md#r20-complete-hosted-validation-gate).

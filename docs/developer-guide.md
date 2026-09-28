@@ -31,7 +31,7 @@ npm run verify:storage
 npm run verify:demo
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo nextest run --workspace
+cargo nextest run --workspace --no-fail-fast
 npm --prefix apps/desktop test
 ```
 
@@ -64,9 +64,12 @@ checks local Markdown file destinations and literal npm script examples against 
 It checks neither external URLs nor heading fragments and does not execute examples. Rendered HTML
 and packaged text guides still need the desktop guide tests and visual verification.
 
-Pull requests run Rust checks on Linux and macOS, full-workspace linting on macOS, and the
-macOS desktop/React, documentation, and storage checks. The nightly job runs the complete local
-command plus dependency policy. A configured workflow is not evidence of a successful hosted run;
+Pull requests and main pushes run the complete `npm test` gate in the macOS test job, followed by
+the native renderer checks. The seven existing jobs remain, including independent Linux Rust,
+desktop/React, documentation, storage, license and dependency-policy checks. Rust test failures do
+not stop the remaining Rust cases; the command still fails, and later gate stages require success.
+The nightly job also runs the complete local command plus dependency policy. A configured workflow
+is not evidence of a successful hosted run;
 inspect the exact revision's results before release.
 
 On macOS, `npm run test:macos-renderers` runs all four PDFKit and Office integration cases using checked-in synthetic fixtures.

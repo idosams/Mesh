@@ -8,7 +8,7 @@
   "scripts": {
     "test": "npm run verify",
     "verify:license": "node tools/program/license-check.mjs && node tools/program/license-check.mjs --self-test",
-    "verify:rust": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo fmt --all --check && PATH=\"$HOME/.cargo/bin:$PATH\" cargo clippy --workspace --all-targets -- -D warnings && PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run --workspace",
+    "verify:rust": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo fmt --all --check && PATH=\"$HOME/.cargo/bin:$PATH\" cargo clippy --workspace --all-targets -- -D warnings && PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run --workspace --no-fail-fast",
     "verify:desktop": "npm --prefix apps/desktop test",
     "verify": "npm run verify:repository && npm run verify:docs && npm run verify:license && npm run verify:storage && npm run verify:rust && npm run verify:desktop && npm run verify:demo",
     "verify:docs": "node --test tools/docs/check.test.mjs && node tools/docs/check.mjs",

@@ -57,11 +57,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      # Preserve every failure in one run; an unrelated early failure must not hide later evidence.
-      - run: cargo nextest run --workspace --no-fail-fast
+      # Exercise the same complete gate contributors run, including the real daemon demo.
+      # Keep the independent jobs above/below for early, separately named failure reporting.
+      - run: npm test
       - run: npm run test:macos-renderers
-      - run: npm run verify:demo
 
   deny:
     runs-on: ubuntu-latest

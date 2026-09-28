@@ -2617,3 +2617,18 @@ retained handoff, unauthenticated refusal, duplicate request IDs, frame/byte bud
 command parsing. Full validation is in progress. This is an embedding loop, not a deployed worker,
 SSH connector or key provisioner. Initial worker-proof transport, resident service lifecycle, client
 reply verification, signed results/reconciliation and actual second-machine acceptance remain open.
+
+## R20 complete hosted validation gate
+
+New canonical workflow correction on merged #137; no preserved source commits are replaced.
+The macOS test job invokes the complete `npm test` command instead of manually repeating only its
+Rust and demo portions. It still runs the four native renderer cases afterward. All seven existing
+job names, dependency checks, platform scopes, assertions and timeouts remain unchanged. Independent
+desktop/docs/storage and license jobs continue to provide earlier failure reporting.
+
+The shared Rust command uses `--no-fail-fast`, matching the existing hosted macOS behavior: remaining
+Rust cases run after a failure, and any failure still fails the gate. This does not make later gate
+stages run after a failed Rust command. No test is ignored, removed or relaxed. Hosted full-gate
+results must be verified at the exact revision before merging; configuration alone is not a pass.
+Local repository, docs, license and storage checks and their mutation/regression tests passed.
+Earlier local processes and failed logs are preserved, not replaced by a hosted success claim.
