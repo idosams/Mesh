@@ -179,3 +179,19 @@ cargo test -p mesh-daemon --test fleet-agent actual_claude -- --ignored --nocapt
 No successful live Claude journey is claimed. Authentication previously returned
 `authentication_failed`; local sign-in refresh is pending. Do not retry that probe
 as a substitute for completing this full journey once authentication is available.
+
+## Persisted provider choices
+
+`NativeFleetDirectory::create_attached_with_providers` binds a validated
+`FleetProviderPolicy` to an allocation. The policy chooses the coordinator and
+which of Codex/Claude may receive delegated lanes. The existing `create_attached`
+entry point and its v1 receipt stay Codex-only. Non-default policies use a v2
+receipt; allowed-provider order is canonical and duplicate/unknown entries refuse.
+
+The request identity cannot be reused to change providers, including while the
+service is already open. Restart discovery checks the retained lane providers
+against the receipt and restores observation only. Old software cannot execute a
+v2 allocation by treating it as a v1 Codex allocation: the schema/receipt byte
+comparison refuses it. `admitted_providers` exposes immutable native configuration
+for constructing all required hosts before dispatch; it is not an agent command.
+These native policy APIs still need desktop selector/receipt integration.

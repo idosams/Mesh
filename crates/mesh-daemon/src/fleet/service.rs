@@ -479,6 +479,11 @@ impl FleetService {
             .map_err(|_| refusal("fleet-host-needs-recovery"))
     }
 
+    /// Immutable native provider policy. Reading it admits no executable or agent session.
+    pub fn admitted_providers(&self) -> impl Iterator<Item = &str> {
+        self.providers.iter().map(String::as_str)
+    }
+
     /// Native routing identity; credentials remain scoped to this objective.
     pub fn objective(&self) -> Result<String, Unavailable> {
         Ok(self.lock()?.runtime.objective().to_owned())

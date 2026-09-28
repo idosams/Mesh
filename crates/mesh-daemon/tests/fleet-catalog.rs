@@ -1,7 +1,9 @@
 //! Durable native discovery must not adopt unknown workers or manufacture missing fleet history.
 #![cfg(target_os = "macos")]
 use ed25519_dalek::{Signer as _, SigningKey};
-use mesh_daemon::fleet::catalog::{AttachedFleetRequest, NativeFleetDirectory};
+use mesh_daemon::fleet::catalog::{
+    AttachedFleetRequest, FleetProviderPolicy, NativeFleetDirectory,
+};
 use mesh_daemon::fleet::{Command, Limits};
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
@@ -123,6 +125,136 @@ fn rows(value: &Json) -> &[Json] {
 }
 fn text<'a>(value: &'a Json, name: &str) -> &'a str {
     value.get(name).unwrap().as_text().unwrap()
+}
+
+#[test]
+fn provider_policy_binds_retries_receipts_and_restart_without_adoption() {
+    for (name, coordinator, providers) in [
+        ("policy-legacy", "codex", vec!["codex".into()]),
+        ("policy-claude", "claude", vec!["claude".into()]),
+        (
+            "policy-mixed",
+            "claude",
+            vec!["codex".into(), "claude".into()],
+        ),
+    ] {
+        let f = Fixture::new(name);
+        let catalog = f.open().unwrap();
+        let policy = FleetProviderPolicy::new(coordinator, &providers).unwrap();
+        let service = catalog
+            .create_attached_with_providers(&f.history, &f.request, &policy)
+            .unwrap();
+        let id = service.objective().unwrap();
+        let state = service.native_state().unwrap();
+        assert_eq!(state.lanes.len(), 1);
+        assert_eq!(state.lanes.values().next().unwrap().provider, coordinator);
+        assert_eq!(
+            service.admitted_providers().collect::<Vec<_>>(),
+            policy.providers().collect::<Vec<_>>()
+        );
+        let receipt_path = f.catalog.join(&id).join("allocation.json");
+        let receipt_bytes = fs::read(&receipt_path).unwrap();
+        let receipt = Json::parse(std::str::from_utf8(&receipt_bytes).unwrap()).unwrap();
+        let legacy = coordinator == "codex" && providers.len() == 1;
+        assert_eq!(
+            text(&receipt, "schema"),
+            if legacy {
+                "mesh.native-fleet-allocation/v1"
+            } else {
+                "mesh.native-fleet-allocation/v2"
+            }
+        );
+        if legacy {
+            assert!(receipt.get("providers").is_none());
+            assert!(std::sync::Arc::ptr_eq(
+                &service,
+                &catalog.create_attached(&f.history, &f.request).unwrap()
+            ));
+        } else {
+            assert_eq!(text(&receipt, "coordinator_provider"), coordinator);
+            assert!(catalog.create_attached(&f.history, &f.request).is_err());
+        }
+        assert!(std::sync::Arc::ptr_eq(
+            &service,
+            &catalog
+                .create_attached_with_providers(&f.history, &f.request, &policy)
+                .unwrap()
+        ));
+        for conflicting in [
+            FleetProviderPolicy::default(),
+            FleetProviderPolicy::new("claude", &["claude".into()]).unwrap(),
+            FleetProviderPolicy::new("claude", &["claude".into(), "codex".into()]).unwrap(),
+            FleetProviderPolicy::new("codex", &["claude".into(), "codex".into()]).unwrap(),
+        ]
+        .into_iter()
+        .filter(|candidate| candidate != &policy)
+        {
+            assert!(catalog
+                .create_attached_with_providers(&f.history, &f.request, &conflicting)
+                .is_err());
+        }
+        assert_eq!(fs::read(&receipt_path).unwrap(), receipt_bytes);
+        assert_eq!(service.native_state().unwrap(), state);
+        drop(service);
+        drop(catalog);
+        let reopened = f.open().unwrap();
+        let restored = reopened.snapshot().unwrap();
+        assert_eq!(
+            text(&rows(&restored)[0], "ownership"),
+            "restored-unattached"
+        );
+        assert!(reopened.current_service(&id).is_err());
+        let lanes = rows(&restored)[0]
+            .get("state")
+            .unwrap()
+            .get("lanes")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(text(&lanes[0], "provider"), coordinator);
+        assert_eq!(fs::read(&receipt_path).unwrap(), receipt_bytes);
+    }
+}
+
+#[test]
+fn persisted_provider_policy_must_agree_with_the_coordinator_ledger() {
+    let f = Fixture::new("policy-ledger-mismatch");
+    let catalog = f.open().unwrap();
+    let policy = FleetProviderPolicy::new("claude", &["claude".into(), "codex".into()]).unwrap();
+    let service = catalog
+        .create_attached_with_providers(&f.history, &f.request, &policy)
+        .unwrap();
+    let id = service.objective().unwrap();
+    let receipt_path = f.catalog.join(&id).join("allocation.json");
+    let original = fs::read(&receipt_path).unwrap();
+    drop(service);
+    drop(catalog);
+    let original_text = std::str::from_utf8(&original).unwrap();
+    assert_eq!(
+        original_text
+            .matches("\"coordinator_provider\":\"claude\"")
+            .count(),
+        1
+    );
+    let altered = original_text.replace(
+        "\"coordinator_provider\":\"claude\"",
+        "\"coordinator_provider\":\"codex\"",
+    );
+    fs::write(&receipt_path, &altered).unwrap();
+    let reopened = f.open().unwrap();
+    assert_eq!(
+        text(&rows(&reopened.snapshot().unwrap())[0], "ownership"),
+        "unavailable"
+    );
+    assert!(reopened.current_service(&id).is_err());
+    assert_eq!(fs::read(&receipt_path).unwrap(), altered.as_bytes());
+    drop(reopened);
+    fs::write(&receipt_path, original).unwrap();
+    let reopened = f.open().unwrap();
+    assert_eq!(
+        text(&rows(&reopened.snapshot().unwrap())[0], "ownership"),
+        "restored-unattached"
+    );
 }
 
 #[test]

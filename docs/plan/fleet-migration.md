@@ -1998,3 +1998,28 @@ and live Claude acceptance remain pending. Existing #102/#107 verification runs
 are preserved; no new large target is built while the shared native target is in
 use and local disk headroom is limited. Hosted canonical checks remain mandatory
 before merge, alongside the unresolved native and packaged acceptance gates.
+
+## I08c durable native provider policy
+
+New canonical implementation based on #109 at
+`fcbac1482178362f388e9887313c7435d8ecd917`; no preserved source commit is replaced.
+Native allocation can now bind a coordinator provider and a closed set containing
+Codex, Claude, or both. The original creation API remains Codex-only. Explicit
+policy creation rejects unknown/duplicate providers and excluded coordinators
+before allocation. Services expose their immutable admitted provider identities
+for native host configuration; reading the list grants no execution authority.
+
+Default Codex allocations retain the exact v1 receipt format. Non-default choices
+use `mesh.native-fleet-allocation/v2` with canonical provider order. Same-request
+retries cannot change the coordinator or widen/narrow the set. Discovery validates
+receipt policy against retained lane facts and still restores observation only,
+without adopting workers or granting current-session execution. Unknown/noncanonical
+receipts remain unavailable, with their original bytes preserved.
+
+Native regression cases cover default, Claude-only and mixed policies, exact retries,
+conflicting requests, v1 compatibility, restart refusal and receipt/ledger mismatch.
+Focused policy tests run against byte-matched source in an isolated harness;
+full catalogue execution and canonical npm validation remain pending. Repository,
+docs, license, storage and formatting checks pass. Desktop input/receipt controls
+and configuration of all admitted worker hosts follow in the next increment; this
+native persistence change alone does not expose provider choice in the UI.

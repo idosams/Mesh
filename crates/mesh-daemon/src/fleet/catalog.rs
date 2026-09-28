@@ -8,7 +8,7 @@ use crate::{CheckpointRuntimeParameters, ProtectedWorkspaceRoot, TrustedReviewer
 use mesh_store::fleet::{FleetStore, FleetStoreAuthority, FleetStoreError};
 use mesh_store::RecordDigest;
 use mesh_types::{Blake3, ContentDigest as _};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs::{File, Permissions};
 use std::io::{self, Read as _};
@@ -16,6 +16,9 @@ use std::os::darwin::fs::MetadataExt as _;
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+
+mod provider_policy;
+pub use provider_policy::FleetProviderPolicy;
 
 const MAX_FLEETS: usize = 16;
 const DATABASE: &str = "fleet.sqlite";
@@ -202,6 +205,7 @@ impl FleetStoreAuthority for LedgerAuthority {
     }
 }
 struct OpenFleet {
+    policy: FleetProviderPolicy,
     service: Arc<FleetService>,
     restored: bool,
 }
@@ -244,6 +248,17 @@ impl NativeFleetDirectory {
         source: &ProvisionedAttachment,
         request: &AttachedFleetRequest,
     ) -> io::Result<Arc<FleetService>> {
+        self.create_attached_with_providers(source, request, &FleetProviderPolicy::default())
+    }
+
+    /// Allocate an exact provider policy with the request. Retrying cannot widen the allowed set,
+    /// change the coordinator, adopt old workers or rewrite an existing allocation receipt.
+    pub fn create_attached_with_providers(
+        &self,
+        source: &ProvisionedAttachment,
+        request: &AttachedFleetRequest,
+        policy: &FleetProviderPolicy,
+    ) -> io::Result<Arc<FleetService>> {
         request.validate()?;
         source.validate_lane_version(&request.version.to_string())?;
         self.owner.check()?;
@@ -254,7 +269,8 @@ impl NativeFleetDirectory {
         let id = objective(&request.request);
         if let Some(existing) = fleets.get(&id) {
             let state = existing.service.native_state().map_err(|_| unavailable())?;
-            if state.goal.as_deref() != Some(&request.goal)
+            if &existing.policy != policy
+                || state.goal.as_deref() != Some(&request.goal)
                 || state.limits.as_ref() != Some(&request.limits)
             {
                 return Err(unavailable());
@@ -264,7 +280,7 @@ impl NativeFleetDirectory {
                 .create_root_from_attachment(
                     "root",
                     &request.goal,
-                    "codex",
+                    policy.coordinator(),
                     source,
                     request.version,
                 )
@@ -295,7 +311,7 @@ impl NativeFleetDirectory {
             )?;
             let file = root.filesystem().inspect_entry(Path::new(DATABASE))?;
             root.create_child_directory(OsStr::new("lanes"))?;
-            let encoded = receipt(&root, &file, source.id(), request)?.encode();
+            let encoded = receipt(&root, &file, source.id(), request, policy)?.encode();
             root.filesystem().write_new_file(
                 Path::new(RECEIPT),
                 encoded.as_bytes(),
@@ -304,17 +320,24 @@ impl NativeFleetDirectory {
         }
         let stored = read_receipt(&root)?;
         let file = root.filesystem().inspect_entry(Path::new(DATABASE))?;
-        if stored != receipt(&root, &file, source.id(), request)?.encode() {
+        if stored != receipt(&root, &file, source.id(), request, policy)?.encode() {
             return Err(unavailable());
         }
-        let service = self.open_service(root, stored, fresh, &id, request)?;
+        let service = self.open_service(root, stored, fresh, &id, request, policy)?;
         service
-            .create_root_from_attachment("root", &request.goal, "codex", source, request.version)
+            .create_root_from_attachment(
+                "root",
+                &request.goal,
+                policy.coordinator(),
+                source,
+                request.version,
+            )
             .map_err(|_| unavailable())?;
         self.owner.check()?;
         fleets.insert(
             id,
             OpenFleet {
+                policy: policy.clone(),
                 service: service.clone(),
                 restored: !fresh,
             },
@@ -329,6 +352,7 @@ impl NativeFleetDirectory {
         initialize: bool,
         id: &str,
         request: &AttachedFleetRequest,
+        policy: &FleetProviderPolicy,
     ) -> io::Result<Arc<FleetService>> {
         let file = root.filesystem().inspect_entry(Path::new(DATABASE))?;
         let authority = Arc::new(LedgerAuthority {
@@ -351,6 +375,10 @@ impl NativeFleetDirectory {
         }
         if runtime.state().goal.as_deref() != Some(&request.goal)
             || runtime.state().limits.as_ref() != Some(&request.limits)
+            || runtime.state().lanes.values().any(|lane| {
+                !policy.providers.contains(&lane.provider)
+                    || (lane.parent.is_none() && lane.provider != policy.coordinator)
+            })
         {
             return Err(unavailable());
         }
@@ -362,13 +390,9 @@ impl NativeFleetDirectory {
         let allocator =
             NativeLaneAllocator::open(&path, self.reviewers.clone(), self.checkpoint, vec![])
                 .map_err(|_| unavailable())?;
-        FleetService::new(
-            runtime,
-            Arc::new(allocator),
-            BTreeSet::from(["codex".into()]),
-        )
-        .map(Arc::new)
-        .map_err(|_| unavailable())
+        FleetService::new(runtime, Arc::new(allocator), policy.providers.clone())
+            .map(Arc::new)
+            .map_err(|_| unavailable())
     }
 
     /// Return only a service allocated by this catalogue instance. Discovery after restart is
@@ -427,18 +451,21 @@ impl NativeFleetDirectory {
                     let stored = read_receipt(&root)?;
                     let value = Json::parse(&stored).map_err(|_| unavailable())?;
                     let (project, request) = decode_request(&value)?;
+                    let policy = FleetProviderPolicy::decode(&value)?;
                     let file = root.filesystem().inspect_entry(Path::new(DATABASE))?;
                     if objective(&request.request) != id
-                        || receipt(&root, &file, &project, &request)?.encode() != stored
+                        || receipt(&root, &file, &project, &request, &policy)?.encode() != stored
                     {
                         return Err(unavailable());
                     }
-                    self.open_service(root, stored, false, id, &request)
+                    self.open_service(root, stored, false, id, &request, &policy)
+                        .map(|service| (service, policy))
                 })();
-                if let Ok(service) = recovered {
+                if let Ok((service, policy)) = recovered {
                     fleets.insert(
                         id.into(),
                         OpenFleet {
+                            policy,
                             service,
                             restored: true,
                         },
@@ -473,9 +500,17 @@ fn receipt(
     file: &File,
     project: &str,
     request: &AttachedFleetRequest,
+    policy: &FleetProviderPolicy,
 ) -> io::Result<Json> {
-    Ok(Json::object([
-        ("schema", Json::text("mesh.native-fleet-allocation/v1")),
+    let mut value = Json::object([
+        (
+            "schema",
+            Json::text(if policy.legacy() {
+                "mesh.native-fleet-allocation/v1"
+            } else {
+                "mesh.native-fleet-allocation/v2"
+            }),
+        ),
         ("directory", Json::text(directory(root)?.directory_token())),
         ("database", Json::text(file_identity(file)?)),
         (
@@ -492,7 +527,21 @@ fn receipt(
         ("concurrency", Json::Number(request.limits.concurrency)),
         ("depth", Json::Number(request.limits.depth)),
         ("retries", Json::Number(request.limits.retries)),
-    ]))
+    ]);
+    if !policy.legacy() {
+        let Json::Object(fields) = &mut value else {
+            unreachable!()
+        };
+        fields.push((
+            "coordinator_provider".into(),
+            Json::text(policy.coordinator()),
+        ));
+        fields.push((
+            "providers".into(),
+            Json::Array(policy.providers().map(Json::text).collect()),
+        ));
+    }
+    Ok(value)
 }
 fn decode_request(value: &Json) -> io::Result<(String, AttachedFleetRequest)> {
     let text = |field| {
