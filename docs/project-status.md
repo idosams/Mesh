@@ -173,10 +173,20 @@ results/recovery and actual second-machine operation remain unfinished. Evidence
 The literal full gate and all seven exact-head checks passed. Preserved local runs and failures remain
 separate evidence. See [R20](plan/fleet-migration.md#r20-complete-hosted-validation-gate).
 
-The next increment connects the original broker handoff to native workspace initialization,
+[PR #139](https://github.com/idosams/Mesh/pull/139) merged at
+`ec633abe199092d468a64da4f026cd9726ce2c78` with all seven exact-head checks passing. It connects
+the original broker handoff to native workspace initialization,
 durable launch intent and `ReceivedWorkerHost`. Integration tests exercise authenticated stream
 transfer followed by one fixture-provider process, scoped IPC reconnect, signed checkpoint and saved
 review, including loss of the broker's final reply. Changed input must refuse before launch intent.
-Validation is pending. This is local native composition; resident deployment, SSH, signed remote
+All six focused native host tests passed. This is local native composition; resident deployment, SSH, signed remote
 result recovery and second-machine acceptance remain open. See
 [R21](plan/fleet-migration.md#r21-broker-handoff-to-native-provider).
+
+The coordinator input client now connects a native saved-history export to the receiving broker,
+verifies canonical reply correlation, checks native authority during transfer and resumes from
+confirmed offsets. Lost final replies remain uncertain; retained-only admission sends no input.
+All seven focused native transfer tests passed, including preservation of continued live project edits.
+Full hosted CI is pending. This remains an embedding API requiring
+authenticated transport, not a deployed remote worker. See
+[R22](plan/fleet-migration.md#r22-coordinator-immutable-input-transfer).

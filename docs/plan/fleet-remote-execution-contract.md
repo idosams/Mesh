@@ -442,3 +442,24 @@ consumes the handed-off capability and requires reconciliation. It never implies
 The embedding owner must retain and poll the returned host after connection loss. This API does not
 install a resident service, expose SSH or add remote result/status recovery. Local integration tests
 use real processes with a fixture provider; deployed and actual-provider evidence remain separate.
+
+## Coordinator input client
+
+`transfer_remote_input` composes native saved-history export with the bounded receiving protocol.
+The current native attempt must already carry the worker proof. Configured public keys and the exact
+source manifest are compared with the fresh admission challenge before its payload reaches the native
+signer. During transfer the client rechecks lane/limits/cancellation, the native lease clock and pinned
+source identities around exchanges. It does not hold a capture lock while waiting for network I/O.
+
+Every reply must match the closed canonical schema, expected request/kind, assignment/input/bundle,
+allocation and original admission revision. Each distinct chunk is queried for a confirmed offset;
+offsets outside its declared size or inconsistent completion flags refuse. Native source reads verify
+whole chunk hashes before sending parts of at most 64 KiB. Synchronous acknowledgments bound queued
+data. Complete peer chunks need not be retransmitted. No local source or coordinator record is mutated.
+
+`Materialized` acknowledges only input receipt. `Retained` returns correlation facts and sends no
+manifest or chunk, requiring native reconciliation. A missing final reply is an error even when the
+worker retained its handoff; the client neither infers completion nor retries automatically. These
+unsigned input replies are not remote result signatures or launch permits. The embedding owner still
+must provide authenticated streams, deadlines, cancellation, initial worker proof and bounded stderr.
+This client does not launch SSH, install a worker, admit keys or implement remote result recovery.

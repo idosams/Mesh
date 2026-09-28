@@ -30,7 +30,7 @@ impl RemoteInputSource {
         &self.manifest
     }
 
-    fn verify_roots(&self) -> io::Result<()> {
+    pub(crate) fn verify_roots(&self) -> io::Result<()> {
         for root in &self.roots {
             root.ensure_namespace_identity().map_err(|_| invalid())?;
         }

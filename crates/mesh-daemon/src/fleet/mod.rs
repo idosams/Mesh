@@ -11,11 +11,18 @@ pub(crate) mod comparison;
 #[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
+mod input_transfer;
+#[cfg(unix)]
 mod received_host;
 #[cfg(unix)]
 mod receiving_broker;
 #[cfg(unix)]
 mod receiving_session;
+#[cfg(unix)]
+pub use input_transfer::{
+    transfer_remote_input, RemoteInputTransferOutcome, RemoteInputTransferReceipt,
+    RemoteInputTransferRequest,
+};
 #[cfg(unix)]
 pub use received_host::ReceivedWorkerHost;
 #[cfg(unix)]

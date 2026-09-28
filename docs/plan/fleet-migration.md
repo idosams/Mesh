@@ -2654,3 +2654,29 @@ This is neither a real-provider acceptance run nor deployed SSH/second-machine e
 resident service must retain and poll the host independently of the broker. Initial worker-proof
 transport, client reply validation, native key/host provisioning, authenticated result lookup after
 reconnect/restart, signed result export/import and final packaged acceptance remain unfinished.
+
+## R22 coordinator immutable input transfer
+
+New canonical implementation on merged #139; no preserved source commits are replaced.
+`transfer_remote_input` accepts a native-selected current attempt, saved-history `RemoteInputSource`,
+configured keys and already-authenticated streams. It validates the fresh admission challenge against
+the native attempt before invoking the coordinator signer. Every exchange rechecks native cancellation,
+lane/limit changes, lease expiry and pinned source identities. No live project scan or assignment
+mutation occurs. The owner still supplies transport authentication, deadlines and cancellation.
+
+The serial client verifies exact canonical reply bytes, schema, request/kind, assignment correlation,
+allocation and pinned admission revision. It sends the manifest, asks for each distinct chunk's
+confirmed offset, reads/hash-verifies native source chunks and sends at most 64 KiB per acknowledged
+part. Complete chunks are reused. Invalid offsets, changed correlation and unknown fields refuse.
+Only the final matching materialization reply yields an input acknowledgment; EOF or a lost final
+reply remains an error/uncertainty. Retained-only admission returns facts without sending input.
+Neither outcome is provider execution, a signed saved result or protected-main approval.
+
+Seven focused tests cover actual saved-history export and native Unix-stream receiving, a seeded
+partial offset followed by real disconnect/resume, completed-chunk reuse, lost final reply with
+worker handoff retained, wrong reply correlation, cancellation during signing, wrong immutable source,
+retained-only admission and strict canonical reply matching. An initial fixture assumed one chunk per
+file; it was corrected to use actual saved manifest boundaries, preserving the failed log. All seven
+focused tests passed, including continued live project edits preserved while transferring the earlier
+saved version. Full hosted validation is pending. Deployment, initial worker-proof transport, SSH/key provisioning, signed output transfer
+and local result import/reconnect recovery remain unfinished.
