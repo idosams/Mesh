@@ -1,3 +1,4 @@
+import { fleetInputComparison } from './fleet-input-comparison.js';
 // Immutable saved-result selection and independent presentation requests. No publication authority.
 const identity = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -53,7 +54,7 @@ export function savedFleetReview(raw, selection) {
 }
 
 export function createFleetReviews({ invoke, laneFor, changed }) {
-  let queues = {}, pins = [], nextPin = 1, disposed = false, notice = '';
+  let queues = {}, pins = [], nextPin = 1, nextRead = 1, disposed = false, notice = '';
   const publish = () => { if (!disposed) changed(); };
   async function loadPage(objective, lane, after) {
     const id = key(objective, lane), existing = queues[id];
@@ -70,13 +71,27 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     publish();
   }
   async function loadPin(pin) {
-    const loading = { ...pin, loading: true, error: '' };
+    const loading = { ...pin, loading: true, error: '', reviewRequest: nextRead++ };
     pins = pins.map(value => value === pin ? loading : value); publish();
     try {
       const review = savedFleetReview(await invoke('inspect_fleet_saved_review', loading.selection), loading.selection);
-      if (!disposed) pins = pins.map(value => value === loading ? { ...loading, loading: false, review } : value);
+      if (!disposed) pins = pins.map(value => value.key === loading.key && value.reviewRequest === loading.reviewRequest ? { ...value, loading: false, review } : value);
     } catch {
-      if (!disposed) pins = pins.map(value => value === loading ? { ...loading, loading: false, error: 'This exact saved result could not be verified. Its selection is retained.' } : value);
+      if (!disposed) pins = pins.map(value => value.key === loading.key && value.reviewRequest === loading.reviewRequest ? { ...value, loading: false, error: 'This exact saved result could not be verified. Its selection is retained.' } : value);
+    }
+    publish();
+  }
+  async function loadInput(pin, after = null, selected = null) {
+    if (pin.input?.loading) return;
+    const loading = { ...pin.input, page: pin.input?.page ?? null, file: pin.input?.file ?? null, loading: true, error: '', requestedAfter: after, requestedObject: selected };
+    pins = pins.map(value => value.key === pin.key ? { ...value, input: loading } : value); publish();
+    try {
+      const comparison = fleetInputComparison(await invoke('inspect_fleet_starting_comparison', { ...pin.selection, after, selected }), pin, after, selected);
+      if (!disposed) pins = pins.map(value => value.key === pin.key && value.input === loading
+        ? { ...value, input: { ...loading, loading: false, ...(selected === null ? { page: comparison } : { file: comparison.changes[0] }) } } : value);
+    } catch {
+      if (!disposed) pins = pins.map(value => value.key === pin.key && value.input === loading
+        ? { ...value, input: { ...loading, loading: false, error: 'This starting-version comparison could not be verified. Any displayed content is the previously verified result.' } } : value);
     }
     publish();
   }
@@ -85,13 +100,22 @@ export function createFleetReviews({ invoke, laneFor, changed }) {
     dispose: () => { disposed = true; },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review'].includes(value.type)) return false;
+      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (['close-review', 'retry-review'].includes(value.type) && fields === 'pin,type') {
         const pin = pins.find(pin => pin.key === value.pin);
         if (!pin) return true;
         if (value.type === 'close-review') { pins = pins.filter(value => value !== pin); notice = ''; publish(); }
         else if (!pin.loading) void loadPin(pin);
+        return true;
+      }
+      if (['input-review', 'input-page', 'input-file', 'retry-input'].includes(value.type)) {
+        const pin = pins.find(pin => pin.key === value.pin);
+        if (!pin || pin.input?.loading) return true;
+        if (value.type === 'input-review' && fields === 'pin,type') void loadInput(pin);
+        if (value.type === 'retry-input' && fields === 'pin,type' && pin.input?.error) void loadInput(pin, pin.input.requestedAfter, pin.input.requestedObject);
+        if (value.type === 'input-page' && fields === 'after,pin,type' && typeof value.after === 'string' && value.after === pin.input?.page?.nextAfter) void loadInput(pin, value.after);
+        if (value.type === 'input-file' && fields === 'object,pin,type' && pin.input?.page?.changes.some(change => change.object === value.object)) void loadInput(pin, null, value.object);
         return true;
       }
       const id = key(value.objective, value.lane);

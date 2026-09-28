@@ -253,3 +253,18 @@ desktop command exposes this read without approval authority. Native tests cover
 mapping and immutable historical reads; the visible panels still use their labeled recorded review
 base until this separate comparison is connected. Restart reconstruction of this binding, full artifact
 presentation, original-main integration and packaged graphical proof remain required.
+
+
+Desktop pinned fleet panels now expose the native starting-version comparison as a separate read-only
+view. Each panel has independent changed-object paging, selected saved sides and text-diff layout.
+Responses bind exact source/local-base/result identities; page/detail retries preserve their request,
+and recorded-review responses cannot overwrite concurrent comparison results. The shared bounded text
+diff viewer now labels saved-versus-saved comparisons explicitly while retaining working-copy labels
+for its existing use. Tests cover response order, closing pending reads, multiple panels, cursor and
+identity substitution, absent/empty sides and unavailable text. Native pin persistence, restored-context
+reads, artifacts and original-main integration remain unfinished; no packaged graphical proof is claimed.
+
+The canonical starting-comparison panels preserve English/Hebrew labels and literal saved content,
+with separate wording for saved comparisons and the existing working-copy view. Local type/build,
+132 interface tests and 514 desktop tests pass. Hosted and packaged graphical validation remain
+separate; this increment is unmerged and grants no approval or main-update authority.

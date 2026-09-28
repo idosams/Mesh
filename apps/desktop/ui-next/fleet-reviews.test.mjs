@@ -12,7 +12,7 @@ const pin = () => ({ key: '1', selection: { objective: `fleet-${'7'.repeat(64)}`
 test('panels render verified text, exact base and disabled authority', () => {
   const value = pin(), model = fleetSavedReviewModel(value.review), html = render({ pins: [value], notice: '' });
   assert.match(html, /saved &lt;text&gt;/); assert.match(html, /&lt;script&gt;goal/); assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /Comparison base: this review/); assert.match(html, /starting input is not available yet/);
+  assert.match(html, /Comparison base: the recorded review/); assert.match(html, /starting-version comparison below/);
   assert.match(html, /not restored after an app reload/); assert.match(html, new RegExp(value.review.reviewed_head));
   for (const field of ['canApprove', 'canApproveAndExport', 'canExportGit', 'canExportPrivateCopy', 'canRecordReview', 'canRenderArtifactPreview', 'canInspectExactCopies']) assert.equal(model[field], false);
   assert.strictEqual(reduceReviewWorkbench(model, { type: 'approve-version' }), model);
@@ -90,5 +90,73 @@ test('Hebrew saved-result queues keep stale pages identifiable and disable pinni
     assert.match(incomplete, /סקירה זו אינה שלמה/);
     assert.match(incomplete, /5 שינויים ועוד 2 פעולות אינם מוצגים/);
     assert.doesNotMatch(incomplete, /אין שינויים בקבצים/);
+  } finally { module.exports.setLocale('en'); }
+});
+
+const inputSide = text => ({ path: 'note.txt', kind: 'file', digest: '9'.repeat(64), bytes: text.length, executable: false, state: 'text', text });
+const inputState = () => { const file = { object: '7'.repeat(32), effect: 'modified', before: inputSide('old\n'), after: inputSide('new\n') }; return { loading: false, error: '', file, page: { base: '8'.repeat(64), target: '2'.repeat(64), total: 1, after: null, nextAfter: null, changes: [file] } }; };
+test('starting-version panel renders actual saved text differences without working-copy claims', () => {
+  const value = { ...pin(), review: null, input: inputState() };
+  const html = render({ pins: [value], notice: '' });
+  assert.match(html, /Changes since this lane started/); assert.match(html, /data-mesh-work-diff-line="removed"/); assert.match(html, /data-mesh-work-diff-line="added"/);
+  assert.match(html, /Local starting version/); assert.match(html, /Pinned result/);
+  assert.doesNotMatch(html, /Working tree diff|The working copy matches|remains available in Edit/);
+  assert.match(html, /does not approve or apply changes to main/);
+});
+test('metadata-only and unavailable content never claim that saved text is unchanged', () => {
+  const value = { ...pin(), review: null, input: inputState() };
+  value.input.file.after = { ...inputSide(''), bytes: 300000, text: null, state: 'too-large' };
+  let html = render({ pins: [value], notice: '' }); assert.match(html, /256 KiB text preview limit/); assert.doesNotMatch(html, /No text changes/);
+  value.input.file.after = { ...inputSide(''), bytes: 4, text: null, state: 'binary-or-unsafe-text' };
+  html = render({ pins: [value], notice: '' }); assert.match(html, /Binary or unsafe text/); assert.doesNotMatch(html, /No text changes/);
+  value.input.file.after = { ...value.input.file.before, executable: true };
+  html = render({ pins: [value], notice: '' }); assert.match(html, /These saved texts are identical. Paths and executable modes may differ/);
+});
+test('empty comparison and selected absence are explicit; pending reads retain the previous file', () => {
+  const value = { ...pin(), review: null, input: inputState() };
+  value.input.file.before = null; value.input.file.effect = 'added'; value.input.loading = true;
+  let html = render({ pins: [value], notice: '' }); assert.match(html, /Absent in this version/); assert.match(html, /previous selection remains below/);
+  value.input = { ...inputState(), file: null, page: { ...inputState().page, total: 0, changes: [] } };
+  html = render({ pins: [value], notice: '' }); assert.match(html, /No path, content or executable-mode changes/); assert.doesNotMatch(html, /Selected: note.txt/);
+});
+
+test('Hebrew starting comparison preserves paths, versions and saved text while identifying retained content', () => {
+  const value = {...pin(), review:null, input:inputState()};
+  value.input.file.before.path = 'משפחה/Working.txt'; value.input.file.after.path = 'משפחה/Working.txt';
+  value.input.error = 'This starting-version comparison could not be verified. Any displayed content is the previously verified result.';
+  module.exports.setLocale('he');
+  try {
+    const html = render({pins:[value],notice:''});
+    assert.match(html, /aria-label="שינויים מאז תחילת המסלול"/);
+    assert.match(html, /השוואת גרסאות שמורות/);
+    assert.match(html, /התוצאה הקודמת שאומתה/);
+    assert.match(html, /השוואה לקריאה בלבד/);
+    assert.match(html, /<bdi dir="ltr">משפחה\/Working.txt<\/bdi>/);
+    assert.ok(html.includes(`<bdi dir="ltr">${value.input.page.base}</bdi>`));
+    assert.ok(html.includes(`<bdi dir="ltr">${value.input.page.target}</bdi>`));
+    assert.match(html, /<pre dir="ltr"[^>]*>old\n<\/pre>/);
+    assert.match(html, /<pre dir="ltr"[^>]*>new\n<\/pre>/);
+    assert.match(html, /ניסיון נוסף לאותה בקשת השוואה/);
+    assert.doesNotMatch(html, /Working tree diff|The working copy matches|remains available in Edit/);
+  } finally { module.exports.setLocale('en'); }
+});
+
+test('Hebrew saved comparison distinguishes identical text from metadata and unavailable content', () => {
+  const value = {...pin(), review:null, input:inputState()};
+  module.exports.setLocale('he');
+  try {
+    value.input.file.after = {...value.input.file.before, executable:true};
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /הטקסטים השמורים האלה זהים/);
+    assert.match(html, /הרשאות ההרצה עשויים להיות שונים/);
+    assert.doesNotMatch(html, /עותק העבודה תואם/);
+    value.input.file.after = {...inputSide(''), bytes:300000, text:null, state:'too-large'};
+    html = render({pins:[value],notice:''});
+    assert.match(html, /חורג ממגבלת תצוגת הטקסט/);
+    assert.doesNotMatch(html, /הטקסטים השמורים האלה זהים/);
+    value.input.file.before = null;
+    html = render({pins:[value],notice:''});
+    assert.match(html, /אינו קיים בגרסה זו/);
+    assert.match(html, /300000 בתים/);
   } finally { module.exports.setLocale('en'); }
 });

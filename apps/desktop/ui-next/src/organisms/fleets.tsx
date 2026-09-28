@@ -94,7 +94,7 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
           </li>;
         })}</ul>
-        <p className="text-xs text-muted-foreground">{t("Agent completion does not approve changes to main. Saved reviews can be pinned above. Starting-input comparison, approval and worker recovery are not available yet.")}</p>
+        <p className="text-xs text-muted-foreground">{t("Agent completion does not approve changes to main. Saved reviews can be pinned above. Approval and worker recovery are not available yet.")}</p>
       </article>;
     })}</div>
   );

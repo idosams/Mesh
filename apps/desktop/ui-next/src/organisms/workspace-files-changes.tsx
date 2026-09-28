@@ -818,7 +818,7 @@ function structuralProjectionCopy(
   return `${projection.matched.toLocaleString()} matching ${label}.`;
 }
 
-export function TextComparison({ before, after, split, baselineAvailable = true }: { before: string; after: string; split: boolean; baselineAvailable?: boolean }) {
+export function TextComparison({ before, after, split, baselineAvailable = true, context = "working" }: { before: string; after: string; split: boolean; baselineAvailable?: boolean; context?: "working" | "saved" }) {
   const t = useTranslation();
   const comparison = useMemo(
     () => baselineAvailable ? workspaceTextDiff(before, after) : null,
@@ -828,7 +828,7 @@ export function TextComparison({ before, after, split, baselineAvailable = true 
     return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Text comparison unavailable")}>
       <div className="max-w-lg">
         <h4 className="font-semibold">{t("Saved baseline cannot be displayed")}</h4>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("The saved baseline is not available as bounded text. The exact working file remains available in Edit.")}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{t(context === "saved" ? "A saved side is unavailable as bounded text. Inspect its metadata below." : "The saved baseline is not available as bounded text. The exact working file remains available in Edit.")}</p>
       </div>
     </section>;
   }
@@ -837,25 +837,25 @@ export function TextComparison({ before, after, split, baselineAvailable = true 
     return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Text comparison unavailable")}>
       <div className="max-w-lg">
         <h4 className="font-semibold">{t("Comparison is too large to display")}</h4>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{comparison.reason} {t("The exact file remains available in Edit.")}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{comparison.reason} {t(context === "saved" ? "Inspect the saved side previews below." : "The exact file remains available in Edit.")}</p>
       </div>
     </section>;
   }
   if (comparison.kind === "unchanged") {
     return <section className="grid min-h-64 place-items-center rounded-md border border-dashed border-border p-8 text-center" aria-label={t("Unchanged text comparison")}>
-      <div><h4 className="font-semibold">{t("No text changes")}</h4><p className="mt-2 text-sm text-muted-foreground">{t("The working copy matches the saved version exactly.")}</p></div>
+      <div><h4 className="font-semibold">{t("No text changes")}</h4><p className="mt-2 text-sm text-muted-foreground">{t(context === "saved" ? "These saved texts are identical. Paths and executable modes may differ." : "The working copy matches the saved version exactly.")}</p></div>
     </section>;
   }
-  return <section className="min-w-0 overflow-hidden rounded-md border border-border bg-[#070b10]" aria-label={split ? "Split text comparison" : "Inline text comparison"}>
+  return <section className="min-w-0 overflow-hidden rounded-md border border-border bg-[#070b10]" aria-label={t(split ? "Split text comparison" : "Inline text comparison")}>
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/25 px-3 py-2">
-      <h4 className="text-xs font-semibold">{t("Working tree diff")}</h4>
+      <h4 className="text-xs font-semibold">{t(context === "saved" ? "Saved version comparison" : "Working tree diff")}</h4>
       <p className="flex items-center gap-3 font-mono text-[11px]">
         <span className="text-emerald-300">+{comparison.additions} {comparison.additions === 1 ? t("addition") : t("additions")}</span>
         <span className="text-red-300">−{comparison.deletions} {comparison.deletions === 1 ? t("deletion") : t("deletions")}</span>
       </p>
     </div>
     <div className="max-h-[32rem] overflow-auto">
-      {split ? <SplitWorkingDiff hunks={comparison.hunks} /> : <InlineWorkingDiff hunks={comparison.hunks} />}
+      {split ? <SplitWorkingDiff hunks={comparison.hunks} saved={context === "saved"} /> : <InlineWorkingDiff hunks={comparison.hunks} />}
     </div>
   </section>;
 }
@@ -910,12 +910,12 @@ function InlineWorkingDiff({ hunks }: { hunks: readonly WorkspaceTextDiffHunk[] 
   </div>;
 }
 
-function SplitWorkingDiff({ hunks }: { hunks: readonly WorkspaceTextDiffHunk[] }) {
+function SplitWorkingDiff({ hunks, saved = false }: { hunks: readonly WorkspaceTextDiffHunk[]; saved?: boolean }) {
   const t = useTranslation();
   return <div className="min-w-[48rem] font-mono text-[13px] leading-6">
     <div className="grid grid-cols-2 border-b border-border bg-muted/20 font-sans text-xs font-semibold text-muted-foreground">
-      <span className="px-3 py-2">{t("Saved version")}</span>
-      <span className="border-l border-border px-3 py-2">{t("Working copy")}</span>
+      <span className="px-3 py-2">{t(saved ? "Lane starting version" : "Saved version")}</span>
+      <span className="border-l border-border px-3 py-2">{t(saved ? "Pinned result" : "Working copy")}</span>
     </div>
     {hunks.map((hunk, hunkIndex) => <div key={`${hunk.beforeStart}:${hunk.afterStart}:${hunkIndex}`}>
       <HunkHeader hunk={hunk} />

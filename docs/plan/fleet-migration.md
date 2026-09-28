@@ -177,8 +177,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | L02 | `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` | Connect desktop-owned fleet scheduling and activity | [Mesh PR #48](https://github.com/idosams/Mesh/pull/48), `f1578135da3da1aca14d77612117caf8ac031620`; all seven hosted checks passed; local full/package validation and human review pending; not merged |
 | L02 | `c7922b3d74cae8715066e2868533ba714d67ddb0` | Connect fleet provisioning and live lane controls to project view | [Mesh PR #49](https://github.com/idosams/Mesh/pull/49), `4a6126868cbe26b59c751488e2aa56f4dbe5072f`; 620 local desktop/interface tests passed; all seven hosted checks passed; local full/package validation and human review pending; not merged |
 | R01 | `7d617e60828c6d6cae0e71a52f60fd4095eaed9a` | Read pinned fleet reviews independently of live work | [Mesh PR #50](https://github.com/idosams/Mesh/pull/50), `c2c625a1ff7fe9bfc0acd42f0655e637890f24d7`; all seven hosted checks passed; local native/full and packaged checks pending; not merged |
-| R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | [Mesh PR #51](https://github.com/idosams/Mesh/pull/51), `35f486661ed4aa82ea59327da7cec75e3a2da8f5`; 634 local desktop/interface tests passed; hosted checks running; not merged |
-| R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | Pending transfer |
+| R01 | `2e8992f8bbb6c990e399a4a308969c7f88a95d37` | Connect exact fleet results to independent parallel review panels | [Mesh PR #51](https://github.com/idosams/Mesh/pull/51), `35f486661ed4aa82ea59327da7cec75e3a2da8f5`; 634 local desktop/interface tests passed; all seven hosted checks passed; not merged |
+| R01 | `b1a166da5cfb714c6677b02b0343e816ea47fcf4` | Bind fleet comparisons to verified starting versions | [Mesh PR #52](https://github.com/idosams/Mesh/pull/52), `90be90858d8a8c1271160edc8bdccd3b160c26a5`; hosted/native validation running; not merged |
 | R01 | `5a553e78177cc045f10af15a2da86bdb32c95bf0` | Show starting-version comparisons in pinned fleet reviews | Pending transfer |
 | R01 | `5b9f758c2db294b636bc2bfd9b4eb867a2fcb2ff` | Persist exact fleet review selectors through native storage | Pending transfer |
 | R01 | `20b01d6023616e02e2c9e5cabdc82dc39bb82c3b` | Restore exact fleet review selections and independent view state | Pending transfer |
@@ -691,3 +691,29 @@ alone does not establish runtime or packaged acceptance. The next increment conn
 starting-input comparison to the parallel panels. All later selector/history/artifact, correspondence,
 integration/recovery, provider/package/remote, required-review, merge and combined-main obligations
 remain intact. Original work and verification are preserved.
+
+## R01d starting-version comparisons in pinned panels
+
+Preserved source `5a553e78177cc045f10af15a2da86bdb32c95bf0` transfers on published #52 at
+`90be90858d8a8c1271160edc8bdccd3b160c26a5`. Each pinned result can independently request its
+verified starting-version comparison, page changed objects and select saved before/after content.
+The coordinator binds the original source, local starting operation, target, cursor and selected
+object. Independent review/input reads cannot overwrite each other, retries preserve the last exact
+request, and closing a panel ignores late content. The recorded review remains a separately labeled
+section; saved comparisons never claim to inspect current working files or approve main.
+
+The canonical adaptation preserves English/Hebrew controls, content-state warnings and literal
+paths/versions/file bytes. The shared text renderer has an explicit saved context while its existing
+working-copy behavior remains the default. Two added Hebrew regressions and the transferred saved
+context regression fail with the unlocalized source panel/previous renderer, then pass after byte-exact
+restoration. Local type/build and all 132 interface tests pass, along with all 514 desktop tests.
+Initial duplicate-translation and existing-wording assertion failures are retained in separate logs;
+the duplicate was removed and the canonical wording kept. Docs, vocabulary, formatting and diff checks
+also pass. Local native/full validation stays queued behind the preserved #44 gate.
+
+Parent #51 passed all seven hosted checks: 3,001 Linux and 3,210 macOS tests, four separate macOS
+renderer tests and all 44 daemon checks. #52 is published with native validation running at this
+point. This panel increment still needs hosted checks and exact-revision packaged graphical proof.
+Selector persistence, restored history/artifacts, correspondence and all integration/recovery phases
+remain in dependency order. Required human review, provider/four-worker/remote acceptance, eventual
+merges and final combined-main testing remain part of completion. Original work is preserved.

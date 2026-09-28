@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "../lib/localization";
 import { Button } from "../atoms/button";
+import { FleetInputComparison, type InputComparison } from "./fleet-input-comparison";
 import { ArtifactReview } from "./artifact-review";
 import { reviewWorkbenchFromProjection } from "../models/review-workbench-adapter";
 import { reconcileReviewWorkbenchProjection, reduceReviewWorkbench, type ReviewWorkbenchModel } from "../models/review-workbench";
 
 export type FleetReviewSelection = { objective: string; lane: string; checkpoint: string; version: string; bundle: string };
 type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
-export type FleetReviewPin = { key: string; selection: FleetReviewSelection; goal: string; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
+export type FleetReviewPin = { input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 
@@ -42,9 +43,11 @@ export function FleetReviewPanel({ pin }: { pin: FleetReviewPin }) {
   return <article className="grid min-w-0 gap-3 rounded-lg border border-border p-3" aria-label={`${t("Pinned fleet review")} ${pin.key}`} data-mesh-fleet-review={pin.key}>
     <div className="flex items-start justify-between gap-2"><h4 dir="auto" className="whitespace-pre-wrap break-words font-semibold">{pin.goal}</h4>
       <Button variant="secondary" onClick={() => send({ type: "close-review", pin: pin.key })}>{t("Close review")} <bdi dir="ltr">{pin.key}</bdi></Button></div>
-    <p className="text-xs text-muted-foreground">{t("Comparison base: this review's recorded lane base. Comparison with the lane's starting input is not available yet.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Comparison base: the recorded review uses its original lane review base. Use the starting-version comparison below to inspect what this lane changed.")}</p>
     <details className="break-all text-xs"><summary>{t("Exact saved selection and base")}</summary><p>{t("Fleet")}: <bdi dir="ltr">{pin.selection.objective}</bdi></p><p>{t("Lane")}: <bdi dir="ltr">{pin.selection.lane}</bdi></p><p>{t("Checkpoint")}: <bdi dir="ltr">{pin.selection.checkpoint}</bdi></p><p>{t("Saved operation")}: <bdi dir="ltr">{pin.selection.version}</bdi></p><p>{t("Review")}: <bdi dir="ltr">{pin.selection.bundle}</bdi></p>
       <p>{t("Recorded base head")}: {pin.review?.reviewed_head ? <bdi dir="ltr">{pin.review.reviewed_head}</bdi> : t("Unavailable")}</p><p>{t("Lane starting input")}: <bdi dir="ltr">{pin.startingInput}</bdi></p></details>
+    <FleetInputComparison pin={pin.key} input={pin.input} />
+    <details><summary className="font-semibold">{t("Recorded review against its original review base")}</summary>
     {pin.loading && <p role="status" className="text-sm">{t("Reading the exact saved result\u2026")}</p>}
     {pin.error && <p role="alert" className="text-sm">{t(pin.error)} {t("Any content below is the previously verified cached result.")}</p>}
     {!pin.loading && (!pin.review || pin.error || !pin.review.content_complete || (!model && !empty)) && <Button variant="secondary" onClick={() => send({ type: "retry-review", pin: pin.key })}>{t("Retry exact saved result")}</Button>}
@@ -52,6 +55,7 @@ export function FleetReviewPanel({ pin }: { pin: FleetReviewPin }) {
     {pin.review?.content_complete && !model && !empty && <p role="alert" className="text-sm">{t("The saved comparison could not be safely displayed. Its exact selection is retained.")}</p>}
     {empty && <p className="text-sm">{t("No file changes in this recorded comparison.")}</p>}
     {model && <ReviewContent initial={model} />}
+    </details>
   </article>;
 }
 export function FleetReviewPanels({ pins, notice }: { pins: FleetReviewPin[]; notice: string }) {

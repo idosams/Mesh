@@ -363,3 +363,13 @@ are connected without blocking fleet refresh. Source tests cover late replies af
 loads, retained selection on failure and accessible identities. This increment does not satisfy the
 full phase exit: pin persistence, input-relative comparison, artifact previews, original-main review
 and integration, recovery and packaged graphical journeys remain required.
+
+
+### Starting-version comparison presentation
+
+The native source-to-local-import binding now feeds a separate comparison inside each pinned fleet
+panel. Bounded object pages and selected saved before/after sides remain independent of recorded-review
+reads and fleet polling. The existing text-diff viewer supports explicitly labeled saved versions and
+independent layouts. Source tests verify exact identity/cursor handling and concurrent response order.
+This closes the initial current-session presentation connection; persistent pins, restart reattachment,
+artifact previews, changes requested from lanes and original-main integration remain phase requirements.

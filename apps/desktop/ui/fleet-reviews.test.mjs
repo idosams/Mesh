@@ -63,3 +63,40 @@ test('closed or disposed requests cannot repopulate state and pages do not auto-
   h.calls[1].reject(new Error('unavailable')); await settle(); assert.equal(h.calls.length, 2);
   h.open(); const count = h.changes(); h.dispose(); h.calls[2].resolve(page()); await settle(); assert.equal(h.changes(), count);
 });
+
+function comparisonReply(n = 1, selected = null) {
+  const { objective: objectiveId, ...selectedResult } = selection(n);
+  const side = text => ({ path: 'note.txt', kind: 'file', bytes: 4, digest: '9'.repeat(64), executable: false, content_state: selected ? 'text' : 'not-requested', text: selected ? text : null });
+  return { schema: 'mesh.fleet-starting-comparison/v1', objective: objectiveId, selection: selectedResult, approval_authority: false, input: { source_version: 'f'.repeat(64), comparison: { base: '8'.repeat(64), target: selectedResult.version, order: 'object-id', after: null, selected, total: 1, next_after: null, approval_authority: false, changes: [{ object: '7'.repeat(32), effect: 'modified', before: side('old\n'), after: side('new\n') }] } } };
+}
+test('recorded and input comparisons finish in either order without discarding each other', async () => {
+  for (const inputFirst of [true, false]) {
+    const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1);
+    h.handle({ type: 'input-review', pin: '1' }); assert.equal(h.calls[2].command, 'inspect_fleet_starting_comparison');
+    if (inputFirst) { h.calls[2].resolve(comparisonReply()); await settle(); h.calls[1].resolve(result()); }
+    else { h.calls[1].resolve(result()); await settle(); h.calls[2].resolve(comparisonReply()); }
+    await settle(); const pinned = h.snapshot().reviewPins[0];
+    assert.equal(pinned.review.recorded, true); assert.equal(pinned.input.page.total, 1);
+    assert.equal(pinned.loading, false); assert.equal(pinned.input.loading, false);
+  }
+});
+test('comparison retries retain exact requests and ignore replies after panel close', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1);
+  h.handle({ type: 'input-review', pin: '1' }); h.calls[2].resolve(comparisonReply()); await settle();
+  h.handle({ type: 'input-file', pin: '1', object: '0'.repeat(32) });
+  h.handle({ type: 'input-file', pin: '1', object: '7'.repeat(32), path: '/tmp' }); assert.equal(h.calls.length, 3);
+  h.handle({ type: 'input-file', pin: '1', object: '7'.repeat(32) }); h.calls[3].reject(new Error('private detail')); await settle();
+  assert.match(h.snapshot().reviewPins[0].input.error, /previously verified/);
+  h.handle({ type: 'retry-input', pin: '1' }); assert.deepEqual(h.calls[4].args, h.calls[3].args);
+  h.handle({ type: 'close-review', pin: '1' }); h.calls[4].resolve(comparisonReply(1, '7'.repeat(32))); h.calls[1].resolve(result()); await settle();
+  assert.equal(h.snapshot().reviewPins.length, 0);
+});
+test('two input comparisons retain independent selected objects and do not block one another', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page([row(1), row(2)])); await settle(); h.pin(1); h.pin(2);
+  h.handle({ type: 'input-review', pin: '1' }); h.handle({ type: 'input-review', pin: '2' });
+  h.calls[4].resolve(comparisonReply(2)); await settle(); assert.equal(h.snapshot().reviewPins[0].input.loading, true);
+  h.handle({ type: 'input-file', pin: '2', object: '7'.repeat(32) }); h.calls[5].resolve(comparisonReply(2, '7'.repeat(32))); await settle();
+  assert.equal(h.snapshot().reviewPins[1].input.file.after.text, 'new\n');
+  h.calls[3].resolve(comparisonReply()); await settle(); assert.equal(h.snapshot().reviewPins[0].input.file, null);
+  h.dispose();
+});

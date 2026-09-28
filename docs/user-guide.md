@@ -310,16 +310,16 @@ Result pages stay fixed until refreshed; they are ordered by checkpoint identifi
 Closing a loading panel does not stop a worker. Failed reads retain the selection and label previously
 verified cached content explicitly; retry reads that same result.
 
-These panels compare against the recorded lane review base, which is not necessarily the lane's
-starting input. They show verified text and binary metadata; artifact rendering, input-relative
-comparison, main approval and integration are not yet connected. Incomplete content and omitted
-changes are labeled explicitly. Pins are retained only in the current app view, not after reload.
-The complete packaged graphical interaction remains unverified.
+Within a pinned panel, choose **Compare with starting version** to inspect what that lane changed.
+The comparison uses the exact verified local copy of the lane's original input and the pinned saved
+result. Select a changed object for its saved before/after content, then choose inline or side-by-side
+text comparison. Larger change lists have independent pages. Paths, byte counts and executable modes
+remain visible when text is unavailable or unchanged. Binary, unsafe text and files above the 256 KiB
+text bound are labeled; they never appear as an unchanged text comparison. A failed request retains
+previously verified content and can retry the same request.
 
-
-The subsequent native starting-version comparison reads the lane's verified initial import and the
-exact selected saved result. The original project's saved version is reported separately from that
-local import identity. It lists changed objects and can read bounded before/after text without using
-later source or lane edits. Binary, unsafe or large text remains labeled metadata. This is a read-only
-development API; connecting it to the parallel panels and reopening its binding after restart are
-separate increments. It grants no main approval authority.
+Expand **Recorded review against its original review base** to inspect the existing review bundle.
+That base can differ from the lane's starting version. Both comparisons remain pinned while agents
+work. Artifact rendering, main approval and integration are not yet connected. Incomplete content
+and omitted changes are labeled explicitly. Pins are retained only in the current app view, not after
+reload. The complete packaged graphical interaction remains unverified.
