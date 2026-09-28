@@ -149,3 +149,26 @@ test('an explicitly retained saved input does not drift when source capture adva
   assert.equal(calls.find(call => call.command === 'provision_attached_fleet').args.version, version);
   h.dispose();
 });
+
+test('saved-result reads and closing panels remain independent of an active fleet refresh', async () => {
+  let holdRefresh = false, pendingCatalogue, pendingReview;
+  const commands = [], bundle = 'f'.repeat(64);
+  const h = harness(async (command, args) => {
+    commands.push(command);
+    if (command === 'attached_fleets') return holdRefresh ? new Promise(resolve => { pendingCatalogue = resolve; }) : catalogue();
+    if (command === 'fleet_activity') return activity();
+    if (command === 'fleet_saved_reviews') return { schema: 'mesh.fleet-saved-reviews/v1', objective, lane, revision: 1, after: null, total: 1, next_after: null, order: 'checkpoint-id', reviews: [{ checkpoint: 'checkpoint-one', version, bundle, run: 'run-one' }] };
+    if (command === 'inspect_fleet_saved_review') return new Promise(resolve => { pendingReview = resolve; });
+    throw new Error(`Unexpected command ${command}`);
+  });
+  await settle(); holdRefresh = true; h.intent({ type: 'refresh' });
+  assert.equal(h.projections.at(-1).busy, true);
+  h.intent({ type: 'reviews', objective, lane }); await settle();
+  h.intent({ type: 'pin-review', objective, lane, checkpoint: 'checkpoint-one', version, bundle });
+  assert.equal(h.projections.at(-1).reviewPins.length, 1);
+  h.intent({ type: 'close-review', pin: '1' }); assert.equal(h.projections.at(-1).reviewPins.length, 0);
+  pendingReview({}); pendingCatalogue(catalogue()); await settle();
+  assert.equal(h.projections.at(-1).reviewPins.length, 0);
+  assert.equal(commands.filter(command => command === 'inspect_fleet_saved_review').length, 1);
+  h.dispose();
+});

@@ -228,3 +228,19 @@ checkpoint-id order; it is not an atomic chronological feed. Native desktop comm
 and exact review projection. Tests verify fifty-three results and immutable bytes across navigation.
 Visible fleet result panels, desktop artifact rendering for these readers, restored-context access,
 main approval/integration and packaged graphical proof remain unfinished.
+
+
+Desktop source now connects current-session fleet saved-result lists to up to eight independent pinned
+review panels. Exact selectors survive newer result pages and failed reads; closed pending reads cannot
+reopen panels, and fleet refresh does not block review reads or closing. Existing verified-text review
+presentation supplies independent file/layout state with approval and export disabled. Accessible folder
+heading identities are unique across concurrent panels of the same objects. Coordinator and rendered
+presentation tests cover these boundaries, incomplete content, exact-base labeling and cached results.
+Pins remain renderer-session-only. Starting-input comparison, artifact rendering, restored-context
+access, original-main integration and packaged graphical proof remain required; this does not complete
+the parallel review phase.
+
+The canonical parallel fleet-review transfer preserves English/Hebrew controls and warnings, literal
+saved identities and file contents, and distinct accessible folder headings across panels. Local
+interface and coordinator checks pass; native full and packaged graphical acceptance remain pending.
+This remains unmerged development work and does not add main approval authority.

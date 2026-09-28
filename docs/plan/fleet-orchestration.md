@@ -353,3 +353,13 @@ verification are the next integration work. No approval or project-main integrat
 The saved-review reader preserves each bundle's recorded canonical base. An attached source version
 is not automatically the managed lane's shared review base. Add explicit input-relative comparison
 and original-project main mapping before claiming the complete fleet review/integration journey.
+
+
+### Parallel saved-result presentation increment
+
+Current-session fleet results now have independent bounded lists and up to eight exact pinned panels.
+Verified text, incomplete-content markers, comparison-base identity and independent file/layout state
+are connected without blocking fleet refresh. Source tests cover late replies after close, concurrent
+loads, retained selection on failure and accessible identities. This increment does not satisfy the
+full phase exit: pin persistence, input-relative comparison, artifact previews, original-main review
+and integration, recovery and packaged graphical journeys remain required.

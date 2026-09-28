@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { savedFleetReviewPage, savedFleetReview, createFleetReviews } from './fleet-reviews.js';
+const objective = `fleet-${'a'.repeat(64)}`, lane = 'lane-one';
+const row = n => ({ checkpoint: `checkpoint-${String(n).padStart(3, '0')}`, version: 'b'.repeat(64), bundle: 'c'.repeat(64), run: 'run-one' });
+const selection = n => ({ objective, lane, ...Object.fromEntries(Object.entries(row(n)).filter(([key]) => key !== 'run')) });
+const page = (rows = [row(1)], after = null, total = rows.length, next = null) => ({ schema: 'mesh.fleet-saved-reviews/v1', objective, lane, revision: 1, order: 'checkpoint-id', after, total, next_after: next, reviews: rows });
+const result = (n = 1) => ({ schema: 'mesh.fleet-saved-review/v1', objective, selection: Object.fromEntries(Object.entries(selection(n)).filter(([key]) => key !== 'objective')), review: { bundle: row(n).bundle, subject_operation: row(n).version, recorded: true, projection_authorizes_approval: false, content_complete: true, reviewed_head: 'd'.repeat(64), presentation_digest: 'e'.repeat(64), bundle_changes: [], bundle_changes_not_listed: 0, subject_operations_not_listed: 0, unavailable_code: null } });
+const settle = () => new Promise(resolve => setImmediate(resolve));
+function harness() {
+  const calls = []; let changes = 0;
+  const controller = createFleetReviews({ invoke: (command, args) => new Promise((resolve, reject) => calls.push({ command, args, resolve, reject })), laneFor: (o, l) => o === objective && l === lane ? { goal: 'Existing work', base: 'f'.repeat(64) } : null, changed: () => changes++ });
+  return { ...controller, calls, changes: () => changes, open: () => controller.handle({ type: 'reviews', objective, lane }), pin: n => controller.handle({ type: 'pin-review', ...selection(n) }) };
+}
+test('pages bind exact lane, cursor and ordered unique results', () => {
+  assert.equal(savedFleetReviewPage(JSON.stringify(page()), objective, lane, null).rows[0].objective, objective);
+  for (const mutate of [v => v.objective = 'fleet-wrong', v => v.lane = 'other', v => v.after = 'different', v => v.reviews.push(row(1)), v => v.reviews[0].version = 'invalid', v => v.total = 2, v => v.next_after = 'invented', v => v.revision = -1]) {
+    const value = page(); mutate(value); assert.throws(() => savedFleetReviewPage(value, objective, lane, null));
+  }
+  const rows = Array.from({ length: 50 }, (_, n) => row(n));
+  assert.equal(savedFleetReviewPage(page(rows, null, 53, rows.at(-1).checkpoint), objective, lane, null).nextAfter, rows.at(-1).checkpoint);
+  assert.throws(() => savedFleetReviewPage(page([row(1)], row(2).checkpoint), objective, lane, row(2).checkpoint));
+});
+test('exact results reject substitution and authority and preserve incomplete evidence', () => {
+  assert.equal(savedFleetReview(result(), selection(1)).recorded, true);
+  for (const mutate of [v => v.selection.checkpoint = 'other', v => v.selection.path = '/tmp', v => v.review.bundle = 'f'.repeat(64), v => v.review.recorded = false, v => v.review.projection_authorizes_approval = true, v => v.review.bundle_changes_not_listed = 1, v => v.review.reviewed_head = null, v => v.review.unavailable_code = 'missing']) {
+    const value = result(); mutate(value); assert.throws(() => savedFleetReview(value, selection(1)));
+  }
+  const partial = result(); Object.assign(partial.review, { content_complete: false, unavailable_code: 'missing-content', reviewed_head: null, presentation_digest: null, bundle_changes_not_listed: 3 });
+  assert.equal(savedFleetReview(partial, selection(1)).bundle_changes_not_listed, 3);
+});
+test('simultaneous pins finish independently; closing a pending pin ignores late content', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page([row(1), row(2)])); await settle();
+  h.pin(1); h.pin(2);
+  assert.equal(h.calls.length, 3);
+  h.calls[2].resolve(result(2)); await settle();
+  assert.equal(h.snapshot().reviewPins[0].loading, true);
+  assert.equal(h.snapshot().reviewPins[1].review.recorded, true);
+  h.handle({ type: 'close-review', pin: '1' }); h.calls[1].resolve(result(1)); await settle();
+  assert.deepEqual(h.snapshot().reviewPins.map(pin => pin.selection.checkpoint), [row(2).checkpoint]);
+  assert.ok(h.calls.every(call => ['fleet_saved_reviews', 'inspect_fleet_saved_review'].includes(call.command)));
+});
+test('pins keep exact selections across refreshed pages and retry failure', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  h.open(); h.calls[2].resolve(page([row(2)])); await settle();
+  assert.deepEqual(h.snapshot().reviewPins[0].selection, selection(1));
+  h.handle({ type: 'retry-review', pin: '1' }); assert.deepEqual(h.calls[3].args, selection(1));
+  h.calls[3].reject(new Error('private native diagnostic')); await settle();
+  assert.equal(h.snapshot().reviewPins[0].review.recorded, true);
+  assert.doesNotMatch(h.snapshot().reviewPins[0].error, /private native/);
+  h.pin(1); assert.equal(h.calls.length, 4); // Old rows cannot create new selections.
+});
+test('bounded pins deduplicate exact results and reject added fields or unlisted identities', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page(Array.from({ length: 9 }, (_, n) => row(n)))); await settle();
+  h.handle({ type: 'pin-review', ...selection(0), path: '/tmp' }); h.pin(99); assert.equal(h.calls.length, 1);
+  for (let n = 0; n < 9; n++) h.pin(n);
+  assert.equal(h.snapshot().reviewPins.length, 8); assert.equal(h.calls.length, 9);
+  h.pin(0); assert.equal(h.calls.length, 9); assert.match(h.snapshot().reviewNotice, /already pinned/);
+});
+test('closed or disposed requests cannot repopulate state and pages do not auto-retry', async () => {
+  const h = harness(); h.open(); h.handle({ type: 'close-reviews', objective, lane }); h.open();
+  h.calls[0].resolve(page()); await settle(); assert.equal(h.snapshot().reviewQueues[`${objective}/${lane}`].loading, true);
+  h.calls[1].reject(new Error('unavailable')); await settle(); assert.equal(h.calls.length, 2);
+  h.open(); const count = h.changes(); h.dispose(); h.calls[2].resolve(page()); await settle(); assert.equal(h.changes(), count);
+});

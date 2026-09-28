@@ -296,14 +296,22 @@ has source tests; its complete packaged graphical journey is not yet verified.
 If provisioning is unconfirmed, use **Retry this provisioning request**. It preserves the same input,
 goal, limits and request within this app view instead of creating another fleet. After an app/renderer
 restart, inspect retained fleet state before creating another request; pending-intent recovery across
-renderer reload is not implemented. Restored fleets cannot restart workers automatically. Fleet result
-review, worker recovery and integration into the original project's main remain unavailable in this
-view. Existing project history, manual lanes and their comparisons remain independently usable.
+renderer reload is not implemented. Restored fleets cannot restart workers automatically. Worker
+recovery and integration into the original project's main remain unavailable in this view. Existing project history, manual lanes and their comparisons remain independently usable.
 
+Saved fleet results remain independent of newer agent edits and desktop navigation. They remain
+readable after cancellation or session revocation while their native lane context is attached.
+Missing or replaced contexts refuse; restored-context access follows separately.
 
-A subsequent native development increment can read an exact recorded fleet result independently
-of the currently selected workspace and newer agent edits. Saved results remain readable after
-cancellation or session revocation while their native lane context remains attached. Missing or
-replaced contexts refuse. The result list is paged by checkpoint identity, not completion time;
-refresh the list to find newly inserted earlier identities. This read API does not approve work.
-Visible parallel review panels and restored-context access follow in separate increments.
+For a current-session fleet lane, choose **Show saved results**, then **Pin saved review**. Up to eight
+panels can remain open while fleet activity refreshes and agents keep working. Each panel keeps an
+exact checkpoint/version/review selection and independent file and comparison-layout controls.
+Result pages stay fixed until refreshed; they are ordered by checkpoint identifier, not creation time.
+Closing a loading panel does not stop a worker. Failed reads retain the selection and label previously
+verified cached content explicitly; retry reads that same result.
+
+These panels compare against the recorded lane review base, which is not necessarily the lane's
+starting input. They show verified text and binary metadata; artifact rendering, input-relative
+comparison, main approval and integration are not yet connected. Incomplete content and omitted
+changes are labeled explicitly. Pins are retained only in the current app view, not after reload.
+The complete packaged graphical interaction remains unverified.

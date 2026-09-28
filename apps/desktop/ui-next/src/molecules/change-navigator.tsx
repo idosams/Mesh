@@ -1,5 +1,5 @@
 import { useTranslation } from "../lib/localization";
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Badge } from "../atoms/badge";
 import { Button } from "../atoms/button";
 import { rovingSelectionIndex } from "../models/roving-selection";
@@ -34,6 +34,7 @@ function changeStatus(change: ReviewChange): ReviewChange["status"] {
 
 export function ChangeNavigator({ changes, selectedChangeId, onSelect }: ChangeNavigatorProps) {
   const t = useTranslation();
+  const instanceId = useId();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [kind, setKind] = useState<KindFilter>("all");
@@ -115,7 +116,7 @@ export function ChangeNavigator({ changes, selectedChangeId, onSelect }: ChangeN
       <div className="grid max-h-72 gap-3 overflow-y-auto p-2 xl:max-h-[44rem]">
         {groups.map(([folder, folderChanges]) => {
           const uniqueFolderKey = folderChanges[0]?.id.replaceAll(/[^a-zA-Z0-9_-]/gu, "-") ?? "empty";
-          const headingId = `change-folder-${folder.replaceAll(/[^a-zA-Z0-9_-]/gu, "-")}-${uniqueFolderKey}`;
+          const headingId = `change-folder-${instanceId}-${folder.replaceAll(/[^a-zA-Z0-9_-]/gu, "-")}-${uniqueFolderKey}`;
           return (
             <section key={folder} aria-labelledby={headingId}>
               <h3 id={headingId} className="sticky top-0 z-10 truncate bg-card/95 px-2 py-1 text-xs font-semibold text-muted-foreground" title={folder}>{folder}</h3>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "../lib/localization";
+import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetReviewQueue } from "./fleet-reviews";
 import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
@@ -7,7 +8,7 @@ type Lane = { id: string; parent: string | null; sourceProject: string | null; g
 type Fleet = { objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type Projection = { reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const states: Record<string, string> = { launching: "Starting", running: "Working", waiting: "Waiting", reconciling: "Needs recovery", stopping: "Stop requested · ownership reserved", succeeded: "Execution completed", failed: "Execution failed", cancelled: "Cancelled" };
@@ -64,6 +65,7 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
     {projection.feedback && <p role="status" className="break-words text-sm">{t(projection.feedback)}</p>}
     <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "refresh" })}>{t("Refresh fleets")}</Button>
     {!projection.fleets.length && <p className="text-sm text-muted-foreground">{t(projection.error ? "Saved fleets could not be loaded." : "No fleets yet. Manual work and externally run harnesses remain available below.")}</p>}
+    <FleetReviewPanels pins={projection.reviewPins ?? []} notice={projection.reviewNotice ?? ""} />
     <FleetCards projection={projection} projects={projects} disabled={disabled} />
   </section>;
 }
@@ -88,10 +90,11 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
             <p className="font-medium">{t(lane.parent ? "Worker lane" : "Coordinator lane")} · <bdi dir="ltr">{lane.provider}</bdi></p><p dir="auto" className="whitespace-pre-wrap break-words">{lane.goal}</p>
             <p>{lane.run ? <>{!worker && <>{t("Last saved state")}: </>}{t(states[lane.run.state])}</> : t(!current ? "Saved lane · recovery required" : lane.allocated ? "Waiting to start" : "Allocation needs attention")}</p>
             {worker && <p className="text-xs">{age(worker.observedAt, t)} · {worker.activity ? <bdi dir="ltr">{worker.activity}</bdi> : t("No activity reported")} · {worker.events} {t("events")}</p>}
+            <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && current} />
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
           </li>;
         })}</ul>
-        <p className="text-xs text-muted-foreground">{t("Agent completion does not approve changes to main. Fleet result review and recovery are not available yet.")}</p>
+        <p className="text-xs text-muted-foreground">{t("Agent completion does not approve changes to main. Saved reviews can be pinned above. Starting-input comparison, approval and worker recovery are not available yet.")}</p>
       </article>;
     })}</div>
   );

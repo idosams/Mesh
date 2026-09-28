@@ -1,3 +1,4 @@
+import { createFleetReviews } from './fleet-reviews.js';
 // Presentation of native-owned fleet state. This module never chooses paths or launches processes.
 const hex = (value, length) => typeof value === 'string' && new RegExp(`^[a-f0-9]{${length}}$`).test(value);
 const identity = (value) => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value);
@@ -66,7 +67,9 @@ export function fleetProvisioned(raw, pending) {
 export function startFleets({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
   let fleets = [], activity = [], pending = null, busy = false, error = '', feedback = '', visible = false, disposed = false, timer = null;
   let sources = { projects: [], histories: {}, error: '' };
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function' } })); };
+  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot() } })); }
+  const reviews = createFleetReviews({ invoke, changed: publish, laneFor: (objective, lane) =>
+    fleets.find(fleet => fleet.objective === objective && fleet.ownership === 'current-host')?.lanes.find(value => value.id === lane) });
   const plan = () => {
     if (timer !== null) cancel(timer);
     timer = visible && !disposed ? schedule(() => { timer = null; void refresh(); }, 2000) : null;
@@ -89,7 +92,9 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   }
   function intent(event) {
     const value = event.detail;
-    if (!visible || disposed || busy || !value || typeof value !== 'object') return;
+    if (!visible || disposed || !value || typeof value !== 'object') return;
+    if (reviews.handle(value)) return;
+    if (busy) return;
     const fields = Object.keys(value).sort().join(',');
     if (value.type === 'refresh' && fields === 'type') { void refresh(); return; }
     if (value.type === 'retry-provision' && fields === 'type' && pending) { void refresh(provision); return; }
@@ -126,5 +131,5 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   document.addEventListener('mesh:fleets-visible', mount);
   document.addEventListener('mesh:fleets-intent', intent);
   document.addEventListener('mesh:attachments-projection', attachment);
-  return () => { disposed = true; if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
+  return () => { disposed = true; reviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
 }
