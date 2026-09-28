@@ -26,7 +26,7 @@ test("group recovery renders partial outcomes, member observations and historica
     group: { group, alreadyPresent: ["present.txt"], restorations: [`restoration-${"c".repeat(32)}`], moreRestorations: true, entries: [{group, transaction, status: "changed-files", path: "kept.txt", attention: true, operation: "remove-approved", retainedAvailable: true, recordedOutcome: "applied-observed"}] },
     recovery: { entries: [{transaction: group, status: "group-reference", attention: true, path: null, operation: null, retainedAvailable: false, recordedOutcome: null}], more: false },
   }));
-  for (const text of ["Needs reconciliation", "1 observed", "1 uncertain", "1 not attempted", "kept.txt", "not an atomic snapshot", "not rewritten or reverified", "present.txt", "Inspect recovery group", "Review restoring retained file", "Inspect restoration record", "Exact file recovery reference within this group", "More restoration records"]) assert.ok(html.includes(text), text);
+  for (const text of ["Needs reconciliation", "1 observed", "1 uncertain", "1 not attempted", "kept.txt", "not an atomic snapshot", "not rewritten or reverified", "present.txt", "Inspect recovery group", "Review restoring retained file", "Inspect restoration record", "Exact recovery reference within this group", "More restoration records"]) assert.ok(html.includes(text), text);
 });
 
 test("unavailable group inspection disables restoration and complete-group application respects disabled state", () => {
@@ -213,5 +213,58 @@ test('Hebrew conversion directions preserve literal retained paths without file 
       assert.ok(!html.includes('The original entry'));
       assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
     }
+  } finally { setLocale('en'); }
+});
+
+function wholeEntryProps(grouped = false) {
+  const transaction = `entry-restoration-${'d'.repeat(32)}`;
+  return { project: 'project', disabled: false, detached: false,
+    recovery: {entries: [], more: true, entryReferences: [transaction]},
+    ...(grouped ? {group: {group, entries: [], alreadyPresent: [], entryRestorations: [transaction], moreRestorations: true}} : {}),
+    selected: {group: grouped ? group : null, transaction, status: 'origin-changed', attention: true,
+      path: 'שם/<entry>', operation: 'restore-entry', retainedAvailable: false, entryRestorationReviewable: true, recordedOutcome: 'applied-observed',
+      sourceTree: {state: 'observed', entries: [{path: '', kind: 'file', bytes: 4}]},
+      stagedTree: {state: 'observed', entries: [{path: '', kind: 'directory'}, {path: 'שם/LATE.txt', kind: 'file', bytes: 8}]},
+      originTree: {state: 'observed', entries: [{path: '', kind: 'file', bytes: 12}]},
+    },
+  };
+}
+test('whole-entry recovery renders three independent observations and explicit review for undo', () => {
+  for (const grouped of [false, true]) {
+    const html = renderToStaticMarkup(React.createElement(FileRecovery, wholeEntryProps(grouped)));
+    for (const text of ['Working entry', 'New recovery entry', 'Original retained entry', 'Review undoing this restoration',
+      'original retained entry changed', 'does not approve it as Mesh main', 'File and folder recovery references',
+      'Undo also requires a new review', 'Inspect retained entry']) assert.ok(html.includes(text), text);
+    assert.ok(html.includes('<bdi dir="ltr">שם/&lt;entry&gt;</bdi>'));
+    assert.ok(html.includes('<bdi dir="ltr">שם/LATE.txt</bdi>'));
+    assert.ok(!html.includes('No file recovery entries found.'));
+    assert.ok(!html.includes('Review restoring retained file'));
+    if (grouped) assert.ok(html.includes('File and folder restorations in this group'));
+  }
+});
+test('whole-entry review is disabled for busy detached or stale views and hidden without an eligible observation', () => {
+  for (const restriction of [{disabled: true}, {detached: true}, {error: 'stale'}, {groupError: 'stale'}]) {
+    const props = {...wholeEntryProps(true), ...restriction};
+    const html = renderToStaticMarkup(React.createElement(FileRecovery, props));
+    const button = html.match(/<button\b([^>]*)>Review undoing this restoration<\/button>/);
+    assert.ok(button); assert.ok(button[1].includes('disabled=""'));
+  }
+  const props = wholeEntryProps(); props.selected.entryRestorationReviewable = false;
+  assert.ok(!renderToStaticMarkup(React.createElement(FileRecovery, props)).includes('Review undoing this restoration'));
+  props.selected.entryRestorationReviewable = true; props.selected.operation = 'remove-directory';
+  assert.ok(renderToStaticMarkup(React.createElement(FileRecovery, props)).includes('Review restoring retained entry'));
+});
+test('Hebrew whole-entry recovery keeps paths and recovery references literal', () => {
+  setLocale('he');
+  try {
+    const props = wholeEntryProps(true);
+    const html = renderToStaticMarkup(React.createElement(FileRecovery, props));
+    for (const text of ['הפריט בתיקיית העבודה', 'פריט השחזור החדש', 'הפריט המקורי שנשמר', 'סקירה לפני ביטול השחזור הזה',
+      'שחזור עבודה שנשמרה', 'הפניות לשחזור קבצים ותיקיות', 'שחזורי קבצים ותיקיות בקבוצה זו',
+      'הפניה מדויקת לשחזור בקבוצה זו', 'בדיקת הפריט שנשמר']) assert.ok(html.includes(text), text);
+    assert.ok(html.includes('<bdi dir="ltr">שם/LATE.txt</bdi>'));
+    assert.ok(html.includes(`<bdi dir="ltr">${props.selected.transaction}</bdi>`));
+    assert.ok(!html.includes('Review undoing this restoration'));
+    assert.ok(!html.includes('Original retained entry'));
   } finally { setLocale('en'); }
 });

@@ -816,3 +816,9 @@ Typed whole-entry recovery and dedicated native restoration/undo intents now exi
 in the desktop controller with English/Hebrew feedback. Visible controls, full
 desktop/native verification and packaged user acceptance remain the next steps.
 No recovery observation grants approval of Mesh main.
+
+The visible whole-entry recovery flow is connected in source: discover, inspect,
+review restoration, inspect its new transaction and explicitly review undo. Native
+code retains complete confirmation and revalidation; the UI grants no approval of
+Mesh main. Full native/desktop gates, packaged interaction, signing and broader
+fleet/provider/remote acceptance remain required before completion.

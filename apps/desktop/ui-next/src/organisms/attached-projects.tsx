@@ -21,9 +21,9 @@ type IntegrationPreview = { head: string; bundle: string; target: string; base_h
   matches_base: number; already_present: number; preserve_current: number; conflicts: number; blocked: number; not_listed: number;
   entries: { path: string; status: string; reason: string | null; base: { kind: string } | null; target: { kind: string } | null }[] };
 type DirectoryObservation = { state: string; entries: { path: string; kind: string; bytes: number | null; digest: string | null }[] };
-type RecoveryEntry = { conversionFrom?: string | null; conversionTo?: string | null; sourceTree?: DirectoryObservation; stagedTree?: DirectoryObservation; parentIdentityMatches?: boolean | null; parentPolicyMatches?: boolean | null; group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
-type Recovery = { entries: RecoveryEntry[]; more: boolean };
-type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; moreRestorations?: boolean;
+type RecoveryEntry = { originTree?: DirectoryObservation; entryRestorationReviewable?: boolean; conversionFrom?: string | null; conversionTo?: string | null; sourceTree?: DirectoryObservation; stagedTree?: DirectoryObservation; parentIdentityMatches?: boolean | null; parentPolicyMatches?: boolean | null; group?: string | null; transaction: string; status: string; attention: boolean; path: string | null; operation: string | null; retainedAvailable: boolean; recordedOutcome: string | null };
+type Recovery = { entryReferences?: string[]; entries: RecoveryEntry[]; more: boolean };
+type GroupRecovery = { group: string; entries: RecoveryEntry[]; alreadyPresent: string[]; restorations?: string[]; entryRestorations?: string[]; moreRestorations?: boolean;
   execution?: { status: string; attempts: {transaction: string; status: string}[]; outcome: GroupOutcome | null } | null };
 type GroupOutcome = { group: string; status: string; members: { transaction: string; status: string }[] };
 type Projection = { groupRecoveries?: Record<string, GroupRecovery>; groupOutcomes?: Record<string, GroupOutcome>; groupRecoveryErrors?: Record<string, string>; reviewNavigation?: { id: string; bundle: string; target: string; sequence: number } | null; laneRequests?: Record<string, { request: string; version: string }>; laneFeedback?: Record<string, string>; recoveries?: Record<string, Recovery>; selectedRecovery?: Record<string, RecoveryEntry>; recoveryErrors?: Record<string, string>; fileChangeFeedback?: Record<string, string>; integrationPreviews?: Record<string, IntegrationPreview>; integrationErrors?: Record<string, string>; approvalStates?: Record<string, ApprovalState>; approvalFeedback?: Record<string, string>; reviewQueues?: Record<string, ReviewQueue>; selectedReviews?: Record<string, SavedReview>; pinStatus: string; pinError: string; pins: PinnedComparison[]; bases: Record<string, string>; comparisons: Record<string, Comparison>; inspections: Record<string, Inspection>; histories: Record<string, VersionPage>; projects: Project[]; busy: boolean; error: string; available: boolean };
@@ -297,6 +297,7 @@ export function IntegrationPreviewCard({ project, preview, disabled }: { project
 const recoveryLabels: Record<string, string> = {
   "group-reference": "Group reference · inspect to verify its members",
   "prepared-arrangement": "Prepared content is retained", "applied-arrangement": "Installed and retained files match the recorded arrangement",
+  "origin-changed": "The original retained entry changed since preparation",
   "changed-entries": "Directory contents changed since preparation", "source-parent-changed": "The containing folder was replaced", "parent-policy-changed": "The containing folder permissions changed",
   "changed-files": "Files changed since the recorded operation", "identity-mismatch": "File identity changed",
   "incomplete-observation": "Files could not be fully checked", "invalid-outcome": "Outcome record needs attention",
@@ -315,30 +316,36 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
     <p className="break-all text-sm font-medium">{entry.path ? <bdi dir="ltr">{entry.path}</bdi> : t("File details unavailable")}</p>
     <p className="text-sm">{t(recoveryLabels[entry.status])}{entry.attention ? <> · {t("Needs attention")}</> : ""}</p>
     <p className="break-all text-xs">{t("Recovery reference:")} {entry.transaction ? <bdi dir="ltr">{entry.transaction}</bdi> : t("Unavailable")}</p>
-    {["add-directory", "remove-directory", "convert-entry"].includes(entry.operation ?? "") && <div className="grid gap-2 text-xs">
-      <p>{entry.operation === "convert-entry" ? <>{t(entry.conversionFrom === "directory" ? "Folder to file" : "File to folder")}. {t("The original entry and open handles remain in recovery. These observations never authorize replay, cleanup or automatic restoration.")}</> : entry.operation === "remove-directory" ? t("Directory removal retains the complete original tree. Open file and directory handles may still be writing there. These observations never authorize replay, cleanup or automatic restoration.") : t("New directory tree. No existing work was displaced by this operation; these observations never authorize replay or removal.")}</p>
+    {["add-directory", "remove-directory", "convert-entry", "restore-entry"].includes(entry.operation ?? "") && <div className="grid gap-2 text-xs">
+      <p>{entry.operation === "restore-entry" ? t("Restoration installs a fresh copy. The original retained entry and any displaced work remain separate; these observations do not authorize replay or cleanup.") : entry.operation === "convert-entry" ? <>{t(entry.conversionFrom === "directory" ? "Folder to file" : "File to folder")}. {t("The original entry and open handles remain in recovery. These observations never authorize replay, cleanup or automatic restoration.")}</> : entry.operation === "remove-directory" ? t("Directory removal retains the complete original tree. Open file and directory handles may still be writing there. These observations never authorize replay, cleanup or automatic restoration.") : t("New directory tree. No existing work was displaced by this operation; these observations never authorize replay or removal.")}</p>
       {entry.parentIdentityMatches === false && <p role="alert">{t("The containing folder no longer has its recorded identity.")}</p>}
       {entry.parentPolicyMatches === false && <p role="alert">{t("The containing folder permissions differ from preparation.")}</p>}
-      {([["Working tree", entry.sourceTree], [entry.operation === "convert-entry" ? "Retained entry" : entry.operation === "remove-directory" ? "Retained tree" : "Prepared tree", entry.stagedTree]] as const).map(([label, tree]) => <details key={label}>
+      {([[entry.operation === "restore-entry" ? "Working entry" : "Working tree", entry.sourceTree], [entry.operation === "restore-entry" ? "New recovery entry" : entry.operation === "convert-entry" ? "Retained entry" : entry.operation === "remove-directory" ? "Retained tree" : "Prepared tree", entry.stagedTree], ...(entry.operation === "restore-entry" ? [["Original retained entry", entry.originTree] as const] : [])] as const).map(([label, tree]) => <details key={label}>
         <summary>{t(label)}: {tree?.state === "observed" ? <>{tree.entries.length} {t("entries observed")}</> : tree?.state === "absent" ? t("absent") : t("unavailable")}</summary>
         <ul>{tree?.entries.map(item => <li key={item.path} className="break-all">{item.path ? <bdi dir="ltr">{item.path}</bdi> : t("(tree root)")} · {item.kind === "directory" ? t("Folder") : <>{item.bytes} {t("bytes")}</>}</li>)}</ul>
       </details>)}
     </div>}
-    {entry.operation === "restore-retained" && <p className="text-xs">{t("Restored private work; this does not approve it as Mesh main.")}</p>}
+    {["restore-retained", "restore-entry"].includes(entry.operation ?? "") && <p className="text-xs">{t("Restored private work; this does not approve it as Mesh main.")}</p>}
     {entry.recordedOutcome === "absent" && <p className="text-xs">{t("No outcome was recorded. This does not prove that the working file was unchanged.")}</p>}
     {entry.status === "group-reference" && <Button variant="secondary" disabled={disabled}
       onClick={() => send({ type: "lookup-group", id: project, group: entry.transaction })}>{t("Inspect recovery group")}</Button>}
+    {entry.entryRestorationReviewable && <Button variant="secondary" disabled={disabled || detached || Boolean(error) || Boolean(entry.group && groupError)}
+      onClick={() => send({ type: "restore-entry", id: project, group: entry.group ?? null, transaction: entry.transaction })}>{t(entry.operation === "restore-entry" ? "Review undoing this restoration" : "Review restoring retained entry")}</Button>}
     {entry.retainedAvailable && <Button variant="secondary" disabled={disabled || detached || Boolean(error) || Boolean(entry.group && groupError)}
       onClick={() => send(entry.group ? { type: "restore-group-file", id: project, group: entry.group, transaction: entry.transaction } : { type: "restore-retained", id: project, transaction: entry.transaction })}>{t("Review restoring retained file")}</Button>}
   </li>;
-  return <section aria-label={t("Retained file recovery")} className="grid gap-2 rounded-lg border border-border p-3">
-    <h4 className="text-sm font-semibold">{t("Retained file recovery")}</h4>
-    <p className="text-xs text-muted-foreground">{t("Inspect files preserved when applying or restoring work. An open editor may still be writing to a retained file. Nothing is replayed or deleted automatically.")}</p>
-    <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "recovery", id: project })}>{t("Refresh retained files")}</Button>
+  return <section aria-label={t("Retained work recovery")} className="grid gap-2 rounded-lg border border-border p-3">
+    <h4 className="text-sm font-semibold">{t("Retained work recovery")}</h4>
+    <p className="text-xs text-muted-foreground">{t("Inspect files and folders preserved when applying or restoring work. Open handles may still be writing to retained objects. Nothing is replayed or deleted automatically.")}</p>
+    <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "recovery", id: project })}>{t("Refresh retained work")}</Button>
     {feedback && <p role="status" className="text-sm">{t(feedback)}</p>}
     {error && <p role="alert" className="text-sm">{t(error)}</p>}
     {recovery && <><p className="text-xs">{t("Last observed recovery entries")}</p>
-      {recovery.entries.length === 0 ? <p className="text-sm">{t("No file recovery entries found.")}</p> : <ul>{recovery.entries.map((entry, index) => row(entry, `${entry.transaction}-${index}`))}</ul>}
+      {recovery.entries.length === 0 && !(recovery.entryReferences ?? []).length ? <p className="text-sm">{t("No file recovery entries found.")}</p> : <ul>{recovery.entries.map((entry, index) => row(entry, `${entry.transaction}-${index}`))}</ul>}
+      {(recovery.entryReferences ?? []).length > 0 && <div><p className="text-sm">{t("File and folder recovery references")}</p>
+        <p className="text-xs">{t("Inspect a reference before requesting restoration. A reference alone does not verify retained work.")}</p>
+        <ul>{recovery.entryReferences?.map(transaction => <li key={transaction} className="break-all text-xs"><bdi dir="ltr">{transaction}</bdi>
+          <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-recovery", id: project, transaction })}>{t("Inspect retained entry")}</Button></li>)}</ul></div>}
       {recovery.more && <p className="text-sm">{t("More entries exist outside this bounded overview. Use an exact recovery reference to inspect one.")}</p>}
     </>}
     {groupError && <p role="alert" className="text-sm">{t(groupError)}</p>}
@@ -365,19 +372,22 @@ export function FileRecovery({ project, recovery, selected, group, groupOutcome,
       <ul>{group.entries.map(entry => row(entry, `${group.group}-${entry.transaction}`))}</ul>
       {(group.restorations ?? []).length > 0 && <div><p className="text-sm">{t("Restoration records in this group")}</p><ul>{group.restorations?.map(transaction => <li key={transaction} className="break-all text-xs"><bdi dir="ltr">{transaction}</bdi>
         <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-group-file", id: project, group: group.group, transaction })}>{t("Inspect restoration record")}</Button></li>)}</ul></div>}
+      {(group.entryRestorations ?? []).length > 0 && <div><p className="text-sm">{t("File and folder restorations in this group")}</p>
+        <ul>{group.entryRestorations?.map(transaction => <li key={transaction} className="break-all text-xs"><bdi dir="ltr">{transaction}</bdi>
+          <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "lookup-group-file", id: project, group: group.group, transaction })}>{t("Inspect retained entry")}</Button></li>)}</ul></div>}
       {group.moreRestorations && <p className="text-xs">{t("More restoration records may exist outside this bounded overview.")}</p>}
-      <label className="grid gap-2 text-sm">{t("Exact file recovery reference within this group")}
+      <label className="grid gap-2 text-sm">{t("Exact recovery reference within this group")}
         <input dir="ltr" className="min-h-11 rounded-md border border-border bg-background px-3" value={groupTransaction} onChange={event => setGroupTransaction(event.target.value)} autoComplete="off" /></label>
-      <Button variant="secondary" disabled={disabled || !/^(integration|restoration)-[0-9a-f]{32}$/.test(groupTransaction)}
-        onClick={() => send({ type: "lookup-group-file", id: project, group: group.group, transaction: groupTransaction })}>{t("Inspect file in this group")}</Button>
+      <Button variant="secondary" disabled={disabled || !/^(integration|restoration|directory|entry-restoration)-[0-9a-f]{32}$/.test(groupTransaction)}
+        onClick={() => send({ type: "lookup-group-file", id: project, group: group.group, transaction: groupTransaction })}>{t("Inspect entry in this group")}</Button>
       {group.alreadyPresent.length > 0 && <div><p className="text-xs">{t("Already present when prepared; not rewritten or reverified by this view:")}</p><ul>{group.alreadyPresent.map(path => <li key={path} className="break-all text-xs"><bdi dir="ltr">{path}</bdi></li>)}</ul></div>}
     </div>}
     <label className="grid gap-2 text-sm">{t("Exact recovery reference")}
       <input dir="ltr" className="min-h-11 rounded-md border border-border bg-background px-3" value={transaction} onChange={event => setTransaction(event.target.value)} autoComplete="off" />
     </label>
-    <Button variant="secondary" disabled={disabled || !/^(integration|restoration|integration-group)-[0-9a-f]{32}$/.test(transaction)}
+    <Button variant="secondary" disabled={disabled || !/^(integration|restoration|integration-group|directory|entry-restoration)-[0-9a-f]{32}$/.test(transaction)}
       onClick={() => send(transaction.startsWith("integration-group-") ? { type: "lookup-group", id: project, group: transaction } : { type: "lookup-recovery", id: project, transaction })}>{t("Inspect exact recovery")}</Button>
     {selected && <div><p className="text-sm font-medium">{t("Selected recovery \u00b7 last observed")}</p><ul>{row(selected, selected.transaction)}</ul></div>}
-    <p className="text-xs text-muted-foreground">{t("Restoring requires native confirmation. An existing current file is retained in a new recovery entry. Restoring an absent path creates a new file and keeps the original retained file available.")}</p>
+    <p className="text-xs text-muted-foreground">{t("Restoring requires complete native confirmation. Current work is preserved in a new recovery entry. Whole-entry restoration keeps the original retained objects available. Undo also requires a new review; nothing is reversed automatically.")}</p>
   </section>;
 }

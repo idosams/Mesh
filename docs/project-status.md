@@ -750,3 +750,12 @@ paths, stale observations and wrong result identities, and never automatically
 retries uncertain operations. All 52 controller tests pass with a demonstrated
 failing-before result-validation regression. Localized visible controls and packaged
 end-to-end proof remain required.
+
+### Localized whole-entry restoration controls (unmerged increment)
+
+Users can now inspect direct or grouped whole-entry recovery references, compare
+current/new-recovery/original observations, and request native review before
+restoration or undo. English/Hebrew text keeps paths literal; stale, detached and
+busy views disable requests. TypeScript and 35 focused rendering/localization tests
+pass with a demonstrated failing-before disabled-state regression. This connects
+the source flow but does not establish native-dialog, packaged or merged delivery.

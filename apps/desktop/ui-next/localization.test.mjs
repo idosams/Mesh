@@ -413,13 +413,13 @@ test('attached recovery localizes uncertainty while retaining literal file and t
   for (const locale of ['en', 'he']) {
     ui.setLocale(locale);
     const html = ui.renderAttachments();
-    for (const label of ['Retained file recovery', 'Review applying this file', 'Review restoring retained file',
+    for (const label of ['Retained work recovery', 'Review applying this file', 'Review restoring retained file',
       'Files changed since the recorded operation', 'Needs attention', 'Recovery reference:',
       'Restored private work; this does not approve it as Mesh main.',
       'No outcome was recorded. This does not prove that the working file was unchanged.',
-      'Refresh retained files', 'Last observed recovery entries', 'Exact recovery reference', 'Inspect exact recovery',
+      'Refresh retained work', 'Last observed recovery entries', 'Exact recovery reference', 'Inspect exact recovery',
       'Selected recovery · last observed', 'More entries exist outside this bounded overview. Use an exact recovery reference to inspect one.',
-      'Restoring requires native confirmation. An existing current file is retained in a new recovery entry. Restoring an absent path creates a new file and keeps the original retained file available.',
+      'Restoring requires complete native confirmation. Current work is preserved in a new recovery entry. Whole-entry restoration keeps the original retained objects available. Undo also requires a new review; nothing is reversed automatically.',
       'File details unavailable', 'Unavailable', ...states.map(([, label]) => label),
       projection.recoveryErrors[id], projection.fileChangeFeedback[id]]) {
       assert.ok(html.includes(ui.translate(locale, label)), label);

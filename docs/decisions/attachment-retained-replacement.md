@@ -932,3 +932,19 @@ The controller inspects that exact record after success. An uncertain response o
 inspection leaves a visible error, preserves prior observations and does not retry.
 Selecting the newly displaced record uses the same explicit native review for undo;
 it never invokes the ordinary retained-file command or approves Mesh main.
+
+## Visible whole-entry restoration and undo
+
+The recovery view now lists direct and grouped whole-entry references and accepts
+exact directory/restoration identifiers. Inspect a reference to see current work,
+the new recovery entry and the original retained entry as independent observations.
+Paths and identifiers remain literal in English and Hebrew. A reference alone is
+not proof of retained work, and an absent outcome is not proof that nothing changed.
+
+A verified controller observation can expose “Review restoring retained entry” or,
+for displaced work from a restoration, “Review undoing this restoration”. Both open
+fresh native preparation and complete confirmation; neither performs automatic
+rollback. Busy, detached or stale views disable the request, and ineligible or
+absent retained observations hide it. Restored content remains private work and
+never becomes Mesh main through recovery. The ordinary file-restoration action
+remains separate. Packaged interaction and final native validation are still required.

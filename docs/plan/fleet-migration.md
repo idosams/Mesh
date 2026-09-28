@@ -1934,3 +1934,18 @@ extra path injection and no automatic retry. Removing original-retention result
 validation makes its regression fail; restoring it returns all 52 to passing.
 Full desktop validation is pending, as is combined native validation still running
 on #102. Source/controller proof does not establish packaged restoration acceptance.
+
+## I07e localized whole-entry recovery controls
+
+New canonical UI based on #106 at
+`8df187fb55cbf38c7cccc83a8749c3ed5c54ab8e`. Adds three-side observations,
+direct/group reference lists, exact lookup, and distinct native review requests for
+restoration and undo. English/Hebrew labels, literal paths and changed localization
+assertions ship together. No source commit is replaced by this new work.
+
+TypeScript and all 35 focused renderer/localization tests pass. Removing the
+whole-entry button's disabled-state guard makes the new regression fail; restoring
+it returns all 35 to passing. The preceding #106 full desktop run passed 162
+renderer and 575 source/controller tests. This increment's full desktop gate remains
+pending. #102's full native run is still active; actual native dialogs, packaged
+restoration and final combined-main acceptance remain unverified.
