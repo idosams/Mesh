@@ -338,9 +338,11 @@ fn an_enumerated_field_reaches_the_bytes() {
 
 #[test]
 fn workspace_root_matches_the_published_schema_and_vector() {
-    let schema = common::parse_json(&read_repo_file("protocol/schemas/workspace-root-v0.json"));
+    let schema = common::parse_json(&read_repo_file(
+        "protocol/operations/v0/workspace-root-schema.json",
+    ));
     let vector = common::parse_json(&read_repo_file(
-        "protocol/test-vectors/v0/workspace-root.json",
+        "protocol/operations/v0/workspace-root-vector.json",
     ));
     assert_eq!(
         schema.field("record").as_str(),
