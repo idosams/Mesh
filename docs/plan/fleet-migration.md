@@ -166,8 +166,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | A08 | `16eda49617c2e1f146950c2e08b3b0169a63884e` | Wire attachment main review and approval into desktop | A08c: [PR #33](https://github.com/idosams/Mesh/pull/33), replacement `68ab496a804204111b3087ee7c7fc9a1640adb55`, native confirmation, verified main inspection and localized controls on #32; full gate passed (3,151 native tests, one passed with a lingering-handle flag, 13 skips; 587 desktop tests; 44 daemon checks); hosted CI pending, not merged |
 | A09a | `c15c354d30178972b90bf919c051328f8ec2637b` | Preview accepted main against ongoing source work | [Mesh PR #35](https://github.com/idosams/Mesh/pull/35), `3119b8b6233d17309d283d30d6aa855c2a14b8ce`; stacked on #34; not merged |
 | A09b | `38d0a9386e3fef2c3670ff371533e204e1bc76e3` | Retain displaced attachment files during native integration | [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; stacked on #35; all seven hosted checks pass in run 36359358791; initial and unchanged local gates failed native startup waits; not merged |
-| A09c | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | Transferring on #36; validation and PR pending |
-| A09 | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Pending transfer |
+| A09c | `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` | Inspect retained integration recovery without replaying writes | [Mesh PR #38](https://github.com/idosams/Mesh/pull/38), `7ccdc4be19e66840bc005b6ba9302e7bc706807a`; focused checks passed, local startup and hosted Linux restart failures retained; not merged |
+| A09d | `11df227f749aa8654fe89a0612e8f2b286c29b4a` | Restore retained work through a new preserving transaction | Transferred onto published #41; native validation and PR pending |
 | A09b prerequisite | `633af5ca9d81e6c71532b24332fe4310dac0899d` | Preserve file allocation identity while copying native metadata | Included in [Mesh PR #36](https://github.com/idosams/Mesh/pull/36), `c7843205da566684a9541010e03e1a49148e442c`; do not apply twice |
 | A09 | `1c332ba96d3a74c33701143ef54003f35895e1e3` | Connect attached-file recovery to native desktop confirmation | Pending transfer |
 | L01 | `2680f5b1c99e5a4b8c96f24b7678c7d2afe32518` | Open attached saved versions as independent work lanes | Pending transfer |
@@ -412,3 +412,32 @@ All listed PRs remain unmerged and require the applicable human review. Retained
 it has not been validated or delivered by this correction. The later metadata fix `633af5ca` is
 already included in #36 and must not be applied twice. The full fleet, second-provider, four-worker,
 remote-executor, packaged acceptance and combined-main verification objectives remain required.
+
+## A09d restoration transfer after lifecycle corrections
+
+The preserved restoration implementation from `11df227f749aa8654fe89a0612e8f2b286c29b4a`
+now transfers onto [PR #41](https://github.com/idosams/Mesh/pull/41), exact base
+`702100952a0d124044f18420fd752f3677fa8a8b`. The earlier staged transfer based on #38 remains
+untouched in its original worktree and a binary patch backup. This transfer reuses its code and
+resolved documentation, retaining the current canonical migration ledger. No unrelated histories
+are merged. The metadata prerequisite from `633af5ca` is already included in #36.
+
+Restoration freezes exact retained content and metadata, revalidates both inputs and their ancestry,
+and exchanges a new staged copy while preserving the current inode. The original retained inode
+remains available to its existing editor. Undo creates another preserving transaction. New receipts
+bind the parent proposal digest and frozen snapshot; bounded ancestry includes the original
+integration plus at most fifteen restoration transactions. Recovered private content is explicitly
+not approved main. This increment adds no desktop, CLI or agent apply command.
+
+Parent #41 passed all seven hosted checks in run 36363155064: 2,986 Linux native tests (6 skipped),
+3,173 macOS native tests (13 skipped), a separate four-test macOS step, and 593 desktop tests.
+Both platforms passed the four new lifecycle regressions; macOS passed actual filesystem callbacks,
+root replacement refusal and detach/restart. The local UI status regression failed against the
+previous view, passed after byte-exact restoration, and all 109 UI rendering tests passed. The
+preserved local full checks and native failing-before/executable proof remain pending; neither #40
+nor #41 is merged. These parent results do not validate the new restoration source.
+
+This restoration increment still requires focused native/refusal tests, failing-before evidence,
+full canonical validation, hosted checks and named human review. Native confirmation, offline or
+renamed roots, external-volume UX, grouped changes, crash campaigns, Linux metadata support and
+packaged graphical acceptance remain required by the full plan.

@@ -110,6 +110,12 @@ comparison base when another review advances main, including after restart. This
 changes stable; it does not make an old approval valid against the new main version. A stale approval
 must be prepared and reviewed again through the normal current-main flow.
 
+Retained-file restoration is under development and has no desktop action in this increment. Its
+restoration path keeps both the selected retained work and the current working file, including later
+writes through existing editor windows. It requires an explicit review of the exact content before
+applying; it does not automatically undo an earlier operation or approve recovered content as main.
+Graphical confirmation and packaged acceptance are still pending.
+
 ## The six words Mesh shows people
 
 | Status | Meaning |

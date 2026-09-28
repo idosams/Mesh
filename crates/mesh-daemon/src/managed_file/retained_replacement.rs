@@ -8,6 +8,7 @@ mod metadata;
 use metadata::{copy_metadata, metadata_digest};
 
 /// Bounded live recovery evidence. This is not a write/replay capability or an atomic snapshot.
+#[derive(PartialEq, Eq)]
 pub(crate) struct RetainedFileObservation {
     pub(crate) parent: String,
     pub(crate) installation: String,
@@ -22,6 +23,25 @@ pub(crate) fn observe_file(
     relative: &Path,
     limit: u64,
 ) -> io::Result<RetainedFileObservation> {
+    read_file_evidence(root, relative, limit, None).map(|(observation, _)| observation)
+}
+
+pub(crate) fn snapshot_file(
+    root: &PinnedWorkspaceRoot,
+    relative: &Path,
+    limit: u64,
+) -> io::Result<(RetainedFileObservation, Vec<u8>, File)> {
+    let mut bytes = Vec::new();
+    let (observation, file) = read_file_evidence(root, relative, limit, Some(&mut bytes))?;
+    Ok((observation, bytes, file))
+}
+
+fn read_file_evidence(
+    root: &PinnedWorkspaceRoot,
+    relative: &Path,
+    limit: u64,
+    mut content: Option<&mut Vec<u8>>,
+) -> io::Result<(RetainedFileObservation, File)> {
     use mesh_types::DigestHasher as _;
     root.ensure_namespace_identity()?;
     let (parent, file) = root.filesystem().inspect_entry_with_parent(relative)?;
@@ -47,6 +67,9 @@ pub(crate) fn observe_file(
             return Err(io::Error::other("recovery file grew beyond budget"));
         }
         hasher.update(&buffer[..read]);
+        if let Some(bytes) = content.as_mut() {
+            bytes.extend_from_slice(&buffer[..read]);
+        }
     }
     let (current_parent, current) = root.filesystem().inspect_entry_with_parent(relative)?;
     let latest = current.metadata()?;
@@ -78,18 +101,21 @@ pub(crate) fn observe_file(
         return Err(io::Error::other("recovery file changed during observation"));
     }
     root.ensure_namespace_identity()?;
-    Ok(RetainedFileObservation {
-        parent: ManagedDirectoryIdentity {
-            device: parent_metadata.dev(),
-            inode: parent_metadata.ino(),
-        }
-        .token(),
-        installation: identity.token(),
-        digest: hasher.finalize().to_string(),
-        mode: before.mode(),
-        metadata: native_metadata,
-        bytes: length,
-    })
+    Ok((
+        RetainedFileObservation {
+            parent: ManagedDirectoryIdentity {
+                device: parent_metadata.dev(),
+                inode: parent_metadata.ino(),
+            }
+            .token(),
+            installation: identity.token(),
+            digest: hasher.finalize().to_string(),
+            mode: before.mode(),
+            metadata: native_metadata,
+            bytes: length,
+        },
+        file,
+    ))
 }
 
 /// Single-use in-process authority. Dropping it deliberately preserves staged recovery material.
@@ -101,6 +127,7 @@ pub(crate) struct RetainedReplacement {
     installed: ManagedFileIdentity,
     recovery: PinnedWorkspaceRoot,
     metadata_digest: String,
+    installed_metadata_digest: String,
 }
 
 pub(crate) fn read_target(
@@ -164,7 +191,36 @@ impl RetainedReplacement {
         recovery: PinnedWorkspaceRoot,
         receipt: impl FnOnce(ManagedFileIdentity, &str) -> io::Result<()>,
     ) -> io::Result<Self> {
-        if target.mode & 0o7000 != 0 {
+        Self::prepare_with_metadata(
+            target,
+            expected,
+            bytes,
+            mode,
+            recovery,
+            None,
+            |installed, source_metadata, installed_metadata| {
+                if source_metadata != installed_metadata {
+                    return Err(io::Error::other(
+                        "source metadata changed during preparation",
+                    ));
+                }
+                receipt(installed, source_metadata)
+            },
+        )
+    }
+
+    /// Restore may select metadata from an exact retained file instead of the current source.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn prepare_with_metadata(
+        target: ManagedReplacementTarget,
+        expected: Vec<u8>,
+        bytes: Vec<u8>,
+        mode: u32,
+        recovery: PinnedWorkspaceRoot,
+        metadata_source: Option<&File>,
+        receipt: impl FnOnce(ManagedFileIdentity, &str, &str) -> io::Result<()>,
+    ) -> io::Result<Self> {
+        if (target.mode | mode) & 0o7000 != 0 {
             return Err(io::Error::other(
                 "special permission bits require explicit metadata support",
             ));
@@ -187,16 +243,29 @@ impl RetainedReplacement {
         .map_err(|error| io::Error::other(error.to_string()))?;
         let source = open_read_at(&parent, &name)?;
         let source_metadata_digest = metadata_digest(&source)?;
-        copy_metadata(&source, &staged)?;
+        let metadata_source = metadata_source.unwrap_or(&source);
+        let installed_metadata_digest = metadata_digest(metadata_source)?;
+        copy_metadata(metadata_source, &staged)?;
         staged.set_permissions(fs::Permissions::from_mode(mode))?;
-        if metadata_digest(&staged)? != source_metadata_digest {
+        if metadata_digest(&staged)? != installed_metadata_digest {
             return Err(io::Error::other("replacement metadata was not preserved"));
         }
         staged.write_all(&bytes)?;
         staged.sync_all()?;
+        if metadata_digest(&staged)? != installed_metadata_digest
+            || staged.metadata()?.mode() != mode
+        {
+            return Err(io::Error::other(
+                "staged metadata changed while writing content",
+            ));
+        }
         let installed = managed_file_identity(&staged, &staged.metadata()?)?;
         directory.sync_all()?;
-        receipt(installed, &source_metadata_digest)?;
+        receipt(
+            installed,
+            &source_metadata_digest,
+            &installed_metadata_digest,
+        )?;
         recovery.ensure_namespace_identity()?;
         Ok(Self {
             target,
@@ -206,7 +275,15 @@ impl RetainedReplacement {
             installed,
             recovery,
             metadata_digest: source_metadata_digest,
+            installed_metadata_digest,
         })
+    }
+
+    pub(crate) fn current_bytes(&self) -> &[u8] {
+        &self.expected
+    }
+    pub(crate) fn replacement_bytes(&self) -> &[u8] {
+        &self.bytes
     }
 
     /// No error after the exchange is reported as a refusal. False means that reconciliation is
@@ -247,7 +324,8 @@ impl RetainedReplacement {
         }
         let source = open_read_at(&directory, &name)?;
         if metadata_digest(&source)? != self.metadata_digest
-            || metadata_digest(&open_read_at(&recovery, exchange)?)? != self.metadata_digest
+            || metadata_digest(&open_read_at(&recovery, exchange)?)?
+                != self.installed_metadata_digest
         {
             return Err(io::Error::other("file metadata changed since preparation"));
         }
@@ -275,13 +353,19 @@ impl RetainedReplacement {
                         && bytes == self.bytes
                 },
             );
-        let metadata_preserved = [(&recovery, exchange), (&directory, name.as_os_str())]
-            .into_iter()
-            .all(|(directory, name)| {
-                open_read_at(directory, name).is_ok_and(|file| {
-                    metadata_digest(&file).is_ok_and(|digest| digest == self.metadata_digest)
-                })
-            });
+        let metadata_preserved = [
+            (&recovery, exchange, &self.metadata_digest),
+            (
+                &directory,
+                name.as_os_str(),
+                &self.installed_metadata_digest,
+            ),
+        ]
+        .into_iter()
+        .all(|(directory, name, expected)| {
+            open_read_at(directory, name)
+                .is_ok_and(|file| metadata_digest(&file).is_ok_and(|digest| &digest == expected))
+        });
         Ok(metadata_preserved
             && source_durable
             && recovery_durable

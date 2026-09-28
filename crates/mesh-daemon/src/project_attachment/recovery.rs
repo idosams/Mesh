@@ -15,7 +15,7 @@ use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 
 const PAGE: usize = 32;
-const KEYS: &[&str] = &[
+pub(super) const KEYS: &[&str] = &[
     "schema",
     "project",
     "attachment",
@@ -39,7 +39,7 @@ const KEYS: &[&str] = &[
     "recovery_inode",
     "automatic_replay",
 ];
-fn text<'a>(value: &'a Json, key: &str) -> io::Result<&'a str> {
+pub(super) fn text<'a>(value: &'a Json, key: &str) -> io::Result<&'a str> {
     value
         .get(key)
         .and_then(Json::as_text)
@@ -57,10 +57,30 @@ fn hex(value: &str, length: usize) -> bool {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn transaction(value: &str) -> bool {
+pub(super) fn transaction(value: &str) -> bool {
     value
         .strip_prefix("integration-")
+        .or_else(|| value.strip_prefix("restoration-"))
         .is_some_and(|id| hex(id, 32))
+}
+const RESTORE_KEYS: &[&str] = &[
+    "installed_metadata_digest",
+    "origin_transaction",
+    "origin_proposal_digest",
+    "origin_file",
+    "origin_digest",
+    "origin_mode",
+    "origin_metadata_digest",
+];
+pub(super) fn is_restoration(value: &Json) -> bool {
+    value.get("schema") == Some(&Json::text("mesh.attachment-file-restoration/v1"))
+}
+pub(super) fn result_schema(value: &Json) -> &'static str {
+    if is_restoration(value) {
+        "mesh.attachment-file-restoration-result/v1"
+    } else {
+        "mesh.attachment-file-integration-result/v1"
+    }
 }
 fn file_identity(value: &str) -> bool {
     if !value.is_ascii() {
@@ -82,7 +102,7 @@ fn digest(value: &str) -> io::Result<RecordDigest> {
     }
     RecordDigest::parse_hex(value).map_err(|_| invalid("invalid recovery digest"))
 }
-fn read_json(root: &PinnedWorkspaceRoot, name: &str) -> io::Result<(Json, String)> {
+pub(super) fn read_json(root: &PinnedWorkspaceRoot, name: &str) -> io::Result<(Json, String)> {
     let file = root.filesystem().inspect_entry(Path::new(name))?;
     if !file.metadata()?.is_file() {
         return Err(invalid("recovery receipt is not a regular file"));
@@ -98,7 +118,7 @@ fn read_json(root: &PinnedWorkspaceRoot, name: &str) -> io::Result<(Json, String
     }
     Ok((value, raw))
 }
-fn validate_receipt(
+pub(super) fn validate_receipt(
     value: &Json,
     history: &ProvisionedAttachment,
     store: &PinnedWorkspaceRoot,
@@ -107,11 +127,13 @@ fn validate_receipt(
     let Json::Object(fields) = value else {
         return Err(invalid("expected recovery object"));
     };
+    let restoring = is_restoration(value);
+    let extra = if restoring { RESTORE_KEYS } else { &[] };
     if !fields
         .iter()
         .map(|(key, _)| key.as_str())
-        .eq(KEYS.iter().copied())
-        || text(value, "schema")? != "mesh.attachment-file-integration/v1"
+        .eq(KEYS.iter().chain(extra).copied())
+        || (!restoring && text(value, "schema")? != "mesh.attachment-file-integration/v1")
         || text(value, "project")? != history.id()
         || value.get("attachment") != Some(&history.project().receipt()?)
         || value.get("automatic_replay") != Some(&Json::Bool(false))
@@ -163,10 +185,28 @@ fn validate_receipt(
     if [source_mode, installed_mode]
         .into_iter()
         .any(|mode| mode & !0o100777 != 0 || mode & 0o100000 == 0)
-        || source_mode & !0o111 != installed_mode & !0o111
+        || (!restoring && source_mode & !0o111 != installed_mode & !0o111)
         || value.get("source_executable") != Some(&Json::Bool(source_mode & 0o111 != 0))
     {
         return Err(invalid("invalid recovery mode"));
+    }
+    if restoring {
+        for key in [
+            "installed_metadata_digest",
+            "origin_proposal_digest",
+            "origin_digest",
+            "origin_metadata_digest",
+        ] {
+            digest(text(value, key)?)?;
+        }
+        if !transaction(text(value, "origin_transaction")?)
+            || !file_identity(text(value, "origin_file")?)
+            || value.get("origin_digest") != value.get("installed_digest")
+            || value.get("origin_mode") != value.get("installed_mode")
+            || value.get("origin_metadata_digest") != value.get("installed_metadata_digest")
+        {
+            return Err(invalid("invalid restoration snapshot binding"));
+        }
     }
     let (configuration, _) = history.project().history_configuration(store, None)?;
     if Json::parse(&configuration)
@@ -245,6 +285,39 @@ fn verify_history(
     }
     Ok(())
 }
+/// A restoration follows a bounded chain back to an accepted integration. Its new content is
+/// private retained work, never a claim that the approved main contains those bytes.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn verify_ancestry(
+    value: &Json,
+    history: &ProvisionedAttachment,
+    store: &PinnedWorkspaceRoot,
+    root: &PinnedWorkspaceRoot,
+    workspace: &OpenWorkspace,
+    trusted: &TrustedReviewers,
+    depth: usize,
+) -> io::Result<()> {
+    if depth >= 16 {
+        return Err(invalid("restoration ancestry exceeds its bound"));
+    }
+    if !is_restoration(value) {
+        return verify_history(value, workspace, trusted);
+    }
+    let origin = root.open_child_directory(OsStr::new(text(value, "origin_transaction")?))?;
+    let (parent, raw) = read_json(&origin, "prepared.json")?;
+    validate_receipt(&parent, history, store, &origin)?;
+    if Blake3::digest_bytes(raw.as_bytes()).to_string() != text(value, "origin_proposal_digest")?
+        || parent.get("source_file") != value.get("origin_file")
+        || ["head", "bundle", "target", "path", "exclusions"]
+            .into_iter()
+            .any(|key| parent.get(key) != value.get(key))
+    {
+        return Err(invalid("restoration ancestry binding changed"));
+    }
+    verify_ancestry(&parent, history, store, root, workspace, trusted, depth + 1)?;
+    origin.ensure_namespace_identity()
+}
+
 fn report(id: &str, status: &str, details: Json) -> Json {
     let attention = status != "prepared-arrangement"
         && !(status == "applied-arrangement"
@@ -307,7 +380,7 @@ fn inspect(
     if validate_receipt(&value, history, store, &recovery).is_err() {
         return report(id, "invalid-receipt", Json::Null);
     }
-    if verify_history(&value, workspace, trusted).is_err() {
+    if verify_ancestry(&value, history, store, root, workspace, trusted, 0).is_err() {
         return report(id, "unverified-history", Json::Null);
     }
     let outcome = match read_json(&recovery, "observed.json") {
@@ -316,10 +389,7 @@ fn inspect(
         Ok((observed, _)) => {
             let status = observed.get("status").and_then(Json::as_text).unwrap_or("");
             let expected = Json::object([
-                (
-                    "schema",
-                    Json::text("mesh.attachment-file-integration-result/v1"),
-                ),
+                ("schema", Json::text(result_schema(&value))),
                 (
                     "proposal_digest",
                     Json::text(Blake3::digest_bytes(raw.as_bytes()).to_string()),
@@ -352,7 +422,16 @@ fn inspect(
         item.installation == text(&value, &format!("{prefix}_file")).unwrap()
             && item.digest == text(&value, &format!("{prefix}_digest")).unwrap()
             && u64::from(item.mode) == number(&value, &format!("{prefix}_mode")).unwrap()
-            && item.metadata == text(&value, "native_metadata_digest").unwrap()
+            && item.metadata
+                == text(
+                    &value,
+                    if prefix == "installed" && is_restoration(&value) {
+                        "installed_metadata_digest"
+                    } else {
+                        "native_metadata_digest"
+                    },
+                )
+                .unwrap()
     };
     let status = if outcome == "invalid" {
         "invalid-outcome"
@@ -384,6 +463,18 @@ fn inspect(
         id,
         status,
         Json::object([
+            (
+                "operation",
+                Json::text(if is_restoration(&value) {
+                    "restore-retained"
+                } else {
+                    "apply-approved"
+                }),
+            ),
+            (
+                "content_is_approved_main",
+                Json::Bool(!is_restoration(&value)),
+            ),
             ("path", value.get("path").unwrap().clone()),
             ("approved_head", value.get("head").unwrap().clone()),
             (

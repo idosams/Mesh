@@ -173,6 +173,11 @@ in Mesh without manual folder handoffs. Run with the actual provider and package
 providers prove contracts but cannot satisfy the user journey alone. Also demonstrate the complete
 manual baseline without an agent, and a custody-safe human/agent handoff that preserves history.
 
+Native retained-file restoration now prepares a frozen content proposal, preserves the current
+file in a new transaction, and supports explicit undo without replaying an old exchange. Restored
+private bytes cannot advance main. Confirmation UI, offline recovery, grouped changes and packaged
+acceptance remain required.
+
 ## Phase 2: durable orchestration
 
 Persist objective limits, lanes, run attempts, input versions, event cursors, pending commands and

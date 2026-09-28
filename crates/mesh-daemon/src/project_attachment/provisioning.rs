@@ -401,6 +401,25 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Prepare an explicitly confirmed restoration of retained editor work. It creates a new
+    /// recovery transaction and grants no approval or main advancement authority.
+    pub fn prepare_retained_restoration(
+        &self,
+        recovery_root: &Path,
+        transaction: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedRetainedRestoration> {
+        super::restoration::prepare(
+            self,
+            self.store.clone(),
+            recovery_root,
+            transaction,
+            trusted,
+            limits,
+        )
+    }
+
     /// Prepare exact native approval facts. Signing and human confirmation happen outside the lock.
     pub fn approval_preview(
         &self,

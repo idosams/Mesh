@@ -1,7 +1,7 @@
 # Retained recovery for attached-file replacement
 
-Status: native regular-file transaction and restart inspection implemented; desktop confirmation,
-recovery browser/actions, additions/removals, grouped integration and packaged proof are unfinished.
+Status: native regular-file integration, restart inspection and retained-file restoration implemented;
+desktop confirmation/recovery, additions/removals, grouped integration and packaged proof are unfinished.
 This is a foundation for Phase 1, not completion of source integration.
 
 ## Decision and reason
@@ -65,7 +65,8 @@ transaction. Abandoned preparations also remain, with source unchanged.
 
 These are new external recovery records; existing attachment receipts, saved versions, journals,
 review signatures and approval formats are unchanged. Older binaries do not process this separately
-configured directory. There is no automatic cleanup or migration. The native recovery reader validates schema/field sets, rederives approved content from trusted
+configured directory. There is no automatic cleanup or migration. The native recovery reader
+validates schema/field sets, rederives approved content from trusted
 history, inspects current identities and content through retained authority, and reports uncertain
 states without enabling mutations.
 A receipt by itself is never deletion, overwrite, replay or approval authority.
@@ -79,7 +80,7 @@ and exact approval/trust/exclusion revalidation. The domain test retains Git ind
 live files and the history journal while changing only the explicitly selected approved file.
 Native restart inspection now classifies retained artifacts without replaying writes.
 
-Still required: human recovery actions and desktop presentation, crash-process campaigns,
+Still required: native confirmation and desktop recovery presentation, crash-process campaigns,
 retention that does not discard live descriptors' work, grouped additions/deletions and dependency
 handling, integration with native confirmation and desktop rendering, external-volume UX, Linux
 metadata preservation, and revision-bound packaged graphical proof. No general integration or
@@ -93,7 +94,8 @@ The metadata copier and its allocation-identity regression from later source
 does not introduce the known creation-time transplant defect. No recovery or restoration modules
 from the intervening source commits were included in that foundation. Existing receipt formats are retained.
 Read-only inspection now transfers source `7d06b8bd68d77ac9c358bf9002c829cd02995fa0` on #36;
-restoration remains separate.
+restoration follows as a separate increment from source
+`11df227f749aa8654fe89a0612e8f2b286c29b4a` on published #38, preserving the earlier allocation fix.
 
 ## Restart inspection
 
@@ -136,3 +138,54 @@ same-content replacement identities, bound oversized catalogues and live reads, 
 or special entries. The missing-outcome test is fault injection, not a killed-process campaign.
 The current entry point still requires the admitted source root to be available; offline/renamed
 source recovery, automatic catalogue discovery and graphical recovery actions remain unfinished.
+
+## Explicit retained-file restoration
+
+`prepare_retained_restoration` creates a new single-use native proposal to restore a frozen snapshot
+of an exact displaced file to its original project-relative path. A prior apply is never exchanged
+back or replayed. Preparation verifies its origin receipt and trusted approval ancestry, requires the
+origin's `exchange` to retain the original source installation, captures the current project under
+its unchanged exclusions, and reads retained bytes within the remaining capture budget. An unused
+staged proposal is not a displaced source and cannot be restored through this operation.
+
+The native proposal exposes frozen before/after bytes and exact metadata facts for a future native
+confirmation. No source mutation occurs during preparation. Applying after explicit confirmation
+revalidates origin ancestry, retained content/identity/metadata, current exclusions, staged receipt
+and exact current source. A change to either input while confirmation is pending refuses before
+exchange. Changes racing the final exchange still preserve both named inodes and report uncertainty.
+The original retained inode remains untouched, so late writes after restoration remain available.
+The displaced current working inode is retained in the new transaction. Restoring that transaction's
+retained file implements undo as another explicit operation, including any later editor writes.
+
+Restoration copies the selected retained file's native metadata and permissions, while retaining the
+current file with its own metadata. The replacement primitive therefore separately binds current
+and proposed metadata digests; ordinary approved-file integration continues to require matching
+metadata except for the approved executable state. Special permission bits and unsupported metadata
+still refuse. No restoration appends approval/history records or advances main; background capture
+may later save the restored private work through the ordinary observation path.
+
+New directories use `restoration-<32 lowercase hex digits>`. Their canonical prepared receipt is
+`mesh.attachment-file-restoration/v1`: the integration receipt's ordered fields followed by
+`installed_metadata_digest`, `origin_transaction`, `origin_proposal_digest`, `origin_file`,
+`origin_digest`, `origin_mode`, and `origin_metadata_digest`. The origin fields bind the selected
+retained snapshot and parent receipt. `head`, `bundle` and `target` identify approval ancestry, not
+approval of restored content. The source fields describe current work to preserve; proposed content
+may contain later private edits absent from the accepted version. The result schema is
+`mesh.attachment-file-restoration-result/v1`, with the existing proposal-digest/observation/retention
+fields. Both receipts retain `automatic_replay:false` semantics. Older readers do not recognize
+restoration directory names or receipt schemas and cannot replay or delete them.
+
+The restart inspector validates each restoration's exact field sequence, snapshot binding, parent
+receipt digest, original path and approval ancestry. Chains are bounded to 16 records including the
+initial integration; preparation reserves a level for the new transaction and refuses an overflow
+before allocating it. Missing, tampered or untrusted ancestry remains unverified. Inspection labels
+restoration as `restore-retained` and `content_is_approved_main:false`; the original approved head
+cannot promote private restored bytes implicitly. Existing integration receipts are unchanged.
+
+Tests preserve two simultaneously open editor streams, restore late retained edits, retain newer
+current work, reopen and classify restoration records, undo through a new transaction, preserve
+separate native metadata, reject changes during confirmation, refuse abandoned stages and damaged
+ancestry, and enforce the ancestry bound without dropping prior work. These native tests do not
+prove an actual human confirmation or packaged recovery UI. Offline/renamed roots, restoring a
+currently absent path, grouped directory changes, long-chain consolidation, remote recovery and
+safe explicit retention management still require further work.

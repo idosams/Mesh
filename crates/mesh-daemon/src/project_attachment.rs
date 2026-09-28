@@ -2,8 +2,8 @@
 //!
 //! The native caller chooses a private metadata directory outside the source project. This record
 //! establishes observation identity only. Explicit signed saves use external history and grant no
-//! source custody, approval or write-back authority. Explicit native integration is a separate
-//! single-use operation over already-approved content and retained recovery material.
+//! source custody, approval or write-back authority. Explicit native integration and restoration
+//! are separate single-use operations that preserve displaced work; restoration does not publish.
 
 use std::fs;
 use std::io::{self, Read as _};
@@ -35,6 +35,8 @@ mod history;
 mod inspection;
 mod integration;
 mod recovery;
+mod restoration;
+pub use restoration::PreparedRetainedRestoration;
 mod writeback;
 pub use writeback::PreparedMainFileIntegration;
 mod reviews;

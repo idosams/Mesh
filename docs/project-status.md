@@ -71,8 +71,13 @@ record uncertainty without replay or automatic cleanup. This unmerged foundation
 or agent apply command; confirmation, restart recovery and full integration remain unfinished.
 Native restart inspection now verifies retained transaction receipts against accepted history and
 observes source/recovery files under bounded reads. Missing outcomes, later edits and identity
-substitution remain explicit; no inspection replays writes or grants cleanup authority. Restoration
-and graphical recovery acceptance are still pending.
+substitution remain explicit; no inspection replays writes or grants cleanup authority.
+Graphical recovery acceptance is still pending.
+Native-only restoration now freezes retained work for explicit confirmation and preserves the
+current file in a new retained transaction. It rechecks origin ancestry, source, metadata and policy;
+later edits refuse or remain retained for reconciliation. Undo is another preserving transaction,
+and private recovered content cannot advance main. Desktop confirmation, offline recovery and
+packaged acceptance remain unfinished.
 See the [fleet plan](plan/fleet-orchestration.md) and [migration ledger](plan/fleet-migration.md).
 
 Mesh is an early functional local alpha. The strongest supported path is one Apple-silicon Mac

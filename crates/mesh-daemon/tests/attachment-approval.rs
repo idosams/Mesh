@@ -1133,3 +1133,338 @@ fn recovery_catalog_bounds_work_and_preserves_unsafe_or_incomplete_entries() {
         )
         .is_err());
 }
+
+#[test]
+fn retained_restoration_preserves_both_editor_streams_and_supports_a_new_undo_transaction() {
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+    let f = Fixture::new("restore-retained");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    f.git(&["init", "--quiet"]);
+    f.git(&["add", "work.txt"]);
+    let index = fs::read(f.source.join(".git/index")).unwrap();
+    let head = fs::read(f.source.join(".git/HEAD")).unwrap();
+    let root = recovery_root(&f);
+    let mut original_editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    let apply = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let origin = apply.recovery_path().to_owned();
+    let origin_id = origin.file_name().unwrap().to_str().unwrap();
+    apply.apply(&trust).unwrap();
+    original_editor.write_all(b" + late original work").unwrap();
+    fs::set_permissions(origin.join("exchange"), fs::Permissions::from_mode(0o600)).unwrap();
+    let mut current_editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    current_editor.write_all(b" + current work").unwrap();
+    let current_inode = current_editor.metadata().unwrap().ino();
+    let journal = f.journal();
+    let main = f.history.accepted_main(&trust).unwrap();
+    let restore = f
+        .history
+        .prepare_retained_restoration(&root, origin_id, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(restore.current_content(), b"approved + current work");
+    assert_eq!(restore.restored_content(), b"base + late original work");
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"approved + current work"
+    );
+    let recovery = restore.recovery_path().to_owned();
+    let id = recovery.file_name().unwrap().to_str().unwrap();
+    let inspect = |id| {
+        f.storage
+            .reopen(f.history.id())
+            .unwrap()
+            .inspect_integration_recovery(&root, Some(id), &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(recovery_status(&inspect(id)), "prepared-arrangement");
+    assert_eq!(
+        restore.apply(&trust).unwrap().get("status"),
+        Some(&Json::text("applied-observed"))
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"base + late original work"
+    );
+    assert_eq!(
+        fs::metadata(f.source.join("work.txt"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    assert_eq!(
+        fs::metadata(recovery.join("exchange")).unwrap().ino(),
+        current_inode
+    );
+    let inspection = inspect(id);
+    assert_eq!(recovery_status(&inspection), "applied-arrangement");
+    assert_eq!(
+        recovery_entry(&inspection)
+            .get("details")
+            .unwrap()
+            .get("content_is_approved_main"),
+        Some(&Json::Bool(false))
+    );
+    current_editor.write_all(b" + later current work").unwrap();
+    original_editor
+        .write_all(b" + later original work")
+        .unwrap();
+    assert_eq!(
+        fs::read(origin.join("exchange")).unwrap(),
+        b"base + late original work + later original work"
+    );
+    assert_eq!(
+        fs::read(recovery.join("exchange")).unwrap(),
+        b"approved + current work + later current work"
+    );
+    assert_eq!(recovery_status(&inspect(id)), "changed-files");
+    let undo = f
+        .history
+        .prepare_retained_restoration(&root, id, &trust, ObservationLimits::default())
+        .unwrap();
+    let undo_path = undo.recovery_path().to_owned();
+    let undo_id = undo_path.file_name().unwrap().to_str().unwrap();
+    assert_eq!(
+        undo.restored_content(),
+        b"approved + current work + later current work"
+    );
+    undo.apply(&trust).unwrap();
+    assert_eq!(recovery_status(&inspect(undo_id)), "applied-arrangement");
+    assert_eq!(
+        fs::read(undo_path.join("exchange")).unwrap(),
+        b"base + late original work"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"approved + current work + later current work"
+    );
+    assert_eq!(f.history.accepted_main(&trust).unwrap(), main);
+    assert_eq!(f.journal(), journal);
+    assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), head);
+}
+
+#[test]
+fn retained_restoration_refuses_changed_inputs_and_never_replays_an_unused_stage() {
+    let f = Fixture::new("restore-refusals");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("work.txt"))
+        .unwrap();
+    let apply = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let origin = apply.recovery_path().to_owned();
+    let id = origin.file_name().unwrap().to_str().unwrap();
+    let prepare = || {
+        f.history
+            .prepare_retained_restoration(&root, id, &trust, ObservationLimits::default())
+    };
+    assert!(prepare().is_err());
+    apply.apply(&trust).unwrap();
+    let restore = prepare().unwrap();
+    let recovery = restore.recovery_path().to_owned();
+    editor.write_all(b" + changed retained work").unwrap();
+    assert_eq!(restore.restored_content(), b"base");
+    assert!(restore.apply(&trust).is_err());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"approved");
+    assert_eq!(fs::read(recovery.join("exchange")).unwrap(), b"base");
+    let restore = prepare().unwrap();
+    fs::write(f.source.join("work.txt"), b"changed current work").unwrap();
+    assert!(restore.apply(&trust).is_err());
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"changed current work"
+    );
+    assert!(prepare()
+        .unwrap()
+        .apply(&TrustedReviewers::default())
+        .is_err());
+    let restore = prepare().unwrap();
+    fs::write(f.source.join(".meshignore"), b"work.txt\n").unwrap();
+    assert!(restore.apply(&trust).is_err());
+    fs::remove_file(f.source.join(".meshignore")).unwrap();
+    let restore = prepare().unwrap();
+    fs::write(restore.recovery_path().join("prepared.json"), b"{}").unwrap();
+    assert!(restore.apply(&trust).is_err());
+    let restore = prepare().unwrap();
+    fs::write(origin.join("prepared.json"), b"{}").unwrap();
+    assert!(restore.apply(&trust).is_err());
+    assert!(prepare().is_err());
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"changed current work"
+    );
+    assert_eq!(
+        fs::read(origin.join("exchange")).unwrap(),
+        b"base + changed retained work"
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn retained_restoration_uses_retained_metadata_and_keeps_current_metadata_in_recovery() {
+    let f = Fixture::new("restore-metadata");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let apply = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let origin = apply.recovery_path().to_owned();
+    apply.apply(&trust).unwrap();
+    let set = |path, value| {
+        assert!(std::process::Command::new("/usr/bin/xattr")
+            .args(["-w", "user.mesh-restore", value])
+            .arg(path)
+            .status()
+            .unwrap()
+            .success())
+    };
+    let get = |path| {
+        std::process::Command::new("/usr/bin/xattr")
+            .args(["-p", "user.mesh-restore"])
+            .arg(path)
+            .output()
+            .unwrap()
+            .stdout
+    };
+    assert!(std::process::Command::new("/bin/chmod")
+        .args(["+a", "everyone allow read"])
+        .arg(origin.join("exchange"))
+        .status()
+        .unwrap()
+        .success());
+    set(origin.join("exchange"), "retained metadata");
+    set(f.source.join("work.txt"), "current metadata");
+    let restore = f
+        .history
+        .prepare_retained_restoration(
+            &root,
+            origin.file_name().unwrap().to_str().unwrap(),
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let path = restore.recovery_path().to_owned();
+    restore.apply(&trust).unwrap();
+    assert_eq!(get(f.source.join("work.txt")), b"retained metadata\n");
+    assert_eq!(get(path.join("exchange")), b"current metadata\n");
+    assert_eq!(get(origin.join("exchange")), b"retained metadata\n");
+}
+
+#[test]
+fn restoration_ancestry_is_bounded_and_tampering_never_authorizes_replay() {
+    let f = Fixture::new("restore-ancestry");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    let target = f.save("approved");
+    let bundle = accept(&f, &signer, &trust, &target, 2);
+    fs::write(f.source.join("work.txt"), b"base").unwrap();
+    let root = recovery_root(&f);
+    let apply = f
+        .history
+        .prepare_main_file_integration(
+            &bundle,
+            &target,
+            "work.txt",
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let original = apply.recovery_path().to_owned();
+    let mut previous = original.clone();
+    apply.apply(&trust).unwrap();
+    let journal = f.journal();
+    for _ in 0..15 {
+        let restore = f
+            .history
+            .prepare_retained_restoration(
+                &root,
+                previous.file_name().unwrap().to_str().unwrap(),
+                &trust,
+                ObservationLimits::default(),
+            )
+            .unwrap();
+        previous = restore.recovery_path().to_owned();
+        restore.apply(&trust).unwrap();
+    }
+    let id = previous.file_name().unwrap().to_str().unwrap();
+    let inspect = || {
+        f.history
+            .inspect_integration_recovery(&root, Some(id), &trust, ObservationLimits::default())
+            .unwrap()
+    };
+    assert_eq!(recovery_status(&inspect()), "applied-arrangement");
+    let count = fs::read_dir(&root).unwrap().count();
+    assert!(f
+        .history
+        .prepare_retained_restoration(&root, id, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(fs::read_dir(&root).unwrap().count(), count);
+    let source = fs::read(f.source.join("work.txt")).unwrap();
+    let retained = fs::read(previous.join("exchange")).unwrap();
+    fs::write(original.join("prepared.json"), "{}").unwrap();
+    assert_eq!(recovery_status(&inspect()), "unverified-history");
+    assert!(f
+        .history
+        .prepare_retained_restoration(&root, id, &trust, ObservationLimits::default())
+        .is_err());
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), source);
+    assert_eq!(fs::read(previous.join("exchange")).unwrap(), retained);
+    assert_eq!(f.journal(), journal);
+}
