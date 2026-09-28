@@ -262,3 +262,9 @@ is selected in the desktop. It can use the desktop executable instead of a separ
 binary. This does not yet provide a desktop button to start a fleet, adopt an existing agent session,
 or approve work. See the [provider verification procedure](../crates/mesh-daemon/tests/README-provider.md)
 for the required exact-build checks and current acceptance limits.
+
+In the native fleet-discovery development increment, saved fleet records can be reopened even when
+the original project is offline. A restored record reports that its working contexts are not attached;
+it does not mean its former agents have stopped, restarted or been adopted. Missing or changed
+storage is retained and shown as unavailable. Provisioning creates the fleet record and managed input
+without starting a worker. Desktop scheduling and live fleet controls follow separately.

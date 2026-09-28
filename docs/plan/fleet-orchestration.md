@@ -313,3 +313,10 @@ Packaged fleet execution dependency: desktop source now exposes an explicit scop
 context and fail-closed session parsing have source coverage, with an opt-in packaged attached-input
 journey. The next host work still includes native provider admission, durable objective discovery,
 application-lifetime scheduling, process reconciliation and live lane/review presentation.
+
+Native durable discovery is now implemented on macOS: a retained catalogue lease, create-only
+allocation receipts, guarded ledger reopen, and explicit `restored-unattached` state preserve fleet
+facts without assuming worker ownership. Desktop native provisioning and catalogue commands are
+connected; provisioning reports no worker started and keeps source capture running. Restart and
+substitution tests cover the boundary. Application provider admission, fleet IPC registration,
+scheduling, live UI, process/context reconciliation and packaged graphical verification remain open.

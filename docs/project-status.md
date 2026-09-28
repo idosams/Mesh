@@ -186,3 +186,11 @@ inspection remains a separate mode. Native tests cover closed parsing, forwardin
 omission. A revision-bound packaged bridge test is available for attached input, delegation,
 checkpoint/review retry and revocation. Desktop scheduling, live controls and graphical fleet proof
 remain incomplete; this entry point alone does not launch a fleet.
+
+macOS native fleet storage now retains a bounded objective catalogue with one host lease, exact
+allocation receipts and guarded ledger access. Reopening a missing or empty ledger cannot silently
+initialize new history. Saved fleet facts remain discoverable while source projects are offline;
+restored services are explicitly unattached and cannot recreate previously allocated contexts.
+Desktop native commands can provision a fleet from an attached version and read its catalogue while
+ordinary source capture continues. They do not yet start workers or provide fleet UI controls.
+Context/process reconciliation, scheduling and graphical verification remain incomplete.

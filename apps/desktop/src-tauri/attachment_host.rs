@@ -17,6 +17,10 @@ const UNAVAILABLE: &str = "Attachment storage is unavailable or needs reconcilia
 
 pub struct AttachmentHost {
     storage_path: PathBuf,
+    #[cfg(target_os = "macos")]
+    fleet_path: PathBuf,
+    #[cfg(target_os = "macos")]
+    fleets: Mutex<Option<mesh_daemon::fleet::catalog::NativeFleetDirectory>>,
     state: Mutex<HostState>,
 }
 #[derive(Default)]
@@ -57,6 +61,10 @@ impl AttachmentHost {
     pub fn new(application_data: &Path) -> Self {
         Self {
             storage_path: application_data.join("attached-projects"),
+            #[cfg(target_os = "macos")]
+            fleet_path: application_data.join("fleets"),
+            #[cfg(target_os = "macos")]
+            fleets: Mutex::new(None),
             state: Mutex::new(HostState::default()),
         }
     }
@@ -239,6 +247,134 @@ impl AttachmentHost {
             ("project", Json::text(child_id)),
         ])
         .encode())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn with_fleets<T>(
+        &self,
+        create: bool,
+        action: impl FnOnce(
+            Option<&mesh_daemon::fleet::catalog::NativeFleetDirectory>,
+        ) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let mut held = self
+            .fleets
+            .lock()
+            .map_err(|_| "Fleet storage is unavailable")?;
+        if held.is_none() {
+            if !create {
+                match std::fs::symlink_metadata(&self.fleet_path) {
+                    Ok(_) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        return action(None)
+                    }
+                    Err(_) => return Err("Fleet storage is unavailable".into()),
+                }
+            }
+            if create {
+                match DirBuilder::new().mode(0o700).create(&self.fleet_path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                    Err(_) => return Err("Fleet storage is unavailable".into()),
+                }
+            }
+            *held = Some(
+                mesh_daemon::fleet::catalog::NativeFleetDirectory::open(
+                    &self.fleet_path,
+                    mesh_daemon::TrustedReviewers::default(),
+                    mesh_daemon::CheckpointRuntimeParameters {
+                        idle_interval: Some(std::time::Duration::from_millis(50)),
+                        maximum_uncheckpointed_bytes: Some(65_536),
+                        maximum_uncheckpointed_interval: Some(std::time::Duration::from_secs(2)),
+                    },
+                )
+                .map_err(|_| "Fleet storage is unavailable or owned by another host")?,
+            );
+        }
+        action(held.as_ref())
+    }
+
+    pub fn fleets(&self) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            self.with_fleets(false, |directory| match directory {
+                Some(directory) => directory
+                    .snapshot()
+                    .map(|value| value.encode())
+                    .map_err(|_| {
+                        "Fleet status is unavailable; retained work needs reconciliation".into()
+                    }),
+                None => Ok(Json::object([
+                    ("schema", Json::text("mesh.native-fleets/v1")),
+                    ("fleets", Json::Array(vec![])),
+                ])
+                .encode()),
+            })
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Err("Native fleet storage is unavailable on this platform".into())
+        }
+    }
+
+    pub fn provision_fleet(
+        &self,
+        id: &str,
+        request: &str,
+        goal: &str,
+        version: &str,
+        limits_json: &str,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            if limits_json.len() > 256 {
+                return Err("Invalid fleet limits".into());
+            }
+            let value = Json::parse(limits_json).map_err(|_| "Invalid fleet limits")?;
+            let Json::Object(fields) = &value else {
+                return Err("Invalid fleet limits".into());
+            };
+            if fields.len() != 4
+                || fields.iter().any(|(key, _)| {
+                    !["lanes", "concurrency", "depth", "retries"].contains(&key.as_str())
+                })
+            {
+                return Err("Invalid fleet limits".into());
+            }
+            let number = |name| {
+                value
+                    .get(name)
+                    .and_then(Json::as_u64)
+                    .ok_or("Invalid fleet limits")
+            };
+            let input = mesh_daemon::fleet::catalog::AttachedFleetRequest::new(
+                request,
+                goal,
+                version,
+                mesh_daemon::fleet::Limits {
+                    lanes: number("lanes")?,
+                    concurrency: number("concurrency")?,
+                    depth: number("depth")?,
+                    retries: number("retries")?,
+                },
+            )
+            .map_err(|_| "Invalid fleet request")?;
+            let source = self.review_history(id)?;
+            self.with_fleets(true, |directory| {
+                let service = directory.ok_or("Fleet storage is unavailable")?.create_attached(&source, &input)
+                    .map_err(|_| "Fleet allocation could not be confirmed. Retained work requires reconciliation before a different attempt.")?;
+                let objective = service.objective().map_err(|_| "Fleet identity is unavailable")?;
+                Ok(Json::object([
+                    ("schema",Json::text("mesh.desktop-attached-fleet/v1")), ("project",Json::text(id)),
+                    ("request",Json::text(request)), ("objective",Json::text(objective)), ("started",Json::Bool(false)),
+                ]).encode())
+            })
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (id, request, goal, version, limits_json);
+            Err("Native fleet storage is unavailable on this platform".into())
+        }
     }
 
     pub fn projects(&self) -> Result<String, String> {
@@ -1195,6 +1331,100 @@ mod tests {
             "normal tools continue"
         );
         drop(host);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn fleet_provisioning_preserves_capture_and_reopens_only_as_unattached() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-fleet-catalog-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("work"), "saved input").unwrap();
+        let host = AttachmentHost::new(&root);
+        assert!(Json::parse(&host.fleets().unwrap())
+            .unwrap()
+            .get("fleets")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(
+            !root.join("fleets").exists(),
+            "viewing an empty catalogue must not provision storage"
+        );
+        let attached = Json::parse(&host.attach(&source).unwrap()).unwrap();
+        let id = attached.get("id").unwrap().as_text().unwrap();
+        let generation = attached.get("generation").unwrap().as_text().unwrap();
+        let saved = wait_for_project(&host, id, |status| status.saved_version.is_some())
+            .saved_version
+            .unwrap()
+            .operation()
+            .to_string();
+        let limits = r#"{"lanes":4,"concurrency":2,"depth":1,"retries":1}"#;
+        let request = "e".repeat(32);
+        assert!(host
+            .provision_fleet(
+                id,
+                &request,
+                "Coordinate",
+                &saved,
+                r#"{"lanes":4,"concurrency":2,"depth":1,"retries":1,"path":"/elsewhere"}"#
+            )
+            .is_err());
+        assert!(!root.join("fleets").exists());
+        let allocated = host
+            .provision_fleet(id, &request, "Coordinate", &saved, limits)
+            .unwrap();
+        assert_eq!(
+            Json::parse(&allocated).unwrap().get("started"),
+            Some(&Json::Bool(false))
+        );
+        assert_eq!(
+            host.provision_fleet(id, &request, "Coordinate", &saved, limits)
+                .unwrap(),
+            allocated
+        );
+        assert_eq!(
+            host.state.lock().unwrap().projects[id]
+                .generation
+                .to_string(),
+            generation
+        );
+        fs::write(source.join("work"), "original continues").unwrap();
+        wait_for_project(&host, id, |status| {
+            status
+                .saved_version
+                .is_some_and(|version| version.operation().to_string() != saved)
+        });
+        let before = Json::parse(&host.fleets().unwrap()).unwrap();
+        let row = &before.get("fleets").unwrap().as_array().unwrap()[0];
+        assert_eq!(row.get("ownership"), Some(&Json::text("current-host")));
+        assert!(row
+            .get("state")
+            .unwrap()
+            .get("lanes")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|lane| lane.get("run") == Some(&Json::Null)));
+        drop(host);
+        let reopened = AttachmentHost::new(&root);
+        let after = Json::parse(&reopened.fleets().unwrap()).unwrap();
+        let recovered = &after.get("fleets").unwrap().as_array().unwrap()[0];
+        assert_eq!(recovered.get("state"), row.get("state"));
+        assert_eq!(
+            recovered.get("ownership"),
+            Some(&Json::text("restored-unattached"))
+        );
+        assert_eq!(
+            fs::read(source.join("work")).unwrap(),
+            b"original continues"
+        );
+        drop(reopened);
         fs::remove_dir_all(root).unwrap();
     }
 }

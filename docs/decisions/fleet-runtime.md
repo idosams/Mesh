@@ -165,3 +165,43 @@ application has a live scheduling loop or fleet controls. An opt-in native IPC t
 actual packaged executable from attached saved input, delegation, signed capture, pinned review,
 retry and revocation. It requires an exact expected build revision and verifies unchanged source
 work and desktop selection. That test does not launch a model or prove graphical interaction.
+
+## Native fleet discovery and storage ownership
+
+On macOS, `NativeFleetDirectory` owns an existing private application directory through a retained
+nonblocking directory lock. A second owner refuses while the catalogue or any returned service still
+holds that lease. Native callers supply a retained attachment, exact saved version, bounded goal,
+stable request and explicit limits. No renderer-selected database, allocation path, provider binary
+or credential enters this interface. This first catalogue authorizes the existing Codex adapter only.
+
+Each request has a deterministic objective directory containing a create-only ledger, an allocation
+receipt, and an independent `lanes` directory. Canonical `mesh.native-fleet-allocation/v1` binds the
+request, project/version, goal/limits, objective directory identity, lane-directory identity, and
+ledger device/inode plus macOS birth time. Receipt discovery is bounded to sixteen objectives.
+Unknown, incomplete or changed records are retained and reported unavailable, never deleted or
+turned into new history. Existing fleet event bytes and SQLite schema remain unchanged. Older
+runtimes do not discover this new directory layout.
+
+`FleetStore::open_guarded` separates first initialization from reopening. Reopen refuses a missing
+file or empty/unknown schema. SQLite opens without following symbolic aliases. Legacy callers first resolve OS parent aliases
+such as macOS `/var` while leaving the final ledger entry subject to no-follow admission. The native guard
+retains the admitted directories and ledger descriptor, checks canonical receipt equality, single-link
+regular files, owner-private modes and database-family aliases around operations, and checks before
+commit and acknowledgment. An authority change before append commit rolls the transaction back; a
+change after commit produces an uncertain result requiring the same request for reconciliation.
+The native directory reference anchors ledger access. Lane import uses an identity-checked ordinary
+path because macOS cannot canonicalize newly created descendants through the directory reference.
+These are native ownership checks, not an OS sandbox against arbitrary same-account code.
+
+Discovery reconstructs saved facts even when the original project is offline. It marks reconstructed
+services `restored-unattached`, preserves recorded uncertain runs, and neither adopts processes nor
+reacquires workspace custody. A same-host completed creation retry preserves subsequent lane work.
+Conflicting input refuses. A missing bound context after restart refuses new allocation. Incomplete
+allocation recovery, context reattachment and process-tree reconciliation remain separate work.
+
+The native desktop host exposes `attached_fleets` and `provision_attached_fleet`. Reading an absent
+catalogue does not create storage. Provisioning reports `started: false`, preserves the original
+capture session and exposes no publication authority. Provider admission, IPC registration, scheduling
+and UI controls remain to be connected. Tests cover guarded rollback, source preservation, restart
+without source access, owner exclusion, missing/empty ledgers, replaced directories, linked databases,
+receipt changes and closed desktop limits. Packaged graphical discovery is not yet verified.

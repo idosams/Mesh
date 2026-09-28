@@ -540,3 +540,27 @@ macOS tests and 44 daemon checks. Its full local gate remains running. Parent #4
 refusals; macOS was still running at transfer. Local native/full verification for this increment
 waits for the shared target. Named human review, merges, packaged graphical/native approval,
 real-provider/four-worker/remote acceptance and final combined-main validation remain outstanding.
+
+## L02a durable native fleet discovery
+
+Preserved source `877188898d0151d958bb06230b2e3797611a5ff2` transfers on #46 at
+`1434d269759e0ca62d9bc14b62ec6202580133a5`. The macOS catalogue retains an exclusive directory
+lease, identity-bound allocation receipts and guarded ledger access. Reopening never initializes
+missing or empty history. Restored facts remain `restored-unattached`; no process ownership,
+workspace custody, worker launch or original-project publication is inferred. Native desktop
+provisioning retains the source capture generation and reports `started: false`.
+
+The canonical transfer preserves the nonblocking capture lifecycle, shutdown drain, recovery and
+build-identity corrections. An additional storage regression covers a committed event whose native
+authority check refuses acknowledgment: reopening and exact retry must retain one durable event,
+while changed input still refuses. This complements the transferred precommit rollback regression.
+It is pending execution on the canonical branch and is not yet proof of crash or packaged recovery.
+
+Parent #45 passed all seven hosted checks: 2,998 Linux and 3,190 macOS native tests, four separate
+macOS tests and all 44 daemon checks. Parent #46 is published with hosted checks running; its local
+native and packaged execution remain pending. The preserved #44 full gate still owns the shared
+native build target. This discovery increment needs native/refusal, full-gate and hosted validation,
+named human review and packaged acceptance before delivery. The separate scheduling and live-view
+increments remain `60a1c5bc5c573a4b87e57d9f8b0b9c7a1c28c3e9` and
+`c7922b3d74cae8715066e2868533ba714d67ddb0`. All later fleet phases, merged delivery and combined-main
+verification remain required. Original work and histories are preserved.

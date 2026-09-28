@@ -790,6 +790,31 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn attached_fleets(host: State<'_, Arc<AttachmentHost>>) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.fleets())
+            .await
+            .map_err(|_| "Fleet status is unavailable".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn provision_attached_fleet(
+        host: State<'_, Arc<AttachmentHost>>,
+        id: String,
+        request: String,
+        goal: String,
+        version: String,
+        limits_json: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.provision_fleet(&id, &request, &goal, &version, &limits_json)
+        })
+        .await
+        .map_err(|_| "Fleet provisioning did not finish".to_owned())?
+    }
+
+    #[tauri::command]
     async fn attached_project_versions(
         host: State<'_, Arc<AttachmentHost>>,
         id: String,
@@ -6998,6 +7023,8 @@ mod desktop {
                 pick_folder,
                 attach_existing_project,
                 attached_projects,
+                attached_fleets,
+                provision_attached_fleet,
                 attached_project_versions,
                 inspect_attached_version,
                 compare_attached_versions,

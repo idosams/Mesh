@@ -4,6 +4,7 @@
 //! A committed append is a scheduling decision, not proof that an external worker was launched.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
@@ -41,6 +42,8 @@ pub enum FleetStoreError {
     RequestConflict,
     /// The file belongs to another application or uses an unsupported schema.
     UnsupportedSchema,
+    /// The native owner no longer recognizes this exact ledger location.
+    AuthorityChanged,
     /// SQLite refused an operation. The transaction was not acknowledged.
     Database(rusqlite::Error),
 }
@@ -52,6 +55,7 @@ impl std::fmt::Display for FleetStoreError {
             Self::StaleRevision { actual } => write!(f, "fleet revision changed to {actual}"),
             Self::RequestConflict => f.write_str("fleet request identity was reused"),
             Self::UnsupportedSchema => f.write_str("unsupported fleet ledger schema"),
+            Self::AuthorityChanged => f.write_str("fleet ledger authority changed"),
             Self::Database(error) => write!(f, "fleet ledger database operation failed: {error}"),
         }
     }
@@ -64,6 +68,13 @@ impl From<rusqlite::Error> for FleetStoreError {
     }
 }
 
+/// Native authority retained for the lifetime of a ledger. A check grants no actor or run rights.
+/// Implementations must reject changed directory/file identities and aliases without repairing them.
+pub trait FleetStoreAuthority: Send + Sync + std::fmt::Debug {
+    /// Verify the location before and after each database operation.
+    fn check(&self) -> Result<(), FleetStoreError>;
+}
+
 /// SQLite-backed ordered event streams with transactional idempotency and revision checks.
 ///
 /// Open only at a service-authorized private location. This type does not authenticate callers
@@ -71,18 +82,58 @@ impl From<rusqlite::Error> for FleetStoreError {
 #[derive(Debug)]
 pub struct FleetStore {
     connection: Connection,
+    authority: Option<Arc<dyn FleetStoreAuthority>>,
 }
 
 impl FleetStore {
     /// Open or initialize a fleet ledger. Unknown formats are never migrated implicitly.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, FleetStoreError> {
         let path = path.as_ref();
+        if !path.is_absolute() {
+            return Err(FleetStoreError::InvalidInput);
+        }
+        // Existing callers may use OS parent aliases such as macOS /var. Resolve only the parent;
+        // the final ledger entry must still pass SQLite's no-follow check.
+        let parent = path
+            .parent()
+            .ok_or(FleetStoreError::InvalidInput)?
+            .canonicalize()
+            .map_err(|_| FleetStoreError::InvalidInput)?;
+        let name = path.file_name().ok_or(FleetStoreError::InvalidInput)?;
+        Self::open_inner(&parent.join(name), true, None)
+    }
+
+    /// Open a native-bound ledger. Only initial allocation may initialize an empty file;
+    /// reopening refuses missing files and empty/unknown schemas instead of fabricating history.
+    /// `path` must be a native-resolved name or stable directory reference with no symbolic aliases.
+    pub fn open_guarded(
+        path: &Path,
+        initialize: bool,
+        authority: Arc<dyn FleetStoreAuthority>,
+    ) -> Result<Self, FleetStoreError> {
+        Self::open_inner(path, initialize, Some(authority))
+    }
+
+    fn check_authority(&self) -> Result<(), FleetStoreError> {
+        check_authority(self.authority.as_deref())
+    }
+
+    fn open_inner(
+        path: &Path,
+        initialize: bool,
+        authority: Option<Arc<dyn FleetStoreAuthority>>,
+    ) -> Result<Self, FleetStoreError> {
+        check_authority(authority.as_deref())?;
         // Relative SQLite names can select temporary or URI-backed in-memory databases. A
         // durable control ledger requires an absolute native filename selected by the service.
         if !path.is_absolute() {
             return Err(FleetStoreError::InvalidInput);
         }
-        let mut connection = Connection::open(path)?;
+        let mut flags = rusqlite::OpenFlags::default() | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        if !initialize {
+            flags.remove(rusqlite::OpenFlags::SQLITE_OPEN_CREATE);
+        }
+        let mut connection = Connection::open_with_flags(path, flags)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         // Check identity before changing the file's persistent journal mode.
         {
@@ -94,7 +145,7 @@ impl FleetStore {
                 [],
                 |r| r.get(0),
             )?;
-            if version == 0 && app == 0 && tables == 0 {
+            if initialize && version == 0 && app == 0 && tables == 0 {
                 tx.execute_batch(
                     "CREATE TABLE fleet_events (
                         stream TEXT NOT NULL,
@@ -110,6 +161,7 @@ impl FleetStore {
             } else if version != SCHEMA_VERSION || app != APPLICATION_ID {
                 return Err(FleetStoreError::UnsupportedSchema);
             }
+            check_authority(authority.as_deref())?;
             tx.commit()?;
         }
         let mode: String = connection.pragma_query_value(None, "journal_mode", |r| r.get(0))?;
@@ -117,17 +169,23 @@ impl FleetStore {
             connection.pragma_update(None, "journal_mode", "WAL")?;
         }
         connection.pragma_update(None, "synchronous", "FULL")?;
-        Ok(Self { connection })
+        check_authority(authority.as_deref())?;
+        Ok(Self {
+            connection,
+            authority,
+        })
     }
 
     /// Current committed revision, or zero for an objective with no events.
     pub fn revision(&self, stream: &str) -> Result<u64, FleetStoreError> {
+        self.check_authority()?;
         valid_id(stream)?;
         let revision: u64 = self.connection.query_row(
             "SELECT coalesce(max(revision), 0) FROM fleet_events WHERE stream = ?1",
             [stream],
             |r| r.get(0),
         )?;
+        self.check_authority()?;
         Ok(revision)
     }
 
@@ -137,9 +195,11 @@ impl FleetStore {
         stream: &str,
         request: &str,
     ) -> Result<Option<FleetEvent>, FleetStoreError> {
+        self.check_authority()?;
         valid_id(stream)?;
         valid_id(request)?;
-        self.connection
+        let result = self
+            .connection
             .query_row(
                 "SELECT revision, payload FROM fleet_events WHERE stream = ?1 AND request = ?2",
                 params![stream, request],
@@ -153,7 +213,9 @@ impl FleetStore {
                 },
             )
             .optional()
-            .map_err(Into::into)
+            .map_err(Into::into);
+        self.check_authority()?;
+        result
     }
 
     /// Append exactly once at `expected_revision`, or return the identical earlier append.
@@ -167,6 +229,7 @@ impl FleetStore {
         request: &str,
         payload: &str,
     ) -> Result<FleetEvent, FleetStoreError> {
+        self.check_authority()?;
         valid_id(stream)?;
         valid_id(request)?;
         if payload.is_empty()
@@ -189,6 +252,7 @@ impl FleetStore {
             if revision != expected_revision + 1 || saved != payload {
                 return Err(FleetStoreError::RequestConflict);
             }
+            check_authority(self.authority.as_deref())?;
             return Ok(FleetEvent {
                 stream: stream.to_owned(),
                 revision,
@@ -209,7 +273,9 @@ impl FleetStore {
             "INSERT INTO fleet_events(stream, revision, request, payload) VALUES (?1, ?2, ?3, ?4)",
             params![stream, revision, request, payload],
         )?;
+        check_authority(self.authority.as_deref())?;
         tx.commit()?;
+        self.check_authority()?;
         Ok(FleetEvent {
             stream: stream.to_owned(),
             revision,
@@ -225,6 +291,7 @@ impl FleetStore {
         after: u64,
         limit: usize,
     ) -> Result<Vec<FleetEvent>, FleetStoreError> {
+        self.check_authority()?;
         valid_id(stream)?;
         if after > i64::MAX as u64 || limit == 0 || limit > MAX_FLEET_EVENT_PAGE {
             return Err(FleetStoreError::InvalidInput);
@@ -241,8 +308,14 @@ impl FleetStore {
                 payload: r.get(2)?,
             })
         })?;
-        records.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        let result = records.collect::<Result<Vec<_>, _>>().map_err(Into::into);
+        self.check_authority()?;
+        result
     }
+}
+
+fn check_authority(authority: Option<&dyn FleetStoreAuthority>) -> Result<(), FleetStoreError> {
+    authority.map_or(Ok(()), FleetStoreAuthority::check)
 }
 
 fn valid_id(id: &str) -> Result<(), FleetStoreError> {
@@ -468,5 +541,93 @@ mod tests {
         }
         // No unwinding, transaction drop, or Connection drop: exercise SQLite crash recovery.
         std::process::exit(86);
+    }
+
+    #[derive(Debug)]
+    struct BudgetAuthority(AtomicU64);
+    impl FleetStoreAuthority for BudgetAuthority {
+        fn check(&self) -> Result<(), FleetStoreError> {
+            self.0
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .map(|_| ())
+                .map_err(|_| FleetStoreError::AuthorityChanged)
+        }
+    }
+
+    #[test]
+    fn guarded_reopen_never_initializes_missing_or_empty_history() {
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let authority = Arc::new(BudgetAuthority(AtomicU64::new(100)));
+        assert!(FleetStore::open_guarded(&db, false, authority.clone()).is_err());
+        assert!(!db.exists());
+        std::fs::write(&db, []).unwrap();
+        assert!(matches!(
+            FleetStore::open_guarded(&db, false, authority.clone()),
+            Err(FleetStoreError::UnsupportedSchema)
+        ));
+        assert_eq!(std::fs::metadata(&db).unwrap().len(), 0);
+        let mut store = FleetStore::open_guarded(&db, true, authority.clone()).unwrap();
+        store.append("objective", 0, "first", "saved").unwrap();
+        drop(store);
+        let store = FleetStore::open_guarded(&db, false, authority).unwrap();
+        assert_eq!(store.revision("objective").unwrap(), 1);
+    }
+
+    #[test]
+    fn authority_loss_after_commit_retains_the_event_for_exact_retry_after_reopen() {
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let authority = Arc::new(BudgetAuthority(AtomicU64::new(100)));
+        let mut store = FleetStore::open_guarded(&db, true, authority.clone()).unwrap();
+        store.append("objective", 0, "first", "saved").unwrap();
+        // Permit admission and the precommit check, then refuse acknowledgment after commit.
+        authority.0.store(2, Ordering::SeqCst);
+        assert!(matches!(
+            store.append("objective", 1, "second", "durable-but-unacknowledged"),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        drop(store);
+        authority.0.store(100, Ordering::SeqCst);
+        let mut reopened = FleetStore::open_guarded(&db, false, authority).unwrap();
+        assert_eq!(reopened.revision("objective").unwrap(), 2);
+        let retry = reopened
+            .append("objective", 1, "second", "durable-but-unacknowledged")
+            .unwrap();
+        assert_eq!(retry.revision, 2);
+        assert_eq!(retry.payload, "durable-but-unacknowledged");
+        assert_eq!(reopened.events("objective", 0, 4).unwrap().len(), 2);
+        assert!(matches!(
+            reopened.append("objective", 1, "second", "different"),
+            Err(FleetStoreError::RequestConflict)
+        ));
+        assert_eq!(reopened.revision("objective").unwrap(), 2);
+    }
+
+    #[test]
+    fn lost_native_authority_refuses_reads_and_rolls_back_before_append_commit() {
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let authority = Arc::new(BudgetAuthority(AtomicU64::new(100)));
+        let mut store = FleetStore::open_guarded(&db, true, authority.clone()).unwrap();
+        store.append("objective", 0, "first", "saved").unwrap();
+        authority.0.store(1, Ordering::SeqCst);
+        assert!(matches!(
+            store.append("objective", 1, "second", "refused"),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        authority.0.store(100, Ordering::SeqCst);
+        assert_eq!(store.revision("objective").unwrap(), 1);
+        for action in 0..3 {
+            authority.0.store(1, Ordering::SeqCst);
+            let refused = match action {
+                0 => store.revision("objective").is_err(),
+                1 => store.request("objective", "first").is_err(),
+                _ => store.events("objective", 0, 2).is_err(),
+            };
+            assert!(refused, "authority must be rechecked after reading");
+        }
     }
 }

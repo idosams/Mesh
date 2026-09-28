@@ -4,6 +4,8 @@
 //! must authenticate/authorize commands and verify versions before admitting them here. External
 //! process effects happen only after dispatch intent commits, and uncertain runs retain their slot.
 
+#[cfg(target_os = "macos")]
+pub mod catalog;
 #[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
