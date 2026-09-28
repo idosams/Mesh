@@ -25,6 +25,10 @@ pub use remote_admission::{
     RemoteAdmissionOutcome, RemoteAdmissionReceipt, RemoteAdmissionRegistry,
     RemoteInputReservation, RemoteWork,
 };
+#[cfg(target_os = "macos")]
+mod worker_directory;
+#[cfg(target_os = "macos")]
+pub use worker_directory::NativeRemoteWorkerDirectory;
 mod remote_input;
 #[cfg(unix)]
 pub use remote_input::NativeRemoteInputReceiver;

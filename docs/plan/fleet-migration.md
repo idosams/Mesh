@@ -2301,7 +2301,8 @@ Six native regressions passed locally: identical and distinct concurrent connect
 restart/expiry claims, changed work/allocation refusal, configuration/history validation, closed
 canonical records and actual pinned materialization with no regrant after refusal. The current
 store and daemon test crate were rebuilt in independent output locations using unchanged dependency
-artifacts. This is focused native evidence, not a full local Cargo gate; complete hosted CI is pending.
+artifacts. This is focused native evidence, not a full local Cargo gate. All seven exact-head hosted
+checks passed and #125 is merged.
 No existing fleet event schema or dependency changes. The additive admission record refuses unknown
 formats. Shared native ledger provisioning, terminal reconciliation/retry, worker history binding,
 launch ownership, authenticated transport and actual second-machine execution remain required.
@@ -2319,3 +2320,22 @@ corrected script. This validates the script correction, not the newer Rust imple
 exact-head hosted rebuild/checks remain pending. The original full-run log remains retained: 3,384
 native tests passed, two native watcher startup tests failed (issue #37), 16 skipped, and desktop
 checks passed. This correction does not resolve those native watcher failures.
+
+## R11 native shared worker ledger
+
+New canonical implementation based on #126 at
+`ad6f1c53498dfefcd257a0461981dd6bab7a0c55`; no preserved source commits are replaced.
+The macOS native worker directory composes retained directory authority, independent exclusive
+ownership, a create-only physical receipt and guarded SQLite access through a stable directory
+reference. Every objective registry uses this same worker ledger; retained registry connections keep
+ownership alive. Reopen never repairs partial or absent history. Changed namespace, files, keys,
+permissions, links, unknown entries and physical movement into protected projects refuse.
+
+All seven native test cases passed locally (six scenarios plus the child-process helper), including
+abrupt process exit with committed admission recovery and no renewed reservation. The current store
+and daemon test crate were rebuilt independently using unchanged dependency artifacts. Structural
+checks pass; full exact-head CI remains pending. This is macOS storage/ownership evidence, not
+portable worker support, network authentication, provider execution, second-machine or packaged
+acceptance. No existing schema or dependencies changed; the additive worker-directory receipt is
+closed and refuses unknown versions. Worker workspace provenance, process supervision, terminal
+reconciliation, transport and saved-result recovery remain required.

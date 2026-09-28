@@ -192,10 +192,34 @@ increment conservatively retains every admitted slot and refuses another attempt
 terminal reconciliation and authorized retry are still required before production execution.
 
 This API integrates durable admission with pinned file materialization, but is not exposed to peers.
-Native provisioning of the shared worker ledger, current authentication/capability admission,
+Current authentication/capability admission,
 initial worker history binding, process launch/acknowledgment, terminal receipts, bidirectional
 transport authentication and result recovery remain unfinished. An input reservation cannot launch a
 provider or advance protected main. Existing lower-level materialization remains available to trusted
 native callers; the worker transport must use the registry path rather than treating a folder name
 as admission. The additive closed canonical `mesh.remote-admission/v1` record lives in separate fleet
 event streams; unknown fields/versions or changed retained configuration refuse without migration.
+
+## Native worker ledger ownership
+
+`NativeRemoteWorkerDirectory` now provisions and reopens the shared receiving ledger on macOS.
+Native configuration supplies an existing private directory, its retained directory identity,
+the worker public-key identity and protected project roots. Creation requires an empty directory;
+reopen requires the exact physical receipt, database identity and supported schema. Partial creation,
+missing files, changed keys, unknown entries and non-private or linked files refuse without repair.
+All objective registries use that same ledger and retain its exclusive native ownership for their
+entire lifetime, including after the directory wrapper is dropped.
+
+SQLite uses the existing macOS persistent directory reference so an ancestor rename cannot redirect
+its database family to a replacement pathname. Every guarded operation rechecks retained directory,
+database and receipt identities, private permissions, sidecar types and protected-root ancestry.
+Abrupt process termination releases the OS lock but preserves committed admissions; reopening
+returns retained facts, never another input reservation. The receipt format is additive and closed,
+`mesh.remote-worker-directory/v1`; unknown versions or mismatches refuse instead of migrating.
+
+This is a native macOS capability, not a portable Unix SQLite-location guarantee. Other platforms
+need an equivalent safe native storage implementation before worker provisioning is supported.
+It does not authenticate peers, provision an SSH endpoint, initialize an execution workspace,
+release uncertain slots, own a provider process or satisfy actual second-machine acceptance.
+The supervisor must retain one configured worker directory across connections; a network request
+must never choose a different ledger to evade assignment uniqueness.
