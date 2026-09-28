@@ -16,11 +16,13 @@ pub(crate) mod project_import;
 mod project_mapping;
 #[cfg(unix)]
 pub use project_import::{CandidateImportSigner, PreparedProjectCandidateImport};
+mod file_deletions;
 #[cfg(unix)]
 pub mod provider;
 #[cfg(unix)]
 pub mod service;
 mod wire;
+pub use file_deletions::{FileDeletion, FileDeletionResult};
 #[cfg(unix)]
 pub mod workspace;
 
@@ -234,6 +236,8 @@ pub struct State {
     pub lanes: BTreeMap<String, Lane>,
     /// Acknowledged capture intents and immutable outcomes, retained across restart.
     pub checkpoints: BTreeMap<String, Checkpoint>,
+    /// Explicit deletion intents and exact prepared operations, never inferred from missing files.
+    pub file_deletions: BTreeMap<String, FileDeletion>,
     /// Durable requests remain readable independently of worker attempts.
     pub review_change_requests: BTreeMap<String, ReviewChangeRequest>,
     /// Append-ordered proposals, bounded to eight per request. No resolution is inferred.
@@ -298,6 +302,35 @@ pub enum Command {
         id: String,
         /// Native-verified outcome.
         result: CheckpointResult,
+    },
+    /// Persist an explicit missing-file resolution before any native append.
+    BeginFileDeletion {
+        /// Objective-unique request identity.
+        id: String,
+        /// Bound lane.
+        lane: String,
+        /// Native-authenticated caller.
+        origin: AgentOrigin,
+        /// Exact fold at admission.
+        input_digest: String,
+        /// Explicit confined relative path; no filesystem mutation is authorized by this alone.
+        path: String,
+        /// Last saved file version expected at this path.
+        version: RecordDigest,
+    },
+    /// Bind the exact signed native operation before appending it to workspace history.
+    PrepareFileDeletion {
+        /// Previously accepted intent.
+        id: String,
+        /// Exact authenticated deletion operation identity.
+        operation: RecordDigest,
+    },
+    /// Record a native-verified outcome, including reconciliation after cancellation.
+    FinishFileDeletion {
+        /// Previously accepted intent.
+        id: String,
+        /// Immutable native outcome; no approval authority.
+        result: FileDeletionResult,
     },
     /// Initialize an objective once.
     Start {
@@ -536,6 +569,9 @@ impl State {
         }
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
+            Command::BeginFileDeletion { .. }
+            | Command::PrepareFileDeletion { .. }
+            | Command::FinishFileDeletion { .. } => self.apply_file_deletion(command)?,
             Command::Start { .. } => unreachable!("handled above"),
             Command::SetReviewChangeDecision {
                 request,

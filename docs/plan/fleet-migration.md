@@ -1378,3 +1378,20 @@ Fleet idempotency/tool exposure and later deletion/integration/restoration incre
 
 D01a canonical checks: repository 7, docs 5 plus 106-document links, license/storage self-tests,
 Rust formatting and whitespace checks pass. These checks do not establish native runtime behavior.
+
+## D01b deletion intent, preparation and outcome records
+
+Transfers the state/replay portion of source `278beb6d5549a2380953f0cbfb2e1351566637df`
+onto canonical PR #77 at `0e3c36b30354c11bb61c5aaa7fe80f17bbbf907d`: exactly
+`fleet/file_deletions.rs`, the additions in `fleet/mod.rs`, `fleet/wire.rs` and `fleet/tests.rs`.
+The remaining authenticated changeset, native workspace/live, service, service tests, fleet-agent
+and MCP changes from the same source commit are intentionally deferred to the dependent increment.
+This records partial replacement, not completion of the whole source commit.
+
+The journal binds explicit intent before one exact prepared operation and allows only its matching
+outcome. Replay has no filesystem effects. New intent/preparation refuse after cancellation while
+an already-prepared outcome remains reconcilable. Three transferred regressions cover restart and
+idempotency, cancellation, malformed paths/stale runs/replaced inputs and closed additive encoding.
+Existing histories remain readable; older binaries refuse new command kinds. Native execution and
+harness exposure are not included in this slice. Local native/failing-before/full validation remains
+queued behind preserved verification; hosted runtime evidence is required before delivery.

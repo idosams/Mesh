@@ -941,3 +941,170 @@ fn review_decisions_are_reversible_revision_bound_and_do_not_approve_or_change_w
         "review-change-decision-limit",
     );
 }
+
+fn deletion_intent(path: &str) -> Command {
+    Command::BeginFileDeletion {
+        id: "delete-one".into(),
+        lane: "worker".into(),
+        origin: AgentOrigin {
+            actor: "actor".into(),
+            session: "session".into(),
+            run: "run".into(),
+            generation: "a".repeat(32),
+        },
+        input_digest: "b".repeat(32),
+        path: path.into(),
+        version: RecordDigest::from_bytes([2; 32]),
+    }
+}
+#[test]
+fn file_deletion_three_stage_receipts_survive_restart_and_reconcile_after_cancel() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    let begin = deletion_intent("docs/old.txt");
+    let accepted = runtime.record("delete-intent", begin.clone()).unwrap();
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(runtime.record("delete-intent", begin).unwrap(), accepted);
+    let pending = &runtime.state().file_deletions["delete-one"];
+    assert_eq!(pending.path, "docs/old.txt");
+    assert!(pending.operation.is_none());
+    assert!(pending.result.is_none());
+    let operation = RecordDigest::from_bytes([3; 32]);
+    let result = FileDeletionResult {
+        operation,
+        workspace_digest: "c".repeat(32),
+        settled: false,
+    };
+    refuses(
+        &mut runtime,
+        Command::FinishFileDeletion {
+            id: "delete-one".into(),
+            result: result.clone(),
+        },
+        "file-deletion-operation-mismatch",
+    );
+    let prepared = Command::PrepareFileDeletion {
+        id: "delete-one".into(),
+        operation,
+    };
+    let receipt = runtime.record("delete-prepared", prepared.clone()).unwrap();
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(
+        runtime.record("delete-prepared", prepared.clone()).unwrap(),
+        receipt
+    );
+    refuses(&mut runtime, prepared, "file-deletion-already-prepared");
+    let mut wrong = result.clone();
+    wrong.operation = RecordDigest::from_bytes([4; 32]);
+    refuses(
+        &mut runtime,
+        Command::FinishFileDeletion {
+            id: "delete-one".into(),
+            result: wrong,
+        },
+        "file-deletion-operation-mismatch",
+    );
+    send(&mut runtime, Command::Cancel);
+    let lane = runtime.state().lanes["worker"].clone();
+    let finish = Command::FinishFileDeletion {
+        id: "delete-one".into(),
+        result: result.clone(),
+    };
+    let acknowledged = runtime.record("delete-finished", finish.clone()).unwrap();
+    assert_eq!(
+        runtime.record("delete-finished", finish.clone()).unwrap(),
+        acknowledged
+    );
+    refuses(&mut runtime, finish, "file-deletion-already-finished");
+    assert_eq!(runtime.state().lanes["worker"], lane);
+    assert!(runtime.state().checkpoints.is_empty());
+    drop(runtime);
+    let runtime = fixture.runtime();
+    assert_eq!(
+        runtime.state().file_deletions["delete-one"].result,
+        Some(result)
+    );
+    assert!(runtime.state().cancelled);
+}
+#[test]
+fn deletion_intents_reject_bad_paths_stale_runs_replaced_inputs_and_late_preparation() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, start());
+    register_lane(&mut runtime, "worker", None);
+    send(&mut runtime, dispatch("worker", "run"));
+    for path in [
+        "",
+        "/absolute",
+        "../outside",
+        "folder/../old",
+        "folder//old",
+        "./old",
+        "old\nfile",
+        "old\u{202e}file",
+    ] {
+        refuses(&mut runtime, deletion_intent(path), "invalid-deletion-path");
+    }
+    let mut stale = deletion_intent("old");
+    if let Command::BeginFileDeletion { origin, .. } = &mut stale {
+        origin.run = "replaced".into();
+    }
+    assert!(runtime.record("stale-delete", stale).is_err());
+    let accepted = runtime
+        .record("delete-intent", deletion_intent("old"))
+        .unwrap();
+    assert!(runtime
+        .record("delete-intent", deletion_intent("other"))
+        .is_err());
+    assert_eq!(runtime.state().revision, accepted.revision);
+    send(&mut runtime, Command::Cancel);
+    refuses(
+        &mut runtime,
+        Command::PrepareFileDeletion {
+            id: "delete-one".into(),
+            operation: RecordDigest::from_bytes([3; 32]),
+        },
+        "objective-cancelled",
+    );
+    assert!(runtime.state().file_deletions["delete-one"]
+        .operation
+        .is_none());
+}
+#[test]
+fn deletion_command_encoding_is_additive_closed_and_roundtrips_exactly() {
+    let commands = [
+        deletion_intent("docs/old.txt"),
+        Command::PrepareFileDeletion {
+            id: "delete-one".into(),
+            operation: RecordDigest::from_bytes([3; 32]),
+        },
+        Command::FinishFileDeletion {
+            id: "delete-one".into(),
+            result: FileDeletionResult {
+                operation: RecordDigest::from_bytes([3; 32]),
+                workspace_digest: "c".repeat(32),
+                settled: true,
+            },
+        },
+    ];
+    for command in commands {
+        let encoded = wire::encode(&command);
+        assert_eq!(wire::decode(&encoded).unwrap(), command);
+        assert!(wire::decode(&encoded.replacen("\"id\":", "\"unknown\":", 1)).is_err());
+        assert!(
+            wire::decode(&encoded.replacen("\"id\":", "\"authority\":true,\"id\":", 1)).is_err()
+        );
+    }
+    let legacy = start();
+    assert_eq!(wire::decode(&wire::encode(&legacy)).unwrap(), legacy);
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    send(&mut runtime, legacy);
+    drop(runtime);
+    assert!(fixture.runtime().state().file_deletions.is_empty());
+}

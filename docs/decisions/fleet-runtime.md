@@ -819,3 +819,21 @@ existing agent tool contract changes in this increment. Native tests cover compl
 history, source preservation, stale assignment/version refusal, signer failure and concurrent
 recreation. Fleet request idempotency, tool exposure and end-to-end packaged agent deletion remain
 required before agents can use this through their harness.
+
+### Durable deletion records before native recovery
+
+The fleet journal adds `begin-file-deletion`, `prepare-file-deletion` and `finish-file-deletion`
+commands. Begin binds the lane/run, admitted actor/session/generation, input fold, explicit relative
+path and last saved file version. Preparation records one exact authenticated operation identity;
+finish must match that operation. Replay changes fleet state only and never acts on filesystem entries.
+
+New intents and preparation refuse after cancellation. An already-prepared native outcome can still
+be acknowledged after cancellation, preserving history without changing lane or checkpoint state.
+The objective retains at most 4,096 deletion intents. Unsafe paths, stale runs, changed idempotency
+inputs, duplicate preparation and substituted operation outcomes refuse.
+
+Encoding adds command kinds within the existing deterministic journal envelope. Earlier histories
+replay with an empty deletion map. Older binaries cannot consume histories containing the new kinds
+and must refuse them; no claim of downgrade compatibility is made. Unknown fields and altered command
+shapes refuse. This increment does not expose a service, MCP tool or automatic filesystem recovery;
+those depend on the following native execution increment.

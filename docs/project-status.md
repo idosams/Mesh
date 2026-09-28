@@ -532,3 +532,9 @@ history and leaves shared main and custody unchanged. Ordinary capture still ref
 missing files. Transferred native tests cover resolution followed by complete capture, stale identities,
 signer failure and concurrent recreation; execution on this canonical increment remains pending. Fleet request recovery, harness tooling and packaged
 agent-deletion proof remain unfinished; the existing agent tool surface is unchanged.
+
+The fleet journal now represents explicit deletion intent, exact prepared operation and acknowledged
+outcome independently. Replay is state-only; cancellation permits acknowledgement of an already
+prepared outcome but refuses new intent/preparation. Native service recovery and harness exposure
+remain the next increment. Transferred replay/refusal/encoding tests have not yet executed locally
+on this canonical base; full verification is queued behind the preserved run.

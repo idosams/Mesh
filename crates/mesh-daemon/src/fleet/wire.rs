@@ -1,13 +1,50 @@
 //! Versioned deterministic command encoding. Unknown fields/versions refuse during replay.
 use super::{
-    AgentOrigin, CheckpointResult, Command, Error, Limits, ReviewChangeRequest, RunState,
-    WorkspaceBinding,
+    AgentOrigin, CheckpointResult, Command, Error, FileDeletionResult, Limits, ReviewChangeRequest,
+    RunState, WorkspaceBinding,
 };
 use crate::ipc::Json;
 use mesh_store::RecordDigest;
 
 pub(super) fn encode(command: &Command) -> String {
     let (kind, fields) = match command {
+        Command::BeginFileDeletion {
+            id,
+            lane,
+            origin,
+            input_digest,
+            path,
+            version,
+        } => (
+            "begin-file-deletion",
+            vec![
+                ("id", Json::text(id)),
+                ("lane", Json::text(lane)),
+                ("actor", Json::text(&origin.actor)),
+                ("session", Json::text(&origin.session)),
+                ("run", Json::text(&origin.run)),
+                ("generation", Json::text(&origin.generation)),
+                ("input_digest", Json::text(input_digest)),
+                ("path", Json::text(path)),
+                ("version", Json::text(version.to_string())),
+            ],
+        ),
+        Command::PrepareFileDeletion { id, operation } => (
+            "prepare-file-deletion",
+            vec![
+                ("id", Json::text(id)),
+                ("operation", Json::text(operation.to_string())),
+            ],
+        ),
+        Command::FinishFileDeletion { id, result } => (
+            "finish-file-deletion",
+            vec![
+                ("id", Json::text(id)),
+                ("operation", Json::text(result.operation.to_string())),
+                ("workspace_digest", Json::text(&result.workspace_digest)),
+                ("settled", Json::Bool(result.settled)),
+            ],
+        ),
         Command::SetReviewChangeDecision {
             request,
             expected_revision,
@@ -234,6 +271,34 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     };
     let digest = |key| RecordDigest::parse_hex(&text(key)?).map_err(|_| Error::InvalidHistory);
     let command = match json.get("kind").and_then(Json::as_text) {
+        Some("begin-file-deletion") => Command::BeginFileDeletion {
+            id: text("id")?,
+            lane: text("lane")?,
+            input_digest: text("input_digest")?,
+            path: text("path")?,
+            version: digest("version")?,
+            origin: AgentOrigin {
+                actor: text("actor")?,
+                session: text("session")?,
+                run: text("run")?,
+                generation: text("generation")?,
+            },
+        },
+        Some("prepare-file-deletion") => Command::PrepareFileDeletion {
+            id: text("id")?,
+            operation: digest("operation")?,
+        },
+        Some("finish-file-deletion") => Command::FinishFileDeletion {
+            id: text("id")?,
+            result: FileDeletionResult {
+                operation: digest("operation")?,
+                workspace_digest: text("workspace_digest")?,
+                settled: fields
+                    .get("settled")
+                    .and_then(Json::as_bool)
+                    .ok_or(Error::InvalidHistory)?,
+            },
+        },
         Some("set-review-change-decision") => Command::SetReviewChangeDecision {
             request: text("request")?,
             expected_revision: number("expected_revision")?,
