@@ -765,7 +765,10 @@ printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"total_cost
             .is_empty());
         let config = Json::parse(value("--mcp-config")).unwrap();
         let server = config.get("mcpServers").unwrap().get("mesh").unwrap();
-        assert_eq!(text(server, "command"), executable.to_str().unwrap());
+        assert_eq!(
+            text(server, "command"),
+            executable.canonicalize().unwrap().to_str().unwrap()
+        );
         assert_eq!(
             text(server.get("env").unwrap(), "MESH_FLEET_CREDENTIAL"),
             "${MESH_FLEET_CREDENTIAL}"
