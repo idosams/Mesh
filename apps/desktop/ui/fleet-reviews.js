@@ -1,4 +1,4 @@
-import { reviewChangeMessage, reviewChangeReceipt, savedReviewChanges } from './fleet-review-changes.js';
+import { reviewChangeMessage, reviewChangeReceipt, savedReviewChangeActivity } from './fleet-review-changes.js';
 import { loadFleetArtifact } from './fleet-artifact-preview.js';
 import { reviewArtifactKind } from './review-artifact-validation.js';
 import { createFleetPinPersistence, defaultFleetView } from './fleet-pin-persistence.js';
@@ -125,14 +125,22 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     }
     publish();
   }
+  function pinResult(row, lane) {
+    if (pins.some(pin => same(pin.selection, row))) { notice = 'This exact result is already pinned.'; publish(); return; }
+    if (pins.length >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return; }
+    const selection = Object.fromEntries(selectorFields.map(field => [field, row[field]]));
+    if (nextPin > 18446744073709551615n) { notice = 'Review display keys are exhausted.'; publish(); return; }
+    const pin = { view: defaultFleetView(), key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };
+    pins = [...pins, pin]; notice = ''; persist(); void loadPin(pin);
+  }
   async function loadChanges(pin) {
     if (pin.feedback?.loading || pin.feedback?.sending) return;
     const feedback = { ...pin.feedback, rows: pin.feedback?.rows ?? null, loading: true, error: '' };
     pins = pins.map(value => value === pin ? { ...value, feedback } : value); publish();
     try {
-      const rows = savedReviewChanges(await invoke('fleet_review_changes', pin.selection), pin.selection);
+      const activity = savedReviewChangeActivity(await invoke('fleet_review_changes', pin.selection), pin.selection);
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
-        ? { ...value, feedback: { ...feedback, rows, loaded: true, loading: false } } : value);
+        ? { ...value, feedback: { ...feedback, ...activity, loaded: true, loading: false } } : value);
     } catch {
       if (!disposed) pins = pins.map(value => value.selection === pin.selection && value.feedback === feedback
         ? { ...value, feedback: { ...feedback, loading: false, error: 'Saved change requests could not be verified. Retry reading the same review.' } } : value);
@@ -194,12 +202,21 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
     dispose: () => { disposed = true; storage.dispose(); },
     handle(value) {
       if (disposed || typeof invoke !== 'function') return false;
-      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes'].includes(value.type)) return false;
+      if (!['reviews', 'reviews-page', 'close-reviews', 'pin-review', 'close-review', 'retry-review', 'input-review', 'input-page', 'input-file', 'retry-input', 'review-view', 'input-layout', 'retry-saved-reviews', 'reload-saved-reviews', 'artifact-preview', 'review-changes', 'request-review-changes', 'retry-review-changes', 'pin-review-response'].includes(value.type)) return false;
       const fields = Object.keys(value).sort().join(',');
       if (fields === 'type' && value.type === 'retry-saved-reviews') { if (persistenceState.phase === 'error') void controlStorage(() => storage.retry()); return true; }
       if (fields === 'type' && value.type === 'reload-saved-reviews') { if (!controlBusy && ['saved', 'error'].includes(persistenceState.phase)) { editable = false; persistenceState = { phase: 'loading', message: '' }; publish(); void controlStorage(() => storage.reload()); } return true; }
       if (!editable && !['reviews', 'reviews-page', 'close-reviews', 'retry-review', 'retry-input'].includes(value.type)) {
         notice = 'Load the saved review set before changing its selections.'; publish(); return true;
+      }
+      if (value.type === 'pin-review-response' && fields === 'checkpoint,pin,request,type') {
+        const source = pins.find(pin => pin.key === value.pin);
+        const response = source?.feedback?.responses?.find(response => response.request === value.request && response.checkpoint === value.checkpoint);
+        if (source && response && !source.feedback.loading && !source.feedback.error) {
+          pinResult({ ...source.selection, checkpoint: response.checkpoint, version: response.version, bundle: response.bundle },
+            { goal: source.goal, base: source.startingInput });
+        }
+        return true;
       }
       if (['review-changes', 'retry-review-changes'].includes(value.type) && fields === 'pin,type') {
         const pin = pins.find(pin => pin.key === value.pin);
@@ -251,12 +268,7 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
       if (value.type === 'pin-review' && fields === 'bundle,checkpoint,lane,objective,type,version' && queue?.page && !queue.loading && !queue.error) {
         const row = queue.page.rows.find(row => same(row, value));
         if (!row) return true;
-        if (pins.some(pin => same(pin.selection, row))) { notice = 'This exact result is already pinned.'; publish(); return true; }
-        if (pins.length >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return true; }
-        const selection = Object.fromEntries(selectorFields.map(field => [field, row[field]]));
-        if (nextPin > 18446744073709551615n) { notice = 'Review display keys are exhausted.'; publish(); return true; }
-        const pin = { view: defaultFleetView(), key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };
-        pins = [...pins, pin]; notice = ''; persist(); void loadPin(pin);
+        pinResult(row, lane);
       }
       return true;
     },

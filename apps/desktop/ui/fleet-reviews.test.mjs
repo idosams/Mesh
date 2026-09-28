@@ -150,9 +150,32 @@ test('feedback reads are exact, and closing a panel never restores it from a lat
   const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
   h.handle({ type: 'review-changes', pin: '1' }); assert.equal(h.calls[2].command, 'fleet_review_changes');
   const { objective: id, ...selected } = selection(1);
-  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v1', objective: id, selection: selected, changes: [] }); await settle();
+  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v2', objective: id, selection: selected, activity: { changes: [], responses: [] } }); await settle();
   assert.equal(h.snapshot().reviewPins[0].feedback.loaded, true);
   h.handle({ type: 'request-review-changes', pin: '1', message: 'Revise.' });
   h.handle({ type: 'close-review', pin: '1' }); h.calls[3].resolve(feedbackReceipt(h.calls[3])); await settle();
   assert.equal(h.snapshot().reviewPins.length, 0);
+});
+
+test('a proposed result opens beside its original review only from verified feedback, with normal pin bounds', async () => {
+  const h = harness(); h.open(); h.calls[0].resolve(page()); await settle(); h.pin(1); h.calls[1].resolve(result()); await settle();
+  const original = h.snapshot().reviewPins[0].selection;
+  const id = `review-change-${'f'.repeat(64)}`;
+  const intent = { type: 'pin-review-response', pin: '1', request: id, checkpoint: 'revised' };
+  h.handle(intent); assert.equal(h.calls.length, 2);
+  h.handle({ type: 'review-changes', pin: '1' });
+  const { objective: objectiveId, ...selected } = selection(1);
+  h.calls[2].resolve({ schema: 'mesh.fleet-review-changes/v2', objective: objectiveId, selection: selected,
+    activity: { changes: [{ ...selected, id, message: 'Add the example.', status: 'recorded', approval_authority: false }],
+      responses: [{ request: id, lane, checkpoint: 'revised', version: '8'.repeat(64), bundle: '9'.repeat(64), status: 'proposed', approval_authority: false }] } });
+  await settle();
+  h.handle({ ...intent, path: '/tmp' }); h.handle({ ...intent, checkpoint: 'invented' }); assert.equal(h.calls.length, 3);
+  h.handle(intent);
+  assert.deepEqual(h.calls[3].args, { objective, lane, checkpoint: 'revised', version: '8'.repeat(64), bundle: '9'.repeat(64) });
+  assert.equal(h.calls[3].command, 'inspect_fleet_saved_review');
+  assert.strictEqual(h.snapshot().reviewPins[0].selection, original);
+  assert.equal(h.snapshot().reviewPins[1].startingInput, h.snapshot().reviewPins[0].startingInput);
+  h.handle(intent); assert.equal(h.snapshot().reviewPins.length, 2); assert.equal(h.calls.length, 4);
+  h.calls[3].reject(new Error('missing retained result')); await settle();
+  assert.equal(h.snapshot().reviewPins[0].error, ''); assert.match(h.snapshot().reviewPins[1].error, /could not be verified/);
 });

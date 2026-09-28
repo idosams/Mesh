@@ -285,16 +285,25 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
         Json::empty_object(),
         token,
     );
+    let tools = listed
+        .get("result")
+        .unwrap()
+        .get("tools")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    let names: BTreeSet<_> = tools.iter().map(|tool| text(tool, "name")).collect();
+    assert_eq!(tools.len(), names.len());
     assert_eq!(
-        listed
-            .get("result")
-            .unwrap()
-            .get("tools")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .len(),
-        5
+        names,
+        BTreeSet::from([
+            "mesh_fleet_context",
+            "mesh_fleet_children",
+            "mesh_fleet_delegate",
+            "mesh_fleet_checkpoint",
+            "mesh_fleet_submit_review",
+            "mesh_fleet_propose_review_change_result",
+        ])
     );
     let context = call(
         &mut stdin,
@@ -462,6 +471,119 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
         "newer unsaved work\n"
     );
     assert_eq!(desktop.workspace_state().unwrap().root, source.root);
+    let selection = mesh_daemon::fleet::service::SavedReviewSelection::new(
+        text(context, "lane"),
+        text(&captured, "checkpoint"),
+        text(&captured, "version"),
+        text(&submitted, "bundle"),
+    )
+    .unwrap();
+    let feedback = service
+        .request_review_changes("native-feedback", &selection, "Add the missing example.")
+        .unwrap();
+    let feedback_id = feedback.get("id").unwrap().as_text().unwrap();
+    let observed = call(
+        &mut stdin,
+        &mut stdout,
+        14,
+        "tools/call",
+        tool("mesh_fleet_context", Json::empty_object()),
+        token,
+    );
+    let observed = observed
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    assert_eq!(
+        text(
+            &observed
+                .get("review_change_requests")
+                .unwrap()
+                .as_array()
+                .unwrap()[0],
+            "id"
+        ),
+        feedback_id
+    );
+    let revision = call(
+        &mut stdin,
+        &mut stdout,
+        15,
+        "tools/call",
+        tool(
+            "mesh_fleet_checkpoint",
+            Json::object([("request", Json::text("feedback-result"))]),
+        ),
+        token,
+    );
+    let revision = revision
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    let revised_review = call(
+        &mut stdin,
+        &mut stdout,
+        16,
+        "tools/call",
+        tool(
+            "mesh_fleet_submit_review",
+            Json::object([("checkpoint", revision.get("checkpoint").unwrap().clone())]),
+        ),
+        token,
+    );
+    let revised_review = revised_review
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    let proposal_args = Json::object([
+        ("request", Json::text(feedback_id)),
+        ("checkpoint", revision.get("checkpoint").unwrap().clone()),
+    ]);
+    let proposed = call(
+        &mut stdin,
+        &mut stdout,
+        17,
+        "tools/call",
+        tool(
+            "mesh_fleet_propose_review_change_result",
+            proposal_args.clone(),
+        ),
+        token,
+    );
+    let proposed = proposed
+        .get("result")
+        .unwrap()
+        .get("structuredContent")
+        .unwrap();
+    assert_eq!(text(proposed, "status"), "proposed");
+    assert_eq!(proposed.get("version"), revision.get("version"));
+    assert_eq!(proposed.get("bundle"), revised_review.get("bundle"));
+    assert_eq!(proposed.get("approval_authority"), Some(&Json::Bool(false)));
+    let retried = call(
+        &mut stdin,
+        &mut stdout,
+        18,
+        "tools/call",
+        tool("mesh_fleet_propose_review_change_result", proposal_args),
+        token,
+    );
+    assert_eq!(
+        retried.get("result").unwrap().get("structuredContent"),
+        Some(proposed)
+    );
+    let pinned = service.saved_review(&selection).unwrap();
+    assert_eq!(
+        pinned
+            .get("selection")
+            .unwrap()
+            .get("version")
+            .unwrap()
+            .as_text(),
+        Some(text(&captured, "version"))
+    );
     service.revoke(&credential).unwrap();
     let revoked = call(
         &mut stdin,
@@ -482,7 +604,7 @@ fn bridge_journey(executable: &std::path::Path, packaged_revision: Option<&str>)
             fs::read(root.join("source/note.txt")).unwrap(),
             b"original work continues\n"
         );
-        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, retry and revoked-session refusal; graphical=false");
+        eprintln!("Packaged fleet MCP passed: attached source preserved, two child lanes, signed checkpoint, pinned review, feedback, proposed revision, exact retry and revoked-session refusal; graphical=false");
     }
     server.shutdown();
 }

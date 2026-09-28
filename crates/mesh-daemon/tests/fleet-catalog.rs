@@ -376,6 +376,32 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
             "Add the missing example without replacing the opening.",
         )
         .unwrap();
+    fs::write(working.join("work.txt"), "proposed revised result\n").unwrap();
+    let revised = service
+        .agent_call(
+            credential.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("revised"))]),
+        )
+        .unwrap();
+    service
+        .agent_call(
+            credential.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", revised.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    service
+        .agent_call(
+            credential.transport_value(),
+            "propose_review_change_result",
+            &Json::object([
+                ("request", feedback.get("id").unwrap().clone()),
+                ("checkpoint", revised.get("checkpoint").unwrap().clone()),
+            ]),
+        )
+        .unwrap();
+    let activity = service.saved_review_change_activity(&selection).unwrap();
     let expected = service.saved_review(&selection).unwrap();
     let input = service
         .saved_starting_comparison(&selection, None, None)
@@ -391,6 +417,10 @@ fn history_discovery_reopens_attached_results_offline_without_execution_or_reall
     let before = restored.snapshot().unwrap();
     assert_eq!(history.saved_reviews(&lane, None).unwrap(), page);
     assert_eq!(history.saved_review(&selection).unwrap(), expected);
+    assert_eq!(
+        history.saved_review_change_activity(&selection).unwrap(),
+        activity
+    );
     assert_eq!(
         history.saved_review_changes(&selection).unwrap(),
         Json::Array(vec![feedback])

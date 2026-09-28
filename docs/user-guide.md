@@ -345,3 +345,10 @@ After a restart or reload, read recorded requests before submitting another: sav
 but draft text and unconfirmed retry identities are session-only. Restored fleets support reading;
 recording new requests requires recovered native ownership. This interaction still needs packaged
 visual verification.
+
+An agent can respond with a proposed saved result after saving and submitting its checkpoint. Choose
+**Read recorded change requests** again to discover these proposals, then **Pin proposed result beside
+this review** to inspect one independently. The original review stays fixed. Up to eight proposals can
+be recorded for each request, within the existing eight-panel limit. A proposed result is not marked
+resolved or approved, and a stopped agent is not restarted automatically. Unsupported or unavailable
+history is reported when Mesh verifies the new pin.

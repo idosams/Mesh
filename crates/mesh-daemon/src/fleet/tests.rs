@@ -723,3 +723,134 @@ fn review_change_utf8_boundary_is_preserved_exactly_across_replay() {
         .is_err());
     assert_eq!(restored.state().revision, event.revision);
 }
+
+fn response_checkpoint(runtime: &mut Runtime, n: u8) -> Command {
+    let checkpoint = format!("revision-{n}");
+    let origin = runtime.state().checkpoints["capture"].origin.clone();
+    send(
+        runtime,
+        Command::BeginCheckpoint {
+            id: checkpoint.clone(),
+            lane: "worker".into(),
+            origin: origin.clone(),
+            input_digest: "b".repeat(32),
+        },
+    );
+    send(
+        runtime,
+        Command::FinishCheckpoint {
+            id: checkpoint.clone(),
+            result: CheckpointResult {
+                complete: true,
+                version: RecordDigest::from_bytes([10 + n; 32]),
+                workspace_digest: "c".repeat(32),
+                saved_changes: 1,
+                issue: None,
+            },
+        },
+    );
+    send(
+        runtime,
+        Command::SubmitReview {
+            checkpoint: checkpoint.clone(),
+            bundle: RecordDigest::from_bytes([30 + n; 32]),
+        },
+    );
+    Command::ProposeReviewChangeResult {
+        request: "feedback".into(),
+        checkpoint,
+        origin,
+    }
+}
+
+#[test]
+fn review_change_proposals_replay_retry_and_never_resolve_or_mutate_the_original_review() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let feedback = reviewed_checkpoint(&mut runtime);
+    send(
+        &mut runtime,
+        Command::RequestReviewChanges(feedback.clone()),
+    );
+    let command = response_checkpoint(&mut runtime, 0);
+    let before = runtime.state().clone();
+    let receipt = runtime.record("response", command.clone()).unwrap();
+    assert_eq!(runtime.state().lanes, before.lanes);
+    assert_eq!(runtime.state().checkpoints, before.checkpoints);
+    assert_eq!(
+        runtime.state().review_change_requests,
+        before.review_change_requests
+    );
+    assert_eq!(
+        runtime.state().review_change_responses["feedback"][0].checkpoint,
+        "revision-0"
+    );
+    let encoded = wire::encode(&command);
+    assert_eq!(wire::decode(&encoded).unwrap(), command);
+    assert!(
+        wire::decode(&encoded.replace("\"actor\":", "\"unexpected\":true,\"actor\":")).is_err()
+    );
+    drop(runtime);
+    let mut runtime = fixture.runtime();
+    assert_eq!(
+        runtime.record("response", command.clone()).unwrap(),
+        receipt
+    );
+    refuses(&mut runtime, command, "review-change-response-exists");
+    assert_eq!(runtime.state().review_change_requests["feedback"], feedback);
+    for n in 1..8 {
+        let command = response_checkpoint(&mut runtime, n);
+        send(&mut runtime, command);
+    }
+    let ninth = response_checkpoint(&mut runtime, 8);
+    refuses(&mut runtime, ninth, "review-change-response-limit");
+    assert_eq!(
+        fixture.runtime().state().review_change_responses["feedback"].len(),
+        8
+    );
+}
+
+#[test]
+fn review_change_proposals_refuse_original_checkpoint_wrong_session_and_cancelled_runs() {
+    let fixture = Fixture::new();
+    let mut runtime = fixture.runtime();
+    let feedback = reviewed_checkpoint(&mut runtime);
+    send(&mut runtime, Command::RequestReviewChanges(feedback));
+    let origin = runtime.state().checkpoints["capture"].origin.clone();
+    refuses(
+        &mut runtime,
+        Command::ProposeReviewChangeResult {
+            request: "feedback".into(),
+            checkpoint: "capture".into(),
+            origin: origin.clone(),
+        },
+        "review-change-response-unchanged",
+    );
+    send(
+        &mut runtime,
+        Command::BeginCheckpoint {
+            id: "unfinished".into(),
+            lane: "worker".into(),
+            origin: origin.clone(),
+            input_digest: "b".repeat(32),
+        },
+    );
+    refuses(
+        &mut runtime,
+        Command::ProposeReviewChangeResult {
+            request: "feedback".into(),
+            checkpoint: "unfinished".into(),
+            origin,
+        },
+        "checkpoint-incomplete",
+    );
+    let command = response_checkpoint(&mut runtime, 0);
+    let mut wrong = command.clone();
+    if let Command::ProposeReviewChangeResult { origin, .. } = &mut wrong {
+        origin.session = "substituted".into();
+    }
+    refuses(&mut runtime, wrong, "review-change-response-not-in-session");
+    send(&mut runtime, Command::Cancel);
+    refuses(&mut runtime, command, "objective-cancelled");
+    assert!(runtime.state().review_change_responses.is_empty());
+}

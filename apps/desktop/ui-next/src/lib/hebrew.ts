@@ -1,5 +1,9 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Proposed saved result": "תוצאה שמורה שהוצעה",
+"This proposal does not resolve the request or approve the result.": "ההצעה אינה מסיימת את הטיפול בבקשה ואינה מאשרת את התוצאה.",
+"Pin proposed result beside this review": "הצמדת התוצאה המוצעת לצד הסקירה הזו",
+
 "Request changes to this saved result": "בקשת שינויים בתוצאה השמורה הזו",
 "Requests stay tied to this checkpoint. The originating agent can read them when it next checks its context. Recorded does not mean delivered or addressed, and does not restart a worker.": "הבקשות נשארות משויכות לנקודת השמירה הזו. הסוכן במסלול המקורי יוכל לקרוא אותן בבדיקת ההקשר הבאה שלו. רישום אינו מעיד על מסירה או טיפול ואינו מפעיל סוכן מחדש.",
 "Read recorded change requests": "קריאת בקשות שינוי שנרשמו",

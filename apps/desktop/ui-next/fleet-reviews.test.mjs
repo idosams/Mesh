@@ -279,3 +279,30 @@ test('Hebrew feedback translates recording state and keeps the original request 
     assert.match(html, /disabled=""[^>]*>רישום בקשת שינוי/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('proposed result controls preserve the distinction from resolution and approval', () => {
+  const value = pin(); value.feedback = { loaded: true, rows: [{ id: 'request', message: 'Add an example.', status: 'recorded' }], responses: [{ request: 'request', lane: value.selection.lane, checkpoint: 'revised', version: '9'.repeat(64), bundle: 'a'.repeat(64), status: 'proposed', approval_authority: false }], error: '' };
+  let html = render({ pins: [value], notice: '' });
+  assert.match(html, /Proposed saved result/); assert.match(html, /does not resolve the request or approve/);
+  assert.match(html, /Pin proposed result beside this review/); assert.doesNotMatch(html, /Request resolved/);
+  value.feedback.error = 'Historical read is unavailable.';
+  html = render({ pins: [value], notice: '' }); assert.match(html, /disabled=""[^>]*>Pin proposed result beside this review/);
+});
+
+test('Hebrew proposed results preserve exact versions and feedback while exposing a separate review', () => {
+  const value = pin();
+  value.feedback = {loaded:true,rows:[{id:'request',message:'Proposed saved result',status:'recorded'}],responses:[{request:'request',lane:value.selection.lane,checkpoint:'revision',version:'9'.repeat(64),bundle:'a'.repeat(64),status:'proposed',approval_authority:false}],error:''};
+  module.exports.setLocale('he');
+  try {
+    let html = render({pins:[value],notice:''});
+    assert.match(html, /תוצאה שמורה שהוצעה/);
+    assert.match(html, /ההצעה אינה מסיימת את הטיפול בבקשה ואינה מאשרת את התוצאה/);
+    assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>הצמדת התוצאה המוצעת לצד הסקירה הזו<\/button>/);
+    assert.match(html, /<bdi dir="auto">Proposed saved result<\/bdi>/);
+    for (const version of [value.selection.version,value.feedback.responses[0].version]) assert.ok(html.includes(`<bdi dir="ltr">${version}</bdi>`));
+    value.feedback.error = 'Saved change requests could not be verified. Retry reading the same review.';
+    html = render({pins:[value],notice:''});
+    assert.match(html, /לא ניתן לאמת את בקשות השינוי השמורות/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>הצמדת התוצאה המוצעת לצד הסקירה הזו<\/button>/);
+  } finally { module.exports.setLocale('en'); }
+});

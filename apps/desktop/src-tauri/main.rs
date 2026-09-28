@@ -900,15 +900,15 @@ mod desktop {
                 &bundle,
             )
             .map_err(|_| "Saved review selection is invalid")?;
-            let changes = host
+            let activity = host
                 .fleet_history(&objective)?
-                .saved_review_changes(&selection)
+                .saved_review_change_activity(&selection)
                 .map_err(|_| "Saved review change requests are unavailable")?;
             Ok(Json::object([
-                ("schema", Json::text("mesh.fleet-review-changes/v1")),
+                ("schema", Json::text("mesh.fleet-review-changes/v2")),
                 ("objective", Json::text(objective)),
                 ("selection", selection.to_json()),
-                ("changes", changes),
+                ("activity", activity),
             ])
             .encode())
         })

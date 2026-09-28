@@ -8,6 +8,21 @@ use mesh_store::RecordDigest;
 
 pub(super) fn encode(command: &Command) -> String {
     let (kind, fields) = match command {
+        Command::ProposeReviewChangeResult {
+            request,
+            checkpoint,
+            origin,
+        } => (
+            "propose-review-change-result",
+            vec![
+                ("request", Json::text(request)),
+                ("checkpoint", Json::text(checkpoint)),
+                ("actor", Json::text(&origin.actor)),
+                ("session", Json::text(&origin.session)),
+                ("run", Json::text(&origin.run)),
+                ("generation", Json::text(&origin.generation)),
+            ],
+        ),
         Command::RequestReviewChanges(request) => (
             "request-review-changes",
             vec![
@@ -204,6 +219,16 @@ pub(super) fn decode(payload: &str) -> Result<Command, Error> {
     };
     let digest = |key| RecordDigest::parse_hex(&text(key)?).map_err(|_| Error::InvalidHistory);
     let command = match json.get("kind").and_then(Json::as_text) {
+        Some("propose-review-change-result") => Command::ProposeReviewChangeResult {
+            request: text("request")?,
+            checkpoint: text("checkpoint")?,
+            origin: AgentOrigin {
+                actor: text("actor")?,
+                session: text("session")?,
+                run: text("run")?,
+                generation: text("generation")?,
+            },
+        },
         Some("request-review-changes") => Command::RequestReviewChanges(ReviewChangeRequest {
             id: text("id")?,
             lane: text("lane")?,

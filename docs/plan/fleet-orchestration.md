@@ -409,3 +409,10 @@ record/read/exact-retry controls per pin. Feedback does not restart workers or a
 completion. Native replay, authority, bounded-message and renderer race checks cover the foundation;
 provider wakeup/resume, addressed-result linkage, durable pending desktop requests and the actual
 packaged change-request journey remain phase requirements.
+
+Review result-link increment: a scoped agent can propose a different complete recorded checkpoint for
+an exact change request. Proposals retain authenticated origin and exact saved identities, survive
+replay and retry, and do not replace the original review or imply resolution. Desktop source can pin
+these proposed results beside the request's original saved result. The existing standalone/packaged
+bridge journey now includes feedback retrieval, checkpoint/review creation, proposal and retry. Actual
+packaged graphical use, human resolution, provider wakeup and original-main integration remain required.

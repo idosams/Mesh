@@ -389,3 +389,34 @@ remain durable; drafts and unconfirmed desktop retry identities are session-only
 restarting during an uncertain request, read recorded requests before creating another. There is no
 automatic provider interruption, resume, completion acknowledgment, or claim that the agent has read
 or addressed feedback. These lifecycle extensions and packaged graphical verification remain work.
+
+## Proposed results for review change requests
+
+The additive `propose-review-change-result` event links an existing request to a complete recorded
+checkpoint from its originating lane. The caller's actor/session/run/generation are taken from native
+credentials, must match the checkpoint's capture origin, and must name the active run. Native code
+verifies the retained review and holds the custody guard while recording. Agents supply only the
+request and checkpoint identities; saved version and bundle are derived from verified state. The
+original checkpoint or identical saved operation is refused. This is an explicit proposal, not proof
+of semantic improvement, chronology, human acceptance, resolution, or approval.
+
+Up to eight proposals per request remain in append order. The retry identity derives from the
+request/checkpoint pair; identical retries recover the original record. Altered origin, duplicate
+proposals under another event key, unsubmitted/incomplete checkpoints, other lanes, expired sessions
+and cancelled runs refuse. The original request, checkpoint, review and execution state are unchanged.
+Existing event bytes remain unchanged; older binaries refuse the new unknown command. The new state
+projection is reconstructed from the ledger without changing its database schema.
+
+Scoped MCP exposes `mesh_fleet_propose_review_change_result`. Context retains its original request
+array and adds a separate `review_change_responses` array for that lane only. Read-only history can
+return original requests and proposed selectors together at one runtime revision. The desktop read
+projection is now `mesh.fleet-review-changes/v2` with a closed `activity` object; original mutation
+receipts remain v1. Bundled frontend/native versions move together; older closed readers refuse v2
+rather than silently hide proposals. No saved pin or workspace format changes.
+
+A reviewer explicitly pins a proposed result beside the original, using only a selector returned by
+verified feedback. Each result is rechecked through the ordinary saved-review reader, including after
+restart; unavailable content keeps an unavailable pin. The original panel never follows the proposal
+automatically. Pin limits and persistence are shared with ordinary saved results. Linking a result does
+not mark the request addressed, wake a provider, or permit publication; human resolution and original
+project integration remain separate work.

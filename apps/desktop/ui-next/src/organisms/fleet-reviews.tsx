@@ -11,7 +11,7 @@ export type FleetReviewSelection = { objective: string; lane: string; checkpoint
 type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
 export type FleetReviewView = { input_open: boolean; input_after: string | null; input_object: string | null; input_layout: "inline" | "split"; review_object: string | null; review_mode: "content" | "visual"; review_layout: "inline" | "split" };
 export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
-type ReviewChanges = { loaded?: boolean; rows: { id: string; message: string; status: "recorded" }[] | null; loading?: boolean; sending?: boolean; error: string; pending?: { request: string; message: string } | null };
+type ReviewChanges = { responses?: { request: string; lane: string; checkpoint: string; version: string; bundle: string; status: "proposed"; approval_authority: false }[]; loaded?: boolean; rows: { id: string; message: string; status: "recorded" }[] | null; loading?: boolean; sending?: boolean; error: string; pending?: { request: string; message: string } | null };
 export type FleetReviewPin = { feedback?: ReviewChanges; artifact?: { generation: number; object: string; page: number; loading: boolean; error: string; envelope: unknown }; view?: FleetReviewView; input?: InputComparison; key: string; selection: FleetReviewSelection; goal: string | null; startingInput: string; review: SavedReview | null; loading: boolean; error: string };
 export type FleetReviewQueue = { objective: string; lane: string; loading: boolean; error: string; page: { after: string | null; rows: (FleetReviewSelection & { run: string })[]; total: number; nextAfter: string | null; revision: number } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
@@ -65,7 +65,13 @@ function ChangeRequests({ pin, editable }: { pin: FleetReviewPin; editable: bool
       {busy && <p role="status">{t(feedback?.sending ? "Recording the exact change request…" : "Reading recorded requests…")}</p>}
       {feedback?.error && <p role="alert">{t(feedback.error)}</p>}
       {feedback?.rows && !feedback.loaded && <p>{t("Read recorded change requests to load any earlier feedback for this result.")}</p>}
-      {feedback?.rows && (feedback.rows.length ? <ul className="grid gap-2">{feedback.rows.map(row => <li key={row.id} className="whitespace-pre-wrap break-words border-t border-border pt-2"><strong>{t("Recorded request")}: </strong><bdi dir="auto">{row.message}</bdi></li>)}</ul> : <p>{t("No recorded requests for this result.")}</p>)}
+      {feedback?.rows && (feedback.rows.length ? <ul className="grid gap-2">{feedback.rows.map(row => <li key={row.id} className="whitespace-pre-wrap break-words border-t border-border pt-2"><strong>{t("Recorded request")}: </strong><bdi dir="auto">{row.message}</bdi>
+        {feedback.responses?.filter(response => response.request === row.id).map(response => <div key={response.checkpoint} className="mt-2 grid gap-1 rounded border border-border p-2 text-xs">
+          <p className="break-all">{t("Proposed saved result")}: <bdi dir="ltr">{response.version}</bdi></p>
+          <p>{t("This proposal does not resolve the request or approve the result.")}</p>
+          <Button variant="secondary" disabled={busy || !editable || Boolean(feedback.error)} onClick={() => send({ type: "pin-review-response", pin: pin.key, request: row.id, checkpoint: response.checkpoint })}>{t("Pin proposed result beside this review")}</Button>
+        </div>)}
+      </li>)}</ul> : <p>{t("No recorded requests for this result.")}</p>)}
       {feedback?.pending ? <><p className="whitespace-pre-wrap break-words">{t("Pending receipt")}: <bdi dir="auto">{feedback.pending.message}</bdi></p><Button variant="secondary" disabled={busy || !editable} onClick={() => send({ type: "retry-review-changes", pin: pin.key })}>{t("Retry this exact change request")}</Button></> :
         <form className="grid gap-2" onSubmit={event => { event.preventDefault(); if (validMessage) send({ type: "request-review-changes", pin: pin.key, message }); }}>
           <label className="grid gap-1">{t("Requested changes")}<textarea dir="auto" className="min-h-24 rounded border border-border bg-background p-2" value={message} maxLength={8192} disabled={busy || !editable} onChange={event => setMessage(event.target.value)} /></label>

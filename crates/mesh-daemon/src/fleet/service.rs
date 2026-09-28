@@ -303,6 +303,13 @@ impl FleetHistory {
     ) -> Result<Json, Unavailable> {
         self.0.saved_review_changes(selection)
     }
+    /// Read exact requests and result proposals without acquiring execution ownership.
+    pub fn saved_review_change_activity(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<Json, Unavailable> {
+        self.0.saved_review_change_activity(selection)
+    }
     /// Compare a result with its verified local starting version.
     pub fn saved_starting_comparison(
         &self,
@@ -719,6 +726,88 @@ impl FleetService {
         let state = exact_state(&workspace)?;
         verify_custody(&workspace, &state, &grant.generation)?;
         match action {
+            "propose_review_change_result" => {
+                exact_fields(arguments, &["request", "checkpoint"])?;
+                let request = field(arguments, "request")?;
+                let checkpoint = field(arguments, "checkpoint")?;
+                let feedback = inner
+                    .runtime
+                    .state()
+                    .review_change_requests
+                    .get(request)
+                    .ok_or_else(|| refusal("fleet-review-change-request-unavailable"))?;
+                if feedback.lane != grant.lane {
+                    return Err(refusal("fleet-review-change-not-in-lane"));
+                }
+                let origin = super::AgentOrigin {
+                    actor: grant.actor.clone(),
+                    session: grant.session.clone(),
+                    run: grant.run.clone(),
+                    generation: grant.generation.clone(),
+                };
+                let saved = inner
+                    .runtime
+                    .state()
+                    .checkpoints
+                    .get(checkpoint)
+                    .filter(|saved| saved.lane == grant.lane && saved.origin == origin)
+                    .ok_or_else(|| refusal("fleet-checkpoint-not-in-session"))?;
+                let result = saved
+                    .result
+                    .as_ref()
+                    .filter(|result| result.complete)
+                    .ok_or_else(|| refusal("fleet-checkpoint-incomplete"))?;
+                let bundle = saved
+                    .review
+                    .ok_or_else(|| refusal("fleet-review-not-recorded"))?;
+                // Verify the recorded immutable result while preserving the current workspace and
+                // native custody. A checkpoint identity alone is not proof of retained review bytes.
+                workspace.daemon().with_recorded_lane_review(
+                    &state.root,
+                    &state.installation,
+                    bundle,
+                    result.version,
+                    |_open| Ok(()),
+                )?;
+                let framed = Json::object([
+                    ("request", Json::text(request)),
+                    ("checkpoint", Json::text(checkpoint)),
+                ])
+                .encode();
+                let id = format!("review-response-{}", token_key(&framed));
+                let _authority = workspace
+                    .daemon()
+                    .lock_workspace_agent_setup(
+                        &state.root,
+                        &state.digest,
+                        &state.installation,
+                        &grant.generation,
+                    )
+                    .map_err(|_| refusal("fleet-session-custody-changed"))?;
+                inner
+                    .runtime
+                    .record(
+                        &id,
+                        Command::ProposeReviewChangeResult {
+                            request: request.into(),
+                            checkpoint: checkpoint.into(),
+                            origin,
+                        },
+                    )
+                    .map_err(runtime_error)?;
+                let response = inner
+                    .runtime
+                    .state()
+                    .review_change_responses
+                    .get(request)
+                    .and_then(|responses| {
+                        responses
+                            .iter()
+                            .find(|response| response.checkpoint == checkpoint)
+                    })
+                    .ok_or_else(|| refusal("fleet-review-response-unavailable"))?;
+                Ok(review_change_response_json(&grant.lane, response))
+            }
             "submit_review" => {
                 exact_fields(arguments, &["checkpoint"])?;
                 let id = field(arguments, "checkpoint")?;
@@ -880,6 +969,14 @@ impl FleetService {
                         Json::text(&inner.runtime.state().lanes[&grant.lane].goal),
                     ),
                     ("workspace", state.to_json()),
+                    (
+                        "review_change_responses",
+                        Json::Array(review_change_response_rows(
+                            inner.runtime.state(),
+                            &grant.lane,
+                            None,
+                        )),
+                    ),
                     (
                         "review_change_requests",
                         Json::Array(
@@ -1099,6 +1196,43 @@ impl FleetService {
                 .map(review_change_json)
                 .collect(),
         ))
+    }
+
+    /// Read requests and proposed results together at one observed runtime revision.
+    pub fn saved_review_change_activity(
+        &self,
+        selection: &SavedReviewSelection,
+    ) -> Result<Json, Unavailable> {
+        self.with_saved_review(selection, |_open, _binding| Ok(()))?;
+        let mut inner = self.lock()?;
+        inner.runtime.refresh().map_err(runtime_error)?;
+        let state = inner.runtime.state();
+        Ok(Json::object([
+            (
+                "changes",
+                Json::Array(
+                    state
+                        .review_change_requests
+                        .values()
+                        .filter(|request| {
+                            request.lane == selection.lane
+                                && request.checkpoint == selection.checkpoint
+                                && request.version == selection.version
+                                && request.bundle == selection.bundle
+                        })
+                        .map(review_change_json)
+                        .collect(),
+                ),
+            ),
+            (
+                "responses",
+                Json::Array(review_change_response_rows(
+                    state,
+                    &selection.lane,
+                    Some(selection),
+                )),
+            ),
+        ]))
     }
 
     /// Verify the immutable review for one saved checkpoint without navigating or reading live files.
@@ -1415,6 +1549,43 @@ fn lane_identity(objective: &str, parent: &str, request: &str) -> Result<String,
         "lane-{}",
         Blake3::digest_bytes(framed.as_bytes()).to_hex()
     ))
+}
+fn review_change_response_rows(
+    state: &super::State,
+    lane: &str,
+    selection: Option<&SavedReviewSelection>,
+) -> Vec<Json> {
+    state
+        .review_change_requests
+        .values()
+        .filter(|request| {
+            request.lane == lane
+                && selection.is_none_or(|selected| {
+                    request.checkpoint == selected.checkpoint
+                        && request.version == selected.version
+                        && request.bundle == selected.bundle
+                })
+        })
+        .flat_map(|request| {
+            state
+                .review_change_responses
+                .get(&request.id)
+                .into_iter()
+                .flatten()
+        })
+        .map(|response| review_change_response_json(lane, response))
+        .collect()
+}
+fn review_change_response_json(lane: &str, response: &super::ReviewChangeResponse) -> Json {
+    Json::object([
+        ("request", Json::text(&response.request)),
+        ("lane", Json::text(lane)),
+        ("checkpoint", Json::text(&response.checkpoint)),
+        ("version", Json::text(response.version.to_string())),
+        ("bundle", Json::text(response.bundle.to_string())),
+        ("status", Json::text("proposed")),
+        ("approval_authority", Json::Bool(false)),
+    ])
 }
 fn review_change_json(request: &super::ReviewChangeRequest) -> Json {
     Json::object([

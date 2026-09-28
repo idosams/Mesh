@@ -873,3 +873,35 @@ Parent #58 has six passing checks with macOS pending. Original work and verifica
 Candidates, decisions, original-main integration, remaining recovery phases, complete provider/four-
 worker/remote and packaged acceptance, named human review, eventual merges and final combined-main
 verification remain required. No migration PR has been merged.
+
+## R03b proposed saved results for exact change requests
+
+Preserved source `367ec923ba6e1bcd3d15d62429ddec7ca49bda06` transfers on published #59 at
+`27ce54b6912dd2da9aafae628cadfec52537e30e`. A scoped MCP action proposes a complete reviewed
+checkpoint from the authenticated originating lane/session. Native code derives version and bundle
+from the checkpoint and verifies retained review and custody. Proposing unchanged, unreviewed,
+incomplete, wrong-session or cancelled work refuses. Exact retries recover the same proposal; eight
+append-ordered proposals per request remain bounded. Requests are not resolved and original saved
+work, run state and approval/main authority are unchanged.
+
+A v2 desktop activity projection binds recorded requests and proposed results in one observed runtime
+state, keeping the v1 receipt contract. Users explicitly pin a proposed result beside the original;
+existing pin bounds, duplicate checks and immutable selectors apply. Missing proposed history affects
+that new panel only. Canonical English/Hebrew labels, literal feedback/version identities and prior
+native corrections are retained. The additive persisted event is rejected by older binaries; rollback
+requires a compatible binary, and replay never reconstructs response identities from agent-supplied
+version or bundle fields.
+
+Local type/build, 143 interface and 536 desktop tests pass, along with docs/vocabulary/format/diff
+checks. The Hebrew presentation regression detects the unlocalized source and the separate-panel
+regression detects the previous coordinator; both pass after byte-exact restoration. Transferred
+native runtime/service/catalogue/MCP journeys cover origin checks, duplicate/exact retry, restart,
+proposal bounds, extra argument refusal, immutable original review and absence of approval authority.
+Native/failing-before/full local execution remains queued behind the preserved #44 gate, which has
+advanced from discovery into running tests. This increment needs its own hosted validation.
+
+Parent #58 passed all seven checks: 3,012 Linux and 3,226 macOS tests, four separate macOS renderer
+tests, 44 daemon checks and all 668 desktop/interface tests. #59 native validation is running. Request
+decisions, candidates, original-main integration, remaining recovery phases, second-provider/four-worker/
+remote and packaged acceptance, required human review, eventual merges and final combined-main tests
+remain in scope. Original work and running verification are preserved; nothing has been merged.

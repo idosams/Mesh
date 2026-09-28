@@ -2046,6 +2046,85 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         child_context.get("review_change_requests"),
         Some(&Json::Array(vec![]))
     );
+    let feedback_id = f
+        .service
+        .native_state()
+        .unwrap()
+        .review_change_requests
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    let propose_original = Json::object([
+        ("request", Json::text(&feedback_id)),
+        ("checkpoint", checkpoint.get("checkpoint").unwrap().clone()),
+    ]);
+    assert!(f
+        .call("propose_review_change_result", &propose_original)
+        .is_err());
+    assert!(f
+        .service
+        .agent_call(
+            child_credential.transport_value(),
+            "propose_review_change_result",
+            &propose_original
+        )
+        .is_err());
+    fs::write(root.join("note.txt"), "revised result with example\n").unwrap();
+    let revised = f
+        .call(
+            "checkpoint",
+            &Json::object([("request", Json::text("revision"))]),
+        )
+        .unwrap();
+    let proposed = Json::object([
+        ("request", Json::text(&feedback_id)),
+        ("checkpoint", revised.get("checkpoint").unwrap().clone()),
+    ]);
+    assert!(f.call("propose_review_change_result", &proposed).is_err());
+    let new_review = f
+        .call(
+            "submit_review",
+            &Json::object([("checkpoint", revised.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let before_proposal = f.service.native_state().unwrap();
+    let proposal = f.call("propose_review_change_result", &proposed).unwrap();
+    assert_eq!(text(&proposal, "status"), "proposed");
+    assert_eq!(proposal.get("version"), revised.get("version"));
+    assert_eq!(proposal.get("bundle"), new_review.get("bundle"));
+    assert_eq!(proposal.get("approval_authority"), Some(&Json::Bool(false)));
+    assert_eq!(
+        f.call("propose_review_change_result", &proposed).unwrap(),
+        proposal
+    );
+    let after_proposal = f.service.native_state().unwrap();
+    assert_eq!(before_proposal.lanes, after_proposal.lanes);
+    assert_eq!(before_proposal.checkpoints, after_proposal.checkpoints);
+    assert_eq!(
+        before_proposal.review_change_requests,
+        after_proposal.review_change_requests
+    );
+    let activity = f.service.saved_review_change_activity(&selection).unwrap();
+    assert_eq!(
+        activity.get("responses"),
+        Some(&Json::Array(vec![proposal.clone()]))
+    );
+    assert_eq!(
+        f.context().get("review_change_responses"),
+        Some(&Json::Array(vec![proposal]))
+    );
+    assert_eq!(
+        f.service
+            .agent_call(
+                child_credential.transport_value(),
+                "context",
+                &Json::empty_object()
+            )
+            .unwrap()
+            .get("review_change_responses"),
+        Some(&Json::Array(vec![]))
+    );
     fs::write(root.join("note.txt"), "newer unreviewed work\n").unwrap();
     assert_eq!(
         text(

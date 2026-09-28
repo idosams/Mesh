@@ -189,6 +189,21 @@ pub struct ReviewChangeRequest {
     pub message: String,
 }
 
+/// Authenticated proposal of a saved result in response to one review change request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewChangeResponse {
+    /// Exact request in this objective.
+    pub request: String,
+    /// Complete recorded checkpoint from the originating lane.
+    pub checkpoint: String,
+    /// Saved operation derived from that checkpoint, never supplied by the agent.
+    pub version: RecordDigest,
+    /// Recorded review derived from that checkpoint.
+    pub bundle: RecordDigest,
+    /// Native-authenticated session that proposed the result.
+    pub origin: AgentOrigin,
+}
+
 /// Reconstructable objective control state.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct State {
@@ -206,6 +221,8 @@ pub struct State {
     pub checkpoints: BTreeMap<String, Checkpoint>,
     /// Durable requests remain readable independently of worker attempts.
     pub review_change_requests: BTreeMap<String, ReviewChangeRequest>,
+    /// Append-ordered proposals, bounded to eight per request. No resolution is inferred.
+    pub review_change_responses: BTreeMap<String, Vec<ReviewChangeResponse>>,
 }
 
 /// Authorized scheduling decisions and adapter observations admitted to the ledger.
@@ -213,6 +230,15 @@ pub struct State {
 pub enum Command {
     /// Native-only feedback bound to a completed, recorded review. No scheduling side effects.
     RequestReviewChanges(ReviewChangeRequest),
+    /// Propose an exact reviewed checkpoint; the native caller authenticates this session.
+    ProposeReviewChangeResult {
+        /// Original native-requested feedback identity.
+        request: String,
+        /// Complete recorded checkpoint produced by this session.
+        checkpoint: String,
+        /// Native-authenticated caller, not agent-supplied metadata.
+        origin: AgentOrigin,
+    },
     /// Claim a dispatch exactly once before performing its external process launch.
     ClaimLaunch {
         /// Exact lane.
@@ -477,6 +503,70 @@ impl State {
         let limits = self.limits.as_ref().ok_or(Error::Refused("not-started"))?;
         match command {
             Command::Start { .. } => unreachable!("handled above"),
+            Command::ProposeReviewChangeResult {
+                request,
+                checkpoint,
+                origin,
+            } => {
+                if self.cancelled {
+                    return refuse("objective-cancelled");
+                }
+                let feedback = self
+                    .review_change_requests
+                    .get(request)
+                    .ok_or(Error::Refused("review-change-request-missing"))?;
+                let saved = self
+                    .checkpoints
+                    .get(checkpoint)
+                    .ok_or(Error::Refused("checkpoint-missing"))?;
+                let result = saved
+                    .result
+                    .as_ref()
+                    .filter(|result| result.complete)
+                    .ok_or(Error::Refused("checkpoint-incomplete"))?;
+                let bundle = saved
+                    .review
+                    .ok_or(Error::Refused("checkpoint-review-missing"))?;
+                if saved.lane != feedback.lane || &saved.origin != origin {
+                    return refuse("review-change-response-not-in-session");
+                }
+                if result.version == feedback.version || checkpoint == &feedback.checkpoint {
+                    return refuse("review-change-response-unchanged");
+                }
+                let run = self
+                    .lanes
+                    .get(&feedback.lane)
+                    .and_then(|lane| lane.runs.last())
+                    .ok_or(Error::Refused("run-missing"))?;
+                if run.id != origin.run
+                    || !matches!(
+                        run.state,
+                        RunState::Launching | RunState::Running | RunState::Waiting
+                    )
+                {
+                    return refuse("run-not-active");
+                }
+                let responses = self
+                    .review_change_responses
+                    .entry(request.clone())
+                    .or_default();
+                if responses
+                    .iter()
+                    .any(|response| response.checkpoint == *checkpoint)
+                {
+                    return refuse("review-change-response-exists");
+                }
+                if responses.len() >= 8 {
+                    return refuse("review-change-response-limit");
+                }
+                responses.push(ReviewChangeResponse {
+                    request: request.clone(),
+                    checkpoint: checkpoint.clone(),
+                    version: result.version,
+                    bundle,
+                    origin: origin.clone(),
+                });
+            }
             Command::RequestReviewChanges(request) => {
                 id_valid(&request.id)?;
                 id_valid(&request.lane)?;

@@ -341,3 +341,18 @@ The canonical feedback transfer preserves localized controls and literal user me
 feedback routing. Added native UTF-8 boundary/replay and hidden-control cases still require native/hosted
 execution on this revision. Full local and packaged acceptance remain separately tracked, as do named
 human review, eventual merges and final combined-main verification.
+
+Review change requests can now carry authenticated proposed-result links in source. An agent uses the
+new scoped proposal tool after submitting a complete checkpoint from its current lane/session. Native
+code verifies retained review content and custody, derives saved identities, and persists a bounded,
+retryable link without changing the original request or review. Desktop feedback reads expose proposals
+and let a reviewer pin one beside the original for independent inspection. Native replay, session/lane
+isolation, restart reads and renderer validation/navigation have regression coverage. The bridge journey
+now exercises feedback and a proposed revision through the executable. A proposal does not prove that
+feedback is addressed; explicit resolution, provider wakeup and packaged graphical proof remain work.
+
+The canonical proposed-result transfer preserves localized controls and literal feedback/version
+identities. Local type/build, 143 interface and 536 desktop tests pass. Rendered and coordinator
+regressions detect untranslated proposal controls and the absent separate-panel route, then pass after
+byte-exact restoration. Native/full, real-provider and packaged evidence remain separately tracked;
+proposed results do not resolve feedback or approve main, and migration PRs remain unmerged.
