@@ -11,7 +11,11 @@ pub(crate) mod comparison;
 #[cfg(unix)]
 pub mod host;
 #[cfg(unix)]
+mod project_import;
+#[cfg(unix)]
 mod project_mapping;
+#[cfg(unix)]
+pub use project_import::PreparedProjectCandidateImport;
 #[cfg(unix)]
 pub mod provider;
 #[cfg(unix)]

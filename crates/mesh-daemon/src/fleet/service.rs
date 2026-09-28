@@ -1672,6 +1672,87 @@ impl FleetService {
         Ok(result)
     }
 
+    /// Compile a staged result using complete native ancestry correspondence. This is read-only:
+    /// it does not append, sign, create a project review, advance main or touch ordinary files.
+    pub fn prepare_project_candidate_import(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        actor: mesh_types::PublicKey,
+    ) -> Result<super::PreparedProjectCandidateImport, Unavailable> {
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let state = self.native_state()?;
+        saved_review_binding_from_state(&state, selection)?;
+        let lineage = super::project_mapping::lineage(
+            &state,
+            &selection.lane,
+            selection.version,
+            source.id(),
+        )
+        .map_err(|_| refusal("fleet-project-lineage-unavailable"))?;
+        let histories = lineage
+            .iter()
+            .map(|step| self.allocator.reopen_history(&step.lane, &step.binding))
+            .collect::<Result<Vec<_>, _>>()?;
+        let leaf = histories
+            .last()
+            .ok_or_else(|| refusal("fleet-project-lineage-unavailable"))?;
+        let root = &lineage[0];
+        let prepared = source
+            .with_fleet_input(root.binding.source_version, trusted, |project, main| {
+                if main.get("head").and_then(Json::as_text) != expected_main {
+                    return Err(std::io::Error::other(
+                        "candidate main changed before import preparation",
+                    ));
+                }
+                let preview = |open: &crate::workspace::OpenWorkspace, version| {
+                    open.historical_workspace_preview(version)
+                        .map_err(|error| std::io::Error::other(error.to_string()))
+                };
+                let mut snapshots = Vec::new();
+                for (step, history) in lineage.iter().zip(&histories) {
+                    history
+                        .verify()
+                        .map_err(|_| std::io::Error::other("lineage history changed"))?;
+                    let starting = step
+                        .binding
+                        .starting_version()
+                        .ok_or_else(|| std::io::Error::other("unbound input"))?;
+                    snapshots.push((
+                        preview(&history.open, starting)?,
+                        preview(&history.open, step.result)?,
+                    ));
+                }
+                let origins = super::project_mapping::import_correspondence(
+                    preview(project, root.binding.source_version)?,
+                    snapshots,
+                )?;
+                super::project_import::compile(
+                    project,
+                    root.binding.source_version,
+                    &leaf.open,
+                    &preview(&leaf.open, selection.version)?,
+                    &origins,
+                    &candidate,
+                    actor,
+                )
+            })
+            .map_err(|_| refusal("fleet-candidate-import-plan-unavailable"))?;
+        for history in &histories {
+            history.verify()?;
+        }
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-import-input-changed"));
+        }
+        Ok(prepared)
+    }
+
     /// Read a complete candidate against its recorded original-project main base. The derived
     /// review identity stays fixed across pages, newer captures and main advancement. No approval.
     pub fn review_project_candidate(

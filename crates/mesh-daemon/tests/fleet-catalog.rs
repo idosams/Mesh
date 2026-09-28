@@ -745,6 +745,50 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
             None,
         )
         .unwrap();
+    let import_actor = mesh_types::PublicKey::from_bytes(
+        ed25519_dalek::SigningKey::from_bytes(&[123; 32])
+            .verifying_key()
+            .to_bytes(),
+    );
+    let import_plan = service
+        .prepare_project_candidate_import(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            import_actor,
+        )
+        .unwrap();
+    let retry_plan = service
+        .prepare_project_candidate_import(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            import_actor,
+        )
+        .unwrap();
+    assert_eq!(import_plan.context(), retry_plan.context());
+    assert_eq!(
+        import_plan.context().get("prepared_files"),
+        Some(&Json::Number(2))
+    );
+    assert_eq!(
+        import_plan.context().get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert!(service
+        .prepare_project_candidate_import(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            Some(&"0".repeat(64)),
+            import_actor,
+        )
+        .is_err());
     let retained = candidate_root.join(text(&candidate, "candidate"));
     assert_eq!(
         fs::read(retained.join("files/work.txt")).unwrap(),

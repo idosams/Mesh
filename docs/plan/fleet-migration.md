@@ -3,6 +3,17 @@
 Canonical repository: **idosams/Mesh**. Mesh-internal is deprecated for development and remains
 historical evidence. The full [fleet objective](fleet-orchestration.md) is unchanged.
 
+## Current delivery checkpoint (2026-09-28)
+
+The sections below retain the migration's historical observations. Later verified delivery supersedes
+earlier statements that no PR has merged or named human review is still required. The owner explicitly
+authorized merging without human review for this effort; required checks remain mandatory, and no
+self-approval or check bypass is authorized. Main is verified through #55 at
+`b9d3f48c1b4adc2fce79099c7941a592a5eda17f`. The published dependency chain through #69 has been
+reconciled without rewriting original commits or changing those implementations. Each reconciled
+head requires fresh hosted checks before its merge. Final combined-main and runtime acceptance
+remain incomplete, including the preserved native macOS registration failure on #69's original tree.
+
 ## Verified reconciliation baseline
 
 - Canonical main: `9db6136803e9a50a0701d29d054b1fbf31591fd2`, alpha.5, merged through Mesh PR #1.
@@ -1203,3 +1214,20 @@ guard is removed, then passes after exact source restoration. Full local verific
 
 Candidate compilation/import and signable original-project review remain subsequent increments.
 Human review, ordered merges, latest packaged acceptance and combined-main testing remain required.
+
+## C03c identity-preserving candidate compilation
+
+This increment transfers preserved source `0d6114701a778f1277cbd69ff2bc3280feb2a716` onto
+#69 at `ec3d4052ae10f9d24051676973a5f1c206b9913c`. It prepares original-project operations from
+complete verified lane ancestry, preserving original identities for moved or edited objects and
+distinguishing new objects at reused paths. Bounded content and correspondence refusals remain.
+Preparation cannot sign, append, approve, advance protected main, or change ordinary project files.
+
+Transferred tests independently materialize the proposed signed historical tree, compare original
+identities/content/modes, exclude newer user work and reject malformed correspondence, content and
+no-op imports. Canonical compiler and delegated-history integration regressions each executed and passed.
+Repository/docs/license/storage/format checks pass. Replacing retained original identities with
+lane-local identities makes the compiler regression fail; restoring the exact source passes. Full
+and hosted validation remain pending. Durable signed import
+receipts, desktop signable review, the remaining source increments and complete acceptance remain
+required. The separate native registration failure is not resolved by this compiler transfer.

@@ -473,6 +473,16 @@ PR is merged and combined-main verification remains required.
 Canonical capture-line transfer adds refusal checks for public permissions, size, history binding
 and unexpected fields, preserving retained metadata, journal and working files. Repository/docs/
 license/storage/format checks and 38 focused native tests pass. The new refusal regression fails without its permission guard and passes after exact restoration.
-Full verification is pending. Previous #44 full local
-verification passed, while #67 and #68 have green hosted CI. These are separate revision scopes;
-required review, migration merges and final combined-main verification remain outstanding.
+The subsequent full local run failed native macOS event registration after 1,273 native passes,
+with 1,982 tests unrun. Its logs and follow-up diagnostics are retained; isolated passes do not
+establish reliable native acceptance. Earlier #44 full validation and hosted checks cover different
+revisions. Ordered migration merges and final combined-main verification remain outstanding.
+
+Native fleet candidate compilation now translates complete delegated ancestry into original-project
+operations, preserving object identity through moves/edits and distinguishing same-path replacements.
+Preparation is read-only and refuses stale main, invalid correspondence and unchanged/no-op input.
+Transferred signed-journal fixtures exercise the resulting historical tree independently of newer
+user work; service coverage exercises delegated preparation and stable retry context. Canonical
+compiler and delegated-history regressions pass. Full local, hosted and packaged validation remain
+incomplete; this is not a delivered runtime importer. The runtime importer,
+provenance-bound signed receipt, signable review and packaged user journey remain unfinished.

@@ -130,13 +130,12 @@ fn entries(snapshot: HistoricalWorkspacePreview) -> io::Result<BTreeMap<String, 
     Ok(entries)
 }
 
-/// Walk each immutable import boundary and retain original identity through local edits.
-/// Earlier deletions and additions remain part of the final source-relative result.
-pub(super) fn mapping_chain(
+type Entries = BTreeMap<String, Entry>;
+
+fn chain(
     source: HistoricalWorkspacePreview,
     steps: Vec<(HistoricalWorkspacePreview, HistoricalWorkspacePreview)>,
-    after: Option<&str>,
-) -> io::Result<Json> {
+) -> io::Result<(Entries, Entries, BTreeMap<String, String>)> {
     if steps.is_empty() || steps.len() > 33 {
         return Err(refused());
     }
@@ -170,6 +169,26 @@ pub(super) fn mapping_chain(
             .collect();
         current = result;
     }
+    Ok((source, current, origins))
+}
+
+/// Complete native correspondence, including unchanged objects; never derived from paginated UI rows.
+pub(super) fn import_correspondence(
+    source: HistoricalWorkspacePreview,
+    steps: Vec<(HistoricalWorkspacePreview, HistoricalWorkspacePreview)>,
+) -> io::Result<BTreeMap<String, String>> {
+    let (_, _, origins) = chain(source, steps)?;
+    Ok(origins)
+}
+
+/// Walk each immutable import boundary and retain original identity through local edits.
+/// Earlier deletions and additions remain part of the final source-relative result.
+pub(super) fn mapping_chain(
+    source: HistoricalWorkspacePreview,
+    steps: Vec<(HistoricalWorkspacePreview, HistoricalWorkspacePreview)>,
+    after: Option<&str>,
+) -> io::Result<Json> {
+    let (source, current, origins) = chain(source, steps)?;
     let reverse: BTreeMap<_, _> = origins
         .iter()
         .map(|(local, original)| (original, local))

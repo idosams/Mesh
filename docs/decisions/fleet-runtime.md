@@ -667,3 +667,31 @@ migrate. Missing position records in v2 refuse; branched legacy history cannot g
 Existing signed operations and approval records are unchanged. Native migration and recovery tests
 cover identity preservation, lost acknowledgement, interrupted metadata staging, linked records and
 corruption. This evidence is source-level; packaged graphical verification remains outstanding.
+
+
+### Native candidate operation compiler
+
+`FleetService::prepare_project_candidate_import` now verifies an existing staged candidate and
+reopens its complete saved input ancestry. It compiles against the original source version using
+native correspondence for every object, including unchanged entries; paginated renderer rows are
+never used as authoring input. Original object identity and file-version ancestry survive moves and
+edits. Proven replacements receive new identities, even at the same path. New identities and the
+plan digest bind the complete candidate receipt, including its provenance. The current verified
+main must match the candidate's recorded base when preparation begins.
+
+The compiler unlinks displaced bindings before creating and linking the target tree, reads changed
+file bytes from immutable lane history, and checks the resulting operations against the exact
+historical predecessor. Candidate content is bounded by the staging limits. Ambiguous identity,
+kind changes on retained objects, missing parents, inconsistent content, oversized input, an actor
+outside the predecessor's ancestry and empty operation sets refuse. A no-op candidate does not
+fabricate a saved version. Later user captures stay outside the proposal.
+
+The opaque result exposes bounded context and a read-only historical operation plan. It does not
+append, sign, create a review or authorize integration. An eventual writer must rederive it under
+project custody, verify the exact candidate and expected main again, bind provenance into the
+signed import and persist an exact retry receipt before appending. Signer provisioning must respect
+independent actor sequences across candidate branches. Native signed-journal fixtures prove the
+compiled result preserves moved originals, removes deleted entries, distinguishes replacements,
+retains exact bytes/modes and leaves ordinary files/main untouched. A delegated-lineage service
+test checks stable preparation and stale-input refusal. Runtime import receipts, crash recovery,
+signable review, desktop invocation and packaged user proof remain outstanding.
