@@ -739,3 +739,19 @@ tree restoration and file/directory conversion remain unfinished. Transferred te
 cover late writes, collisions, substitution, recreation, durability, unknown/ignored
 children, trust/receipt bindings, group version refusal, mixed-group interruption
 and historical recovery. Native runtime and packaged graphical proof are pending.
+
+### Localized retained removal view
+
+The renderer now accepts verified removal-recovery v1, distinguishes the operation
+from addition, and labels retained-tree observations separately from the working
+tree. It explains that open file and directory handles may still write there.
+Directory references remain excluded from retained-file restoration; observed
+state never grants replay, cleanup or automatic restoration authority. English
+and Hebrew keep file identifiers literal. Whole-tree restoration requires its own
+confirmed preserving operation and remains outstanding.
+
+The source's disposable macOS experiment reported file/directory exchange with
+open-handle continuity. That historical experiment is not canonical implementation
+or Linux/packaged acceptance. Conversion still requires a complete exchange
+executor, exact source/stage bindings, race handling, receipts, confirmation and
+recovery; a remove-then-add sequence is not an equivalent substitute.

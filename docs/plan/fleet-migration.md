@@ -1800,3 +1800,21 @@ removal receipts while v1/v2 remain readable. Native confirmation distinguishes
 removal from creation and lists frozen base content. Local native focused,
 failing-before and full execution remain pending behind preserved verification.
 Historical 3,311 Rust/679 desktop tests and 14 skips are provenance only.
+
+## I05b localized retained-directory recovery
+
+Completes source `a02b33d8c7454a440d3ca94ae22f34e762913cc6` accounting on
+PR #98 at `1a95c9c59e21a850ae53c1962fabe4362a68a0e7`: four renderer paths
+transferred here; nine native paths in #98. Its three documentation changes are
+reconciled across the ledger, retained-replacement decision, fleet plan and project
+status. Historical 3,311 Rust/679 desktop results and 14 skips are provenance only.
+The source macOS file/directory exchange experiment establishes only a historical
+platform prerequisite, not canonical conversion or packaged acceptance.
+
+Directory removal recovery is typed separately from addition, labels the retained
+tree and explains ongoing descriptor writes without offering file restoration.
+Hebrew text and literal paths are preserved; changed safety-copy assertions ship
+together. All 48 controller tests pass. Mutating removal classification to addition
+makes the operation regression fail; restoration returns all 48 to passing.
+TypeScript and all 30 rendering/localization tests pass. Full native, packaged confirmation/recovery,
+whole-tree restoration and file/directory conversion remain unfinished.

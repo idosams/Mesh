@@ -775,3 +775,9 @@ through open descriptors, and uses group v3 with complete removal confirmation.
 This unmerged transfer still needs native verification and localized recovery
 presentation. Whole-tree restoration, file/directory conversion, packaged graphical
 acceptance and full fleet/provider/remote acceptance remain required.
+
+Localized directory removal recovery now distinguishes working and retained trees,
+including possible later descriptor writes, without exposing file restoration.
+The removal source is fully accounted for across #98 and its UI increment, but
+native runtime, whole-tree restoration, conversion and packaged graphical proof
+remain required. Historical exchange experiments do not complete conversion.

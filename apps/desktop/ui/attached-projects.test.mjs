@@ -1171,6 +1171,9 @@ test('directory group observations retain complete bounded trees without offerin
     const changed = structuredClone(value); mutate(changed.members[1].recovery);
     assert.throws(() => attachedGroupRecovery(changed, id, groupId));
   }
+  const removal = structuredClone(value); removal.members[1].recovery.schema = 'mesh.attachment-directory-removal-recovery/v1';
+  assert.equal(attachedGroupRecovery(removal, id, groupId).entries[1].operation, 'remove-directory');
+  assert.equal(attachedGroupRecovery(removal, id, groupId).entries[1].retainedAvailable, false);
   const outcome = groupChangeReply(); outcome.outcome.members[0].transaction = tx;
   assert.equal(attachedGroupChange(outcome, id).members[0].transaction, tx);
   // Directory references never acquire the existing retained-file restoration path.

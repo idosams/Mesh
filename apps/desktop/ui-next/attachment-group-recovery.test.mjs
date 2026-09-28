@@ -40,7 +40,8 @@ test("unavailable group inspection disables restoration and complete-group appli
   }));
   assert.match(preview, /disabled=""[^>]*>Review applying accepted changes/);
   assert.ok(preview.includes("create complete new folders"));
-  assert.ok(preview.includes("Removing folders, changing between files and folders"));
+  assert.ok(preview.includes("move removed folders to recovery"));
+  assert.ok(preview.includes("Changing between files and folders"));
 });
 
 
@@ -140,6 +141,39 @@ test('Hebrew directory observations preserve literal nested paths without restor
     assert.ok(html.includes('<bdi dir="ltr">שם/FILE.txt</bdi>'));
     assert.ok(html.includes('העץ שהוכן: חסר'));
     assert.ok(!html.includes('New directory tree'));
+    assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
+  } finally { setLocale('en'); }
+});
+
+test('directory removal recovery shows retained work without offering file restoration', () => {
+  const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+    project: 'a'.repeat(64), disabled: false, detached: false,
+    group: { group: `integration-group-${'b'.repeat(32)}`, alreadyPresent: [], entries: [{
+      transaction: `directory-${'c'.repeat(32)}`, status: 'changed-entries', attention: true,
+      path: 'old', operation: 'remove-directory', retainedAvailable: false, recordedOutcome: 'applied-observed',
+      sourceTree: { state: 'absent', entries: [] },
+      stagedTree: { state: 'observed', entries: [{ path: '', kind: 'directory', bytes: null, digest: null }, { path: 'late', kind: 'file', bytes: 4, digest: 'a'.repeat(64) }] },
+    }] },
+  }));
+  for (const text of ['retains the complete original tree', 'Open file and directory handles', 'Retained tree: 2 entries observed', 'late', 'Working tree: absent']) assert.ok(html.includes(text), text);
+  assert.ok(!html.includes('Review restoring retained file'));
+});
+
+test('Hebrew removal recovery keeps late-work paths literal and offers no file restore', () => {
+  setLocale('he');
+  try {
+    const html = renderToStaticMarkup(React.createElement(FileRecovery, {
+      project: 'project', disabled: false, detached: false,
+      group: { group, alreadyPresent: [], entries: [{ transaction: `directory-${'c'.repeat(32)}`,
+        status: 'changed-entries', attention: true, path: 'שם/OLD', operation: 'remove-directory',
+        retainedAvailable: false, recordedOutcome: 'applied-observed', sourceTree: {state: 'absent', entries: []},
+        stagedTree: {state: 'observed', entries: [{path: '', kind: 'directory'}, {path: 'שם/LATE.txt', kind: 'file', bytes: 4}]},
+      }] },
+    }));
+    assert.ok(html.includes('הסרת תיקייה שומרת את העץ המקורי בשלמותו'));
+    assert.ok(html.includes('העץ שנשמר'));
+    assert.ok(html.includes('<bdi dir="ltr">שם/LATE.txt</bdi>'));
+    assert.ok(!html.includes('Directory removal retains'));
     assert.ok(!html.includes('סקירה לפני שחזור הקובץ שנשמר'));
   } finally { setLocale('en'); }
 });

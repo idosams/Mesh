@@ -682,3 +682,11 @@ and explains retained open handles. Unknown or changed entries refuse; uncertain
 results do not trigger replay or cleanup. Native regressions are transferred but
 not locally executed yet. Localized removal recovery and whole-tree restoration
 remain outstanding, along with packaged graphical acceptance.
+
+### Localized retained-directory recovery (unmerged increment)
+
+English/Hebrew recovery now identifies removed directory trees as retained work,
+keeps late-work paths literal and never offers the file-restoration command.
+All 48 controller tests pass with a demonstrated failing-before classification
+regression. TypeScript and all 30 rendering/localization tests pass; complete native, restoration,
+conversion and packaged graphical acceptance remain outstanding.

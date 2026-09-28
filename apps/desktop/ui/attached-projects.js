@@ -279,7 +279,7 @@ function attachedDirectoryRecovery(value, id, transaction, group) {
   const path = value => safeText(value, 4096) && !value.startsWith('/') && value.split('/').every(part => part && part !== '.' && part !== '..');
   const nullableBool = value => value === null || typeof value === 'boolean';
   const statuses = ['prepared-arrangement', 'applied-arrangement', 'changed-entries', 'incomplete-observation', 'source-parent-changed', 'parent-policy-changed', 'invalid-outcome', 'contradictory-outcome'];
-  if (value?.schema !== 'mesh.attachment-directory-addition-recovery/v1' || value.project !== id || value.transaction !== transaction
+  if (!['mesh.attachment-directory-addition-recovery/v1', 'mesh.attachment-directory-removal-recovery/v1'].includes(value?.schema) || value.project !== id || value.transaction !== transaction
     || !directoryTransaction(transaction) || !path(value.path) || !statuses.includes(value.status)
     || !['observation_final', 'automatic_replay', 'write_authority', 'cleanup_authority'].every(key => value[key] === false)
     || !nullableBool(value.parent_identity_matches) || !nullableBool(value.parent_policy_matches)
@@ -305,7 +305,7 @@ function attachedDirectoryRecovery(value, id, transaction, group) {
     return { state: observation.state, entries };
   };
   return { group, transaction, status: value.status, attention: !['prepared-arrangement', 'applied-arrangement'].includes(value.status),
-    path: value.path, operation: 'add-directory', retainedAvailable: false, recordedOutcome: value.recorded_outcome,
+    path: value.path, operation: value.schema === 'mesh.attachment-directory-removal-recovery/v1' ? 'remove-directory' : 'add-directory', retainedAvailable: false, recordedOutcome: value.recorded_outcome,
     sourceTree: tree(value.source), stagedTree: tree(value.stage), parentIdentityMatches: value.parent_identity_matches, parentPolicyMatches: value.parent_policy_matches };
 }
 

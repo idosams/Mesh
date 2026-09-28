@@ -341,7 +341,7 @@ test('attached main comparison renders localized read-only conflicts and inert e
     for (const label of ['Compare main with working files', 'Working folder compared with Mesh main', 'Review applying accepted changes',
       'This directory contains entries outside the captured view, including possible ignored content.',
       'more entries are omitted from this overview. The counts include all entries.',
-      'Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create complete new folders and create, replace or remove regular files. Removing folders, changing between files and folders, and incomplete or oversized text confirmations remain unavailable.',
+      'Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create complete new folders, move removed folders to recovery, and create, replace or remove regular files. Changing between files and folders and incomplete or oversized text confirmations remain unavailable.',
       projection.integrationErrors[id]]) {
       assert.ok(html.includes(ui.translate(locale, label)), label);
       if (locale === 'he') assert.notEqual(ui.translate(locale, label), label);
