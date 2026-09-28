@@ -391,7 +391,7 @@ impl PreparedFolderImport {
     /// The source is never opened for writing. Any failure after destination creation attempts to
     /// remove only the marker-owned destination.
     pub fn prepare(source: &Path, destination: &Path) -> Result<Self, FolderImportError> {
-        Self::prepare_inner(source, destination, None, false, None)
+        Self::prepare_inner(source, destination, None, false, None, false)
     }
 
     /// Copy one existing folder into the `mounts/` child of a new external private store.
@@ -403,7 +403,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, &[], None)
+        Self::prepare_presented_inner(source, storage_root, false, &[], None, false)
     }
 
     /// Copy into a new presented store only when its pinned parent remains outside every exact
@@ -413,7 +413,7 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, protected, None)
+        Self::prepare_presented_inner(source, storage_root, false, protected, None, false)
     }
 
     /// Copy only the user content of an exact zero-history workspace into a presented folder.
@@ -421,7 +421,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, &[], None)
+        Self::prepare_presented_inner(source, storage_root, true, &[], None, false)
     }
 
     /// Copy an admitted zero-history workspace while keeping the new store outside every exact
@@ -431,7 +431,7 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, protected, None)
+        Self::prepare_presented_inner(source, storage_root, true, protected, None, false)
     }
 
     /// Require the native caller's retained destination parent before creating any entry.
@@ -441,7 +441,32 @@ impl PreparedFolderImport {
         protected: &[ProtectedWorkspaceRoot],
         expected_parent: Option<ProtectedWorkspaceRoot>,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, protected, expected_parent)
+        Self::prepare_presented_inner(
+            source,
+            storage_root,
+            false,
+            protected,
+            expected_parent,
+            false,
+        )
+    }
+
+    /// Native received baselines may be empty: their complete manifest is checked after ingestion.
+    /// Ordinary user imports retain the existing no-importable-entries refusal.
+    pub(crate) fn prepare_received_with_parent(
+        source: &Path,
+        storage_root: &Path,
+        protected: &[ProtectedWorkspaceRoot],
+        expected_parent: ProtectedWorkspaceRoot,
+    ) -> Result<Self, FolderImportError> {
+        Self::prepare_presented_inner(
+            source,
+            storage_root,
+            false,
+            protected,
+            Some(expected_parent),
+            true,
+        )
     }
 
     fn prepare_presented_inner(
@@ -450,6 +475,7 @@ impl PreparedFolderImport {
         source_private_fence: bool,
         protected: &[ProtectedWorkspaceRoot],
         expected_parent: Option<ProtectedWorkspaceRoot>,
+        allow_empty: bool,
     ) -> Result<Self, FolderImportError> {
         let source = validated_source(source)?;
         let storage_root = absolute_destination(storage_root)?;
@@ -536,6 +562,7 @@ impl PreparedFolderImport {
             Some(presented),
             source_private_fence,
             Some(pinned_store),
+            allow_empty,
         ) {
             Ok(prepared) => Ok(prepared),
             Err(problem) => Err(cleanup_presented_prepare_or(
@@ -554,6 +581,7 @@ impl PreparedFolderImport {
         presented_store: Option<PresentedStore>,
         source_private_fence: bool,
         pinned_parent: Option<PinnedWorkspaceRoot>,
+        allow_empty: bool,
     ) -> Result<Self, FolderImportError> {
         let source = validated_source(source)?;
         let source_identity = directory_identity(&source)?;
@@ -587,7 +615,9 @@ impl PreparedFolderImport {
         }
 
         let before = import_snapshot_for_layout(&source, source_private_fence)?;
-        require_import_entries(&source, &before)?;
+        if !allow_empty {
+            require_import_entries(&source, &before)?;
+        }
         if presented_store.is_none() {
             reject_reserved_workspace_path(&before)?;
         }

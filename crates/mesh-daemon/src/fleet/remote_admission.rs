@@ -24,11 +24,21 @@ pub struct RemoteWork {
 /// Durable admission receipt. Reading or cloning this fact cannot allocate or launch anything.
 #[derive(Clone, PartialEq, Eq)]
 pub struct RemoteAdmissionReceipt {
+    coordinator: String,
+    objective: String,
     work: RemoteWork,
     allocation: String,
     revision: u64,
 }
 impl RemoteAdmissionReceipt {
+    /// Configured coordinator identity that owns this admission namespace.
+    pub fn coordinator(&self) -> &str {
+        &self.coordinator
+    }
+    /// Exact objective within that coordinator's namespace.
+    pub fn objective(&self) -> &str {
+        &self.objective
+    }
     /// Immutable coordinator work retained by the worker.
     pub fn work(&self) -> &RemoteWork {
         &self.work
@@ -51,11 +61,14 @@ impl RemoteInputReservation {
     pub fn receipt(&self) -> &RemoteAdmissionReceipt {
         &self.0
     }
-    pub(super) fn consume(self, assignment: &RemoteAssignment) -> Result<String, Error> {
+    pub(super) fn consume(
+        self,
+        assignment: &RemoteAssignment,
+    ) -> Result<RemoteAdmissionReceipt, Error> {
         if &self.0.work.assignment != assignment {
             return refuse("remote-admission-assignment-mismatch");
         }
-        Ok(self.0.allocation)
+        Ok(self.0)
     }
 }
 
@@ -283,6 +296,8 @@ impl RemoteAdmissionRegistry {
             return Err(Error::InvalidHistory);
         }
         Ok(RemoteAdmissionReceipt {
+            coordinator: self.coordinator.clone(),
+            objective: self.objective.clone(),
             work,
             allocation,
             revision: event.revision,

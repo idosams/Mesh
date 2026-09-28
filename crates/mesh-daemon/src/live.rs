@@ -9248,6 +9248,82 @@ impl LiveDaemon {
         prepared: crate::PreparedFolderImport,
         snapshot: &HistoricalWorkspacePreview,
     ) -> Result<WorkspaceSummary, Unavailable> {
+        self.install_imported_lane(prepared, |candidate| {
+            workspace_version_candidate_is_exact(candidate, snapshot, None)
+        })
+    }
+
+    /// Install an independent received tree. The input identifies remote content, not local DAG ancestry.
+    pub(crate) fn install_received_lane(
+        &self,
+        prepared: crate::PreparedFolderImport,
+        manifest: &crate::fleet::RemoteInputManifest,
+    ) -> Result<WorkspaceSummary, Unavailable> {
+        self.install_imported_lane(prepared, |candidate| {
+            if !candidate.names_answered()
+                || !candidate.conditions().is_empty()
+                || candidate.operations() != 1
+                || candidate.private_version().concurrent_changes() != 1
+            {
+                return false;
+            }
+            let versions = candidate.workspace_versions();
+            let [initial] = versions.as_slice() else {
+                return false;
+            };
+            let Ok(snapshot) = candidate.historical_workspace_preview(initial.operation()) else {
+                return false;
+            };
+            let settled = match SqliteRecoveryState::inspect_isolated_read_only(
+                recovery_database(candidate.database_file()),
+                candidate.database_file(),
+                LIVE_WORKSPACE_VIEW,
+            ) {
+                Ok(None) => true,
+                Ok(Some(value)) => value == RecoverySnapshot::default(),
+                Err(_) => false,
+            };
+            manifest.matches_saved_content(&snapshot)
+                && native_tree_matches_snapshot(candidate, &snapshot)
+                && settled
+        })
+    }
+
+    pub(crate) fn verify_received_lane_binding(
+        &self,
+        parent: crate::ProtectedWorkspaceRoot,
+        root: &str,
+        installation: &str,
+        initial: RecordDigest,
+        manifest: &crate::fleet::RemoteInputManifest,
+    ) -> Result<(), Unavailable> {
+        let changed = || workspace_version_refusal("fleet-received-workspace-changed");
+        let held = self.held();
+        let open = held.as_ref().ok_or_else(changed)?;
+        open.ensure_physical_root().map_err(|_| changed())?;
+        if open.root().as_path() != Path::new(root) || open.installation() != installation {
+            return Err(changed());
+        }
+        for pin in [open.pinned_root(), open.storage_pinned_root()] {
+            pin.ensure_namespace_identity().map_err(|_| changed())?;
+            if !pin.is_within(parent).map_err(|_| changed())? {
+                return Err(changed());
+            }
+        }
+        let saved = open
+            .historical_workspace_preview(initial)
+            .map_err(|_| changed())?;
+        if !manifest.matches_saved_content(&saved) {
+            return Err(changed());
+        }
+        Ok(())
+    }
+
+    fn install_imported_lane(
+        &self,
+        prepared: crate::PreparedFolderImport,
+        exact: impl FnOnce(&OpenWorkspace) -> bool,
+    ) -> Result<WorkspaceSummary, Unavailable> {
         let (confirmed, _) = prepared
             .confirm_into_workspace_without_origin()
             .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
@@ -9270,7 +9346,7 @@ impl LiveDaemon {
         let candidate =
             OpenWorkspace::reopen_with_trusted_reviewers(presented, &self.trusted_reviewers)
                 .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
-        if !workspace_version_candidate_is_exact(&candidate, snapshot, None) {
+        if !exact(&candidate) {
             return Err(workspace_version_refusal(
                 "fleet-attachment-content-changed",
             ));

@@ -86,10 +86,12 @@ impl<'a> NativeRemoteInputReceiver<'a> {
         &mut self,
         reservation: crate::fleet::RemoteInputReservation,
     ) -> io::Result<RemoteInputAllocation> {
-        let allocation = reservation
+        let admission = reservation
             .consume(&self.assignment)
             .map_err(|_| io::Error::other("remote input reservation does not match assignment"))?;
-        self.materialize(&allocation)
+        let mut allocation = self.materialize(admission.allocation())?;
+        allocation.admission = Some(admission);
+        Ok(allocation)
     }
 }
 fn store_error(_: io::Error) -> Error {

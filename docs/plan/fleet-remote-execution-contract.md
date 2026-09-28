@@ -223,3 +223,23 @@ It does not authenticate peers, provision an SSH endpoint, initialize an executi
 release uncertain slots, own a provider process or satisfy actual second-machine acceptance.
 The supervisor must retain one configured worker directory across connections; a network request
 must never choose a different ledger to evade assignment uniqueness.
+
+## Worker baseline integration in progress
+
+The received-workspace implementation now retains coordinator/objective scope from the original
+admission through materialization. It consumes the admitted allocation, writes a create-only
+initialization intent, and uses native folder ingestion to create independent worker history.
+A completion receipt binds the source input/bundle and assignment to the actual worker installation
+and initial operation. Native verification checks saved content, original input, receipt bytes and
+physical custody. Existing intent/destination state is preserved and refuses another initialization.
+This path grants no process launch, restart adoption or protected-main authority.
+
+This increment is not ready to merge: the empty-tree regression currently fails. The existing
+materializer discovers a root from directory references in operations; an empty import has no such
+reference. Empty received inputs require an explicit durable root initialization representation,
+with canonical encoding, rejection and replay tests, before this path can claim a saved initial
+version for every valid input. Do not remove the regression, synthesize placeholder project files,
+or label zero-history state as a saved version. Ordinary user imports retain their existing
+no-importable-entries refusal. The remote native route must validate exact saved content after
+initialization, including the empty case. No remote execution or second-machine claim follows from
+the passing nonempty initialization tests.

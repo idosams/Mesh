@@ -10,6 +10,8 @@ use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
+mod worker;
+pub use worker::ReceivedWorkerWorkspace;
 
 fn invalid() -> io::Error {
     io::Error::other("remote input storage or allocation is unavailable or changed")
@@ -109,6 +111,7 @@ impl RemoteInputDestination {
         )?;
         let files = allocation.create_child_directory(OsStr::new("files"))?;
         let result = RemoteInputAllocation {
+            admission: None,
             manifest: manifest.clone(),
             parent: self.parent.clone(),
             allocation,
@@ -169,6 +172,7 @@ impl RemoteInputDestination {
 /// Keep this handle and recheck immediately before any separately authorized executor claim.
 /// Dropping it never deletes partial or completed work. Restart requires native reconciliation.
 pub struct RemoteInputAllocation {
+    pub(super) admission: Option<super::RemoteAdmissionReceipt>,
     manifest: RemoteInputManifest,
     parent: PinnedWorkspaceRoot,
     allocation: PinnedWorkspaceRoot,

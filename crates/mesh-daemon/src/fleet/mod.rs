@@ -40,7 +40,9 @@ pub use remote_input::{
     RemoteInputChunk, RemoteInputEntry, RemoteInputManifest, RemoteInputReceiver,
 };
 #[cfg(unix)]
-pub use remote_materialization::{RemoteInputAllocation, RemoteInputDestination};
+pub use remote_materialization::{
+    ReceivedWorkerWorkspace, RemoteInputAllocation, RemoteInputDestination,
+};
 #[cfg(unix)]
 mod remote_peer;
 #[cfg(unix)]

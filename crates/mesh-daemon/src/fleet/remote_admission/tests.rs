@@ -261,3 +261,26 @@ fn canonical_receipts_refuse_unknown_schema_fields_and_changed_stream_context() 
         })
         .is_err());
 }
+
+#[test]
+fn identical_work_in_different_objectives_keeps_distinct_receipt_scope() {
+    let fixture = Fixture::new();
+    let mut first = fixture.registry(2);
+    first.reserve(work(), ALLOCATION, 100).unwrap();
+    let mut other = RemoteAdmissionRegistry::new(
+        FleetStore::open(fixture.0.join("worker.sqlite")).unwrap(),
+        &"ab".repeat(32),
+        &"cd".repeat(32),
+        "another-objective",
+        limits(2),
+    )
+    .unwrap();
+    other.reserve(work(), ALLOCATION, 100).unwrap();
+    let first = first.receipts().unwrap().remove(0);
+    let other = other.receipts().unwrap().remove(0);
+    assert!(first != other);
+    assert_eq!(first.objective(), "objective");
+    assert_eq!(other.objective(), "another-objective");
+    assert_eq!(first.coordinator(), "ab".repeat(32));
+    assert!(first.work() == other.work());
+}

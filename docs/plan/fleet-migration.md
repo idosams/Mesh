@@ -2339,3 +2339,22 @@ portable worker support, network authentication, provider execution, second-mach
 acceptance. No existing schema or dependencies changed; the additive worker-directory receipt is
 closed and refuses unknown versions. Worker workspace provenance, process supervision, terminal
 reconciliation, transport and saved-result recovery remain required.
+
+## R12 received worker baseline integration, draft
+
+New canonical implementation based on merged #127 at
+`606fb9d901d655109eea674fc8f8e264ba765c99`; no preserved source commits are replaced.
+All seven exact-head checks passed for #127. This draft carries coordinator/objective attribution
+through the original input reservation, creates an initialization intent before native ingestion,
+and records the actual worker installation/initial operation separately from source input/bundle.
+Saved content, immutable input, receipts and physical custody are checked; existing state refuses
+without repair. It adds no provider execution or automatic restart adoption.
+
+The focused native run currently has fifteen passing tests and one failing empty-tree regression.
+Nonempty binary/executable/empty-entry content, persisted mapping and native-history reopen pass;
+changed/unreserved input, existing intent/destination, changed receipts and worker escape refuse.
+The empty-tree case exposes the lack of an explicit root declaration in the operation model and
+must be fixed before merge. Initial failure logs are retained; the executable-mode expectation was
+corrected to preserve the native owner execute bit instead of adding execute permissions for others.
+Complete exact-head validation remains pending. The [integration contract](fleet-remote-execution-contract.md)
+keeps the empty-root requirement and all remaining supervision, transport and acceptance work intact.

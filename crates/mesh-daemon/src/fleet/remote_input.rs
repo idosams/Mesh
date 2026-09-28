@@ -65,6 +65,45 @@ pub struct RemoteInputManifest {
     bundle: RecordDigest,
 }
 impl RemoteInputManifest {
+    /// Compare verified visible content only. A worker's new initial operation has its own ancestry.
+    #[cfg(unix)]
+    pub(crate) fn matches_saved_content(
+        &self,
+        snapshot: &crate::workspace::HistoricalWorkspacePreview,
+    ) -> bool {
+        let expected: BTreeMap<_, _> = self
+            .entries
+            .iter()
+            .map(|entry| match entry {
+                RemoteInputEntry::Directory { path } => (path.as_str(), None),
+                RemoteInputEntry::File {
+                    path,
+                    executable,
+                    digest,
+                    chunks,
+                } => (
+                    path.as_str(),
+                    Some((
+                        chunks.iter().map(|chunk| chunk.bytes).sum::<u64>(),
+                        RecordDigest::from_bytes(*digest.as_bytes()),
+                        *executable,
+                    )),
+                ),
+            })
+            .collect();
+        let actual: BTreeMap<_, _> = snapshot
+            .directories
+            .iter()
+            .map(|entry| (entry.path.as_str(), None))
+            .chain(snapshot.files.iter().map(|entry| {
+                (
+                    entry.path.as_str(),
+                    Some((entry.byte_length, entry.content_digest, entry.executable)),
+                )
+            }))
+            .collect();
+        actual.len() == snapshot.directories.len() + snapshot.files.len() && expected == actual
+    }
     /// Build from a native-verified saved inventory. This does not itself prove source provenance.
     pub fn new(input: RecordDigest, mut entries: Vec<RemoteInputEntry>) -> Result<Self, Error> {
         if entries.len() > MAX_ENTRIES {
