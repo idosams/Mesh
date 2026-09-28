@@ -756,6 +756,64 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     );
     assert!(!retained.join("files/unrelated-later.txt").exists());
     assert_eq!(text(&candidate, "state"), "staged");
+    let project_review = service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            (None, None),
+        )
+        .unwrap();
+    assert_eq!(
+        project_review.get("comparison").unwrap().get("total"),
+        Some(&Json::Number(3)),
+        "genesis review must include all proposed files, not only the two lane changes"
+    );
+    let project_detail = service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            (None, Some("work.txt")),
+        )
+        .unwrap();
+    assert_eq!(project_detail.get("review"), project_review.get("review"));
+    let row = &project_detail
+        .get("comparison")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap()[0];
+    assert_eq!(row.get("before"), Some(&Json::Null));
+    assert_eq!(
+        row.get("after").unwrap().get("text"),
+        Some(&Json::text("child result\n"))
+    );
+    assert!(service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            (None, Some("../work.txt"))
+        )
+        .is_err());
+    assert!(service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            (Some("work.txt"), Some("work.txt"))
+        )
+        .is_err());
     assert_eq!(
         candidate.get("approval_authority"),
         Some(&Json::Bool(false))
@@ -814,6 +872,19 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     assert!(reopened.current_service(&objective).is_err());
     assert_eq!(
         history
+            .review_project_candidate(
+                &selection,
+                &f.history,
+                &TrustedReviewers::default(),
+                &candidate_request,
+                None,
+                (None, None)
+            )
+            .unwrap(),
+        project_review
+    );
+    assert_eq!(
+        history
             .inspect_project_candidate(
                 &selection,
                 &f.history,
@@ -839,6 +910,16 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
         "changed retained candidate\n",
     )
     .unwrap();
+    assert!(history
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &candidate_request,
+            None,
+            (None, None)
+        )
+        .is_err());
     assert!(history
         .inspect_project_candidate(
             &selection,
@@ -867,5 +948,241 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     assert_eq!(
         fs::read(f.source.join("obsolete.txt")).unwrap(),
         b"original content\n"
+    );
+}
+
+#[test]
+fn candidate_review_keeps_its_verified_main_base_after_main_advances() {
+    use mesh_approval::{
+        ApprovalDecision, ExpectedHumanApproval, HumanApprovalCredential, HumanApprovalReceiptDraft,
+    };
+    use mesh_daemon::fleet::service::SavedReviewSelection;
+    use ring::rand::SystemRandom;
+    use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
+    use std::sync::Arc;
+    let f = Fixture::new("candidate-review-main");
+    let random = SystemRandom::new();
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &random).unwrap();
+    let key =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &random).unwrap();
+    let credential =
+        HumanApprovalCredential::from_public_key(key.public_key().as_ref().try_into().unwrap())
+            .unwrap();
+    let trust = TrustedReviewers::with_human_credentials([credential.clone()]);
+    // Cryptographic fixture receipts exercise the native fold; this is not OS user-presence proof.
+    let approve = |version: &str, challenge: u8| {
+        let review = f
+            .history
+            .request_review_with_trusted_reviewers(
+                version,
+                mesh_types::PublicKey::from_bytes([3; 32]),
+                &trust,
+            )
+            .unwrap();
+        let preview = f
+            .history
+            .approval_preview(text(&review, "bundle"), version, &trust)
+            .unwrap();
+        let draft = HumanApprovalReceiptDraft::new(
+            ExpectedHumanApproval::new(
+                preview.context().clone(),
+                credential.clone(),
+                [challenge; 32],
+            ),
+            ApprovalDecision::Approve,
+        );
+        let signature = key.sign(&random, &draft.canonical_bytes()).unwrap();
+        let receipt = draft
+            .with_signature(signature.as_ref().to_vec())
+            .unwrap()
+            .canonical_bytes();
+        f.history
+            .approve_review(text(&review, "bundle"), version, &receipt, &trust)
+            .unwrap()
+    };
+    let first_main = approve(&f.request.version.to_string(), 1).to_string();
+    let catalog = f.open().unwrap();
+    let service = catalog.create_attached(&f.history, &f.request).unwrap();
+    let state = service.native_state().unwrap();
+    let lane = state.lanes.keys().next().unwrap();
+    let root = PathBuf::from(state.lanes[lane].workspace.as_ref().unwrap().root());
+    service
+        .native_command(
+            "dispatch",
+            Command::Dispatch {
+                lane: lane.clone(),
+                run: "run".into(),
+            },
+        )
+        .unwrap();
+    let agent = service
+        .grant_with_signer(
+            lane,
+            "run",
+            "session",
+            Arc::new(HistorySigner(SigningKey::from_bytes(&[63; 32]))),
+        )
+        .unwrap();
+    fs::write(root.join("work.txt"), "candidate result\n").unwrap();
+    let saved = service
+        .agent_call(
+            agent.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("save"))]),
+        )
+        .unwrap();
+    let reviewed = service
+        .agent_call(
+            agent.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", saved.get("checkpoint").unwrap().clone())]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        lane,
+        text(&saved, "checkpoint"),
+        text(&saved, "version"),
+        text(&reviewed, "bundle"),
+    )
+    .unwrap();
+    let request = "e".repeat(32);
+    let candidate = service
+        .stage_project_candidate(&selection, &f.history, &trust, &request, Some(&first_main))
+        .unwrap();
+    let original = service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            (None, Some("work.txt")),
+        )
+        .unwrap();
+    assert_eq!(original.get("base_is_current"), Some(&Json::Bool(true)));
+    assert!(
+        f.history
+            .approval_preview(
+                text(&original, "review"),
+                &f.request.version.to_string(),
+                &trust
+            )
+            .is_err(),
+        "a candidate content-review digest is not a signable source-history review bundle"
+    );
+    let before_text = |review: &Json| {
+        review
+            .get("comparison")
+            .unwrap()
+            .get("changes")
+            .unwrap()
+            .as_array()
+            .unwrap()[0]
+            .get("before")
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(before_text(&original), Json::text("saved input\n"));
+    fs::write(f.source.join("work.txt"), "new accepted main\n").unwrap();
+    let capture = f
+        .history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let capture_key = SigningKey::from_bytes(&[61; 32]);
+    let next = f
+        .history
+        .project()
+        .save_capture(
+            f.history.metadata_path(),
+            &capture,
+            mesh_types::PublicKey::from_bytes(capture_key.verifying_key().to_bytes()),
+            |payload| {
+                Ok::<_, String>(mesh_types::Signature::from_bytes(
+                    capture_key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap()
+        .operation();
+    let next_main = approve(&next.to_string(), 2).to_string();
+    assert_eq!(
+        service
+            .stage_project_candidate(&selection, &f.history, &trust, &request, Some(&first_main))
+            .unwrap(),
+        candidate
+    );
+    let stale = service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &request,
+            Some(&first_main),
+            (None, Some("work.txt")),
+        )
+        .unwrap();
+    assert_eq!(stale.get("review"), original.get("review"));
+    assert_eq!(stale.get("context"), original.get("context"));
+    assert_eq!(stale.get("comparison"), original.get("comparison"));
+    assert_eq!(stale.get("base_is_current"), Some(&Json::Bool(false)));
+    assert_eq!(
+        stale.get("observed_main").unwrap().get("head"),
+        Some(&Json::text(&next_main))
+    );
+    assert!(service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &TrustedReviewers::default(),
+            &request,
+            Some(&first_main),
+            (None, None)
+        )
+        .is_err());
+    let new_request = "f".repeat(32);
+    assert!(service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &new_request,
+            Some(&first_main)
+        )
+        .is_err());
+    service
+        .stage_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &new_request,
+            Some(&next_main),
+        )
+        .unwrap();
+    let refreshed = service
+        .review_project_candidate(
+            &selection,
+            &f.history,
+            &trust,
+            &new_request,
+            Some(&next_main),
+            (None, Some("work.txt")),
+        )
+        .unwrap();
+    assert_ne!(refreshed.get("review"), original.get("review"));
+    assert_eq!(before_text(&refreshed), Json::text("new accepted main\n"));
+    assert_eq!(
+        refreshed.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"new accepted main\n"
+    );
+    assert_eq!(
+        f.history.accepted_main(&trust).unwrap().get("head"),
+        Some(&Json::text(next_main))
     );
 }

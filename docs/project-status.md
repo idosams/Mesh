@@ -406,3 +406,15 @@ The canonical candidate-staging transfer retains all previous lineage and decisi
 adds refusal checks for changed provenance and executable permissions without repair or receipt
 replacement. Local repository/docs/license/storage/format checks pass. Native/full local and packaged
 validation remain pending; migration PRs remain unmerged.
+
+
+Staged fleet candidates now have a native whole-project content review against their fixed original
+main base. The review identity remains stable after main advances, while a separate observation marks
+the base stale. Native tests cover signed fixture main advancement, inherited-file completeness,
+restart, saved text, 200-path pagination, 256 KiB text limits and altered content/unverified base refusal.
+The context digest is not an approvable source-history bundle. Operation import, signable review,
+UI/artifacts, dependency validation, human approval and integration remain unfinished.
+
+The canonical fixed-main review transfer preserves earlier candidate and ancestry regressions and
+adds exact text-limit and invalid UTF-8 coverage. Local repository/docs/license/storage/format checks
+pass. Native/full local and packaged validation remain pending; no migration PR is merged.

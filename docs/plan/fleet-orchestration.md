@@ -447,3 +447,14 @@ This is a durable staging boundary, not the completed original-main loop: source
 import, exact project review, dependency validation, UI, human approval and grouped integration remain
 required. Standalone offline candidate verification/discovery and partial-allocation reconciliation
 are also outstanding. See the candidate staging decision for supported limits and evidence scope.
+
+
+### Fixed-base candidate content review
+
+A native reader now presents a staged result against its recorded original-project main, including
+all inherited files. Its immutable review identity survives pagination, restart and later main changes;
+staleness is reported separately. Verified historical approval membership is required for a non-genesis
+base. This is a read-only content review, not a source-history operation bundle. Import, signable review
+creation, UI/artifact presentation, dependency validation, exact human approval and integration remain
+phase requirements. Native fixture approval tests verify old-base stability without claiming OS user
+presence or a packaged graphical journey.

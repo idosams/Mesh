@@ -288,6 +288,19 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Read a fixed whole-project candidate comparison without acquiring publication authority.
+    pub fn review_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        page: (Option<&str>, Option<&str>),
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .review_project_candidate(selection, source, trusted, request, expected_main, page)
+    }
     /// Recover an existing exact staged candidate without creating content or adopting workers.
     pub fn inspect_project_candidate(
         &self,
@@ -1657,6 +1670,39 @@ impl FleetService {
             .map_err(|_| refusal("fleet-candidate-staging-unavailable"))?;
         history.verify()?;
         Ok(result)
+    }
+
+    /// Read a complete candidate against its recorded original-project main base. The derived
+    /// review identity stays fixed across pages, newer captures and main advancement. No approval.
+    pub fn review_project_candidate(
+        &self,
+        selection: &SavedReviewSelection,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        request: &str,
+        expected_main: Option<&str>,
+        page: (Option<&str>, Option<&str>),
+    ) -> Result<Json, Unavailable> {
+        let candidate =
+            self.inspect_project_candidate(selection, source, trusted, request, expected_main)?;
+        let state = self.native_state()?;
+        let binding = saved_review_binding_from_state(&state, selection)?;
+        let history = self.allocator.reopen_history(&selection.lane, binding)?;
+        history.verify()?;
+        let snapshot = history
+            .open
+            .historical_workspace_preview(selection.version)
+            .map_err(|_| refusal("fleet-candidate-content-unavailable"))?;
+        let review = source
+            .review_fleet_candidate(&candidate, &history.open, snapshot, trusted, page)
+            .map_err(|_| refusal("fleet-candidate-review-unavailable"))?;
+        history.verify()?;
+        if self.inspect_project_candidate(selection, source, trusted, request, expected_main)?
+            != candidate
+        {
+            return Err(refusal("fleet-candidate-review-changed"));
+        }
+        Ok(review)
     }
 
     /// Read an exact historical artifact; object identity and side select content, never a path.

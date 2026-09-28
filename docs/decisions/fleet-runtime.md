@@ -539,3 +539,41 @@ stale main, conflicting requests, restart inspection, source-history preservatio
 revalidation, concurrent retained edits, changed manifests, replaced files directories and capacity.
 Creating an original-project review against its exact main base, importing operations with correct
 provenance, private dependency validation, UI, human approval and grouped write-back remain required.
+
+
+## Candidate review against fixed original-project main
+
+`review_project_candidate` now derives a read-only original-project content review from an existing
+complete staged candidate. Both current services and history-only readers support it. It first and
+last revalidates the retained candidate, reopens the exact result through native history, and compares
+against the candidate's recorded expected main. A non-genesis base must belong to the trusted project
+approval fold, not merely to a private version or stored review. The exact base operation is resolved
+from that verified head. Main advancement does not replace the original comparison.
+
+The comparison covers the whole proposed project. In particular, a genesis review shows all proposed
+files, including inherited input, rather than only changes made after lane allocation. Paths are
+compared by type, content digest, length and executable bit; moves appear as path removals/additions,
+not inferred identity changes. This is a content-tree presentation, not a signable operation review.
+Original object correspondence and ancestry remain separate recorded evidence for eventual import.
+
+The canonical `mesh.fleet-project-review-context/v1` binds project/candidate identity, the complete
+candidate receipt digest (including provenance), fixed base head/operation, target operation and
+content manifest digest. Its digest identifies the read-only review. This identity is recomputed from
+persisted immutable inputs and stays identical across pages, selected files, new captures and main
+advancement. No new lifecycle record or source ReviewRecord is appended. The native projection
+`mesh.fleet-project-candidate-review/v1` keeps observed main and `base_is_current` outside the immutable
+context. The latter is an observation, not approval eligibility or a reservation.
+
+Pages contain at most 200 changed paths with exact total and cursor. Selecting one changed path
+returns verified saved before/after text bounded to 256 KiB per side; folders, large files, binary
+content and unsafe control/bidi text have explicit states. Unknown paths, mixed page/file selection,
+substituted manifests, unverified bases and altered retained content refuse. File paths select only
+known saved changes and never grant arbitrary filesystem access. Artifact previews for this new
+comparison remain unconnected.
+
+Native tests exercise genesis completeness, selected immutable bytes, restart identity, real advancement
+of the trusted approval fold with fixture signatures, old-base readability/staleness, new-base identity,
+untrusted reviewer refusal, bounded pagination/text and no source-history mutation. Fixture signatures
+do not prove graphical user presence. The digest cannot be used as a source approval bundle. Source-
+history operation import, signable review creation, private dependency validation, desktop presentation,
+human approval and grouped integration remain required.

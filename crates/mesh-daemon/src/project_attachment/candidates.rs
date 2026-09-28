@@ -78,6 +78,10 @@ fn manifest(snapshot: &HistoricalWorkspacePreview) -> Json {
         ),
     ])
 }
+
+pub(super) fn content_digest(snapshot: &HistoricalWorkspacePreview) -> String {
+    digest(manifest(snapshot).encode().as_bytes())
+}
 fn verify_manifest(root: &PinnedWorkspaceRoot, expected: &str) -> io::Result<()> {
     let file = root.filesystem().inspect_entry(Path::new("content.json"))?;
     if !file.metadata()?.is_file() {

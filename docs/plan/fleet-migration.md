@@ -190,8 +190,8 @@ column becomes the canonical PR and replacement commit mapping as each increment
 | R03 | `f14d5344ebb5826a63aa9f2878902676e6f0140a` | feat(fleet): confirm reversible review request decisions | [Mesh PR #61](https://github.com/idosams/Mesh/pull/61), `3fbc74fe2c5ba8e86d0686807687394bf0b97ae1`; reversible decisions; stacked on #60; not merged |
 | C01 | `302f6cbb0a795b9743ef6c72447d803cdc7860ab` | feat(fleet): verify original project input correspondence | [Mesh PR #62](https://github.com/idosams/Mesh/pull/62), `d68ea27f6876f3a206d23ec564e706d7098dd45a`; original input correspondence; stacked on corrected #61; not merged |
 | C01 | `ee7b74fc47a831a3b7eb3827647f7aa841621fa7` | feat(fleet): trace delegated results to original project inputs | [Mesh PR #63](https://github.com/idosams/Mesh/pull/63), `a9bc1c78f486cdfc55a0c9e5985feddf4ca8aaf7`; exact delegated ancestry; stacked on #62; not merged |
-| C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | This increment, C01c; durable candidate staging; stacked on published #63; not merged |
-| C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | Pending transfer |
+| C01 | `0f79d16c0456d83e707e6652e8bd4e3774683eea` | feat(fleet): stage exact project candidates outside capture history | [Mesh PR #64](https://github.com/idosams/Mesh/pull/64), `7d2afb61254ef46c691f760ff66a6ed0d52f7ad4`; exact external candidate staging; stacked on #63; not merged |
+| C02 | `27b5efc316a84a896189cb85952fa468c5e5b57c` | feat(fleet): review candidates against fixed project main | This increment, C02a; whole-project review against fixed main; stacked on published #64; not merged |
 | C02 | `2263d5db328d3aab957218642c61e3e3b94d6047` | feat(desktop): expose fixed fleet project candidate reviews | Pending transfer |
 | C02 | `c53e4fdc3494eb0037fa43326d2a56e4c7c3a77b` | feat(desktop): pin project comparisons with durable preparation inputs | Pending transfer |
 | C03 | `3aef42a9373ff0ebb84fd482819d39536b022ab2` | feat(history): prepare operations against exact saved ancestry | Pending transfer |
@@ -1045,3 +1045,37 @@ No native local, packaged, approval or merged-delivery claim follows.
 Fixed-main project review, UI, private dependency validation, human approval and grouped integration,
 remaining recovery/acceptance phases, required human reviews, eventual merges and final combined-main
 testing remain part of the goal. Original work and active verification remain preserved.
+
+## C02a whole-project candidate review against fixed main
+
+Preserved source `27b5efc316a84a896189cb85952fa468c5e5b57c` transfers onto published #64 at
+`7d2afb61254ef46c691f760ff66a6ed0d52f7ad4`. The native review compares the complete staged
+project snapshot against its recorded, verified main head (or empty genesis). The base does not follow
+later main advancement or newer private captures. Current main and base freshness are separate facts.
+An explicit new staging request against a new main produces a different review identity.
+
+The v1 candidate-review projection and context bind candidate receipt digest, project, fixed base,
+target version, complete content digest and scope. Pages share one review identity; paths are ordered,
+200 per page, with selected text limited to 256 KiB per side. Oversized, binary and unsafe text remains
+metadata-only. Exact candidate content and retained history are checked before and after inspection.
+Traversal, invalid cursors, simultaneous page/file selection, untrusted main and substituted content
+refuse. A derived content-review identity is not a signable original-project review bundle and grants
+no approval authority. Existing persisted schemas are unchanged.
+
+Transferred native tests cover whole-project genesis, fixed verified base after main advancement,
+explicit new preparation, trust refusal, restart, candidate corruption, stable pagination, saved bytes
+versus live edits, unsafe text and refusal to approve the content-review digest. Added canonical
+boundary coverage includes exactly 256 KiB of valid text and invalid UTF-8, retaining the over-limit
+and hidden-direction refusal cases and verifying all 209 changes remain paged. Prior candidate
+provenance/mode refusal assertions and lineage/decision corrections remain intact.
+
+Local repository (7 tests), docs (106 documents), license/self-test, storage/self-test, formatting and
+whitespace checks pass. Native/failing-before/full local execution remains pending behind the
+preserved #44 full run. Hosted tests must validate this exact revision; no packaged or graphical
+claim is made. #62 and #63 have six passing checks with macOS pending; #64 has five passing checks
+with native jobs running. All migration PRs remain unmerged.
+
+Desktop review controls and durable preparation pins are next. Exact human approval, original-main
+integration and remaining recovery/provider/four-worker/remote/packaged acceptance, required reviews,
+eventual merges and final combined-main verification remain in scope. Original work and running
+verification are preserved.
