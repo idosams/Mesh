@@ -292,12 +292,13 @@ impl RetainedReplacement {
         self.apply_with_hooks(|| {}, || {}, File::sync_all)
     }
 
-    fn apply_with_hooks(
-        self,
-        before: impl FnOnce(),
-        after: impl FnOnce(),
-        sync: impl Fn(&File) -> io::Result<()>,
-    ) -> io::Result<bool> {
+    /// Recheck all source, stage and metadata evidence before a group starts its first exchange.
+    /// This reserves nothing; apply repeats the same check at each individual exchange boundary.
+    pub(crate) fn validate(&self) -> io::Result<()> {
+        self.validated_target().map(|_| ())
+    }
+
+    fn validated_target(&self) -> io::Result<(File, std::ffi::OsString)> {
         let (path, directory, name, metadata, identity, bytes) =
             read_confined_regular_file_in_layout_bounded(
                 &self.target.root,
@@ -329,6 +330,18 @@ impl RetainedReplacement {
         {
             return Err(io::Error::other("file metadata changed since preparation"));
         }
+        Ok((directory, name))
+    }
+
+    fn apply_with_hooks(
+        self,
+        before: impl FnOnce(),
+        after: impl FnOnce(),
+        sync: impl Fn(&File) -> io::Result<()>,
+    ) -> io::Result<bool> {
+        let (directory, name) = self.validated_target()?;
+        let recovery = self.recovery.try_clone_directory()?;
+        let exchange = std::ffi::OsStr::new(EXCHANGE);
         before();
         atomic_exchange_at(&recovery, exchange, &directory, &name)?;
         after();

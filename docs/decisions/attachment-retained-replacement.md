@@ -236,3 +236,56 @@ link, permission-only and malformed values refuse. Permission changes in an obse
 do not grant mutation authority: preparation/application still revalidate identities, metadata and
 supported modes. A real temporary file's metadata fails the older parser and passes the correction.
 The native receipt/observation format itself is unchanged.
+
+## Accepted-review replacement groups
+
+The native `prepare_main_integration` operation now selects all changed paths in one accepted review.
+This executor supports regular-file replacements only. An addition, removal, directory change,
+conflict, exclusion, unavailable member or group budget overflow refuses the complete group. It never
+silently reduces the accepted result to a supported subset. Up to 64 changed files and the configured
+aggregate byte budget are admitted. Already-present accepted files are recorded and not rewritten;
+unrelated current work is preserved. Add/remove/directory executors and desktop group confirmation
+remain unfinished, so this does not complete general integration.
+
+Preparation first derives a complete plan from trusted accepted history and a fresh bounded source
+capture, then stages each replacement under one private `integration-group-<32 lowercase hex>`
+directory on the source filesystem. Each member retains its existing single-file preparation receipt.
+A create-new `group-prepared.json` (`mesh.attachment-integration-group/v1`) binds project/attachment,
+accepted head/bundle/target, exclusion fingerprint, group directory identity, ordered member paths,
+transaction identities and proposal digests, plus already-present paths. It explicitly records
+`automatic_replay:false` and `filesystem_atomic:false`. No source write occurs during preparation.
+
+The single-use native group exposes every frozen member's complete before/after bytes for a future
+native confirmation. Apply holds the verified history lock, validates the group and every member
+before the first exchange, then revalidates each member at its own boundary. Before each attempt it
+writes `attempt-NNNN.json` (`mesh.attachment-integration-group-attempt/v1`) binding group digest,
+index and member transaction. A failed attempt receipt prevents that exchange. Any failed or uncertain
+member stops the group; subsequent members remain staged and unattempted. Prior exchanges are never
+rolled back automatically. Late writes to displaced inodes remain retained.
+
+`group-observed.json` (`mesh.attachment-integration-group-result/v1`) records ordered member outcomes
+and a final non-atomic observation. A fresh full-plan check must find all accepted changes present
+before reporting `applied-observed`; otherwise the result is `reconciliation-required`. An absent
+outcome or lost acknowledgment never authorizes retry. All outcomes state `observation_final:false`.
+These new external group records leave existing file receipts, history journals and approval formats
+unchanged. Older readers cannot process group directories and must not replay them.
+
+`inspect_main_integration_group` accepts a native-configured recovery root and exact group identity.
+It validates the closed group format, attachment/directory identities, member proposal digests and
+trusted approval evidence. It rederives full accepted-review path coverage, then reads each member
+through the existing native recovery inspector with a shared content budget. Current observations
+are explicitly non-atomic, confer no write authority and never replay operations. Already-present
+paths are labeled as preparation evidence. Copied, missing, tampered or incomplete groups refuse.
+
+Native tests cover whole-group preflight, retained late editor writes, already-present inode
+preservation, refusal of mixed unsupported changes before staging, restart inspection and altered
+membership. A deterministic mid-apply test changes the second of three files after the first exchange:
+apply stops, retains the completed member and every stage, preserves the new user content and leaves
+the final member untouched. Restart inspection does not replay the partial group. Desktop confirmation,
+add/remove/directory support and packaged graphical proof remain required for the full journey.
+
+
+The original source commit reports 3,252 Rust tests (14 skipped) and 666 desktop tests. Those
+historical results do not validate this canonical transfer; native execution remains queued. Current
+preparation and member validation repeat bounded project captures; reuse of verified captures and
+large-project timing remain performance work before making group-latency claims.

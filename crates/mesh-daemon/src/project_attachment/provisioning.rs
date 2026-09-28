@@ -381,6 +381,45 @@ impl ProvisionedAttachment {
         )
     }
 
+    /// Prepare every changed path in the accepted review as one native confirmation group.
+    /// Unsupported entry kinds or any diverged member refuse the entire proposal before source writes.
+    pub fn prepare_main_integration(
+        &self,
+        bundle: &str,
+        target: &str,
+        recovery_root: &Path,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<super::PreparedMainIntegration> {
+        super::group_integration::prepare(
+            self.clone(),
+            self.store.clone(),
+            bundle,
+            target,
+            recovery_root,
+            trusted,
+            limits,
+        )
+    }
+
+    /// Inspect one exact retained integration group without retrying any source write.
+    pub fn inspect_main_integration_group(
+        &self,
+        recovery_root: &Path,
+        group: &str,
+        trusted: &crate::TrustedReviewers,
+        limits: super::ObservationLimits,
+    ) -> io::Result<Json> {
+        super::group_integration::inspect(
+            self,
+            self.store.clone(),
+            recovery_root,
+            group,
+            trusted,
+            limits,
+        )
+    }
+
     /// Native host default for file recovery, inside this exact external metadata store.
     /// Inspection passes `false` and never provisions a missing directory. No renderer may
     /// select this path. External-volume hosts can still configure a separate recovery root.

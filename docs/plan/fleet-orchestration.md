@@ -669,3 +669,10 @@ reconstruction must prove exact equality before creating the separate inspection
 starting-version comparison retains actual deleted content; importing into the original project
 creates a separate review against verified project main. Inspection identities never authorize
 approval or publication. Current canonical runtime and packaged verification remain required.
+
+Native accepted-review grouping now stages and preflights every regular-file replacement, preserves
+already-present and unrelated source work, records each attempt and retains partial outcomes without
+automatic rollback. Recovery inspection rederives full review membership and verifies each retained
+member. Unsupported additions/removals/directory changes refuse the entire group before source writes.
+This is the replacement executor foundation; the other entry executors, complete native desktop
+confirmation, grouped recovery UI and packaged proof remain required.

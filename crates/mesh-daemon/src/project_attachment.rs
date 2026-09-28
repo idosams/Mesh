@@ -40,9 +40,11 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod group_integration;
 mod history;
 mod inspection;
 mod integration;
+pub use group_integration::PreparedMainIntegration;
 mod lanes;
 mod recovery;
 mod restoration;

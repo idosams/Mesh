@@ -218,7 +218,7 @@ pub(super) fn validate_receipt(
     }
     Ok(())
 }
-fn verify_history(
+pub(super) fn verify_history(
     value: &Json,
     workspace: &OpenWorkspace,
     trusted: &TrustedReviewers,

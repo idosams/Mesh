@@ -268,67 +268,86 @@ impl PreparedMainFileIntegration {
     /// Errors and lost replies require inspecting retained recovery material; never blindly retry.
     /// A successful observation is not a promise that ordinary tools stopped writing afterward.
     pub fn apply(self, trusted: &TrustedReviewers) -> io::Result<Json> {
-        self.history.project().with_review_history(
-            self.history.metadata_path(),
-            self.store,
+        let history = self.history.clone();
+        history.project().with_review_history(
+            history.metadata_path(),
+            self.store.clone(),
             trusted,
             |workspace, store| {
-                let current = workspace
-                    .accepted_main_review()
-                    .map_err(error)?
-                    .ok_or_else(|| invalid("accepted review unavailable"))?;
-                if current.bundle.to_string() != self.bundle
-                    || current.subject_operation.to_string() != self.target
-                    || super::approval::main_head(workspace)?
-                        .map(|head| head.to_string())
-                        .as_deref()
-                        != Some(&self.head)
-                {
-                    return Err(invalid("Mesh main changed since preparation"));
-                }
-                let capture = self.history.project().capture_inputs(self.limits)?;
-                self.history
-                    .project()
-                    .history_configuration(store, Some(capture.exclusion_digest()))?;
-                if capture.exclusion_digest().to_string() != self.exclusions {
-                    return Err(invalid("exclusions changed since preparation"));
-                }
-                self.recovery.ensure_namespace_identity()?;
-                let mut receipt = String::new();
-                self.recovery
-                    .filesystem()
-                    .read_file(Path::new("prepared.json"))?
-                    .take(65_537)
-                    .read_to_string(&mut receipt)?;
-                if receipt != self.receipt.encode() {
-                    return Err(invalid("prepared receipt changed"));
-                }
-                let applied = self.replacement.apply()?;
-                let result = Json::object([
-                    (
-                        "schema",
-                        Json::text("mesh.attachment-file-integration-result/v1"),
-                    ),
-                    ("proposal_digest", Json::text(digest(receipt.as_bytes()))),
-                    (
-                        "status",
-                        Json::text(if applied {
-                            "applied-observed"
-                        } else {
-                            "reconciliation-required"
-                        }),
-                    ),
-                    ("displaced_file_retained", Json::Bool(true)),
-                    ("observation_final", Json::Bool(false)),
-                ]);
-                // Failure here means uncertain acknowledgement, not that the exchange was undone.
-                self.recovery.filesystem().write_new_file(
-                    Path::new("observed.json"),
-                    result.encode().as_bytes(),
-                    fs::Permissions::from_mode(0o600),
-                )?;
-                Ok(result)
+                self.validate(workspace, store)?;
+                self.apply_validated()
             },
         )
+    }
+
+    pub(super) fn validate(
+        &self,
+        workspace: &OpenWorkspace,
+        store: &PinnedWorkspaceRoot,
+    ) -> io::Result<()> {
+        let current = workspace
+            .accepted_main_review()
+            .map_err(error)?
+            .ok_or_else(|| invalid("accepted review unavailable"))?;
+        if current.bundle.to_string() != self.bundle
+            || current.subject_operation.to_string() != self.target
+            || super::approval::main_head(workspace)?
+                .map(|head| head.to_string())
+                .as_deref()
+                != Some(&self.head)
+        {
+            return Err(invalid("Mesh main changed since preparation"));
+        }
+        let capture = self.history.project().capture_inputs(self.limits)?;
+        self.history
+            .project()
+            .history_configuration(store, Some(capture.exclusion_digest()))?;
+        if capture.exclusion_digest().to_string() != self.exclusions {
+            return Err(invalid("exclusions changed since preparation"));
+        }
+        self.recovery.ensure_namespace_identity()?;
+        let mut receipt = String::new();
+        self.recovery
+            .filesystem()
+            .read_file(Path::new("prepared.json"))?
+            .take(65_537)
+            .read_to_string(&mut receipt)?;
+        if receipt != self.receipt.encode() {
+            return Err(invalid("prepared receipt changed"));
+        }
+        self.replacement.validate()
+    }
+
+    /// The caller holds verified project history and has validated the proposal. The retained
+    /// exchange still rechecks source/stage evidence; this never skips filesystem race protection.
+    pub(super) fn apply_validated(self) -> io::Result<Json> {
+        let applied = self.replacement.apply()?;
+        let result = Json::object([
+            (
+                "schema",
+                Json::text("mesh.attachment-file-integration-result/v1"),
+            ),
+            (
+                "proposal_digest",
+                Json::text(digest(self.receipt.encode().as_bytes())),
+            ),
+            (
+                "status",
+                Json::text(if applied {
+                    "applied-observed"
+                } else {
+                    "reconciliation-required"
+                }),
+            ),
+            ("displaced_file_retained", Json::Bool(true)),
+            ("observation_final", Json::Bool(false)),
+        ]);
+        // Failure here means uncertain acknowledgement, not that the exchange was undone.
+        self.recovery.filesystem().write_new_file(
+            Path::new("observed.json"),
+            result.encode().as_bytes(),
+            fs::Permissions::from_mode(0o600),
+        )?;
+        Ok(result)
     }
 }

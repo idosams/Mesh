@@ -544,3 +544,10 @@ proves no changes against lane main. They remain inspectable against their origi
 be imported as actual source-project deletions. Ordinary approval contexts reject these inspection
 identities. Transferred tests cover later edits, retained-history reopen, source preservation and
 approval refusal; canonical native and packaged execution remains pending.
+
+Native integration can now prepare a complete accepted-review group of regular-file replacements.
+All members are preflighted before writing; changed or uncertain members stop further work, and each
+attempt retains recovery evidence. Already-present files are not rewritten. A read-only group inspector
+verifies complete accepted-review membership and individual retained transactions. Additions, deletions
+and directory changes refuse the whole group; their executors, desktop group confirmation/recovery
+and packaged graphical proof remain unfinished.

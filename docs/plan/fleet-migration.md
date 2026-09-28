@@ -1442,3 +1442,22 @@ verification of any canonical replacement commit. Current packaged and graphical
 Canonical native focused/failing-before/full execution remains queued behind preserved local runs.
 This source accounting does not complete directory deletion, cancellation recovery, grouped integration,
 restoration, provider/remote acceptance or final combined-main verification.
+
+## I01a native accepted-review replacement groups
+
+Transfers source `496debf33e758b05985c493a7ecb30a230fdcd42` onto canonical PR #80
+at `4e3daa214e7ccb63dac64622f34e571d53491ec5`. The native group stages all supported replacements
+for an exact accepted review, preserving already-present files and unrelated user work. Every member
+is validated before the first exchange and again at its individual boundary. Attempt/outcome records
+retain partial results without rollback or replay, and read-only inspection rederives full accepted
+membership and verified per-file evidence. Up to 64 changed files and the aggregate byte budget apply.
+Unsupported additions/removals/directories refuse the whole proposal; subsequent entry executors and
+desktop confirmation/recovery remain required for the complete integration objective.
+
+Canonical conflict resolution retains localized recovery adaptations, full-mode validation correction
+and current proof limitations. Existing single-file receipt/journal/approval formats remain unchanged;
+new external group records are versioned, identity-bound and non-atomic. Older readers must not replay
+them. Transferred tests cover complete preflight, partial interruption after the first exchange,
+concurrent editor changes, preserved stages, already-present inode preservation and restart inspection.
+Local native/failing-before/full validation is queued behind preserved runs. The source's historical
+3,252 Rust/666 desktop result is not validation of this canonical replacement.

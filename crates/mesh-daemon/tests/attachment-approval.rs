@@ -1498,3 +1498,159 @@ fn native_file_recovery_allocation_is_external_private_and_never_follows_replace
     assert!(f.history.file_recovery_root(true).is_err());
     assert!(!metadata.join("file-recovery").exists());
 }
+
+#[test]
+fn integration_group_preflights_all_members_and_preserves_editor_handles_and_restart_evidence() {
+    use std::io::Write as _;
+    let f = Fixture::new("group-replacement");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("other.txt"), "other base").unwrap();
+    let first = f.save("work base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::write(f.source.join("other.txt"), "other accepted").unwrap();
+    let second = f.save("work accepted");
+    let bundle = accept(&f, &signer, &trust, &second, 2);
+    fs::write(f.source.join("other.txt"), "other base").unwrap();
+    fs::write(f.source.join("work.txt"), "work base").unwrap();
+    let root = recovery_root(&f);
+    let failed = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &second,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    fs::write(f.source.join("work.txt"), "later work").unwrap();
+    assert!(failed.apply(&trust).is_err());
+    assert_eq!(fs::read(f.source.join("other.txt")).unwrap(), b"other base");
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"later work");
+    fs::write(f.source.join("work.txt"), "work base").unwrap();
+    let mut editor = fs::OpenOptions::new()
+        .append(true)
+        .open(f.source.join("other.txt"))
+        .unwrap();
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &second,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(prepared.files().count(), 2);
+    let retained = prepared
+        .files()
+        .find(|file| file.proposal().get("path") == Some(&Json::text("other.txt")))
+        .unwrap()
+        .recovery_path()
+        .join("exchange");
+    let group = prepared
+        .recovery_path()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let journal = f.journal();
+    let result = prepared.apply(&trust).unwrap();
+    assert_eq!(result.get("status"), Some(&Json::text("applied-observed")));
+    assert_eq!(
+        fs::read(f.source.join("other.txt")).unwrap(),
+        b"other accepted"
+    );
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"work accepted"
+    );
+    editor.write_all(b" later descriptor edit").unwrap();
+    editor.sync_all().unwrap();
+    assert_eq!(
+        fs::read(retained).unwrap(),
+        b"other base later descriptor edit"
+    );
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    let inspected = reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .unwrap();
+    assert_eq!(
+        inspected.get("members").unwrap().as_array().unwrap().len(),
+        2
+    );
+    assert_eq!(inspected.get("automatic_replay"), Some(&Json::Bool(false)));
+    assert_eq!(inspected.get("write_authority"), Some(&Json::Bool(false)));
+    assert_eq!(f.journal(), journal);
+    // Altering membership cannot turn a partial list into evidence for the accepted review.
+    let receipt_path = root.join(&group).join("group-prepared.json");
+    let original = fs::read_to_string(&receipt_path).unwrap();
+    let proposal = Json::parse(&original).unwrap();
+    let one = proposal.get("members").unwrap().as_array().unwrap()[0].clone();
+    fs::write(
+        &receipt_path,
+        replace_json(&proposal, "members", Json::Array(vec![one])).encode(),
+    )
+    .unwrap();
+    assert!(reopened
+        .inspect_main_integration_group(&root, &group, &trust, ObservationLimits::default())
+        .is_err());
+}
+
+#[test]
+fn integration_group_does_not_rewrite_already_present_files_or_skip_unsupported_changes() {
+    use std::os::unix::fs::MetadataExt as _;
+    let f = Fixture::new("group-coverage");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    fs::write(f.source.join("other.txt"), "base").unwrap();
+    let first = f.save("base");
+    accept(&f, &signer, &trust, &first, 1);
+    fs::write(f.source.join("other.txt"), "accepted").unwrap();
+    let second = f.save("accepted");
+    let bundle = accept(&f, &signer, &trust, &second, 2);
+    fs::write(f.source.join("work.txt"), "base").unwrap();
+    let inode = fs::metadata(f.source.join("other.txt")).unwrap().ino();
+    let root = recovery_root(&f);
+    let prepared = f
+        .history
+        .prepare_main_integration(
+            &bundle,
+            &second,
+            &root,
+            &trust,
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(prepared.files().count(), 1);
+    assert_eq!(
+        prepared.proposal().get("already_present"),
+        Some(&Json::Array(vec![Json::text("other.txt")]))
+    );
+    prepared.apply(&trust).unwrap();
+    assert_eq!(
+        fs::metadata(f.source.join("other.txt")).unwrap().ino(),
+        inode
+    );
+    fs::write(f.source.join("new.txt"), "new accepted").unwrap();
+    let third = f.save("third");
+    let third_bundle = accept(&f, &signer, &trust, &third, 3);
+    fs::write(f.source.join("work.txt"), "accepted").unwrap();
+    fs::remove_file(f.source.join("new.txt")).unwrap();
+    let count = fs::read_dir(&root).unwrap().count();
+    assert!(f
+        .history
+        .prepare_main_integration(
+            &third_bundle,
+            &third,
+            &root,
+            &trust,
+            ObservationLimits::default()
+        )
+        .is_err());
+    assert_eq!(fs::read_dir(root).unwrap().count(), count);
+    assert_eq!(fs::read(f.source.join("work.txt")).unwrap(), b"accepted");
+}
