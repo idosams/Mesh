@@ -1323,3 +1323,19 @@ the actual check passed. Full local renderer/native verification remains queued 
 runs; hosted and graphical keyboard-focus evidence are still required. This increment grants no
 approval authority and does not complete the remaining recovery/integration/restoration or full
 provider, remote, packaged and final-main acceptance obligations.
+
+## C04c durable exact pending review inputs
+
+Transfers source `0ccc58c78b0278b4a8e84cc9de7fdaa073563ccc` onto canonical PR #74
+at `cd804ad3708b1056ae29e84019575dfe4e6b42bb`. A separate native outbox retains at most eight
+exact change-request or decision inputs, independently of open panels. Compare-and-swap revisions
+reject stale writers; retained operation tokens cannot silently change their inputs. Private bounded
+identity-bound records preserve incomplete staging and refuse aliases or catalog substitution.
+Loading does not submit operations, adopt workers or grant approval. The new optional v1 format
+leaves existing pin and journal formats unchanged; desktop save-before-dispatch wiring follows.
+
+Canonical adaptation preserves earlier validation limitations and adds a regression for eight-entry
+capacity, nonprivate/oversized records, unchanged refusal evidence and restoration of acknowledged
+inputs. Focused native/mutation/full execution is queued behind preserved local verification;
+no native or graphical completion is claimed. This increment replaces only the listed source commit,
+not the remaining desktop recovery, deletion, integration, restoration or full acceptance obligations.

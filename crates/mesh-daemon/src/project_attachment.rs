@@ -19,6 +19,8 @@ const MAX_RECEIPT_BYTES: u64 = 65_536;
 
 mod detachment;
 mod fleet_pins;
+mod review_outbox;
+pub use review_outbox::FleetReviewOutbox;
 mod pins;
 pub use fleet_pins::{FleetCandidatePin, FleetPin, FleetPinState};
 pub use pins::{AttachmentPin, AttachmentPinState};

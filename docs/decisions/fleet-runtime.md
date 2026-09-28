@@ -774,3 +774,22 @@ fixed review after verified main advancement and no worker adoption. Coordinator
 tests cover explicit mutation, read-only restoration, exact lost-response retry, independent panels,
 late replies, incomplete reviews and substituted identities. These transferred tests require execution on this canonical increment; packaged import invocation
 and graphical approval are not established by source tests.
+
+### Pending review operation storage
+
+Pending change requests and decisions need identities that survive a lost response and a closed
+review panel. A separate native `fleet-review-outbox.json` stores at most eight exact inputs, bounded
+to 128 KiB, outside project files. It uses a compare-and-swap revision, a private identity-bound
+record and durable staging/rename. A retained operation token cannot change its inputs. Reads never
+submit requests, approve work or recover worker ownership. Decisions retain the expected decision
+revision and exact proposed checkpoint/version/bundle; reopening requests retain a null target.
+Messages are bounded to the same 8 KiB input limit as change requests. No keys or review contents
+are stored here.
+
+This is a new optional format (`mesh.bound-fleet-review-outbox/v1`, containing
+`mesh.fleet-review-outbox/v1`), independent of existing pin formats. Older binaries do not consume
+it; existing pins and journals are unchanged. Unknown fields, malformed inputs, aliases, foreign
+catalog identity and stale writers refuse. An incomplete first write refuses instead of inventing
+an empty outbox; an incomplete replacement leaves the previous committed snapshot readable and
+blocks another write. Evidence is retained for explicit reconciliation. Desktop commands and
+save-before-dispatch wiring are still required before UI request recovery is available.

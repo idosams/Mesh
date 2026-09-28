@@ -510,3 +510,12 @@ inspection must verify project, bundle and target before selection and keyboard 
 queue pagination is not required. Navigation waits for an ongoing attachment refresh and performs
 no save, review creation, approval or integration. Coordinator and render coverage exercise this
 connection; graphical focus and the complete approval journey still require live app verification.
+
+Native pending review storage now preserves up to eight exact change/decision inputs independently
+of open review panels, with identity-bound private records, compare-and-swap writes and immutable
+inputs per retained operation token. Reading this outbox does not submit work. This is a storage
+foundation: desktop commands, save-before-dispatch and restart recovery UI remain unfinished.
+
+The transferred pending-review storage tests require execution on the canonical branch. The local
+full gate is still live on the earlier compiler increment; no native or packaged completion is
+claimed for this new storage increment.
