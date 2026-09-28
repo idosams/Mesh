@@ -13,7 +13,14 @@ pub mod host;
 #[cfg(unix)]
 mod received_host;
 #[cfg(unix)]
+mod receiving_session;
+#[cfg(unix)]
 pub use received_host::ReceivedWorkerHost;
+#[cfg(unix)]
+pub use receiving_session::{
+    RemoteReceivingAccess, RemoteReceivingConnection, RemoteReceivingProgress,
+    RemoteReceivingSession,
+};
 #[cfg(unix)]
 pub(crate) mod project_import;
 #[cfg(unix)]

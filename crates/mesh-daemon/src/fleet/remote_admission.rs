@@ -333,6 +333,6 @@ fn admission_json(
 }
 
 #[cfg(unix)]
-mod authentication;
+pub(in crate::fleet) mod authentication;
 #[cfg(unix)]
 pub use authentication::{RemoteAdmissionChallenge, RemoteAdmissionProof};

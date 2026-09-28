@@ -6,15 +6,15 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 const ALLOCATION: &str = "0123456789abcdef0123456789abcdef";
 static NEXT: AtomicU64 = AtomicU64::new(0);
-struct Fixture {
-    path: PathBuf,
-    coordinator: SigningKey,
-    worker: SigningKey,
-    work: RemoteWork,
+pub(in crate::fleet) struct Fixture {
+    pub(in crate::fleet) path: PathBuf,
+    pub(in crate::fleet) coordinator: SigningKey,
+    pub(in crate::fleet) worker: SigningKey,
+    pub(in crate::fleet) work: RemoteWork,
     now: u64,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(in crate::fleet) fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
             "mesh-admission-auth-{}-{}",
             std::process::id(),
@@ -46,7 +46,7 @@ impl Fixture {
             now,
         }
     }
-    fn registry(&self) -> RemoteAdmissionRegistry {
+    pub(in crate::fleet) fn registry(&self) -> RemoteAdmissionRegistry {
         RemoteAdmissionRegistry::new(
             FleetStore::open(self.path.join("worker.sqlite")).unwrap(),
             &key(&public(&self.coordinator)),
@@ -56,7 +56,7 @@ impl Fixture {
         )
         .unwrap()
     }
-    fn runtime(&self, claimed: bool) -> Runtime {
+    pub(in crate::fleet) fn runtime(&self, claimed: bool) -> Runtime {
         let mut runtime = Runtime::open(
             FleetStore::open(self.path.join("coordinator.sqlite")).unwrap(),
             "objective",

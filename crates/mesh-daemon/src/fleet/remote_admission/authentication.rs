@@ -195,19 +195,52 @@ impl RemoteAdmissionChallenge {
     }
 
     fn verify_at(
-        mut self,
+        self,
         signature: &Signature,
         now: u64,
     ) -> Result<(RemoteAdmissionRegistry, RemoteAdmissionOutcome), Error> {
-        self.proof.fresh(now)?;
-        Ed25519::verify(
-            &self.coordinator,
-            self.proof.payload().as_bytes(),
-            signature,
-        )
-        .map_err(|_| Error::Refused("remote-admission-proof-signature"))?;
-        let outcome = self.registry.reserve(self.work, &self.allocation, now)?;
-        Ok((self.registry, outcome))
+        let (registry, outcome) = self.verify_retaining_at(signature, Ok(now));
+        Ok((registry, outcome?))
+    }
+
+    // Native supervisor recovery of ledger ownership, never authentication or a reservation.
+    pub(in crate::fleet) fn abandon(self) -> RemoteAdmissionRegistry {
+        self.registry
+    }
+
+    pub(in crate::fleet) fn verify_retaining(
+        self,
+        signature: &Signature,
+    ) -> (
+        RemoteAdmissionRegistry,
+        Result<RemoteAdmissionOutcome, Error>,
+    ) {
+        self.verify_retaining_at(signature, now_ms())
+    }
+
+    fn verify_retaining_at(
+        self,
+        signature: &Signature,
+        now: Result<u64, Error>,
+    ) -> (
+        RemoteAdmissionRegistry,
+        Result<RemoteAdmissionOutcome, Error>,
+    ) {
+        let Self {
+            mut registry,
+            work,
+            allocation,
+            proof,
+            coordinator,
+        } = self;
+        let outcome = (|| {
+            let now = now?;
+            proof.fresh(now)?;
+            Ed25519::verify(&coordinator, proof.payload().as_bytes(), signature)
+                .map_err(|_| Error::Refused("remote-admission-proof-signature"))?;
+            registry.reserve(work, &allocation, now)
+        })();
+        (registry, outcome)
     }
 }
 
@@ -283,4 +316,4 @@ fn now_ms() -> Result<u64, Error> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;

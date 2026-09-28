@@ -2545,3 +2545,40 @@ storage, resumes from the confirmed offset and verifies complete content. Valida
 This framing is not a deployed broker, SSH transport, authenticated state machine or second-machine
 proof. Supervisor entry point, admission/transfer routing, key provisioning, bounded diagnostics,
 deadlines, result/reconnect protocol and actual remote acceptance remain required.
+
+
+### R17 delivered evidence
+
+[#135](https://github.com/idosams/Mesh/pull/135) merged at
+`90eed19f0cc535362d1d47060a193ffc35c349f0` after all seven exact-head checks passed.
+Linux passed 3,209 tests; macOS passed 3,463 plus four renderer tests and the real daemon demo.
+All nine focused local framing/CAS tests passed. Prior #134 combined-main run 36491586154 also
+passed. Local aggregate verification remains queued behind preserved earlier runs, not a claimed pass.
+
+## R18 supervisor-owned receiving session
+
+New canonical implementation on merged #135; no preserved source commits are replaced.
+The native supervisor retains a fixed assignment, guarded registry, original input reservation and
+pinned receiving store. Each broker connection exclusively borrows that session and issues a fresh
+coordinator proof. Dropping an unverified challenge restores only native ledger ownership. A failed
+signature grants nothing and does not destroy retained transfer state. No nonce or authentication
+survives connection drop.
+
+Successful reconnect authentication returns retained admission facts while the same supervisor
+continues owning its original reservation. A new supervisor opened from a saved receipt has facts
+only and cannot receive/materialize another allocation. Manifest and chunk frames flow through
+existing native input admission and CAS verification. Unexpected control frames, changed manifests
+and invalid sequencing refuse; a receive failure makes that connection unusable. Native lease,
+ledger and destination facts are checked before work and before acknowledging it.
+
+A complete transfer consumes the reservation into a native allocation and returns the same registry
+for independent workspace initialization and launch-intent composition. The receiving lock is released
+only after successful handoff. Once materialization consumes the reservation, failure preserves work
+and ends that session; missing content before consumption remains recoverable. No persisted schema,
+provider launch, generic command dispatcher or peer-selected path is added.
+
+Regressions cover fresh proof after disconnect, retained partial offsets and native receiving ownership,
+exact workspace/launch-intent handoff, abandoned and invalid proofs, receipt-only restart refusal,
+unexpected frames, conflicting allocation preservation, replaced storage and lease refusal. Validation
+is in progress. Resident-worker deployment, bounded control-schema routing, SSH/key provisioning,
+signed results, saved-history recovery and actual second-machine acceptance remain required.

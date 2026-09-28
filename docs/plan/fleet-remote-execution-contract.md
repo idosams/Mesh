@@ -360,3 +360,32 @@ No frame, flush, clean EOF or reconnection establishes durable receipt, successf
 capacity or permission to replay a launch. Reconnect must consult existing durable facts. The local
 stream/CAS disconnect regression proves framing and saved-offset composition, not SSH, a resident
 worker endpoint, mutual authentication or actual second-machine operation.
+
+
+## Supervisor-owned receiving session
+
+`RemoteReceivingSession` belongs to the native supervisor, not its broker connection. It retains the
+fixed native work/configuration, the guarded shared registry, original reservation and receiving-store
+lock. `connect` lends exclusive access and creates a fresh coordinator proof. Dropping that connection
+consumes its nonce and authentication but keeps partial transfer state. The native owner must retain
+the session independently of socket/stdio lifetime. Failure to create a challenge ends the session
+without replacing its ledger or reconstructing a grant; existing work remains for reconciliation.
+
+The connection accepts a typed signature through the existing coordinator-proof verifier. Abandoning
+or failing a challenge restores only native registry ownership. A fresh valid proof for an already
+admitted assignment returns retained facts; the original supervisor may continue because it still
+owns its original reservation. After supervisor restart a receipt alone yields `Retained` access and
+cannot create another receiver or allocation. This is not automatic process or reservation adoption.
+
+Authenticated manifest/chunk frames pass through existing canonical manifest, assignment, pinned-store
+and CAS checks. A repeated exact manifest keeps the same receiver and offsets. Unexpected control
+frames cannot execute commands. Receive refusal invalidates that connection. Status requires fresh
+authentication, and both data acknowledgments and status recheck native lease/ledger/destination facts.
+The embedding broker must also drop the connection guard on framing failure, EOF or disconnect.
+
+After complete verification, materialization consumes the original reservation. A successful handoff
+returns the allocation and same guarded registry for native workspace initialization and launch intent,
+then releases receiving exclusion. Once consumed, failure ends the session and preserves partial work.
+A missing/incomplete input detected before consumption can continue receiving. These native APIs open
+no endpoint and launch no provider. Control-schema dispatch, deployed supervisor/broker lifecycle,
+SSH admission, renewed/expired-lease status recovery, signed results and actual remote proof remain open.
