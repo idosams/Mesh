@@ -354,7 +354,7 @@ fn workspace_root_matches_the_published_schema_and_vector() {
     assert_eq!(hex, vector.field("canonical_encoding_hex").as_str());
     assert_eq!(
         vector.field("input").field("root_id").as_str(),
-        "1717171717171717171717171717171717"
+        "17".repeat(16)
     );
     assert_eq!(decode_operation(&encoded).unwrap(), operation);
     let fields = schema.field("schema").field("fields").as_array();
