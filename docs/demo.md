@@ -17,6 +17,9 @@ node examples/local-daemon-demo.mjs
 
 The first run builds the required Rust binaries and can therefore download missing Cargo packages.
 The script finds rustup's usual `$HOME/.cargo/bin/cargo` location; set `CARGO` to override it.
+It also honors `CARGO_TARGET_DIR` for both building and locating the debug binaries. A relative
+override is resolved from the repository root, matching Cargo's working directory. Use the same
+override when building separately and running with `--skip-build`.
 
 A passing default run prints `PASS — 44 checks, all green`. The executable checks this count
 against both quickstart documents before it starts, so the public promise cannot silently drift as

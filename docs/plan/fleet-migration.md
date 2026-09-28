@@ -2305,3 +2305,17 @@ artifacts. This is focused native evidence, not a full local Cargo gate; complet
 No existing fleet event schema or dependency changes. The additive admission record refuses unknown
 formats. Shared native ledger provisioning, terminal reconciliation/retry, worker history binding,
 launch ownership, authenticated transport and actual second-machine execution remain required.
+
+## V01 shared-target verification path correction
+
+New verification increment based on published #125 at
+`c43a4576e065019d45a09c2d758609e26e9aceb2`; no preserved source commits are replaced.
+The completed full local #116 run exposed the demo building into `CARGO_TARGET_DIR` but looking for
+binaries under the checkout's default target. The demo now uses the same environment override for
+lookup. Two actual CLI regressions cover absolute and repository-relative targets from another
+invocation directory; both fail against the original script and pass after the fix. They run in the
+existing demo gate. The real 44-check demo passed using the retained #116 binaries through the
+corrected script. This validates the script correction, not the newer Rust implementation; full
+exact-head hosted rebuild/checks remain pending. The original full-run log remains retained: 3,384
+native tests passed, two native watcher startup tests failed (issue #37), 16 skipped, and desktop
+checks passed. This correction does not resolve those native watcher failures.

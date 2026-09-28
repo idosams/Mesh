@@ -28,9 +28,12 @@ const EXPECTED_DEFAULT_CHECKS = 44;
 const executable = process.platform === "win32" ? ".exe" : "";
 const rustupCargo = join(homedir(), ".cargo", "bin", `cargo${executable}`);
 const cargo = process.env.CARGO ?? (existsSync(rustupCargo) ? rustupCargo : "cargo");
-const meshd = join(repo, "target", "debug", `meshd${executable}`);
-const meshctl = join(repo, "target", "debug", `meshctl${executable}`);
-const checkpoint = join(repo, "target", "debug", "examples", `capture-checkpoint${executable}`);
+// Cargo runs with the repository as cwd, so a relative override is relative to that same root.
+// Keep lookup and build in agreement when verification shares a target outside the worktree.
+const target = resolve(repo, process.env.CARGO_TARGET_DIR ?? "target");
+const meshd = join(target, "debug", `meshd${executable}`);
+const meshctl = join(target, "debug", `meshctl${executable}`);
+const checkpoint = join(target, "debug", "examples", `capture-checkpoint${executable}`);
 // Colour only a real terminal; piped output and CI logs stay plain text.
 const colourful = process.stdout.isTTY && process.env.NO_COLOR === undefined;
 
