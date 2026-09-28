@@ -2,7 +2,7 @@ import { useTranslation } from "../lib/localization";
 import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 
-type Project = { nativeEvents?: boolean; detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
+type Project = { nativeSignalState?: string; nativeEvents?: boolean; detached?: boolean; recovery: "restored-stopped" | "unavailable" | null; id: string; generation: string; root: string; phase: string; outcome: string; savedVersion: string | null; captureAgeMs: number | null };
 type SavedEntry = { path: string; kind: "file" | "folder"; bytes: number | null; digest: string | null; executable: boolean | null };
 type SavedFile = { path: string; state: "text" | "binary" | "too-large"; text: string | null; bytes: number };
 type Inspection = { operation: string; entries: SavedEntry[]; nextAfter: string | null; file: SavedFile | null };
@@ -86,7 +86,7 @@ export function AttachedProjects() {
       return <article key={project.id} className="grid gap-2 rounded-lg border border-border p-4">
         <p className="break-all text-sm font-medium"><bdi dir="ltr">{project.root}</bdi></p>
         <p className="text-sm">{t(projection.error ? "Status may be out of date" : project.detached ? "Detached · saved history retained" : phases[project.phase])} · {t(project.detached ? "Reattach to enable capture controls" : project.recovery === "restored-stopped" ? "Saved history restored; resume when ready" : project.recovery === "unavailable" ? "Project or history needs reconciliation" : outcomes[project.outcome])}</p>
-        {!terminal && !project.detached && <p className="text-xs text-muted-foreground">{t(project.nativeEvents ? "File-change signals active, with periodic checks for missed changes." : "Using periodic checks for file changes.")}</p>}
+        {project.nativeSignalState === "stopping" ? <p className="text-xs text-muted-foreground">{t("File-change monitoring is still stopping.")}</p> : !terminal && project.phase !== "stopping" && !project.detached && <p className="text-xs text-muted-foreground">{t(project.nativeSignalState === "starting" ? "Preparing file-change monitoring; periodic checks continue." : project.nativeEvents ? "File-change signals active, with periodic checks for missed changes." : "Using periodic checks for file changes.")}</p>}
         <p className="break-all text-xs text-muted-foreground">{project.savedVersion ? <>{t("Latest saved version:")} <bdi dir="ltr">{project.savedVersion}</bdi></> : t(project.recovery === "unavailable" ? "Saved version unavailable until history is verified" : "No saved version yet")}</p>
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">

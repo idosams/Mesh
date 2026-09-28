@@ -58,6 +58,8 @@ export const hebrew: Readonly<Record<string, string>> = Object.freeze({
 "Inspect saved result":"בדיקת התוצאה השמורה",
 "This request stays on its saved version while work continues. Change author unknown. Approval and main-version integration are not available here yet.":"בקשה זו נשארת על הגרסה השמורה בזמן שהעבודה נמשכת. מחבר השינוי אינו ידוע. אישור ושילוב בגרסה הראשית עדיין אינם זמינים כאן.",
 "File-change signals active, with periodic checks for missed changes.":"התראות על שינויי קבצים פעילות, עם בדיקות תקופתיות לאיתור שינויים שהוחמצו.",
+"Preparing file-change monitoring; periodic checks continue.":"מעקב שינויי הקבצים בהכנה; הבדיקות התקופתיות נמשכות.",
+"File-change monitoring is still stopping.":"עצירת המעקב אחר שינויי הקבצים עדיין מתבצעת.",
 "Using periodic checks for file changes.":"שינויים בקבצים נבדקים באופן תקופתי.",
 "Detached · saved history retained":"מנותק · ההיסטוריה השמורה נשמרת",
 "Reattach to enable capture controls":"חברו מחדש כדי להפעיל את בקרות הלכידה",

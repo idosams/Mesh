@@ -99,6 +99,12 @@ periodic checks. On macOS, signals can wake capture sooner; periodic checks stil
 changes. This status does not mean an edit has been saved: check the latest saved version and
 capture outcome. Mesh does not infer who made a change from filesystem events.
 
+Capture continues while file-change monitoring is being prepared or is unavailable. The status
+shows these separately. Once capture shows **Stopped**, it performs no further saves; monitoring
+may still be finishing, and that status remains visible until it ends. Resuming starts a new
+capture session. An older monitor cannot restart the stopped session.
+
+
 In the unmerged review-history increment, an already-open pending review stays on its original
 comparison base when another review advances main, including after restart. This keeps the reviewed
 changes stable; it does not make an old approval valid against the new main version. A stale approval

@@ -380,7 +380,11 @@ fn native_events_capture_nested_edits_and_atomic_replacement_before_reconciliati
         },
     )
     .unwrap();
-    let first = outcome(&service, CaptureOutcome::Saved, 0);
+    let captured = outcome(&service, CaptureOutcome::Saved, 0);
+    let first = wait(&service, |status| {
+        status.native_events && status.phase == CapturePhase::Waiting
+    });
+    assert_eq!(first.saved_version, captured.saved_version);
     assert!(
         first.native_events,
         "the macOS event stream must actually start"
@@ -434,7 +438,11 @@ fn native_root_change_wakes_capture_without_adopting_the_replacement() {
         },
     )
     .unwrap();
-    let first = outcome(&service, CaptureOutcome::Saved, 0);
+    let captured = outcome(&service, CaptureOutcome::Saved, 0);
+    let first = wait(&service, |status| {
+        status.native_events && status.phase == CapturePhase::Waiting
+    });
+    assert_eq!(first.saved_version, captured.saved_version);
     assert!(first.native_events);
     fs::rename(&f.source, f.root.join("original-project")).unwrap();
     fs::create_dir(&f.source).unwrap();

@@ -690,3 +690,24 @@ test('working-folder comparison stays pinned during capture and failed refresh r
   assert.equal(calls.length, before);
   h.dispose();
 });
+
+test('native signal lifecycle remains distinct from capture and rejects contradictory activity', () => {
+  for (const state of ['disabled', 'starting', 'active', 'unavailable', 'stopping', 'stopped']) {
+    const value = reply();
+    value.projects[0].capture.native_signal_state = state;
+    value.projects[0].capture.native_events = state === 'active';
+    assert.equal(attachedProjectList(value)[0].nativeSignalState, state);
+    value.projects[0].capture.native_events = state !== 'active';
+    assert.throws(() => attachedProjectList(value));
+  }
+  const value = reply(); value.projects[0].capture.native_signal_state = 'invented';
+  assert.throws(() => attachedProjectList(value));
+  assert.equal(attachedProjectList(reply())[0].nativeSignalState, 'unavailable');
+});
+
+test('stopped captures cannot claim an active native signal stream', () => {
+  for (const phase of ['stopping', 'stopped', 'failed']) {
+    const value = reply(); Object.assign(value.projects[0].capture, { phase, native_events: true, native_signal_state: 'active' });
+    assert.throws(() => attachedProjectList(value));
+  }
+});

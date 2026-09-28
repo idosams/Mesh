@@ -98,7 +98,8 @@ try {
   assert.deepEqual(await list(), [first]);
 
   const live = watch();
-  const watching = await live.next(value => value.phase === 'waiting' && value.last_outcome === 'unchanged');
+  const watching = await live.next(value => value.phase === 'waiting' && value.last_outcome === 'unchanged'
+    && (process.platform !== 'darwin' || value.native_events === true));
   if (process.platform === 'darwin') assert.equal(watching.native_events, true, 'native change signals must be active in the executable proof');
   await writeFile(join(project, 'work.txt'), 'ordinary edit, no manual capture request\n');
   const expectedGit = await git(['status', '--porcelain=v1']);

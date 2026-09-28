@@ -1,6 +1,7 @@
 import { createPinPersistence } from './attachment-pin-persistence.js';
 // Native attachment coordinator. React receives display data and emits bounded user intents.
 const PHASES = new Set(['starting', 'scanning', 'saving', 'waiting', 'stopping', 'stopped', 'failed']);
+const NATIVE_SIGNALS = new Set(['disabled', 'starting', 'active', 'unavailable', 'stopping', 'stopped']);
 const OUTCOMES = new Set(['pending', 'saved', 'unchanged', 'incomplete', 'source-unavailable', 'store-unavailable', 'save-unavailable', 'cancelled']);
 const safeText = (value, maximum) => typeof value === 'string' && value.length > 0
   && value.length <= maximum && !/[\u0000-\u001f\u007f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
@@ -21,6 +22,9 @@ export function attachedProjectList(raw) {
       || capture?.schema !== 'mesh.attachment-capture/v1'
       || !PHASES.has(capture.phase) || !OUTCOMES.has(capture.last_outcome)
       || (capture.native_events !== undefined && typeof capture.native_events !== 'boolean')
+      || (capture.native_signal_state !== undefined && (!NATIVE_SIGNALS.has(capture.native_signal_state)
+        || capture.native_events !== (capture.native_signal_state === 'active')
+        || (capture.native_signal_state === 'active' && ['stopping', 'stopped', 'failed'].includes(capture.phase))))
       || capture.attribution !== 'unknown' || capture.atomic_snapshot !== false
       || (capture.saved_version !== null && !/^[a-f0-9]{64}$/.test(capture.saved_version))
       || (capture.last_complete_capture_age_ms !== null
@@ -28,7 +32,7 @@ export function attachedProjectList(raw) {
       throw new Error('Invalid attachment status');
     }
     ids.add(project.id);
-    return Object.freeze({ nativeEvents: capture.native_events ?? false, detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
+    return Object.freeze({ nativeSignalState: capture.native_signal_state ?? (capture.native_events ? 'active' : 'unavailable'), nativeEvents: capture.native_events ?? false, detached: project.detached ?? false, id: project.id, generation: project.generation, root: project.root,
       phase: capture.phase, outcome: capture.last_outcome, savedVersion: capture.saved_version,
       captureAgeMs: capture.last_complete_capture_age_ms, recovery: project.recovery ?? null });
   });

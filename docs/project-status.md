@@ -46,7 +46,10 @@ This does not claim rendered-window acceptance. macOS capture now uses coalesced
 events to wake bounded scans, with periodic reconciliation retained for missed or unavailable events.
 The desktop shows active native signals or periodic fallback. Events never authorize content or
 establish authorship; source/store identities are rechecked on every capture. Linux uses periodic
-reconciliation. A canonical sealed executable passed the event-enabled capture journey with an
+reconciliation. Native registration and cleanup now run separately from capture with a bounded
+process budget. Initial/periodic capture and capture stop can proceed while registration is pending;
+the native signal lifecycle stays explicit, including cleanup after capture stops. This correction
+is under validation and does not establish a packaged UI or fleet latency result. A canonical sealed executable passed the event-enabled capture journey with an
 active stream and an observed callback batch. Incremental hashing and large-project performance
 remain unverified. Packaged graphical
 lifecycle and review, live fleet UI, process-tree recovery

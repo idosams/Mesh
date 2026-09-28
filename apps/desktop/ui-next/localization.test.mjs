@@ -351,3 +351,23 @@ test('attached main comparison renders localized read-only conflicts and inert e
     assert.doesNotMatch(html, /<script>|apply-main/);
   }
 });
+
+test('pending native setup and cleanup have localized status independent of capture stop', async () => {
+  for (const [nativeSignalState, phase, detached, expected] of [
+    ['starting', 'waiting', false, 'Preparing file-change monitoring; periodic checks continue.'],
+    ['stopping', 'stopped', false, 'File-change monitoring is still stopping.'],
+    ['stopping', 'stopped', true, 'File-change monitoring is still stopping.'],
+  ]) {
+    const ui = await loadLocalization({ projects: [{ nativeSignalState, nativeEvents: false, phase, detached, recovery: null,
+      id: 'a'.repeat(64), generation: '1', root: '/Users/משפחה/Files', outcome: 'unchanged', savedVersion: null, captureAgeMs: null }],
+      histories: {}, bases: {}, comparisons: {}, inspections: {}, pins: [], pinStatus: 'saved', pinError: '',
+      busy: false, error: '', available: true });
+    ui.setLocale('he');
+    const html = ui.renderAttachments();
+    assert.ok(html.includes(ui.translate('he', expected)));
+    assert.ok(!html.includes(expected));
+    assert.ok(html.includes('<bdi dir="ltr">/Users/משפחה/Files</bdi>'));
+    ui.setLocale('en');
+    assert.ok(ui.renderAttachments().includes(expected));
+  }
+});

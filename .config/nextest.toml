@@ -5,3 +5,11 @@
 # bounds remain unchanged.
 filter = 'test(continuous_activity_cannot_postpone_the_maximum_time_bound)'
 threads-required = "num-test-threads"
+
+[[profile.default.overrides]]
+# Native FSEvents registration is a host-global service. A sampled failing run was blocked in
+# its registration RPC while the full suite generated unrelated filesystem load. Keep the real
+# callback/root-replacement assertions and their eight-second deadlines, with exclusive suite
+# capacity. Separate controlled blocked-registration tests prove capture and stop stay responsive.
+filter = 'test(native_events_capture_nested_edits_and_atomic_replacement_before_reconciliation) | test(native_root_change_wakes_capture_without_adopting_the_replacement)'
+threads-required = "num-test-threads"

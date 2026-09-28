@@ -377,3 +377,38 @@ unchanged recheck also failed: both native-event cases remained Starting at revi
 any capture attempt (8.054s and 8.056s). It passed 1,292 tests, failed two, left 1,870 unrun and
 skipped 13; desktop and daemon gates were not reached. Neither focused nor hosted passes resolve
 [issue #37](https://github.com/idosams/Mesh/issues/37) or establish a passing combined gate.
+
+## Native capture lifecycle correction and checkpoint dependency
+
+[PR #38](https://github.com/idosams/Mesh/pull/38) published recovery inspection at
+`7ccdc4be19e66840bc005b6ba9302e7bc706807a`, replacing source
+`7d06b8bd68d77ac9c358bf9002c829cd02995fa0`. Its local full gate passed 1,298 native tests,
+failed both native startup waits, left 1,868 unrun and skipped 13. Hosted run 36360628264
+passed six checks, including macOS, but Linux failed immediate checkpoint database restart.
+The focused recovery assertions passed; the full failures remain evidence, not a passing delivery.
+
+Two separate corrections follow those failures:
+
+- [Issue #39](https://github.com/idosams/Mesh/issues/39): checkpoint workers must release database
+  ownership before daemon destruction returns. [PR #40](https://github.com/idosams/Mesh/pull/40)
+  publishes `4816f5bb22efb179cd5ba6fc2b04b8bfe870cb1e` on the canonical validation floor (#23).
+  All seven hosted checks passed in run 36361925547. Its local full gate is still running.
+  The focused ownership regression passes, fails with the original non-draining behavior, and
+  passes after restoration; all 26 checkpoint-save integration tests passed. This feature stack
+  carries the same correction as `8285ffadc7eac74a81eca2ce64d631e92ed4b4f3`, with only the
+  project-status append context adapted. This is a dependency transfer, not a second independent
+  fix or a merged change; reconcile identical patches when updating the stack after main delivery.
+- [Issue #37](https://github.com/idosams/Mesh/issues/37): an eight-process diagnostic reproduced
+  15 startup failures in 16 unchanged native-event executions. A failing worker was sampled in
+  the operating system's event-registration RPC. The current correction separates bounded optional
+  monitoring from capture, retains generation-specific cleanup status and preserves periodic
+  capture when monitoring is pending or unavailable. It is new canonical work, not a replacement
+  for an untransferred source commit. Native, full, executable and hosted verification remain
+  pending. The source and evidence contract is in the
+  [native signal lifecycle decision](../decisions/attachment-native-signal-lifecycle.md).
+
+All listed PRs remain unmerged and require the applicable human review. Retained restoration source
+`11df227f749aa8654fe89a0612e8f2b286c29b4a` remains preserved in its separate unpublished worktree;
+it has not been validated or delivered by this correction. The later metadata fix `633af5ca` is
+already included in #36 and must not be applied twice. The full fleet, second-provider, four-worker,
+remote-executor, packaged acceptance and combined-main verification objectives remain required.

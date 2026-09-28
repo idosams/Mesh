@@ -14,6 +14,10 @@ use std::time::{Duration, Instant};
 #[path = "signals_macos.rs"]
 mod signals_macos;
 
+#[cfg(any(target_os = "macos", test))]
+#[path = "signals_worker.rs"]
+mod signals_worker;
+
 /// Native scheduling policy. Scans remain bounded by the observer's separate resource limits.
 #[derive(Clone, Copy, Debug)]
 pub struct CaptureSchedule {
@@ -74,9 +78,40 @@ pub enum CaptureOutcome {
     Cancelled,
 }
 
+/// Optional native monitoring has its own lifecycle; capture can stop before native cleanup ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeSignalState {
+    /// Native signals were not requested.
+    Disabled,
+    /// Native registration is pending; periodic capture is available.
+    Starting,
+    /// A lossy native stream is registered.
+    Active,
+    /// Platform, capacity or registration failure leaves periodic capture available.
+    Unavailable,
+    /// Stop requested; a native registration or cleanup call may still be pending.
+    Stopping,
+    /// Native helper cleanup has completed.
+    Stopped,
+}
+impl NativeSignalState {
+    fn text(self) -> &'static str {
+        match self {
+            Self::Disabled => "disabled",
+            Self::Starting => "starting",
+            Self::Active => "active",
+            Self::Unavailable => "unavailable",
+            Self::Stopping => "stopping",
+            Self::Stopped => "stopped",
+        }
+    }
+}
+
 /// Live, redacted status. Ages are measured with a monotonic clock in this process only.
 #[derive(Clone, Debug)]
 pub struct CaptureStatus {
+    /// Native monitoring state, independent of capture-worker termination.
+    pub native_signal_state: NativeSignalState,
     /// A native event stream is active; it is lossy and does not attest to content or authorship.
     pub native_events: bool,
     /// Count of coalesced native callback batches, not file edits or saved versions.
@@ -141,6 +176,10 @@ impl CaptureStatus {
                 }),
             ),
             ("native_events", Json::Bool(self.native_events)),
+            (
+                "native_signal_state",
+                Json::text(self.native_signal_state.text()),
+            ),
             ("event_signals", Json::Number(self.event_signals)),
             ("attempts", Json::Number(self.attempts)),
             ("versions_saved", Json::Number(self.versions_saved)),
@@ -204,7 +243,7 @@ impl Shared {
 
 /// One native background controller. Starting it explicitly authorizes captures with the supplied
 /// host signer. It provisions no agent and never writes, locks or takes over the original project.
-/// Dropping requests stop without blocking; use `stop_and_join` to wait for confirmed termination.
+/// Dropping requests stop without blocking; use `stop_and_join` to wait for capture termination. Native helper cleanup is reported separately.
 pub struct AttachmentCaptureService {
     shared: Arc<Shared>,
     worker: Option<JoinHandle<()>>,
@@ -229,6 +268,37 @@ impl AttachmentCaptureService {
         signer: Arc<dyn CheckpointSigner>,
         schedule: CaptureSchedule,
     ) -> io::Result<Self> {
+        Self::start_pinned_with_signals(
+            metadata,
+            attachment,
+            store,
+            signer,
+            schedule,
+            |shared, path| {
+                #[cfg(target_os = "macos")]
+                signals_worker::start(shared, path);
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = path;
+                    shared.change(|state| {
+                        state.status.native_signal_state = NativeSignalState::Unavailable
+                    });
+                }
+            },
+        )
+    }
+
+    fn start_pinned_with_signals<F>(
+        metadata: &Path,
+        attachment: ProjectAttachment,
+        store: PinnedWorkspaceRoot,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+        start_signals: F,
+    ) -> io::Result<Self>
+    where
+        F: FnOnce(&Arc<Shared>, &Path) + Send + 'static,
+    {
         attachment.ensure_current()?;
         store.ensure_namespace_identity()?;
         super::detachment::ensure_attached(&store)?;
@@ -245,6 +315,11 @@ impl AttachmentCaptureService {
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
                 status: CaptureStatus {
+                    native_signal_state: if schedule.native_signals {
+                        NativeSignalState::Starting
+                    } else {
+                        NativeSignalState::Disabled
+                    },
                     native_events: false,
                     event_signals: 0,
                     revision: 0,
@@ -270,9 +345,19 @@ impl AttachmentCaptureService {
             .name("mesh-attachment-capture".to_owned())
             .spawn(move || {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run(&running, attachment, store, metadata, signer, schedule);
+                    run(
+                        &running,
+                        attachment,
+                        store,
+                        metadata,
+                        signer,
+                        schedule,
+                        start_signals,
+                    );
                 }));
                 running.change(|state| {
+                    stop_native_signals(state);
+                    state.stop = true;
                     state.status.native_events = false;
                     state.status.phase = if result.is_ok() {
                         CapturePhase::Stopped
@@ -324,6 +409,7 @@ impl AttachmentCaptureService {
     /// Stop future scans and wake a waiting worker. An in-flight durable commit may still finish.
     pub fn request_stop(&self) {
         self.shared.change(|state| {
+            stop_native_signals(state);
             state.stop = true;
             state.pending = false;
         });
@@ -332,6 +418,12 @@ impl AttachmentCaptureService {
     /// Wait for the current bounded attempt to exit. Slow filesystem I/O or an external signer can
     /// delay this wait; stop does not claim to interrupt those operations or roll back a commit.
     pub fn stop_and_join(mut self) -> io::Result<CaptureStatus> {
+        self.stop_capture_and_join()
+    }
+
+    /// Join the capture worker while retaining live status for optional native cleanup.
+    /// A stopped capture cannot save again; native monitoring may still report stopping.
+    pub fn stop_capture_and_join(&mut self) -> io::Result<CaptureStatus> {
         self.request_stop();
         if let Some(worker) = self.worker.take() {
             worker
@@ -347,25 +439,38 @@ impl Drop for AttachmentCaptureService {
     }
 }
 
-fn run(
+fn stop_native_signals(state: &mut State) {
+    if matches!(
+        state.status.native_signal_state,
+        NativeSignalState::Starting | NativeSignalState::Active
+    ) {
+        state.status.native_signal_state = NativeSignalState::Stopping;
+    }
+    state.status.native_events = false;
+}
+
+fn run<F>(
     shared: &Arc<Shared>,
     attachment: ProjectAttachment,
     store: PinnedWorkspaceRoot,
     metadata: PathBuf,
     signer: Arc<dyn CheckpointSigner>,
     schedule: CaptureSchedule,
-) {
+    start_signals: F,
+) where
+    F: FnOnce(&Arc<Shared>, &Path),
+{
     if shared.stopped() {
+        shared.change(|state| {
+            if schedule.native_signals {
+                state.status.native_signal_state = NativeSignalState::Stopped;
+            }
+        });
         return;
     }
-    #[cfg(target_os = "macos")]
-    let events = if schedule.native_signals {
-        signals_macos::Events::start(attachment.root(), shared).ok()
-    } else {
-        None
-    };
-    #[cfg(target_os = "macos")]
-    shared.change(|state| state.status.native_events = events.is_some());
+    if schedule.native_signals {
+        start_signals(shared, attachment.root());
+    }
     let actor = signer.public_key();
     if store
         .filesystem()
@@ -491,3 +596,7 @@ fn complete_attempt(
         }
     });
 }
+
+#[cfg(test)]
+#[path = "signals_worker_tests.rs"]
+mod signals_worker_tests;

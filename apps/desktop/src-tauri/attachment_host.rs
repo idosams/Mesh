@@ -4,7 +4,7 @@ use crate::attachment_capture::NativeCaptureSigner;
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
     AttachmentCaptureService, AttachmentPinState, AttachmentStorage, CaptureOutcome, CapturePhase,
-    CaptureSchedule, CaptureStatus, ProvisionedAttachment,
+    CaptureSchedule, CaptureStatus, NativeSignalState, ProvisionedAttachment,
 };
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
@@ -414,9 +414,9 @@ impl AttachmentHost {
             "detach" => {
                 let next = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
                 let project = state.projects.get_mut(id).ok_or(UNAVAILABLE)?;
-                if let Some(service) = project.service.take() {
+                if let Some(service) = project.service.as_mut() {
                     project.recovered = service
-                        .stop_and_join()
+                        .stop_capture_and_join()
                         .map_err(|_| "Capture stop needs reconciliation")?;
                 }
                 state
@@ -511,6 +511,7 @@ impl AttachmentHost {
 
 fn stopped_status() -> CaptureStatus {
     CaptureStatus {
+        native_signal_state: NativeSignalState::Stopped,
         native_events: false,
         event_signals: 0,
         revision: 0,
@@ -831,7 +832,12 @@ mod tests {
         assert!(host.control(id, generation, "resume").is_err());
         assert!(host.control(id, next, "resume").is_err());
         assert!(host.control(id, next, "capture").is_err());
-        assert!(host.state.lock().unwrap().projects[id].service.is_none());
+        {
+            let state = host.state.lock().unwrap();
+            let service = state.projects[id].service.as_ref().unwrap();
+            assert_eq!(service.status().phase, CapturePhase::Stopped);
+            assert!(!service.request_capture());
+        }
         fs::write(source.join("work"), "normal tools continue").unwrap();
         assert!(host
             .versions(id, None)

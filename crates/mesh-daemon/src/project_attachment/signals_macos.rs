@@ -149,7 +149,7 @@ impl Events {
 impl Drop for Events {
     fn drop(&mut self) {
         // Stop guarantees no further callback. Invalidate unschedules before stream/context release.
-        // This owner stays on the capture worker; no raw native handle crosses Rust threads.
+        // This owner stays on the native signals helper; no raw native handle crosses Rust threads.
         unsafe {
             FSEventStreamStop(self.stream);
             FSEventStreamInvalidate(self.stream);
