@@ -36,7 +36,7 @@ pub struct ReceivedWorkerObservation {
     pub admission: RemoteAdmissionReceipt,
     /// Poll result for this owner only. An error retains ownership and the occupied slot.
     pub observation: Result<Vec<WorkerObservation>, Unavailable>,
-    /// Result of an attempted native saved-offer publication in this poll. None means no attempt;
+    /// Result of native saved-offer publication in this poll. None means no offer or error to report;
     /// an offered checkpoint is not content transfer, process completion or main approval.
     pub result_publication: Option<Result<String, Unavailable>>,
 }
