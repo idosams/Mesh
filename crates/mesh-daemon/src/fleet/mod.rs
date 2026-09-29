@@ -49,6 +49,11 @@ mod file_deletions;
 pub mod provider;
 mod remote;
 mod remote_admission;
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::{
+    inspect_remote_worker_over_ssh, RemoteWorkerStatusChallenge, RemoteWorkerStatusQuery,
+    RemoteWorkerStatusReceipt, RemoteWorkerStatusRequest, VerifiedRemoteWorkerStatusQuery,
+};
 #[cfg(unix)]
 pub use remote_admission::{RemoteAdmissionChallenge, RemoteAdmissionProof};
 pub use remote_admission::{

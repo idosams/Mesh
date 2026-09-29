@@ -219,3 +219,21 @@ automatically retries a failed call or adopts a provider. The native signer rece
 dispatch and admission payloads. The worker proof must remain fresh throughout SSH setup; the
 connection budget never extends proof or lease expiry. A successful return describes input
 materialization only. Remote results, lease renewal and real second-machine acceptance remain open.
+
+### Recovering retained worker facts
+
+Native coordinators can call `inspect_remote_worker_over_ssh` with the exact current attempt and
+independently configured execution keys. The signed query is fresh for 30 seconds and does not
+extend the connection or lease deadline. A signed reply binds the original query and current
+coordinator context; older or changed-context replies refuse. These APIs are not exposed to agent
+or desktop commands yet. Older workers reject the additive v1 status message rather than guessing.
+
+Interpret the returned facts conservatively: null admission is unknown/unrecorded; admission records
+one original allocation reservation; launch intent records the worker's original execution claim
+and source-to-worker initial mapping. None proves materialization, current liveness, completion,
+termination, a saved output or permission to retry. Initial lease fields are historical, not renewal
+acknowledgments. Status can read retained expired/cancelled work under fresh authentication without
+changing any ownership or lease. Worker observation timestamps do not make cached facts stay fresh.
+No filenames, task text, credentials or provider diagnostics are returned. The protocol carries a
+private goal digest for exact correlation and must not be logged. Signed saved results, actual
+second-machine recovery and packaged acceptance remain required.
