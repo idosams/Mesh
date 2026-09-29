@@ -207,3 +207,5 @@ impl NativeRemoteResultReceiver<'_> {
 
 mod catalog;
 pub use catalog::{RemoteLocalReviewEntry, RemoteLocalReviewPage};
+
+mod reader;

@@ -47,6 +47,25 @@ impl RemoteInputDestination {
         reviewers: &TrustedReviewers,
         review: Option<(RecordDigest, RecordDigest)>,
     ) -> io::Result<RemoteInputSource> {
+        self.reopen_result_review_history(
+            allocation_id,
+            mapping,
+            evidence,
+            manifest,
+            reviewers,
+            review,
+        )
+        .map(|(_, source)| source)
+    }
+    pub(in crate::fleet) fn reopen_result_review_history(
+        &self,
+        allocation_id: &str,
+        mapping: RecordDigest,
+        evidence: RecordDigest,
+        manifest: &RemoteInputManifest,
+        reviewers: &TrustedReviewers,
+        review: Option<(RecordDigest, RecordDigest)>,
+    ) -> io::Result<(crate::workspace::OpenWorkspace, RemoteInputSource)> {
         self.verify()?;
         if allocation_id.len() != 32
             || !allocation_id
@@ -146,6 +165,6 @@ impl RemoteInputDestination {
         }
         self.verify()?;
         source.verify_roots()?;
-        Ok(source)
+        Ok((open, source))
     }
 }
