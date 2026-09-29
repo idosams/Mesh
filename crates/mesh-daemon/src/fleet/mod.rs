@@ -1300,7 +1300,7 @@ pub use remote_admission::status::renewal::{
 };
 
 #[cfg(target_os = "macos")]
-pub use remote_admission::status::result::RemoteSavedResultOffer;
+pub use remote_admission::status::result::{RemoteSavedResultExport, RemoteSavedResultOffer};
 
 #[cfg(target_os = "macos")]
 pub use remote_admission::status::result::query::{
@@ -1324,3 +1324,8 @@ pub use remote_input::{NativeRemoteResultReceiver, RemoteResultContentReceipt};
 pub use remote_admission::status::result::transfer::{
     receive_remote_saved_result, receive_remote_saved_result_over_ssh,
 };
+
+#[cfg(target_os = "macos")]
+mod remote_correspondence;
+#[cfg(target_os = "macos")]
+pub use remote_correspondence::RemoteResultCorrespondence;

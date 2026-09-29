@@ -369,3 +369,10 @@ frame. Native restart recovery verifies the exact signed offer, retained private
 store identity and all content. The expanded receipt regression passes replay/reopen and partial
 manifest, content mutation and ledger-tail refusal. Full validation is pending. Candidate import,
 retention policy and actual second-machine/packaged acceptance remain required.
+
+
+Native saved-result reopening now also derives exact input-to-result identity correspondence. Two
+focused tests pass renames, same-path replacement, deletions, deterministic ordering and malformed
+identity/content refusal; the composed worker-history regression passes after correcting its
+empty-input expectation. Full validation is pending. Authenticated correspondence transport and
+coordinator candidate import remain unfinished; unsigned metadata grants no import authority.

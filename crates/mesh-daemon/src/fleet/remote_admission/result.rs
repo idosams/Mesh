@@ -251,6 +251,17 @@ pub(in crate::fleet) mod catalog;
 #[path = "result/discovery.rs"]
 pub(in crate::fleet) mod discovery;
 
+/// Native reopened content and identity evidence for one exact retained worker result.
+/// Correspondence still needs authenticated transport binding before coordinator use.
+pub struct RemoteSavedResultExport {
+    /// Original durable worker-signed result offer.
+    pub offer: RemoteSavedResultOffer,
+    /// Read-only content retaining native filesystem identities.
+    pub source: crate::fleet::RemoteInputSource,
+    /// Identity correspondence derived from the exact original and saved history.
+    pub correspondence: crate::fleet::RemoteResultCorrespondence,
+}
+
 impl RemoteAdmissionRegistry {
     /// Reopen the exact signed saved result from native-admitted private storage after restart.
     /// This reads immutable history only; it creates no execution/session/credential authority.
@@ -262,13 +273,31 @@ impl RemoteAdmissionRegistry {
         checkpoint: &str,
         reviewers: &crate::TrustedReviewers,
     ) -> Result<Option<(RemoteSavedResultOffer, crate::fleet::RemoteInputSource)>, Error> {
+        Ok(self
+            .reopen_saved_result_with_correspondence(
+                destination,
+                assignment,
+                checkpoint,
+                reviewers,
+            )?
+            .map(|export| (export.offer, export.source)))
+    }
+    /// Reopen exact content plus native identity correspondence. Later working edits do not enter
+    /// either output. The evidence itself grants no coordinator import or main approval authority.
+    pub fn reopen_saved_result_with_correspondence(
+        &self,
+        destination: &crate::fleet::RemoteInputDestination,
+        assignment: &str,
+        checkpoint: &str,
+        reviewers: &crate::TrustedReviewers,
+    ) -> Result<Option<RemoteSavedResultExport>, Error> {
         let Some(offer) = self.saved_result_offer(assignment, checkpoint)? else {
             return Ok(None);
         };
         let launch = self.launch_receipt(assignment)?.ok_or_else(invalid)?;
         let digest =
             |field| RecordDigest::parse_hex(text(&offer.body, field)?).map_err(|_| invalid());
-        let source = destination
+        let (source, correspondence) = destination
             .reopen_saved_review(
                 &launch,
                 digest("review")?,
@@ -286,7 +315,11 @@ impl RemoteAdmissionRegistry {
             return Err(invalid());
         }
         source.verify_roots().map_err(|_| invalid())?;
-        Ok(Some((offer, source)))
+        Ok(Some(RemoteSavedResultExport {
+            offer,
+            source,
+            correspondence,
+        }))
     }
 }
 

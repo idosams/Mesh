@@ -3352,3 +3352,25 @@ and refused, not overwritten; receipt durability is separate from content retent
 The expanded native regression passed durable replay, database reopen, partial-manifest preservation,
 changed-manifest/content refusal and corrupt ledger tails. Full validation and PR delivery are
 pending. Exact candidate mapping/import, retention and actual remote/packaged acceptance remain.
+
+
+## R45 native result identity correspondence (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #175](https://github.com/idosams/Mesh/pull/175), `6183986f01c7723e25575d85a8741c8ab00ef452`.
+No preserved commits are replaced. R44 final local gate passed 3,567 native tests, 17 skipped,
+desktop checks and 44 daemon checks. [PR #174](https://github.com/idosams/Mesh/pull/174) merged as
+`121849cad3041f1624d9f947c6ad3299aac1a547` after all seven checks passed.
+
+Native exact-history reopening now returns original offer/content plus an opaque correspondence
+descriptor. It reuses existing project-import identity rules across the verified initial/result
+snapshots, with complete manifest comparison, duplicate rejection and retained-kind checks. The
+bounded canonical evidence binds original input, worker initial operation and exact saved result.
+No renderer/peer constructor or coordinator import authority is added.
+
+Two focused identity regressions pass, including retained renames and a new object at the old path.
+The composed received-host test passes native reopen after the owner is dropped. Its initial
+expectation incorrectly assigned ancestry to a new file from an empty input; correcting that
+fixture expectation required no production behavior change, and the failed log is retained. Full
+validation and PR delivery are pending. Authenticated evidence transport, exact coordinator import,
+retention and actual remote/packaged acceptance remain in scope.
