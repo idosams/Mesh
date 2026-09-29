@@ -27,7 +27,7 @@ impl RemoteInputDestination {
         version: RecordDigest,
         expected_manifest: RecordDigest,
         reviewers: &TrustedReviewers,
-    ) -> io::Result<RemoteInputSource> {
+    ) -> io::Result<(RemoteInputSource, crate::fleet::RemoteResultCorrespondence)> {
         self.verify()?;
         let admission = launch.admission();
         let assignment = &admission.work().assignment;
@@ -108,6 +108,15 @@ impl RemoteInputDestination {
         if source.manifest().bundle() != expected_manifest {
             return Err(invalid());
         }
+        let saved = open
+            .historical_workspace_preview(version)
+            .map_err(|_| invalid())?;
+        let correspondence = crate::fleet::RemoteResultCorrespondence::derive(
+            &input.manifest,
+            &initial,
+            source.manifest(),
+            &saved,
+        )?;
         input.verify()?;
         if retained(&input.allocation, RECEIPT)? != receipt_bytes
             || retained(&input.allocation, INTENT)? != intent
@@ -116,6 +125,6 @@ impl RemoteInputDestination {
         }
         self.verify()?;
         source.verify_roots()?;
-        Ok(source)
+        Ok((source, correspondence))
     }
 }

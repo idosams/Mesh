@@ -406,6 +406,35 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
             .unwrap();
         assert_eq!(offer.encode(), *encoded);
         assert_eq!(reopened.manifest(), source.manifest());
+        let export = registry
+            .reopen_saved_result_with_correspondence(
+                destination,
+                "assignment",
+                checkpoint,
+                &crate::TrustedReviewers::default(),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(export.offer.encode(), *encoded);
+        assert_eq!(export.source.manifest(), source.manifest());
+        let correspondence = Json::parse(export.correspondence.encoded()).unwrap();
+        assert_eq!(
+            correspondence.get("result_manifest"),
+            Some(&Json::text(source.manifest().bundle().to_string()))
+        );
+        let note = correspondence
+            .get("entries")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row.get("path") == Some(&Json::text("note.txt")))
+            .unwrap();
+        assert_eq!(
+            note.get("input_path"),
+            Some(&Json::Null),
+            "the received input was empty; a new saved file has no original identity"
+        );
         assert_eq!(
             fs::read(root.join("note.txt")).unwrap(),
             b"later unsaved working bytes\n"

@@ -490,3 +490,20 @@ An interrupted manifest write can leave partial evidence requiring explicit reco
 never becomes a completion receipt. Existing stores without these files remain valid input/result
 stores, but cannot claim a recorded content receipt. This receipt is not retention policy or the
 original-project candidate import; those must still establish their own native proofs.
+
+
+### Native saved-result identity correspondence
+
+The macOS worker registry can reopen a result with `reopen_saved_result_with_correspondence`.
+Alongside the original signed offer and read-only content source, it derives bounded
+`mesh.remote-result-correspondence/v1` metadata from the exact original worker snapshot and saved
+review. Both complete snapshots must match their manifests. Existing project-import correspondence
+rules preserve retained object identity across moves; a newly created object at an old path has no
+input identity. Duplicate objects, mismatched content/version and retained-object type changes refuse.
+
+The metadata binds assigned input and manifest, worker initial operation, saved result and manifest,
+and every result entry's native object identity, kind, path and optional original input path. Its
+canonical encoding is limited to 4 MiB and exposes a complete digest for future authenticated
+transport. This is private metadata, not a control-frame payload. It has no decoder, import mutation
+or approval capability. Current transfer does not carry it yet: a coordinator must not trust these
+bytes without the separately authenticated binding and native original-project checks.
