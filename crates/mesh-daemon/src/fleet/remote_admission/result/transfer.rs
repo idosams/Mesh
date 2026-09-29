@@ -344,8 +344,8 @@ impl VerifiedRemoteResultTransferQuery {
 }
 
 /// Receive one known signed saved result through already authenticated, deadline-bound streams.
-/// Partial offsets survive disconnect. Success verifies current content only: it is not a durable
-/// completion/import receipt, a retention pin, working-folder mutation or permission to retry work.
+/// Partial offsets survive disconnect. Success retains a durable content receipt; this is not
+/// process completion, candidate import, a retention pin or permission to retry work.
 pub fn receive_remote_saved_result<R: Read, W: Write>(
     destination: &crate::fleet::RemoteInputDestination,
     request: crate::fleet::RemoteWorkerStatusRequest<'_>,
@@ -452,7 +452,7 @@ pub fn receive_remote_saved_result<R: Read, W: Write>(
         .context
         .context(runtime, now().map_err(map)?)
         .map_err(map)?;
-    receiver.verify_complete(runtime).map_err(map)?;
+    receiver.record_content_receipt(runtime).map_err(map)?;
     writer.write_frame(&control(end()))?;
     challenge
         .context

@@ -362,3 +362,10 @@ resume, incorrect-offset refusal, stale replies, wrong signing domains and keys.
 fixture uses signed synthetic metadata; native exact saved-history reopening is covered separately
 by the received-host regression. Full verification is in progress. Durable candidate import and
 actual second-machine/packaged acceptance remain unfinished.
+
+
+Remote result transfer now records a durable coordinator content receipt before sending its end
+frame. Native restart recovery verifies the exact signed offer, retained private manifest, physical
+store identity and all content. The expanded receipt regression passes replay/reopen and partial
+manifest, content mutation and ledger-tail refusal. Full validation is pending. Candidate import,
+retention policy and actual second-machine/packaged acceptance remain required.

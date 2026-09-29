@@ -106,3 +106,6 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         self.check(runtime)
     }
 }
+
+mod receipt;
+pub use receipt::RemoteResultContentReceipt;

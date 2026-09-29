@@ -467,6 +467,25 @@ Worker requests must name declared chunks in increasing digest order, at most on
 requests cannot cause unbounded repeated reads. A worker retains at most one verified 4 MiB chunk
 while writing parts and checks native root identity and freshness between parts.
 
-A successful return verifies currently present immutable content. The end frame is not a durable
-completion/import receipt, a retention pin, proof of provider success, or protected-main approval.
+A successful return verifies immutable content and retains a native content receipt before writing
+the end frame. The end frame itself is not a durable peer acknowledgment, candidate import,
+retention pin, proof of provider success, or protected-main approval.
 Durable import correlation and real second-machine acceptance remain separate requirements.
+
+
+### Durable remote result content receipts
+
+`NativeRemoteResultReceiver::record_content_receipt` verifies all files, durably retains the canonical
+manifest as a private bounded create-only file, then records an exact receipt in the coordinator
+ledger. `mesh.remote-result-content-receipt/v1` binds the original signed offer, manifest identity
+and receiving directory's physical identity. Receipt replay returns the same digest without changing
+objective revision, run state, capacity or approval. Transfer completion calls this before its end
+frame; a lost reply can be reconciled without launching work again.
+
+`reopen_content_receipt` takes a freshly native-admitted destination, the exact original signed offer
+and current coordinator assignment. It checks the retained manifest, ledger and every content hash.
+Missing, partial, non-private, linked, replaced or conflicting metadata refuses and is preserved.
+An interrupted manifest write can leave partial evidence requiring explicit reconciliation; this
+never becomes a completion receipt. Existing stores without these files remain valid input/result
+stores, but cannot claim a recorded content receipt. This receipt is not retention policy or the
+original-project candidate import; those must still establish their own native proofs.
