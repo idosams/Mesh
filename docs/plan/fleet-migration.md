@@ -2920,7 +2920,7 @@ local process observations authorize protected-main changes.
 
 Focused transfer/reconnect/refusal and endpoint tests have passed. Native CLI compilation passed;
 expanded end-to-end endpoint/provider tests, final CLI regressions and full validation are still
-running or pending. This increment is not yet published or merged. Successful eligible signed-app
+running or pending. This increment is published as [draft PR #151](https://github.com/idosams/Mesh/pull/151) and is not yet merged. Successful eligible signed-app
 provisioning, actual second-machine transport, renewed leases and signed-result recovery remain
 required by the full fleet plan.
 
@@ -2946,3 +2946,14 @@ blocked writes), buffered EOF, authentication and handoff checks passed. The com
 now reached native provider startup but failed its existing ten-second acknowledgment deadline.
 That local failure is preserved; its cause remains unconfirmed and the deadline is unchanged. The
 increment is being published as a draft for full hosted validation, not claimed as merged delivery.
+
+Initial hosted macOS validation stopped before runtime tests on `large_enum_variant`. The connection
+outcome now boxes its admission payload; no lint is suppressed. Direct native lint checks use the
+repository's declared Rust 1.85 minimum, matching Cargo's setting rather than suggesting newer APIs
+in unchanged baseline code. Full corrected hosted validation remains required.
+
+The exact provider fixture also missed ten seconds outside Mesh and then exited normally after
+160.717 seconds, with one launch and the expected completion event. A read-only sample showed
+`_dyld_start` before program entry. This narrows the local startup investigation without identifying
+the underlying OS cause or resolving [#133](https://github.com/idosams/Mesh/issues/133). No running
+process was stopped and the test deadline remains unchanged.

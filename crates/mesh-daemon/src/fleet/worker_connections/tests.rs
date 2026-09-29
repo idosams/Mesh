@@ -242,7 +242,7 @@ fn authenticated_reconnect_preserves_input_and_delivers_original_handoff_once() 
             panic!("materialization expected")
         };
         assert!(reply_written);
-        admission
+        *admission
     });
     let retained = hub.transfers[0].handoff.as_ref().unwrap();
     assert_eq!(

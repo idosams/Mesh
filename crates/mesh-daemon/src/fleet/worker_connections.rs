@@ -23,7 +23,7 @@ pub enum WorkerConnectionOutcome {
     /// Native input is retained for one-time delivery to the independent provider supervisor.
     Materialized {
         /// Exact facts, never a replacement reservation.
-        admission: RemoteAdmissionReceipt,
+        admission: Box<RemoteAdmissionReceipt>,
         /// Only local final-response write/flush success, not durable peer receipt.
         reply_written: bool,
     },
@@ -148,7 +148,7 @@ impl<'a> NativeWorkerConnections<'a> {
                 entry.receipt = Some(admission.clone());
                 entry.handoff = Some(handoff);
                 Ok(WorkerConnectionOutcome::Materialized {
-                    admission,
+                    admission: Box::new(admission),
                     reply_written,
                 })
             }
