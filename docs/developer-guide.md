@@ -445,3 +445,28 @@ it does not create a durable completion/import receipt or protect bytes from lat
 This is a native receiving component. Authenticated network result serving, transfer orchestration,
 durable exact import receipts and real second-machine acceptance remain required. Missing or
 corrupt bytes refuse; no receiving failure authorizes rerunning the original worker.
+
+
+### Authenticated saved-result content transfer
+
+The macOS native resident route accepts a separately signed
+`mesh.worker-result-transfer-query/v1`, scoped to a known checkpoint and exact coordinator
+assignment. Its reply uses its own signing domain and binds the fresh query to the original
+worker-signed offer. The worker reopens the exact retained immutable review before serving its
+manifest and declared content. Existing known-offer queries do not authorize this operation.
+
+`receive_remote_saved_result` and `receive_remote_saved_result_over_ssh` verify the signed header
+and manifest before opening the independently admitted private result store. They resume retained
+CAS offsets, verify frame identity, offsets and final hashes, and check every complete file. A
+connection failure preserves partial receipt; a new explicit request has a new challenge. There
+is no automatic reconnect, authorization extension, execution retry or working-folder write.
+
+The existing 30-second challenge lifetime also bounds transfer authority; the authenticated stream
+owner must provide I/O deadlines. Manifest and part frames remain bounded to 1 MiB and 64 KiB.
+Worker requests must name declared chunks in increasing digest order, at most once each, so peer
+requests cannot cause unbounded repeated reads. A worker retains at most one verified 4 MiB chunk
+while writing parts and checks native root identity and freshness between parts.
+
+A successful return verifies currently present immutable content. The end frame is not a durable
+completion/import receipt, a retention pin, proof of provider success, or protected-main approval.
+Durable import correlation and real second-machine acceptance remain separate requirements.

@@ -1319,3 +1319,8 @@ pub use remote_admission::status::result::discovery::{
 
 #[cfg(target_os = "macos")]
 pub use remote_input::NativeRemoteResultReceiver;
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::result::transfer::{
+    receive_remote_saved_result, receive_remote_saved_result_over_ssh,
+};

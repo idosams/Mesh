@@ -281,3 +281,6 @@ impl RemoteAdmissionRegistry {
         Ok(Some((offer, source)))
     }
 }
+
+#[path = "result/transfer.rs"]
+pub(in crate::fleet) mod transfer;
