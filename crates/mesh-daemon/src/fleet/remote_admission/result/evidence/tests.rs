@@ -485,6 +485,56 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     );
     // Native CAS is independent of the new candidate copy.
     receiver.verify_complete(&mut runtime).unwrap();
+    assert!(
+        allocation
+            .into_result_workspace(
+                crate::TrustedReviewers::default(),
+                crate::CheckpointRuntimeParameters::selected_defaults(),
+            )
+            .is_err(),
+        "changed copy cannot become saved native history"
+    );
+    let clean = receiver
+        .materialize_result(
+            &mut runtime,
+            &setup.manifest,
+            &restored,
+            "22222222222222222222222222222222",
+        )
+        .unwrap();
+    let local_parent = clean.path().parent().unwrap().to_path_buf();
+    let local = clean
+        .into_result_workspace(
+            crate::TrustedReviewers::default(),
+            crate::CheckpointRuntimeParameters::selected_defaults(),
+        )
+        .unwrap();
+    local.verify().unwrap();
+    assert_eq!(local.binding().source_version, setup.manifest.input());
+    assert_ne!(
+        local.binding().starting_version,
+        Some(setup.manifest.input())
+    );
+    assert_eq!(
+        local
+            .receipt()
+            .get("context")
+            .unwrap()
+            .get("evidence_receipt")
+            .unwrap()
+            .as_text(),
+        Some(receipt_digest.to_string().as_str())
+    );
+    let local_receipt = local_parent.join("result-workspace.json");
+    let retained_local = local_parent.join("preserved-result-workspace.json");
+    fs::rename(&local_receipt, &retained_local).unwrap();
+    assert!(local.verify().is_err());
+    assert!(!local_receipt.exists());
+    fs::rename(&retained_local, &local_receipt).unwrap();
+    local.verify().unwrap();
+    fs::hard_link(&local_receipt, &retained_local).unwrap();
+    assert!(local.verify().is_err());
+    drop(local);
     let retained = metadata.with_extension("retained");
     fs::rename(&metadata, &retained).unwrap();
     assert!(receiver
@@ -526,6 +576,6 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         fs::read_dir(setup.f.path.join("allocations"))
             .unwrap()
             .count(),
-        1
+        2
     );
 }

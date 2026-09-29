@@ -10,6 +10,8 @@ use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
+mod result;
+pub use result::ReceivedResultWorkspace;
 mod worker;
 pub use worker::ReceivedWorkerWorkspace;
 
