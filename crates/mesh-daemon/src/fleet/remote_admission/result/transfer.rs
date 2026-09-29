@@ -350,6 +350,26 @@ pub fn receive_remote_saved_result<R: Read, W: Write>(
     destination: &crate::fleet::RemoteInputDestination,
     request: crate::fleet::RemoteWorkerStatusRequest<'_>,
     checkpoint: &str,
+    input: R,
+    output: W,
+    sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+) -> io::Result<RemoteSavedResultOffer> {
+    receive_remote_saved_result_selected(
+        destination,
+        request,
+        checkpoint,
+        None,
+        input,
+        output,
+        sign,
+    )
+}
+
+pub(in crate::fleet) fn receive_remote_saved_result_selected<R: Read, W: Write>(
+    destination: &crate::fleet::RemoteInputDestination,
+    request: crate::fleet::RemoteWorkerStatusRequest<'_>,
+    checkpoint: &str,
+    expected: Option<&str>,
     mut input: R,
     mut output: W,
     sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
@@ -381,6 +401,9 @@ pub fn receive_remote_saved_result<R: Read, W: Write>(
         )
         .map_err(map)?
         .ok_or_else(transfer_error)?;
+    if expected.is_some_and(|selected| offer.encode() != selected) {
+        return Err(transfer_error());
+    }
     let Some(RemoteFrame::Manifest(raw)) = reader.read_frame()? else {
         return Err(transfer_error());
     };

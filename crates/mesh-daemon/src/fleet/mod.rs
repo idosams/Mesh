@@ -1340,3 +1340,8 @@ pub use remote_admission::status::result::evidence::{
     receive_remote_result_evidence, receive_remote_result_evidence_over_ssh,
     AuthenticatedRemoteResultEvidence, RemoteResultEvidenceRequest,
 };
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::result::ingestion::{
+    ingest_remote_result_over_ssh, RemoteResultIngestionRequest,
+};
