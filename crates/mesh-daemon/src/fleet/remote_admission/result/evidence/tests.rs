@@ -279,3 +279,186 @@ fn metadata_query_rejects_other_domains_wrong_keys_and_noncanonical_forms() {
             .is_err()
     );
 }
+
+#[test]
+fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missing_metadata() {
+    use crate::fleet::{NativeRemoteResultReceiver, RemoteWorkerStatusRequest, Runtime};
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    let setup = Setup::new();
+    let mut runtime = setup.f.runtime(true);
+    let before = runtime.state().revision;
+    let initial = initial(&setup);
+    let mut saved = initial.clone();
+    saved.operation = setup.manifest.input();
+    let evidence =
+        RemoteResultCorrespondence::derive(&setup.manifest, &initial, &setup.manifest, &saved)
+            .unwrap();
+    let context = RemoteWorkerStatusChallenge::issue(
+        &mut runtime,
+        "lane",
+        "run",
+        public(&setup.f.coordinator),
+        public(&setup.f.worker),
+    )
+    .unwrap();
+    let offer = RemoteSavedResultOffer::sign(
+        Json::object([
+            ("target", context.body.get("target").unwrap().clone()),
+            ("owner", Json::text("01".repeat(32))),
+            ("mapping", Json::text("02".repeat(32))),
+            ("initial", Json::text(initial.operation.to_string())),
+            ("installation", Json::text("fixture")),
+            ("checkpoint", Json::text("checkpoint")),
+            ("review", Json::text("03".repeat(32))),
+            ("version", Json::text(setup.manifest.input().to_string())),
+            ("manifest", Json::text(setup.manifest.bundle().to_string())),
+        ]),
+        |p| sign(&setup.f.worker, p),
+    )
+    .unwrap()
+    .encode();
+    fn status<'a>(setup: &Setup, runtime: &'a mut Runtime) -> RemoteWorkerStatusRequest<'a> {
+        RemoteWorkerStatusRequest {
+            runtime,
+            lane: "lane",
+            run: "run",
+            coordinator: public(&setup.f.coordinator),
+            worker: public(&setup.f.worker),
+        }
+    }
+    macro_rules! request {
+        ($runtime:expr) => {
+            RemoteResultEvidenceRequest {
+                status: status(&setup, $runtime),
+                offer: &offer,
+                input: &setup.manifest,
+                result: &setup.manifest,
+            }
+        };
+    }
+    let attest = |raw: &str, nonce: u8, key: &SigningKey| {
+        let body = Json::object([
+            ("query", Json::text(format!("{nonce:02x}").repeat(32))),
+            ("observed_ms", Json::Number(1)),
+            ("offer", Json::text(&offer)),
+            (
+                "evidence",
+                Json::text(Blake3::digest_bytes(raw.as_bytes()).to_string()),
+            ),
+            ("bytes", Json::Number(raw.len() as u64)),
+        ]);
+        let signature = sign(key, &payload(REPLY_SIGNING, &body)).unwrap();
+        envelope(REPLY_SCHEMA, body, &signature)
+    };
+    let first = attest(evidence.encoded(), 1, &setup.f.worker);
+    let authenticated = AuthenticatedRemoteResultEvidence::verify_retained(
+        request!(&mut runtime),
+        &first,
+        evidence.encoded(),
+    )
+    .unwrap();
+    let wrong = attest(evidence.encoded(), 1, &setup.f.coordinator);
+    assert!(AuthenticatedRemoteResultEvidence::verify_retained(
+        request!(&mut runtime),
+        &wrong,
+        evidence.encoded(),
+    )
+    .is_err());
+    let mut receiver = NativeRemoteResultReceiver::new(
+        &setup.destination,
+        setup.manifest.clone(),
+        &offer,
+        status(&setup, &mut runtime),
+    )
+    .unwrap();
+    assert!(receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &authenticated)
+        .is_err());
+    receiver
+        .accept(&mut runtime, setup.digest, 0, &setup.bytes, true)
+        .unwrap();
+    let metadata = setup
+        .f
+        .path
+        .join("store")
+        .join(format!("result-evidence-{}.json", evidence.digest()));
+    fs::write(&metadata, b"partial evidence").unwrap();
+    fs::set_permissions(&metadata, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &authenticated)
+        .is_err());
+    assert_eq!(fs::read(&metadata).unwrap(), b"partial evidence");
+    let preserved = metadata.with_extension("preserved");
+    fs::rename(&metadata, &preserved).unwrap();
+    let receipt = receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &authenticated)
+        .unwrap();
+    let receipt_digest = receipt.digest();
+    let second = attest(evidence.encoded(), 2, &setup.f.worker);
+    let replay = AuthenticatedRemoteResultEvidence::verify_retained(
+        request!(&mut runtime),
+        &second,
+        evidence.encoded(),
+    )
+    .unwrap();
+    let repeated = receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &replay)
+        .unwrap();
+    assert_eq!(repeated.digest(), receipt_digest);
+    assert_eq!(repeated.evidence().attestation(), first);
+    // A different, validly signed provenance claim for the same content cannot replace the first.
+    let changed = evidence
+        .encoded()
+        .replace("\"input_path\":\"result.txt\"", "\"input_path\":null");
+    assert_ne!(changed, evidence.encoded());
+    let conflict = AuthenticatedRemoteResultEvidence::verify_retained(
+        request!(&mut runtime),
+        &attest(&changed, 3, &setup.f.worker),
+        &changed,
+    )
+    .unwrap();
+    assert!(receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &conflict)
+        .is_err());
+    drop(receiver);
+    drop(runtime);
+    let mut runtime = Runtime::open(
+        crate::fleet::FleetStore::open(setup.f.path.join("coordinator.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let (receiver, restored) = NativeRemoteResultReceiver::reopen_evidence_receipt(
+        &setup.destination,
+        request!(&mut runtime),
+    )
+    .unwrap();
+    assert_eq!(restored.digest(), receipt_digest);
+    assert_eq!(restored.evidence().attestation(), first);
+    let retained = metadata.with_extension("retained");
+    fs::rename(&metadata, &retained).unwrap();
+    assert!(receiver
+        .record_evidence_receipt(&mut runtime, &setup.manifest, &authenticated)
+        .is_err());
+    assert!(!metadata.exists());
+    drop(receiver);
+    assert!(NativeRemoteResultReceiver::reopen_evidence_receipt(
+        &setup.destination,
+        request!(&mut runtime)
+    )
+    .is_err());
+    fs::rename(&retained, &metadata).unwrap();
+    fs::hard_link(&metadata, &retained).unwrap();
+    assert!(NativeRemoteResultReceiver::reopen_evidence_receipt(
+        &setup.destination,
+        request!(&mut runtime)
+    )
+    .is_err());
+    assert_eq!(runtime.state().revision, before);
+    assert_eq!(
+        fs::read_dir(setup.f.path.join("allocations"))
+            .unwrap()
+            .count(),
+        0
+    );
+}

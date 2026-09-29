@@ -21,6 +21,13 @@ fn manifest_path(bundle: RecordDigest) -> PathBuf {
     PathBuf::from(format!("result-manifest-{bundle}.json"))
 }
 fn read_manifest(root: &PinnedWorkspaceRoot, path: &Path) -> io::Result<Option<Vec<u8>>> {
+    read_metadata(root, path, MAX_MANIFEST_BYTES)
+}
+pub(super) fn read_metadata(
+    root: &PinnedWorkspaceRoot,
+    path: &Path,
+    maximum: usize,
+) -> io::Result<Option<Vec<u8>>> {
     let file = match root.filesystem().read_only().read_file(path) {
         Ok(file) => file,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -29,16 +36,15 @@ fn read_manifest(root: &PinnedWorkspaceRoot, path: &Path) -> io::Result<Option<V
     let metadata = file.metadata()?;
     if metadata.nlink() != 1
         || metadata.permissions().mode() & 0o077 != 0
-        || metadata.len() > MAX_MANIFEST_BYTES as u64
+        || metadata.len() > maximum as u64
     {
         return Err(io::Error::other(
             "result manifest is not a bounded private regular file",
         ));
     }
     let mut bytes = Vec::new();
-    file.take(MAX_MANIFEST_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() > MAX_MANIFEST_BYTES {
+    file.take(maximum as u64 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > maximum {
         return Err(io::Error::other("result manifest grew"));
     }
     Ok(Some(bytes))
