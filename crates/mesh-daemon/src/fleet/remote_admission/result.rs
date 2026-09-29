@@ -124,6 +124,14 @@ impl RemoteSavedResultOffer {
             .map_err(|_| invalid())?;
         Ok(Self { body, signature })
     }
+    pub(in crate::fleet) fn content_identity(
+        encoded: &str,
+    ) -> Result<(RecordDigest, RecordDigest), Error> {
+        let offer = Self::decode(encoded)?;
+        let digest =
+            |field| RecordDigest::parse_hex(text(&offer.body, field)?).map_err(|_| invalid());
+        Ok((digest("version")?, digest("manifest")?))
+    }
     /// Canonical bounded bytes for authenticated private transport; not a completion receipt.
     pub fn encode(&self) -> String {
         envelope(SCHEMA, self.body.clone(), &self.signature)

@@ -3333,3 +3333,22 @@ source chunk as a partial 64 KiB transfer; the corrected bounded synthetic fixtu
 logs are retained. This is protocol/socket/native-store evidence, not actual second-machine proof.
 Full validation and PR delivery remain pending; durable exact import receipts and candidate review
 correlation remain required.
+
+
+## R44 durable result content receipts (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #174](https://github.com/idosams/Mesh/pull/174), `37f1e2e8a755ef71fd699db35a33989faf83a6c2`.
+No preserved source commits are replaced. R43 full local validation passed 3,567 native tests,
+17 skipped, desktop checks and 44 real daemon checks; its hosted verification remains in progress.
+
+Content receipt publication verifies complete files, preserves a bounded private canonical manifest,
+and records the original offer plus exact manifest and physical store identity in the coordinator
+ledger. Replays recover the same receipt; native reopen requires the retained manifest, ledger and
+complete valid bytes. Network transfer now records this fact before its end frame. It does not
+release execution capacity, materialize files or approve main. Partial/corrupt metadata is preserved
+and refused, not overwritten; receipt durability is separate from content retention and import.
+
+The expanded native regression passed durable replay, database reopen, partial-manifest preservation,
+changed-manifest/content refusal and corrupt ledger tails. Full validation and PR delivery are
+pending. Exact candidate mapping/import, retention and actual remote/packaged acceptance remain.

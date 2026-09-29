@@ -284,6 +284,20 @@ fn authenticated_result_stream_resumes_partial_content_and_refuses_wrong_frames(
     )
     .unwrap();
     receiver.verify_complete(&mut runtime).unwrap();
+    drop(receiver);
+    let (_, receipt) = NativeRemoteResultReceiver::reopen_content_receipt(
+        &setup.destination,
+        encoded_offer.as_ref().unwrap(),
+        RemoteWorkerStatusRequest {
+            runtime: &mut runtime,
+            lane: "lane",
+            run: "run",
+            coordinator: public(&setup.f.coordinator),
+            worker: public(&setup.f.worker),
+        },
+    )
+    .unwrap();
+    assert_ne!(receipt.digest(), RecordDigest::from_bytes([0; 32]));
     assert_eq!(runtime.state().revision, revision);
     assert!(setup.f.registry().receipts().unwrap().is_empty());
 }

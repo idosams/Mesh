@@ -240,6 +240,7 @@ fn native_result_receipt_resumes_verified_content_without_input_admission_or_wor
         .accept(&mut runtime, digest, 0, &bytes[..50_000], false)
         .unwrap();
     assert!(receiver.verify_complete(&mut runtime).is_err());
+    assert!(receiver.record_content_receipt(&mut runtime).is_err());
     drop(receiver);
     let mut receiver = NativeRemoteResultReceiver::new(
         &destination,
@@ -264,6 +265,85 @@ fn native_result_receipt_resumes_verified_content_without_input_admission_or_wor
         (100_000, true)
     );
     assert_eq!(receiver.manifest(), &manifest);
+    // A partial retained manifest is never overwritten or interpreted as a durable receipt.
+    let manifest_path = store.join(format!("result-manifest-{}.json", manifest.bundle()));
+    fs::write(&manifest_path, b"partial preserved manifest").unwrap();
+    fs::set_permissions(&manifest_path, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(receiver.record_content_receipt(&mut runtime).is_err());
+    assert_eq!(
+        fs::read(&manifest_path).unwrap(),
+        b"partial preserved manifest"
+    );
+    fs::rename(&manifest_path, store.join("preserved-partial-manifest")).unwrap();
+    let receipt = receiver.record_content_receipt(&mut runtime).unwrap();
+    fs::rename(&manifest_path, store.join("preserved-recorded-manifest")).unwrap();
+    assert!(receiver.record_content_receipt(&mut runtime).is_err());
+    assert!(
+        !manifest_path.exists(),
+        "an existing receipt cannot silently recreate missing metadata"
+    );
+    fs::rename(store.join("preserved-recorded-manifest"), &manifest_path).unwrap();
+    assert_eq!(
+        receiver
+            .record_content_receipt(&mut runtime)
+            .unwrap()
+            .digest(),
+        receipt.digest()
+    );
+    drop(receiver);
+    drop(runtime);
+    let mut runtime = Runtime::open(
+        FleetStore::open(f.path.join("coordinator.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let (receiver, reopened) = NativeRemoteResultReceiver::reopen_content_receipt(
+        &destination,
+        &encoded,
+        request(&f, &mut runtime),
+    )
+    .unwrap();
+    assert_eq!(reopened.digest(), receipt.digest());
+    receiver.verify_complete(&mut runtime).unwrap();
+    drop(receiver);
+    let original = fs::read(&manifest_path).unwrap();
+    fs::write(&manifest_path, b"changed retained manifest").unwrap();
+    assert!(NativeRemoteResultReceiver::reopen_content_receipt(
+        &destination,
+        &encoded,
+        request(&f, &mut runtime)
+    )
+    .is_err());
+    assert_eq!(
+        fs::read(&manifest_path).unwrap(),
+        b"changed retained manifest"
+    );
+    fs::write(&manifest_path, original).unwrap();
+    let chunk_path = mesh_cas::StoreLayout::new(store.clone()).chunk_path(&digest);
+    fs::write(&chunk_path, b"changed content").unwrap();
+    assert!(NativeRemoteResultReceiver::reopen_content_receipt(
+        &destination,
+        &encoded,
+        request(&f, &mut runtime)
+    )
+    .is_err());
+    fs::write(&chunk_path, &bytes).unwrap();
+    let (receiver, _) = NativeRemoteResultReceiver::reopen_content_receipt(
+        &destination,
+        &encoded,
+        request(&f, &mut runtime),
+    )
+    .unwrap();
+    runtime
+        .store
+        .append_with_outcome(
+            &format!("result-content-{}", receipt.digest()),
+            1,
+            "extra",
+            "{}",
+        )
+        .unwrap();
+    assert!(receiver.record_content_receipt(&mut runtime).is_err());
     assert_eq!(runtime.state().revision, initial_revision);
     assert_eq!(runtime.state().lanes["lane"].runs.len(), 1);
     assert_eq!(
