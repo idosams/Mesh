@@ -18,7 +18,7 @@ impl RemoteLocalReviewReceipt {
         ])
     }
 
-    fn with_review<T>(
+    pub(super) fn with_review<T>(
         &self,
         destination: &RemoteInputDestination,
         manifest: &RemoteInputManifest,

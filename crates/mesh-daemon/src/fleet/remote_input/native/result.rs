@@ -113,5 +113,5 @@ pub use receipt::RemoteResultContentReceipt;
 mod evidence_receipt;
 pub use evidence_receipt::{
     RemoteLocalReviewEntry, RemoteLocalReviewPage, RemoteLocalReviewReceipt,
-    RemoteResultEvidenceReceipt,
+    RemoteProjectCandidateRequest, RemoteResultEvidenceReceipt,
 };

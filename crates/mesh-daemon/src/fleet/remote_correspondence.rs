@@ -101,6 +101,64 @@ impl RemoteResultCorrespondence {
         let digest = RecordDigest::from_bytes(*Blake3::digest_bytes(encoded.as_bytes()).as_bytes());
         Ok(Self { encoded, digest })
     }
+    /// Map an independently imported exact result to the original native objects. Only a caller
+    /// holding authenticated, retained evidence may use this mapping for candidate preparation.
+    pub(in crate::fleet) fn project_origins(
+        &self,
+        input: &RemoteInputManifest,
+        original: &HistoricalWorkspacePreview,
+        result: &RemoteInputManifest,
+        local: &HistoricalWorkspacePreview,
+    ) -> io::Result<BTreeMap<String, String>> {
+        let invalid = || io::Error::other("remote project correspondence unavailable");
+        if original.operation != input.input()
+            || !input.matches_saved_content(original)
+            || !result.matches_saved_content(local)
+        {
+            return Err(invalid());
+        }
+        let body = Json::parse(self.encoded()).map_err(|_| invalid())?;
+        let initial = body
+            .get("worker_initial")
+            .and_then(Json::as_text)
+            .and_then(|v| RecordDigest::parse_hex(v).ok())
+            .ok_or_else(invalid)?;
+        Self::decode_bound(self.encoded(), input, result, initial)?;
+        let entries = |snapshot: &HistoricalWorkspacePreview| -> io::Result<BTreeMap<String, (String, bool)>> {
+            let mut paths = BTreeMap::new();
+            let mut objects = std::collections::BTreeSet::new();
+            for (path, object, directory) in snapshot.directories.iter()
+                .map(|v| (&v.path, v.object.to_string(), true))
+                .chain(snapshot.files.iter().map(|v| (&v.path, v.object.to_string(), false))) {
+                if !objects.insert(object.clone()) || paths.insert(path.clone(), (object, directory)).is_some() {
+                    return Err(invalid());
+                }
+            }
+            Ok(paths)
+        };
+        let original = entries(original)?;
+        let local = entries(local)?;
+        let mut origins = BTreeMap::new();
+        for row in body
+            .get("entries")
+            .and_then(Json::as_array)
+            .ok_or_else(invalid)?
+        {
+            let path = row
+                .get("path")
+                .and_then(Json::as_text)
+                .ok_or_else(invalid)?;
+            let target = local.get(path).ok_or_else(invalid)?;
+            if let Some(source) = row.get("input_path").and_then(Json::as_text) {
+                let source = original.get(source).ok_or_else(invalid)?;
+                if source.1 != target.1 {
+                    return Err(invalid());
+                }
+                origins.insert(target.0.clone(), source.0.clone());
+            }
+        }
+        Ok(origins)
+    }
 }
 
 #[cfg(test)]

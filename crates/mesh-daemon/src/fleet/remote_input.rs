@@ -436,7 +436,8 @@ impl<'a, F: DurableFs> RemoteInputReceiver<'a, F> {
 #[cfg(target_os = "macos")]
 pub use native::{
     NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
-    RemoteLocalReviewReceipt, RemoteResultContentReceipt, RemoteResultEvidenceReceipt,
+    RemoteLocalReviewReceipt, RemoteProjectCandidateRequest, RemoteResultContentReceipt,
+    RemoteResultEvidenceReceipt,
 };
 
 #[cfg(test)]

@@ -188,7 +188,8 @@ mod result;
 #[cfg(target_os = "macos")]
 pub use result::{
     NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
-    RemoteLocalReviewReceipt, RemoteResultContentReceipt, RemoteResultEvidenceReceipt,
+    RemoteLocalReviewReceipt, RemoteProjectCandidateRequest, RemoteResultContentReceipt,
+    RemoteResultEvidenceReceipt,
 };
 
 #[cfg(test)]
