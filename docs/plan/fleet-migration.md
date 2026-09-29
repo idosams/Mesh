@@ -3286,3 +3286,26 @@ unsaved bytes excluded, altered mapping refusal and replacement-root refusal. An
 compile lacked a type qualification; the correction and original log are retained. Full validation
 and canonical PR delivery remain pending. Resumable output transport, exact coordinator review
 import and actual remote/packaged acceptance remain required.
+
+
+## R42 native resumable result receipt (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #171](https://github.com/idosams/Mesh/pull/171). No preserved source commits are replaced.
+R41's full local gate passed: 3,563 native tests, 17 skipped, desktop checks and 44 daemon checks.
+Two local process-leak warnings remain tracked in [#172](https://github.com/idosams/Mesh/issues/172).
+Its original seven hosted checks also passed, including 3,563 native tests and four renderer cases;
+its updated dependency preserves the identical source tree.
+
+The native result receiver verifies the exact signed offer/current assignment and manifest before
+store effects, owns the private receiving lock, and reuses durable partial CAS receipt. Context and
+root checks bracket each operation. It creates no synthetic input assignment or launch reservation
+and cannot materialize working files. Complete verification is an observation, not a durable
+completion/import receipt or retention pin.
+
+The native regression passed resumable receipt after dropping the owner, exclusive ownership,
+invalid manifest before store creation, unknown chunks, conflicting offsets and substituted roots,
+with coordinator revision/run count and the allocation directory unchanged. An initial test-helper
+lifetime failure was corrected; its log is retained. Full local/hosted checks and PR delivery remain
+pending. Authenticated result serving/transfer, durable exact candidate import and real remote
+acceptance remain in scope.

@@ -433,6 +433,9 @@ impl<'a, F: DurableFs> RemoteInputReceiver<'a, F> {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub use native::NativeRemoteResultReceiver;
+
 #[cfg(test)]
 mod tests {
     use super::*;

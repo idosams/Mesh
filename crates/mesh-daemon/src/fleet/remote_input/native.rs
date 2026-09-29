@@ -183,6 +183,11 @@ impl DurableFs for ReceivingFs<'_> {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod result;
+#[cfg(target_os = "macos")]
+pub use result::NativeRemoteResultReceiver;
+
 #[cfg(test)]
 mod tests {
     use super::*;

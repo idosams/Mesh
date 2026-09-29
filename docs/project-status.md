@@ -346,3 +346,11 @@ saved bytes despite later working edits, changed receipt refusal and replacement
 The first test compile missed a type qualification and was corrected; its log is retained. Full
 validation is pending. This is a read-only native foundation for restart-safe transfer, not remote
 file delivery or candidate import.
+
+
+Native signed-result receipt now resumes durable partial chunks in a separately admitted private
+store without creating input admission or working files. Its focused test passed interrupted
+receipt/reopen, exclusive ownership, invalid manifest before storage effects, offset refusal and
+root replacement. An initial test-helper lifetime error was corrected and retained in the log.
+Full validation is pending. Network result serving, durable import receipts and actual remote
+acceptance remain unfinished.
