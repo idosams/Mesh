@@ -724,3 +724,16 @@ still not content availability: a caller must reopen the native review before di
 Neither discovery nor paging contacts workers, creates execution authority, repairs history or
 approves protected main. Existing v1 correlations remain directly readable; an exact authorized
 native re-registration can add their discovery intent without changing the original receipt.
+
+### Retained remote review presentation
+
+The native correlation reader returns `mesh.remote-saved-review/v1` with exact offer, correlation,
+local version/bundle and remote version identities. Its `comparison_basis` is
+`received-result-tree`: the local review describes the independent received snapshot, not the
+original-project changes. `approval_authority` is false. The embedded review uses Mesh's existing
+native saved-review projection, including explicit unavailable content states. Artifact reads reuse
+the bounded immutable review reader and require an exact object and before/after side. Both paths
+recheck native retained mapping/history/custody after reading; neither repairs missing state.
+
+This additive native interface does not change persisted v1 receipts. It does not yet register
+a desktop route, supply destination discovery, certify import eligibility or establish retention.

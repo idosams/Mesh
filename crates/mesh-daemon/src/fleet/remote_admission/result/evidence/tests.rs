@@ -664,11 +664,77 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         open.shared_version().is_none(),
         "review creation cannot approve protected main"
     );
+    let object = open
+        .historical_workspace_preview(local_operation)
+        .unwrap()
+        .files[0]
+        .object
+        .to_string();
+    let trusted = crate::TrustedReviewers::default();
+    let displayed = durable
+        .saved_review(&setup.destination, &setup.manifest, &trusted)
+        .unwrap();
+    assert_eq!(
+        displayed.get("bundle"),
+        Some(&Json::text(review.to_string()))
+    );
+    assert_eq!(
+        displayed.get("version"),
+        Some(&Json::text(local_operation.to_string()))
+    );
+    assert_eq!(
+        displayed.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        displayed.get("review"),
+        open.recorded_review_item(review).as_ref()
+    );
     drop(open);
+    assert_eq!(
+        durable
+            .saved_review_artifact(
+                &setup.destination,
+                &setup.manifest,
+                &trusted,
+                (&object, "after")
+            )
+            .unwrap()
+            .bytes(),
+        setup.bytes
+    );
+    for selection in [
+        ("result.txt", "after"),
+        (&object, "live"),
+        (&object, "before"),
+        ("ffffffffffffffffffffffffffffffff", "after"),
+    ] {
+        assert!(durable
+            .saved_review_artifact(&setup.destination, &setup.manifest, &trusted, selection)
+            .is_err());
+    }
+    assert!(durable
+        .saved_review(
+            &setup.destination,
+            &RemoteInputManifest::new(RecordDigest::from_bytes([88; 32]), vec![]).unwrap(),
+            &trusted
+        )
+        .is_err());
 
     assert_eq!(source.manifest().input(), local_operation);
     assert_eq!(source.read_chunk(setup.digest).unwrap(), setup.bytes);
     fs::rename(&local_receipt, &retained_local).unwrap();
+    assert!(durable
+        .saved_review(&setup.destination, &setup.manifest, &trusted)
+        .is_err());
+    assert!(durable
+        .saved_review_artifact(
+            &setup.destination,
+            &setup.manifest,
+            &trusted,
+            (&object, "after")
+        )
+        .is_err());
     assert!(reopen(mapping).is_err());
     assert!(
         !local_receipt.exists(),

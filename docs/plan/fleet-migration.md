@@ -3538,3 +3538,17 @@ on the index writer was corrected after the initial library check failed; that l
 An existing historical branch name was preserved by choosing a distinct new branch. Full validation
 and PR delivery are pending. Native review-panel integration, exact original-project import,
 retention and actual remote/provider/packaged acceptance remain required.
+
+## R54: native historical remote review reader
+
+Depends on R53 / PR #184. New canonical implementation; replaces no preserved legacy commit.
+Retained remote/local correlations now expose the existing native recorded-review presentation and
+immutable artifact reader. Each read checks the exact manifest, mapping, installation, allocation,
+local subject and review before and after access. Artifact selection uses object identity and side,
+never a supplied path. Missing metadata is preserved and refused. The received result tree is
+explicitly labelled; it does not claim an original-project diff or import eligibility. No session,
+worker, approval or writeback authority is created. Desktop routing, durable destination lookup,
+original-project import and full remote acceptance remain outstanding.
+
+Validation: composed native regression covers SQLite reopening, exact saved review/artifact bytes,
+invalid path/object/side/manifest and missing metadata refusals. Full canonical gate pending.
