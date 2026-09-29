@@ -210,3 +210,12 @@ does not close output; dropping the connection kills/reaps only the local SSH cl
 worker cancellation and never grants a new launch. Diagnostics are drained without retaining raw
 text. A local-client exit status is not a remote result receipt. Actual SSH deployment and
 second-machine disconnect/result recovery remain unverified.
+
+Native coordinators can call `deliver_remote_input_over_ssh` with an existing saved-history source,
+current lane/run, independently configured coordinator/worker execution keys and an explicit
+`RemoteInputDeliveryIntent`. `Claim` verifies the peer before recording the selected original
+assignment; `Reconnect` is limited to the retained initial-lease input transfer. Neither intent
+automatically retries a failed call or adopts a provider. The native signer receives only checked
+dispatch and admission payloads. The worker proof must remain fresh throughout SSH setup; the
+connection budget never extends proof or lease expiry. A successful return describes input
+materialization only. Remote results, lease renewal and real second-machine acceptance remain open.

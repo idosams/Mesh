@@ -10,13 +10,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
-struct Export {
+pub(in crate::fleet) struct Export {
     root: PathBuf,
-    source: RemoteInputSource,
+    pub(in crate::fleet) source: RemoteInputSource,
     live_bytes: Vec<u8>,
 }
 impl Export {
-    fn new() -> Self {
+    pub(in crate::fleet) fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
             "mesh-transfer-client-{}-{}",
             std::process::id(),
@@ -52,7 +52,7 @@ impl Export {
             live_bytes: vec![0xff; 140_000],
         }
     }
-    fn setup(&self) -> Setup {
+    pub(in crate::fleet) fn setup(&self) -> Setup {
         let mut setup = Setup::new();
         setup.f.work.assignment.input = self.source.manifest().input();
         setup.f.work.assignment.bundle = self.source.manifest().bundle();

@@ -68,8 +68,12 @@ pub use worker_directory::{
     NativeRemoteWorkerDirectory, NativeWorkerEndpoint, NativeWorkerInstallation,
     NativeWorkerStream, WorkerInstallationIdentity,
 };
+#[cfg(target_os = "macos")]
+mod remote_delivery;
 mod remote_input;
 mod remote_transport;
+#[cfg(target_os = "macos")]
+pub use remote_delivery::{deliver_remote_input_over_ssh, RemoteInputDeliveryIntent};
 #[cfg(target_os = "macos")]
 mod ssh_transport;
 #[cfg(unix)]
