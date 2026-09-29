@@ -2890,3 +2890,9 @@ search path passed without weakening product assertions, and the failed log rema
 Repository target, documentation, license, storage and formatting checks passed. Full hosted
 validation is pending. Resident transport, signing-eligible
 provisioning, renewed leases, signed-result recovery and real second-machine acceptance remain open.
+
+Initial R28 hosted validation caught an undeclared direct `mesh_store` reference in the desktop
+command and a startup-order regression whose exact expected sequence lacked the new worker mode.
+The command now formats public key bytes directly without a dependency change. The startup test
+requires the worker mode, its failure exit and early return before the existing attachment/MCP and
+AppKit sequence. Failed CI logs remain preserved; full corrected validation is pending.

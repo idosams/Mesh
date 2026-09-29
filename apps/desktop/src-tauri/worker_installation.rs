@@ -73,7 +73,12 @@ fn run(action: Action, root: PathBuf) -> Result<(), String> {
         (
             "worker",
             Json::text(
-                mesh_store::RecordDigest::from_bytes(*identity.worker().as_bytes()).to_string(),
+                identity
+                    .worker()
+                    .as_bytes()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>(),
             ),
         ),
     ])
