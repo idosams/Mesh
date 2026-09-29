@@ -325,3 +325,6 @@ impl RemoteAdmissionRegistry {
 
 #[path = "result/transfer.rs"]
 pub(in crate::fleet) mod transfer;
+
+#[path = "result/evidence.rs"]
+pub(in crate::fleet) mod evidence;

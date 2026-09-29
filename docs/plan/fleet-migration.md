@@ -3374,3 +3374,23 @@ expectation incorrectly assigned ancestry to a new file from an empty input; cor
 fixture expectation required no production behavior change, and the failed log is retained. Full
 validation and PR delivery are pending. Authenticated evidence transport, exact coordinator import,
 retention and actual remote/packaged acceptance remain in scope.
+
+
+## R46 authenticated result correspondence (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #176](https://github.com/idosams/Mesh/pull/176), `5756a26efbfe9c28d77c449190b6b0f9d8e451ef`.
+No preserved commits are replaced. R45 full local validation passed 3,569 native tests, 17 skipped,
+desktop checks and 44 daemon checks.
+
+The new read-only evidence query/reply uses separate signing domains, a fresh exact-assignment
+challenge and the original signed-offer digest. Native worker reopening produces bounded metadata;
+authenticated headers bind its full digest/length and bounded chunk frames carry it. The receiver
+verifies both manifests and exact initial/result identities, completeness, unique objects/origins,
+kind compatibility and canonical encoding. It writes no import, execution or main state.
+
+Focused real-socket protocol fixtures passed multi-frame metadata and malicious response refusal;
+closed-decoder tests pass malformed path/identity/context refusal. An initial scoped-borrow error
+in the test helper was corrected and retained. Native history reopening is covered separately, not
+claimed as actual second-machine proof. Full validation and PR delivery are pending; durable
+evidence/import correlation, retention and complete remote/packaged acceptance remain required.

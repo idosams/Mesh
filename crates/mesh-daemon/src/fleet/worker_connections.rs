@@ -26,6 +26,8 @@ pub enum WorkerConnectionOutcome {
     ResultsDiscovered,
     /// Peer ended an authenticated content stream; no durable import acknowledgment is implied.
     ResultServed,
+    /// Authenticated native correspondence metadata was written; this is not candidate import.
+    ResultEvidenceServed,
     /// A signed durable lease acknowledgment was written; peer receipt and liveness stay unknown.
     LeaseReplied,
     /// EOF before materialization. The original reservation and partial input remain resident-owned.
@@ -168,6 +170,19 @@ impl<'a> NativeWorkerConnections<'a> {
             query.serve(&registry, self.destination, input, output, sign)?;
             self.installation.verify()?;
             return Ok(WorkerConnectionOutcome::ResultServed);
+        }
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-result-evidence-query/v1")
+        {
+            let query = super::remote_admission::status::result::evidence::RemoteResultEvidenceQuery::decode(encoded).and_then(|q| q.verify(&self.policy)).map_err(|_| refused())?;
+            let registry = self.installation.registry(
+                query.coordinator(),
+                query.objective(),
+                query.limits().clone(),
+            )?;
+            query.serve(&registry, self.destination, output, sign)?;
+            self.installation.verify()?;
+            return Ok(WorkerConnectionOutcome::ResultEvidenceServed);
         }
         self.destination.verify()?;
         let dispatch = RemoteDispatch::decode(encoded)
