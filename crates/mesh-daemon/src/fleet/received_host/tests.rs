@@ -415,10 +415,23 @@ fn resident_retains_failed_start_and_polls_independent_provider_after_broker_dis
         .is_err());
     let failed_receipt = resident.admissions().remove(0);
     let handoff = received_handoff(&live, true);
-    let root = handoff.allocation.path().to_path_buf();
+    let input_root = handoff.allocation.path().to_path_buf();
     let receipt = resident
         .start_received(*handoff, resident_launch(&fixture2, Arc::new(Signers)))
         .unwrap();
+    let snapshot = resident.snapshot(&receipt).unwrap();
+    let lanes = snapshot.get("lanes").unwrap().as_array().unwrap();
+    assert_eq!(lanes.len(), 1);
+    let root = std::path::PathBuf::from(
+        lanes[0]
+            .get("workspace")
+            .unwrap()
+            .get("root")
+            .unwrap()
+            .as_text()
+            .unwrap(),
+    );
+    assert_ne!(root, input_root);
     wait_started(&root);
     assert!(resident.snapshot(&failed_receipt).is_err());
     assert!(resident.snapshot(&receipt).is_ok());
@@ -445,18 +458,26 @@ fn resident_retains_failed_start_and_polls_independent_provider_after_broker_dis
     let extra_root = extra_handoff.allocation.path().to_path_buf();
     let unknown = extra_handoff.allocation.admission.as_ref().unwrap().clone();
     assert!(resident.request_cancel(&unknown).is_err());
-    assert!(resident
-        .start_received(
-            *extra_handoff,
-            resident_launch(&Fixture::new(), Arc::new(Signers))
-        )
-        .is_err());
+    assert_eq!(
+        resident
+            .start_received(
+                *extra_handoff,
+                resident_launch(&Fixture::new(), Arc::new(Signers))
+            )
+            .err()
+            .unwrap()
+            .code,
+        "remote-supervisor-capacity"
+    );
     assert_eq!(resident.admissions().len(), 2);
     assert!(!extra_root.join("launches.txt").exists());
     assert_eq!(
         fs::read_to_string(root.join("launches.txt")).unwrap(),
         "one\n"
     );
+    assert!(!input_root.join("launches.txt").exists());
+    assert!(!input_root.join("finish").exists());
+    assert_eq!(fs::read(input_root.join("result.txt")).unwrap(), live.bytes);
 }
 #[test]
 fn resident_never_retries_retained_identity_or_accepts_another_worker() {

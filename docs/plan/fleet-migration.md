@@ -2761,3 +2761,11 @@ identity instead of a hard-coded value. Complete native compilation passed with 
 test execution and full hosted validation are pending. This is native resident ownership composition,
 not a deployed listener. Key/host provisioning, persistent service lifecycle, renewed-lease and signed
 result recovery, real second-machine and packaged acceptance remain unfinished.
+
+
+R25's first Linux run caught a fixture-path error: the resident test waited for provider output in
+received immutable input rather than the initialized independent worker workspace. The regression
+now reads the actual root from the native snapshot, asserts the roots differ and verifies that input
+bytes remain unchanged with no provider markers. The same startup deadline and all launch/capacity
+assertions remain; the capacity refusal also checks its exact error code. The failed run is retained.
+Corrected validation is pending.
