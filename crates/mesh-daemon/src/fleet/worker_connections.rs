@@ -24,6 +24,8 @@ pub enum WorkerConnectionOutcome {
     ResultReplied,
     /// Fresh signed catalog page; neither an empty page nor an offer proves completion.
     ResultsDiscovered,
+    /// Peer ended an authenticated content stream; no durable import acknowledgment is implied.
+    ResultServed,
     /// A signed durable lease acknowledgment was written; peer receipt and liveness stay unknown.
     LeaseReplied,
     /// EOF before materialization. The original reservation and partial input remain resident-owned.
@@ -152,6 +154,20 @@ impl<'a> NativeWorkerConnections<'a> {
             self.installation.verify()?;
             RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
             return Ok(WorkerConnectionOutcome::ResultsDiscovered);
+        }
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-result-transfer-query/v1")
+        {
+            let query = super::remote_admission::status::result::transfer::RemoteResultTransferQuery::decode(encoded)
+                .and_then(|q| q.verify(&self.policy)).map_err(|_| refused())?;
+            let registry = self.installation.registry(
+                query.coordinator(),
+                query.objective(),
+                query.limits().clone(),
+            )?;
+            query.serve(&registry, self.destination, input, output, sign)?;
+            self.installation.verify()?;
+            return Ok(WorkerConnectionOutcome::ResultServed);
         }
         self.destination.verify()?;
         let dispatch = RemoteDispatch::decode(encoded)

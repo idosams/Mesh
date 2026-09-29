@@ -3309,3 +3309,27 @@ with coordinator revision/run count and the allocation directory unchanged. An i
 lifetime failure was corrected; its log is retained. Full local/hosted checks and PR delivery remain
 pending. Authenticated result serving/transfer, durable exact candidate import and real remote
 acceptance remain in scope.
+
+
+## R43 authenticated saved-result content transfer (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #173](https://github.com/idosams/Mesh/pull/173). No preserved commits are replaced.
+[PR #171](https://github.com/idosams/Mesh/pull/171) merged as
+`3c6bddf913767c2a1587d4bc5184971af5650d51` after all seven checks passed. R42's corrected full
+local gate and seven hosted checks passed (3,564 native tests, 17 skipped, desktop and 44 daemon
+checks); its main-base reconciliation preserves identical content. Process warnings remain tracked
+in [#172](https://github.com/idosams/Mesh/issues/172).
+
+A separately signed fresh transfer query selects one exact saved checkpoint. The native resident
+reopens guarded immutable history, signs a query-bound header, and serves only declared chunks in
+strictly increasing order. The coordinator verifies offer/manifest before native store effects,
+resumes durable offsets, and verifies complete file content. Authorization stays bounded by the
+original challenge lifetime; explicit reconnect creates a new challenge without retrying execution.
+
+Three focused regressions pass. Initial resume-fixture assumptions incorrectly treated a 32 KiB
+source chunk as a partial 64 KiB transfer; the corrected bounded synthetic fixture tests a real
+65,536-byte retained offset. A missing digest trait/type qualification was also corrected. Failed
+logs are retained. This is protocol/socket/native-store evidence, not actual second-machine proof.
+Full validation and PR delivery remain pending; durable exact import receipts and candidate review
+correlation remain required.

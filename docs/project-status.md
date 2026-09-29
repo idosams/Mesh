@@ -354,3 +354,11 @@ receipt/reopen, exclusive ownership, invalid manifest before storage effects, of
 root replacement. An initial test-helper lifetime error was corrected and retained in the log.
 Full validation is pending. Network result serving, durable import receipts and actual remote
 acceptance remain unfinished.
+
+
+Authenticated saved-result content transfer now has a distinct native resident route and bounded
+SSH entry point. Three focused regressions pass, including lost-connection partial receipt, fresh
+resume, incorrect-offset refusal, stale replies, wrong signing domains and keys. The transfer
+fixture uses signed synthetic metadata; native exact saved-history reopening is covered separately
+by the received-host regression. Full verification is in progress. Durable candidate import and
+actual second-machine/packaged acceptance remain unfinished.
