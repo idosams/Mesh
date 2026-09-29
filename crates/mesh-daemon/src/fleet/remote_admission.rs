@@ -292,6 +292,9 @@ impl RemoteAdmissionRegistry {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub(in crate::fleet) mod status;
+
 #[cfg(test)]
 mod tests;
 

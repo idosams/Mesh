@@ -18,6 +18,8 @@ struct Transfer<'a> {
 
 /// Native connection disposition; materialized input is not provider execution or completion.
 pub enum WorkerConnectionOutcome {
+    /// Fresh signed retained facts were written; this grants no execution or retry authority.
+    StatusReplied,
     /// EOF before materialization. The original reservation and partial input remain resident-owned.
     Disconnected,
     /// Native input is retained for one-time delivery to the independent provider supervisor.
@@ -74,12 +76,30 @@ impl<'a> NativeWorkerConnections<'a> {
         sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
     ) -> io::Result<WorkerConnectionOutcome> {
         self.installation.verify()?;
-        self.destination.verify()?;
         let Some(RemoteFrame::Control(bytes)) = RemoteFrameReader::new(&mut input).read_frame()?
         else {
             return Err(refused());
         };
-        let dispatch = RemoteDispatch::decode(std::str::from_utf8(&bytes).map_err(|_| refused())?)
+        let encoded = std::str::from_utf8(&bytes).map_err(|_| refused())?;
+        let envelope = crate::ipc::Json::parse(encoded).map_err(|_| refused())?;
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-status-query/v1")
+        {
+            let query = super::RemoteWorkerStatusQuery::decode(encoded)
+                .and_then(|q| q.verify(&self.policy))
+                .map_err(|_| refused())?;
+            let registry = self.installation.registry(
+                query.coordinator(),
+                query.objective(),
+                query.limits().clone(),
+            )?;
+            let reply = query.reply(&registry, sign).map_err(|_| refused())?;
+            self.installation.verify()?;
+            RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
+            return Ok(WorkerConnectionOutcome::StatusReplied);
+        }
+        self.destination.verify()?;
+        let dispatch = RemoteDispatch::decode(encoded)
             .and_then(|dispatch| dispatch.verify(&self.policy))
             .map_err(|_| refused())?;
         let index = match self.transfers.iter().position(|entry| {

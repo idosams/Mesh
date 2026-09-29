@@ -3026,3 +3026,34 @@ log is preserved; corrected focused and full validation remain required.
 The corrected three-case native composition suite passed in 0.78 seconds. Complete daemon lint
 with warnings denied and repository/docs/license/storage/format checks passed. Full hosted checks
 remain required; native loopback composition is not actual second-machine SSH acceptance.
+
+## R32 signed retained worker status (in progress)
+
+New canonical work tracked in [#156](https://github.com/idosams/Mesh/issues/156), based on merged
+[PR #155](https://github.com/idosams/Mesh/pull/155), `bef131c69224c427ade919c680940b32f7f4efc3`.
+No preserved source commits are replaced. R31 passed all seven PR checks, including full macOS
+`npm test` with 3,534 Rust tests passed / 17 skipped, all three delivery cases and four renderer
+cases. Its combined-main checks are running; R30 combined-main checks passed.
+
+The additive closed v1 worker-status query/reply uses separate signing domains and fresh native
+nonces. Native context binds coordinator/worker keys, objective, lane/run, immutable input/bundle,
+provider and a goal digest. The worker verifies configured keys/caps before reading the guarded
+registry, signs only retained facts, and rechecks history and freshness after signing. The coordinator
+consumes its original query, verifies the worker reply, checks current context and exposes correlated
+read-only facts with an observation time. Unknown fields, noncanonical data and replay refuse.
+
+Admission is not materialization; launch intent is not provider acknowledgment or completion. Null
+admission means unrecorded/unknown and grants no retry. Reading can recover expired/cancelled work
+using fresh authentication without resetting a lease, adopting a process, allocating, launching,
+changing ownership or freeing a slot. Initial lease fields are explicitly historical. The existing
+resident endpoint routes status separately from input transfer, and a native SSH inspection API
+closes only its owned connection. Status reads require guarded installation/history authority, not
+input-store materialization authority; input transfer retains its separate destination verification.
+
+Five focused native tests passed: durable reopen with no second reservation, key/staleness/replay
+refusal, expired-lease read, changed context/history/unknown-field refusal, and actual resident-broker
+recovery of a signed launch intent without launching a process or changing coordinator state. An
+initial test compile failed because the deliberate history-mutation fixture omitted `mut`; that log
+is preserved. Complete native compilation and initial lint passed; full final-base checks remain
+required. This is not signed saved-result transfer, current process liveness, lease renewal, UI
+readiness or real second-machine acceptance.
