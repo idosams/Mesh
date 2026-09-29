@@ -390,3 +390,15 @@ and reopened after a coordinator restart. The receipt preserves the first worker
 refuses changed or missing metadata; it does not grant candidate import or main approval. This
 source increment's validation and delivery state is tracked in the migration ledger. Real remote
 and packaged acceptance, coordinator candidate import and content retention policy remain open.
+
+## Remote result history integration
+
+Remote results now have source support for authenticated immutable transfer, retained correspondence,
+independent local history, exact review correlation and bounded offline discovery. The native history
+interface resolves a registered result from offer/correlation identities and reads its saved review
+and artifacts without renderer-supplied paths or a running worker. Missing or replaced private storage
+refuses without repair. This is a received result snapshot, not yet an original-project comparison.
+
+Desktop remote-review routing/panels, original-project result import, retention guarantees and the
+fully composed second-machine journey remain incomplete. Local/hosted native tests do not prove
+packaged graphical acceptance. The delivery ledger records exact PR validation and merge status.

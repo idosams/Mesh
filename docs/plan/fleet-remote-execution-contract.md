@@ -737,3 +737,18 @@ recheck native retained mapping/history/custody after reading; neither repairs m
 
 This additive native interface does not change persisted v1 receipts. It does not yet register
 a desktop route, supply destination discovery, certify import eligibility or establish retention.
+
+### Native destination lookup
+
+`mesh.remote-review-location/v1` is a private, canonical, bounded ledger record keyed by the exact
+remote/local correlation. It records only a native-admitted receiving store and allocation parent,
+with directory identities and at most 64 protected roots. The record is at most 16 KiB. It precedes
+index and correlation commitment. Lost replies can replay the exact registration; conflicting or
+partial records are preserved and refused. Existing v1 correlation schemas are unchanged.
+
+Native history calls accept offer/correlation identities, load the exact retained manifest, and
+verify the recorded destination before reading the local review. Location paths do not cross the
+renderer interface. A replaced directory or a missing legacy binding is unavailable, not permission
+to initialize new state. Historical reading survives cancellation and does not authorize import,
+execution or protected-main approval. FleetHistory exposes this route without a live worker;
+desktop command and panel integration are still separate outstanding work.

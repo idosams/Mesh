@@ -636,6 +636,43 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         .unwrap()
         .unwrap();
     assert_eq!(durable, correlation);
+    let mut legacy = Runtime::open(
+        crate::fleet::FleetStore::open(setup.f.path.join("legacy-coordinator.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let correlation_stream = format!("result-local-review-{offer_id}");
+    let original_event = runtime
+        .store
+        .events(&correlation_stream, 0, 1)
+        .unwrap()
+        .remove(0);
+    legacy
+        .store
+        .append_with_outcome(&correlation_stream, 0, "review", &original_event.payload)
+        .unwrap();
+    assert_eq!(
+        legacy
+            .retained_remote_local_review(offer_id)
+            .unwrap()
+            .unwrap(),
+        correlation
+    );
+    assert!(legacy
+        .remote_saved_review(
+            offer_id,
+            correlation.digest(),
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    assert_eq!(
+        legacy
+            .store
+            .revision(&format!("result-review-location-{}", correlation.digest()))
+            .unwrap(),
+        0,
+        "legacy reads must not invent a destination"
+    );
     assert_eq!(
         durable
             .reopen(
@@ -692,6 +729,73 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     );
     drop(open);
     assert_eq!(
+        historical
+            .remote_saved_review(offer_id, durable.digest(), &trusted)
+            .unwrap(),
+        displayed
+    );
+    assert_eq!(
+        historical
+            .remote_saved_review_artifact(offer_id, durable.digest(), &trusted, (&object, "after"))
+            .unwrap()
+            .bytes(),
+        setup.bytes
+    );
+    assert!(historical
+        .remote_saved_review(offer_id, RecordDigest::from_bytes([99; 32]), &trusted)
+        .is_err());
+    assert!(historical
+        .remote_saved_review(
+            RecordDigest::from_bytes([99; 32]),
+            durable.digest(),
+            &trusted
+        )
+        .is_err());
+    // The same path naming a replacement store cannot recover native read authority.
+    let store_path = setup.f.path.join("store");
+    let retained_store = setup.f.path.join("retained-location-store");
+    fs::rename(&store_path, &retained_store).unwrap();
+    fs::create_dir(&store_path).unwrap();
+    fs::set_permissions(&store_path, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(historical
+        .remote_saved_review(offer_id, durable.digest(), &trusted)
+        .is_err());
+    assert_eq!(fs::read_dir(&store_path).unwrap().count(), 0);
+    fs::remove_dir(&store_path).unwrap();
+    fs::rename(&retained_store, &store_path).unwrap();
+    let allocator = crate::fleet::service::NativeLaneAllocator::open(
+        &setup.f.path.join("allocations"),
+        trusted.clone(),
+        crate::CheckpointRuntimeParameters::selected_defaults(),
+        vec![],
+    )
+    .unwrap();
+    let history = crate::fleet::service::FleetHistory(std::sync::Arc::new(
+        crate::fleet::service::FleetService::new(
+            historical,
+            std::sync::Arc::new(allocator),
+            ["codex".to_owned()].into(),
+        )
+        .unwrap(),
+    ));
+    assert_eq!(
+        history.remote_saved_reviews(0, None).unwrap().entries.len(),
+        1
+    );
+    assert_eq!(
+        history
+            .remote_saved_review(offer_id, durable.digest(), &trusted)
+            .unwrap(),
+        displayed
+    );
+    assert_eq!(
+        history
+            .remote_saved_review_artifact(offer_id, durable.digest(), &trusted, (&object, "after"))
+            .unwrap()
+            .bytes(),
+        setup.bytes
+    );
+    assert_eq!(
         durable
             .saved_review_artifact(
                 &setup.destination,
@@ -724,6 +828,9 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     assert_eq!(source.manifest().input(), local_operation);
     assert_eq!(source.read_chunk(setup.digest).unwrap(), setup.bytes);
     fs::rename(&local_receipt, &retained_local).unwrap();
+    assert!(history
+        .remote_saved_review(offer_id, durable.digest(), &trusted)
+        .is_err());
     assert!(durable
         .saved_review(&setup.destination, &setup.manifest, &trusted)
         .is_err());
@@ -807,6 +914,25 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
             .read_chunk(setup.digest)
             .unwrap(),
         setup.bytes
+    );
+    assert_eq!(
+        runtime
+            .remote_saved_review(offer_id, correlation.digest(), &trusted)
+            .unwrap(),
+        displayed
+    );
+    let location_stream = format!("result-review-location-{}", correlation.digest());
+    runtime
+        .store
+        .append_with_outcome(&location_stream, 1, "extra", "{}")
+        .unwrap();
+    assert!(runtime
+        .remote_saved_review(offer_id, correlation.digest(), &trusted)
+        .is_err());
+    assert_eq!(
+        runtime.store.revision(&location_stream).unwrap(),
+        2,
+        "read must preserve malformed metadata"
     );
     runtime
         .store

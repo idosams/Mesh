@@ -292,6 +292,48 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Native offline remote review discovery, separate from local checkpoints and agent sessions.
+    #[cfg(target_os = "macos")]
+    pub fn remote_saved_reviews(
+        &self,
+        after: u64,
+        snapshot: Option<u64>,
+    ) -> Result<super::RemoteLocalReviewPage, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .remote_local_reviews(after, snapshot)
+            .map_err(runtime_error)
+    }
+    /// Read a retained remote review by exact native identities, never renderer paths.
+    #[cfg(target_os = "macos")]
+    pub fn remote_saved_review(
+        &self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .remote_saved_review(offer, correlation, trusted)
+            .map_err(runtime_error)
+    }
+    /// Read immutable remote artifacts without current execution authority.
+    #[cfg(target_os = "macos")]
+    pub fn remote_saved_review_artifact(
+        &self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+        trusted: &TrustedReviewers,
+        selection: (&str, &str),
+    ) -> Result<crate::ReviewArtifact, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .remote_saved_review_artifact(offer, correlation, trusted, selection)
+            .map_err(runtime_error)
+    }
     /// Read a fixed whole-project candidate comparison without acquiring publication authority.
     pub fn review_project_candidate(
         &self,
