@@ -208,3 +208,16 @@ cancellation, changed leases, wrong peers and running work refuse. Three native 
 added; the local linker failed with disk-full `errno=28`, so native validation awaits hosted CI. This is an
 integration API; resident transport and real second-machine recovery remain unfinished. See
 [R24](plan/fleet-migration.md#r24-fresh-identity-proof-for-input-reconnect).
+
+
+[PR #142](https://github.com/idosams/Mesh/pull/142) is confirmed merged at
+`57b020af3d2504fd8f9073657669edd47c08bfd0`; all seven PR and combined-main checks passed.
+The separate local test process remained in macOS startup after successful compilation and is not
+counted as a local test pass.
+
+The resident-provider collection now retains received owners independently of broker connections,
+keeps failed/completed slots for reconciliation and polls each owner separately. It pins a native
+worker key and capacity and refuses duplicate assignments. Two new integration regressions and full
+hosted validation are pending after successful native compilation. This does not yet deploy a
+resident endpoint or provide remote result recovery. See
+[R25](plan/fleet-migration.md#r25-resident-ownership-of-received-providers).

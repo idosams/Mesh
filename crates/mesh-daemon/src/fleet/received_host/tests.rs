@@ -378,3 +378,139 @@ fn changed_broker_input_is_preserved_and_refused_before_launch_intent() {
         .is_none());
     assert!(!fixture.0.join("s").exists());
 }
+
+fn resident_launch(
+    fixture: &Fixture,
+    signers: Arc<dyn WorkerSignerFactory>,
+) -> ReceivedWorkerLaunch {
+    ReceivedWorkerLaunch {
+        adapter: adapter(fixture).into(),
+        endpoint: fixture.0.join("s"),
+        signers,
+        reviewers: crate::TrustedReviewers::default(),
+        checkpoint: crate::CheckpointRuntimeParameters::selected_defaults(),
+    }
+}
+fn resident_key(setup: &crate::fleet::receiving_session::tests::Setup) -> mesh_types::PublicKey {
+    mesh_types::PublicKey::from_bytes(setup.f.worker.verifying_key().to_bytes())
+}
+#[test]
+fn resident_retains_failed_start_and_polls_independent_provider_after_broker_disconnect() {
+    use crate::fleet::{
+        receiving_broker::tests::received_handoff, receiving_session::tests::Setup,
+    };
+    let failed = Setup::new();
+    let mut live = Setup::new();
+    live.f.work.assignment.id = "second".into();
+    let mut extra = Setup::new();
+    extra.f.work.assignment.id = "third".into();
+    let mut resident = ReceivedWorkerSupervisor::new(2, resident_key(&failed)).unwrap();
+    let fixture1 = Fixture::new();
+    let fixture2 = Fixture::new();
+    assert!(resident
+        .start_received(
+            *received_handoff(&failed, false),
+            resident_launch(&fixture1, Arc::new(RefusingSigner))
+        )
+        .is_err());
+    let failed_receipt = resident.admissions().remove(0);
+    let handoff = received_handoff(&live, true);
+    let input_root = handoff.allocation.path().to_path_buf();
+    let receipt = resident
+        .start_received(*handoff, resident_launch(&fixture2, Arc::new(Signers)))
+        .unwrap();
+    let snapshot = resident.snapshot(&receipt).unwrap();
+    let lanes = snapshot.get("lanes").unwrap().as_array().unwrap();
+    assert_eq!(lanes.len(), 1);
+    let root = std::path::PathBuf::from(
+        lanes[0]
+            .get("workspace")
+            .unwrap()
+            .get("root")
+            .unwrap()
+            .as_text()
+            .unwrap(),
+    );
+    assert_ne!(root, input_root);
+    wait_started(&root);
+    assert!(resident.snapshot(&failed_receipt).is_err());
+    assert!(resident.snapshot(&receipt).is_ok());
+    let observations = resident.poll();
+    assert_eq!(observations.len(), 2);
+    assert!(observations[0].observation.is_err());
+    assert_eq!(observations[1].observation.as_ref().unwrap().len(), 1);
+    fs::write(root.join("finish"), b"finish").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let observations = resident.poll();
+        assert!(observations[0].observation.is_err());
+        if let Some(outcome) = observations[1].observation.as_ref().unwrap()[0].outcome {
+            assert!(outcome);
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "resident provider did not finish"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let extra_handoff = received_handoff(&extra, false);
+    let extra_root = extra_handoff.allocation.path().to_path_buf();
+    let unknown = extra_handoff.allocation.admission.as_ref().unwrap().clone();
+    assert!(resident.request_cancel(&unknown).is_err());
+    assert_eq!(
+        resident
+            .start_received(
+                *extra_handoff,
+                resident_launch(&Fixture::new(), Arc::new(Signers))
+            )
+            .err()
+            .unwrap()
+            .code,
+        "remote-supervisor-capacity"
+    );
+    assert_eq!(resident.admissions().len(), 2);
+    assert!(!extra_root.join("launches.txt").exists());
+    assert_eq!(
+        fs::read_to_string(root.join("launches.txt")).unwrap(),
+        "one\n"
+    );
+    assert!(!input_root.join("launches.txt").exists());
+    assert!(!input_root.join("finish").exists());
+    assert_eq!(fs::read(input_root.join("result.txt")).unwrap(), live.bytes);
+}
+#[test]
+fn resident_never_retries_retained_identity_or_accepts_another_worker() {
+    use crate::fleet::{
+        receiving_broker::tests::received_handoff, receiving_session::tests::Setup,
+    };
+    let setup = Setup::new();
+    let replay = Setup::new();
+    let mut resident = ReceivedWorkerSupervisor::new(2, resident_key(&setup)).unwrap();
+    let fixture = Fixture::new();
+    assert!(resident
+        .start_received(
+            *received_handoff(&setup, false),
+            resident_launch(&fixture, Arc::new(RefusingSigner))
+        )
+        .is_err());
+    let handoff = received_handoff(&replay, false);
+    let root = handoff.allocation.path().to_path_buf();
+    assert!(resident
+        .start_received(*handoff, resident_launch(&fixture, Arc::new(Signers)))
+        .is_err());
+    assert_eq!(resident.admissions().len(), 1);
+    assert!(!root.join("launches.txt").exists());
+    let other = Setup::new();
+    let mut wrong =
+        ReceivedWorkerSupervisor::new(1, mesh_types::PublicKey::from_bytes([0; 32])).unwrap();
+    assert!(wrong
+        .start_received(
+            *received_handoff(&other, false),
+            resident_launch(&fixture, Arc::new(Signers))
+        )
+        .is_err());
+    assert!(wrong.admissions().is_empty());
+    assert!(ReceivedWorkerSupervisor::new(0, resident_key(&setup)).is_err());
+    assert!(ReceivedWorkerSupervisor::new(65, resident_key(&setup)).is_err());
+}

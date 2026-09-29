@@ -24,7 +24,9 @@ pub use input_transfer::{
     RemoteInputTransferRequest,
 };
 #[cfg(unix)]
-pub use received_host::ReceivedWorkerHost;
+pub use received_host::{
+    ReceivedWorkerHost, ReceivedWorkerLaunch, ReceivedWorkerObservation, ReceivedWorkerSupervisor,
+};
 #[cfg(unix)]
 pub use receiving_broker::{
     serve_remote_receiving, RemoteReceivedHandoff, RemoteReceivingBrokerOutcome,
