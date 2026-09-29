@@ -267,3 +267,10 @@ desktop/agent exposure. Existing host/key files and a separately provisioned
 worker subsystem are prerequisites; no trust or SSH settings are changed automatically. Focused
 and full validation are in progress. Actual second-machine authentication, renewed leases, signed
 result recovery and packaged acceptance remain open; this is not a remote-execution readiness claim.
+
+Native worker status now has a fresh mutually authenticated read-only query path through the resident
+broker and configured SSH transport. It recovers signed admission/launch-intent facts across lost
+connections without granting execution, retry or lease authority. Five focused native cases passed;
+full final-base validation is pending. The facts do not establish current process liveness or saved
+results. Lease renewal, result transfer, live presentation and real second-machine acceptance remain
+unfinished.
