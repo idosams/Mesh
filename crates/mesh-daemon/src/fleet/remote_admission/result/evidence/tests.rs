@@ -435,12 +435,79 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     .unwrap();
     assert_eq!(restored.digest(), receipt_digest);
     assert_eq!(restored.evidence().attestation(), first);
+    let allocation = receiver
+        .materialize_result(
+            &mut runtime,
+            &setup.manifest,
+            &restored,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .unwrap();
+    assert_eq!(allocation.evidence_receipt(), receipt_digest);
+    assert_eq!(allocation.manifest(), &setup.manifest);
+    assert_eq!(
+        fs::read(allocation.path().join("result.txt")).unwrap(),
+        setup.bytes
+    );
+    assert_eq!(
+        allocation.path().parent().unwrap().file_name().unwrap(),
+        "result-0123456789abcdef0123456789abcdef"
+    );
+    allocation.verify().unwrap();
+    assert!(
+        receiver
+            .materialize_result(
+                &mut runtime,
+                &setup.manifest,
+                &restored,
+                "0123456789abcdef0123456789abcdef",
+            )
+            .is_err(),
+        "existing output cannot be adopted or overwritten"
+    );
+    fs::write(
+        allocation.path().join("result.txt"),
+        b"changed local candidate",
+    )
+    .unwrap();
+    assert!(allocation.verify().is_err());
+    assert!(receiver
+        .materialize_result(
+            &mut runtime,
+            &setup.manifest,
+            &restored,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .is_err());
+    assert_eq!(
+        fs::read(allocation.path().join("result.txt")).unwrap(),
+        b"changed local candidate"
+    );
+    // Native CAS is independent of the new candidate copy.
+    receiver.verify_complete(&mut runtime).unwrap();
     let retained = metadata.with_extension("retained");
     fs::rename(&metadata, &retained).unwrap();
     assert!(receiver
         .record_evidence_receipt(&mut runtime, &setup.manifest, &authenticated)
         .is_err());
     assert!(!metadata.exists());
+    assert!(
+        receiver
+            .materialize_result(
+                &mut runtime,
+                &setup.manifest,
+                &restored,
+                "11111111111111111111111111111111",
+            )
+            .is_err(),
+        "missing evidence refuses before allocation"
+    );
+    assert!(!setup
+        .f
+        .path
+        .join("allocations/result-11111111111111111111111111111111")
+        .exists());
+
     drop(receiver);
     assert!(NativeRemoteResultReceiver::reopen_evidence_receipt(
         &setup.destination,
@@ -459,6 +526,6 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         fs::read_dir(setup.f.path.join("allocations"))
             .unwrap()
             .count(),
-        0
+        1
     );
 }

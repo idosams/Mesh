@@ -92,6 +92,27 @@ impl RemoteInputDestination {
         cas: &Cas<F>,
         allocation_id: &str,
     ) -> io::Result<RemoteInputAllocation> {
+        self.materialize_named(manifest, cas, allocation_id, "input")
+    }
+    pub(super) fn materialize_result<F: mesh_cas::DurableFs>(
+        &self,
+        manifest: &RemoteInputManifest,
+        cas: &Cas<F>,
+        allocation_id: &str,
+        evidence: mesh_store::RecordDigest,
+    ) -> io::Result<RemoteResultAllocation> {
+        Ok(RemoteResultAllocation {
+            tree: self.materialize_named(manifest, cas, allocation_id, "result")?,
+            evidence,
+        })
+    }
+    fn materialize_named<F: mesh_cas::DurableFs>(
+        &self,
+        manifest: &RemoteInputManifest,
+        cas: &Cas<F>,
+        allocation_id: &str,
+        prefix: &str,
+    ) -> io::Result<RemoteInputAllocation> {
         self.verify()?;
         if cas.layout().root() != self.store_path
             || allocation_id.len() != 32
@@ -102,7 +123,7 @@ impl RemoteInputDestination {
             return Err(invalid());
         }
         // Create-only. A failed/crashed attempt remains named and must be reconciled explicitly.
-        let name = format!("input-{allocation_id}");
+        let name = format!("{prefix}-{allocation_id}");
         let allocation = self.parent.create_child_directory(OsStr::new(&name))?;
         allocation.filesystem().write_new_file(
             Path::new("manifest.json"),
@@ -262,6 +283,32 @@ impl RemoteInputAllocation {
             }
         }
         self.verify_roots()
+    }
+}
+
+/// Independently copied authenticated result. This type cannot become an admitted worker input.
+/// It grants no execution, project import or main approval; failed copies remain for inspection.
+pub struct RemoteResultAllocation {
+    tree: RemoteInputAllocation,
+    evidence: mesh_store::RecordDigest,
+}
+impl RemoteResultAllocation {
+    /// Native private files, never a peer-selected path or an authority token.
+    pub fn path(&self) -> &Path {
+        self.tree.path()
+    }
+    /// Exact remote result manifest. Local workspace identities have not been created yet.
+    pub fn manifest(&self) -> &RemoteInputManifest {
+        self.tree.manifest()
+    }
+    /// Retained authenticated provenance checked when this independent copy was made.
+    pub fn evidence_receipt(&self) -> mesh_store::RecordDigest {
+        self.evidence
+    }
+    /// Recheck complete copied content and native allocation custody. This does not reauthorize
+    /// consuming a dependency or assert continued availability of remote execution.
+    pub fn verify(&self) -> io::Result<()> {
+        self.tree.verify()
     }
 }
 
