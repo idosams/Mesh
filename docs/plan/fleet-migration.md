@@ -2985,3 +2985,10 @@ correcting only its harness test-path resolution compiled the actual new source 
 Direct lint passed. Focused runtime tests and full canonical checks remain required. This API is not
 yet wired to coordinator dispatch or presentation. Mesh mutual proof, lease renewal, signed-result
 recovery, a provisioned second machine and eligible packaged/signing acceptance remain required.
+
+Initial R30 full macOS validation caught a conflicting `fcntl` declaration before runtime tests.
+The installed Darwin SDK declares the function variadic; the older resident endpoint declaration
+now matches that ABI, with an added runtime check that connected descriptors retain close-on-exec.
+This also matters on [Apple ARM64's distinct variadic calling convention](https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms).
+No warning is suppressed. Failed CI logs are preserved. The focused seven-case SSH suite passed
+before this endpoint correction; full corrected native and hosted validation remain required.
