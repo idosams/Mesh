@@ -4,7 +4,7 @@ fn stream(receipt: &RemoteLocalReviewReceipt) -> String {
     format!("result-review-location-{}", receipt.digest())
 }
 impl Runtime {
-    fn remote_review_location(
+    pub(super) fn remote_review_location(
         &self,
         receipt: &RemoteLocalReviewReceipt,
     ) -> Result<Option<String>, Error> {

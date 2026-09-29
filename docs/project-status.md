@@ -438,3 +438,9 @@ private local history and review registration. Completed retries verify retained
 another connection, signature or allocation. Conflicting selected offers and replaced storage refuse.
 The native endpoint integration uses a fixture provider and test keys; real SSH/second-host and packaged
 receiving remain unverified. Desktop receiving/import actions and transitive lineage are still open.
+
+
+Native history APIs now resolve remote project actions from retained offer/correlation identities,
+reconstructing the input from original-project saved history. They preserve the existing native
+staging, signing/recovery and imported-review checks. The renderer does not choose receiving paths
+or supply input manifests. Native fixture journeys pass; desktop action wiring remains outstanding.

@@ -217,4 +217,4 @@ mod reader;
 mod location;
 
 mod project;
-pub use project::RemoteProjectCandidateRequest;
+pub use project::{RemoteProjectCandidateRequest, RetainedRemoteProjectRequest};

@@ -3702,3 +3702,33 @@ Delivery update: PR #189 passed all seven final checks and merged as
 `70567590d03fcadefca30f153644290b940538e1`. Its combined-main run is still pending. PR #190's original
 seven checks passed; its unchanged source tree is being checked after rebasing the PR target on main
 through a normal ancestry-only merge (no history rewrite).
+
+
+## R61: project actions from retained remote selectors
+
+Depends on R60 / PR #191. New canonical code; replaces no legacy commits. Runtime and FleetHistory
+APIs stage, inspect/import and read/create the imported project review from exact retained offer and
+correlation digests. Native code resolves the previously bound receiving destination and complete
+content receipt, reopens the exact signed offer against current assignment context, and derives the
+input manifest from the independently admitted original project's saved version. Neither a renderer
+path nor a peer-supplied manifest enters the API. Keys recovered from the local content record are
+bound by its exact digest in the committed correlation and reverified with native content/history.
+
+The existing direct-root eligibility, provenance, cancellation, signing/recovery, fixed-main and
+custody checks remain in force. Historical outcome inspection remains distinct from mutation.
+Missing/ambiguous local records, mismatched selectors and replaced native roots refuse without
+repair. Persisted formats are unchanged. These APIs do not start or adopt workers, approve main,
+apply original-folder changes or complete the graphical integration.
+
+Three real native project journeys pass through retained-selector staging, signed import and
+restart/outcome recovery, including cancellation and storage replacement during signing. Exact
+correlation mismatch refuses; cancellation still permits historical inspection while staging/import
+refuse. Original identities, unchanged source bytes/main and retained-signature recovery remain
+asserted. Fixture worker evidence/test keys are used. Full `npm test` passed: 3,584 native tests,
+17 skipped, 158.190 s, desktop checks and all 44 daemon-demo checks. One slow comparison test
+completed; no process-leak warning occurred. Earlier reliability issues remain open.
+
+Delivery update: PR #190 passed all seven final checks and merged as
+`c2b032579093f1323cf48f11cd44a78addb518e5`; combined-main validation is pending. PR #189's combined-main
+run passed. PR #191 is published at `49a0ef81af03e8693692def607ad97e6e7fa3849`, with original hosted
+checks running. Its full local gate passed with 3,584 tests, 17 skipped, desktop and 44 daemon checks.

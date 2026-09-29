@@ -437,7 +437,7 @@ impl<'a, F: DurableFs> RemoteInputReceiver<'a, F> {
 pub use native::{
     NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
     RemoteLocalReviewReceipt, RemoteProjectCandidateRequest, RemoteResultContentReceipt,
-    RemoteResultEvidenceReceipt,
+    RemoteResultEvidenceReceipt, RetainedRemoteProjectRequest,
 };
 
 #[cfg(test)]
