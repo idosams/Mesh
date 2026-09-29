@@ -9,7 +9,7 @@ import { reviewWorkbenchFromProjection } from "../models/review-workbench-adapte
 import { reduceReviewWorkbench, type ReviewWorkbenchModel } from "../models/review-workbench";
 
 export type FleetReviewSelection = { objective: string; lane: string; checkpoint: string; version: string; bundle: string };
-type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
+export type SavedReview = { bundle: string; subject_operation: string; recorded: boolean; content_complete: boolean; reviewed_head: string | null; presentation_digest: string | null; bundle_changes: unknown[]; bundle_changes_not_listed: number; subject_operations_not_listed: number; unavailable_code: string | null; projection_authorizes_approval: boolean };
 export type FleetReviewView = { candidate?: CandidateSelector | null; input_open: boolean; input_after: string | null; input_object: string | null; input_layout: "inline" | "split"; review_object: string | null; review_mode: "content" | "visual"; review_layout: "inline" | "split" };
 export type FleetReviewPersistence = { phase: string; message: string; editable: boolean; busy?: boolean };
 type ReviewDecision = { request: string; revision: number; status: "open" | "addressed"; checkpoint: string | null; version: string | null; bundle: string | null; approval_authority: false };

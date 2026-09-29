@@ -804,6 +804,73 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn remote_fleet_reviews(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        after: u64,
+        snapshot: Option<u64>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.remote_fleet_reviews(&objective, after, snapshot)
+        })
+        .await
+        .map_err(|_| "Remote results could not be loaded".to_owned())?
+    }
+    #[tauri::command]
+    async fn inspect_remote_fleet_review(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        offer: String,
+        correlation: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.remote_fleet_review(&objective, &offer, &correlation)
+        })
+        .await
+        .map_err(|_| "Remote review could not be loaded".to_owned())?
+    }
+    #[allow(clippy::too_many_arguments)]
+    #[tauri::command]
+    async fn render_remote_fleet_artifact(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        offer: String,
+        correlation: String,
+        object_id: String,
+        side: String,
+        page_number: Option<usize>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            let artifact =
+                host.remote_fleet_artifact(&objective, &offer, &correlation, &object_id, &side)?;
+            let rendered = render_artifact(artifact.path(), artifact.bytes(), page_number)
+                .map_err(|e| e.to_string())?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.remote-artifact-preview/v1")),
+                ("objective", Json::text(objective)),
+                ("offer", Json::text(offer)),
+                ("correlation", Json::text(correlation)),
+                ("object", Json::text(object_id)),
+                (
+                    "preview",
+                    rendered_artifact_json(
+                        &rendered,
+                        &side,
+                        &artifact.version().to_string(),
+                        &artifact.digest().to_string(),
+                    ),
+                ),
+            ])
+            .encode())
+        })
+        .await
+        .map_err(|_| "Remote artifact could not be rendered".to_owned())?
+    }
+
+    #[tauri::command]
     async fn fleet_saved_reviews(
         host: State<'_, Arc<AttachmentHost>>,
         objective: String,
@@ -7797,6 +7864,9 @@ mod desktop {
                 attached_fleets,
                 provision_attached_fleet,
                 fleet_activity,
+                remote_fleet_reviews,
+                inspect_remote_fleet_review,
+                render_remote_fleet_artifact,
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
                 fleet_project_mapping,

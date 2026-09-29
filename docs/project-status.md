@@ -399,6 +399,15 @@ interface resolves a registered result from offer/correlation identities and rea
 and artifacts without renderer-supplied paths or a running worker. Missing or replaced private storage
 refuses without repair. This is a received result snapshot, not yet an original-project comparison.
 
-Desktop remote-review routing/panels, original-project result import, retention guarantees and the
-fully composed second-machine journey remain incomplete. Local/hosted native tests do not prove
+Durable remote panel selectors, original-project result import, retention guarantees and the
+fully composed second-machine journey remain incomplete. Desktop routing and session-only panels
+are covered in the next section. Local/hosted native tests do not prove
 packaged graphical acceptance. The delivery ledger records exact PR validation and merge status.
+
+### Remote review desktop source coverage
+
+The desktop now has native commands, bounded received-result lists and independent review panels
+using exact remote correlation identities. Native reads and the controller/rendered states have
+automated coverage. Remote panel selections are currently session-only; durable remote selectors,
+original-project import and full ingestion/packaged remote acceptance remain unfinished. This source
+coverage is not evidence of a signed packaged or second-machine graphical journey.

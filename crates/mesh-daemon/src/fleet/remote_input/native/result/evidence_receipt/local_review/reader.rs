@@ -2,6 +2,22 @@
 use super::*;
 
 impl RemoteLocalReviewReceipt {
+    /// Public immutable selector facts; native destination paths and credentials stay private.
+    pub fn selection(&self) -> Json {
+        Json::object([
+            ("offer", Json::text(self.offer.to_string())),
+            ("correlation", Json::text(self.digest().to_string())),
+            ("lane", Json::text(&self.lane)),
+            ("run", Json::text(&self.run)),
+            ("version", Json::text(self.version.to_string())),
+            ("bundle", Json::text(self.review.to_string())),
+            (
+                "remote_version",
+                Json::text(self.remote_version.to_string()),
+            ),
+        ])
+    }
+
     fn with_review<T>(
         &self,
         destination: &RemoteInputDestination,
