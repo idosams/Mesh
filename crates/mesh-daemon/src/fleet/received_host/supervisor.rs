@@ -36,6 +36,9 @@ pub struct ReceivedWorkerObservation {
     pub admission: RemoteAdmissionReceipt,
     /// Poll result for this owner only. An error retains ownership and the occupied slot.
     pub observation: Result<Vec<WorkerObservation>, Unavailable>,
+    /// Result of an attempted native saved-offer publication in this poll. None means no attempt;
+    /// an offered checkpoint is not content transfer, process completion or main approval.
+    pub result_publication: Option<Result<String, Unavailable>>,
 }
 impl ReceivedWorkerSupervisor {
     /// Admit a fixed native resident capacity, independently of per-objective durable limits.
@@ -103,6 +106,7 @@ impl ReceivedWorkerSupervisor {
             .iter_mut()
             .map(|entry| ReceivedWorkerObservation {
                 admission: entry.admission.clone(),
+                result_publication: None,
                 observation: match entry.owner.as_mut() {
                     Some(owner) => owner.poll(),
                     None => Err(unavailable("remote-supervisor-start-uncertain")),
@@ -110,6 +114,22 @@ impl ReceivedWorkerSupervisor {
             })
             .collect()
     }
+    /// Observe providers and offer at most one saved review per eligible owner. Each owner applies
+    /// its own bounded retry interval; one failed publication does not suppress other observations.
+    #[cfg(target_os = "macos")]
+    pub fn poll_with_result_publication(
+        &mut self,
+        signer: &dyn crate::CheckpointSigner,
+    ) -> Vec<ReceivedWorkerObservation> {
+        let mut observations = self.poll();
+        for (entry, observation) in self.entries.iter_mut().zip(&mut observations) {
+            if let Some(owner) = entry.owner.as_mut() {
+                observation.result_publication = owner.publish_saved_result(signer);
+            }
+        }
+        observations
+    }
+
     /// Exact retained facts for native reconciliation, including failed starts and occupied slots.
     pub fn admissions(&self) -> Vec<RemoteAdmissionReceipt> {
         self.entries

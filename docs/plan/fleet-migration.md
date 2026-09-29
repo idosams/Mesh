@@ -3168,3 +3168,22 @@ a later test module path accidentally selected unrelated tests. Both are correct
 are retained. Full local and hosted validation and PR delivery remain pending. Authenticated result
 transport, output integrity/recovery, exact candidate import and actual remote acceptance remain
 required.
+
+
+## R38 resident saved-result publication (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), based on merged
+[PR #165](https://github.com/idosams/Mesh/pull/165), `d90cc25bcd992116bdbc2f4b81cea6e22f495d4d`.
+No preserved source commits are replaced. PR #165 passed all seven checks with 3,556 native tests,
+17 skipped, 44 daemon-demo checks and four renderer cases; combined-main checks are pending.
+
+The actual native worker service publishes saved review offers from its original received owners
+using configured worker custody. Per-owner attempts are spaced by one second; a wrapping page
+cursor prevents a failed result from permanently starving later reviews. A bounded retained cache
+avoids repeated exports/signatures, while durable offers remain the source of truth. Publication
+errors are separate native observations and grant no retry, slot-release or protected-main rights.
+
+The composed regression and daemon lint pass. The regression uses a controlled clock for retry
+spacing and proves wrong-key refusal and durable replay without signing again. Full local and
+hosted checks and PR delivery remain pending. Authenticated discovery, reopening/transfer, exact
+coordinator import and remote/packaged acceptance remain in scope.

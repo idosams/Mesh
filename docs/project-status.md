@@ -308,3 +308,11 @@ replay and read-only ledger recovery. Three focused regressions and daemon lint 
 actual received-session export/signing and coordinator signature/context/manifest refusal. Full
 canonical validation is pending. No result transport, complete coordinator import or second-machine
 acceptance is claimed.
+
+
+The resident worker service now connects original received owners to automatic native saved-result
+publication using its configured worker key. The composed regression passes for wrong-key refusal,
+retry spacing, durable publication and replay without signing again; daemon lint passes. Full
+workspace and hosted validation are pending. This publishes immutable offers locally, not content
+to the coordinator. Discovery, transfer/recovery, candidate import and actual remote/packaged
+acceptance remain unfinished.

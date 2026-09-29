@@ -252,13 +252,19 @@ pub(crate) fn serve(path: &Path) -> Result<(), String> {
     let (observations, observed) = mpsc::sync_channel(1);
     let stop = AtomicBool::new(false);
     let signers = Arc::new(Signers(custody.clone()));
+    let publication_signer = Actor(custody.clone());
     std::thread::scope(|scope| {
         let stop_ref = &stop;
         let supervisor_ref = &mut supervisor;
         let observer = std::thread::Builder::new()
             .name("mesh-worker-owner".into())
             .spawn_scoped(scope, move || {
-                supervisor_ref.serve(&mailbox, stop_ref, &observations)
+                supervisor_ref.serve_with_result_publication(
+                    &mailbox,
+                    stop_ref,
+                    &observations,
+                    &publication_signer,
+                )
             })
             .map_err(|_| UNAVAILABLE)?;
         let result = (|| -> Result<(), String> {

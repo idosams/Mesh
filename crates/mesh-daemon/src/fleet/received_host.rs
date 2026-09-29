@@ -12,6 +12,8 @@ use crate::ipc::{
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
+mod publication;
 mod resident;
 mod supervisor;
 pub use resident::{ReceivedWorkerMailbox, ReceivedWorkerRequest};
@@ -25,6 +27,8 @@ pub struct ReceivedWorkerHost {
     host: NativeFleetHost,
     service: Arc<FleetService>,
     receipt: RemoteLaunchReceipt,
+    #[cfg(target_os = "macos")]
+    publication: publication::Publication,
 }
 
 /// The provider endpoint exposes scoped fleet calls only. All ordinary workspace operations use
@@ -143,6 +147,8 @@ impl ReceivedWorkerHost {
             host,
             service,
             receipt,
+            #[cfg(target_os = "macos")]
+            publication: publication::Publication::default(),
         })
     }
 

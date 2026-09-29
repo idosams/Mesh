@@ -325,3 +325,20 @@ This supplies signed offer construction, persistence and verification. An authen
 query/transport route, resumable content transfer and coordinator candidate import are still
 required under [#163](https://github.com/idosams/Mesh/issues/163). An offer or manifest alone never
 proves complete transfer, releases a slot or approves protected main.
+
+
+### Resident saved-result publication
+
+The native worker service now polls its original received owners with the configured worker-key
+signer. Each owner attempts publication at most once per second, reads a page of saved review
+identities, and durably signs at most one new offer per attempt. The cursor wraps to revisit late
+completion and earlier checkpoint IDs; failures advance the cursor without changing execution
+authority. Up to 4,096 successful selections are retained in memory to avoid repeated exports.
+The underlying saved-review metadata scan is not a constant-time operation.
+
+Publication failures are separate native observations from provider status. The desktop service
+currently drains these observations; no live UI delivery is claimed. Existing explicit signing
+and resident polling APIs remain available. This adds no persisted or wire format. Durable offers
+remain authoritative after cache loss. Signing and storage can block the owner loop, so the poll
+interval is not a latency guarantee. Discovery, content reopening and transfer, coordinator import,
+and real signed-app/second-machine acceptance remain required.
