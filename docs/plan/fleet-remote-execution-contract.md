@@ -652,3 +652,18 @@ modes. Its type has no conversion to an admitted worker workspace, so no input r
 execution authority is fabricated. The copied bytes are independent of the receiving CAS. This
 step creates no local history/review identities, import receipt or protected-main approval; those
 require the later native candidate initialization and exact provenance correlation steps.
+
+### Independent local history from a result copy
+
+The result-only allocation can initialize a native workspace with an exact one-operation initial
+history verified against the remote result manifest. The remote operation identifies content; it
+is not inserted as local DAG ancestry. A create-only `mesh.received-result-intent/v1` receipt is
+synced before import, followed by `mesh.received-result-workspace/v1` after native verification.
+Both bind the retained authenticated evidence identity, remote version/manifest and physical copy
+identities; the completed receipt adds the local installation and initial operation.
+
+The retained handle rechecks native custody, original copied bytes, exact initial local history and
+private single-link receipt bytes. Failure preserves intent, receipts and partial workspace; no
+repair, adoption or automatic retry is granted. No worker admission, provider or main approval is
+created. Durable history-only reopening and local review registration are separate required steps,
+as is rechecking dependency eligibility before original-project candidate import.

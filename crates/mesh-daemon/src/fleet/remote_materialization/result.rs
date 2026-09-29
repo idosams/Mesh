@@ -1,0 +1,161 @@
+//! Independent local history for an authenticated result copy, without worker admission.
+use super::*;
+use crate::fleet::WorkspaceBinding;
+use crate::ipc::{nothing_to_recover, Json, StartupSummary};
+use crate::{CheckpointRuntimeParameters, LiveDaemon, TrustedReviewers};
+use std::sync::Arc;
+const INTENT: &str = "result-initialization.json";
+const RECEIPT: &str = "result-workspace.json";
+
+/// Native local history correlated with a retained authenticated remote result.
+/// No provider, worker admission, execution session or protected-main approval is created.
+pub struct ReceivedResultWorkspace {
+    result: RemoteResultAllocation,
+    daemon: Arc<LiveDaemon>,
+    binding: WorkspaceBinding,
+    intent: String,
+    receipt: Json,
+}
+impl ReceivedResultWorkspace {
+    /// Local installation and saved operation; remote content is not local DAG ancestry.
+    pub fn binding(&self) -> &WorkspaceBinding {
+        &self.binding
+    }
+    /// Exact durable mapping retained beside the independently imported workspace.
+    pub fn receipt(&self) -> &Json {
+        &self.receipt
+    }
+    /// Recheck original copy, physical allocation custody, native history and retained receipts.
+    /// This verifies immutable provenance only, not current dependency eligibility or approval.
+    pub fn verify(&self) -> io::Result<()> {
+        self.result.verify()?;
+        self.daemon
+            .verify_received_lane_binding(
+                token(&self.result.tree.allocation)?,
+                &self.binding.root,
+                &self.binding.installation,
+                self.binding.starting_version.ok_or_else(invalid)?,
+                self.result.manifest(),
+            )
+            .map_err(|_| invalid())?;
+        for (name, expected) in [
+            (INTENT, self.intent.clone()),
+            (RECEIPT, self.receipt.encode()),
+        ] {
+            let file = self
+                .result
+                .tree
+                .allocation
+                .filesystem()
+                .read_only()
+                .read_file(Path::new(name))?;
+            let metadata = file.metadata()?;
+            if metadata.nlink() != 1 || metadata.permissions().mode() & 0o077 != 0 {
+                return Err(invalid());
+            }
+            let mut bytes = Vec::new();
+            file.take(expected.len() as u64 + 1)
+                .read_to_end(&mut bytes)?;
+            if bytes != expected.as_bytes() {
+                return Err(invalid());
+            }
+        }
+        self.result.verify()
+    }
+}
+impl RemoteResultAllocation {
+    /// Initialize independent native history once. The create-only intent precedes import effects;
+    /// interrupted or conflicting work remains intact and does not authorize retry or adoption.
+    pub fn into_result_workspace(
+        self,
+        reviewers: TrustedReviewers,
+        checkpoint: CheckpointRuntimeParameters,
+    ) -> io::Result<ReceivedResultWorkspace> {
+        self.verify()?;
+        let parent = self.tree.path.parent().ok_or_else(invalid)?;
+        let context = Json::object([
+            ("evidence_receipt", Json::text(self.evidence.to_string())),
+            (
+                "remote_version",
+                Json::text(self.manifest().input().to_string()),
+            ),
+            (
+                "remote_manifest",
+                Json::text(self.manifest().bundle().to_string()),
+            ),
+            (
+                "allocation",
+                Json::text(token(&self.tree.allocation)?.directory_token()),
+            ),
+            (
+                "files",
+                Json::text(token(&self.tree.files)?.directory_token()),
+            ),
+        ]);
+        let intent = Json::object([
+            ("schema", Json::text("mesh.received-result-intent/v1")),
+            ("context", context.clone()),
+        ])
+        .encode();
+        self.tree.allocation.filesystem().write_new_file(
+            Path::new(INTENT),
+            intent.as_bytes(),
+            fs::Permissions::from_mode(0o600),
+        )?;
+        self.tree.allocation.sync()?;
+        self.verify()?;
+        let daemon = Arc::new(
+            LiveDaemon::with_trusted_reviewers_and_checkpoint_runtime(
+                StartupSummary::from(&nothing_to_recover()),
+                reviewers,
+                checkpoint,
+            )
+            .map_err(|_| invalid())?,
+        );
+        let prepared = crate::PreparedFolderImport::prepare_received_with_parent(
+            self.path(),
+            &parent.join("workspace.mesh"),
+            &self.tree.protected,
+            token(&self.tree.allocation)?,
+        )
+        .map_err(|_| invalid())?;
+        let state = daemon
+            .install_received_lane(prepared, self.manifest())
+            .map_err(|error| io::Error::other(error.code))?;
+        self.verify()?;
+        let [initial] = state.workspace_versions.as_slice() else {
+            return Err(invalid());
+        };
+        let binding = WorkspaceBinding {
+            source_version: self.manifest().input(),
+            starting_version: Some(initial.operation()),
+            root: state.root.clone(),
+            digest: state.digest.clone(),
+            installation: state.installation.clone(),
+        };
+        let receipt = Json::object([
+            ("schema", Json::text("mesh.received-result-workspace/v1")),
+            ("context", context),
+            (
+                "local_initial_operation",
+                Json::text(initial.operation().to_string()),
+            ),
+            ("workspace", state.to_json()),
+        ]);
+        self.tree.allocation.filesystem().write_new_file(
+            Path::new(RECEIPT),
+            receipt.encode().as_bytes(),
+            fs::Permissions::from_mode(0o600),
+        )?;
+        self.tree.allocation.sync()?;
+        let result = ReceivedResultWorkspace {
+            result: self,
+            daemon,
+            binding,
+            intent,
+            receipt,
+        };
+        result.verify()?;
+        Ok(result)
+    }
+}

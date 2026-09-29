@@ -3435,3 +3435,24 @@ preservation, changed-copy refusal, CAS independence and missing-evidence refusa
 Full validation and PR delivery are pending. Independent native history/review, original-project
 candidate import, durable local/remote review correlation, retention and real remote/provider/
 packaged acceptance remain required; a copied tree alone is not an imported review candidate.
+
+## R49 independent native result history (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #179](https://github.com/idosams/Mesh/pull/179), `60fb2dc6bcec194624d15b88f816b5574d1c9630`.
+No preserved commits are replaced. R48 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks; hosted delivery is checked separately.
+
+An exact result-only allocation can initialize one independent native workspace. A create-only
+intent precedes import; the completed private receipt binds the authenticated evidence identity,
+remote version/manifest, physical allocation/files identities and the new local initial operation
+and installation. Native import verifies the complete manifest and settled initial history.
+Revalidation checks pinned custody, immutable local history, original copy and exact private receipts.
+There is no worker-admission fabrication, provider launch or protected-main approval.
+
+The composed native regression passes from authenticated retained evidence through result copy and
+native import, proves distinct local history identity and refuses changed input, missing receipt and
+hard-linked receipt without repair. The library build's unused import warning was corrected before
+the focused test. Full validation and PR delivery are pending. History-only reopening, local review
+registration/correlation, original-project candidate import, retention and real remote/provider/
+packaged acceptance remain required; this source step does not complete remote review delivery.
