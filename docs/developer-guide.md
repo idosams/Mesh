@@ -284,3 +284,17 @@ around signing. The coordinator verifies the exact version/domain, nonce, contex
 time and closed facts. Expired work remains readable without changing lease, owner, slot or attempt.
 A fresh read is an observation; it grants no execution rights and does not replace signed result
 verification or actual remote disconnect/reconnect acceptance.
+
+
+### Exporting a received worker's saved review
+
+`FleetService::prepare_remote_review_input` also handles a native received-worker session.
+Select the exact completed checkpoint, recorded bundle and saved version from that session.
+The exporter verifies the original assignment attempt, workspace installation and allocation
+custody, then pins the immutable saved tree. Later working edits are excluded. The returned
+source can outlive the execution owner; each chunk read still checks its retained filesystem
+identity and digest. Replacing the workspace path refuses further reads.
+
+This read-only export does not recapture files, revive an execution credential or mutate the
+worker ledger. Signed result offers, transfer to the coordinator, restart recovery and candidate
+import are subsequent increments tracked in [#163](https://github.com/idosams/Mesh/issues/163).
