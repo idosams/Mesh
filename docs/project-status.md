@@ -324,3 +324,10 @@ retry spacing, durable publication and replay without signing again; daemon lint
 workspace and hosted validation are pending. This publishes immutable offers locally, not content
 to the coordinator. Discovery, transfer/recovery, candidate import and actual remote/packaged
 acceptance remain unfinished.
+
+
+Native result discovery now has a durable per-launch catalog with bounded pages, exact signed-offer
+cross-checks and restart-safe cursors. Its focused regression passed for pagination, reopen,
+interrupted-publication repair, duplicate publication and corrupted records after fixing explicit
+unknown-admission handling. Full checks are pending. Legacy offers require explicit republication
+to enter the catalog. Authenticated remote discovery and content transfer/import remain unfinished.

@@ -363,3 +363,25 @@ and resident polling APIs remain available. This adds no persisted or wire forma
 remain authoritative after cache loss. Signing and storage can block the owner loop, so the poll
 interval is not a latency guarantee. Discovery, content reopening and transfer, coordinator import,
 and real signed-app/second-machine acceptance remain required.
+
+
+### Durable native result discovery
+
+`RemoteAdmissionRegistry::saved_result_page` reads at most sixteen offers for one exact original
+launch, ordered by durable catalog revision. The page includes its observed revision, continuation
+cursor and whether more rows existed at that revision. Reuse the final cursor to observe later
+publication. Unknown admission or absent launch returns no page; an empty page is not completion.
+Every row must match its checkpoint request and the original guarded signed-offer record. The
+reader refuses invalid cursors, gaps, altered records and mismatched launch facts.
+
+Publication now retains the original offer first, then indexes its exact bytes in a separate
+`remote-result-catalog-` stream before returning success. Each launch is bounded to 4,096 entries.
+The two appends are not one transaction: interruption can leave an original offer without an index
+entry, but cannot acknowledge a catalog entry before both records exist. Explicit republication
+repairs that gap without another signature. A concurrent conflicting append refuses and does not
+automatically retry. Existing per-checkpoint records and known-checkpoint queries are unchanged.
+
+Pre-catalog offers remain readable by checkpoint and enter discovery only after explicit
+republication; this page does not claim a complete inventory of legacy offers. Restart enumeration
+requires no provider or workspace recreation. This is a native API, not yet authenticated discovery
+over SSH. Content transfer/reopening, coordinator import and actual remote acceptance remain open.
