@@ -179,11 +179,11 @@ impl NativeRemoteResultReceiver<'_> {
             run: self.run.clone(),
             objective: runtime.objective().to_owned(),
         };
-        if let Some(old) = previous {
-            if old != receipt {
-                return Err(refused());
-            }
-        } else {
+        if previous.as_ref().is_some_and(|old| old != &receipt) {
+            return Err(refused());
+        }
+        runtime.index_remote_local_review(&receipt)?;
+        if previous.is_none() {
             let result = runtime.store.append_with_outcome(
                 &format!("result-local-review-{offer}"),
                 0,
@@ -204,3 +204,6 @@ impl NativeRemoteResultReceiver<'_> {
         Ok(receipt)
     }
 }
+
+mod catalog;
+pub use catalog::{RemoteLocalReviewEntry, RemoteLocalReviewPage};

@@ -625,6 +625,12 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         "objective",
     )
     .unwrap();
+    let discovered = historical.remote_local_reviews(0, None).unwrap();
+    assert_eq!(discovered.entries.len(), 1);
+    assert_eq!(
+        discovered.entries[0].receipt.as_ref().unwrap(),
+        &correlation
+    );
     let durable = historical
         .retained_remote_local_review(offer_id)
         .unwrap()

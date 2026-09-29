@@ -3517,3 +3517,24 @@ is included in full validation. An initial edit-script indentation error was cor
 compilation; no existing work was lost. Full validation and PR delivery remain pending. Native
 review discovery/panels, original-project import, retention and actual remote/provider/packaged
 acceptance remain required.
+
+## R53 bounded offline remote review discovery (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #183](https://github.com/idosams/Mesh/pull/183), `9b36db11531f3ce7ee90f9b09d029b071c6a1f21`.
+No preserved commits are replaced. R52 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks.
+
+A bounded objective index makes retained remote reviews discoverable without contacting a worker
+or knowing each offer in advance. Index intent precedes per-offer correlation commitment; incomplete
+commitment is explicit and never reported as ready. Pages contain at most sixteen entries against
+a fixed snapshot, with a 4,096-entry ceiling, contiguous sequence checks and exact canonical binding.
+Reads refuse malformed/conflicting history without repair. Old v1 direct lookups stay valid; exact
+native re-registration can add the index without rewriting the original correlation.
+
+Two focused tests pass snapshot paging across later appends, interrupted intents, replay, malformed
+history preservation, SQLite restart and composed native review discovery. A missing mutable receiver
+on the index writer was corrected after the initial library check failed; that log is retained.
+An existing historical branch name was preserved by choosing a distinct new branch. Full validation
+and PR delivery are pending. Native review-panel integration, exact original-project import,
+retention and actual remote/provider/packaged acceptance remain required.
