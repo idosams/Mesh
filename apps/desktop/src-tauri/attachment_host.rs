@@ -1167,6 +1167,36 @@ impl AttachmentHost {
         Ok((parse(offer)?, parse(correlation)?))
     }
 
+    pub fn load_remote_fleet_pins(&self) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let pins = match &state.storage {
+            Some(storage) => storage
+                .load_remote_fleet_pins()
+                .map_err(|_| "Saved pin selectors need reconciliation")?,
+            None => mesh_daemon::project_attachment::RemoteFleetPinState {
+                revision: 0,
+                pins: Vec::new(),
+            },
+        };
+        Ok(pins.to_json().encode())
+    }
+
+    pub fn save_remote_fleet_pins(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot =
+            mesh_daemon::project_attachment::RemoteFleetPinState::parse_projection(snapshot)
+                .map_err(|_| "Invalid pin selectors")?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        let stored = state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_remote_fleet_pins(snapshot.revision, snapshot.pins)
+            .map_err(|_| "Pin state changed or could not be saved")?;
+        Ok(stored.to_json().encode())
+    }
+
     pub fn load_fleet_pins(&self) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         self.initialize(&mut state, false)?;
@@ -1372,6 +1402,14 @@ mod tests {
             std::env::temp_dir().join(format!("mesh-remote-history-empty-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
         let host = AttachmentHost::new(&root);
+        assert_eq!(
+            mesh_daemon::project_attachment::RemoteFleetPinState::parse_projection(
+                &host.load_remote_fleet_pins().unwrap()
+            )
+            .unwrap()
+            .revision,
+            0
+        );
         let objective = format!("fleet-{}", "a".repeat(64));
         assert!(host.remote_fleet_reviews(&objective, 0, None).is_err());
         assert!(host

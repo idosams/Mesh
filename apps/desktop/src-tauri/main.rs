@@ -1516,6 +1516,27 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn load_remote_fleet_pins(
+        host: State<'_, Arc<AttachmentHost>>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.load_remote_fleet_pins())
+            .await
+            .map_err(|_| "Pin loading stopped".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn save_remote_fleet_pins(
+        host: State<'_, Arc<AttachmentHost>>,
+        snapshot: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.save_remote_fleet_pins(&snapshot))
+            .await
+            .map_err(|_| "Pin saving stopped".to_owned())?
+    }
+
+    #[tauri::command]
     async fn load_fleet_pins(host: State<'_, Arc<AttachmentHost>>) -> Result<String, String> {
         let host = Arc::clone(host.inner());
         tauri::async_runtime::spawn_blocking(move || host.load_fleet_pins())
@@ -7904,6 +7925,8 @@ mod desktop {
                 save_attachment_pins,
                 load_fleet_review_outbox,
                 save_fleet_review_outbox,
+                load_remote_fleet_pins,
+                save_remote_fleet_pins,
                 load_fleet_pins,
                 save_fleet_pins,
                 compare_attached_path,

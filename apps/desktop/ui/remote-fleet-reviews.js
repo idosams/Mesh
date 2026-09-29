@@ -1,3 +1,4 @@
+import { createRemotePinPersistence } from './remote-fleet-pin-persistence.js';
 import { savedReviewItem } from './fleet-reviews.js';
 import { loadSavedArtifact } from './fleet-artifact-preview.js';
 import { validatedReviewArtifactPreview } from './review-artifact-validation.js';
@@ -44,8 +45,26 @@ export function remoteArtifactSide(raw, selection, change, side, kind, page) {
     textSections: answer.text_sections?.map(s => ({ label: s.label, lineStart: s.line_start, lineCount: s.line_count })) ?? null, textTruncated: answer.text_truncated };
 }
 export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherPinCount = () => 0 }) {
-  let queues = {}, pins = [], next = 1, generation = 0, disposed = false, notice = '';
+  let queues = {}, pins = [], next = 1n, generation = 0, disposed = false, notice = '';
   const publish = () => { if (!disposed) changed(); };
+  let persistenceEnabled = false, editable = true, controlBusy = false, persistence = { phase: 'session', message: '' };
+  const persist = () => { if (persistenceEnabled) storage.changed(); };
+  const storage = createRemotePinPersistence({ invoke,
+    selectors: () => pins.map(p => ({ key: p.key.slice(7), ...p.selection, ...p.view })),
+    restore(saved) {
+      if (saved.length + otherPinCount() > 8) throw new Error('Close local panels before loading this saved set');
+      pins = saved.map(p => ({ key: `remote-${p.key}`, selection: Object.fromEntries(['objective', ...fields].map(f => [f,p[f]])), view: { object: p.object, mode: p.mode, layout: p.layout }, review: null, loading: false, error: '' }));
+      next = saved.reduce((max,p) => BigInt(p.key) >= max ? BigInt(p.key) + 1n : max, next);
+      notice = ''; publish();
+      for (const p of pins) void read(p);
+    },
+    status(phase, message) { if (phase === 'loading') editable = false; if (phase === 'saved') editable = true; persistence = { phase, message }; publish(); },
+  });
+  async function control(action) {
+    if (controlBusy) return;
+    controlBusy = true; publish();
+    try { await action(); } finally { controlBusy = false; publish(); }
+  }
   async function page(name, after = 0, snapshot = null) {
     if (queues[name]?.loading) return;
     const token = ++generation;
@@ -79,12 +98,16 @@ export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherP
     publish();
   }
   return {
-    snapshot: () => ({ remoteReviewQueues: queues, remoteReviewPins: pins, remoteReviewNotice: notice }),
-    dispose() { disposed = true; },
+    snapshot: () => ({ remoteReviewQueues: queues, remoteReviewPins: pins, remoteReviewNotice: notice, remoteReviewPersistence: { ...persistence, editable, busy: controlBusy } }),
+    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return storage.ensureLoaded(); } },
+    dispose() { disposed = true; storage.dispose(); },
     handle(v) {
       if (typeof v?.type !== 'string' || !v.type.startsWith('remote-')) return false;
       if (disposed || typeof invoke !== 'function') return true;
       const shape = Object.keys(v).sort().join(',');
+      if (v.type === 'remote-pins-retry' && shape === 'type') { void control(() => storage.retry()); return true; }
+      if (v.type === 'remote-pins-reload' && shape === 'type') { void control(() => storage.reload()); return true; }
+      if (!editable && !['remote-results','remote-results-next','remote-results-close','remote-retry'].includes(v.type)) return true;
       if (v.type === 'remote-results' && shape === 'objective,type' && objective(v.objective) && objectiveFor(v.objective)) {
         if (!queues[v.objective] && Object.keys(queues).length >= 16) return true;
         void page(v.objective); return true;
@@ -95,16 +118,16 @@ export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherP
       if (v.type === 'remote-pin' && shape === 'correlation,objective,offer,type' && queue?.page && !queue.loading && !queue.error) {
         const selection = queue.page.rows.find(r => r.selection?.offer === v.offer && r.selection?.correlation === v.correlation)?.selection;
         if (!selection || pins.some(p => p.selection.objective === v.objective && p.selection.correlation === v.correlation)) return true;
-        if (pins.length + otherPinCount() >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return true; }
+        if (pins.length + otherPinCount() >= 8 || next > 18446744073709551615n) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return true; }
         const pin = { key: `remote-${next++}`, selection, review: null, loading: false, error: '', view: { object: null, mode: 'content', layout: 'split' } };
-        pins = [...pins, pin]; notice = ''; void read(pin); return true;
+        pins = [...pins, pin]; notice = ''; persist(); void read(pin); return true;
       }
       const pin = pins.find(p => p.key === v.pin);
       if (!pin) return true;
-      if (v.type === 'remote-close' && shape === 'pin,type') { pins = pins.filter(p => p !== pin); publish(); }
+      if (v.type === 'remote-close' && shape === 'pin,type') { pins = pins.filter(p => p !== pin); persist(); publish(); }
       if (v.type === 'remote-retry' && shape === 'pin,type' && !pin.loading) void read(pin);
       if (v.type === 'remote-view' && shape === 'layout,mode,object,pin,type' && /^[a-f0-9]{32}$/.test(v.object) && pin.review?.bundle_changes.some(c => c.object_id === v.object) && ['content','visual'].includes(v.mode) && ['inline','split'].includes(v.layout)) {
-        pins = pins.map(p => p === pin ? { ...p, view: { object: v.object, mode: v.mode, layout: v.layout } } : p); publish();
+        pins = pins.map(p => p === pin ? { ...p, view: { object: v.object, mode: v.mode, layout: v.layout } } : p); persist(); publish();
       }
       if (v.type === 'remote-artifact' && shape === 'object,page,pin,type' && /^[1-9][0-9]?$/.test(v.page) && Number(v.page) <= 64) void artifact(pin, v.object, Number(v.page));
       return true;
