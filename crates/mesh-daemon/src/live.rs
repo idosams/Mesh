@@ -3310,6 +3310,38 @@ impl LiveDaemon {
                     "The agent workspace assignment changed.",
                 )
             })?;
+        self.record_saved_review(target, actor)
+    }
+
+    /// Register an exact received result review under native custody, without agent admission.
+    pub(crate) fn submit_received_result_review(
+        &self,
+        parent: crate::ProtectedWorkspaceRoot,
+        root: &str,
+        installation: &str,
+        target: RecordDigest,
+        manifest: &crate::fleet::RemoteInputManifest,
+        actor: PublicKey,
+    ) -> Result<RecordDigest, Unavailable> {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(publication_refusal(
+                "result-review-nested",
+                "A signing callback cannot submit a review.",
+            ));
+        }
+        let _authority = self
+            .lock_current_managed_workspace_mutation()
+            .map_err(agent_custody_refusal)?;
+        self.verify_received_lane_binding(parent, root, installation, target, manifest)?;
+        self.record_saved_review(target, actor)
+    }
+
+    // Callers retain their respective native custody and workspace-open guards.
+    fn record_saved_review(
+        &self,
+        target: RecordDigest,
+        actor: PublicKey,
+    ) -> Result<RecordDigest, Unavailable> {
         let mut checkpoint = self
             .checkpoint
             .lock()

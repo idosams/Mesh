@@ -680,3 +680,17 @@ Missing or changed state refuses without recreation. Reopening installs no daemo
 session, provider or credential. The caller must retain the mapping digest in its durable coordinator
 correlation and revalidate dependency eligibility separately before candidate import. This API does
 not itself register a local review or grant protected-main approval.
+
+### Exact saved result review registration
+
+The received result handle can register a saved inspection review for its exact initial local
+operation. Native managed-workspace custody serializes the operation; allocation, installation and
+complete saved content are verified before review persistence. No agent custody generation, session
+or execution admission is fabricated. Existing agent reviews keep their original generation checks;
+only the internal durable review writer is shared.
+
+The immutable review record survives daemon shutdown, binds its exact subject operation and returns
+the same bundle on repeated requests. The result handle revalidates its provenance before and after
+registration. Creating a review does not approve protected main. The coordinator must still durably
+correlate this local review with the authenticated remote offer/evidence and expose it through native
+review discovery; dependency eligibility remains a separate import-time check.

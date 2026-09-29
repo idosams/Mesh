@@ -3475,3 +3475,23 @@ exact saved bytes/local operation, wrong mapping and missing/linked receipt refu
 source refusal after allocation relocation. Full validation and delivery remain pending. Local review
 registration, durable coordinator correlation, original-project import, retention and real remote/
 provider/packaged acceptance remain required.
+
+## R51 exact native result review registration (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #181](https://github.com/idosams/Mesh/pull/181), `046dedd8a3cc1b5bd81ac3f7e9c68fb99bf2677c`.
+No preserved commits are replaced. R50 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks. [PR #179](https://github.com/idosams/Mesh/pull/179) merged as
+`c2e35df46b4cf8af76b7084101edb4f9a3983657` after all seven corrected checks passed.
+
+Received local result history can register an exact saved inspection review under native managed
+workspace custody, with no agent generation or admission. Native installation, allocation and
+complete immutable manifest are checked before reusing the existing saved-review persistence.
+Agent review creation retains its original custody guard and shares only that persistence helper.
+Repeats return the original bundle; review creation grants no protected-main approval.
+
+The library and composed native regression pass review creation, idempotent replay, linked receipt
+refusal, durable record reopening after dropping the daemon, exact subject operation and absent
+protected main. Full validation and PR delivery are pending. Durable coordinator correlation,
+review-panel discovery, original-project import, retention and real remote/provider/packaged
+acceptance remain required.
