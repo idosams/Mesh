@@ -3732,3 +3732,28 @@ Delivery update: PR #190 passed all seven final checks and merged as
 `c2b032579093f1323cf48f11cd44a78addb518e5`; combined-main validation is pending. PR #189's combined-main
 run passed. PR #191 is published at `49a0ef81af03e8693692def607ad97e6e7fa3849`, with original hosted
 checks running. Its full local gate passed with 3,584 tests, 17 skipped, desktop and 44 daemon checks.
+
+
+## R62: native desktop remote-project command boundary
+
+Depends on R61 / PR #192. New canonical code; replaces no legacy commits. The asynchronous desktop
+command `remote_fleet_project` accepts a bounded closed `mesh.desktop-remote-project-request/v1`
+selection containing project/objective, exact offer/correlation, stable request, fixed observed main
+and one named stage/inspect/import/review action. Paths, unknown fields, malformed identities and
+approval/application/execution actions refuse. Native work runs off the renderer thread.
+
+The native host resolves the admitted source and retained history with the same review trust used by
+existing local project imports. A new recorded-outcome API verifies the actual durable import actor
+and outcome without opening a private key. Completed imports return recorded truth; pending imports
+use the recorded native identity; new imports use the existing native signer. Stage, inspect-import,
+import, inspect-review and create-review are separate actions. No main approval, source write-back or
+worker adoption is added. Responses bind the exact selection under
+`mesh.desktop-remote-project-result/v1`; stored import formats are unchanged.
+
+Three real native project journeys verify recorded actor/outcome recovery, including cancellation and
+replaced storage during signing. Two desktop host tests cover closed-request refusals and missing-state
+refusal without provisioning. Test keys/evidence are fixtures; this is not positive packaged UI or
+OS-key acceptance. Full `npm test` passed: 3,586 native tests, 17 skipped, 148.478 s, desktop
+checks and all 44 daemon-demo checks. One slow comparison test completed; no process-leak warning
+occurred. Earlier reliability issues remain open. Graphical controls and durable remote action
+retry state remain outstanding; the native command alone is not the completed user workflow.

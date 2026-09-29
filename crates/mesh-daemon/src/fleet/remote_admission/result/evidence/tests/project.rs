@@ -399,6 +399,11 @@ fn project_import_journey(fault: u8) {
         "objective",
     )
     .unwrap();
+    let recorded = runtime
+        .recorded_retained_remote_project_import(&retained)
+        .unwrap()
+        .unwrap();
+    assert_eq!(recorded.0, public(&signer.key));
     let recovered = runtime
         .inspect_retained_remote_project_import(&retained, public(&signer.key))
         .unwrap();
@@ -419,6 +424,7 @@ fn project_import_journey(fault: u8) {
     .unwrap()
     .0;
     assert_eq!(recovered.get("state"), Some(&Json::text(expected_state)));
+    assert_eq!(recorded.1, recovered);
     source
         .with_fleet_input(input_version, &trusted, |open, main| {
             assert_eq!(main, Json::Null);

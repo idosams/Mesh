@@ -818,6 +818,20 @@ mod desktop {
         .map_err(|_| "Remote results could not be loaded".to_owned())?
     }
     #[tauri::command]
+    async fn remote_fleet_project(
+        host: State<'_, Arc<AttachmentHost>>,
+        selection: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.remote_fleet_project(&selection, &attachment_review_trust())
+        })
+        .await
+        .map_err(|_| {
+            "Remote project action could not be confirmed; retain its exact selection".to_owned()
+        })?
+    }
+    #[tauri::command]
     async fn inspect_remote_fleet_review(
         host: State<'_, Arc<AttachmentHost>>,
         objective: String,
@@ -7886,6 +7900,7 @@ mod desktop {
                 provision_attached_fleet,
                 fleet_activity,
                 remote_fleet_reviews,
+                remote_fleet_project,
                 inspect_remote_fleet_review,
                 render_remote_fleet_artifact,
                 fleet_saved_reviews,
