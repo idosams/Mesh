@@ -384,3 +384,9 @@ hash refusal; strict decoding tests passed manifest, identity, canonical-form an
 scoped test-helper borrow error was corrected and its log retained. Full validation is pending.
 This is protocol-fixture evidence with separate native-history tests, not actual second-machine
 acceptance or durable candidate import.
+
+Authenticated remote result correspondence can now be retained alongside verified native content
+and reopened after a coordinator restart. The receipt preserves the first worker attestation and
+refuses changed or missing metadata; it does not grant candidate import or main approval. This
+source increment's validation and delivery state is tracked in the migration ledger. Real remote
+and packaged acceptance, coordinator candidate import and content retention policy remain open.

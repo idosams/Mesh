@@ -3394,3 +3394,25 @@ closed-decoder tests pass malformed path/identity/context refusal. An initial sc
 in the test helper was corrected and retained. Native history reopening is covered separately, not
 claimed as actual second-machine proof. Full validation and PR delivery are pending; durable
 evidence/import correlation, retention and complete remote/packaged acceptance remain required.
+
+## R47 durable authenticated result evidence (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #177](https://github.com/idosams/Mesh/pull/177), `1e540674f982e018af5c787949d72e01b8ba19fe`.
+No preserved commits are replaced. R46 full local validation passed 3,573 native tests, 17 skipped,
+desktop checks and 44 daemon checks. [PR #176](https://github.com/idosams/Mesh/pull/176) merged as
+`e1c05bc5e7b851513ff28d5f2183d5c46a7af177` after all seven checks passed.
+
+The coordinator retains the first authenticated correspondence attestation alongside complete
+verified content, in a private create-only descriptor file and an exact ledger receipt. Receipt
+identity binds the original offer, descriptor and native content receipt. Fresh response nonces do
+not replace the first attestation; conflicting provenance for the same content refuses. Restart
+rechecks signatures, assignment, manifests, metadata and content without renewing execution authority.
+Missing, partial, linked or changed metadata is preserved and refused, not repaired.
+
+A focused native regression passes complete-content gating, partial-file preservation, wrong-key
+refusal, idempotent replay, conflicting validly signed provenance, actual SQLite reopen, missing
+metadata refusal and hard-link refusal. Initial production error-conversion and test-helper borrow
+errors were corrected; failed logs are retained. Full validation and PR delivery are pending.
+Candidate materialization/import, retention policy and real remote/provider/packaged acceptance
+remain required; this receipt grants none of those authorities.

@@ -325,12 +325,99 @@ pub struct RemoteResultEvidenceRequest<'a> {
     /// Complete saved result manifest, verified against the signed offer.
     pub result: &'a RemoteInputManifest,
 }
-/// Fresh authenticated evidence for one exact offer. This is not persisted import authority.
+/// Authenticated immutable evidence for one exact offer. This is not import authority.
 pub struct AuthenticatedRemoteResultEvidence {
     correspondence: crate::fleet::RemoteResultCorrespondence,
     offer_digest: RecordDigest,
+    attestation: String,
 }
 impl AuthenticatedRemoteResultEvidence {
+    pub(in crate::fleet) fn attestation(&self) -> &str {
+        &self.attestation
+    }
+    /// Verify retained immutable provenance. Query freshness is intentionally not restored:
+    /// a historical worker signature grants no new execution, liveness or import authorization.
+    pub(in crate::fleet) fn verify_retained(
+        request: RemoteResultEvidenceRequest<'_>,
+        attestation: &str,
+        raw: &str,
+    ) -> io::Result<Self> {
+        let map = |_| unavailable();
+        let status = request.status;
+        let runtime = status.runtime;
+        let offer = RemoteSavedResultOffer::verify(
+            runtime,
+            status.lane,
+            status.run,
+            status.coordinator,
+            status.worker,
+            request.offer,
+            request.result,
+        )
+        .map_err(|_| unavailable())?;
+        let target = offer.body.get("target").ok_or_else(unavailable)?;
+        if text(target, "input").map_err(map)? != request.input.input().to_string()
+            || text(target, "bundle").map_err(map)? != request.input.bundle().to_string()
+            || raw.len() > 4_194_304
+        {
+            return Err(unavailable());
+        }
+        let envelope_value = parse_envelope(attestation, REPLY_SCHEMA).map_err(map)?;
+        let body = closed(
+            envelope_value.get("body").ok_or_else(unavailable)?,
+            &["query", "observed_ms", "offer", "evidence", "bytes"],
+        )
+        .map_err(|_| unavailable())?;
+        bytes::<32>(text(&body, "query").map_err(map)?).map_err(map)?;
+        let observed = number(&body, "observed_ms").map_err(map)?;
+        if observed == 0
+            || observed > now().map_err(map)?
+            || text(&body, "offer").map_err(map)? != request.offer
+            || number(&body, "bytes").map_err(map)? != raw.len() as u64
+            || text(&body, "evidence").map_err(map)?
+                != Blake3::digest_bytes(raw.as_bytes()).to_string()
+        {
+            return Err(unavailable());
+        }
+        let signature = Signature::from_bytes(
+            bytes::<64>(text(&envelope_value, "signature").map_err(map)?).map_err(map)?,
+        );
+        if envelope(REPLY_SCHEMA, body.clone(), &signature) != attestation {
+            return Err(unavailable());
+        }
+        Ed25519::verify(
+            &status.worker,
+            payload(REPLY_SIGNING, &body).as_bytes(),
+            &signature,
+        )
+        .map_err(|_| unavailable())?;
+        let initial = RecordDigest::parse_hex(text(&offer.body, "initial").map_err(map)?)
+            .map_err(|_| unavailable())?;
+        let correspondence = crate::fleet::RemoteResultCorrespondence::decode_bound(
+            raw,
+            request.input,
+            request.result,
+            initial,
+        )?;
+        RemoteSavedResultOffer::verify(
+            runtime,
+            status.lane,
+            status.run,
+            status.coordinator,
+            status.worker,
+            request.offer,
+            request.result,
+        )
+        .map_err(map)?;
+        Ok(Self {
+            correspondence,
+            offer_digest: RecordDigest::from_bytes(
+                *Blake3::digest_bytes(request.offer.as_bytes()).as_bytes(),
+            ),
+            attestation: attestation.into(),
+        })
+    }
+
     /// Exact original signed-offer identity bound by the authenticated query and reply.
     pub fn offer_digest(&self) -> RecordDigest {
         self.offer_digest
@@ -438,6 +525,7 @@ pub fn receive_remote_result_evidence<R: Read, W: Write>(
     Ok(AuthenticatedRemoteResultEvidence {
         correspondence,
         offer_digest,
+        attestation: std::str::from_utf8(&raw).map_err(|_| unavailable())?.into(),
     })
 }
 /// One native SSH metadata request, without automatic retries or lease renewal.

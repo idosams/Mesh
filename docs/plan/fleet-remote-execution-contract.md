@@ -622,3 +622,19 @@ identity reopens complete state and existing custody. Their output contains only
 and worker identifiers. It is not coordinator trust, a launch grant or remote authentication proof.
 Neither command starts a listener or provider, changes the selected desktop workspace, or touches
 human approval custody. See the developer guide for the current invocation and acceptance limits.
+
+### Retained authenticated result evidence
+
+The coordinator may record `mesh.remote-result-evidence-receipt/v1` only after complete native result
+content verification. A private, bounded, create-only descriptor is correlated with the first
+worker-signed evidence reply in the coordinator ledger. Its stable identity binds descriptor digest,
+original offer and content receipt (including native receiving-store identity). Repeating a fresh
+query retains the original attestation; conflicting correspondence for the same content refuses.
+
+Restart requires existing complete content and metadata. It rechecks the original worker signature,
+exact assignment and both manifests, complete correspondence, native store identity and content.
+A historical query signature establishes immutable provenance only: it restores no challenge
+freshness, liveness, execution, import or protected-main authority. Missing, partial, changed,
+nonprivate or linked recorded metadata refuses without repair. Existing content-only receipts stay
+valid; evidence is an additive format and is never inferred for an old receipt. This is verified
+retention of metadata, not a content retention/garbage-collection policy or a candidate import.
