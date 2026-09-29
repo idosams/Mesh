@@ -26,20 +26,22 @@ impl NativeRemoteResultReceiver<'_> {
         &self,
         runtime: &mut Runtime,
         request: &RemoteProjectCandidateRequest<'_>,
+        eligible: bool,
     ) -> Result<RemoteResultEvidenceReceipt, Error> {
         self.verify_complete(runtime)?;
         let state = runtime.state();
         let lane = state.lanes.get(&self.lane).ok_or_else(refused)?;
-        if state.cancelled
-            || lane.parent.is_some()
+        if lane.parent.is_some()
             || lane.source_project.as_deref() != Some(request.source.id())
             || lane.base != request.input.input()
-            || lane.runs.last().is_none_or(|r| {
-                matches!(
-                    r.state,
-                    crate::fleet::RunState::Stopping | crate::fleet::RunState::Cancelled
-                )
-            })
+            || (eligible
+                && (state.cancelled
+                    || lane.runs.last().is_none_or(|r| {
+                        matches!(
+                            r.state,
+                            crate::fleet::RunState::Stopping | crate::fleet::RunState::Cancelled
+                        )
+                    })))
         {
             return Err(refused());
         }
@@ -67,6 +69,7 @@ impl NativeRemoteResultReceiver<'_> {
         runtime: &mut Runtime,
         request: &RemoteProjectCandidateRequest<'_>,
         create: bool,
+        eligible: bool,
         read: impl FnOnce(
             &OpenWorkspace,
             &OpenWorkspace,
@@ -82,7 +85,7 @@ impl NativeRemoteResultReceiver<'_> {
         }) {
             return Err(refused());
         }
-        let evidence = self.project_context(runtime, request)?;
+        let evidence = self.project_context(runtime, request, eligible)?;
         let revision = runtime.state().revision;
         let receipt = request.correlation;
         let source = request.source;
@@ -121,7 +124,9 @@ impl NativeRemoteResultReceiver<'_> {
                         request.input.input(),
                         request.reviewers,
                         |project, main| {
-                            if main.get("head").and_then(Json::as_text) != request.expected_main {
+                            if eligible
+                                && main.get("head").and_then(Json::as_text) != request.expected_main
+                            {
                                 return Err(io::Error::other("remote candidate main changed"));
                             }
                             let original = project
@@ -146,9 +151,10 @@ impl NativeRemoteResultReceiver<'_> {
                             CandidateAdmission::Inspect
                         },
                         || {
-                            self.project_context(runtime, request).map_err(|_| {
-                                io::Error::other("remote candidate context changed")
-                            })?;
+                            self.project_context(runtime, request, eligible)
+                                .map_err(|_| {
+                                    io::Error::other("remote candidate context changed")
+                                })?;
                             if runtime.state().revision != revision {
                                 return Err(io::Error::other("remote candidate revision changed"));
                             }
@@ -156,8 +162,9 @@ impl NativeRemoteResultReceiver<'_> {
                                 request.input.input(),
                                 request.reviewers,
                                 |_, main| {
-                                    if main.get("head").and_then(Json::as_text)
-                                        != request.expected_main
+                                    if eligible
+                                        && main.get("head").and_then(Json::as_text)
+                                            != request.expected_main
                                     {
                                         return Err(io::Error::other(
                                             "remote candidate main changed",
@@ -172,7 +179,9 @@ impl NativeRemoteResultReceiver<'_> {
                         request.input.input(),
                         request.reviewers,
                         |project, main| {
-                            if main.get("head").and_then(Json::as_text) != request.expected_main {
+                            if eligible
+                                && main.get("head").and_then(Json::as_text) != request.expected_main
+                            {
                                 return Err(io::Error::other("remote candidate main changed"));
                             }
                             read(project, target, &snapshot, &origins, &candidate)
@@ -181,7 +190,7 @@ impl NativeRemoteResultReceiver<'_> {
                 },
             )
             .map_err(store_error)?;
-        if self.project_context(runtime, request)?.digest() != evidence.digest()
+        if self.project_context(runtime, request, eligible)?.digest() != evidence.digest()
             || runtime.state().revision != revision
         {
             return Err(refused());
@@ -196,7 +205,7 @@ impl NativeRemoteResultReceiver<'_> {
         runtime: &mut Runtime,
         request: &RemoteProjectCandidateRequest<'_>,
     ) -> Result<Json, Error> {
-        self.with_project_candidate(runtime, request, true, |_, _, _, _, candidate| {
+        self.with_project_candidate(runtime, request, true, true, |_, _, _, _, candidate| {
             Ok(candidate.clone())
         })
     }
@@ -213,6 +222,7 @@ impl NativeRemoteResultReceiver<'_> {
             runtime,
             request,
             false,
+            true,
             |project, target, snapshot, origins, candidate| {
                 crate::fleet::project_import::compile(
                     project,
@@ -225,5 +235,119 @@ impl NativeRemoteResultReceiver<'_> {
                 )
             },
         )
+    }
+    fn project_candidate_snapshot(
+        &self,
+        runtime: &mut Runtime,
+        request: &RemoteProjectCandidateRequest<'_>,
+        eligible: bool,
+    ) -> Result<(Json, HistoricalWorkspacePreview), Error> {
+        self.with_project_candidate(
+            runtime,
+            request,
+            false,
+            eligible,
+            |_, _, snapshot, _, candidate| Ok((candidate.clone(), snapshot.clone())),
+        )
+    }
+
+    /// Inspect a durable import outcome without signing, appending or repairing it. Cancellation
+    /// and later main advancement do not erase an already retained outcome.
+    pub fn inspect_project_candidate_import(
+        &self,
+        runtime: &mut Runtime,
+        request: &RemoteProjectCandidateRequest<'_>,
+        actor: PublicKey,
+    ) -> Result<Json, Error> {
+        let (candidate, snapshot) = self.project_candidate_snapshot(runtime, request, false)?;
+        let outcome = request
+            .source
+            .inspect_fleet_import(
+                request.request,
+                &candidate,
+                &snapshot,
+                actor,
+                request.reviewers,
+            )
+            .map_err(store_error)?
+            .unwrap_or(Json::Null);
+        if self.project_candidate_snapshot(runtime, request, false)?.0 != candidate {
+            return Err(refused());
+        }
+        Ok(outcome)
+    }
+
+    /// Append a signed, provenance-bound private project version. Exact retries recover native
+    /// journal truth without signing twice. This never advances main or writes original files.
+    pub fn import_project_candidate(
+        &self,
+        runtime: &mut Runtime,
+        request: &RemoteProjectCandidateRequest<'_>,
+        signer: &dyn crate::fleet::CandidateImportSigner,
+    ) -> Result<Json, Error> {
+        self.project_context(runtime, request, true)?;
+        let existing =
+            self.inspect_project_candidate_import(runtime, request, signer.public_key())?;
+        if existing.get("state") == Some(&Json::text("imported")) {
+            return Ok(existing);
+        }
+        let plan = self.prepare_project_candidate_import(runtime, request, signer.public_key())?;
+        let (candidate, _) = self.project_candidate_snapshot(runtime, request, true)?;
+        let revision = runtime.state().revision;
+        // Pin verified remote storage before entering the original project write custody.
+        let retained_source = request
+            .correlation
+            .reopen(self.destination, &self.manifest, request.reviewers)
+            .map_err(store_error)?;
+        let outcome = request
+            .source
+            .commit_fleet_import_with(
+                request.request,
+                &candidate,
+                plan,
+                signer,
+                request.reviewers,
+                || {
+                    // Native signing may yield. Refuse cancellation/context changes before journal
+                    // append; an already durable intent is retained for explicit inspection/recovery.
+                    self.project_context(runtime, request, true)
+                        .map_err(|_| io::Error::other("remote import context changed"))?;
+                    if runtime.state().revision != revision {
+                        return Err(io::Error::other("remote import revision changed"));
+                    }
+                    retained_source.verify_roots()?;
+                    Ok(())
+                },
+            )
+            .map_err(store_error)?;
+        if self.project_candidate_snapshot(runtime, request, true)?.0 != candidate {
+            return Err(refused());
+        }
+        Ok(outcome)
+    }
+
+    /// Record or inspect the actual imported project review against its fixed historical main.
+    /// The review grants no human approval or original-folder write-back authority.
+    pub fn review_imported_project_candidate(
+        &self,
+        runtime: &mut Runtime,
+        request: &RemoteProjectCandidateRequest<'_>,
+        create: bool,
+    ) -> Result<Json, Error> {
+        let (candidate, snapshot) = self.project_candidate_snapshot(runtime, request, create)?;
+        let review = request
+            .source
+            .review_fleet_import(
+                request.request,
+                &candidate,
+                &snapshot,
+                request.reviewers,
+                create,
+            )
+            .map_err(store_error)?;
+        if self.project_candidate_snapshot(runtime, request, create)?.0 != candidate {
+            return Err(refused());
+        }
+        Ok(review)
     }
 }

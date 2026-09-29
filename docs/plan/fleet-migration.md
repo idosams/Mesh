@@ -3641,3 +3641,33 @@ transitive remote lineage, composed transport/ingestion and the remaining full-p
 still required. Full `npm test` passed: 3,581 native tests, 17 skipped, 158.645 s,
 desktop checks and all 44 real daemon-demo checks. One slow comparison test completed; no process
 leak warning occurred. Earlier reliability issues remain open.
+
+## R59: signed remote candidate import and recovery
+
+Depends on R58 / PR #189. New canonical implementation; no legacy commit is replaced. Native
+receiver APIs now inspect durable import outcomes, append the exact signed private project version,
+and record/read its real original-project review through existing native import/recovery controls.
+Original files and protected main remain unchanged. Import signing is distinct from human approval.
+
+Signing may yield. The remote source is verified and pinned before acquiring original-project write
+custody; the retained source roots, current remote context and revision are checked immediately
+before append, after durable intent. Reopening a foreign workspace under original-project write
+custody is deliberately avoided. Cancellation or replaced remote storage leaves the pending intent
+intact and refuses append. Exact pending retries use retained signatures; completed retries return
+the existing operation without signing again. Historical outcome inspection permits cancellation
+and later main advancement, while new import/review creation requires current eligibility. The
+current receiver still requires its retained assignment context; arbitrary older-attempt discovery
+is not added by this increment.
+
+Three focused native journeys passed: real signed import/review/reopen, cancellation during signing,
+and remote allocation substitution during signing followed by exact pending recovery. Tests assert
+original object identities in the actual imported version, unchanged original files and main,
+no double signing, refusal with an unavailable key, retained pending intent, and no append across
+cancelled or substituted custody. Worker evidence/signing keys are deterministic fixtures; this is
+not OS-key, packaged or second-host acceptance. Persisted import/receipt formats are unchanged.
+The full gate first stopped during compilation because the disk was full; its failure log is retained.
+After reclaiming only the inactive incremental compiler cache, the same `npm test` gate passed with
+`CARGO_INCREMENTAL=0`: 3,583 native tests, 17 skipped, 147.814 s, desktop checks and all 44 real
+daemon-demo checks. One slow comparison test completed; no process-leak warning occurred. Earlier
+reliability issues remain open. Direct-root input support does not complete transitive remote
+lineage, graphical actions, composed transport/ingestion, retention or external acceptance.
