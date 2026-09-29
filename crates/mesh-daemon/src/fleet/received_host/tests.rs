@@ -224,6 +224,45 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
     )
     .unwrap();
     worker.service.saved_review(&selection).unwrap();
+    fs::write(root.join("note.txt"), "later unsaved working bytes\n").unwrap();
+    let revision = worker.service.native_state().unwrap().revision;
+    let source = worker
+        .service
+        .prepare_remote_review_input(&selection)
+        .unwrap();
+    assert_eq!(
+        source.manifest().input().to_string(),
+        saved.get("version").unwrap().as_text().unwrap()
+    );
+    let chunks = source
+        .manifest()
+        .entries()
+        .iter()
+        .find_map(|entry| match entry {
+            crate::fleet::RemoteInputEntry::File { path, chunks, .. } if path == "note.txt" => {
+                Some(chunks.clone())
+            }
+            _ => None,
+        })
+        .expect("saved note export");
+    let exported: Vec<u8> = chunks
+        .iter()
+        .flat_map(|chunk| source.read_chunk(chunk.digest).unwrap())
+        .collect();
+    assert_eq!(exported, b"received worker result\n");
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"later unsaved working bytes\n"
+    );
+    assert_eq!(worker.service.native_state().unwrap().revision, revision);
+    let wrong = super::super::service::SavedReviewSelection::new(
+        "lane",
+        saved.get("checkpoint").unwrap().as_text().unwrap(),
+        &worker.receipt().initial_operation().to_string(),
+        saved.get("bundle").unwrap().as_text().unwrap(),
+    )
+    .unwrap();
+    assert!(worker.service.prepare_remote_review_input(&wrong).is_err());
     // Completion revoked the exact provider session. Reconnection cannot resurrect it.
     let mut connection = Client::open(worker.endpoint());
     assert!(matches!(
@@ -231,6 +270,17 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
         DaemonMessage::Failed { .. }
     ));
     drop(connection);
+    drop(worker);
+    // A read-only export retains native pins, not an execution owner or credential.
+    let exported: Vec<u8> = chunks
+        .iter()
+        .flat_map(|chunk| source.read_chunk(chunk.digest).unwrap())
+        .collect();
+    assert_eq!(exported, b"received worker result\n");
+    let displaced = root.with_file_name("displaced-export-workspace");
+    fs::rename(root, &displaced).unwrap();
+    fs::create_dir(root).unwrap();
+    assert!(source.read_chunk(chunks[0].digest).is_err());
 }
 
 #[test]

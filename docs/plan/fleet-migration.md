@@ -3129,3 +3129,19 @@ All eight status tests passed, including v1/v2 real resident routing, expired-le
 lease recovery after reopen, null admission, downgrade refusal and mutation during signing. Full
 final-source checks and canonical PR delivery remain required. Actual remote execution/results,
 provider and packaged acceptance remain part of the full fleet objective.
+
+
+## R35 received-worker immutable result export (validation in progress)
+
+New canonical implementation for [#163](https://github.com/idosams/Mesh/issues/163), following
+[PR #162](https://github.com/idosams/Mesh/pull/162). No preserved source commits are replaced.
+The native received session verifies the exact saved checkpoint/review, original attempt and
+workspace binding before exporting the recorded immutable tree with allocation pins. It does
+not rely on the ordinary lane allocator, which intentionally cannot recreate received work.
+
+The composed received-host regression passed: saved bytes exclude later unsaved working edits,
+wrong selection refuses, the ledger revision stays unchanged, execution credentials stay revoked,
+content survives dropping the worker owner, and replacing its workspace path refuses reads.
+Daemon lint with warnings denied passed. Full canonical checks and PR delivery remain pending.
+Signed offers, resumable output transfer, exact coordinator import/recovery and real second-machine
+acceptance remain required; this increment introduces no new wire or persisted format.

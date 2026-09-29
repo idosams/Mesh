@@ -293,3 +293,11 @@ current guarded worker lease alongside those original facts, including after exp
 reopen. Missing admission remains unknown, and a valid lease never proves process liveness or
 permits a retry. Native resident routing and a bounded SSH inspection entry point support both
 versions. Eight focused status tests pass; full validation and merged delivery remain pending.
+
+
+Native received-worker sessions can now export an exact recorded saved review as immutable
+content, retaining native custody checks after the execution owner is dropped. The focused
+regression passed with later unsaved edits, mismatched selection and replaced-path refusal;
+daemon lint passed. Full validation and PR delivery are pending. This is the first source
+increment for [#163](https://github.com/idosams/Mesh/issues/163), not signed result transfer or
+second-machine acceptance.

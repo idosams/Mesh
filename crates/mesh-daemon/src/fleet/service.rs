@@ -2269,6 +2269,13 @@ impl FleetService {
         &self,
         selection: &SavedReviewSelection,
     ) -> Result<super::RemoteInputSource, Unavailable> {
+        {
+            let mut inner = self.lock()?;
+            inner.runtime.refresh().map_err(runtime_error)?;
+            if let Some(received) = &inner.received {
+                return received.export_saved_review(&inner.runtime, selection);
+            }
+        }
         let state = self.native_state()?;
         let binding = saved_review_binding_from_state(&state, selection)?.clone();
         let history = self.allocator.reopen_history(&selection.lane, &binding)?;

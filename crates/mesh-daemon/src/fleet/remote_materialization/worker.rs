@@ -35,6 +35,39 @@ impl ReceivedWorkerWorkspace {
     pub fn receipt(&self) -> &Json {
         &self.receipt
     }
+    /// Export one recorded immutable result while retaining the original allocation pins.
+    /// The containing native session must separately verify the checkpoint and exact attempt.
+    pub(in crate::fleet) fn export_saved_review(
+        &self,
+        bundle: mesh_store::RecordDigest,
+        version: mesh_store::RecordDigest,
+    ) -> io::Result<crate::fleet::RemoteInputSource> {
+        self.verify()?;
+        let source = self
+            .daemon
+            .with_recorded_lane_review(
+                &self.binding.root,
+                &self.binding.installation,
+                bundle,
+                version,
+                |open| {
+                    open.remote_input_source(version).map_err(|_| {
+                        crate::ipc::Unavailable::new(
+                            "remote-result-content-unavailable",
+                            "The exact saved worker result is unavailable.",
+                        )
+                    })
+                },
+            )
+            .map_err(|_| invalid())?
+            .protecting_allocation(
+                vec![self.input.parent.clone(), self.input.allocation.clone()],
+                token(&self.input.allocation)?,
+            )?;
+        self.verify()?;
+        source.verify_roots()?;
+        Ok(source)
+    }
     /// Recheck the original input, allocation custody, current installation and retained initial
     /// operation. Later working edits do not rewrite the original source-to-worker mapping.
     pub fn verify(&self) -> io::Result<()> {
