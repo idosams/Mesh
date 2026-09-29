@@ -3223,3 +3223,24 @@ the log is retained and this is not a clean lifecycle claim. PR #167 merged as
 `a370cdc77a6b80004ef83d477135ca94aee85743` after all seven checks, 3,559 native tests and four
 renderer cases. This branch incorporates it by normal merge, retaining both appended documentation
 sections. Final combined-source validation is running before delivery.
+
+
+## R39 durable native result catalog (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), stacked on published
+[PR #168](https://github.com/idosams/Mesh/pull/168), `0bbe5eaca7e182bfe1dedc3e01de2d89ce8d6873`.
+No preserved source commits are replaced. R38's final full local gate passed: 3,559 native tests,
+17 skipped, desktop checks and 44 daemon checks. Its initial run reported a process-leak warning;
+the final run did not. Neither is proof of a lifecycle fix. Hosted checks are still running.
+
+A bounded per-launch catalog retains the exact signed offer after the original checkpoint record.
+Native discovery cross-checks every row against guarded original facts, with a revision cursor and
+at most sixteen results per page. Publication reports success only after both records are retained;
+interruption between appends is repaired by explicit idempotent republication without resigning.
+Legacy offers remain readable by known checkpoint but require republication for discovery.
+
+The composed native regression passes pagination across eighteen offers, reopen, duplicate
+publication, interrupted index append, invalid cursor and corrupted records. The first run exposed
+missing explicit unknown-admission handling; it was fixed and the failed log retained. Full local
+and hosted checks remain pending. Authenticated discovery, content reopening/transfer, exact
+coordinator import and real second-machine/packaged acceptance remain required.

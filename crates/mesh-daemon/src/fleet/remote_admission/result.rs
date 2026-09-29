@@ -170,13 +170,13 @@ impl RemoteSavedResultOffer {
     }
     pub(in crate::fleet) fn persist(self, store: &mut FleetStore) -> Result<Self, Error> {
         if let Some(retained) = Self::retained(store, &self.body)? {
-            return Ok(retained);
+            return catalog::retain(store, retained);
         }
         let stream = Self::stream(&self.body)?;
         let result = store.append_with_outcome(&stream, 0, "offer", &self.encode());
         // A competing exact writer may have committed first. Verify its immutable signed fact.
         match Self::retained(store, &self.body)? {
-            Some(retained) => Ok(retained),
+            Some(retained) => catalog::retain(store, retained),
             None => {
                 result?;
                 Err(invalid())
@@ -236,3 +236,6 @@ mod tests;
 
 #[path = "result/query.rs"]
 pub(in crate::fleet) mod query;
+
+#[path = "result/catalog.rs"]
+pub(in crate::fleet) mod catalog;
