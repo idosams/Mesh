@@ -292,6 +292,57 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Stage a received remote result from retained native selectors and original-project history.
+    #[cfg(target_os = "macos")]
+    pub fn stage_retained_remote_project(
+        &self,
+        request: &super::RetainedRemoteProjectRequest<'_>,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .stage_retained_remote_project(request)
+            .map_err(runtime_error)
+    }
+    /// Read a retained remote import outcome without a private signing key.
+    #[cfg(target_os = "macos")]
+    pub fn inspect_retained_remote_project_import(
+        &self,
+        request: &super::RetainedRemoteProjectRequest<'_>,
+        actor: mesh_types::PublicKey,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .inspect_retained_remote_project_import(request, actor)
+            .map_err(runtime_error)
+    }
+    /// Import through native signing/recovery; exact eligibility is checked around signing.
+    #[cfg(target_os = "macos")]
+    pub fn import_retained_remote_project(
+        &self,
+        request: &super::RetainedRemoteProjectRequest<'_>,
+        signer: &dyn super::CandidateImportSigner,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .import_retained_remote_project(request, signer)
+            .map_err(runtime_error)
+    }
+    /// Read or create the exact original-project review for a received result.
+    #[cfg(target_os = "macos")]
+    pub fn review_retained_remote_project_import(
+        &self,
+        request: &super::RetainedRemoteProjectRequest<'_>,
+        create: bool,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .review_retained_remote_project_import(request, create)
+            .map_err(runtime_error)
+    }
     /// Native offline remote review discovery, separate from local checkpoints and agent sessions.
     #[cfg(target_os = "macos")]
     pub fn remote_saved_reviews(

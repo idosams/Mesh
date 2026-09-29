@@ -217,15 +217,34 @@ fn project_import_journey(fault: u8) {
         request: &request_id,
         expected_main: None,
     };
+    let retained = crate::fleet::RetainedRemoteProjectRequest {
+        offer: RecordDigest::from_bytes(*Blake3::digest_bytes(offer.as_bytes()).as_bytes()),
+        correlation: correlation.digest(),
+        source: &source,
+        reviewers: &trusted,
+        request: &request_id,
+        expected_main: None,
+    };
     assert!(
         receiver
             .prepare_project_candidate_import(&mut runtime, &request, actor)
             .is_err(),
         "preparation never creates a missing candidate"
     );
-    let candidate = receiver
-        .stage_project_candidate(&mut runtime, &request)
-        .unwrap();
+    drop(receiver);
+    let wrong = crate::fleet::RetainedRemoteProjectRequest {
+        correlation: RecordDigest::from_bytes([0xee; 32]),
+        ..retained
+    };
+    assert!(runtime.stage_retained_remote_project(&wrong).is_err());
+    let candidate = runtime.stage_retained_remote_project(&retained).unwrap();
+    let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
+        &setup.destination,
+        &offer,
+        status!(&mut runtime),
+    )
+    .unwrap()
+    .0;
     assert_eq!(
         candidate,
         receiver
@@ -307,7 +326,15 @@ fn project_import_journey(fault: u8) {
                 .join(format!("result-{}", "a".repeat(32)))
         }),
     };
-    let mut outcome = receiver.import_project_candidate(&mut runtime, &request, &signer);
+    drop(receiver);
+    let mut outcome = runtime.import_retained_remote_project(&retained, &signer);
+    let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
+        &setup.destination,
+        &offer,
+        status!(&mut runtime),
+    )
+    .unwrap()
+    .0;
     if let Some(path) = &signer.replace {
         assert!(
             outcome.is_err(),
@@ -365,15 +392,32 @@ fn project_import_journey(fault: u8) {
         );
         "imported"
     };
+    drop(receiver);
     drop(runtime);
     let mut runtime = Runtime::open(
         FleetStore::open(setup.f.path.join("project-coordinator.sqlite")).unwrap(),
         "objective",
     )
     .unwrap();
-    let recovered = receiver
-        .inspect_project_candidate_import(&mut runtime, &request, public(&signer.key))
+    let recovered = runtime
+        .inspect_retained_remote_project_import(&retained, public(&signer.key))
         .unwrap();
+    if !cancel_while_signing {
+        assert_ne!(
+            runtime
+                .review_retained_remote_project_import(&retained, false)
+                .unwrap()
+                .get("review"),
+            Some(&Json::Null)
+        );
+    }
+    let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
+        &setup.destination,
+        &offer,
+        status!(&mut runtime),
+    )
+    .unwrap()
+    .0;
     assert_eq!(recovered.get("state"), Some(&Json::text(expected_state)));
     source
         .with_fleet_input(input_version, &trusted, |open, main| {
@@ -440,6 +484,17 @@ fn project_import_journey(fault: u8) {
             .is_ok(),
         "cancellation still allows immutable historical reads"
     );
+    drop(receiver);
+    assert_eq!(
+        runtime
+            .inspect_retained_remote_project_import(&retained, public(&signer.key))
+            .unwrap(),
+        recovered
+    );
+    assert!(runtime
+        .import_retained_remote_project(&retained, &signer)
+        .is_err());
+    assert!(runtime.stage_retained_remote_project(&retained).is_err());
 }
 
 struct ImportSigner {

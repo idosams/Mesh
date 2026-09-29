@@ -189,7 +189,7 @@ mod result;
 pub use result::{
     NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
     RemoteLocalReviewReceipt, RemoteProjectCandidateRequest, RemoteResultContentReceipt,
-    RemoteResultEvidenceReceipt,
+    RemoteResultEvidenceReceipt, RetainedRemoteProjectRequest,
 };
 
 #[cfg(test)]
