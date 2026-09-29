@@ -1320,8 +1320,8 @@ pub use remote_admission::status::result::discovery::{
 
 #[cfg(target_os = "macos")]
 pub use remote_input::{
-    NativeRemoteResultReceiver, RemoteLocalReviewReceipt, RemoteResultContentReceipt,
-    RemoteResultEvidenceReceipt,
+    NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
+    RemoteLocalReviewReceipt, RemoteResultContentReceipt, RemoteResultEvidenceReceipt,
 };
 
 #[cfg(target_os = "macos")]

@@ -253,4 +253,4 @@ impl<'a> NativeRemoteResultReceiver<'a> {
 }
 
 mod local_review;
-pub use local_review::RemoteLocalReviewReceipt;
+pub use local_review::{RemoteLocalReviewEntry, RemoteLocalReviewPage, RemoteLocalReviewReceipt};

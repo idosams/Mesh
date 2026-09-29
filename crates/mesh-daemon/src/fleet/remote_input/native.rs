@@ -187,8 +187,8 @@ impl DurableFs for ReceivingFs<'_> {
 mod result;
 #[cfg(target_os = "macos")]
 pub use result::{
-    NativeRemoteResultReceiver, RemoteLocalReviewReceipt, RemoteResultContentReceipt,
-    RemoteResultEvidenceReceipt,
+    NativeRemoteResultReceiver, RemoteLocalReviewEntry, RemoteLocalReviewPage,
+    RemoteLocalReviewReceipt, RemoteResultContentReceipt, RemoteResultEvidenceReceipt,
 };
 
 #[cfg(test)]

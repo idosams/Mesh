@@ -710,3 +710,17 @@ review to name the exact local operation. It creates no daemon or execution owne
 and stays readable after objective cancellation. This historical capability does not renew leases,
 release execution slots or establish current dependency/import eligibility. Native review discovery
 and original-project import still need explicit integration with this retained record.
+
+### Bounded offline review discovery
+
+`mesh.remote-local-review-index/v1` binds an objective's ordered discovery intent to the exact
+remote/local correlation. The index is written before per-offer commitment and acknowledgment;
+interruption therefore leaves an explicit entry with missing correlation, not invented readiness.
+Replays retain the first exact entry. Conflicts, unknown forms, gaps and out-of-range cursors refuse.
+
+Native pages contain at most sixteen entries within a caller-retained snapshot revision, bounded by
+4,096 entries per objective. Later appends do not move the selected snapshot. Committed metadata is
+still not content availability: a caller must reopen the native review before displaying its bytes.
+Neither discovery nor paging contacts workers, creates execution authority, repairs history or
+approves protected main. Existing v1 correlations remain directly readable; an exact authorized
+native re-registration can add their discovery intent without changing the original receipt.
