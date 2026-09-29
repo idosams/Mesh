@@ -1310,3 +1310,9 @@ pub use remote_admission::status::result::query::{
 
 #[cfg(target_os = "macos")]
 pub use remote_admission::status::result::catalog::RemoteSavedResultPage;
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::result::discovery::{
+    discover_remote_saved_results_over_ssh, RemoteResultDiscoveryChallenge,
+    RemoteResultDiscoveryQuery, VerifiedRemoteResultDiscoveryQuery,
+};

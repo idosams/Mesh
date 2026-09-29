@@ -144,32 +144,7 @@ impl RemoteInputAllocation {
             )
             .map_err(|_| invalid())?,
         );
-        let context = Json::object([
-            ("coordinator", Json::text(admission.coordinator())),
-            ("objective", Json::text(admission.objective())),
-            ("assignment", Json::text(&assignment.id)),
-            ("worker", Json::text(&assignment.worker_key)),
-            ("lane", Json::text(&admission.work().lane)),
-            ("run", Json::text(&admission.work().run)),
-            ("admission_revision", Json::Number(admission.revision())),
-            ("allocation", Json::text(admission.allocation())),
-            (
-                "allocation_installation",
-                Json::text(token(&self.allocation)?.directory_token()),
-            ),
-            (
-                "input_installation",
-                Json::text(token(&self.files)?.directory_token()),
-            ),
-            (
-                "source_input",
-                Json::text(self.manifest.input().to_string()),
-            ),
-            (
-                "source_bundle",
-                Json::text(self.manifest.bundle().to_string()),
-            ),
-        ]);
+        let context = mapping_context(&self, &admission)?;
         let intent = Json::object([
             ("schema", Json::text("mesh.received-workspace-intent/v1")),
             ("context", context.clone()),
@@ -233,3 +208,39 @@ impl RemoteInputAllocation {
 
 #[cfg(test)]
 mod tests;
+
+fn mapping_context(
+    input: &RemoteInputAllocation,
+    admission: &RemoteAdmissionReceipt,
+) -> io::Result<Json> {
+    let assignment = &admission.work().assignment;
+    Ok(Json::object([
+        ("coordinator", Json::text(admission.coordinator())),
+        ("objective", Json::text(admission.objective())),
+        ("assignment", Json::text(&assignment.id)),
+        ("worker", Json::text(&assignment.worker_key)),
+        ("lane", Json::text(&admission.work().lane)),
+        ("run", Json::text(&admission.work().run)),
+        ("admission_revision", Json::Number(admission.revision())),
+        ("allocation", Json::text(admission.allocation())),
+        (
+            "allocation_installation",
+            Json::text(token(&input.allocation)?.directory_token()),
+        ),
+        (
+            "input_installation",
+            Json::text(token(&input.files)?.directory_token()),
+        ),
+        (
+            "source_input",
+            Json::text(input.manifest.input().to_string()),
+        ),
+        (
+            "source_bundle",
+            Json::text(input.manifest.bundle().to_string()),
+        ),
+    ]))
+}
+
+#[cfg(target_os = "macos")]
+mod reopen;
