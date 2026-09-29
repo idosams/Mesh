@@ -3057,3 +3057,28 @@ initial test compile failed because the deliberate history-mutation fixture omit
 is preserved. Complete native compilation and initial lint passed; full final-base checks remain
 required. This is not signed saved-result transfer, current process liveness, lease renewal, UI
 readiness or real second-machine acceptance.
+
+## Validation follow-up: managed-save replacement synchronization
+
+New canonical test-only work tracked in [#158](https://github.com/idosams/Mesh/issues/158),
+based on R31 merge `bef131c69224c427ade919c680940b32f7f4efc3`. No preserved implementation
+commit is replaced. R31 passed all seven PR checks, but its
+[combined-main macOS run](https://github.com/idosams/Mesh/actions/runs/36548847897/job/109341756509)
+failed: 3,533 native tests passed, one managed-save replacement test failed, 17 skipped. The
+remaining six checks passed; combined main must not be reported green.
+
+The test observed a pending checkpoint before starting replacement, leaving a 50 ms scheduling
+window in which the original save could correctly finish. It now pauses the real signing callback
+while the native workspace authority guard is held, checks that replacement cannot finish, and
+releases the save. Exact durable assertions still require the original workspace to settle and
+the replacement's identically numbered checkpoint to remain pending. No production code, timeout
+threshold, retry or skip changes. Focused native and full hosted validation are pending. This
+follow-up does not resolve native event registration issue #37 or process startup issue #133.
+
+R32 merged through [PR #157](https://github.com/idosams/Mesh/pull/157) as
+`aa48e79dc093cf9a3bd0a08b9c8969953c2e811e`. All seven hosted PR checks passed: 3,539 native
+tests passed / 17 skipped, desktop and daemon demo passed, four renderer cases passed. Its local
+full run ended during compilation with no disk space; that failure is retained and is not a test
+pass. Combined-main validation is running. The test-only [PR #159](https://github.com/idosams/Mesh/pull/159)
+now includes that merged base. Its initial focused native managed-edit suite passed all 49 cases
+in 19 seconds; final merged-base hosted validation remains required.
