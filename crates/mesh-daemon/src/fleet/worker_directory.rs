@@ -262,3 +262,6 @@ mod tests;
 
 mod installation;
 pub use installation::{NativeWorkerInstallation, WorkerInstallationIdentity};
+
+mod endpoint;
+pub use endpoint::{NativeWorkerEndpoint, NativeWorkerStream};

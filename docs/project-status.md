@@ -250,3 +250,12 @@ Fourteen native directory tests and two command-module tests passed; full hosted
 These modes do not start a resident listener or provider. Successful provisioning in an eligible
 signed application and actual remote execution remain unverified. See
 [R28](plan/fleet-migration.md#r28-guarded-worker-installation-and-native-setup-commands).
+
+The guarded installation increment [#149](https://github.com/idosams/Mesh/pull/149) is merged
+with all seven PR and combined-main checks passing. The resident endpoint implementation tracked
+in [#150](https://github.com/idosams/Mesh/issues/150) now connects retained authenticated transfers
+to an independent provider supervisor through explicit native `serve` and `connect` modes. Native
+connection/refusal and CLI tests have passed; the complete endpoint/provider regression and final
+validation are pending. This is not verified signed-app or second-machine deployment. See the
+[worker configuration](developer-guide.md#resident-worker-configuration-native-implementation-under-validation)
+and [R29 ledger](plan/fleet-migration.md#r29-resident-authenticated-worker-endpoint-in-progress).

@@ -5,18 +5,22 @@ use std::path::PathBuf;
 enum Action {
     Provision,
     Identity,
+    Serve,
+    Connect,
 }
 fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     if args.first().map(String::as_str) != Some("--worker") {
         return Ok(None);
     }
     if args.len() != 3 {
-        return Err("Use --worker provision|identity <existing-private-folder>".into());
+        return Err("Use --worker provision|identity|serve|connect <absolute-path>".into());
     }
     let action = match args[1].as_str() {
         "provision" => Action::Provision,
         "identity" => Action::Identity,
-        _ => return Err("Worker action must be provision or identity".into()),
+        "serve" => Action::Serve,
+        "connect" => Action::Connect,
+        _ => return Err("Worker action must be provision, identity, serve or connect".into()),
     };
     let root = PathBuf::from(&args[2]);
     if !root.is_absolute() {
@@ -43,6 +47,11 @@ fn run(action: Action, root: PathBuf) -> Result<(), String> {
     // directory creation: this explicit command operates only on the caller's private metadata root.
     AppleActorCustody::availability()
         .map_err(|_| "Worker identity requires an eligible signed Mesh application")?;
+    match action {
+        Action::Serve => return crate::worker_service::serve(&root),
+        Action::Connect => return crate::worker_service::connect(&root),
+        _ => {}
+    }
     let expected = ProtectedWorkspaceRoot::inspect(&root).map_err(|_| UNAVAILABLE)?;
     let custody_error = |_| io::Error::other("worker custody unavailable");
     let (installation, _custody) = match action {
@@ -54,6 +63,9 @@ fn run(action: Action, root: PathBuf) -> Result<(), String> {
             NativeWorkerInstallation::reopen(&root, expected, &[], |account, key| {
                 AppleActorCustody::open(account, key).map_err(custody_error)
             })
+        }
+        Action::Serve | Action::Connect => {
+            unreachable!("service modes return before installation setup")
         }
     }
     .map_err(|_| UNAVAILABLE)?;
@@ -108,9 +120,15 @@ mod tests {
             parse(&args(&["--worker", "identity", "/private/tmp/worker"])).unwrap(),
             Some((Action::Identity, PathBuf::from("/private/tmp/worker")))
         );
+        for (name, action) in [("serve", Action::Serve), ("connect", Action::Connect)] {
+            assert_eq!(
+                parse(&args(&["--worker", name, "/private/tmp/native-input"])).unwrap(),
+                Some((action, PathBuf::from("/private/tmp/native-input")))
+            );
+        }
         for items in [
             vec!["--worker"],
-            vec!["--worker", "serve", "/tmp/x"],
+            vec!["--worker", "unknown", "/tmp/x"],
             vec!["--worker", "provision", "relative"],
             vec!["--worker", "identity", "/tmp/x", "extra"],
         ] {
@@ -126,7 +144,12 @@ mod tests {
         // The test binary has no enrolled Mesh application identity. Fail before filesystem work,
         // including when the requested path doesn't exist. This test creates no keychain item.
         assert!(mesh_keychain::AppleActorCustody::availability().is_err());
-        for action in [Action::Provision, Action::Identity] {
+        for action in [
+            Action::Provision,
+            Action::Identity,
+            Action::Serve,
+            Action::Connect,
+        ] {
             assert_eq!(
                 run(action, PathBuf::from("/unused-mesh-worker-test-path")).unwrap_err(),
                 "Worker identity requires an eligible signed Mesh application"

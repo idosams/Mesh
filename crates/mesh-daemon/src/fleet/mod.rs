@@ -58,10 +58,15 @@ pub use remote_admission::{
 #[cfg(unix)]
 pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
 #[cfg(target_os = "macos")]
+mod worker_connections;
+#[cfg(target_os = "macos")]
 mod worker_directory;
 #[cfg(target_os = "macos")]
+pub use worker_connections::{NativeWorkerConnections, WorkerConnectionOutcome};
+#[cfg(target_os = "macos")]
 pub use worker_directory::{
-    NativeRemoteWorkerDirectory, NativeWorkerInstallation, WorkerInstallationIdentity,
+    NativeRemoteWorkerDirectory, NativeWorkerEndpoint, NativeWorkerInstallation,
+    NativeWorkerStream, WorkerInstallationIdentity,
 };
 mod remote_input;
 mod remote_transport;
