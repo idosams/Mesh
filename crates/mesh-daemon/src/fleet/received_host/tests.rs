@@ -919,3 +919,69 @@ fn resident_mailbox_returns_original_handoff_when_full_or_disconnected() {
     assert!(!fixture.0.join("s").exists());
     assert!(!root.join("launches.txt").exists());
 }
+
+#[cfg(target_os = "macos")]
+pub(in crate::fleet) fn saved_result_fixture(
+    fixture: &Fixture,
+    reservation: crate::fleet::RemoteLaunchReservation,
+    worker_key: ed25519_dalek::SigningKey,
+) -> String {
+    let root = std::path::PathBuf::from(reservation.workspace().binding().root());
+    let mut worker = ReceivedWorkerHost::start(
+        reservation,
+        adapter(fixture),
+        &fixture.0.join("s"),
+        Arc::new(Signers),
+    )
+    .unwrap();
+    wait_started(&root);
+    worker.poll().unwrap();
+    let objective = worker.service.objective().unwrap();
+    let credential = worker.host.test_owned_credential("lane").to_owned();
+    let mut client = Client::open(worker.endpoint());
+    fs::write(root.join("note.txt"), b"saved native worker result\n").unwrap();
+    let checkpoint = result(client.call(
+        &objective,
+        &credential,
+        "checkpoint",
+        Json::object([("request", Json::text("saved"))]),
+    ));
+    result(client.call(
+        &objective,
+        &credential,
+        "submit_review",
+        Json::object([("checkpoint", checkpoint.get("checkpoint").unwrap().clone())]),
+    ));
+    drop(client);
+    fs::write(root.join("finish"), b"finish").unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Some(outcome) = worker.poll().unwrap()[0].outcome {
+            assert!(outcome);
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    worker
+        .publish_saved_result_at(&Signer(worker_key), Instant::now())
+        .unwrap()
+        .unwrap();
+    let reviews = worker.service.saved_reviews("lane", None).unwrap();
+    let checkpoint = &reviews.get("reviews").unwrap().as_array().unwrap()[0];
+    let selection = crate::fleet::service::SavedReviewSelection::new(
+        "lane",
+        checkpoint.get("checkpoint").unwrap().as_text().unwrap(),
+        checkpoint.get("version").unwrap().as_text().unwrap(),
+        checkpoint.get("bundle").unwrap().as_text().unwrap(),
+    )
+    .unwrap();
+    let (offer, _) = worker
+        .service
+        .sign_remote_saved_review(&selection, |_| panic!("already signed"))
+        .unwrap();
+    fs::write(root.join("note.txt"), b"unsaved later bytes").unwrap();
+    assert_eq!(fs::read(root.join("launches.txt")).unwrap(), b"one\n");
+    drop(worker);
+    offer.encode()
+}

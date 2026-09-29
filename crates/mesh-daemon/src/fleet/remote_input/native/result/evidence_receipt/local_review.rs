@@ -83,6 +83,9 @@ impl RemoteLocalReviewReceipt {
     pub fn digest(&self) -> RecordDigest {
         hash(&self.encoded())
     }
+    pub(in crate::fleet) fn evidence_receipt(&self) -> RecordDigest {
+        self.evidence
+    }
     /// Exact local saved review bundle.
     pub fn review(&self) -> RecordDigest {
         self.review

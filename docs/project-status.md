@@ -429,3 +429,12 @@ project reviews, with durable pending/completed recovery. Key refusal, cancellat
 and replaced remote custody refuse append. Exact retries reuse retained signatures. This preserves
 the separate human approval and original-folder application boundaries. Source/native fixture tests
 cover these paths; graphical remote import and signed packaged acceptance remain unverified.
+
+
+### Composed remote receiving source coverage
+
+A native coordinator API now composes exact selected result transfer, authenticated evidence,
+private local history and review registration. Completed retries verify retained state locally without
+another connection, signature or allocation. Conflicting selected offers and replaced storage refuse.
+The native endpoint integration uses a fixture provider and test keys; real SSH/second-host and packaged
+receiving remain unverified. Desktop receiving/import actions and transitive lineage are still open.

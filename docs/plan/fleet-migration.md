@@ -3671,3 +3671,34 @@ After reclaiming only the inactive incremental compiler cache, the same `npm tes
 daemon-demo checks. One slow comparison test completed; no process-leak warning occurred. Earlier
 reliability issues remain open. Direct-root input support does not complete transitive remote
 lineage, graphical actions, composed transport/ingestion, retention or external acceptance.
+
+
+## R60: composed native remote result ingestion
+
+Depends on R59 / PR #190. New canonical implementation; no legacy commit is replaced. One native
+coordinator operation binds an independently configured worker and current assignment to an exact
+selected signed offer, receives complete saved content and authenticated correspondence, retains both
+receipts, materializes independent local history and registers its review correlation. SSH connections
+have separate bounded budgets. A different signed offer for the same checkpoint is refused before
+accepting content. Existing transfer callers retain their original behavior.
+
+A completed retry revalidates retained evidence, content and native history locally without signing,
+network access or another allocation. Missing or replaced storage refuses without repair. A partial or
+unacknowledged allocation remains preserved for reconciliation; this operation does not adopt it or
+restart a provider. Existing persisted formats and protected-main approval boundaries are unchanged.
+
+The composed native integration uses a real received worker, a fixture executable and test signing
+keys. It checkpoints/reviews real history, publishes its signed offer, stops the worker and serves
+content and correspondence through the native endpoint and connection handler. Assertions cover saved
+bytes despite later unsaved edits, exact-offer substitution before content mutation, coordinator
+restart/offline replay and replaced receiving storage. This is local native transport evidence, not a
+real SSH/second-host or packaged acceptance claim. The full `npm test` gate passed: 3,584 native
+tests, 17 skipped, 148.805 s, desktop checks and all 44 real daemon-demo checks. One slow test
+completed; no process-leak warning occurred. Initial fixture-selector and Clippy failures were
+corrected, with their logs preserved. Existing reliability issues remain open.
+Desktop receive/import actions, transitive lineage, retention and full external acceptance remain open.
+
+Delivery update: PR #189 passed all seven final checks and merged as
+`70567590d03fcadefca30f153644290b940538e1`. Its combined-main run is still pending. PR #190's original
+seven checks passed; its unchanged source tree is being checked after rebasing the PR target on main
+through a normal ancestry-only merge (no history rewrite).

@@ -39,7 +39,7 @@ impl Fixture {
     fn workspace(&self, registry: &mut RemoteAdmissionRegistry) -> ReceivedWorkerWorkspace {
         self.workspace_for(registry, work())
     }
-    fn workspace_for(
+    pub(in crate::fleet) fn workspace_for(
         &self,
         registry: &mut RemoteAdmissionRegistry,
         work: RemoteWork,

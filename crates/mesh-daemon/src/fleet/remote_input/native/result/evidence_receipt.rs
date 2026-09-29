@@ -80,7 +80,7 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         )
         .map_err(|_| refused())
     }
-    fn load_evidence(
+    pub(in crate::fleet) fn load_evidence(
         &self,
         runtime: &mut Runtime,
         input: &RemoteInputManifest,

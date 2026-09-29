@@ -328,3 +328,6 @@ pub(in crate::fleet) mod transfer;
 
 #[path = "result/evidence.rs"]
 pub(in crate::fleet) mod evidence;
+
+#[path = "result/ingestion.rs"]
+pub(in crate::fleet) mod ingestion;

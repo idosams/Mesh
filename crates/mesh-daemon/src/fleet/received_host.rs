@@ -189,4 +189,4 @@ fn unavailable(code: &str) -> Unavailable {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;
