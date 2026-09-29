@@ -29,11 +29,23 @@ use mesh_store::{
 use mesh_types::{Blake3, ContentDigest as _, PublicKey};
 
 fn scratch(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "mesh-live-save-{name}-{}-{:?}",
-        std::process::id(),
-        std::thread::current().id()
-    ))
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    // Import receipts are siblings of the workspace. Reserve the whole namespace atomically;
+    // a recycled PID must never reuse a prior run's retained receipt or delete its evidence.
+    for _ in 0..4096 {
+        let parent = std::env::temp_dir().join(format!(
+            "mesh-live-save-{name}-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        match fs::create_dir(&parent) {
+            Ok(()) => return parent.join("workspace"),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("reserve test namespace: {error}"),
+        }
+    }
+    panic!("test namespace collision bound exhausted")
 }
 
 fn startup() -> StartupSummary {
