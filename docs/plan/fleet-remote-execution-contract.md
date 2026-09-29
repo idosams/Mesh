@@ -638,3 +638,17 @@ freshness, liveness, execution, import or protected-main authority. Missing, par
 nonprivate or linked recorded metadata refuses without repair. Existing content-only receipts stay
 valid; evidence is an additive format and is never inferred for an old receipt. This is verified
 retention of metadata, not a content retention/garbage-collection policy or a candidate import.
+
+### Private result copy before local history
+
+A retained authenticated evidence receipt can authorize an exact native copy into a create-only
+`result-<native-allocation-id>` private folder. Native code selects storage and the allocation ID;
+peer paths remain manifest-relative content only. Existing content and evidence receipts are
+revalidated before and after copying. Missing records or metadata refuse without repair. Partial
+or existing allocations are preserved and cannot be adopted through a repeated copy request.
+
+The result handle retains allocation custody and rechecks the complete inventory, file hashes and
+modes. Its type has no conversion to an admitted worker workspace, so no input reservation or
+execution authority is fabricated. The copied bytes are independent of the receiving CAS. This
+step creates no local history/review identities, import receipt or protected-main approval; those
+require the later native candidate initialization and exact provenance correlation steps.

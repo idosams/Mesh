@@ -3416,3 +3416,22 @@ metadata refusal and hard-link refusal. Initial production error-conversion and 
 errors were corrected; failed logs are retained. Full validation and PR delivery are pending.
 Candidate materialization/import, retention policy and real remote/provider/packaged acceptance
 remain required; this receipt grants none of those authorities.
+
+## R48 private remote result materialization (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #178](https://github.com/idosams/Mesh/pull/178), `9523d306d593a26c0b5ed3400e43e92f38b8aa4b`.
+No preserved commits are replaced. R47 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks; its hosted checks are separate from this source validation.
+
+A native result receiver can copy an exact retained result to a fresh private result allocation.
+It revalidates existing content/evidence receipts before and after copying, preserving the existing
+bounded native materializer's complete inventory, file hashes, modes and root identity checks.
+The result-only handle has no worker-admission conversion. Existing or partial output refuses;
+missing receipt metadata cannot be recreated by copying. The original project is never a target.
+
+The native library check and focused regression pass exact copy, provenance identity, collision
+preservation, changed-copy refusal, CAS independence and missing-evidence refusal before allocation.
+Full validation and PR delivery are pending. Independent native history/review, original-project
+candidate import, durable local/remote review correlation, retention and real remote/provider/
+packaged acceptance remain required; a copied tree alone is not an imported review candidate.

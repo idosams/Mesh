@@ -161,6 +161,24 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         self.check(runtime)?;
         Ok(receipt)
     }
+    pub(super) fn verify_content_receipt(
+        &self,
+        runtime: &mut Runtime,
+    ) -> Result<RemoteResultContentReceipt, Error> {
+        self.verify_complete(runtime)?;
+        let body = self.receipt_body()?;
+        let receipt = self.retained_receipt(runtime, &body)?.ok_or_else(refused)?;
+        let (root, _) = self.destination.receiving_store().map_err(store_error)?;
+        if read_manifest(&root, &manifest_path(self.manifest.bundle()))
+            .map_err(store_error)?
+            .as_deref()
+            != Some(self.manifest.encoded().as_bytes())
+        {
+            return Err(refused());
+        }
+        self.check(runtime)?;
+        Ok(receipt)
+    }
     /// Reopen only an already recorded receipt using the exact native destination and current
     /// assignment. Missing manifest, ledger fact or content refuses; nothing is repaired or imported.
     pub fn reopen_content_receipt(

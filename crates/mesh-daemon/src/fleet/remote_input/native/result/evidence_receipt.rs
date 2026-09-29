@@ -193,6 +193,35 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         self.verify_complete(runtime)?;
         Ok(retained)
     }
+    /// Copy one exact retained result into an independent create-only private allocation.
+    /// The supplied receipt is revalidated against durable state before and after copying.
+    /// Missing metadata refuses without repair; existing/partial allocations are never adopted.
+    pub fn materialize_result(
+        &self,
+        runtime: &mut Runtime,
+        input: &RemoteInputManifest,
+        receipt: &RemoteResultEvidenceReceipt,
+        allocation_id: &str,
+    ) -> Result<crate::fleet::RemoteResultAllocation, Error> {
+        let verify = |runtime: &mut Runtime| -> Result<(), Error> {
+            let content = self.verify_content_receipt(runtime)?.digest();
+            let retained = self
+                .load_evidence(runtime, input, content)?
+                .ok_or_else(refused)?;
+            if retained.digest() != receipt.digest() || content != receipt.content_receipt() {
+                return Err(refused());
+            }
+            self.verify_complete(runtime)
+        };
+        verify(runtime)?;
+        let allocation = self
+            .destination
+            .materialize_result(&self.manifest, &self.cas, allocation_id, receipt.digest())
+            .map_err(store_error)?;
+        verify(runtime)?;
+        allocation.verify().map_err(store_error)?;
+        Ok(allocation)
+    }
     /// Reopen existing content and authenticated provenance after restart, without network access,
     /// execution reattachment or metadata repair. Every signature, context and content hash is checked.
     pub fn reopen_evidence_receipt(

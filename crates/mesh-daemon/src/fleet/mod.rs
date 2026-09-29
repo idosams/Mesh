@@ -96,7 +96,7 @@ pub use remote_input::{
 };
 #[cfg(unix)]
 pub use remote_materialization::{
-    ReceivedWorkerWorkspace, RemoteInputAllocation, RemoteInputDestination,
+    ReceivedWorkerWorkspace, RemoteInputAllocation, RemoteInputDestination, RemoteResultAllocation,
 };
 #[cfg(unix)]
 mod remote_peer;
