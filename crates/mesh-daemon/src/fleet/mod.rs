@@ -1316,3 +1316,6 @@ pub use remote_admission::status::result::discovery::{
     discover_remote_saved_results_over_ssh, RemoteResultDiscoveryChallenge,
     RemoteResultDiscoveryQuery, VerifiedRemoteResultDiscoveryQuery,
 };
+
+#[cfg(target_os = "macos")]
+pub use remote_input::NativeRemoteResultReceiver;

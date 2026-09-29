@@ -139,3 +139,149 @@ fn saved_result_persistence_recovers_exact_bytes_and_refuses_conflicts_or_extra_
         .unwrap();
     assert!(RemoteSavedResultOffer::retained(&registry.store, &body).is_err());
 }
+
+#[test]
+fn native_result_receipt_resumes_verified_content_without_input_admission_or_working_files() {
+    use crate::fleet::{
+        NativeRemoteResultReceiver, RemoteInputChunk, RemoteInputDestination, RemoteInputEntry,
+        RemoteWorkerStatusRequest,
+    };
+    use crate::ProtectedWorkspaceRoot;
+    use mesh_cas::{ContentDigest as _, Digest32};
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    let f = Fixture::new();
+    let mut runtime = f.runtime(true);
+    let initial_revision = runtime.state().revision;
+    let (mut body, _) = fixture_body(&f, &mut runtime);
+    let bytes = vec![b'x'; 100_000];
+    let digest = mesh_cas::Blake3::digest_bytes(&bytes);
+    let manifest = RemoteInputManifest::new(
+        RecordDigest::from_bytes([0x93; 32]),
+        vec![RemoteInputEntry::File {
+            path: "result.txt".into(),
+            executable: false,
+            digest,
+            chunks: vec![RemoteInputChunk {
+                digest,
+                bytes: bytes.len() as u64,
+            }],
+        }],
+    )
+    .unwrap();
+    let Json::Object(fields) = &mut body else {
+        panic!("object");
+    };
+    fields.iter_mut().find(|(k, _)| k == "version").unwrap().1 =
+        Json::text(manifest.input().to_string());
+    fields.iter_mut().find(|(k, _)| k == "manifest").unwrap().1 =
+        Json::text(manifest.bundle().to_string());
+    let encoded = RemoteSavedResultOffer::sign(body, |p| sign(&f.worker, p))
+        .unwrap()
+        .encode();
+    let store = f.path.join("result-store");
+    let allocations = f.path.join("result-allocations");
+    for path in [&store, &allocations] {
+        fs::create_dir(path).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let destination = RemoteInputDestination::admit(
+        &store,
+        ProtectedWorkspaceRoot::inspect(&store).unwrap(),
+        &allocations,
+        ProtectedWorkspaceRoot::inspect(&allocations).unwrap(),
+        &[],
+    )
+    .unwrap();
+    fn request<'a>(f: &Fixture, runtime: &'a mut Runtime) -> RemoteWorkerStatusRequest<'a> {
+        RemoteWorkerStatusRequest {
+            runtime,
+            lane: "lane",
+            run: "run",
+            coordinator: public(&f.coordinator),
+            worker: public(&f.worker),
+        }
+    }
+    let wrong = RemoteInputManifest::new(RecordDigest::from_bytes([0x94; 32]), vec![]).unwrap();
+    assert!(NativeRemoteResultReceiver::new(
+        &destination,
+        wrong,
+        &encoded,
+        request(&f, &mut runtime)
+    )
+    .is_err());
+    assert_eq!(
+        fs::read_dir(&store).unwrap().count(),
+        0,
+        "invalid identity must not initialize a store"
+    );
+    let mut receiver = NativeRemoteResultReceiver::new(
+        &destination,
+        manifest.clone(),
+        &encoded,
+        request(&f, &mut runtime),
+    )
+    .unwrap();
+    assert!(
+        NativeRemoteResultReceiver::new(
+            &destination,
+            manifest.clone(),
+            &encoded,
+            request(&f, &mut runtime)
+        )
+        .is_err(),
+        "one receiving owner"
+    );
+    assert_eq!(receiver.status(&mut runtime, digest).unwrap(), (0, false));
+    assert!(receiver
+        .status(&mut runtime, Digest32::from_bytes([9; 32]))
+        .is_err());
+    receiver
+        .accept(&mut runtime, digest, 0, &bytes[..50_000], false)
+        .unwrap();
+    assert!(receiver.verify_complete(&mut runtime).is_err());
+    drop(receiver);
+    let mut receiver = NativeRemoteResultReceiver::new(
+        &destination,
+        manifest.clone(),
+        &encoded,
+        request(&f, &mut runtime),
+    )
+    .unwrap();
+    assert_eq!(
+        receiver.status(&mut runtime, digest).unwrap(),
+        (50_000, false)
+    );
+    assert!(receiver
+        .accept(&mut runtime, digest, 0, &bytes[..1], false)
+        .is_err());
+    receiver
+        .accept(&mut runtime, digest, 50_000, &bytes[50_000..], true)
+        .unwrap();
+    receiver.verify_complete(&mut runtime).unwrap();
+    assert_eq!(
+        receiver.status(&mut runtime, digest).unwrap(),
+        (100_000, true)
+    );
+    assert_eq!(receiver.manifest(), &manifest);
+    assert_eq!(runtime.state().revision, initial_revision);
+    assert_eq!(runtime.state().lanes["lane"].runs.len(), 1);
+    assert_eq!(
+        fs::read_dir(&allocations).unwrap().count(),
+        0,
+        "receipt must not materialize working files"
+    );
+    fs::rename(&store, f.path.join("displaced-result-store")).unwrap();
+    fs::create_dir(&store).unwrap();
+    fs::set_permissions(&store, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(receiver.verify_complete(&mut runtime).is_err());
+    assert!(receiver.status(&mut runtime, digest).is_err());
+    drop(receiver);
+    assert!(NativeRemoteResultReceiver::new(
+        &destination,
+        manifest,
+        &encoded,
+        request(&f, &mut runtime)
+    )
+    .is_err());
+}

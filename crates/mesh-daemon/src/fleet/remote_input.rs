@@ -691,3 +691,6 @@ mod tests {
         ));
     }
 }
+
+#[cfg(target_os = "macos")]
+pub use native::NativeRemoteResultReceiver;

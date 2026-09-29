@@ -426,3 +426,22 @@ This supplies restart-safe native content access. It adds no persisted or wire f
 claim remote delivery, retention against garbage collection, candidate import or real-machine
 acceptance. An unknown checkpoint yields no result; unavailable storage never authorizes rerunning
 the original work.
+
+
+### Native resumable result receipt
+
+`NativeRemoteResultReceiver` verifies the signed saved-result offer against the coordinator's
+current assignment and complete manifest before initializing its independently admitted private
+store. It takes exclusive native receiving ownership and reuses the existing CAS partial-offset,
+chunk promotion and whole-file verification rules. Each status/readiness/write operation rechecks
+the exact offer/context and native root identity before and after storage access.
+
+Dropping the receiver preserves durable partial offsets. A new receiver revalidates the offer and
+manifest, resumes from the retained offset and refuses undeclared chunks, conflicting offsets and
+substituted storage. No input admission, synthetic assignment, worker launch or working folder is
+created. The receiver has no materialization method. `verify_complete` checks current full content;
+it does not create a durable completion/import receipt or protect bytes from later collection.
+
+This is a native receiving component. Authenticated network result serving, transfer orchestration,
+durable exact import receipts and real second-machine acceptance remain required. Missing or
+corrupt bytes refuse; no receiving failure authorizes rerunning the original worker.
