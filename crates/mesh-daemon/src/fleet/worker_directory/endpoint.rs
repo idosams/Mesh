@@ -153,7 +153,7 @@ fn connect_before(path: &Path, budget: Duration) -> io::Result<NativeWorkerStrea
     use std::os::unix::ffi::OsStrExt as _;
     unsafe extern "C" {
         fn socket(domain: i32, kind: i32, protocol: i32) -> i32;
-        fn fcntl(fd: i32, command: i32, flags: i32) -> i32;
+        fn fcntl(fd: i32, command: i32, ...) -> i32;
         fn connect(fd: i32, address: *const SocketAddress, length: u32) -> i32;
         fn poll(descriptors: *mut PollDescriptor, count: u32, milliseconds: i32) -> i32;
     }
@@ -369,6 +369,27 @@ mod tests {
         drop(endpoint);
         assert_eq!(std::fs::read(f.0.join(SOCKET)).unwrap(), b"unrelated bytes");
         assert!(NativeWorkerEndpoint::bind(&f.0, f.token(), &[]).is_err());
+    }
+    #[test]
+    #[allow(unsafe_code)]
+    fn connected_descriptor_is_close_on_exec() {
+        use std::os::fd::AsRawFd as _;
+        unsafe extern "C" {
+            fn fcntl(fd: i32, command: i32, ...) -> i32;
+        }
+        let f = Folder::new();
+        let endpoint = NativeWorkerEndpoint::bind(&f.0, f.token(), &[]).unwrap();
+        let client =
+            NativeWorkerEndpoint::connect(&f.0, f.token(), Duration::from_secs(1)).unwrap();
+        assert!(endpoint.accept(Duration::from_secs(1)).unwrap().is_some());
+        // SAFETY: Darwin F_GETFD reads descriptor flags and takes no variadic argument.
+        let flags = unsafe { fcntl(client.stream.as_raw_fd(), 1) };
+        assert!(flags >= 0);
+        assert_eq!(
+            flags & 1,
+            1,
+            "the connection must not leak across provider exec"
+        );
     }
     #[test]
     fn buffered_final_reply_and_clean_eof_survive_peer_closure() {
