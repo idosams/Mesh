@@ -376,3 +376,11 @@ focused tests pass renames, same-path replacement, deletions, deterministic orde
 identity/content refusal; the composed worker-history regression passes after correcting its
 empty-input expectation. Full validation is pending. Authenticated correspondence transport and
 coordinator candidate import remain unfinished; unsigned metadata grants no import authority.
+
+
+A distinct native resident query and bounded SSH entry point now retrieve authenticated result
+correspondence. Focused socket tests passed multi-frame metadata and replay/key/domain/size/offset/
+hash refusal; strict decoding tests passed manifest, identity, canonical-form and path checks. A
+scoped test-helper borrow error was corrected and its log retained. Full validation is pending.
+This is protocol-fixture evidence with separate native-history tests, not actual second-machine
+acceptance or durable candidate import.

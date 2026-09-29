@@ -1329,3 +1329,9 @@ pub use remote_admission::status::result::transfer::{
 mod remote_correspondence;
 #[cfg(target_os = "macos")]
 pub use remote_correspondence::RemoteResultCorrespondence;
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::result::evidence::{
+    receive_remote_result_evidence, receive_remote_result_evidence_over_ssh,
+    AuthenticatedRemoteResultEvidence, RemoteResultEvidenceRequest,
+};

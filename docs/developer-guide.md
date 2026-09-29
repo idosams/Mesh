@@ -504,6 +504,27 @@ input identity. Duplicate objects, mismatched content/version and retained-objec
 The metadata binds assigned input and manifest, worker initial operation, saved result and manifest,
 and every result entry's native object identity, kind, path and optional original input path. Its
 canonical encoding is limited to 4 MiB and exposes a complete digest for future authenticated
-transport. This is private metadata, not a control-frame payload. It has no decoder, import mutation
+transport. This is private metadata, not a control-frame payload. It has no import mutation
 or approval capability. Current transfer does not carry it yet: a coordinator must not trust these
 bytes without the separately authenticated binding and native original-project checks.
+
+
+### Authenticated correspondence retrieval
+
+The native worker route `mesh.worker-result-evidence-query/v1` accepts a fresh coordinator-signed
+request for one exact signed-offer digest. Its separately signed reply binds the whole query,
+original offer and complete correspondence digest/byte count. The worker derives evidence only by
+reopening the exact native retained result and rechecks history, source identity and the 30-second
+query lifetime while serving it. Existing offer discovery and content-transfer formats are unchanged.
+
+`receive_remote_result_evidence` and its bounded SSH wrapper require the original offer and complete
+input/result manifests. They verify assignment and signatures, receive at most 4 MiB in 64 KiB
+parts, enforce digest/offset/final flags, and decode a closed canonical descriptor. Every result path
+and kind must match its manifest; objects and retained input paths must be unique, and claimed
+input paths must exist with the same kind. Wrong initial operations and input/result identities
+refuse. No automatic reconnect extends the fresh authorization.
+
+The returned `AuthenticatedRemoteResultEvidence` is a current authenticated observation, not durable
+import authority. It writes no CAS, working files or import state. Durable evidence retention and
+coordinator original-project candidate preparation still need to bind this exact offer/evidence
+to native source custody before any review import. Real second-machine acceptance remains required.
