@@ -2259,6 +2259,25 @@ impl FleetService {
         })
     }
 
+    /// Sign and durably retain one received result before returning its immutable content source.
+    /// Only native worker policy supplies the signing callback; no agent route exposes it.
+    #[cfg(target_os = "macos")]
+    pub fn sign_remote_saved_review(
+        &self,
+        selection: &SavedReviewSelection,
+        sign: impl FnOnce(&mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String>,
+    ) -> Result<(super::RemoteSavedResultOffer, super::RemoteInputSource), Unavailable> {
+        let mut inner = self.lock()?;
+        let Inner {
+            runtime, received, ..
+        } = &mut *inner;
+        runtime.refresh().map_err(runtime_error)?;
+        received
+            .as_ref()
+            .ok_or_else(|| refusal("remote-result-received-session-required"))?
+            .sign_saved_review(runtime, selection, sign)
+    }
+
     /// Prepare a native-only export of one exact recorded lane result, including after restart.
     ///
     /// History is reopened through the allocation policy without creating an execution context.

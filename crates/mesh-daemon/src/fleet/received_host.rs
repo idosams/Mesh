@@ -55,6 +55,16 @@ impl Operations for ScopedRouter {
 }
 
 impl ReceivedWorkerHost {
+    /// Native worker policy may offer one exact saved result. This never routes through agent IPC.
+    #[cfg(target_os = "macos")]
+    pub fn sign_saved_result(
+        &self,
+        selection: &super::service::SavedReviewSelection,
+        sign: impl FnOnce(&mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String>,
+    ) -> Result<(super::RemoteSavedResultOffer, super::RemoteInputSource), Unavailable> {
+        self.service.sign_remote_saved_review(selection, sign)
+    }
+
     /// Consume the broker's original native handoff, initialize its independent workspace, commit
     /// launch intent and start one provider. Native policy supplies every execution parameter.
     /// The broker's final reply status is deliberately not an execution permission: this same

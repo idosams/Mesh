@@ -131,6 +131,22 @@ fn received_host_keeps_one_attempt_across_connections_and_serves_signed_checkpoi
     verify_saved_review(worker, &fixture, &root);
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn received_saved_result_offer_is_signed_durable_and_replayed_without_resigning() {
+    let fixture = Fixture::new();
+    let reservation = fixture.result_session_reservation();
+    let root = std::path::PathBuf::from(reservation.workspace().binding().root());
+    let worker = ReceivedWorkerHost::start(
+        *reservation,
+        adapter(&fixture),
+        &fixture.0.join("s"),
+        Arc::new(Signers),
+    )
+    .unwrap();
+    verify_saved_review(worker, &fixture, &root);
+}
+
 fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: &Path) {
     wait_started(root);
     let objective = worker.service.objective().unwrap();
@@ -263,6 +279,71 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
     )
     .unwrap();
     assert!(worker.service.prepare_remote_review_input(&wrong).is_err());
+    #[cfg(target_os = "macos")]
+    {
+        let signer = Signer(ed25519_dalek::SigningKey::from_bytes(&[0x73; 32]));
+        let key: String = signer
+            .public_key()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        if worker.receipt().admission().work().assignment.worker_key == key {
+            assert!(worker
+                .service
+                .sign_remote_saved_review(&selection, |_| Err("fixture refusal".into()))
+                .is_err());
+            assert!(worker
+                .service
+                .sign_remote_saved_review(&selection, |p| Signer(
+                    ed25519_dalek::SigningKey::from_bytes(&[0x74; 32])
+                )
+                .sign(p))
+                .is_err());
+            let (offer, exported) = worker
+                .service
+                .sign_remote_saved_review(&selection, |p| signer.sign(p))
+                .unwrap();
+            assert_eq!(exported.manifest(), source.manifest());
+            let encoded = offer.encode();
+            let (replayed, _) = worker
+                .service
+                .sign_remote_saved_review(&selection, |_| {
+                    panic!("retained offer must not sign again")
+                })
+                .unwrap();
+            assert_eq!(encoded, replayed.encode());
+            let registry = crate::fleet::RemoteAdmissionRegistry::new(
+                mesh_store::fleet::FleetStore::open(fixture.0.join("worker.sqlite")).unwrap(),
+                &"ab".repeat(32),
+                &key,
+                "objective",
+                crate::fleet::Limits {
+                    lanes: 1,
+                    concurrency: 1,
+                    depth: 0,
+                    retries: 0,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                registry
+                    .saved_result_offer(
+                        "assignment",
+                        saved.get("checkpoint").unwrap().as_text().unwrap()
+                    )
+                    .unwrap()
+                    .unwrap()
+                    .encode(),
+                encoded
+            );
+            assert!(registry
+                .saved_result_offer("assignment", "unknown-checkpoint")
+                .unwrap()
+                .is_none());
+            assert_eq!(worker.service.native_state().unwrap().revision, revision);
+        }
+    }
     // Completion revoked the exact provider session. Reconnection cannot resurrect it.
     let mut connection = Client::open(worker.endpoint());
     assert!(matches!(

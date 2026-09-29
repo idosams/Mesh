@@ -68,6 +68,35 @@ impl Fixture {
             )
             .unwrap()
     }
+    #[cfg(target_os = "macos")]
+    pub(in crate::fleet) fn result_session_reservation(&self) -> Box<RemoteLaunchReservation> {
+        let key = ed25519_dalek::SigningKey::from_bytes(&[0x73; 32]);
+        let worker: String = key
+            .verifying_key()
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let mut registry = RemoteAdmissionRegistry::new(
+            FleetStore::open(self.0.join("worker.sqlite")).unwrap(),
+            &"ab".repeat(32),
+            &worker,
+            "objective",
+            limits(),
+        )
+        .unwrap();
+        let now = crate::fleet::service::received_clock().unwrap();
+        let mut work = work();
+        work.assignment.worker_key = worker;
+        work.assignment.lease_until_ms = now + 120_000;
+        let workspace = self.workspace_for(&mut registry, work);
+        let RemoteLaunchOutcome::Reserved(reservation) =
+            registry.reserve_launch(workspace, "codex", now).unwrap()
+        else {
+            panic!("original required");
+        };
+        reservation
+    }
     pub(in crate::fleet) fn session_reservation(&self) -> Box<RemoteLaunchReservation> {
         self.session_reservation_with(self.registry())
     }

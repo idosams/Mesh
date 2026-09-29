@@ -3145,3 +3145,26 @@ content survives dropping the worker owner, and replacing its workspace path ref
 Daemon lint with warnings denied passed. Full canonical checks and PR delivery remain pending.
 Signed offers, resumable output transfer, exact coordinator import/recovery and real second-machine
 acceptance remain required; this increment introduces no new wire or persisted format.
+
+
+## R36 signed saved-result offers (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), following
+[PR #164](https://github.com/idosams/Mesh/pull/164). No preserved source commits are replaced.
+R34 merged through [PR #162](https://github.com/idosams/Mesh/pull/162) as
+`3a6533dfc739c050ced2e04d05f9e6c961875a7f`; all seven PR checks passed, including 3,553 native
+tests / 17 skipped, 44 daemon-demo checks and four renderer cases. Combined-main checks are running.
+R35's local full gate and initial seven hosted checks passed; its final-main-base run is pending.
+
+The native original received session signs an exact immutable result identity under the configured
+worker key and separate signing domain, rechecks custody around the callback, and retains the
+signed offer before returning it. Exact replay requires no second signature; restart inspection
+returns retained facts without reconstituting execution. Coordinator verification binds its current
+assignment and supplied manifest without changing state. Result streams are additive; existing
+admission, launch and session records remain unchanged.
+
+Three focused regressions and full daemon lint passed. An initial misplaced method failed compile;
+a later test module path accidentally selected unrelated tests. Both are corrected and their logs
+are retained. Full local and hosted validation and PR delivery remain pending. Authenticated result
+transport, output integrity/recovery, exact candidate import and actual remote acceptance remain
+required.

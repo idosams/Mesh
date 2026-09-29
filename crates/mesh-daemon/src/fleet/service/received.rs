@@ -66,6 +66,45 @@ impl ReceivedSession {
         Ok(source)
     }
 
+    #[cfg(target_os = "macos")]
+    pub(super) fn sign_saved_review(
+        &self,
+        runtime: &mut Runtime,
+        selection: &SavedReviewSelection,
+        sign: impl FnOnce(&mesh_crypto::SigningPayload) -> Result<mesh_types::Signature, String>,
+    ) -> Result<
+        (
+            crate::fleet::RemoteSavedResultOffer,
+            crate::fleet::RemoteInputSource,
+        ),
+        Unavailable,
+    > {
+        use crate::fleet::RemoteSavedResultOffer;
+        let source = self.export_saved_review(runtime, selection)?;
+        let body = RemoteSavedResultOffer::body(
+            &self.receipt,
+            &selection.checkpoint,
+            selection.bundle,
+            source.manifest(),
+        )
+        .map_err(runtime_error)?;
+        let offer =
+            match RemoteSavedResultOffer::retained(&runtime.store, &body).map_err(runtime_error)? {
+                Some(retained) => retained,
+                None => RemoteSavedResultOffer::sign(body, sign).map_err(runtime_error)?,
+            };
+        self.verify(runtime)?;
+        source
+            .verify_roots()
+            .map_err(|_| refusal("remote-result-content-unavailable"))?;
+        let offer = offer.persist(&mut runtime.store).map_err(runtime_error)?;
+        self.verify(runtime)?;
+        source
+            .verify_roots()
+            .map_err(|_| refusal("remote-result-content-unavailable"))?;
+        Ok((offer, source))
+    }
+
     pub(super) fn verify_run(&self, lane: &str, run: &str) -> Result<(), Unavailable> {
         let work = self.receipt.admission().work();
         if lane != work.lane || run != work.run {

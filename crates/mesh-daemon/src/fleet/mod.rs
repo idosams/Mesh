@@ -1298,3 +1298,6 @@ pub use remote_admission::status::renewal::{
     RemoteLeaseRenewal, RemoteLeaseRenewalPlan, RemoteLeaseRenewalRequest,
     VerifiedRemoteLeaseRenewal,
 };
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::result::RemoteSavedResultOffer;
