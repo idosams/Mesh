@@ -1,3 +1,4 @@
+import { createRemoteFleetReviews } from './remote-fleet-reviews.js';
 import { createFleetReviews } from './fleet-reviews.js';
 // Presentation of native-owned fleet state. This module never chooses paths or launches processes.
 const hex = (value, length) => typeof value === 'string' && new RegExp(`^[a-f0-9]{${length}}$`).test(value);
@@ -80,9 +81,12 @@ export function fleetProvisioned(raw, pending) {
 export function startFleets({ document, invoke, CustomEvent, schedule = setTimeout, cancel = clearTimeout, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
   let fleets = [], activity = [], pending = null, busy = false, error = '', feedback = '', visible = false, disposed = false, timer = null;
   let sources = { projects: [], histories: {}, error: '' };
-  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot() } })); }
-  const reviews = createFleetReviews({ invoke, changed: publish, laneFor: (objective, lane) =>
+  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot() } })); }
+  const reviews = createFleetReviews({ invoke, changed: publish, otherPinCount: () => remoteReviews.snapshot().remoteReviewPins.length, laneFor: (objective, lane) =>
     fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
+  const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish,
+    otherPinCount: () => reviews.snapshot().reviewPins.length,
+    objectiveFor: objective => fleets.find(f => f.objective === objective && f.ownership !== 'unavailable') });
   const plan = () => {
     if (timer !== null) cancel(timer);
     timer = visible && !disposed ? schedule(() => { timer = null; void refresh(); }, 2000) : null;
@@ -106,7 +110,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   function intent(event) {
     const value = event.detail;
     if (!visible || disposed || !value || typeof value !== 'object') return;
-    if (reviews.handle(value)) return;
+    if (remoteReviews.handle(value) || reviews.handle(value)) return;
     if (busy) return;
     const fields = Object.keys(value).sort().join(',');
     if (value.type === 'refresh' && fields === 'type') { void refresh(); return; }
@@ -146,5 +150,5 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   document.addEventListener('mesh:fleets-visible', mount);
   document.addEventListener('mesh:fleets-intent', intent);
   document.addEventListener('mesh:attachments-projection', attachment);
-  return () => { disposed = true; reviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
+  return () => { disposed = true; reviews.dispose(); remoteReviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
 }

@@ -373,3 +373,15 @@ Provisioning prepares lanes; **Start agents** begins provider usage. Review the 
 provider choices on the fleet card before starting. If provisioning is uncertain,
 the pending request retains its choices and offers an explicit retry. Refresh a fleet
 with unavailable provider choices before starting it; its saved work remains readable.
+
+### Reviewing retained remote results
+
+In the fleet view, choose **Show remote saved results**. Pages remain fixed while work continues;
+refresh to discover newer results. An interrupted registration remains visible and cannot be pinned.
+Choose **Pin saved review** to keep a received snapshot in an independent panel. File and preview
+choices in one panel do not replace another. Native history verifies each exact saved review and
+artifact; missing history shows an unavailable state rather than restarting a worker.
+
+These panels show the received result tree. Original-project comparison and import are not available
+from them yet. They cannot approve Mesh main. Remote panel selections currently last for the app
+session; the underlying saved result remains in native history and can be selected again.

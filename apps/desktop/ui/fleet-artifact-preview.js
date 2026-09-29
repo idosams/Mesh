@@ -22,7 +22,8 @@ export function fleetArtifactSide(raw, selection, change, side, kind, page) {
 }
 
 // One page/object per pin. Content is transient and never enters saved selector persistence.
-export async function loadFleetArtifact(invoke, pin, change, page, generation) {
+export const loadFleetArtifact = (invoke, pin, change, page, generation) => loadSavedArtifact(invoke, pin, change, page, generation, 'render_fleet_review_artifact', fleetArtifactSide);
+export async function loadSavedArtifact(invoke, pin, change, page, generation, command, parseSide) {
   const kind = reviewArtifactKind(change);
   if (!kind || !Number.isSafeInteger(page) || page < 1 || page > 64 || (kind !== 'pdf' && page !== 1)) throw new Error('Unsupported preview');
   const envelope = { generation, bundle: pin.selection.bundle, changeId: change.object_id, kind, requestedPage: page,
@@ -37,8 +38,8 @@ export async function loadFleetArtifact(invoke, pin, change, page, generation) {
       envelope[`${side}AbsentPage`] = { side, versionId: known.versionId, contentDigest: known.contentDigest, pageCount: known.pageCount }; return;
     }
     try {
-      const answer = await invoke('render_fleet_review_artifact', { ...pin.selection, objectId: change.object_id, side, pageNumber: kind === 'pdf' ? page : null });
-      envelope[side] = fleetArtifactSide(answer, pin.selection, change, side, kind, page);
+      const answer = await invoke(command, { ...pin.selection, objectId: change.object_id, side, pageNumber: kind === 'pdf' ? page : null });
+      envelope[side] = parseSide(answer, pin.selection, change, side, kind, page);
     } catch {
       envelope[`${side}Error`] = 'This exact saved artifact preview is unavailable. Retry to render it again.';
     }

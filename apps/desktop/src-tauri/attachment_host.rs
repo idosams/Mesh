@@ -1048,6 +1048,125 @@ impl AttachmentHost {
         Ok(saved.to_json().encode())
     }
 
+    pub fn remote_fleet_reviews(
+        &self,
+        objective: &str,
+        after: u64,
+        snapshot: Option<u64>,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let page = self
+                .fleet_history(objective)?
+                .remote_saved_reviews(after, snapshot)
+                .map_err(|_| "Remote results unavailable")?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.desktop-remote-reviews/v1")),
+                ("objective", Json::text(objective)),
+                ("after", Json::Number(after)),
+                ("snapshot", Json::Number(page.snapshot)),
+                ("next", page.next.map_or(Json::Null, Json::Number)),
+                (
+                    "entries",
+                    Json::Array(
+                        page.entries
+                            .into_iter()
+                            .map(|entry| {
+                                Json::object([
+                                    ("sequence", Json::Number(entry.sequence)),
+                                    ("offer", Json::text(entry.offer.to_string())),
+                                    (
+                                        "selection",
+                                        entry
+                                            .receipt
+                                            .map_or(Json::Null, |receipt| receipt.selection()),
+                                    ),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+            ])
+            .encode())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (objective, after, snapshot);
+            Err("Remote results unavailable on this platform".into())
+        }
+    }
+    pub fn remote_fleet_review(
+        &self,
+        objective: &str,
+        offer: &str,
+        correlation: &str,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let (offer, correlation) = Self::remote_review_ids(offer, correlation)?;
+            self.fleet_history(objective)?
+                .remote_saved_review(
+                    offer,
+                    correlation,
+                    &mesh_daemon::TrustedReviewers::default(),
+                )
+                .map(|value| value.encode())
+                .map_err(|_| "Exact remote review unavailable".into())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (objective, offer, correlation);
+            Err("Remote results unavailable on this platform".into())
+        }
+    }
+    pub fn remote_fleet_artifact(
+        &self,
+        objective: &str,
+        offer: &str,
+        correlation: &str,
+        object: &str,
+        side: &str,
+    ) -> Result<mesh_daemon::ReviewArtifact, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let (offer, correlation) = Self::remote_review_ids(offer, correlation)?;
+            self.fleet_history(objective)?
+                .remote_saved_review_artifact(
+                    offer,
+                    correlation,
+                    &mesh_daemon::TrustedReviewers::default(),
+                    (object, side),
+                )
+                .map_err(|_| "Exact remote artifact unavailable".into())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (objective, offer, correlation, object, side);
+            Err("Remote results unavailable on this platform".into())
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn remote_review_ids(
+        offer: &str,
+        correlation: &str,
+    ) -> Result<
+        (
+            mesh_daemon::ManagedContentDigest,
+            mesh_daemon::ManagedContentDigest,
+        ),
+        String,
+    > {
+        let parse = |value: &str| {
+            let id = mesh_daemon::ManagedContentDigest::parse_hex(value)
+                .map_err(|_| "Invalid remote review identity")?;
+            if id.to_string() != value {
+                return Err("Invalid remote review identity");
+            }
+            Ok(id)
+        };
+        Ok((parse(offer)?, parse(correlation)?))
+    }
+
     pub fn load_fleet_pins(&self) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         self.initialize(&mut state, false)?;
@@ -1246,6 +1365,34 @@ mod tests {
     use super::*;
     use std::fs;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn remote_review_reads_never_initialize_missing_fleet_storage() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-remote-history-empty-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let host = AttachmentHost::new(&root);
+        let objective = format!("fleet-{}", "a".repeat(64));
+        assert!(host.remote_fleet_reviews(&objective, 0, None).is_err());
+        assert!(host
+            .remote_fleet_review(&objective, &"b".repeat(64), &"c".repeat(64))
+            .is_err());
+        assert!(host
+            .remote_fleet_review(&objective, "/tmp/private", &"c".repeat(64))
+            .is_err());
+        assert!(host
+            .remote_fleet_artifact(
+                &objective,
+                &"b".repeat(64),
+                &"c".repeat(64),
+                &"d".repeat(32),
+                "after"
+            )
+            .is_err());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        drop(host);
+        fs::remove_dir(root).unwrap();
+    }
 
     #[test]
     fn pending_review_storage_restores_exact_inputs_without_opening_work() {

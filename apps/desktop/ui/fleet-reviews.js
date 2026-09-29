@@ -40,8 +40,11 @@ export function savedFleetReview(raw, selection) {
     && digest(selection.version) && digest(selection.bundle));
   check(value?.schema === 'mesh.fleet-saved-review/v1' && value.objective === selection.objective
     && value.selection && Object.keys(value.selection).sort().join(',') === 'bundle,checkpoint,lane,version'
-    && ['lane', 'checkpoint', 'version', 'bundle'].every(field => value.selection[field] === selection[field])
-    && item?.bundle === selection.bundle && item.subject_operation === selection.version && item.recorded === true
+    && ['lane', 'checkpoint', 'version', 'bundle'].every(field => value.selection[field] === selection[field]));
+  return savedReviewItem(item, selection.version, selection.bundle);
+}
+export function savedReviewItem(item, version, bundle) {
+  check(digest(version) && digest(bundle) && item?.bundle === bundle && item.subject_operation === version && item.recorded === true
     && item.projection_authorizes_approval === false && typeof item.content_complete === 'boolean'
     && count(item.bundle_changes_not_listed) && count(item.subject_operations_not_listed)
     && (item.unavailable_code === null || identity(item.unavailable_code))
@@ -59,7 +62,7 @@ export function savedFleetReview(raw, selection) {
     projection_authorizes_approval: false, bundle_changes: item.bundle_changes };
 }
 
-export function createFleetReviews({ invoke, laneFor, changed, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
+export function createFleetReviews({ invoke, laneFor, changed, otherPinCount = () => 0, requestId = () => globalThis.crypto.randomUUID().replaceAll('-', '') }) {
   let queues = {}, pins = [], nextPin = 1n, nextRead = 1, disposed = false, notice = '', recovering = false;
   let persistenceEnabled = false, controlBusy = false, editable = true, persistenceState = { phase: 'session', message: '' };
   const inflightReviewOperations = new Set();
@@ -69,6 +72,7 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
   const storage = createFleetPinPersistence({ invoke,
     selectors: () => pins.map(pin => ({ key: pin.key, ...pin.selection, source_version: pin.startingInput, ...pin.view })),
     restore(saved) {
+      if (saved.length + otherPinCount() > 8) throw new Error('Close remote review panels before loading this saved set.');
       pins = saved.map(value => ({ key: value.key, selection: Object.fromEntries(selectorFields.map(field => [field, value[field]])),
         startingInput: value.source_version, goal: laneFor(value.objective, value.lane)?.goal ?? null,
         view: Object.fromEntries(Object.keys(defaultFleetView()).map(field => [field, value[field]])), review: null, loading: false, error: '' }));
@@ -132,7 +136,7 @@ export function createFleetReviews({ invoke, laneFor, changed, requestId = () =>
   }
   function pinResult(row, lane) {
     if (pins.some(pin => same(pin.selection, row))) { notice = 'This exact result is already pinned.'; publish(); return; }
-    if (pins.length >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return; }
+    if (pins.length + otherPinCount() >= 8) { notice = 'Close a review panel before opening another. Eight can stay pinned together.'; publish(); return; }
     const selection = Object.fromEntries(selectorFields.map(field => [field, row[field]]));
     if (nextPin > 18446744073709551615n) { notice = 'Review display keys are exhausted.'; publish(); return; }
     const pin = { view: defaultFleetView(), key: String(nextPin++), selection, goal: lane.goal, startingInput: lane.base, review: null, loading: false, error: '' };

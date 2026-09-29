@@ -1,5 +1,19 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Remote result": "תוצאה מרוחקת",
+"Received saved snapshot": "תמונת מצב שמורה שהתקבלה",
+"Pinned remote review": "סקירה מרוחקת מוצמדת",
+"Remote saved reviews": "סקירות מרוחקות שמורות",
+"Remote saved results": "תוצאות מרוחקות שמורות",
+"Show remote saved results": "הצגת תוצאות מרוחקות שמורות",
+"This is the received result tree. Comparison and import into the original project are not available here.": "זו תמונת הקבצים שהתקבלה. השוואה לפרויקט המקורי וייבוא אליו אינם זמינים כאן.",
+"These panels stay fixed while agents work. Remote selections currently last for this app session; saved results remain in native history.": "החלוניות נשארות קבועות בזמן שהסוכנים עובדים. הבחירות המרוחקות נשמרות כעת רק במהלך הפעלת היישום; התוצאות נשארות בהיסטוריה המקומית.",
+"This page stays fixed. Refresh to discover newer results.": "העמוד נשאר קבוע. רעננו כדי לגלות תוצאות חדשות.",
+"No retained remote results in this page.": "אין תוצאות מרוחקות שמורות בעמוד זה.",
+"Registration interrupted. This result is not ready for review.": "הרישום נקטע. תוצאה זו עדיין אינה מוכנה לסקירה.",
+"Remote results could not be verified. Refresh to retry.": "לא ניתן לאמת את התוצאות המרוחקות. רעננו כדי לנסות שוב.",
+"This exact remote review is unavailable. Any displayed content is the previously verified snapshot.": "הסקירה המרוחקת המדויקת אינה זמינה. תוכן שמוצג שייך לתמונת המצב שאומתה קודם.",
+
 "Review applying accepted changes": "סקירה לפני החלת השינויים שאושרו",
 "Working files may have changed since this comparison. Applying changes requires fresh native checks and complete text confirmation. Groups can create, replace and remove regular files. Directory changes and incomplete or oversized text confirmations remain unavailable.": "ייתכן שקובצי העבודה השתנו מאז ההשוואה. החלת שינויים דורשת בדיקות חדשות ואישור מלא בחלון היישום. קבוצה יכולה ליצור, להחליף ולהסיר קבצים רגילים. שינויי תיקיות ותצוגות אישור חסרות או גדולות מדי עדיין אינם זמינים.",
 "Group reference · inspect to verify its members": "מזהה קבוצה · יש לבדוק כדי לאמת את הקבצים שבה",

@@ -3571,3 +3571,25 @@ No execution, import or approval authority is added. Desktop routing and panels 
 Validation: native composed regression covers SQLite reopen, FleetHistory reads, exact artifact
 bytes, legacy unbound records, mismatched identities, replaced store and corrupt location tail.
 Full canonical gate pending. External acceptance and reliability issues remain open.
+
+## R56: desktop remote review lists and parallel panels
+
+Depends on R55 / PR #186. New canonical implementation; replaces no legacy commit. The native
+desktop exposes bounded remote discovery and exact review/artifact calls through FleetHistory.
+Only objective, offer/correlation and object/side identifiers cross the boundary; private locations
+remain native. Missing history does not initialize storage. Other platforms refuse explicitly.
+
+The fleet view now lists received results with a fixed bounded snapshot, explicit interrupted
+registrations and independent pinned panels. It reuses the verified saved-review/artifact UI without
+fabricating local checkpoints. Late replies cannot revive closed lists/panels, changed identities
+refuse, incomplete projections stay explicit, and new work never replaces a pinned selection. The
+shared eight-panel admission limit includes local panels; loading a saved local set that would
+exceed capacity requires closing remote panels first. Remote pins remain session-only in this
+increment, clearly disclosed; durable remote selectors remain required follow-on work.
+
+Received snapshots expose no feedback, project-import or protected-main approval action. Original
+project comparison/import, complete ingestion composition, retention, signed packaged proof and
+second-machine/provider acceptance remain open. Focused native, controller, React build/render and
+artifact refusal tests passed. Full `npm test` passed: 3,576 native tests, 17 skipped,
+153.593 s, desktop checks and 44 daemon-demo checks. One slow test completed successfully; no
+leak warning occurred in this run. Earlier reliability issues remain open.
