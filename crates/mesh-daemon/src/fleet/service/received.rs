@@ -42,6 +42,30 @@ impl ReceivedSession {
         Ok(())
     }
 
+    pub(super) fn export_saved_review(
+        &self,
+        runtime: &Runtime,
+        selection: &SavedReviewSelection,
+    ) -> Result<crate::fleet::RemoteInputSource, Unavailable> {
+        self.verify(runtime)?;
+        let binding = saved_review_binding_from_state(runtime.state(), selection)?;
+        let checkpoint = runtime
+            .state()
+            .checkpoints
+            .get(&selection.checkpoint)
+            .ok_or_else(|| refusal("remote-result-checkpoint-unavailable"))?;
+        self.verify_run(&selection.lane, &checkpoint.origin.run)?;
+        if binding != self.workspace.binding() {
+            return Err(refusal("remote-result-workspace-changed"));
+        }
+        let source = self
+            .workspace
+            .export_saved_review(selection.bundle, selection.version)
+            .map_err(|_| refusal("remote-result-content-unavailable"))?;
+        self.verify(runtime)?;
+        Ok(source)
+    }
+
     pub(super) fn verify_run(&self, lane: &str, run: &str) -> Result<(), Unavailable> {
         let work = self.receipt.admission().work();
         if lane != work.lane || run != work.run {
