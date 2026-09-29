@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 import { ArtifactReview } from "./artifact-review";
-import { fleetSavedReviewModel, type SavedReview } from "./fleet-reviews";
+import { fleetSavedReviewModel, type SavedReview, type FleetReviewPersistence } from "./fleet-reviews";
 import { reduceReviewWorkbench } from "../models/review-workbench";
 import { reviewArtifactPreviewEnvelope } from "../models/review-artifact-preview";
 
@@ -10,7 +10,7 @@ type Selection = { objective: string; offer: string; correlation: string; lane: 
 export type RemoteReviewPin = { key: string; selection: Selection; review: SavedReview | null; loading: boolean; error: string; view: { object: string | null; mode: "content" | "visual"; layout: "inline" | "split" }; artifact?: { generation: number; object: string; loading: boolean; error: string; envelope: unknown } };
 export type RemoteReviewQueue = { loading: boolean; error: string; page?: { snapshot: number; next: number | null; rows: { sequence: number; offer: string; selection: Selection | null }[] } };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
-function RemotePanel({ pin }: { pin: RemoteReviewPin }) {
+function RemotePanel({ pin, editable }: { pin: RemoteReviewPin; editable: boolean }) {
   const t = useTranslation();
   const model = useMemo(() => {
     if (!pin.review?.content_complete) return null;
@@ -26,7 +26,7 @@ function RemotePanel({ pin }: { pin: RemoteReviewPin }) {
     try { return reviewArtifactPreviewEnvelope(artifact.envelope, artifact.generation, pin.selection.bundle, model); } catch { return null; }
   }, [model, artifact, pin.selection.bundle]);
   return <article className="grid min-w-0 gap-2 rounded border border-border p-3" aria-label={t("Pinned remote review")}>
-    <div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{t("Received saved snapshot")}</h4><Button variant="quiet" onClick={() => send({ type: "remote-close", pin: pin.key })}>{t("Close review")}</Button></div>
+    <div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{t("Received saved snapshot")}</h4><Button variant="quiet" disabled={!editable} onClick={() => send({ type: "remote-close", pin: pin.key })}>{t("Close review")}</Button></div>
     <p className="text-xs">{t("This is the received result tree. Comparison and import into the original project are not available here.")}</p>
     <details className="break-all text-xs"><summary>{t("Result identity")}</summary>{([ ["Fleet", pin.selection.objective], ["Lane", pin.selection.lane], ["Run", pin.selection.run], ["Saved operation", pin.selection.version], ["Review", pin.selection.bundle], ["Remote saved operation", pin.selection.remote_version], ["Offer", pin.selection.offer], ["Correlation", pin.selection.correlation] ]).map(([name, value]) => <p key={name}>{t(name)}: <bdi dir="ltr">{value}</bdi></p>)}</details>
     {pin.loading && <p role="status">{t("Reading the exact saved result…")}</p>}
@@ -38,20 +38,25 @@ function RemotePanel({ pin }: { pin: RemoteReviewPin }) {
       artifactPreview={preview} artifactPreviewLoading={Boolean(artifact?.loading)} artifactPreviewError={artifact?.error || (artifact?.envelope && !preview ? t("This exact saved preview could not be verified.") : null)}
       controls={{ countLabel: `${model.changes.length} ${t("changes in this saved review")}`, overflowLabel: null, canSetupApproval: false, setupApprovalLabel: t("Approval unavailable"), setupApprovalReason: t(model.approvalReason), canRecordReview: false, recordReviewLabel: t("Review already recorded"), recordReviewReason: t("This panel shows an existing immutable review."), earlierReviews: [] }}
       onIntent={intent => {
-        if (intent.type === "load-artifact-preview" && !pin.error) send({ type: "remote-artifact", pin: pin.key, object: intent.changeId, page: String(intent.pageNumber) });
-        if (["select-change", "change-mode", "change-diff-layout"].includes(intent.type)) {
+        if (intent.type === "load-artifact-preview" && !pin.error && editable) send({ type: "remote-artifact", pin: pin.key, object: intent.changeId, page: String(intent.pageNumber) });
+        if (editable && ["select-change", "change-mode", "change-diff-layout"].includes(intent.type)) {
           const next = reduceReviewWorkbench(model, intent);
           send({ type: "remote-view", pin: pin.key, object: next.selectedChangeId, mode: next.mode, layout: next.diffLayout });
         }
       }} />}
   </article>;
 }
-export function RemoteReviewPanels({ pins, notice }: { pins: RemoteReviewPin[]; notice: string }) {
+export function RemoteReviewPanels({ pins, notice, persistence }: { pins: RemoteReviewPin[]; notice: string; persistence?: FleetReviewPersistence }) {
   const t = useTranslation();
-  if (!pins.length && !notice) return null;
+  if (!pins.length && !notice && (!persistence || persistence.phase === "session")) return null;
   return <section className="grid gap-3" aria-label={t("Remote saved reviews")}><h3>{t("Remote saved reviews")}</h3>
-    <p className="text-xs">{t("These panels stay fixed while agents work. Remote selections currently last for this app session; saved results remain in native history.")}</p>
-    {notice && <p role="status">{t(notice)}</p>}<div className="grid items-start gap-4 xl:grid-cols-2">{pins.map(pin => <RemotePanel key={pin.key} pin={pin} />)}</div>
+    <p className="text-xs">{t("Saved selections contain no file content. Reopening rechecks exact history; unavailable lanes remain listed and never restart agents.")}</p>
+    {persistence && <div role="status" className="grid gap-2 text-sm">
+      <p>{t(persistence.phase === "loading" ? "Loading saved review selections…" : persistence.phase === "saving" ? "Saving review selections…" : persistence.phase === "saved" ? "Review selections saved." : persistence.message)}</p>
+      {persistence.phase === "error" && <Button disabled={persistence.busy} onClick={() => send({ type: "remote-pins-retry" })}>{t("Retry saving or loading review selections")}</Button>}
+      {["saved", "error"].includes(persistence.phase) && <><Button variant="quiet" disabled={persistence.busy} onClick={() => send({ type: "remote-pins-reload" })}>{t("Reload saved review set")}</Button><p>{t("Reload replaces local selections with the saved set, including any unsaved local choices.")}</p></>}
+    </div>}
+    {notice && <p role="status">{t(notice)}</p>}<div className="grid items-start gap-4 xl:grid-cols-2">{pins.map(pin => <RemotePanel key={pin.key} pin={pin} editable={persistence?.editable ?? true} />)}</div>
   </section>;
 }
 export function RemoteSavedResults({ objective, queue, available }: { objective: string; queue?: RemoteReviewQueue; available: boolean }) {

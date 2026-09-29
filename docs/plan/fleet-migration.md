@@ -3593,3 +3593,23 @@ second-machine/provider acceptance remain open. Focused native, controller, Reac
 artifact refusal tests passed. Full `npm test` passed: 3,576 native tests, 17 skipped,
 153.593 s, desktop checks and 44 daemon-demo checks. One slow test completed successfully; no
 leak warning occurred in this run. Earlier reliability issues remain open.
+
+## R57: durable remote review selectors
+
+Depends on R56 / PR #187. New canonical implementation; no legacy commit is replaced. Separate
+closed v1 remote selectors retain exact objective/offer/correlation, local and remote review identity,
+selected object and view layout. No content or path is persisted. Native storage binds records to
+the physical private catalogue, bounds them to 64 KiB/eight selectors, compares revisions and
+acknowledges only after file and directory durability. Interrupted, unknown, linked or foreign
+records are preserved and refused. Existing local v1/v2 pin records remain unchanged.
+
+Local and remote saves share the native initialization lock and enforce eight combined pins. The
+desktop restores local then remote selections, rechecks native content, retains unavailable reviews,
+and exposes retry/reload status. Lost save replies reconcile without duplicate publication; unknown
+snapshots cannot be overwritten. A stored selector conveys no content, execution or approval
+authority. Original-project import, full ingestion, retention and external acceptance remain open.
+
+Validation: nine focused native pin tests passed, including concurrent local/remote capacity,
+restart, stale revisions, malformed metadata and foreign storage. The full `npm test` gate passed:
+3,579 native tests, 17 skipped, 151.050 s, desktop checks and all 44 real daemon-demo checks.
+One slow test completed successfully; no leak warning occurred. Earlier reliability issues remain open.

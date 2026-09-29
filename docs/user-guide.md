@@ -383,5 +383,6 @@ choices in one panel do not replace another. Native history verifies each exact 
 artifact; missing history shows an unavailable state rather than restarting a worker.
 
 These panels show the received result tree. Original-project comparison and import are not available
-from them yet. They cannot approve Mesh main. Remote panel selections currently last for the app
-session; the underlying saved result remains in native history and can be selected again.
+from them yet. They cannot approve Mesh main. Remote panel selections and view choices are saved privately. Reopening verifies the same native
+history before showing content. If saving is uncertain, keep the current panels and retry; reloading
+the saved set replaces unsaved local choices. Missing history stays listed without restarting agents.

@@ -278,3 +278,130 @@ fn legacy_pins_migrate_only_on_change_and_candidate_inputs_survive_restart() {
     );
     assert_eq!(f.open().load_fleet_pins().unwrap(), stored);
 }
+
+fn remote_pin(key: &str) -> mesh_daemon::ipc::Json {
+    use mesh_daemon::ipc::Json;
+    Json::object([
+        ("key", Json::text(key)),
+        ("objective", Json::text(format!("fleet-{}", "a".repeat(64)))),
+        ("offer", Json::text("b".repeat(64))),
+        ("correlation", Json::text("c".repeat(64))),
+        ("lane", Json::text("remote")),
+        ("run", Json::text("run")),
+        ("version", Json::text("d".repeat(64))),
+        ("bundle", Json::text("e".repeat(64))),
+        ("remote_version", Json::text("f".repeat(64))),
+        ("object", Json::Null),
+        ("mode", Json::text("content")),
+        ("layout", Json::text("split")),
+    ])
+}
+#[test]
+fn remote_pins_restart_preserve_local_pins_and_enforce_shared_capacity() {
+    use mesh_daemon::project_attachment::RemoteFleetPinState;
+    let f = Fixture::new("remote-roundtrip");
+    let store = f.open();
+    let local = store
+        .save_fleet_pins(0, (1..=7).map(|n| pin(&n.to_string())).collect())
+        .unwrap();
+    let remote = store
+        .save_remote_fleet_pins(0, vec![remote_pin("1")])
+        .unwrap();
+    assert_eq!(f.open().load_remote_fleet_pins().unwrap(), remote);
+    assert_eq!(
+        RemoteFleetPinState::parse_projection(&remote.to_json().encode()).unwrap(),
+        remote
+    );
+    assert_eq!(store.load_fleet_pins().unwrap(), local);
+    assert!(store
+        .save_fleet_pins(1, (1..=8).map(|n| pin(&n.to_string())).collect())
+        .is_err());
+    assert!(store.save_remote_fleet_pins(0, vec![]).is_err());
+    assert_eq!(
+        store
+            .save_remote_fleet_pins(1, remote.pins.clone())
+            .unwrap(),
+        remote
+    );
+    assert_eq!(store.save_remote_fleet_pins(1, vec![]).unwrap().revision, 2);
+    assert!(store
+        .save_fleet_pins(1, (1..=8).map(|n| pin(&n.to_string())).collect())
+        .is_ok());
+    assert!(store
+        .save_remote_fleet_pins(2, vec![remote_pin("1")])
+        .is_err());
+    assert!(store.registrations().unwrap().is_empty());
+}
+#[test]
+fn remote_selector_storage_refuses_content_links_stale_stage_and_foreign_catalog() {
+    use mesh_daemon::{ipc::Json, project_attachment::RemoteFleetPinState};
+    let f = Fixture::new("remote-refusal");
+    let store = f.open();
+    let mut bad = remote_pin("1");
+    if let Json::Object(ref mut fields) = bad {
+        fields.push(("content".into(), Json::text("private")));
+    }
+    assert!(store.save_remote_fleet_pins(0, vec![bad]).is_err());
+    assert!(RemoteFleetPinState::parse_projection(
+        &RemoteFleetPinState {
+            revision: 0,
+            pins: vec![remote_pin("01")]
+        }
+        .to_json()
+        .encode()
+    )
+    .is_err());
+    let pending = f.0.join("desktop-remote-fleet-pins.pending");
+    fs::write(&pending, b"preserved partial").unwrap();
+    assert!(store.load_remote_fleet_pins().is_err());
+    assert!(store.save_remote_fleet_pins(0, vec![]).is_err());
+    assert_eq!(fs::read(&pending).unwrap(), b"preserved partial");
+    fs::remove_file(&pending).unwrap();
+    store
+        .save_remote_fleet_pins(0, vec![remote_pin("1")])
+        .unwrap();
+    let record = f.0.join("desktop-remote-fleet-pins.json");
+    let bytes = fs::read(&record).unwrap();
+    fs::hard_link(&record, f.0.join("linked")).unwrap();
+    assert!(store.load_remote_fleet_pins().is_err());
+    fs::remove_file(f.0.join("linked")).unwrap();
+    let other = Fixture::new("remote-foreign");
+    let other_store = other.open();
+    fs::write(other.0.join("desktop-remote-fleet-pins.json"), &bytes).unwrap();
+    fs::set_permissions(
+        other.0.join("desktop-remote-fleet-pins.json"),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    assert!(other_store.load_remote_fleet_pins().is_err());
+    assert_eq!(fs::read(record).unwrap(), bytes);
+}
+#[test]
+fn concurrent_local_and_remote_saves_cannot_overbook_capacity() {
+    let f = Fixture::new("remote-race");
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let path = f.0.clone();
+    let b = barrier.clone();
+    let local = std::thread::spawn(move || {
+        let store = AttachmentStorage::open(&path).unwrap();
+        b.wait();
+        store
+            .save_fleet_pins(0, (1..=8).map(|n| pin(&n.to_string())).collect())
+            .is_ok()
+    });
+    let path = f.0.clone();
+    let remote = std::thread::spawn(move || {
+        let store = AttachmentStorage::open(&path).unwrap();
+        barrier.wait();
+        store
+            .save_remote_fleet_pins(0, vec![remote_pin("1")])
+            .is_ok()
+    });
+    assert_ne!(local.join().unwrap(), remote.join().unwrap());
+    let store = f.open();
+    assert!(
+        store.load_fleet_pins().unwrap().pins.len()
+            + store.load_remote_fleet_pins().unwrap().pins.len()
+            <= 8
+    );
+}

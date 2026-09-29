@@ -6,10 +6,10 @@ const output = await build({ stdin: { contents: `import React from 'react'; impo
 const module = { exports: {} }; Function('require', 'module', 'exports', output.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
 const { render, queue } = module.exports;
 const pin = n => ({ key: `remote-${n}`, selection: { objective: `fleet-${'a'.repeat(64)}`, offer: 'b'.repeat(64), correlation: String(n).repeat(64), lane: 'lane', run: 'run', version: 'c'.repeat(64), bundle: 'd'.repeat(64), remote_version: 'e'.repeat(64) }, review: null, loading: true, error: '', view: { object: null, mode: 'content', layout: 'split' } });
-test('remote panels keep independent identities and disclose session and import limits', () => {
+test('remote panels keep independent identities and disclose saved selector and import limits', () => {
   const html = render({ pins: [pin(1), pin(2)], notice: '' });
   assert.equal((html.match(/aria-label="Pinned remote review"/g) ?? []).length, 2);
-  assert.match(html, /this app session/); assert.match(html, /received result tree/); assert.match(html, /import into the original project are not available/);
+  assert.match(html, /Saved selections contain no file content/); assert.match(html, /received result tree/); assert.match(html, /import into the original project are not available/);
   assert.match(html, new RegExp('1'.repeat(64))); assert.match(html, new RegExp('2'.repeat(64)));
   assert.doesNotMatch(html, /Start agents|Apply to project|Approve and/);
 });

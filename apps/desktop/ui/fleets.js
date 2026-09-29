@@ -141,7 +141,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
       });
     }
   }
-  function mount(event) { visible = event.detail === true; if (visible) { publish(); void refresh(); void reviews.loadSaved(); } else if (timer !== null) { cancel(timer); timer = null; } }
+  function mount(event) { visible = event.detail === true; if (visible) { publish(); void refresh(); void Promise.resolve(reviews.loadSaved()).then(() => remoteReviews.loadSaved()); } else if (timer !== null) { cancel(timer); timer = null; } }
   function attachment(event) {
     const value = event.detail;
     sources = value && Array.isArray(value.projects) && value.histories && typeof value.error === 'string'

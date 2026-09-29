@@ -324,6 +324,9 @@ impl AttachmentStorage {
         if current.revision != expected_revision {
             return Err(invalid("comparison pin revision changed"));
         }
+        if pins.len() + self.read_remote_fleet_pins()?.pins.len() > 8 {
+            return Err(invalid("shared review capacity exceeded"));
+        }
         if current.pins == pins {
             return Ok(current);
         }
@@ -382,7 +385,7 @@ impl AttachmentStorage {
             ),
         ]))
     }
-    fn read_fleet_pins(&self) -> io::Result<FleetPinState> {
+    pub(super) fn read_fleet_pins(&self) -> io::Result<FleetPinState> {
         let filesystem = self.pinned.filesystem();
         let file = match filesystem.inspect_entry(Path::new(RECORD)) {
             Ok(file) => file,
