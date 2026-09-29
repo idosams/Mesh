@@ -594,3 +594,31 @@ Apple API references:
 - [Data Protection keychain selection on macOS](https://developer.apple.com/documentation/security/ksecusedataprotectionkeychain)
 - [After-first-unlock, device-only accessibility](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)
 - [Noninteractive authentication guidance](https://developer.apple.com/documentation/security/ksecuseauthenticationuifail)
+
+### Guarded installation and explicit native provisioning
+
+`NativeWorkerInstallation` binds the persistent actor account to an existing empty private macOS
+directory. It holds a nonblocking exclusive directory lock, verifies ownership/permissions and native
+protected-root exclusions, generates a fresh installation identifier, and durably writes
+`intent.json` before calling the native custody creator. A failure retains that intent and any key
+or filesystem effects. A repeated provision refuses before another custody call.
+
+The installation has exactly three entries: `intent.json`, `identity.json` and `ledger/`. The two
+canonical v1 receipts bind the installation identifier, public worker key and physical directory
+identities, including birth times. The ledger retains its existing `mesh.remote-worker-directory/v1`
+format and closed file set. Missing, partial, noncanonical, changed or additional entries refuse;
+there is no automatic repair, migration, overwrite or process adoption.
+
+Reopening validates complete receipts and the existing ledger before loading the exact expected
+custody identity, then checks the complete installation again after that callback. Every retained
+registry inherits the parent's authority and lock. Dropping the installation wrapper therefore
+neither releases a live registry's parent lock nor permits it to continue after parent receipt or
+namespace replacement. Existing standalone ledger APIs keep their previous behavior.
+
+The desktop binary handles `--worker provision` and `--worker identity` before AppKit/Tauri startup.
+They require an explicit absolute private metadata directory and the eligible signed application
+identity before filesystem work. Provision operates only on an already existing empty directory;
+identity reopens complete state and existing custody. Their output contains only public installation
+and worker identifiers. It is not coordinator trust, a launch grant or remote authentication proof.
+Neither command starts a listener or provider, changes the selected desktop workspace, or touches
+human approval custody. See the developer guide for the current invocation and acceptance limits.

@@ -19,6 +19,8 @@ mod attachment_host;
 mod attachment_recovery;
 #[cfg(unix)]
 mod fleet_host;
+#[cfg(unix)]
+mod worker_installation;
 
 #[cfg(unix)]
 mod artifact_preview;
@@ -13016,6 +13018,13 @@ fn main() {
     if build_identity::run_if_requested() {
         return;
     }
+    if let Some(result) = worker_installation::run_if_requested() {
+        if let Err(problem) = result {
+            eprintln!("Mesh worker: {problem}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(result) = attachment_capture::run_if_requested() {
         if let Err(problem) = result {
             eprintln!("Mesh attachment: {problem}");
@@ -13038,6 +13047,13 @@ fn main() {
 #[cfg(all(unix, not(target_os = "macos")))]
 fn main() {
     if build_identity::run_if_requested() {
+        return;
+    }
+    if let Some(result) = worker_installation::run_if_requested() {
+        if let Err(problem) = result {
+            eprintln!("Mesh worker: {problem}");
+            std::process::exit(1);
+        }
         return;
     }
     if let Some(result) = attachment_capture::run_if_requested() {
