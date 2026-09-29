@@ -21,6 +21,12 @@ impl ReceivedResultWorkspace {
     pub fn binding(&self) -> &WorkspaceBinding {
         &self.binding
     }
+    /// Digest to retain in the coordinator correlation record before history-only reopening.
+    pub fn receipt_digest(&self) -> mesh_store::RecordDigest {
+        mesh_store::RecordDigest::from_bytes(
+            *Blake3::digest_bytes(self.receipt.encode().as_bytes()).as_bytes(),
+        )
+    }
     /// Exact durable mapping retained beside the independently imported workspace.
     pub fn receipt(&self) -> &Json {
         &self.receipt
@@ -73,25 +79,7 @@ impl RemoteResultAllocation {
     ) -> io::Result<ReceivedResultWorkspace> {
         self.verify()?;
         let parent = self.tree.path.parent().ok_or_else(invalid)?;
-        let context = Json::object([
-            ("evidence_receipt", Json::text(self.evidence.to_string())),
-            (
-                "remote_version",
-                Json::text(self.manifest().input().to_string()),
-            ),
-            (
-                "remote_manifest",
-                Json::text(self.manifest().bundle().to_string()),
-            ),
-            (
-                "allocation",
-                Json::text(token(&self.tree.allocation)?.directory_token()),
-            ),
-            (
-                "files",
-                Json::text(token(&self.tree.files)?.directory_token()),
-            ),
-        ]);
+        let context = context(&self)?;
         let intent = Json::object([
             ("schema", Json::text("mesh.received-result-intent/v1")),
             ("context", context.clone()),
@@ -159,3 +147,28 @@ impl RemoteResultAllocation {
         Ok(result)
     }
 }
+
+fn context(result: &RemoteResultAllocation) -> io::Result<Json> {
+    Ok(Json::object([
+        ("evidence_receipt", Json::text(result.evidence.to_string())),
+        (
+            "remote_version",
+            Json::text(result.manifest().input().to_string()),
+        ),
+        (
+            "remote_manifest",
+            Json::text(result.manifest().bundle().to_string()),
+        ),
+        (
+            "allocation",
+            Json::text(token(&result.tree.allocation)?.directory_token()),
+        ),
+        (
+            "files",
+            Json::text(token(&result.tree.files)?.directory_token()),
+        ),
+    ]))
+}
+
+#[cfg(target_os = "macos")]
+mod reopen;

@@ -667,3 +667,16 @@ private single-link receipt bytes. Failure preserves intent, receipts and partia
 repair, adoption or automatic retry is granted. No worker admission, provider or main approval is
 created. Durable history-only reopening and local review registration are separate required steps,
 as is rechecking dependency eligibility before original-project candidate import.
+
+### History-only local result reopening
+
+Native code can reopen the exact saved initial result with the separately retained local mapping
+digest, authenticated evidence receipt, allocation identifier and remote manifest. It validates
+bounded canonical private receipts, exact physical copy identities, local installation and saved
+content, then returns an immutable source retaining allocation custody. The remote manifest is
+compared by content; the exported local manifest names the independent local saved operation.
+
+Missing or changed state refuses without recreation. Reopening installs no daemon, execution
+session, provider or credential. The caller must retain the mapping digest in its durable coordinator
+correlation and revalidate dependency eligibility separately before candidate import. This API does
+not itself register a local review or grant protected-main approval.
