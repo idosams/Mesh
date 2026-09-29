@@ -3456,3 +3456,22 @@ hard-linked receipt without repair. The library build's unused import warning wa
 the focused test. Full validation and PR delivery are pending. History-only reopening, local review
 registration/correlation, original-project candidate import, retention and real remote/provider/
 packaged acceptance remain required; this source step does not complete remote review delivery.
+
+## R50 history-only result reopening (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #180](https://github.com/idosams/Mesh/pull/180), `f31d72f296256d7fb86d96d177705646329020a5`.
+No preserved commits are replaced. R49 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks, with one unresolved process-leak warning tracked in #172.
+
+A native destination can reopen an existing local result using a separately retained mapping digest,
+authenticated evidence receipt and exact remote manifest. It checks canonical bounded private
+metadata, physical identities, exact local installation and immutable initial content, then returns
+a source that retains allocation pins. It creates no daemon, provider, session or credential and
+repairs no missing state. Reading history does not establish dependency eligibility or approval.
+
+The library check and composed native regression pass reopening after the original daemon is dropped,
+exact saved bytes/local operation, wrong mapping and missing/linked receipt refusal, and retained
+source refusal after allocation relocation. Full validation and delivery remain pending. Local review
+registration, durable coordinator correlation, original-project import, retention and real remote/
+provider/packaged acceptance remain required.

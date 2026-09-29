@@ -534,7 +534,42 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     local.verify().unwrap();
     fs::hard_link(&local_receipt, &retained_local).unwrap();
     assert!(local.verify().is_err());
+    let mapping = local.receipt_digest();
+    let local_operation = local.binding().starting_version.unwrap();
     drop(local);
+    let reopen = |mapping| {
+        setup.destination.reopen_result_history(
+            "22222222222222222222222222222222",
+            mapping,
+            &restored,
+            &setup.manifest,
+            &crate::TrustedReviewers::default(),
+        )
+    };
+    assert!(
+        reopen(mapping).is_err(),
+        "linked retained mapping must refuse"
+    );
+    fs::remove_file(&retained_local).unwrap();
+    assert!(reopen(RecordDigest::from_bytes([77; 32])).is_err());
+    let source = reopen(mapping).unwrap();
+    assert_eq!(source.manifest().input(), local_operation);
+    assert_eq!(source.read_chunk(setup.digest).unwrap(), setup.bytes);
+    fs::rename(&local_receipt, &retained_local).unwrap();
+    assert!(reopen(mapping).is_err());
+    assert!(
+        !local_receipt.exists(),
+        "history-only reopen cannot repair metadata"
+    );
+    fs::rename(&retained_local, &local_receipt).unwrap();
+    let moved = local_parent.with_extension("preserved");
+    fs::rename(&local_parent, &moved).unwrap();
+    assert!(
+        source.read_chunk(setup.digest).is_err(),
+        "retained source must keep allocation custody"
+    );
+    fs::rename(&moved, &local_parent).unwrap();
+
     let retained = metadata.with_extension("retained");
     fs::rename(&metadata, &retained).unwrap();
     assert!(receiver
