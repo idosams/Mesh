@@ -292,6 +292,18 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Recover an exact remote import's recorded actor/outcome without loading a private key.
+    #[cfg(target_os = "macos")]
+    pub fn recorded_retained_remote_project_import(
+        &self,
+        request: &super::RetainedRemoteProjectRequest<'_>,
+    ) -> Result<Option<(mesh_types::PublicKey, Json)>, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .recorded_retained_remote_project_import(request)
+            .map_err(runtime_error)
+    }
     /// Stage a received remote result from retained native selectors and original-project history.
     #[cfg(target_os = "macos")]
     pub fn stage_retained_remote_project(

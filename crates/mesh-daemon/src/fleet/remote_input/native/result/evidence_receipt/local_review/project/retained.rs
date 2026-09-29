@@ -124,6 +124,28 @@ impl Runtime {
             receiver.stage_project_candidate(runtime, native)
         })
     }
+    /// Recover the recorded public import actor and outcome without opening a private key.
+    pub fn recorded_retained_remote_project_import(
+        &mut self,
+        request: &RetainedRemoteProjectRequest<'_>,
+    ) -> Result<Option<(PublicKey, Json)>, Error> {
+        self.with_retained_remote_project(request, |receiver, runtime, native| {
+            let (candidate, snapshot) =
+                receiver.project_candidate_snapshot(runtime, native, false)?;
+            let result = native
+                .source
+                .recorded_fleet_import(native.request, &candidate, &snapshot, native.reviewers)
+                .map_err(store_error)?;
+            if receiver
+                .project_candidate_snapshot(runtime, native, false)?
+                .0
+                != candidate
+            {
+                return Err(refused());
+            }
+            Ok(result)
+        })
+    }
     /// Inspect durable import truth without signing, adopting execution or repairing state.
     pub fn inspect_retained_remote_project_import(
         &mut self,

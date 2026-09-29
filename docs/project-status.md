@@ -444,3 +444,10 @@ Native history APIs now resolve remote project actions from retained offer/corre
 reconstructing the input from original-project saved history. They preserve the existing native
 staging, signing/recovery and imported-review checks. The renderer does not choose receiving paths
 or supply input manifests. Native fixture journeys pass; desktop action wiring remains outstanding.
+
+
+The desktop native command boundary now routes exact remote project selections through staging,
+recorded import inspection/recovery and imported-review actions. Completed outcomes avoid loading a
+signing key; pending/new work uses the existing native signer rules. Closed-request and missing-state
+refusal tests pass alongside native recovery journeys. Graphical action controls and durable retry
+state are not yet wired, and positive packaged/OS-key acceptance remains unverified.
