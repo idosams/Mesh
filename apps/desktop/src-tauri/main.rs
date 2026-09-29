@@ -21,6 +21,8 @@ mod attachment_recovery;
 mod fleet_host;
 #[cfg(unix)]
 mod worker_installation;
+#[cfg(target_os = "macos")]
+mod worker_service;
 
 #[cfg(unix)]
 mod artifact_preview;

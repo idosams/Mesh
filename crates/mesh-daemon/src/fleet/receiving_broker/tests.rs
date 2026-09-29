@@ -6,7 +6,7 @@ use mesh_types::{PublicKey, Signature};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-fn pair() -> (UnixStream, UnixStream) {
+pub(in crate::fleet) fn pair() -> (UnixStream, UnixStream) {
     let (left, right) = UnixStream::pair().unwrap();
     for stream in [&left, &right] {
         stream
@@ -18,16 +18,16 @@ fn pair() -> (UnixStream, UnixStream) {
     }
     (left, right)
 }
-fn send(stream: &mut UnixStream, frame: RemoteFrame) {
+pub(in crate::fleet) fn send(stream: &mut impl Write, frame: RemoteFrame) {
     RemoteFrameWriter::new(stream).write_frame(&frame).unwrap();
 }
-fn read(stream: &mut UnixStream) -> RemoteFrame {
+pub(in crate::fleet) fn read(stream: &mut impl Read) -> RemoteFrame {
     RemoteFrameReader::new(stream)
         .read_frame()
         .unwrap()
         .unwrap()
 }
-fn response(stream: &mut UnixStream, kind: &str) -> Json {
+pub(in crate::fleet) fn response(stream: &mut impl Read, kind: &str) -> Json {
     let RemoteFrame::Control(bytes) = read(stream) else {
         panic!("control reply expected")
     };
@@ -39,7 +39,11 @@ fn response(stream: &mut UnixStream, kind: &str) -> Json {
     assert_eq!(value.get("kind").and_then(Json::as_text), Some(kind));
     value
 }
-fn authenticate(s: &Setup, runtime: &mut Runtime, stream: &mut UnixStream) {
+pub(in crate::fleet) fn authenticate(
+    s: &Setup,
+    runtime: &mut Runtime,
+    stream: &mut (impl Read + Write),
+) {
     let RemoteFrame::Control(bytes) = read(stream) else {
         panic!("proof expected")
     };
@@ -82,7 +86,7 @@ fn authenticate(s: &Setup, runtime: &mut Runtime, stream: &mut UnixStream) {
         Some(s.manifest.bundle().to_string().as_str())
     );
 }
-fn finish(stream: &mut UnixStream) {
+pub(in crate::fleet) fn finish(stream: &mut impl Write) {
     send(
         stream,
         RemoteReceivingCommand::Materialize {

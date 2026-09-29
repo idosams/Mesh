@@ -2896,3 +2896,64 @@ command and a startup-order regression whose exact expected sequence lacked the 
 The command now formats public key bytes directly without a dependency change. The startup test
 requires the worker mode, its failure exit and early return before the existing attachment/MCP and
 AppKit sequence. Failed CI logs remain preserved; full corrected validation is pending.
+
+## R29 resident authenticated worker endpoint (in progress)
+
+New canonical work tracked in [#150](https://github.com/idosams/Mesh/issues/150), based on merged
+[#149](https://github.com/idosams/Mesh/pull/149), `f21329b8eb9a02b7727c834730d2bb3f2ba9c426`.
+No preserved source commits are replaced. R28's corrected PR passed all seven checks, including
+full macOS `npm test`; all seven combined-main checks also passed. Failed initial build/startup-order
+checks and successful corrected results remain preserved.
+
+The resident connection owner binds fresh signed dispatch to the same guarded installation ledger,
+retains bounded transfer state across disconnect, refuses changed assignments, and holds original
+materialized handoffs through full/disconnected mailbox delivery. Native endpoint storage is pinned,
+private, exclusively owned and create-only; it never removes stale or substituted socket entries.
+Nonblocking native connection opening and stream clones share an absolute bounded deadline.
+
+Explicit signed-application `serve` and `connect` modes compose installation custody, native provider
+configuration, authenticated transfers and independent resident provider observation. Configuration
+is local, closed, bounded and loaded once; network input cannot choose paths or executables. Separate
+protected metadata roots remain outside configured user projects. Bridge EOF half-closes its own
+connection and cannot stop the resident supervisor. Neither materialization acknowledgments nor
+local process observations authorize protected-main changes.
+
+Focused transfer/reconnect/refusal and endpoint tests have passed. Native CLI compilation passed;
+expanded end-to-end endpoint/provider tests, final CLI regressions and full validation are still
+running or pending. This increment is published as [draft PR #151](https://github.com/idosams/Mesh/pull/151) and is not yet merged. Successful eligible signed-app
+provisioning, actual second-machine transport, renewed leases and signed-result recovery remain
+required by the full fleet plan.
+
+The first complete private-endpoint regression compiled but failed with a native `InvalidInput`
+(`EINVAL`) during frame reading, before provider launch. The earlier pair-based transfer and
+connect-only tests did not establish data exchange on this path. Its failed log is preserved; the
+transport error is under investigation and is not waived. The final native command/configuration
+suite passed all three cases with warnings denied.
+
+The transport investigation reproduced the Darwin failure independently: changing a Unix socket
+timeout after full peer closure fails even while its final reply remains buffered. The stream now
+uses nonblocking I/O and readiness polling against its original absolute deadline. Regressions cover
+buffered final replies/EOF, idle reads, blocked writes and unchanged clone deadlines. Corrected
+end-to-end validation is pending; neither timeout bounds nor assertions were relaxed.
+
+The corrected buffered-reply/deadline tests passed and the complete endpoint test reached provider
+startup. It then correctly refused the fixture's non-private provider socket parent. The fixture
+now uses the same private physical endpoint folder as the production service; the privacy check
+remains unchanged. The failed fixture run is retained, and the final native suite is pending.
+
+The final focused native run passed 20 of 21 cases: installation, endpoint deadlines (including
+blocked writes), buffered EOF, authentication and handoff checks passed. The complete endpoint test
+now reached native provider startup but failed its existing ten-second acknowledgment deadline.
+That local failure is preserved; its cause remains unconfirmed and the deadline is unchanged. The
+increment is being published as a draft for full hosted validation, not claimed as merged delivery.
+
+Initial hosted macOS validation stopped before runtime tests on `large_enum_variant`. The connection
+outcome now boxes its admission payload; no lint is suppressed. Direct native lint checks use the
+repository's declared Rust 1.85 minimum, matching Cargo's setting rather than suggesting newer APIs
+in unchanged baseline code. Full corrected hosted validation remains required.
+
+The exact provider fixture also missed ten seconds outside Mesh and then exited normally after
+160.717 seconds, with one launch and the expected completion event. A read-only sample showed
+`_dyld_start` before program entry. This narrows the local startup investigation without identifying
+the underlying OS cause or resolving [#133](https://github.com/idosams/Mesh/issues/133). No running
+process was stopped and the test deadline remains unchanged.

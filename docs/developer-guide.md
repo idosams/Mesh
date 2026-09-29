@@ -135,3 +135,54 @@ Existing standalone worker-ledger directories are not automatically converted in
 Current automated evidence covers native directory/receipt/lock behavior with a custody test double,
 and command parsing plus refusal by an unentitled executable. It does not prove successful OS
 keychain provisioning, an installed resident service or actual remote execution.
+
+### Resident worker configuration (native implementation under validation)
+
+The signed macOS application now has explicit `--worker serve <absolute-config-file>` and
+`--worker connect <absolute-endpoint-folder>` modes. These are optional worker setup tools; they
+never attach, move or change the user's existing project. Both require the eligible signed Mesh
+application preflight. Successful signed-app enrollment and actual second-machine acceptance remain
+unverified; an unsigned development build refuses before touching these paths.
+
+Provision the installation with the earlier `--worker provision` command. Supply separate existing
+private directories for the endpoint, input store and received allocations. The endpoint directory
+must be empty. Place the configuration in an owner-only directory, with an owner-only regular file;
+it is read once, bounded to 16 KiB. Example schema (replace every path and the public key):
+
+```json
+{
+  "schema": "mesh.worker-config/v1",
+  "installation": "/absolute/private/worker-installation",
+  "endpoint": "/absolute/private/worker-endpoint",
+  "store": "/absolute/private/worker-input-store",
+  "allocations": "/absolute/private/worker-allocations",
+  "provider": "codex",
+  "executable": "/absolute/path/to/codex",
+  "coordinator": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "capacity": 4,
+  "protected": ["/absolute/path/to/existing-project"]
+}
+```
+
+The coordinator value must be its independently admitted execution public key, not a human approval
+key. Unknown fields, duplicate fields, relative paths, unsupported provider names and capacity outside
+1–64 refuse. `claude` selects the existing Claude adapter and needs its explicitly configured installed
+executable. Native policy caps each objective at 64 lanes, the configured concurrency, depth 8,
+8 retries and an initial lease no longer than one hour. These are upper bounds, not permission to
+retry an uncertain assignment. The capacity also bounds retained transfer/provider slots; terminal
+and uncertain entries are not automatically evicted.
+
+The resident service retains input and provider ownership across bridge disconnects. Each connection
+requires fresh signed Mesh dispatch and admission proof, with exact immutable assignment matching.
+The local bridge checks the private socket and OS peer user; that alone is not Mesh key authentication.
+A connection has a 60-second total budget, including native connection opening, and input can resume
+on a fresh authenticated connection. Neither stdin EOF nor a lost final reply means cancellation,
+provider completion or permission to launch twice. Provider observation runs independently of transfer
+I/O; blocking native provider startup/storage can still delay observation.
+
+The endpoint is create-only. Existing sockets and other entries refuse startup, and shutdown does
+not remove them. Restart/reconciliation requires explicit inspection and a new empty endpoint folder;
+retained installation/input evidence is preserved. A restarted service cannot reconstruct an old
+reservation or adopt a process from a PID. SSH admission/configuration, signed remote result recovery,
+renewed leases and actual remote deployment remain unfinished. Do not describe these local native
+modes as verified second-machine execution.
