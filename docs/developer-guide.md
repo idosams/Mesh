@@ -327,6 +327,27 @@ required under [#163](https://github.com/idosams/Mesh/issues/163). An offer or m
 proves complete transfer, releases a slot or approves protected main.
 
 
+### Recovering a known result offer
+
+`RemoteSavedResultChallenge` issues a fresh authenticated query for one known checkpoint in the
+coordinator's current assignment. `inspect_remote_saved_result_over_ssh` sends it over a single
+bounded native SSH connection. The resident `NativeWorkerConnections` route reads the original
+guarded worker ledger and signs a reply without importing content or reconstructing execution.
+
+`mesh.worker-result-query/v1` and `mesh.worker-result-reply/v1` use separate signing domains.
+The query binds a random nonce, 30-second validity, original assignment, objective limits and
+checkpoint. The reply binds the complete query digest, observation time and either the original
+signed offer or null. The worker rechecks ledger facts around signing, and the coordinator rechecks
+its exact context before accepting. Null is an unknown/unrecorded result, never a retry grant.
+A lost reply requires an explicit fresh query; it does not trigger another launch or signature
+of the persisted offer. No automatic retry extends freshness or the connection budget.
+
+This is known-checkpoint recovery only. Checkpoint discovery, immutable manifest/content transfer,
+restart-safe content reopening and exact candidate import remain follow-up work in
+[#163](https://github.com/idosams/Mesh/issues/163). A recovered offer must still be verified against
+the supplied manifest before content reconstruction; it is not transfer completion or approval.
+
+
 ### Resident saved-result publication
 
 The native worker service now polls its original received owners with the configured worker-key

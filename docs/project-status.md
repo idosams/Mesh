@@ -310,6 +310,14 @@ canonical validation is pending. No result transport, complete coordinator impor
 acceptance is claimed.
 
 
+Known-checkpoint signed offers now have a fresh authenticated query/reply path through the native
+resident route and bounded SSH wrapper. Three focused regressions passed, including lost-reply
+recovery, stale-query/reply and wrong-domain/key refusal, signed mismatched checkpoint refusal,
+and changes to retained history during signing. Daemon lint passed after adding missing API docs.
+Full validation is pending. Discovery, content transfer/import and actual second-machine proof
+remain required.
+
+
 The resident worker service now connects original received owners to automatic native saved-result
 publication using its configured worker key. The composed regression passes for wrong-key refusal,
 retry spacing, durable publication and replay without signing again; daemon lint passes. Full

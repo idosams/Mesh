@@ -3170,6 +3170,32 @@ transport, output integrity/recovery, exact candidate import and actual remote a
 required.
 
 
+## R37 authenticated known-result recovery (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), following published
+[PR #165](https://github.com/idosams/Mesh/pull/165). No preserved source commits are replaced.
+R35 merged through [PR #164](https://github.com/idosams/Mesh/pull/164) as
+`fc3487c18a12f6332a698951e33ecf12fa255f2a`, with all seven final checks passing, 3,553 native
+tests / 17 skipped, 44 daemon checks and four renderer cases. Combined-main validation is running.
+
+R36's hosted checks passed, but its local full gate failed on a recycled PID/thread fixture name
+and an import receipt retained from September 27. The failed log and receipt remain preserved.
+Test-only [PR #166](https://github.com/idosams/Mesh/pull/166) atomically reserves separate parent
+namespaces; all 26 focused tests and its full local gate passed. R36 needs validation with that fix.
+
+Fresh result queries bind exact assignment/checkpoint, native peer identities, bounded objective
+limits and a nonce/deadline. The native resident route returns a signed observation of the existing
+immutable offer or unknown result, checking guarded facts again after signing. The caller rechecks
+current context and rejects replay, wrong checkpoint, signature-domain substitution and stale time.
+SSH uses the existing bounded transport with explicit reconnect and no automatic retries.
+
+Three focused tests and full daemon lint passed. Initial compile failures (an error-conversion
+closure and a consumed test registry) and missing public API docs were corrected; original logs
+are retained. Full final-source checks and PR delivery remain pending. Discovery of checkpoint
+identities, actual content transfer/reopening, exact candidate import and real remote acceptance
+remain necessary; this increment is not complete output delivery.
+
+
 ## R38 resident saved-result publication (validation in progress)
 
 New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), based on merged

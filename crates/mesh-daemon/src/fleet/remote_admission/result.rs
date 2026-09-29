@@ -233,3 +233,6 @@ impl RemoteAdmissionRegistry {
 #[cfg(test)]
 #[path = "result/tests.rs"]
 mod tests;
+
+#[path = "result/query.rs"]
+pub(in crate::fleet) mod query;
