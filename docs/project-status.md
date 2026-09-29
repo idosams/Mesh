@@ -338,3 +338,11 @@ entry point. Three focused regressions passed, including lost-reply recovery and
 signed duplicate checkpoints, wrong assignment, cursor mismatches, stale replies and wrong keys.
 Full validation is pending. Catalog discovery does not transfer files, prove completion or import
 a result for review; remote content/recovery, candidate import and real-machine acceptance remain.
+
+
+Native saved-result reopening now works after the original worker owner is dropped, using exact
+launch, mapping, installation and immutable review checks. The composed regression passed for
+saved bytes despite later working edits, changed receipt refusal and replacement-root refusal.
+The first test compile missed a type qualification and was corrected; its log is retained. Full
+validation is pending. This is a read-only native foundation for restart-safe transfer, not remote
+file delivery or candidate import.

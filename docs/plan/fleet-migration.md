@@ -3266,3 +3266,23 @@ the same catalog, stale challenge replay, wrong keys/domains, malformed cursor/c
 duplicate checkpoints, another run's signed offer and history mutation while signing. Full local
 and hosted checks remain pending. Legacy catalog limits, content reopening/transfer, exact
 coordinator review import and actual remote/packaged acceptance remain in scope.
+
+
+## R41 native saved-result reopening (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), following published
+[PR #170](https://github.com/idosams/Mesh/pull/170), `8c19acd36d220858cceedf935c99cc96579a6cac`.
+No preserved source commits are replaced. R40's full local gate passed: 3,563 native tests,
+17 skipped, desktop checks and 44 daemon-demo checks; hosted verification is running.
+
+Native result reopening binds guarded launch/offer facts to a separately admitted destination,
+revalidates the retained initialization mapping, original input and allocation installation, then
+uses the existing history-only reopen seam. The exact recorded review/version and reconstructed
+manifest must match the signed offer. Returned read-only sources retain filesystem authority
+without restoring provider execution, credentials, working files or a launch reservation.
+
+The composed received-host regression passed after the original owner was dropped, with later
+unsaved bytes excluded, altered mapping refusal and replacement-root refusal. An initial test
+compile lacked a type qualification; the correction and original log are retained. Full validation
+and canonical PR delivery remain pending. Resumable output transport, exact coordinator review
+import and actual remote/packaged acceptance remain required.

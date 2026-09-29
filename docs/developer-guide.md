@@ -406,3 +406,23 @@ completion, permission to retry execution or evidence that all legacy offers hav
 This exposes the native catalog's existing scope and compatibility limits. Exact manifest/content
 verification, resumable output transfer, native candidate import and actual second-machine
 acceptance remain required. Task correlation and signed envelopes must stay out of general logs.
+
+
+### Reopening immutable worker results
+
+`RemoteAdmissionRegistry::reopen_saved_result` binds an existing signed offer to an independently
+admitted native input destination and its original launch receipt. It reopens the fixed allocation
+through retained directory authority, checks the complete workspace-mapping digest, input manifest,
+original initialization context and physical installation tokens, then reads saved history using an
+ephemeral index. It does not run working-file recovery or create a provider/session/credential.
+
+The recorded review must name the exact saved version, the original initial tree must match the
+assigned input, and the reconstructed result manifest must match the offer. The reader rechecks
+receipts and guarded launch/offer facts before returning. Reads are bounded and reject links, extra
+permissions, replaced roots and changed receipt bytes. Returned chunk reads retain allocation and
+workspace pins and rehash declared content; missing content refuses instead of being repaired.
+
+This supplies restart-safe native content access. It adds no persisted or wire format and does not
+claim remote delivery, retention against garbage collection, candidate import or real-machine
+acceptance. An unknown checkpoint yields no result; unavailable storage never authorizes rerunning
+the original work.

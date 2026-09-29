@@ -148,6 +148,8 @@ fn received_saved_result_offer_is_signed_durable_and_replayed_without_resigning(
 }
 
 fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: &Path) {
+    #[cfg(target_os = "macos")]
+    let mut reopening = None;
     wait_started(root);
     let objective = worker.service.objective().unwrap();
     let credential = worker.host.test_owned_credential("lane").to_owned();
@@ -370,6 +372,15 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
                 .unwrap()
                 .is_none());
             assert_eq!(worker.service.native_state().unwrap().revision, revision);
+            let destination = crate::fleet::RemoteInputDestination::admit(
+                &fixture.0.join("store"),
+                crate::ProtectedWorkspaceRoot::inspect(&fixture.0.join("store")).unwrap(),
+                &fixture.0.join("allocations"),
+                crate::ProtectedWorkspaceRoot::inspect(&fixture.0.join("allocations")).unwrap(),
+                &[],
+            )
+            .unwrap();
+            reopening = Some((registry, destination, encoded));
         }
     }
     // Completion revoked the exact provider session. Reconnection cannot resurrect it.
@@ -380,6 +391,58 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
     ));
     drop(connection);
     drop(worker);
+    #[cfg(target_os = "macos")]
+    let reopened = reopening.as_ref().map(|(registry, destination, encoded)| {
+        let checkpoint = saved.get("checkpoint").unwrap().as_text().unwrap();
+        let launch = registry.launch_receipt("assignment").unwrap().unwrap();
+        let (offer, reopened) = registry
+            .reopen_saved_result(
+                destination,
+                "assignment",
+                checkpoint,
+                &crate::TrustedReviewers::default(),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(offer.encode(), *encoded);
+        assert_eq!(reopened.manifest(), source.manifest());
+        assert_eq!(
+            fs::read(root.join("note.txt")).unwrap(),
+            b"later unsaved working bytes\n"
+        );
+        let bytes: Vec<u8> = chunks
+            .iter()
+            .flat_map(|c| reopened.read_chunk(c.digest).unwrap())
+            .collect();
+        assert_eq!(bytes, b"received worker result\n");
+        assert!(registry.launch_receipt("assignment").unwrap().unwrap() == launch);
+        let mapping = fixture
+            .0
+            .join("allocations/input-0123456789abcdef0123456789abcdef/workspace.json");
+        let original = fs::read(&mapping).unwrap();
+        let mut altered = original.clone();
+        altered.push(b' ');
+        fs::write(&mapping, altered).unwrap();
+        assert!(registry
+            .reopen_saved_result(
+                destination,
+                "assignment",
+                checkpoint,
+                &crate::TrustedReviewers::default()
+            )
+            .is_err());
+        fs::write(&mapping, original).unwrap();
+        assert!(registry
+            .reopen_saved_result(
+                destination,
+                "assignment",
+                "unknown-checkpoint",
+                &crate::TrustedReviewers::default()
+            )
+            .unwrap()
+            .is_none());
+        reopened
+    });
     // A read-only export retains native pins, not an execution owner or credential.
     let exported: Vec<u8> = chunks
         .iter()
@@ -390,6 +453,19 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
     fs::rename(root, &displaced).unwrap();
     fs::create_dir(root).unwrap();
     assert!(source.read_chunk(chunks[0].digest).is_err());
+    #[cfg(target_os = "macos")]
+    if let Some(reopened) = reopened {
+        assert!(reopened.read_chunk(chunks[0].digest).is_err());
+        let (registry, destination, _) = reopening.unwrap();
+        assert!(registry
+            .reopen_saved_result(
+                &destination,
+                "assignment",
+                saved.get("checkpoint").unwrap().as_text().unwrap(),
+                &crate::TrustedReviewers::default()
+            )
+            .is_err());
+    }
 }
 
 #[test]

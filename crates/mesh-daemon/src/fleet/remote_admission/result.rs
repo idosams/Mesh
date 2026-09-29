@@ -242,3 +242,42 @@ pub(in crate::fleet) mod catalog;
 
 #[path = "result/discovery.rs"]
 pub(in crate::fleet) mod discovery;
+
+impl RemoteAdmissionRegistry {
+    /// Reopen the exact signed saved result from native-admitted private storage after restart.
+    /// This reads immutable history only; it creates no execution/session/credential authority.
+    /// Unknown checkpoint returns None. Missing/changed storage or retained facts refuse.
+    pub fn reopen_saved_result(
+        &self,
+        destination: &crate::fleet::RemoteInputDestination,
+        assignment: &str,
+        checkpoint: &str,
+        reviewers: &crate::TrustedReviewers,
+    ) -> Result<Option<(RemoteSavedResultOffer, crate::fleet::RemoteInputSource)>, Error> {
+        let Some(offer) = self.saved_result_offer(assignment, checkpoint)? else {
+            return Ok(None);
+        };
+        let launch = self.launch_receipt(assignment)?.ok_or_else(invalid)?;
+        let digest =
+            |field| RecordDigest::parse_hex(text(&offer.body, field)?).map_err(|_| invalid());
+        let source = destination
+            .reopen_saved_review(
+                &launch,
+                digest("review")?,
+                digest("version")?,
+                digest("manifest")?,
+                reviewers,
+            )
+            .map_err(|_| invalid())?;
+        if self.launch_receipt(assignment)?.as_ref() != Some(&launch)
+            || self
+                .saved_result_offer(assignment, checkpoint)?
+                .map(|v| v.encode())
+                != Some(offer.encode())
+        {
+            return Err(invalid());
+        }
+        source.verify_roots().map_err(|_| invalid())?;
+        Ok(Some((offer, source)))
+    }
+}
