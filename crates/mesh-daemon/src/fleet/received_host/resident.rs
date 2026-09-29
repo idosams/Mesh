@@ -67,8 +67,33 @@ impl ReceivedWorkerSupervisor {
         stop: &AtomicBool,
         observations: &SyncSender<Vec<ReceivedWorkerObservation>>,
     ) {
+        self.serve_with_poll(mailbox, stop, observations, |owner| owner.poll());
+    }
+
+    /// Native resident loop with bounded publication of saved review offers under the configured
+    /// worker key. Publication errors remain in per-worker observations and never dispatch retries.
+    #[cfg(target_os = "macos")]
+    pub fn serve_with_result_publication(
+        &mut self,
+        mailbox: &ReceivedWorkerMailbox,
+        stop: &AtomicBool,
+        observations: &SyncSender<Vec<ReceivedWorkerObservation>>,
+        signer: &dyn crate::CheckpointSigner,
+    ) {
+        self.serve_with_poll(mailbox, stop, observations, |owner| {
+            owner.poll_with_result_publication(signer)
+        });
+    }
+
+    fn serve_with_poll(
+        &mut self,
+        mailbox: &ReceivedWorkerMailbox,
+        stop: &AtomicBool,
+        observations: &SyncSender<Vec<ReceivedWorkerObservation>>,
+        mut poll: impl FnMut(&mut Self) -> Vec<ReceivedWorkerObservation>,
+    ) {
         while !stop.load(Ordering::Acquire) {
-            let _ = observations.try_send(self.poll());
+            let _ = observations.try_send(poll(self));
             match mailbox.0.recv_timeout(POLL_INTERVAL) {
                 Ok(request) => {
                     // Complete an already dequeued request even if stop changes during its handling.

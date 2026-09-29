@@ -300,9 +300,37 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
                 )
                 .sign(p))
                 .is_err());
+            let wrong = Signer(ed25519_dalek::SigningKey::from_bytes(&[0x74; 32]));
+            let publication_time = Instant::now();
+            assert!(worker
+                .publish_saved_result_at(&wrong, publication_time)
+                .unwrap()
+                .is_err());
+            assert!(
+                worker
+                    .publish_saved_result_at(&signer, publication_time)
+                    .is_none(),
+                "retry interval is enforced"
+            );
+            let publication_time = publication_time + Duration::from_secs(1);
+            assert_eq!(
+                worker
+                    .publish_saved_result_at(&signer, publication_time)
+                    .unwrap()
+                    .unwrap(),
+                saved.get("checkpoint").unwrap().as_text().unwrap()
+            );
+            assert!(
+                worker
+                    .publish_saved_result_at(&signer, publication_time)
+                    .is_none(),
+                "one offer at most per interval"
+            );
             let (offer, exported) = worker
                 .service
-                .sign_remote_saved_review(&selection, |p| signer.sign(p))
+                .sign_remote_saved_review(&selection, |_| {
+                    panic!("automatic publication already retained the signature")
+                })
                 .unwrap();
             assert_eq!(exported.manifest(), source.manifest());
             let encoded = offer.encode();

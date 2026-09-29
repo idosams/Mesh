@@ -3194,3 +3194,32 @@ closure and a consumed test registry) and missing public API docs were corrected
 are retained. Full final-source checks and PR delivery remain pending. Discovery of checkpoint
 identities, actual content transfer/reopening, exact candidate import and real remote acceptance
 remain necessary; this increment is not complete output delivery.
+
+
+## R38 resident saved-result publication (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), based on merged
+[PR #165](https://github.com/idosams/Mesh/pull/165), `d90cc25bcd992116bdbc2f4b81cea6e22f495d4d`.
+No preserved source commits are replaced. PR #165 passed all seven checks with 3,556 native tests,
+17 skipped, 44 daemon-demo checks and four renderer cases. Its combined-main run was superseded
+by the later PR #167 merge; combined-main verification is running.
+
+The actual native worker service publishes saved review offers from its original received owners
+using configured worker custody. Per-owner attempts are spaced by one second; a wrapping page
+cursor prevents a failed result from permanently starving later reviews. A bounded retained cache
+avoids repeated exports/signatures, while durable offers remain the source of truth. Publication
+errors are separate native observations and grant no retry, slot-release or protected-main rights.
+
+The composed regression and daemon lint pass. The regression uses a controlled clock for retry
+spacing and proves wrong-key refusal and durable replay without signing again. Full local and
+hosted checks and PR delivery remain pending. Authenticated discovery, reopening/transfer, exact
+coordinator import and remote/packaged acceptance remain in scope.
+
+
+R38 initial full local gate passed on `ea38833`: 3,556 native tests, 17 skipped, desktop checks
+and all 44 daemon-demo checks. The runner reported one slow test and one process-leak warning
+(`project-attachment::repeated_observations_preserve_git_and_apply_exclusions_without_claiming_a_version`);
+the log is retained and this is not a clean lifecycle claim. PR #167 merged as
+`a370cdc77a6b80004ef83d477135ca94aee85743` after all seven checks, 3,559 native tests and four
+renderer cases. This branch incorporates it by normal merge, retaining both appended documentation
+sections. Final combined-source validation is running before delivery.

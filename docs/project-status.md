@@ -316,3 +316,11 @@ recovery, stale-query/reply and wrong-domain/key refusal, signed mismatched chec
 and changes to retained history during signing. Daemon lint passed after adding missing API docs.
 Full validation is pending. Discovery, content transfer/import and actual second-machine proof
 remain required.
+
+
+The resident worker service now connects original received owners to automatic native saved-result
+publication using its configured worker key. The composed regression passes for wrong-key refusal,
+retry spacing, durable publication and replay without signing again; daemon lint passes. Full
+workspace and hosted validation are pending. This publishes immutable offers locally, not content
+to the coordinator. Discovery, transfer/recovery, candidate import and actual remote/packaged
+acceptance remain unfinished.
