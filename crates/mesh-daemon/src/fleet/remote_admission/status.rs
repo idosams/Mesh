@@ -785,3 +785,6 @@ mod tests;
 
 #[path = "renewal.rs"]
 pub(in crate::fleet) mod renewal;
+
+#[path = "result.rs"]
+pub(in crate::fleet) mod result;

@@ -301,3 +301,10 @@ regression passed with later unsaved edits, mismatched selection and replaced-pa
 daemon lint passed. Full validation and PR delivery are pending. This is the first source
 increment for [#163](https://github.com/idosams/Mesh/issues/163), not signed result transfer or
 second-machine acceptance.
+
+
+The next remote-result increment adds native worker-signed saved-result offers, exact durable
+replay and read-only ledger recovery. Three focused regressions and daemon lint passed, including
+actual received-session export/signing and coordinator signature/context/manifest refusal. Full
+canonical validation is pending. No result transport, complete coordinator import or second-machine
+acceptance is claimed.

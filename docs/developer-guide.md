@@ -298,3 +298,30 @@ identity and digest. Replacing the workspace path refuses further reads.
 This read-only export does not recapture files, revive an execution credential or mutate the
 worker ledger. Signed result offers, transfer to the coordinator, restart recovery and candidate
 import are subsequent increments tracked in [#163](https://github.com/idosams/Mesh/issues/163).
+
+
+### Signed saved-result offers
+
+Native worker policy calls `ReceivedWorkerHost::sign_saved_result` with an exact saved selection
+and the configured worker-key signer. The received session verifies its original mapping and
+saved tree, verifies the returned signature, rechecks custody after signing, and durably records
+the offer before returning it alongside the immutable source. The signer callback must not
+reenter the same fleet service. Agent IPC does not expose this operation.
+
+`mesh.worker-saved-result/v1` uses the separate `mesh.v1.worker-saved-result` signing domain.
+It binds configured coordinator/worker, objective/lane/run/assignment, original input/bundle,
+provider/task digest, launch owner, workspace mapping and initial operation, installation,
+checkpoint, recorded review, saved result version and exact manifest digest. Messages are closed,
+canonical and bounded to 64 KiB. They contain private correlation and must not be logged.
+
+Each launch/checkpoint retains one signed offer in a separate `remote-result-` stream. Exact replay
+returns the original bytes without signing again; conflicting content or extra history refuses.
+`RemoteAdmissionRegistry::saved_result_offer` reads this evidence after reopening the ledger without
+reconstructing execution authority. `RemoteSavedResultOffer::verify` checks the signature against
+the coordinator's exact current assignment and supplied manifest without advancing any state.
+An immutable offer has no freshness or liveness claim; lease expiry does not erase saved results.
+
+This supplies signed offer construction, persistence and verification. An authenticated result
+query/transport route, resumable content transfer and coordinator candidate import are still
+required under [#163](https://github.com/idosams/Mesh/issues/163). An offer or manifest alone never
+proves complete transfer, releases a slot or approves protected main.
