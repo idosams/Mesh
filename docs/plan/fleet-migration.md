@@ -3244,3 +3244,25 @@ publication, interrupted index append, invalid cursor and corrupted records. The
 missing explicit unknown-admission handling; it was fixed and the failed log retained. Full local
 and hosted checks remain pending. Authenticated discovery, content reopening/transfer, exact
 coordinator import and real second-machine/packaged acceptance remain required.
+
+
+## R40 authenticated result discovery (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #169](https://github.com/idosams/Mesh/pull/169), `e7ae39f62481a6aeda396dccf6b014b0890727e1`.
+No preserved source commits are replaced. R39's full local gate passed: 3,560 native tests,
+17 skipped, desktop checks and 44 daemon-demo checks. Its hosted verification is running.
+R38 merged through [PR #168](https://github.com/idosams/Mesh/pull/168) as
+`5cdc12b4934d73fab282f8d0d5ba98edc5c0e6c4` after all seven checks passed.
+
+The native resident connection and bounded SSH wrapper now serve separately signed catalog
+queries/replies with fresh nonce/deadline, exact current assignment, bounded cursor and page
+relationships. Every returned offer is signature-checked and bound to the same assignment;
+duplicate checkpoint identities refuse. The worker rechecks retained catalog facts around signing.
+No automatic retry, provider launch, content transfer or protected-main authority is introduced.
+
+Three focused regressions passed, including the real resident route losing a reply and recovering
+the same catalog, stale challenge replay, wrong keys/domains, malformed cursor/count relationships,
+duplicate checkpoints, another run's signed offer and history mutation while signing. Full local
+and hosted checks remain pending. Legacy catalog limits, content reopening/transfer, exact
+coordinator review import and actual remote/packaged acceptance remain in scope.

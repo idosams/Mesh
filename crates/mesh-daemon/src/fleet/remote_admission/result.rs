@@ -239,3 +239,6 @@ pub(in crate::fleet) mod query;
 
 #[path = "result/catalog.rs"]
 pub(in crate::fleet) mod catalog;
+
+#[path = "result/discovery.rs"]
+pub(in crate::fleet) mod discovery;

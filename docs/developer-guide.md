@@ -385,3 +385,24 @@ Pre-catalog offers remain readable by checkpoint and enter discovery only after 
 republication; this page does not claim a complete inventory of legacy offers. Restart enumeration
 requires no provider or workspace recreation. This is a native API, not yet authenticated discovery
 over SSH. Content transfer/reopening, coordinator import and actual remote acceptance remain open.
+
+
+### Authenticated result discovery
+
+`RemoteResultDiscoveryChallenge` prepares a fresh read-only query bound to the coordinator's
+current assignment and a native catalog revision cursor. The resident connection route and
+`discover_remote_saved_results_over_ssh` return a worker-signed page without receiving input,
+launching work or transferring result content. Queries and replies have distinct
+`mesh.worker-result-discovery-query/v1` and `mesh.worker-result-discovery-reply/v1` schemas and
+signing domains. They are closed canonical control messages bounded to 64 KiB.
+
+The coordinator consumes the challenge, checks its nonce/context/deadline, the reply signature and
+query digest, and the page's cursor/count relationships. Every offer must have the exact assignment
+and a unique checkpoint within the page. The worker rechecks the catalog after signing; concurrent
+changes refuse the observation. Native SSH uses one bounded connection and no automatic retries.
+A lost reply needs a fresh query at the retained cursor. An empty page or unknown launch is not
+completion, permission to retry execution or evidence that all legacy offers have been indexed.
+
+This exposes the native catalog's existing scope and compatibility limits. Exact manifest/content
+verification, resumable output transfer, native candidate import and actual second-machine
+acceptance remain required. Task correlation and signed envelopes must stay out of general logs.
