@@ -486,3 +486,24 @@ permit. The worker still needs the fresh coordinator-admission proof before its 
 including exact matching limits. No native key, path, executable or endpoint is selected by the peer.
 The real-stream test composes this bootstrap with immutable input transfer; deployment and resident
 supervisor lifetime remain separate work.
+
+
+## Fresh input-reconnect bootstrap
+
+After the coordinator claimed an assignment, it must not issue another initial claim challenge.
+`RemoteInputReconnectChallenge` instead reads the exact native retained assignment, requires its
+remote owner and still-launching state, and issues a fresh nonce with the same bounded lifetime.
+It uses the existing coordinator-signed dispatch and worker reply encodings. The private wrapper
+cannot be converted into an initial claim API; verification consumes it without submitting a ledger
+command. Worker possession remains distinct from receiving or execution authority.
+
+Native cancellation, expiry, changed lane/lease or wrong peer refuses. Running or completed work
+requires result reconciliation, not this input path. Following successful proof, the original resident
+receiving session still creates a fresh coordinator-admission proof and validates its retained state.
+No expired bootstrap reuse, second ownership claim, lease renewal, reservation reconstruction or
+provider retry follows from reconnect. The resident endpoint must still compose these APIs and enforce
+transport identity, deadlines and bounded resource use. Actual second-machine acceptance is pending.
+
+The v1 dispatch encodes an initial claim and therefore accepts only lease sequence one. Renewed
+leases explicitly refuse this bootstrap and require separate reconciliation; this API never resets
+or downgrades a lease to reconnect. Renewed-lease transport remains part of the unfinished scope.

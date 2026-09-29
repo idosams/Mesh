@@ -78,7 +78,8 @@ pub use remote_materialization::{
 mod remote_peer;
 #[cfg(unix)]
 pub use remote_peer::{
-    RemoteDispatch, RemoteDispatchPolicy, RemotePeerChallenge, VerifiedRemoteDispatch,
+    RemoteDispatch, RemoteDispatchPolicy, RemoteInputReconnectChallenge, RemotePeerChallenge,
+    VerifiedRemoteDispatch,
 };
 #[cfg(unix)]
 pub mod service;

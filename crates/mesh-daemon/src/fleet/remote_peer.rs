@@ -27,6 +27,44 @@ pub struct RemotePeerChallenge {
     issued_ms: u64,
     expires_ms: u64,
 }
+/// Fresh identity proof for an already claimed input transfer. This type cannot claim ownership.
+/// It neither reconstructs a worker reservation nor authorizes another provider launch.
+pub struct RemoteInputReconnectChallenge(RemotePeerChallenge);
+impl RemoteInputReconnectChallenge {
+    /// Reprove the configured worker for the exact retained, still-launching assignment.
+    /// Running/completed work and renewed leases need separate reconciliation; v1 dispatch
+    /// represents the initial lease only. No lease is reset or downgraded to permit reconnect.
+    pub fn issue(
+        runtime: &mut Runtime,
+        lane: &str,
+        run: &str,
+        configured_peer: PublicKey,
+    ) -> Result<Self, Error> {
+        runtime.refresh()?;
+        let assignment = runtime
+            .state()
+            .lanes
+            .get(lane)
+            .and_then(|lane| lane.runs.last())
+            .filter(|current| current.id == run)
+            .and_then(|current| current.remote.clone())
+            .ok_or(Error::Refused("remote-reconnect-unclaimed"))?;
+        let mut nonce = [0; 32];
+        std::fs::File::open("/dev/urandom")
+            .and_then(|mut source| source.read_exact(&mut nonce))
+            .map_err(|_| Error::Refused("remote-peer-entropy-unavailable"))?;
+        RemotePeerChallenge::build_for(
+            runtime,
+            lane,
+            run,
+            assignment,
+            configured_peer,
+            (now_ms()?, nonce),
+            true,
+        )
+        .map(Self)
+    }
+}
 impl RemotePeerChallenge {
     /// Issue a fresh OS-random challenge for an allocated, dispatched, still-unclaimed attempt.
     /// Native code must verify/admit the immutable transfer bundle independently of this proof.
@@ -60,6 +98,26 @@ impl RemotePeerChallenge {
         issued_ms: u64,
         nonce: [u8; 32],
     ) -> Result<Self, Error> {
+        Self::build_for(
+            runtime,
+            lane,
+            run,
+            assignment,
+            configured_peer,
+            (issued_ms, nonce),
+            false,
+        )
+    }
+    fn build_for(
+        runtime: &mut Runtime,
+        lane: &str,
+        run: &str,
+        assignment: RemoteAssignment,
+        configured_peer: PublicKey,
+        freshness: (u64, [u8; 32]),
+        existing: bool,
+    ) -> Result<Self, Error> {
+        let (issued_ms, nonce) = freshness;
         runtime.refresh()?;
         assignment.validate()?;
         let key = RecordDigest::parse_hex(&assignment.worker_key)
@@ -85,10 +143,14 @@ impl RemotePeerChallenge {
             .runs
             .last()
             .ok_or(Error::Refused("remote-run-missing"))?;
-        if current.id != run
-            || current.state != RunState::Launching
-            || current.launch_owner.is_some()
-        {
+        let ownership_matches = if existing {
+            current.remote.as_ref() == Some(&assignment)
+                && current.launch_owner.as_deref()
+                    == Some(format!("remote:{}", assignment.id).as_str())
+        } else {
+            current.launch_owner.is_none() && current.remote.is_none()
+        };
+        if current.id != run || current.state != RunState::Launching || !ownership_matches {
             return refuse("launch-needs-reconciliation");
         }
         let expires_ms = issued_ms
@@ -146,6 +208,16 @@ impl RemotePeerChallenge {
         signature: &Signature,
         now: u64,
     ) -> Result<FleetEvent, Error> {
+        self.verify_context_at(runtime, signature, now)?;
+        // submit's revision check also closes a competing writer between refresh and commit.
+        runtime.submit(runtime.state().revision, request, self.command)
+    }
+    fn verify_context_at(
+        &self,
+        runtime: &mut Runtime,
+        signature: &Signature,
+        now: u64,
+    ) -> Result<(), Error> {
         if now < self.issued_ms || now >= self.expires_ms {
             return refuse("remote-peer-expired");
         }
@@ -158,8 +230,7 @@ impl RemotePeerChallenge {
         {
             return refuse("remote-peer-context-changed");
         }
-        // submit's revision check also closes a competing writer between refresh and commit.
-        runtime.submit(runtime.state().revision, request, self.command)
+        Ok(())
     }
 }
 fn now_ms() -> Result<u64, Error> {
@@ -479,5 +550,151 @@ mod tests {
         first
             .verify_and_claim(&mut f.runtime, "real-clock", &signed)
             .unwrap();
+    }
+    fn owned_fixture() -> Fixture {
+        let mut f = Fixture::new("reconnect");
+        let mut work = assignment();
+        work.lease_until_ms = now_ms().unwrap() + 60_000;
+        f.command(Command::ClaimRemoteLaunch {
+            lane: "lane".into(),
+            run: "run".into(),
+            assignment: work,
+        });
+        f
+    }
+    fn reconnect_reply(f: &mut Fixture, challenge: &RemoteInputReconnectChallenge) -> String {
+        let coordinator = SigningKey::from_bytes(&[42; 32]);
+        let key = PublicKey::from_bytes(coordinator.verifying_key().to_bytes());
+        let dispatch = challenge
+            .signed_dispatch(&mut f.runtime, &key, |payload| {
+                Ok(Signature::from_bytes(
+                    coordinator.sign(payload.as_bytes()).to_bytes(),
+                ))
+            })
+            .unwrap();
+        let verified = RemoteDispatch::decode(&dispatch.encode())
+            .unwrap()
+            .verify(&RemoteDispatchPolicy {
+                coordinator: key,
+                worker: peer(),
+                provider: "codex",
+                maximum: f.runtime.state().limits.clone().unwrap(),
+                max_lease_ms: 120_000,
+            })
+            .unwrap();
+        let crate::fleet::RemoteFrame::Control(bytes) = verified
+            .worker_reply(|payload| {
+                Ok(Signature::from_bytes(
+                    signer().sign(payload.as_bytes()).to_bytes(),
+                ))
+            })
+            .unwrap()
+        else {
+            panic!("control expected")
+        };
+        String::from_utf8(bytes).unwrap()
+    }
+    #[test]
+    fn reconnect_authenticates_retained_assignment_without_any_ledger_write_or_new_attempt() {
+        let mut f = owned_fixture();
+        let before = f.runtime.state().clone();
+        for _ in 0..2 {
+            let proof = RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer())
+                .unwrap();
+            let reply = reconnect_reply(&mut f, &proof);
+            proof.verify_dispatch_reply(&mut f.runtime, &reply).unwrap();
+            assert_eq!(f.runtime.state(), &before);
+        }
+        let mut reopened = Runtime::open(
+            FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+            "reconnect",
+        )
+        .unwrap();
+        reopened.refresh().unwrap();
+        assert_eq!(reopened.state(), &before);
+        let work = before.lanes["lane"].runs[0].remote.clone().unwrap();
+        assert!(RemotePeerChallenge::issue(&mut f.runtime, "lane", "run", work, peer()).is_err());
+    }
+    #[test]
+    fn reconnect_refuses_unclaimed_wrong_worker_nonce_cancel_and_changed_lease_without_writes() {
+        let mut unclaimed = Fixture::new("unclaimed");
+        assert!(RemoteInputReconnectChallenge::issue(
+            &mut unclaimed.runtime,
+            "lane",
+            "run",
+            peer()
+        )
+        .is_err());
+        let mut f = owned_fixture();
+        assert!(
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "other", peer()).is_err()
+        );
+        assert!(RemoteInputReconnectChallenge::issue(
+            &mut f.runtime,
+            "lane",
+            "run",
+            PublicKey::from_bytes([0; 32])
+        )
+        .is_err());
+        let first =
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).unwrap();
+        let other =
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).unwrap();
+        let reply = reconnect_reply(&mut f, &first);
+        let before = f.runtime.state().clone();
+        assert!(other.verify_dispatch_reply(&mut f.runtime, &reply).is_err());
+        assert_eq!(f.runtime.state(), &before);
+        let old = before.lanes["lane"].runs[0].remote.clone().unwrap();
+        f.command(Command::AdvanceRemoteLease {
+            lane: "lane".into(),
+            run: "run".into(),
+            assignment: old.id,
+            worker_key: old.worker_key,
+            expected_sequence: old.lease_sequence,
+            lease_until_ms: old.lease_until_ms + 1,
+        });
+        let changed = f.runtime.state().clone();
+        assert!(first.verify_dispatch_reply(&mut f.runtime, &reply).is_err());
+        assert_eq!(f.runtime.state(), &changed);
+        // v1 dispatch encodes the initial claim; renewed leases need separate reconciliation.
+        assert!(
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).is_err()
+        );
+        let mut f = owned_fixture();
+        let proof =
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).unwrap();
+        let reply = reconnect_reply(&mut f, &proof);
+        f.command(Command::Cancel);
+        let cancelled = f.runtime.state().clone();
+        assert!(proof.verify_dispatch_reply(&mut f.runtime, &reply).is_err());
+        assert_eq!(f.runtime.state(), &cancelled);
+        assert!(
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).is_err()
+        );
+    }
+    #[test]
+    fn reconnect_refuses_expiry_and_running_work() {
+        let mut f = owned_fixture();
+        let proof =
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).unwrap();
+        let signed = signature(&proof.0);
+        let before = f.runtime.state().clone();
+        assert!(proof
+            .0
+            .verify_context_at(&mut f.runtime, &signed, proof.0.expires_ms)
+            .is_err());
+        assert!(proof
+            .0
+            .verify_context_at(&mut f.runtime, &signed, proof.0.issued_ms - 1)
+            .is_err());
+        assert_eq!(f.runtime.state(), &before);
+        f.command(Command::Observe {
+            lane: "lane".into(),
+            run: "run".into(),
+            state: RunState::Running,
+        });
+        assert!(
+            RemoteInputReconnectChallenge::issue(&mut f.runtime, "lane", "run", peer()).is_err()
+        );
     }
 }

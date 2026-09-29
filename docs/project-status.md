@@ -193,8 +193,18 @@ This remains an embedding API requiring
 authenticated transport, not a deployed remote worker. See
 [R22](plan/fleet-migration.md#r22-coordinator-immutable-input-transfer).
 
-The next increment authenticates a coordinator-signed dispatch before worker proof signing. Native
+[PR #141](https://github.com/idosams/Mesh/pull/141) merged at
+`6ce587303a0e3a82a10b65482fdd826f2878aed7` with all seven exact-head checks passing.
+It authenticates a coordinator-signed dispatch before worker proof signing. Native
 keys, provider and budget/lease policy constrain the request. A real-stream test connects that
-handshake to saved-input transfer; all 20 focused proof/transfer cases passed. Full hosted validation
-is pending. No resident endpoint, key provisioning or signed remote result recovery is claimed. See
+handshake to saved-input transfer; all 20 focused proof/transfer cases passed. Combined-main
+validation is running. No resident endpoint, key provisioning or signed remote result recovery is claimed. See
 [R23](plan/fleet-migration.md#r23-authenticated-dispatch-before-worker-proof).
+
+
+The input-reconnect increment adds fresh worker identity proof for an already claimed transfer,
+without any ledger mutation or second launch claim. Native state supplies the retained assignment;
+cancellation, changed leases, wrong peers and running work refuse. Three native regressions were
+added; the local linker failed with disk-full `errno=28`, so native validation awaits hosted CI. This is an
+integration API; resident transport and real second-machine recovery remain unfinished. See
+[R24](plan/fleet-migration.md#r24-fresh-identity-proof-for-input-reconnect).

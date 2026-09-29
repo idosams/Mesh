@@ -87,6 +87,10 @@ impl RemotePeerChallenge {
         request: &str,
         encoded: &str,
     ) -> Result<FleetEvent, Error> {
+        let signature = self.reply_signature(encoded)?;
+        self.verify_and_claim(runtime, request, &signature)
+    }
+    fn reply_signature(&self, encoded: &str) -> Result<Signature, Error> {
         if encoded.len() > MAX_BYTES {
             return Err(invalid());
         }
@@ -96,7 +100,26 @@ impl RemotePeerChallenge {
         if reply(nonce, &signature).encode() != encoded {
             return Err(invalid());
         }
-        self.verify_and_claim(runtime, request, &signature)
+        Ok(signature)
+    }
+}
+impl RemoteInputReconnectChallenge {
+    /// Sign fresh authenticated work facts using the existing v1 dispatch encoding. The worker
+    /// still requires its fresh receiving proof and the original retained reservation.
+    pub fn signed_dispatch(
+        &self,
+        runtime: &mut Runtime,
+        coordinator: &PublicKey,
+        sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+    ) -> Result<RemoteDispatch, Error> {
+        self.0.signed_dispatch(runtime, coordinator, sign)
+    }
+    /// Consume the fresh proof and revalidate retained ownership, without submitting any command.
+    /// Success establishes worker identity only; source transfer and receiving admission recheck
+    /// their own current state. It is never a completion, lease renewal or launch grant.
+    pub fn verify_dispatch_reply(self, runtime: &mut Runtime, encoded: &str) -> Result<(), Error> {
+        let signature = self.0.reply_signature(encoded)?;
+        self.0.verify_context_at(runtime, &signature, now_ms()?)
     }
 }
 impl RemoteDispatch {

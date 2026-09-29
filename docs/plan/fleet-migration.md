@@ -2707,3 +2707,29 @@ objective-limit validation was extracted without changing its rules. Full hosted
 This supplies bootstrap messages and native verification APIs, not a deployed listener or key store.
 Resident worker lifecycle, transport admission, key provisioning, signed results/local import and
 reconnect/restart recovery still require integration and actual second-machine acceptance.
+
+
+## R24 fresh identity proof for input reconnect
+
+New canonical implementation on merged #141; no preserved source commits are replaced.
+`RemoteInputReconnectChallenge` derives the exact retained assignment from native state and creates
+fresh OS-random proof for a still-launching transfer. Its separate public type has no claim method.
+It reuses the v1 signed dispatch and worker-proof encoding: those messages prove authenticated work
+facts, while native coordinator state determines whether the proof claims initial ownership or only
+revalidates existing ownership. No persisted format or signing domain changes.
+
+Reconnect verification consumes its challenge and performs no ledger write, lease renewal, receiving
+reservation or provider launch. It requires exact worker key, assignment/owner, current lane and
+freshness. Unclaimed work, another run/peer, cross-nonce replies, cancellation, changed leases and
+running work refuse. The existing receiving proof and original retained reservation remain mandatory;
+a restart that lost that reservation can report retained facts but cannot recreate execution authority.
+This closes the initial-worker-proof gap for input reconnect, not result recovery or process adoption.
+
+Three reconnect regressions were added. Local compilation reached linking, which failed with
+`errno=28` (disk full); no local native test pass is claimed. Repository, docs, license and storage
+checks passed. Hosted full checks are pending. Resident service integration, transport
+and key provisioning, signed result import, real second-machine and packaged acceptance remain open.
+
+The v1 dispatch encodes an initial claim and therefore accepts only lease sequence one. Renewed
+leases explicitly refuse this bootstrap and require separate reconciliation; this API never resets
+or downgrades a lease to reconnect. Renewed-lease transport remains part of the unfinished scope.
