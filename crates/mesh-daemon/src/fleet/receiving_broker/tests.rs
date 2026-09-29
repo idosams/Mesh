@@ -71,7 +71,7 @@ fn authenticate(s: &Setup, runtime: &mut Runtime, stream: &mut UnixStream) {
     let admission = reply.get("admission").unwrap();
     assert_eq!(
         admission.get("assignment").and_then(Json::as_text),
-        Some("assignment")
+        Some(s.f.work.assignment.id.as_str())
     );
     assert_eq!(
         admission.get("input").and_then(Json::as_text),

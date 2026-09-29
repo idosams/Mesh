@@ -2733,3 +2733,31 @@ and key provisioning, signed result import, real second-machine and packaged acc
 The v1 dispatch encodes an initial claim and therefore accepts only lease sequence one. Renewed
 leases explicitly refuse this bootstrap and require separate reconciliation; this API never resets
 or downgrades a lease to reconnect. Renewed-lease transport remains part of the unfinished scope.
+
+
+## R25 resident ownership of received providers
+
+New canonical work on merged #142; no preserved source commits are replaced.
+`ReceivedWorkerSupervisor` retains a bounded collection of `ReceivedWorkerHost` owners independently
+of broker connections. Native configuration pins its worker key and capacity (1 through 64); launch
+configuration supplies admitted provider/endpoint, execution signers, reviewers and checkpoint policy.
+The original broker handoff is still required. No message, receipt or process ID can recreate it.
+
+Before any initialization or process effect, the supervisor reserves an in-memory slot for the exact
+coordinator/objective/assignment identity. A failed start retains an unavailable slot. Duplicates,
+other worker keys and exhausted capacity refuse. Completed processes also retain slots; no removal,
+retry or restart adoption is implemented. Durable worker admission and launch intent remain the
+cross-process authority, supplied through the same guarded worker ledger by native provisioning.
+
+Polling visits every retained owner and returns correlated per-owner results. One unavailable owner
+does not abort observation of another. Exact admission facts select native snapshot/cancellation;
+unknown or changed facts refuse. Cancellation and drop never establish descendant termination.
+The embedding resident loop must drive polling independently of blocking transport operations.
+
+Two added regressions compose actual broker handoffs (including a lost final reply), a failed signer
+and a real fixture provider, then test independent polling, completion, retained capacity, duplicate
+identity, wrong worker and capacity bounds. The broker fixture now compares its actual assignment
+identity instead of a hard-coded value. Complete native compilation passed with warnings denied;
+test execution and full hosted validation are pending. This is native resident ownership composition,
+not a deployed listener. Key/host provisioning, persistent service lifecycle, renewed-lease and signed
+result recovery, real second-machine and packaged acceptance remain unfinished.

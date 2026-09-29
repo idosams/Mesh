@@ -507,3 +507,20 @@ transport identity, deadlines and bounded resource use. Actual second-machine ac
 The v1 dispatch encodes an initial claim and therefore accepts only lease sequence one. Renewed
 leases explicitly refuse this bootstrap and require separate reconciliation; this API never resets
 or downgrades a lease to reconnect. Renewed-lease transport remains part of the unfinished scope.
+
+
+## Resident provider collection
+
+The native resident service can retain original received handoffs through `ReceivedWorkerSupervisor`.
+Its configured worker key and bounded resident capacity are independent of peer objective limits.
+Each native launch configuration fixes the provider, private scoped endpoint and execution-signing
+factory. The supervisor occupies a slot before attempting initialization or launch and retains it
+on failure or completion; duplicate coordinator/objective/assignment identities cannot retry.
+
+Connection threads must not own or drop this supervisor. The resident event loop must poll it even
+when transports disappear and avoid holding its mutable access during blocking network reads. Polls
+return one correlated result per slot, including unavailable starts, without suppressing other owners.
+Snapshot and cancellation require exact retained admission facts. This collection is not a network
+control endpoint or a restart adopter. Native provisioning must supply the same guarded worker ledger
+across objectives/connections; the collection does not replace durable admission or launch checks.
+Deployment, native execution-key provisioning and authenticated result recovery remain required.
