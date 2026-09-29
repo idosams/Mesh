@@ -694,3 +694,19 @@ the same bundle on repeated requests. The result handle revalidates its provenan
 registration. Creating a review does not approve protected main. The coordinator must still durably
 correlate this local review with the authenticated remote offer/evidence and expose it through native
 review discovery; dependency eligibility remains a separate import-time check.
+
+### Durable coordinator remote/local review correlation
+
+`mesh.remote-local-review/v1` records the authenticated offer/evidence/content identities, local
+mapping/allocation, exact saved operation/review and objective/lane/run. Native recording rechecks
+complete content and evidence before using the independently verified local result. A distinct
+ledger stream per original offer preserves the first exact correlation; conflicting allocation or
+additional history refuses. Local agent checkpoints and their session/generation fields are not
+fabricated for remote results.
+
+Historical lookup returns only an opaque retained correlation. Reading its content reopens native
+allocation/history, checks the original mapping digest and manifest, and requires the recorded
+review to name the exact local operation. It creates no daemon or execution owner, repairs nothing,
+and stays readable after objective cancellation. This historical capability does not renew leases,
+release execution slots or establish current dependency/import eligibility. Native review discovery
+and original-project import still need explicit integration with this retained record.

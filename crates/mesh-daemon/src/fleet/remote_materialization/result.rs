@@ -53,6 +53,23 @@ impl ReceivedResultWorkspace {
         self.verify()?;
         Ok(bundle)
     }
+    #[cfg(target_os = "macos")]
+    pub(in crate::fleet) fn evidence_receipt(&self) -> mesh_store::RecordDigest {
+        self.result.evidence
+    }
+    #[cfg(target_os = "macos")]
+    pub(in crate::fleet) fn allocation_id(&self) -> io::Result<String> {
+        self.verify()?;
+        let name = self
+            .result
+            .tree
+            .path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(OsStr::to_str)
+            .ok_or_else(invalid)?;
+        Ok(name.strip_prefix("result-").ok_or_else(invalid)?.to_owned())
+    }
     /// Recheck original copy, physical allocation custody, native history and retained receipts.
     /// This verifies immutable provenance only, not current dependency eligibility or approval.
     pub fn verify(&self) -> io::Result<()> {

@@ -541,6 +541,62 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         local.record_review(public(&setup.f.coordinator)).unwrap(),
         review
     );
+    let correlation = receiver
+        .record_local_review(
+            &mut runtime,
+            &setup.manifest,
+            &restored,
+            &local,
+            public(&setup.f.coordinator),
+        )
+        .unwrap();
+    assert_eq!(correlation.review(), review);
+    assert_eq!(
+        receiver
+            .record_local_review(
+                &mut runtime,
+                &setup.manifest,
+                &restored,
+                &local,
+                public(&setup.f.coordinator),
+            )
+            .unwrap(),
+        correlation
+    );
+    let offer_id = RecordDigest::from_bytes(*Blake3::digest_bytes(offer.as_bytes()).as_bytes());
+    let alternative = receiver
+        .materialize_result(
+            &mut runtime,
+            &setup.manifest,
+            &restored,
+            "33333333333333333333333333333333",
+        )
+        .unwrap()
+        .into_result_workspace(
+            crate::TrustedReviewers::default(),
+            crate::CheckpointRuntimeParameters::selected_defaults(),
+        )
+        .unwrap();
+    assert!(
+        receiver
+            .record_local_review(
+                &mut runtime,
+                &setup.manifest,
+                &restored,
+                &alternative,
+                public(&setup.f.coordinator),
+            )
+            .is_err(),
+        "another allocation cannot replace the committed correlation"
+    );
+    assert_eq!(
+        runtime
+            .retained_remote_local_review(offer_id)
+            .unwrap()
+            .unwrap(),
+        correlation
+    );
+    drop(alternative);
     let review_root = local.binding().root.clone();
     let review_installation = local.binding().installation.clone();
     fs::hard_link(&local_receipt, &retained_local).unwrap();
@@ -564,6 +620,29 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     fs::remove_file(&retained_local).unwrap();
     assert!(reopen(RecordDigest::from_bytes([77; 32])).is_err());
     let source = reopen(mapping).unwrap();
+    let historical = Runtime::open(
+        crate::fleet::FleetStore::open(setup.f.path.join("coordinator.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let durable = historical
+        .retained_remote_local_review(offer_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(durable, correlation);
+    assert_eq!(
+        durable
+            .reopen(
+                &setup.destination,
+                &setup.manifest,
+                &crate::TrustedReviewers::default()
+            )
+            .unwrap()
+            .read_chunk(setup.digest)
+            .unwrap(),
+        setup.bytes
+    );
+
     let open = crate::workspace::OpenWorkspace::reopen_history(
         std::path::Path::new(&review_root),
         &review_installation,
@@ -635,10 +714,38 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
     )
     .is_err());
     assert_eq!(runtime.state().revision, before);
+    runtime
+        .record("cancel-after-review", crate::fleet::Command::Cancel)
+        .unwrap();
+    assert_eq!(
+        runtime
+            .retained_remote_local_review(offer_id)
+            .unwrap()
+            .unwrap(),
+        correlation
+    );
+    assert_eq!(
+        correlation
+            .reopen(
+                &setup.destination,
+                &setup.manifest,
+                &crate::TrustedReviewers::default()
+            )
+            .unwrap()
+            .read_chunk(setup.digest)
+            .unwrap(),
+        setup.bytes
+    );
+    runtime
+        .store
+        .append_with_outcome(&format!("result-local-review-{offer_id}"), 1, "extra", "{}")
+        .unwrap();
+    assert!(runtime.retained_remote_local_review(offer_id).is_err());
+
     assert_eq!(
         fs::read_dir(setup.f.path.join("allocations"))
             .unwrap()
             .count(),
-        2
+        3
     );
 }

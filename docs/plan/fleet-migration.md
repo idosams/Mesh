@@ -3495,3 +3495,25 @@ refusal, durable record reopening after dropping the daemon, exact subject opera
 protected main. Full validation and PR delivery are pending. Durable coordinator correlation,
 review-panel discovery, original-project import, retention and real remote/provider/packaged
 acceptance remain required.
+
+## R52 durable remote/local review correlation (validation in progress)
+
+New canonical work for [#163](https://github.com/idosams/Mesh/issues/163), depending on published
+[PR #182](https://github.com/idosams/Mesh/pull/182), `40581ef98be68f2c865aaa4b733eb37a45e023f4`.
+No preserved commits are replaced. R51 full local validation passed 3,574 native tests, 17 skipped,
+desktop checks and 44 daemon checks. [PR #180](https://github.com/idosams/Mesh/pull/180) merged as
+`7207e15fe3c117162f8b167aec0ef09cc8e6dfd8` after all seven final checks passed.
+
+The coordinator ledger now retains a distinct closed remote/local review record binding the signed
+offer digest, authenticated evidence/content receipts, native mapping/allocation and exact local
+operation/review. It retains objective/lane/run attribution without inventing a local agent origin
+or checkpoint. Duplicate requests return the exact record; another mapping and corrupt extra
+history refuse. Historical reopening checks the exact native saved review and content independently
+of current run state; it cannot authorize execution or original-project import.
+
+The library and composed native regression pass correlation replay, actual SQLite reopen, exact
+historical bytes after cancellation and corrupt-tail refusal. A second-allocation conflict case
+is included in full validation. An initial edit-script indentation error was corrected before
+compilation; no existing work was lost. Full validation and PR delivery remain pending. Native
+review discovery/panels, original-project import, retention and actual remote/provider/packaged
+acceptance remain required.
