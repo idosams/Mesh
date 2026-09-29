@@ -212,3 +212,6 @@ pub use catalog::{RemoteLocalReviewEntry, RemoteLocalReviewPage};
 mod reader;
 
 mod location;
+
+mod project;
+pub use project::RemoteProjectCandidateRequest;

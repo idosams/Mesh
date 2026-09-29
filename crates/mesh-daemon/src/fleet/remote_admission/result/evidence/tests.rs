@@ -947,3 +947,6 @@ fn durable_evidence_survives_restart_retains_first_attestation_and_refuses_missi
         3
     );
 }
+
+#[path = "tests/project.rs"]
+mod project;

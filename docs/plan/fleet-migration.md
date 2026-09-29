@@ -3613,3 +3613,31 @@ Validation: nine focused native pin tests passed, including concurrent local/rem
 restart, stale revisions, malformed metadata and foreign storage. The full `npm test` gate passed:
 3,579 native tests, 17 skipped, 151.050 s, desktop checks and all 44 real daemon-demo checks.
 One slow test completed successfully; no leak warning occurred. Earlier reliability issues remain open.
+
+## R58: remote results become original-project candidates
+
+Depends on R57 / PR #188. New canonical implementation; no legacy commit is replaced. Native
+receiver methods stage authenticated remote results through the existing private project-candidate
+store and compile an existing candidate through the original-project operation compiler. Retained
+worker attestation, complete content, local review correlation, exact project registration/input,
+current assignment and main are rechecked. Cancellation or stopping refuses preparation while
+historical review remains readable. Delegated remote inputs require a separate complete transitive
+lineage integration and currently refuse; direct attached-project inputs are supported here.
+
+The original project and independent received history have different object identities. Only an
+exact manifest-equivalent copy may bridge their paths. Authenticated worker input origins preserve
+renamed objects; a new object at the old filename is never adopted as the original. Extra/missing
+entries, duplicate identities, changed bytes/modes or a different original operation refuse.
+`mesh.remote-project-candidate/v1` provenance binds evidence, correspondence, exact review selection,
+source project/version and observed main. Existing candidate/import formats are unchanged. The new
+record confers no approval authority and is bounded by existing candidate/content limits.
+
+The focused native test uses a real attached project and independently materialized native result
+history with a signed worker fixture. It verifies private staging replay, actual compiled rename and
+replacement operations, unchanged original files/history/main, stale-main refusal and cancellation.
+A second test verifies complete-copy identity and content refusals. These are not a real second-host
+or packaged graphical acceptance run. Signed import commit/recovery, remote candidate UI/actions,
+transitive remote lineage, composed transport/ingestion and the remaining full-plan acceptance are
+still required. Full `npm test` passed: 3,581 native tests, 17 skipped, 158.645 s,
+desktop checks and all 44 real daemon-demo checks. One slow comparison test completed; no process
+leak warning occurred. Earlier reliability issues remain open.

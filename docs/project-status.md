@@ -411,3 +411,13 @@ using exact remote correlation identities. Native reads and the controller/rende
 automated coverage. Remote panel selectors and view choices now persist with native revision and shared-capacity checks.
 Original-project import and full ingestion/packaged remote acceptance remain unfinished. This source
 coverage is not evidence of a signed packaged or second-machine graphical journey.
+
+### Remote results and original-project candidates
+
+Native receiver APIs can stage a retained authenticated remote result privately for its original
+attached project and compile operations against that exact saved input. Renames preserve original
+object identity; replacements receive new identity. Staging leaves original files, capture history
+and Mesh main unchanged. Missing/corrupt evidence, changed main, cancellation, wrong project and
+unverified delegated lineage refuse. The signed fixture/native-storage tests cover this direct-input
+path; signed commit/recovery, transitive remote lineage and graphical import actions are still open.
+See R58 in the [delivery ledger](plan/fleet-migration.md) for the verification boundary.

@@ -242,3 +242,57 @@ fn decoder_refuses_two_results_claiming_the_same_original_identity() {
     )
     .is_err());
 }
+
+#[test]
+fn original_mapping_requires_complete_exact_copies_and_keeps_replacement_distinct() {
+    let worker = snapshot();
+    let input = manifest(&worker, RecordDigest::from_bytes([8; 32]));
+    let mut original = worker.clone();
+    original.operation = input.input();
+    original.directories[0].object = ObjectId::from_bytes([20; 16]);
+    original.files[0].object = ObjectId::from_bytes([21; 16]);
+    let mut saved = worker.clone();
+    saved.operation = RecordDigest::from_bytes([9; 32]);
+    saved.files[0].path = "renamed".into();
+    let mut replacement = worker.files[0].clone();
+    replacement.object = ObjectId::from_bytes([4; 16]);
+    saved.files.push(replacement);
+    let result = manifest(&saved, saved.operation);
+    let proof = RemoteResultCorrespondence::derive(&input, &worker, &result, &saved).unwrap();
+    let mut local = saved.clone();
+    local.operation = RecordDigest::from_bytes([10; 32]);
+    local.directories[0].object = ObjectId::from_bytes([30; 16]);
+    local.files[0].object = ObjectId::from_bytes([31; 16]);
+    local.files[1].object = ObjectId::from_bytes([32; 16]);
+    let mapped = proof
+        .project_origins(&input, &original, &result, &local)
+        .unwrap();
+    assert_eq!(mapped.len(), 2);
+    assert_eq!(
+        mapped.get(&local.files[0].object.to_string()),
+        Some(&original.files[0].object.to_string())
+    );
+    assert!(!mapped.contains_key(&local.files[1].object.to_string()));
+    for mutation in 0..6 {
+        let mut wrong = local.clone();
+        match mutation {
+            0 => wrong.files[0].executable = !wrong.files[0].executable,
+            1 => wrong.files[0].byte_length += 1,
+            2 => wrong.files[0].content_digest = RecordDigest::from_bytes([99; 32]),
+            3 => wrong.files[0].object = wrong.directories[0].object,
+            4 => {
+                wrong.directories.clear();
+            }
+            _ => {
+                wrong.files.pop();
+            }
+        }
+        assert!(proof
+            .project_origins(&input, &original, &result, &wrong)
+            .is_err());
+    }
+    original.operation = RecordDigest::from_bytes([11; 32]);
+    assert!(proof
+        .project_origins(&input, &original, &result, &local)
+        .is_err());
+}
