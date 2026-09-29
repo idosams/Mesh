@@ -2992,3 +2992,37 @@ now matches that ABI, with an added runtime check that connected descriptors ret
 This also matters on [Apple ARM64's distinct variadic calling convention](https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms).
 No warning is suppressed. Failed CI logs are preserved. The focused seven-case SSH suite passed
 before this endpoint correction; full corrected native and hosted validation remain required.
+
+## R31 authenticated coordinator input delivery (in progress)
+
+New canonical work tracked in [#154](https://github.com/idosams/Mesh/issues/154), based on merged
+[PR #153](https://github.com/idosams/Mesh/pull/153), `ad1458ae0be5c97fe3e27931f530c35072852d61`.
+All seven corrected R30 PR checks passed, including full macOS `npm test` (3,531 Rust tests passed,
+17 skipped), all seven SSH cases, the descriptor regression and four renderer cases. Combined-main
+validation is running. No preserved
+source commits are replaced. The native `deliver_remote_input_over_ssh` API composes explicit
+SSH destination policy, current coordinator context, bidirectional Mesh proofs and immutable input
+transfer. Desktop/agent exposure, signed-result recovery and remote acceptance remain unfinished.
+
+The caller explicitly chooses a first claim or input reconnect. Before opening transport, native
+code compares the saved input/bundle, checks the applicable current attempt and signs only its
+canonical dispatch. The bounded worker reply is verified before a first durable coordinator claim
+or the receiving admission signature. Existing transfer logic then checks current state around
+every exchange and resumes confirmed immutable chunks. No automatic retry, lease reset, new
+assignment, provider-success observation or protected-main approval is introduced. Any return
+drops only the owned local SSH connection; errors may follow durable work and retain uncertainty.
+
+Tests compose the actual native resident broker with saved-history export, interrupt a chunk
+transfer, refuse a second initial claim and explicitly reconnect to materialize one assignment.
+Refusals cover changed saved-input identity, an unclaimed reconnect, and a canonical reply with an
+invalid worker signature before admission signing or coordinator ownership. Native compilation/lint
+and focused tests are in progress; full canonical checks and real second-machine proof remain required.
+
+The first focused composition run passed both refusal cases and completed one materialization,
+then failed its exact-byte inspection because the fixture omitted the native `input-` allocation
+prefix. The fixture path is corrected without weakening protocol or byte assertions. Its failed
+log is preserved; corrected focused and full validation remain required.
+
+The corrected three-case native composition suite passed in 0.78 seconds. Complete daemon lint
+with warnings denied and repository/docs/license/storage/format checks passed. Full hosted checks
+remain required; native loopback composition is not actual second-machine SSH acceptance.

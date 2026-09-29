@@ -261,8 +261,9 @@ validation are pending. This is not verified signed-app or second-machine deploy
 and [R29 ledger](plan/fleet-migration.md#r29-resident-authenticated-worker-endpoint-in-progress).
 
 The next remote increment adds a native-configured SSH subsystem transport with bounded pipe I/O,
-independent diagnostic draining and owned-client cleanup. It has no desktop/agent exposure and is
-not yet integrated with coordinator dispatch. Existing host/key files and a separately provisioned
+independent diagnostic draining and owned-client cleanup. Native coordinator composition now connects it to
+signed dispatch and saved-input delivery, with explicit first-claim or reconnect intent. It has no
+desktop/agent exposure. Existing host/key files and a separately provisioned
 worker subsystem are prerequisites; no trust or SSH settings are changed automatically. Focused
 and full validation are in progress. Actual second-machine authentication, renewed leases, signed
 result recovery and packaged acceptance remain open; this is not a remote-execution readiness claim.

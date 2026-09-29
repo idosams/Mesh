@@ -314,4 +314,4 @@ fn refused() -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, "remote-input-transfer-refused")
 }
 #[cfg(test)]
-mod tests;
+pub(in crate::fleet) mod tests;
