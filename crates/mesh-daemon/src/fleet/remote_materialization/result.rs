@@ -31,6 +31,28 @@ impl ReceivedResultWorkspace {
     pub fn receipt(&self) -> &Json {
         &self.receipt
     }
+    /// Record an immutable native inspection review for this exact initial result. Repeating
+    /// returns the original review; this does not acquire agent custody or approve publication.
+    pub fn record_review(
+        &self,
+        actor: mesh_types::PublicKey,
+    ) -> io::Result<mesh_store::RecordDigest> {
+        self.verify()?;
+        let target = self.binding.starting_version.ok_or_else(invalid)?;
+        let bundle = self
+            .daemon
+            .submit_received_result_review(
+                token(&self.result.tree.allocation)?,
+                &self.binding.root,
+                &self.binding.installation,
+                target,
+                self.result.manifest(),
+                actor,
+            )
+            .map_err(|_| invalid())?;
+        self.verify()?;
+        Ok(bundle)
+    }
     /// Recheck original copy, physical allocation custody, native history and retained receipts.
     /// This verifies immutable provenance only, not current dependency eligibility or approval.
     pub fn verify(&self) -> io::Result<()> {
