@@ -251,3 +251,6 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         Ok((receiver, receipt))
     }
 }
+
+mod local_review;
+pub use local_review::RemoteLocalReviewReceipt;

@@ -29,6 +29,24 @@ impl RemoteInputDestination {
         manifest: &RemoteInputManifest,
         reviewers: &TrustedReviewers,
     ) -> io::Result<RemoteInputSource> {
+        self.reopen_result_history_checked(
+            allocation_id,
+            mapping,
+            evidence.digest(),
+            manifest,
+            reviewers,
+            None,
+        )
+    }
+    pub(in crate::fleet) fn reopen_result_history_checked(
+        &self,
+        allocation_id: &str,
+        mapping: RecordDigest,
+        evidence: RecordDigest,
+        manifest: &RemoteInputManifest,
+        reviewers: &TrustedReviewers,
+        review: Option<(RecordDigest, RecordDigest)>,
+    ) -> io::Result<RemoteInputSource> {
         self.verify()?;
         if allocation_id.len() != 32
             || !allocation_id
@@ -60,7 +78,7 @@ impl RemoteInputDestination {
                 path: self.parent_path.join(&name).join("files"),
                 protected: self.protected.clone(),
             },
-            evidence: evidence.digest(),
+            evidence,
         };
         result.verify()?;
         let context = context(&result)?;
@@ -106,6 +124,15 @@ impl RemoteInputDestination {
             .map_err(|_| invalid())?;
         if !manifest.matches_saved_content(&saved) {
             return Err(invalid());
+        }
+        if let Some((version, bundle)) = review {
+            if version != initial
+                || !open
+                    .review(&bundle)
+                    .is_some_and(|r| r.subject_operation == version && r.bundle == bundle)
+            {
+                return Err(invalid());
+            }
         }
         let source = open.remote_input_source(initial)?.protecting_allocation(
             vec![self.parent.clone(), result.tree.allocation.clone()],

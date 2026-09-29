@@ -111,4 +111,4 @@ mod receipt;
 pub use receipt::RemoteResultContentReceipt;
 
 mod evidence_receipt;
-pub use evidence_receipt::RemoteResultEvidenceReceipt;
+pub use evidence_receipt::{RemoteLocalReviewReceipt, RemoteResultEvidenceReceipt};
