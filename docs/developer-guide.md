@@ -263,3 +263,24 @@ and report only historical initial leases. A versioned current-lease read is a s
 Focused coverage includes dropped resident replies, reopen, forged acknowledgments, failed signing
 after commit, concurrent conflicting writers, and corrupt history beyond a page boundary. It does
 not establish real second-machine SSH execution or packaged provider/signing acceptance.
+
+
+### Read-only effective lease inspection
+
+Use `RemoteWorkerStatusChallenge::issue_with_current_lease` or
+`inspect_remote_worker_current_lease_over_ssh` for the additive
+`mesh.worker-status-query/v2` / `mesh.worker-status-reply/v2` protocol. The v2 signing domains are
+separate from both v1 status and renewal mutations. The original query constructor and SSH function
+retain their v1 behavior and closed response format.
+
+`RemoteWorkerStatusReceipt::reports_effective_lease` distinguishes v2 coverage from historical-only
+v1 facts. `effective_lease` returns the current retained sequence, deadline and native renewal
+acceptance time, or no lease for an unrecorded admission. For the initial sequence, acceptance time
+is zero because the admission format did not record renewal time. V2 preserves the historical
+initial deadline separately. A null admission is unknown, never proof that retry is safe.
+
+The worker reads the same guarded lease history used for launch decisions and rechecks all facts
+around signing. The coordinator verifies the exact version/domain, nonce, context, native observation
+time and closed facts. Expired work remains readable without changing lease, owner, slot or attempt.
+A fresh read is an observation; it grants no execution rights and does not replace signed result
+verification or actual remote disconnect/reconnect acceptance.

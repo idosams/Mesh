@@ -3108,3 +3108,24 @@ Read-only status v1 still reports historical initial leases. The next coherent i
 versioned effective-lease read; #160 remains open until that recovery surface is delivered. Signed
 saved results, actual remote execution/disconnect/reconnect, second-provider and packaged acceptance
 remain part of the full fleet objective.
+
+
+## R34 versioned effective-lease inspection (validation in progress)
+
+Follow-up for [#160](https://github.com/idosams/Mesh/issues/160), stacked on published
+[PR #161](https://github.com/idosams/Mesh/pull/161),
+`870bd5120ab4766c84744f1ef549b41220e13a51`. No preserved source commits are replaced. R33's full
+local gate passed: 3,550 native tests, desktop checks and all 44 daemon-demo checks; 17 native tests
+were skipped. Its hosted checks and merge remain pending.
+
+Read-only status v2 adds effective worker lease facts with version-specific signing domains and
+preserves v1 wire compatibility. The caller explicitly selects the v2 challenge or native SSH
+inspection API. Original admission/launch facts stay distinguishable from effective sequence,
+deadline and renewal acceptance time. Unknown admission and expired work confer no retry, launch,
+renewal, liveness or protected-main authority. Signing rechecks guarded facts; replies reject
+version/domain downgrades and impossible lease/time relationships.
+
+All eight status tests passed, including v1/v2 real resident routing, expired-lease reads, renewed
+lease recovery after reopen, null admission, downgrade refusal and mutation during signing. Full
+final-source checks and canonical PR delivery remain required. Actual remote execution/results,
+provider and packaged acceptance remain part of the full fleet objective.

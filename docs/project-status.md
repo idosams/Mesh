@@ -285,3 +285,11 @@ nor renewal frees a slot or proves process liveness. The native resident route a
 implemented; focused tests pass, full canonical validation is pending. Read-only status v1 still
 reports explicitly historical initial-lease fields. A versioned effective-lease status query, real
 second-machine execution/recovery, signed results, and packaged acceptance remain required.
+
+
+The effective-lease status follow-up adds an explicit read-only v2 query/reply with separate signing
+domains. Existing v1 callers still receive the same historical initial-lease facts. V2 reports the
+current guarded worker lease alongside those original facts, including after expiry and durable
+reopen. Missing admission remains unknown, and a valid lease never proves process liveness or
+permits a retry. Native resident routing and a bounded SSH inspection entry point support both
+versions. Eight focused status tests pass; full validation and merged delivery remain pending.

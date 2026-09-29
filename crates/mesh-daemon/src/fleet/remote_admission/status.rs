@@ -12,6 +12,37 @@ const QUERY: &str = "mesh.worker-status-query/v1";
 const REPLY: &str = "mesh.worker-status-reply/v1";
 const QUERY_DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v1.fleet-worker-status-query");
 const REPLY_DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v1.fleet-worker-status-reply");
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StatusVersion {
+    Initial,
+    Effective,
+}
+impl StatusVersion {
+    fn query(self) -> &'static str {
+        match self {
+            Self::Initial => QUERY,
+            Self::Effective => "mesh.worker-status-query/v2",
+        }
+    }
+    fn reply(self) -> &'static str {
+        match self {
+            Self::Initial => REPLY,
+            Self::Effective => "mesh.worker-status-reply/v2",
+        }
+    }
+    fn query_domain(self) -> DomainSeparator {
+        match self {
+            Self::Initial => QUERY_DOMAIN,
+            Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-query"),
+        }
+    }
+    fn reply_domain(self) -> DomainSeparator {
+        match self {
+            Self::Initial => REPLY_DOMAIN,
+            Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-reply"),
+        }
+    }
+}
 const MAX: usize = 65_536;
 fn invalid() -> Error {
     Error::Refused("remote-status-unavailable")
@@ -157,6 +188,7 @@ fn payload(domain: DomainSeparator, body: &Json) -> SigningPayload {
 
 /// Single-use current-attempt query. Issuing/verifying this challenge never changes a ledger.
 pub struct RemoteWorkerStatusChallenge {
+    version: StatusVersion,
     body: Json,
     lane: Lane,
     objective: String,
@@ -179,6 +211,19 @@ impl RemoteWorkerStatusChallenge {
             .and_then(|mut f| f.read_exact(&mut nonce))
             .map_err(|_| invalid())?;
         Self::issue_at(runtime, lane, run, coordinator, worker, now()?, nonce)
+    }
+    /// Request versioned current lease facts without changing or renewing any lease.
+    /// Expired/cancelled work remains readable; this never grants another launch or retry.
+    pub fn issue_with_current_lease(
+        runtime: &mut Runtime,
+        lane: &str,
+        run: &str,
+        coordinator: PublicKey,
+        worker: PublicKey,
+    ) -> Result<Self, Error> {
+        let mut challenge = Self::issue(runtime, lane, run, coordinator, worker)?;
+        challenge.version = StatusVersion::Effective;
+        Ok(challenge)
     }
     fn issue_at(
         runtime: &mut Runtime,
@@ -229,6 +274,7 @@ impl RemoteWorkerStatusChallenge {
         ]);
         query_body(&body)?;
         Ok(Self {
+            version: StatusVersion::Initial,
             body,
             lane,
             objective: runtime.objective().into(),
@@ -255,11 +301,12 @@ impl RemoteWorkerStatusChallenge {
         sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
     ) -> Result<RemoteWorkerStatusQuery, Error> {
         self.context(runtime, now()?)?;
-        let p = payload(QUERY_DOMAIN, &self.body);
+        let p = payload(self.version.query_domain(), &self.body);
         let signature = sign(&p).map_err(|_| invalid())?;
         Ed25519::verify(&self.coordinator, p.as_bytes(), &signature).map_err(|_| invalid())?;
         self.context(runtime, now()?)?;
         Ok(RemoteWorkerStatusQuery {
+            version: self.version,
             body: self.body.clone(),
             signature,
         })
@@ -282,7 +329,7 @@ impl RemoteWorkerStatusChallenge {
         time: u64,
     ) -> Result<RemoteWorkerStatusReceipt, Error> {
         self.context(runtime, time)?;
-        let v = parse_envelope(encoded, REPLY)?;
+        let v = parse_envelope(encoded, self.version.reply())?;
         let b = v.get("body").ok_or_else(invalid)?;
         closed(b, &["query", "observed_ms", "facts"])?;
         if text(b, "query")? != Blake3::digest_bytes(self.body.encode().as_bytes()).to_string()
@@ -291,19 +338,27 @@ impl RemoteWorkerStatusChallenge {
         {
             return Err(invalid());
         }
-        let facts = canonical_facts(b.get("facts").ok_or_else(invalid)?)?;
+        let facts = canonical_facts(b.get("facts").ok_or_else(invalid)?, self.version)?;
+        if let Some(lease) = facts
+            .get("effective_lease")
+            .filter(|v| !matches!(v, Json::Null))
+        {
+            if number(lease, "accepted_ms")? > number(b, "observed_ms")? {
+                return Err(invalid());
+            }
+        }
         let body = Json::object([
             ("query", Json::text(text(b, "query")?)),
             ("observed_ms", Json::Number(number(b, "observed_ms")?)),
             ("facts", facts.clone()),
         ]);
         let signature = Signature::from_bytes(bytes::<64>(text(&v, "signature")?)?);
-        if envelope(REPLY, body.clone(), &signature) != encoded {
+        if envelope(self.version.reply(), body.clone(), &signature) != encoded {
             return Err(invalid());
         }
         Ed25519::verify(
             &self.worker,
-            payload(REPLY_DOMAIN, &body).as_bytes(),
+            payload(self.version.reply_domain(), &body).as_bytes(),
             &signature,
         )
         .map_err(|_| invalid())?;
@@ -330,6 +385,20 @@ impl RemoteWorkerStatusReceipt {
     pub fn facts(&self) -> &Json {
         &self.facts
     }
+    /// Whether this version reports effective leases. A v2 null value means no admission was
+    /// recorded; neither null nor a historical v1 response authorizes retry or launch.
+    pub fn reports_effective_lease(&self) -> bool {
+        self.facts.get("effective_lease").is_some()
+    }
+    /// Current retained lease at observation time, never process liveness or launch permission.
+    pub fn effective_lease(&self) -> Option<crate::fleet::RemoteWorkerLease> {
+        let value = self.facts.get("effective_lease")?;
+        Some(crate::fleet::RemoteWorkerLease {
+            sequence: value.get("sequence")?.as_u64()?,
+            until_ms: value.get("until_ms")?.as_u64()?,
+            accepted_ms: value.get("accepted_ms")?.as_u64()?,
+        })
+    }
     /// Worker observation time, bounded by the consumed query; queued data does not stay fresh.
     pub fn observed_ms(&self) -> u64 {
         self.observed_ms
@@ -337,6 +406,7 @@ impl RemoteWorkerStatusReceipt {
 }
 /// Closed coordinator-signed status query. Decoding alone does not authenticate it.
 pub struct RemoteWorkerStatusQuery {
+    version: StatusVersion,
     body: Json,
     signature: Signature,
 }
@@ -354,7 +424,7 @@ fn parse_envelope(encoded: &str, schema: &str) -> Result<Json, Error> {
 impl RemoteWorkerStatusQuery {
     /// Canonical bounded private control bytes; never log them.
     pub fn encode(&self) -> String {
-        envelope(QUERY, self.body.clone(), &self.signature)
+        envelope(self.version.query(), self.body.clone(), &self.signature)
     }
     /// One bounded control frame for the configured authenticated transport.
     pub fn frame(&self) -> Result<RemoteFrame, Error> {
@@ -366,8 +436,18 @@ impl RemoteWorkerStatusQuery {
     }
     /// Reject unknown fields, noncanonical encodings and unsupported versions before verification.
     pub fn decode(encoded: &str) -> Result<Self, Error> {
-        let v = parse_envelope(encoded, QUERY)?;
+        if encoded.len() > MAX {
+            return Err(invalid());
+        }
+        let schema = Json::parse(encoded).map_err(|_| invalid())?;
+        let version = match text(&schema, "schema")? {
+            QUERY => StatusVersion::Initial,
+            "mesh.worker-status-query/v2" => StatusVersion::Effective,
+            _ => return Err(invalid()),
+        };
+        let v = parse_envelope(encoded, version.query())?;
         let q = Self {
+            version,
             body: query_body(v.get("body").ok_or_else(invalid)?)?,
             signature: Signature::from_bytes(bytes::<64>(text(&v, "signature")?)?),
         };
@@ -404,7 +484,7 @@ impl RemoteWorkerStatusQuery {
         }
         Ed25519::verify(
             &policy.coordinator,
-            payload(QUERY_DOMAIN, &self.body).as_bytes(),
+            payload(self.version.query_domain(), &self.body).as_bytes(),
             &self.signature,
         )
         .map_err(|_| invalid())?;
@@ -448,10 +528,11 @@ impl VerifiedRemoteWorkerStatusQuery {
             .into_iter()
             .find(|r| r.work.assignment.id == text(t, "assignment").unwrap());
         let Some(a) = receipt else {
-            return Ok(Json::object([
-                ("admission", Json::Null),
-                ("launch", Json::Null),
-            ]));
+            let mut facts = vec![("admission", Json::Null), ("launch", Json::Null)];
+            if self.query.version == StatusVersion::Effective {
+                facts.push(("effective_lease", Json::Null));
+            }
+            return canonical_facts(&Json::object(facts), self.query.version);
         };
         if identity(&registry.coordinator, &registry.objective, &a.work).encode() != t.encode() {
             return Err(invalid());
@@ -483,10 +564,19 @@ impl VerifiedRemoteWorkerStatusQuery {
                 ("installation", Json::text(l.installation())),
             ]),
         };
-        canonical_facts(&Json::object([
-            ("admission", admission),
-            ("launch", launch),
-        ]))
+        let mut facts = vec![("admission", admission), ("launch", launch)];
+        if self.query.version == StatusVersion::Effective {
+            let current = registry.effective_lease(&a)?;
+            facts.push((
+                "effective_lease",
+                Json::object([
+                    ("sequence", Json::Number(current.sequence)),
+                    ("until_ms", Json::Number(current.until_ms)),
+                    ("accepted_ms", Json::Number(current.accepted_ms)),
+                ]),
+            ));
+        }
+        canonical_facts(&Json::object(facts), self.query.version)
     }
     /// Sign only current guarded ledger facts; recheck them after signing. No materialization,
     /// process adoption, retry permission, lease mutation or concurrency release occurs.
@@ -515,20 +605,57 @@ impl VerifiedRemoteWorkerStatusQuery {
             ("observed_ms", Json::Number(time)),
             ("facts", facts.clone()),
         ]);
-        let p = payload(REPLY_DOMAIN, &body);
+        let p = payload(self.query.version.reply_domain(), &body);
         let signature = sign(&p).map_err(|_| invalid())?;
         Ed25519::verify(&self.worker, p.as_bytes(), &signature).map_err(|_| invalid())?;
         if facts.encode() != self.facts(registry)?.encode() {
             return Err(invalid());
         }
-        let encoded = envelope(REPLY, body, &signature);
+        let encoded = envelope(self.query.version.reply(), body, &signature);
         if encoded.len() > MAX {
             return Err(invalid());
         }
         Ok(RemoteFrame::Control(encoded.into_bytes()))
     }
 }
-fn canonical_facts(v: &Json) -> Result<Json, Error> {
+fn canonical_facts(v: &Json, version: StatusVersion) -> Result<Json, Error> {
+    if version == StatusVersion::Initial {
+        return canonical_base_facts(v);
+    }
+    closed(v, &["admission", "launch", "effective_lease"])?;
+    let base = canonical_base_facts(&Json::object([
+        ("admission", v.get("admission").ok_or_else(invalid)?.clone()),
+        ("launch", v.get("launch").ok_or_else(invalid)?.clone()),
+    ]))?;
+    let admission = base.get("admission").ok_or_else(invalid)?;
+    let value = v.get("effective_lease").ok_or_else(invalid)?;
+    let lease = if matches!(admission, Json::Null) {
+        if !matches!(value, Json::Null) {
+            return Err(invalid());
+        }
+        Json::Null
+    } else {
+        let lease = closed(value, &["sequence", "until_ms", "accepted_ms"])?;
+        let sequence = number(&lease, "sequence")?;
+        let until = number(&lease, "until_ms")?;
+        let accepted = number(&lease, "accepted_ms")?;
+        let initial = number(admission, "initial_lease_until_ms")?;
+        if !(1..=4097).contains(&sequence)
+            || until < initial
+            || (sequence == 1 && (until != initial || accepted != 0))
+            || (sequence > 1 && (until <= initial || accepted == 0 || accepted >= until))
+        {
+            return Err(invalid());
+        }
+        lease
+    };
+    Ok(Json::object([
+        ("admission", admission.clone()),
+        ("launch", base.get("launch").ok_or_else(invalid)?.clone()),
+        ("effective_lease", lease),
+    ]))
+}
+fn canonical_base_facts(v: &Json) -> Result<Json, Error> {
     closed(v, &["admission", "launch"])?;
     let a = v.get("admission").ok_or_else(invalid)?;
     let admission = if matches!(a, Json::Null) {
@@ -600,8 +727,26 @@ pub fn inspect_remote_worker_over_ssh(
     budget: Duration,
     sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
 ) -> io::Result<RemoteWorkerStatusReceipt> {
+    inspect_version(destination, request, budget, sign, StatusVersion::Initial)
+}
+/// Read current retained lease facts over a fresh v2 query, without renewing or adopting work.
+pub fn inspect_remote_worker_current_lease_over_ssh(
+    destination: &NativeSshDestination,
+    request: RemoteWorkerStatusRequest<'_>,
+    budget: Duration,
+    sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+) -> io::Result<RemoteWorkerStatusReceipt> {
+    inspect_version(destination, request, budget, sign, StatusVersion::Effective)
+}
+fn inspect_version(
+    destination: &NativeSshDestination,
+    request: RemoteWorkerStatusRequest<'_>,
+    budget: Duration,
+    sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+    version: StatusVersion,
+) -> io::Result<RemoteWorkerStatusReceipt> {
     let err = |_| io::Error::other("remote worker status unavailable");
-    let challenge = RemoteWorkerStatusChallenge::issue(
+    let mut challenge = RemoteWorkerStatusChallenge::issue(
         request.runtime,
         request.lane,
         request.run,
@@ -609,6 +754,7 @@ pub fn inspect_remote_worker_over_ssh(
         request.worker,
     )
     .map_err(err)?;
+    challenge.version = version;
     let query = challenge.signed_query(request.runtime, sign).map_err(err)?;
     let mut connection = destination.connect(budget)?;
     let (input, output) = connection.streams()?;

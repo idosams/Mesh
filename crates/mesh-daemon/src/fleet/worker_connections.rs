@@ -84,9 +84,10 @@ impl<'a> NativeWorkerConnections<'a> {
         };
         let encoded = std::str::from_utf8(&bytes).map_err(|_| refused())?;
         let envelope = crate::ipc::Json::parse(encoded).map_err(|_| refused())?;
-        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
-            == Some("mesh.worker-status-query/v1")
-        {
+        if matches!(
+            envelope.get("schema").and_then(crate::ipc::Json::as_text),
+            Some("mesh.worker-status-query/v1" | "mesh.worker-status-query/v2")
+        ) {
             let query = super::RemoteWorkerStatusQuery::decode(encoded)
                 .and_then(|q| q.verify(&self.policy))
                 .map_err(|_| refused())?;
