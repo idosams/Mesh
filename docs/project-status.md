@@ -221,3 +221,13 @@ worker key and capacity and refuses duplicate assignments. Two new integration r
 hosted validation are pending after successful native compilation. This does not yet deploy a
 resident endpoint or provide remote result recovery. See
 [R25](plan/fleet-migration.md#r25-resident-ownership-of-received-providers).
+
+
+The resident ownership increment [#143](https://github.com/idosams/Mesh/pull/143) is now merged
+with all seven PR checks passing. Its separate local run outside the sandbox failed five provider
+startup deadlines; [#133](https://github.com/idosams/Mesh/issues/133) remains open.
+The next native loop drives retained owners independently of broker requests, with bounded control
+and nonblocking observations. Connection loss does not stop it; an explicit native stop preserves
+ownership. New lifecycle regressions and full validation are pending. This remains native embedding
+support; an installed worker entry point, persistent signing identity and remote result recovery
+are unfinished. See [R26](plan/fleet-migration.md#r26-resident-observation-loop).

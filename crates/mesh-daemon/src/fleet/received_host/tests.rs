@@ -514,3 +514,144 @@ fn resident_never_retries_retained_identity_or_accepts_another_worker() {
     assert!(ReceivedWorkerSupervisor::new(0, resident_key(&setup)).is_err());
     assert!(ReceivedWorkerSupervisor::new(65, resident_key(&setup)).is_err());
 }
+
+struct StopResident(Arc<std::sync::atomic::AtomicBool>);
+impl Drop for StopResident {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
+#[test]
+fn resident_loop_observes_completion_after_control_disconnect_and_reply_backpressure() {
+    use crate::fleet::{
+        receiving_broker::tests::received_handoff, receiving_session::tests::Setup,
+    };
+    use std::sync::{atomic::AtomicBool, mpsc};
+    let setup = Setup::new();
+    let fixture = Fixture::new();
+    let mut resident = ReceivedWorkerSupervisor::new(1, resident_key(&setup)).unwrap();
+    let (control, mailbox) = ReceivedWorkerMailbox::bounded();
+    let (observations, observed) = mpsc::sync_channel(1);
+    let stop = Arc::new(AtomicBool::new(false));
+    std::thread::scope(|scope| {
+        let stop_loop = stop.clone();
+        let owner = scope.spawn(move || {
+            resident.serve(&mailbox, &stop_loop, &observations);
+            (resident, mailbox)
+        });
+        // Also stop on a failed assertion, before the scoped thread join.
+        let stop_guard = StopResident(stop.clone());
+        let (reply, received) = mpsc::sync_channel(1);
+        control
+            .try_send(ReceivedWorkerRequest::Start {
+                handoff: received_handoff(&setup, true),
+                launch: Box::new(resident_launch(&fixture, Arc::new(Signers))),
+                reply,
+            })
+            .unwrap_or_else(|_| panic!("empty native mailbox"));
+        let admission = received
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap()
+            .unwrap();
+        // Deliberately fill one reply channel. The next native request must still complete even
+        // while both that reply and the observation queue cannot accept another sample.
+        let (full, _undrained) = mpsc::sync_channel(1);
+        full.send(Err(unavailable("fixture-full-reply"))).unwrap();
+        control
+            .try_send(ReceivedWorkerRequest::Snapshot {
+                admission: admission.clone(),
+                reply: full,
+            })
+            .unwrap_or_else(|_| panic!("native mailbox available"));
+        let (reply, received) = mpsc::sync_channel(1);
+        control
+            .try_send(ReceivedWorkerRequest::Snapshot {
+                admission: admission.clone(),
+                reply,
+            })
+            .unwrap_or_else(|_| panic!("native mailbox available"));
+        let snapshot = received
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap()
+            .unwrap();
+        let root = std::path::PathBuf::from(
+            snapshot.get("lanes").unwrap().as_array().unwrap()[0]
+                .get("workspace")
+                .unwrap()
+                .get("root")
+                .unwrap()
+                .as_text()
+                .unwrap(),
+        );
+        wait_started(&root);
+        drop(control);
+        fs::write(root.join("finish"), b"finish").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .expect("autonomous completion");
+            let sample = observed.recv_timeout(remaining).unwrap();
+            if sample.iter().any(|entry| {
+                entry.admission == admission
+                    && entry.observation.as_ref().is_ok_and(|workers| {
+                        workers.iter().any(|worker| worker.outcome == Some(true))
+                    })
+            }) {
+                break;
+            }
+        }
+        // Explicit native stop returns the original ownership; connection loss did not stop it.
+        drop(stop_guard);
+        let (resident, _mailbox) = owner.join().unwrap();
+        assert_eq!(resident.admissions().len(), 1);
+        assert!(resident.snapshot(&admission).is_ok());
+        assert_eq!(
+            fs::read_to_string(root.join("launches.txt")).unwrap(),
+            "one\n"
+        );
+    });
+}
+
+#[test]
+fn resident_mailbox_returns_original_handoff_when_full_or_disconnected() {
+    use crate::fleet::{
+        receiving_broker::tests::received_handoff, receiving_session::tests::Setup,
+    };
+    use std::sync::mpsc::{self, TrySendError};
+    let setup = Setup::new();
+    let handoff = received_handoff(&setup, false);
+    let root = handoff.allocation.path().to_path_buf();
+    let admission = handoff.allocation.admission.as_ref().unwrap().clone();
+    let (control, mailbox) = ReceivedWorkerMailbox::bounded();
+    for _ in 0..32 {
+        let (reply, _received) = mpsc::sync_channel(1);
+        control
+            .try_send(ReceivedWorkerRequest::Snapshot {
+                admission: admission.clone(),
+                reply,
+            })
+            .unwrap_or_else(|_| panic!("within fixed mailbox bound"));
+    }
+    let fixture = Fixture::new();
+    let (reply, _received) = mpsc::sync_channel(1);
+    let request = ReceivedWorkerRequest::Start {
+        handoff,
+        launch: Box::new(resident_launch(&fixture, Arc::new(Signers))),
+        reply,
+    };
+    let Err(TrySendError::Full(request)) = control.try_send(request) else {
+        panic!("bounded queue must return original request");
+    };
+    drop(mailbox);
+    let Err(TrySendError::Disconnected(ReceivedWorkerRequest::Start { handoff, .. })) =
+        control.try_send(request)
+    else {
+        panic!("disconnected queue must return original handoff");
+    };
+    assert_eq!(handoff.allocation.path(), root);
+    assert!(handoff.allocation.admission.as_ref().unwrap() == &admission);
+    assert!(!fixture.0.join("s").exists());
+    assert!(!root.join("launches.txt").exists());
+}

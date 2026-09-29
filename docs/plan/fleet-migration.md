@@ -2769,3 +2769,38 @@ now reads the actual root from the native snapshot, asserts the roots differ and
 bytes remain unchanged with no provider markers. The same startup deadline and all launch/capacity
 assertions remain; the capacity refusal also checks its exact error code. The failed run is retained.
 Corrected validation is pending.
+
+
+R25 was merged through [PR #143](https://github.com/idosams/Mesh/pull/143) as
+`83872041f5e0bf455ec6b8e50f2d1c204a6e2e19`, including corrected tested head
+`94abfc6cdd366277ad111fc7d0d4215e84099d83`. All seven PR checks passed: Linux
+3,245 passed / 7 skipped; macOS Rust 3,499 passed / 17 skipped, desktop 166 and
+580 passed, full `npm test` and all four renderer cases passed. The separate local
+corrected run outside the sandbox failed five provider startup deadlines (three tests passed).
+Inside the sandbox it failed five endpoint creations. Logs remain preserved; [#133](https://github.com/idosams/Mesh/issues/133)
+remains unresolved. Hosted success is not local acceptance.
+
+## R26 resident observation loop
+
+New canonical work on merged #143; no preserved source commits are replaced.
+[Issue #144](https://github.com/idosams/Mesh/issues/144) tracks the native loop around
+`ReceivedWorkerSupervisor`. A fixed 32-request mailbox transfers original handoffs and exact
+snapshot/cancellation requests. Full/disconnected sends return the original request to the caller;
+a rejected handoff must be retained, never reconstructed or interpreted as permission to retry.
+
+The resident thread polls before each request and during idle periods. Losing all control senders
+or the observation receiver does not stop observation. Reply and observation delivery is nonblocking;
+a full observation queue drops the new sample, so observation timestamps remain essential.
+The nominal 50 ms idle interval is not a latency guarantee: native launch or storage can block.
+
+A separate native stop flag returns control while leaving the original supervisor owners, occupied
+slots and queued mailbox requests retained. An already dequeued request completes before the next
+stop boundary. Stop is not cancellation or process-tree termination. No broker message or renderer
+command exposes stop or these native control objects.
+
+Two regressions exercise autonomous provider completion after control disconnect, blocked reply and
+observation consumers, exactly one provider launch, original ownership after explicit stop, and
+return of the same handoff on queue exhaustion/disconnection. Complete native test compilation passed with warnings denied (42.908 seconds). Native execution
+and full hosted validation are pending; repository/docs/license/storage checks passed. This increment supplies an embedding loop, not an installed
+worker binary or listener. Persistent execution identity, deployment, renewed-lease and signed-result
+recovery, real second-machine and packaged acceptance remain required.

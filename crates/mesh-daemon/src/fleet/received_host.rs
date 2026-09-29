@@ -12,7 +12,9 @@ use crate::ipc::{
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
+mod resident;
 mod supervisor;
+pub use resident::{ReceivedWorkerMailbox, ReceivedWorkerRequest};
 pub use supervisor::{ReceivedWorkerLaunch, ReceivedWorkerObservation, ReceivedWorkerSupervisor};
 
 /// The resident native worker owns this handle independently of any transport connection.
