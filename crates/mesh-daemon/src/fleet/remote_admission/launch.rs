@@ -124,11 +124,11 @@ impl RemoteLaunchReservation {
     pub fn workspace(&self) -> &ReceivedWorkerWorkspace {
         &self.workspace
     }
-    /// Revalidate retained intent, immutable input/history/custody and the original lease.
+    /// Revalidate retained intent, immutable input/history/custody and the current durable lease.
     /// The supervisor supplies its current native clock immediately before a launch decision.
     /// This does not claim provider admission or a fresh inventory of mutable working files.
     pub fn verify(&self, now_ms: u64) -> Result<(), Error> {
-        lease(&self.receipt.admission, now_ms)?;
+        lease(&self.registry, &self.receipt.admission, now_ms)?;
         self.workspace
             .verify()
             .map_err(|_| Error::Refused("remote-launch-workspace-changed"))?;
@@ -301,7 +301,7 @@ impl RemoteAdmissionRegistry {
             }
             return Ok((retained, false));
         }
-        lease(&proposed.admission, now_ms)?;
+        lease(self, &proposed.admission, now_ms)?;
         let outcome = self.store.append_with_outcome(
             &self.launch_stream(assignment),
             0,
@@ -313,8 +313,13 @@ impl RemoteAdmissionRegistry {
         Ok((receipt, inserted))
     }
 }
-fn lease(admission: &RemoteAdmissionReceipt, now_ms: u64) -> Result<(), Error> {
-    if now_ms == 0 || now_ms >= admission.work.assignment.lease_until_ms {
+fn lease(
+    registry: &RemoteAdmissionRegistry,
+    admission: &RemoteAdmissionReceipt,
+    now_ms: u64,
+) -> Result<(), Error> {
+    let current = registry.effective_lease(admission)?;
+    if now_ms == 0 || now_ms < current.accepted_ms || now_ms >= current.until_ms {
         return refuse("remote-launch-lease-expired");
     }
     Ok(())

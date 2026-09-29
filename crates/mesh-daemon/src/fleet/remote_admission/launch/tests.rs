@@ -26,7 +26,7 @@ impl Fixture {
         }
         Self(path)
     }
-    fn registry(&self) -> RemoteAdmissionRegistry {
+    pub(in crate::fleet) fn registry(&self) -> RemoteAdmissionRegistry {
         registry(FleetStore::open(self.0.join("worker.sqlite")).unwrap())
     }
     fn admit(&self) -> RemoteAdmissionReceipt {
@@ -403,4 +403,25 @@ fn lost_authority_after_durable_intent_grants_nothing_and_restart_does_not_regra
         .unwrap();
     assert!(!inserted);
     assert!(receipt == proposed);
+}
+
+#[test]
+fn renewed_lease_extends_only_the_original_launch_reservation() {
+    let fixture = Fixture::new();
+    let reservation = fixture.session_reservation();
+    let original = reservation.receipt().clone();
+    let expiry = original.admission().work().assignment.lease_until_ms;
+    assert!(reservation.verify(expiry).is_err());
+    let mut registry = fixture.registry();
+    registry
+        .renew_lease(original.admission(), 1, expiry + 1000, expiry - 1, 2000)
+        .unwrap();
+    reservation.verify(expiry + 1).unwrap();
+    assert!(reservation.verify(expiry + 1000).is_err());
+    let mut proposed = original.clone();
+    proposed.owner = "12".repeat(32);
+    let (retained, inserted) = registry.claim_launch_record(proposed, expiry + 1).unwrap();
+    assert!(!inserted);
+    assert!(retained == original);
+    assert!(reservation.receipt() == &original);
 }

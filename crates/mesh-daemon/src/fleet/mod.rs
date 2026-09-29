@@ -58,7 +58,7 @@ pub use remote_admission::status::{
 pub use remote_admission::{RemoteAdmissionChallenge, RemoteAdmissionProof};
 pub use remote_admission::{
     RemoteAdmissionOutcome, RemoteAdmissionReceipt, RemoteAdmissionRegistry,
-    RemoteInputReservation, RemoteWork,
+    RemoteInputReservation, RemoteWork, RemoteWorkerLease,
 };
 #[cfg(unix)]
 pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
@@ -1291,3 +1291,9 @@ fn refuse<T>(code: &'static str) -> Result<T, Error> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_os = "macos")]
+pub use remote_admission::status::renewal::{
+    RemoteLeaseRenewal, RemoteLeaseRenewalPlan, RemoteLeaseRenewalRequest,
+    VerifiedRemoteLeaseRenewal,
+};

@@ -61,7 +61,13 @@ impl ReceivedSession {
         self.verify(runtime)?;
         self.verify_run(lane, run)?;
         let work = self.receipt.admission().work();
-        if now_ms == 0 || now_ms >= work.assignment.lease_until_ms {
+        let lease = crate::fleet::remote_admission::lease::received_lease(
+            &runtime.store,
+            &self.admission,
+            &work.assignment,
+        )
+        .map_err(|_| refusal("remote-session-lease-unavailable"))?;
+        if now_ms == 0 || now_ms < lease.accepted_ms || now_ms >= lease.until_ms {
             return Err(refusal("remote-session-lease-expired"));
         }
         let state = runtime.state();

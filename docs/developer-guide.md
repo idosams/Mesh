@@ -237,3 +237,29 @@ changing any ownership or lease. Worker observation timestamps do not make cache
 No filenames, task text, credentials or provider diagnostics are returned. The protocol carries a
 private goal digest for exact correlation and must not be logged. Signed saved results, actual
 second-machine recovery and packaged acceptance remain required.
+
+
+### Remote lease renewal
+
+`RemoteLeaseRenewal::prepare` accepts a native-selected `RemoteLeaseRenewalPlan` and persists an
+exact coordinator intent before opening transport. `signed_request` uses a renewal-specific signing
+domain; `exchange_over_ssh` sends it on one configured bounded connection. The resident worker
+verifies native keys, provider, limits and fresh challenge before updating an existing exact admission.
+It commits a separate worker lease record before signing the acknowledgment. `accept` verifies that
+acknowledgment and current coordinator context before `AdvanceRemoteLease`.
+
+New renewals require the previous lease to remain valid. After a lost acknowledgment, explicitly
+prepare the identical sequence/deadline again; only a previously committed worker renewal can be
+recovered after expiry. A changed request at the same sequence refuses. Signer/transport failures
+may follow durable work and are not proof of rollback. A retained lease never reconstructs an input
+reservation, launch owner or provider process. The original guarded launch reservation and received
+session check the effective worker lease while retaining their original custody and attempt.
+
+The additive persisted schemas are `mesh.remote-renewal-intent/v1` and
+`mesh.remote-worker-lease/v1`; existing immutable admissions and launch intents are unchanged.
+Each assignment permits at most 4,096 renewals, read in bounded store pages; exhaustion refuses
+further renewal and never releases ownership. Existing worker-status v1 replies remain unchanged
+and report only historical initial leases. A versioned current-lease read is a separate follow-up.
+Focused coverage includes dropped resident replies, reopen, forged acknowledgments, failed signing
+after commit, concurrent conflicting writers, and corrupt history beyond a page boundary. It does
+not establish real second-machine SSH execution or packaged provider/signing acceptance.

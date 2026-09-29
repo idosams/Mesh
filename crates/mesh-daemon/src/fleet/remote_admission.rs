@@ -3,6 +3,8 @@ use super::{goal_valid, id_valid, refuse, Error, Limits, RemoteAssignment, State
 use crate::ipc::Json;
 use mesh_store::fleet::{FleetAppendOutcome, FleetEvent, FleetStore};
 use mesh_store::RecordDigest;
+pub(in crate::fleet) mod lease;
+pub use lease::RemoteWorkerLease;
 use mesh_types::{Blake3, ContentDigest as _};
 
 /// Immutable work already authenticated and authorized by the native worker service.

@@ -20,6 +20,8 @@ struct Transfer<'a> {
 pub enum WorkerConnectionOutcome {
     /// Fresh signed retained facts were written; this grants no execution or retry authority.
     StatusReplied,
+    /// A signed durable lease acknowledgment was written; peer receipt and liveness stay unknown.
+    LeaseReplied,
     /// EOF before materialization. The original reservation and partial input remain resident-owned.
     Disconnected,
     /// Native input is retained for one-time delivery to the independent provider supervisor.
@@ -97,6 +99,22 @@ impl<'a> NativeWorkerConnections<'a> {
             self.installation.verify()?;
             RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
             return Ok(WorkerConnectionOutcome::StatusReplied);
+        }
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-lease-renewal/v1")
+        {
+            let renewal = super::RemoteLeaseRenewalRequest::decode(encoded)
+                .and_then(|request| request.verify(&self.policy))
+                .map_err(|_| refused())?;
+            let mut registry = self.installation.registry(
+                renewal.coordinator(),
+                renewal.objective(),
+                renewal.limits().clone(),
+            )?;
+            let reply = renewal.commit(&mut registry, sign).map_err(|_| refused())?;
+            self.installation.verify()?;
+            RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
+            return Ok(WorkerConnectionOutcome::LeaseReplied);
         }
         self.destination.verify()?;
         let dispatch = RemoteDispatch::decode(encoded)
