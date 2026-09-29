@@ -31,7 +31,9 @@
 //!
 //! # What is not here, stated plainly
 //!
-//! No operating-system backend exists for Mesh's Ed25519 actor key. The macOS Secure Enclave
+//! [`AppleActorCustody`] provides separate create-only macOS actor persistence, with expected-key
+//! checks on reopen and each signature. Its native storage requires an eligible signed Mesh app;
+//! actual signed-app create/reopen/sign acceptance remains required. The macOS Secure Enclave
 //! backend is deliberately limited to the separate P-256 human-approval credential. Its foreign
 //! boundary is isolated in `secure_enclave.rs`/`secure_enclave.m`, and read-only load plus exact
 //! receipt verification are automated; enrollment and signing still require an interactive macOS
@@ -45,6 +47,7 @@
 // lint it would have to delete.
 #![deny(unsafe_code)]
 
+mod actor_keychain;
 mod entropy;
 mod no_export;
 mod secure_enclave;
@@ -52,6 +55,7 @@ mod software;
 
 pub mod support;
 
+pub use crate::actor_keychain::AppleActorCustody;
 pub use crate::secure_enclave::{
     fresh_approval_challenge, SecureEnclaveApprovalCredential, SecureEnclaveApprovalError,
 };

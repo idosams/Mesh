@@ -231,3 +231,13 @@ and nonblocking observations. Connection loss does not stop it; an explicit nati
 ownership. New lifecycle regressions and full validation are pending. This remains native embedding
 support; an installed worker entry point, persistent signing identity and remote result recovery
 are unfinished. See [R26](plan/fleet-migration.md#r26-resident-observation-loop).
+
+
+The resident event loop [#145](https://github.com/idosams/Mesh/pull/145) is merged with all seven
+PR and combined-main checks passing. Local provider-startup failures remain tracked separately.
+The next custody increment adds source support for persistent macOS worker actor identity, with
+create-only provisioning and expected-key checks on each open/sign. It requires the eligible signed
+Mesh application identity, reports OS-gated rather than hardware-backed custody, and cannot approve
+main. All 45 focused custody tests and crate lint passed; full hosted validation is pending.
+No eligible signed-app provisioning or remote deployment is claimed.
+See [R27](plan/fleet-migration.md#r27-persistent-native-worker-actor-identity).

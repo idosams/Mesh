@@ -111,7 +111,7 @@ impl KeyStoreSupport {
         self.holds_ed25519
     }
 
-    /// Whether Mesh has built this backend. `false` for every row but the software fallback.
+    /// Whether Mesh has built this backend. This is source coverage, not host availability.
     #[must_use]
     pub const fn implemented(&self) -> bool {
         self.implemented
@@ -156,7 +156,7 @@ pub const KEY_STORE_SUPPORT: [KeyStoreSupport; 7] = [
         platform: Platform::MacOs,
         backend: CustodyBackend::AppleKeychain,
         holds_ed25519: true,
-        implemented: false,
+        implemented: true,
         note: "The keychain stores an Ed25519 seed as a generic-password item, under an access \
                control that can require user presence. It has no Ed25519 signing operation, so \
                the seed is READ BACK into this address space to be used: os-gated at rest, \
@@ -211,10 +211,9 @@ pub const KEY_STORE_SUPPORT: [KeyStoreSupport; 7] = [
 /// The best isolation reachable for a Mesh **actor key** on `platform`, over backends Mesh has
 /// actually built.
 ///
-/// [`IsolationClass::InProcess`] for every platform today, because the software fallback is the
-/// only implemented backend. It is a function of `implemented` rather than of the survey so that
-/// it reports what a user would get, and it rises the moment a backend lands rather than when a
-/// document is edited.
+/// Source-supported isolation, not current availability: macOS requires an eligible signed Mesh
+/// application and accessible keychain; other platforms retain the software fallback. Native
+/// provisioning and acceptance must still verify the actual host.
 #[must_use]
 pub fn reachable_today(platform: Platform) -> IsolationClass {
     KEY_STORE_SUPPORT
@@ -287,12 +286,25 @@ mod tests {
     }
 
     #[test]
-    fn nothing_but_the_software_fallback_is_implemented_today() {
+    fn implemented_backends_match_the_documented_platform_boundary() {
         for row in KEY_STORE_SUPPORT {
-            assert!(!row.implemented(), "{} / {}", row.platform, row.backend);
+            assert_eq!(
+                row.implemented(),
+                row.platform == Platform::MacOs && row.backend == CustodyBackend::AppleKeychain,
+                "{} / {}",
+                row.platform,
+                row.backend
+            );
         }
         for platform in Platform::ALL {
-            assert_eq!(reachable_today(platform), IsolationClass::InProcess);
+            assert_eq!(
+                reachable_today(platform),
+                if platform == Platform::MacOs {
+                    IsolationClass::OsGated
+                } else {
+                    IsolationClass::InProcess
+                }
+            );
         }
     }
 

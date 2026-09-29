@@ -27,7 +27,7 @@ The legacy Ed25519 capability route ends in a value the software actor-key backe
 4. The only constructor of an `IsolationProof` is `CustodyBackend::isolation_proof`, and it returns
    `None` for every backend below `IsolationClass::OsMediated`.
 
-`SoftwareCustody` — the only custody implemented for actor keys — reports
+`SoftwareCustody` reports
 `CustodyBackend::SoftwareInProcess`, which is `IsolationClass::InProcess`. It therefore cannot
 obtain a proof, cannot build an attestation, cannot mint a human capability, and cannot reach the
 action. It does not implement `HumanKeyCustody`, and a test asserts no source in this crate does.
@@ -96,7 +96,7 @@ keyring or a hardware token. Each row names the API fact it rests on so it can b
 | Platform | Mechanism | Holds Ed25519 | Reachable class for a Mesh actor key | Implemented |
 |---|---|---|---|---|
 | macos | `apple-secure-enclave` | **no** | `in-process` | no |
-| macos | `apple-keychain` | yes | `os-gated` | no |
+| macos | `apple-keychain` | yes | `os-gated` | yes, source implemented; signed-app acceptance required |
 | windows | `windows-cng` | **no** | `in-process` | no |
 | linux | `linux-kernel-keyring` | yes | `os-gated` | no |
 | macos | `hardware-token` | yes | `hardware-non-exportable` | no |
@@ -144,6 +144,28 @@ presence, approval, and persistence across restart before the alpha calls this j
 
 ## 6. What is not implemented
 
-No operating-system backend exists for the Ed25519 actor key: no Keychain, CNG, kernel keyring, or
-PKCS#11 implementation. The implemented Secure Enclave path is only the separate P-256 human
+Native Keychain actor persistence is source-implemented, with signed-app acceptance pending.
+There is no CNG, kernel keyring or PKCS#11 implementation. The implemented Secure Enclave path is only the separate P-256 human
 approval credential described above; it does not change the actor-key availability table.
+
+
+## 7. Persistent macOS execution identity
+
+`AppleActorCustody` holds a native installation account and expected public key, with no persistent
+in-memory seed. Explicit creation uses OS randomness and create-only Keychain insertion. Opening
+requires an independently admitted public key; every signature reloads the value and refuses a
+missing, locked, malformed or changed identity. No public secret import/export, replacement, deletion,
+rotation or fallback is exposed. Failed provisioning retains any created item for reconciliation.
+
+The bridge first requires the existing Apple-signed `dev.mesh.desktop` application identity and its
+exact app-private keychain group. It uses a separate generic-password service for worker Ed25519,
+Data Protection storage, no synchronization and device-only access after first unlock. Reads disallow
+interaction. This never reads or signs with the P-256 human approval credential. An unsigned helper
+is unavailable, and other operating systems refuse this backend.
+
+The reported backend is `AppleKeychain`, whose isolation is `OsGated`, below human approval's
+required level. Ed25519 signing still reads the seed into process memory. Rust seed buffers are
+scrubbed and the signing object zeroizes on drop; Security/Foundation internal copies and hostile
+process-memory access are not covered by an erasure guarantee. Source support does not establish
+that a machine is provisioned or eligible. Deterministic storage-double and native item-shape tests
+are not evidence of actual signed-app creation, reopening or signing; that acceptance remains open.

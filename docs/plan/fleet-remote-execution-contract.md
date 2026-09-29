@@ -544,3 +544,53 @@ mailbox with their caller, and completes an already dequeued request before retu
 boundary. It does not revoke authority, cancel work, remove slots or prove termination. The service
 owner must retain these objects. No transport codec, installed entry point or remote shutdown
 permission is introduced here.
+
+### Persistent execution identity implementation decision
+
+R27 adds a separate macOS actor-custody backend before wiring the resident entry point.
+The current `SoftwareActorCustody` remains ephemeral, with no import/export or persistence API.
+Human P-256 approval credentials and their user-presence policy remain separate.
+
+The first persistent backend will run inside an eligible, Apple-signed Mesh desktop identity. It
+will use a fixed execution-only generic-password service and a native installation identifier as
+account, with an explicit app-private access group. Neither account nor group comes from a peer,
+renderer, task or shell argument. The existing native code-signing/entitlement preflight must pass
+before key access. An unsigned standalone `meshd` does not gain this custody through its folder name.
+The later resident entry point must therefore run under the admitted signed application identity;
+standalone helper support requires its own explicit signing/group admission.
+
+Creation draws a fresh Ed25519 seed internally and uses create-only `SecItemAdd`. An existing item,
+partial provisioning or failed receipt write is retained for explicit reconciliation. Opening an
+identity never creates or replaces it: it requires the expected public key from independently
+admitted native configuration and refuses mismatches. No automatic rotation, delete or software
+fallback is provided. Native worker-directory provisioning must persist the public identity and
+check it again on reopen before accepting a coordinator or launch claim.
+
+Storage uses the Data Protection keychain, no synchronization, and
+`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. Background signing can therefore be unavailable
+before the first unlock after boot. Reads use an `LAContext` with interaction disallowed; resident
+execution never turns a missing/unavailable key into an authentication dialog. Availability failures
+are explicit and preserve uncertain work. Every signing operation reloads and checks the expected
+identity rather than retaining a signer that silently survives removal of its stored identity.
+
+This is `AppleKeychain` / `OsGated` custody: the secret enters process memory for Ed25519 signing.
+It is not hardware-backed Ed25519 or human approval. Rust-owned seed buffers are scrubbed and the
+signing object zeroizes on drop; Security/Foundation may make internal copies, so complete erasure
+of all process memory is not claimed. Public custody APIs expose only identity and signatures.
+No new cryptographic implementation or third-party dependency is needed.
+
+Validation must include create-only collision, absent/changed identity, repeated reopening with
+identical signatures, loss of backend access after opening, malformed stored values, noninteractive
+refusal, and inability to obtain human approval authority. Extend both existing export scanners and
+custody documentation to cover the new implementation. Deterministic storage-double tests are
+separate from native evidence. Actual create/reopen/sign in the eligible signed application is
+required before claiming persistent worker provisioning works; the current signing prerequisites
+remain unresolved. No existing login-keychain item or signing configuration is changed by planning
+or by read-only refusal tests.
+
+Apple API references:
+
+- [Generic-password identity and duplicate-item behavior](https://developer.apple.com/documentation/security/ksecclassgenericpassword)
+- [Data Protection keychain selection on macOS](https://developer.apple.com/documentation/security/ksecusedataprotectionkeychain)
+- [After-first-unlock, device-only accessibility](https://developer.apple.com/documentation/security/ksecattraccessibleafterfirstunlockthisdeviceonly)
+- [Noninteractive authentication guidance](https://developer.apple.com/documentation/security/ksecuseauthenticationuifail)

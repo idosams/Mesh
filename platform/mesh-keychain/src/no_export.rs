@@ -64,8 +64,9 @@
 //! because a scanner for a string necessarily contains that string.
 
 /// Every source in the crate except this one.
-const SOURCES: [(&str, &str); 5] = [
+const SOURCES: [(&str, &str); 6] = [
     ("lib.rs", include_str!("lib.rs")),
+    ("actor_keychain.rs", include_str!("actor_keychain.rs")),
     ("entropy.rs", include_str!("entropy.rs")),
     ("secure_enclave.rs", include_str!("secure_enclave.rs")),
     ("software.rs", include_str!("software.rs")),
