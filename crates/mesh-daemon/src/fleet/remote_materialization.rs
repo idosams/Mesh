@@ -94,6 +94,7 @@ impl RemoteInputDestination {
     ) -> io::Result<RemoteInputAllocation> {
         self.materialize_named(manifest, cas, allocation_id, "input")
     }
+    #[cfg(target_os = "macos")]
     pub(super) fn materialize_result<F: mesh_cas::DurableFs>(
         &self,
         manifest: &RemoteInputManifest,
