@@ -182,6 +182,7 @@ impl NativeRemoteResultReceiver<'_> {
         if previous.as_ref().is_some_and(|old| old != &receipt) {
             return Err(refused());
         }
+        runtime.record_remote_review_location(&receipt, self.destination)?;
         runtime.index_remote_local_review(&receipt)?;
         if previous.is_none() {
             let result = runtime.store.append_with_outcome(
@@ -209,3 +210,5 @@ mod catalog;
 pub use catalog::{RemoteLocalReviewEntry, RemoteLocalReviewPage};
 
 mod reader;
+
+mod location;

@@ -3552,3 +3552,22 @@ original-project import and full remote acceptance remain outstanding.
 
 Validation: composed native regression covers SQLite reopening, exact saved review/artifact bytes,
 invalid path/object/side/manifest and missing metadata refusals. Full canonical gate pending.
+
+## R55: retained native remote review destinations
+
+Depends on R54 / PR #185. New canonical implementation, replacing no legacy commit. Registration
+now records a bounded private destination binding before indexing or acknowledging the correlation.
+It retains the admitted store/parent paths, exact directory identities and protected-root policy in
+the native ledger, keyed by the immutable correlation. Exact retries preserve the record; conflicts
+refuse. The paths never appear in renderer output.
+
+Runtime and FleetHistory now discover and read remote reviews/artifacts by offer and correlation
+identities alone. Reopening verifies the retained native location, exact manifest, local history and
+review; unknown identities, replacement directories, missing metadata and malformed records refuse
+without repair. Existing v1 correlations remain readable with their explicit native destination;
+unbound legacy correlations cannot use identity-only lookup until authorized exact registration.
+No execution, import or approval authority is added. Desktop routing and panels remain next work.
+
+Validation: native composed regression covers SQLite reopen, FleetHistory reads, exact artifact
+bytes, legacy unbound records, mismatched identities, replaced store and corrupt location tail.
+Full canonical gate pending. External acceptance and reliability issues remain open.
