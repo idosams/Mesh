@@ -6,8 +6,8 @@ use crate::fleet::{
 use crate::project_attachment::{AttachmentStorage, ObservationLimits};
 use std::fs;
 
-#[test]
-fn authenticated_remote_candidate_stages_and_compiles_original_objects_without_approval() {
+fn project_import_journey(fault: u8) {
+    let cancel_while_signing = fault == 1;
     let mut setup = Setup::new();
     let source_path = setup.f.path.join("original-project");
     let metadata = setup.f.path.join("original-metadata");
@@ -276,7 +276,158 @@ fn authenticated_remote_candidate_stages_and_compiles_original_objects_without_a
     assert!(receiver
         .prepare_project_candidate_import(&mut runtime, &stale, actor)
         .is_err());
-    runtime.record("cancel", Command::Cancel).unwrap();
+
+    let signing_key = || SigningKey::from_bytes(&[67; 32]);
+    let refusing = ImportSigner {
+        key: signing_key(),
+        calls: Default::default(),
+        refuse: true,
+        cancel: None,
+        replace: None,
+    };
+    assert!(receiver
+        .import_project_candidate(&mut runtime, &request, &refusing)
+        .is_err());
+    assert_eq!(
+        receiver
+            .inspect_project_candidate_import(&mut runtime, &request, public(&refusing.key))
+            .unwrap(),
+        Json::Null
+    );
+    let signer = ImportSigner {
+        key: signing_key(),
+        calls: Default::default(),
+        refuse: false,
+        cancel: cancel_while_signing.then(|| setup.f.path.join("project-coordinator.sqlite")),
+        replace: (fault == 2).then(|| {
+            setup
+                .f
+                .path
+                .join("allocations")
+                .join(format!("result-{}", "a".repeat(32)))
+        }),
+    };
+    let mut outcome = receiver.import_project_candidate(&mut runtime, &request, &signer);
+    if let Some(path) = &signer.replace {
+        assert!(
+            outcome.is_err(),
+            "replaced remote allocation must refuse before append"
+        );
+        source
+            .with_fleet_input(input_version, &trusted, |open, _| {
+                assert_eq!(open.workspace_versions().len(), 1);
+                Ok(())
+            })
+            .unwrap();
+        assert!(correlation
+            .reopen(&setup.destination, receiver.manifest(), &trusted)
+            .is_err());
+        // Restore only this test-created empty substitute, preserving the retained original.
+        fs::remove_dir(path).unwrap();
+        fs::rename(path.with_extension("preserved"), path).unwrap();
+        let pending = receiver
+            .inspect_project_candidate_import(&mut runtime, &request, public(&signer.key))
+            .unwrap();
+        assert_eq!(pending.get("state"), Some(&Json::text("pending")));
+        // The exact durable intent supplies the signatures; invoking this signer again would
+        // replace the allocation again and fail, so success also proves no signing replay.
+        outcome = receiver.import_project_candidate(&mut runtime, &request, &signer);
+    }
+    assert_eq!(signer.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    let expected_state = if cancel_while_signing {
+        assert!(outcome.is_err());
+        "pending"
+    } else {
+        let outcome = outcome.unwrap();
+        assert_eq!(outcome.get("state"), Some(&Json::text("imported")));
+        assert_eq!(outcome.get("approval_authority"), Some(&Json::Bool(false)));
+        assert_eq!(
+            receiver
+                .import_project_candidate(&mut runtime, &request, &signer)
+                .unwrap(),
+            outcome
+        );
+        assert_eq!(
+            signer.calls.load(std::sync::atomic::Ordering::SeqCst),
+            2,
+            "retry must not sign twice"
+        );
+        let review = receiver
+            .review_imported_project_candidate(&mut runtime, &request, true)
+            .unwrap();
+        assert_ne!(review.get("review"), Some(&Json::Null));
+        assert_eq!(review.get("approval_authority"), Some(&Json::Bool(false)));
+        assert_eq!(
+            receiver
+                .review_imported_project_candidate(&mut runtime, &request, false)
+                .unwrap(),
+            review
+        );
+        "imported"
+    };
+    drop(runtime);
+    let mut runtime = Runtime::open(
+        FleetStore::open(setup.f.path.join("project-coordinator.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let recovered = receiver
+        .inspect_project_candidate_import(&mut runtime, &request, public(&signer.key))
+        .unwrap();
+    assert_eq!(recovered.get("state"), Some(&Json::text(expected_state)));
+    source
+        .with_fleet_input(input_version, &trusted, |open, main| {
+            assert_eq!(main, Json::Null);
+            assert_eq!(
+                open.workspace_versions().len(),
+                if cancel_while_signing { 1 } else { 2 }
+            );
+            if !cancel_while_signing {
+                let target = RecordDigest::parse_hex(
+                    recovered.get("target").and_then(Json::as_text).unwrap(),
+                )
+                .unwrap();
+                let saved = open.historical_workspace_preview(target).unwrap();
+                assert_eq!(
+                    saved
+                        .files
+                        .iter()
+                        .find(|f| f.path == "renamed.txt")
+                        .unwrap()
+                        .object,
+                    original.files[0].object
+                );
+                assert_ne!(
+                    saved
+                        .files
+                        .iter()
+                        .find(|f| f.path == "result.txt")
+                        .unwrap()
+                        .object,
+                    original.files[0].object
+                );
+            }
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        fs::read(source_path.join("result.txt")).unwrap(),
+        setup.bytes
+    );
+    assert!(!source_path.join("renamed.txt").exists());
+    if !cancel_while_signing {
+        runtime.record("cancel", Command::Cancel).unwrap();
+    }
+    assert_eq!(
+        receiver
+            .inspect_project_candidate_import(&mut runtime, &request, public(&signer.key))
+            .unwrap(),
+        recovered
+    );
+    assert!(receiver
+        .import_project_candidate(&mut runtime, &request, &signer)
+        .is_err());
+
     assert!(receiver
         .prepare_project_candidate_import(&mut runtime, &request, actor)
         .is_err());
@@ -289,4 +440,52 @@ fn authenticated_remote_candidate_stages_and_compiles_original_objects_without_a
             .is_ok(),
         "cancellation still allows immutable historical reads"
     );
+}
+
+struct ImportSigner {
+    key: SigningKey,
+    calls: std::sync::atomic::AtomicUsize,
+    refuse: bool,
+    cancel: Option<std::path::PathBuf>,
+    replace: Option<std::path::PathBuf>,
+}
+impl crate::CheckpointSigner for ImportSigner {
+    fn public_key(&self) -> PublicKey {
+        public(&self.key)
+    }
+    fn sign(&self, value: &SigningPayload) -> Result<Signature, String> {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.refuse {
+            return Err("fixture key unavailable".into());
+        }
+        sign(&self.key, value)
+    }
+}
+impl crate::fleet::CandidateImportSigner for ImportSigner {
+    fn sign_import_provenance(&self, value: &SigningPayload) -> Result<Signature, String> {
+        if let Some(path) = &self.cancel {
+            let mut other = Runtime::open(FleetStore::open(path).unwrap(), "objective").unwrap();
+            other
+                .record("cancel-during-signing", Command::Cancel)
+                .unwrap();
+        }
+        if let Some(path) = &self.replace {
+            fs::rename(path, path.with_extension("preserved")).unwrap();
+            fs::create_dir(path).unwrap();
+        }
+        crate::CheckpointSigner::sign(self, value)
+    }
+}
+#[test]
+fn authenticated_remote_candidate_stages_and_compiles_original_objects_without_approval() {
+    project_import_journey(0);
+}
+#[test]
+fn remote_import_cancelled_while_signing_retains_pending_intent_without_appending() {
+    project_import_journey(1);
+}
+
+#[test]
+fn remote_import_replaced_allocation_during_signing_refuses_and_exact_pending_intent_recovers() {
+    project_import_journey(2);
 }

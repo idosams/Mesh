@@ -419,5 +419,13 @@ attached project and compile operations against that exact saved input. Renames 
 object identity; replacements receive new identity. Staging leaves original files, capture history
 and Mesh main unchanged. Missing/corrupt evidence, changed main, cancellation, wrong project and
 unverified delegated lineage refuse. The signed fixture/native-storage tests cover this direct-input
-path; signed commit/recovery, transitive remote lineage and graphical import actions are still open.
+path; transitive remote lineage and graphical import actions are still open. Native signed
+commit/recovery coverage is described below.
 See R58 in the [delivery ledger](plan/fleet-migration.md) for the verification boundary.
+
+
+Native remote candidate APIs also append signed private project versions and record their exact
+project reviews, with durable pending/completed recovery. Key refusal, cancellation during signing
+and replaced remote custody refuse append. Exact retries reuse retained signatures. This preserves
+the separate human approval and original-folder application boundaries. Source/native fixture tests
+cover these paths; graphical remote import and signed packaged acceptance remain unverified.

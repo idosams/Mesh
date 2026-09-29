@@ -422,7 +422,7 @@ impl ProvisionedAttachment {
         self.commit_fleet_import_with(request, candidate, plan, signer, trusted, || Ok(()))
     }
 
-    fn commit_fleet_import_with(
+    pub(crate) fn commit_fleet_import_with(
         &self,
         request: &str,
         candidate: &Json,
