@@ -102,3 +102,36 @@ single-link, permission and physical identity checks must remain intact. The reg
 worker after it owns database references, checks both normal exit and unwind, and immediately
 reopens the preserved journal. This does not verify macOS attachment-event registration or packaged
 application shutdown; those are separate boundaries.
+
+## Native worker identity provisioning
+
+The native desktop binary has two explicit worker-identity modes. These are source-supported setup
+commands; an eligible Apple-signed Mesh application and actual signed-app acceptance are still
+required. Unsigned builds refuse before touching worker files. No installed worker listener or
+second-machine execution is implied.
+
+Choose an existing, empty metadata directory owned by the current user, with permissions `0700`,
+outside existing projects. The native command does not create this directory or select one implicitly.
+For an eligible signed application, the invocation is:
+
+```bash
+/path/to/signed/Mesh.app/Contents/MacOS/Mesh --worker provision /absolute/private/worker-state
+/path/to/signed/Mesh.app/Contents/MacOS/Mesh --worker identity /absolute/private/worker-state
+```
+
+Provision writes a durable setup intent, creates an execution-only keychain identity and initializes
+its private ledger. Identity reopens existing complete state and checks the expected stored key;
+it never creates a replacement. Both print one `mesh.worker-public-identity/v1` JSON object with
+public installation and worker identifiers. This output does not establish peer trust or authorize
+execution. No project files, selected desktop workspace, human approval key or provider process are
+changed by these modes.
+
+Failed or interrupted setup retains its files and any created key for reconciliation. Repeating
+provision against a nonempty directory refuses. Keep retained evidence; these commands provide no
+repair, cleanup, rotation or deletion operation. The private installation contains only `intent.json`,
+`identity.json` and `ledger/`; additional entries make it unavailable rather than being ignored.
+Existing standalone worker-ledger directories are not automatically converted into installations.
+
+Current automated evidence covers native directory/receipt/lock behavior with a custody test double,
+and command parsing plus refusal by an unentitled executable. It does not prove successful OS
+keychain provisioning, an installed resident service or actual remote execution.

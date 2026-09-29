@@ -241,3 +241,12 @@ Mesh application identity, reports OS-gated rather than hardware-backed custody,
 main. All 45 focused custody tests and crate lint passed; full hosted validation is pending.
 No eligible signed-app provisioning or remote deployment is claimed.
 See [R27](plan/fleet-migration.md#r27-persistent-native-worker-actor-identity).
+
+The persistent actor backend [#147](https://github.com/idosams/Mesh/pull/147) is merged with all
+seven PR and combined-main checks passing. The next increment adds guarded native installation
+provisioning and explicit `--worker provision|identity` modes before graphical startup. It preserves
+partial setup, binds the expected actor key, and retains parent checks through ledger handles.
+Fourteen native directory tests and two command-module tests passed; full hosted validation is pending.
+These modes do not start a resident listener or provider. Successful provisioning in an eligible
+signed application and actual remote execution remain unverified. See
+[R28](plan/fleet-migration.md#r28-guarded-worker-installation-and-native-setup-commands).

@@ -2853,3 +2853,46 @@ startup became prompt and available disk space was observed at 3.8 GiB (previous
 All ten received-host tests passed in 6.89 seconds. No source, timeout or assertion changed and
 prior failed logs remain preserved. This is a passing focused rerun, not proof that storage pressure
 caused the earlier delay or that full native reliability is resolved; issue #133 remains open.
+
+R27 merged through [PR #147](https://github.com/idosams/Mesh/pull/147) as
+`c66cff63c8003d3dfe9521992037f9bde168001b`, including tested head
+`5144ad5803ca92eb55f2e82b14555960a497837a`. All seven PR and combined-main checks passed.
+Linux passed 3,250 / 7 skipped; macOS Rust passed 3,505 / 17 skipped, the full `npm test`,
+44-check daemon demonstration and all four renderer cases passed. The separate full local gate
+remains running and is not counted as a pass.
+
+## R28 guarded worker installation and native setup commands
+
+New canonical work on merged #147, tracked in [#148](https://github.com/idosams/Mesh/issues/148).
+No preserved source commits are replaced. `NativeWorkerInstallation` durably binds a native random
+custody account, expected public identity, guarded parent and existing private ledger. Its canonical
+v1 intent is written before key creation; any failure retains evidence and a repeated provision
+refuses before another key call. Reopen requires complete exact state and never initializes missing
+history. Existing standalone ledger APIs and their persisted v1 format remain unchanged.
+
+The parent keeps an exclusive native lock and exactly two receipt files plus its ledger child.
+Child ledger authority inherits parent checks, so retained registry handles still refuse replaced
+parent receipts/namespaces and keep the parent locked after the installation wrapper drops. Public
+identity inspection also checks the ledger. Callback completion is followed by complete physical
+verification; neither callback success nor a copied receipt grants continued authority by itself.
+
+Native `--worker provision|identity <absolute-private-folder>` modes run before the graphical app.
+The first custody preflight refuses an unentitled build before filesystem work. The user explicitly
+supplies a private metadata folder outside projects; provisioning requires it to be empty. Output is
+public identity only. There is no listener, provider launch, selected-workspace change, human-key use,
+repair, deletion, rotation or automatic conversion of existing ledger folders.
+
+Fourteen focused native installation/ledger tests passed, including seven new lifecycle/refusal
+cases. The actual native command module compiled against current daemon/custody code and its two
+parser/application-identity refusal tests passed. These are not full packaged-app or signed-keychain
+acceptance. The first isolated command harness failed to resolve a transitive library; the corrected
+search path passed without weakening product assertions, and the failed log remains preserved.
+Repository target, documentation, license, storage and formatting checks passed. Full hosted
+validation is pending. Resident transport, signing-eligible
+provisioning, renewed leases, signed-result recovery and real second-machine acceptance remain open.
+
+Initial R28 hosted validation caught an undeclared direct `mesh_store` reference in the desktop
+command and a startup-order regression whose exact expected sequence lacked the new worker mode.
+The command now formats public key bytes directly without a dependency change. The startup test
+requires the worker mode, its failure exit and early return before the existing attachment/MCP and
+AppKit sequence. Failed CI logs remain preserved; full corrected validation is pending.

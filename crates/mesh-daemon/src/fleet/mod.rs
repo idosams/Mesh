@@ -60,7 +60,9 @@ pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunc
 #[cfg(target_os = "macos")]
 mod worker_directory;
 #[cfg(target_os = "macos")]
-pub use worker_directory::NativeRemoteWorkerDirectory;
+pub use worker_directory::{
+    NativeRemoteWorkerDirectory, NativeWorkerInstallation, WorkerInstallationIdentity,
+};
 mod remote_input;
 mod remote_transport;
 #[cfg(unix)]

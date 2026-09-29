@@ -47,9 +47,13 @@ struct Owner {
     protected: Vec<ProtectedWorkspaceRoot>,
     uid: u32,
     _lock: File,
+    parent: Option<Arc<dyn FleetStoreAuthority>>,
 }
 impl Owner {
     fn verify(&self) -> io::Result<()> {
+        if let Some(parent) = &self.parent {
+            parent.check().map_err(|_| unavailable())?;
+        }
         self.root.ensure_protected_identity(self.token)?;
         self.root.ensure_namespace_identity()?;
         let m = self.root.try_clone_directory()?.metadata()?;
@@ -70,6 +74,7 @@ fn owner(
     path: &Path,
     token: ProtectedWorkspaceRoot,
     protected: &[ProtectedWorkspaceRoot],
+    parent: Option<Arc<dyn FleetStoreAuthority>>,
 ) -> io::Result<Arc<Owner>> {
     use std::os::fd::AsRawFd as _;
     unsafe extern "C" {
@@ -88,6 +93,7 @@ fn owner(
         protected: protected.to_vec(),
         uid: unsafe { geteuid() },
         _lock: lock,
+        parent,
     });
     value.verify()?;
     // SAFETY: the descriptor stays live with Owner. LOCK_EX|LOCK_NB refuses another native owner.
@@ -157,7 +163,7 @@ impl NativeRemoteWorkerDirectory {
         worker_key: &str,
         protected: &[ProtectedWorkspaceRoot],
     ) -> io::Result<Self> {
-        Self::open_inner(path, expected, worker_key, protected, true)
+        Self::open_inner(path, expected, worker_key, protected, true, None)
     }
     /// Reopen this exact provisioned directory and worker identity. Never initializes absent state.
     pub fn reopen(
@@ -166,7 +172,7 @@ impl NativeRemoteWorkerDirectory {
         worker_key: &str,
         protected: &[ProtectedWorkspaceRoot],
     ) -> io::Result<Self> {
-        Self::open_inner(path, expected, worker_key, protected, false)
+        Self::open_inner(path, expected, worker_key, protected, false, None)
     }
     fn open_inner(
         path: &Path,
@@ -174,11 +180,12 @@ impl NativeRemoteWorkerDirectory {
         worker_key: &str,
         protected: &[ProtectedWorkspaceRoot],
         initialize: bool,
+        parent: Option<Arc<dyn FleetStoreAuthority>>,
     ) -> io::Result<Self> {
         if !RecordDigest::parse_hex(worker_key).is_ok_and(|key| key.to_string() == worker_key) {
             return Err(unavailable());
         }
-        let owner = owner(path, expected, protected)?;
+        let owner = owner(path, expected, protected, parent)?;
         // SQLite resolves a whole family of filenames. The macOS persistent directory reference
         // prevents an ancestor rename from redirecting those writes to a substituted namespace.
         let database_path = expected.stable_reference()?.join(DATABASE);
@@ -252,3 +259,6 @@ impl NativeRemoteWorkerDirectory {
 
 #[cfg(test)]
 mod tests;
+
+mod installation;
+pub use installation::{NativeWorkerInstallation, WorkerInstallationIdentity};
