@@ -331,3 +331,10 @@ cross-checks and restart-safe cursors. Its focused regression passed for paginat
 interrupted-publication repair, duplicate publication and corrupted records after fixing explicit
 unknown-admission handling. Full checks are pending. Legacy offers require explicit republication
 to enter the catalog. Authenticated remote discovery and content transfer/import remain unfinished.
+
+
+Result catalog discovery now has a fresh authenticated native resident route and bounded SSH
+entry point. Three focused regressions passed, including lost-reply recovery and refusal of
+signed duplicate checkpoints, wrong assignment, cursor mismatches, stale replies and wrong keys.
+Full validation is pending. Catalog discovery does not transfer files, prove completion or import
+a result for review; remote content/recovery, candidate import and real-machine acceptance remain.
