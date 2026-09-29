@@ -284,3 +284,149 @@ fn identical_work_in_different_objectives_keeps_distinct_receipt_scope() {
     assert_eq!(first.coordinator(), "ab".repeat(32));
     assert!(first.work() == other.work());
 }
+
+#[test]
+fn worker_renewal_is_durable_exact_replay_and_never_another_reservation() {
+    let fixture = Fixture::new();
+    let mut registry = fixture.registry(1);
+    let RemoteAdmissionOutcome::Reserved(reservation) =
+        registry.reserve(work(), ALLOCATION, 100).unwrap()
+    else {
+        panic!("original reservation");
+    };
+    let receipt = reservation.receipt().clone();
+    let renewed = registry.renew_lease(&receipt, 1, 2000, 500, 2000).unwrap();
+    assert_eq!(renewed.sequence, 2);
+    assert_eq!(renewed.until_ms, 2000);
+    drop(registry);
+    let mut reopened = fixture.registry(1);
+    assert_eq!(reopened.effective_lease(&receipt).unwrap(), renewed);
+    assert_eq!(
+        reopened.renew_lease(&receipt, 1, 2000, 9000, 1).unwrap(),
+        renewed
+    );
+    assert!(matches!(
+        reopened.reserve(work(), ALLOCATION, 9000).unwrap(),
+        RemoteAdmissionOutcome::Retained(_)
+    ));
+    assert_eq!(reopened.receipts().unwrap().len(), 1);
+    assert_eq!(receipt.work().assignment.lease_until_ms, 1000);
+    assert!(reopened.renew_lease(&receipt, 2, 3000, 2000, 4000).is_err());
+    assert_eq!(reopened.effective_lease(&receipt).unwrap(), renewed);
+}
+
+#[test]
+fn worker_renewal_refuses_conflicting_scope_sequence_clock_and_cap() {
+    let fixture = Fixture::new();
+    let mut registry = fixture.registry(1);
+    let RemoteAdmissionOutcome::Reserved(reservation) =
+        registry.reserve(work(), ALLOCATION, 100).unwrap()
+    else {
+        panic!("original reservation");
+    };
+    let receipt = reservation.receipt().clone();
+    let original = registry.effective_lease(&receipt).unwrap();
+    for (sequence, until, now, cap) in [
+        (0, 2000, 500, 2000),
+        (2, 2000, 500, 2000),
+        (1, 1000, 500, 2000),
+        (1, 2000, 0, 2000),
+        (1, 2000, 1000, 2000),
+        (1, 2000, 500, 1000),
+    ] {
+        assert!(registry
+            .renew_lease(&receipt, sequence, until, now, cap)
+            .is_err());
+        assert_eq!(registry.effective_lease(&receipt).unwrap(), original);
+    }
+    let mut wrong = receipt.clone();
+    wrong.objective = "another-objective".into();
+    assert!(registry.renew_lease(&wrong, 1, 2000, 500, 2000).is_err());
+    let renewed = registry.renew_lease(&receipt, 1, 2000, 500, 2000).unwrap();
+    assert!(registry.renew_lease(&receipt, 1, 2100, 600, 3000).is_err());
+    assert!(registry.renew_lease(&receipt, 2, 3000, 400, 4000).is_err());
+    assert_eq!(registry.effective_lease(&receipt).unwrap(), renewed);
+    let next = registry.renew_lease(&receipt, 2, 3000, 1000, 3000).unwrap();
+    assert_eq!(next.sequence, 3);
+    assert_eq!(
+        registry.renew_lease(&receipt, 1, 2000, 9000, 1).unwrap(),
+        renewed
+    );
+    assert_eq!(registry.effective_lease(&receipt).unwrap(), next);
+}
+
+#[test]
+fn competing_worker_renewals_commit_one_deadline() {
+    let fixture = Fixture::new();
+    let mut registry = fixture.registry(1);
+    let RemoteAdmissionOutcome::Reserved(reservation) =
+        registry.reserve(work(), ALLOCATION, 100).unwrap()
+    else {
+        panic!("reservation");
+    };
+    let receipt = reservation.receipt().clone();
+    let barrier = Arc::new(Barrier::new(2));
+    let handles =
+        [(fixture.registry(1), 2000), (fixture.registry(1), 2100)].map(|(mut registry, until)| {
+            let barrier = barrier.clone();
+            let receipt = receipt.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                registry.renew_lease(&receipt, 1, until, 500, 3000)
+            })
+        });
+    let results = handles.map(|handle| handle.join().unwrap());
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    let current = registry.effective_lease(&receipt).unwrap();
+    assert_eq!(current.sequence, 2);
+    assert_eq!(
+        &current,
+        results.iter().find_map(|r| r.as_ref().ok()).unwrap()
+    );
+    assert_eq!(registry.receipts().unwrap().len(), 1);
+}
+
+#[test]
+fn renewal_history_crosses_store_page_boundary_and_refuses_corrupt_tail() {
+    let fixture = Fixture::new();
+    let mut registry = fixture.registry(1);
+    let RemoteAdmissionOutcome::Reserved(reservation) =
+        registry.reserve(work(), ALLOCATION, 100).unwrap()
+    else {
+        panic!("reservation");
+    };
+    let receipt = reservation.receipt().clone();
+    for sequence in 1..=257 {
+        registry
+            .renew_lease(&receipt, sequence, 1000 + sequence, 500, 3000)
+            .unwrap();
+    }
+    let current = fixture.registry(1).effective_lease(&receipt).unwrap();
+    assert_eq!(current.sequence, 258);
+    assert_eq!(current.until_ms, 1257);
+    // Reproduce a noncanonical tail through the raw store, never through the validated API.
+    let event = registry
+        .store
+        .events(&registry.stream, 0, 1)
+        .unwrap()
+        .remove(0);
+    let identity = Json::object([
+        ("stream", Json::text(&event.stream)),
+        ("admission", Json::text(&event.payload)),
+        ("revision", Json::Number(event.revision)),
+    ])
+    .encode();
+    let stream = format!(
+        "remote-leases-{}",
+        Blake3::digest_bytes(identity.as_bytes())
+    );
+    registry
+        .store
+        .append_with_outcome(&stream, 257, "258", "{}")
+        .unwrap();
+    assert!(registry.effective_lease(&receipt).is_err());
+    assert!(registry
+        .renew_lease(&receipt, 258, 2000, 600, 3000)
+        .is_err());
+    assert_eq!(registry.receipts().unwrap().len(), 1);
+}

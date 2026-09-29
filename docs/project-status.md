@@ -274,3 +274,14 @@ connections without granting execution, retry or lease authority. Five focused n
 full final-base validation is pending. The facts do not establish current process liveness or saved
 results. Lease renewal, result transfer, live presentation and real second-machine acceptance remain
 unfinished.
+
+
+The remote renewal increment adds a separate signed request/acknowledgment protocol. Coordinator
+intent is retained before transport; the coordinator advances its lease only after verifying the
+worker's durable acknowledgment. A dropped reply can be reconciled with the exact same request.
+The original admission and launch receipts remain immutable; current durable lease checks extend
+only that original attempt. Expired authorization cannot be newly renewed, and neither expiration
+nor renewal frees a slot or proves process liveness. The native resident route and SSH exchange are
+implemented; focused tests pass, full canonical validation is pending. Read-only status v1 still
+reports explicitly historical initial-lease fields. A versioned effective-lease status query, real
+second-machine execution/recovery, signed results, and packaged acceptance remain required.

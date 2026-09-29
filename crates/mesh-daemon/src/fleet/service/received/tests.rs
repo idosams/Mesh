@@ -255,3 +255,29 @@ fn received_session_uses_existing_native_provider_launch_and_refuses_second_spaw
     drop(process);
     assert!(retained.upgrade().is_none());
 }
+
+#[test]
+fn received_session_reads_renewed_lease_without_changing_original_attempt() {
+    let fixture = Fixture::new();
+    let reservation = fixture.session_reservation();
+    let admission = reservation.receipt().admission().clone();
+    let expiry = admission.work().assignment.lease_until_ms;
+    let service = reservation.into_native_session().unwrap();
+    let mut registry = fixture.registry();
+    let inner = service.lock().unwrap();
+    let received = inner.received.as_ref().unwrap();
+    assert!(received
+        .verify_launch(&inner.runtime, "lane", "run", "codex", expiry)
+        .is_err());
+    registry
+        .renew_lease(&admission, 1, expiry + 1000, expiry - 1, 2000)
+        .unwrap();
+    received
+        .verify_launch(&inner.runtime, "lane", "run", "codex", expiry + 1)
+        .unwrap();
+    assert!(received
+        .verify_launch(&inner.runtime, "lane", "run", "codex", expiry + 1000)
+        .is_err());
+    assert_eq!(inner.runtime.state().lanes["lane"].runs.len(), 1);
+    assert_eq!(registry.receipts().unwrap().len(), 1);
+}

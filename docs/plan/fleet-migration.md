@@ -3082,3 +3082,29 @@ full run ended during compilation with no disk space; that failure is retained a
 pass. Combined-main validation is running. The test-only [PR #159](https://github.com/idosams/Mesh/pull/159)
 now includes that merged base. Its initial focused native managed-edit suite passed all 49 cases
 in 19 seconds; final merged-base hosted validation remains required.
+
+
+## R33 authenticated remote lease renewal (validation in progress)
+
+New canonical work for [#160](https://github.com/idosams/Mesh/issues/160), based on
+[PR #159](https://github.com/idosams/Mesh/pull/159) merge
+`0d74eb085258dbe44c34c48a59061f1e5fcffe45`. No preserved source commits are replaced. PR #159
+passed all seven hosted checks and the full local gate: 3,539 native tests passed / 17 skipped,
+desktop checks and all 44 daemon-demo checks passed. Its combined-main run also passed.
+
+Separate immutable coordinator intent precedes transmission; worker compare-and-advance lease
+records precede its signed acknowledgment. Only verified acknowledgment advances the coordinator.
+Exact replay reconciles lost replies without another admission, launch or attempt. Native keys,
+limits, time, canonical schemas, exact work correlation and current context are checked around
+signing. Original launch/session checks read the effective lease but preserve original ownership.
+New renewal after expiry refuses. Acknowledgment/expiry does not establish liveness or free a slot.
+The resident worker route and bounded native SSH exchange are included.
+
+All 13 selected renewal/deadline tests passed, including 11 new cases. Complete daemon lint with
+warnings denied passed before the final two ledger tests; full final-source canonical validation is
+running. Two earlier fixture failures are preserved: a wrong cancellation variant, then a reopen
+helper that attempted a second claim. The corrected test reopens the original coordinator ledger.
+Read-only status v1 still reports historical initial leases. The next coherent increment adds a
+versioned effective-lease read; #160 remains open until that recovery surface is delivered. Signed
+saved results, actual remote execution/disconnect/reconnect, second-provider and packaged acceptance
+remain part of the full fleet objective.
