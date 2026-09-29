@@ -237,6 +237,21 @@ fn project_import_journey(fault: u8) {
         ..retained
     };
     assert!(runtime.stage_retained_remote_project(&wrong).is_err());
+    assert_eq!(
+        runtime
+            .retained_remote_project_source(retained.offer, retained.correlation)
+            .unwrap(),
+        source.id()
+    );
+    let context = runtime
+        .retained_remote_project_context(retained.offer, retained.correlation, &source, &trusted)
+        .unwrap();
+    assert_eq!(context.get("observed_main"), Some(&Json::Null));
+    assert_eq!(
+        context.get("input"),
+        Some(&Json::text(input_version.to_string()))
+    );
+    assert_eq!(context.get("approval_authority"), Some(&Json::Bool(false)));
     let candidate = runtime.stage_retained_remote_project(&retained).unwrap();
     let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
         &setup.destination,

@@ -9,7 +9,7 @@ const pin = n => ({ key: `remote-${n}`, selection: { objective: `fleet-${'a'.rep
 test('remote panels keep independent identities and disclose saved selector and import limits', () => {
   const html = render({ pins: [pin(1), pin(2)], notice: '' });
   assert.equal((html.match(/aria-label="Pinned remote review"/g) ?? []).length, 2);
-  assert.match(html, /Saved selections contain no file content/); assert.match(html, /received result tree/); assert.match(html, /import into the original project are not available/);
+  assert.match(html, /Saved selections contain no file content/); assert.match(html, /received result tree/); assert.match(html, /Prepare for original project/);
   assert.match(html, new RegExp('1'.repeat(64))); assert.match(html, new RegExp('2'.repeat(64)));
   assert.doesNotMatch(html, /Start agents|Apply to project|Approve and/);
 });
@@ -29,4 +29,10 @@ test('independent remote panels render exact verified text and reject broken con
   first.review.bundle_changes[0].verified_text.after.content_digest = '9'.repeat(64);
   html = render({ pins: [first, second], notice: '' });
   assert.doesNotMatch(html, /first &lt;saved&gt;/); assert.match(html, /second saved/); assert.match(html, /could not be safely displayed/);
+});
+
+test('remote project retry workflow stays visible without panels and exposes exact review navigation only',()=>{
+ const input={project:'a'.repeat(64),objective:`fleet-${'b'.repeat(64)}`,offer:'c'.repeat(64),correlation:'d'.repeat(64),request:'e'.repeat(32),expected_main:null,action:'inspect_review'};
+ const html=render({pins:[],notice:'',workflow:{loaded:true,error:'',preparing:false,entries:[{input,outcome:{state:'imported',target:'f'.repeat(64)},review:{bundle:'1'.repeat(64),target:'f'.repeat(64),complete:true,changes_not_listed:0},baseIsCurrent:true}]}});
+ assert.match(html,/Remote project actions/);assert.match(html,/Open this project review/);assert.match(html,/Remove retry entry/);assert.doesNotMatch(html,/Approve and|Apply to project|Start agents/);
 });

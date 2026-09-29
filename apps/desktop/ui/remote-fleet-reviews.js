@@ -1,3 +1,4 @@
+import { createRemoteProjectWorkflow } from './remote-project-workflow.js';
 import { createRemotePinPersistence } from './remote-fleet-pin-persistence.js';
 import { savedReviewItem } from './fleet-reviews.js';
 import { loadSavedArtifact } from './fleet-artifact-preview.js';
@@ -44,9 +45,10 @@ export function remoteArtifactSide(raw, selection, change, side, kind, page) {
     pageNumber: answer.page_number, pageCount: answer.page_count, textSource: answer.text_source, textLines: answer.text_lines,
     textSections: answer.text_sections?.map(s => ({ label: s.label, lineStart: s.line_start, lineCount: s.line_count })) ?? null, textTruncated: answer.text_truncated };
 }
-export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherPinCount = () => 0 }) {
+export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherPinCount = () => 0, requestId }) {
   let queues = {}, pins = [], next = 1n, generation = 0, disposed = false, notice = '';
   const publish = () => { if (!disposed) changed(); };
+  const project = createRemoteProjectWorkflow({ invoke, changed: publish, requestId });
   let persistenceEnabled = false, editable = true, controlBusy = false, persistence = { phase: 'session', message: '' };
   const persist = () => { if (persistenceEnabled) storage.changed(); };
   const storage = createRemotePinPersistence({ invoke,
@@ -98,13 +100,17 @@ export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherP
     publish();
   }
   return {
-    snapshot: () => ({ remoteReviewQueues: queues, remoteReviewPins: pins, remoteReviewNotice: notice, remoteReviewPersistence: { ...persistence, editable, busy: controlBusy } }),
-    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return storage.ensureLoaded(); } },
-    dispose() { disposed = true; storage.dispose(); },
+    snapshot: () => ({ ...project.snapshot(), remoteReviewQueues: queues, remoteReviewPins: pins, remoteReviewNotice: notice, remoteReviewPersistence: { ...persistence, editable, busy: controlBusy } }),
+    loadSaved() { if (!disposed && typeof invoke === 'function') { persistenceEnabled = true; return Promise.all([storage.ensureLoaded(), project.load()]); } },
+    dispose() { disposed = true; storage.dispose(); project.dispose(); },
     handle(v) {
       if (typeof v?.type !== 'string' || !v.type.startsWith('remote-')) return false;
       if (disposed || typeof invoke !== 'function') return true;
       const shape = Object.keys(v).sort().join(',');
+      if(v.type==='remote-project-load' && shape==='type') {void project.load();return true;}
+      if(v.type==='remote-project-action' && shape==='mode,request,type' && /^[a-f0-9]{32}$/.test(v.request)) {void project.retry(v.request,v.mode);return true;}
+      if(v.type==='remote-project-forget' && shape==='request,type' && /^[a-f0-9]{32}$/.test(v.request)) {void project.forget(v.request);return true;}
+
       if (v.type === 'remote-pins-retry' && shape === 'type') { void control(() => storage.retry()); return true; }
       if (v.type === 'remote-pins-reload' && shape === 'type') { void control(() => storage.reload()); return true; }
       if (!editable && !['remote-results','remote-results-next','remote-results-close','remote-retry'].includes(v.type)) return true;
@@ -124,6 +130,8 @@ export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherP
       }
       const pin = pins.find(p => p.key === v.pin);
       if (!pin) return true;
+      if(v.type==='remote-project-prepare' && shape==='pin,type' && editable && pin.review?.content_complete && !pin.loading && !pin.error) {void project.prepare(pin.selection);return true;}
+
       if (v.type === 'remote-close' && shape === 'pin,type') { pins = pins.filter(p => p !== pin); persist(); publish(); }
       if (v.type === 'remote-retry' && shape === 'pin,type' && !pin.loading) void read(pin);
       if (v.type === 'remote-view' && shape === 'layout,mode,object,pin,type' && /^[a-f0-9]{32}$/.test(v.object) && pin.review?.bundle_changes.some(c => c.object_id === v.object) && ['content','visual'].includes(v.mode) && ['inline','split'].includes(v.layout)) {

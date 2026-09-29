@@ -818,6 +818,44 @@ mod desktop {
         .map_err(|_| "Remote results could not be loaded".to_owned())?
     }
     #[tauri::command]
+    async fn load_remote_project_outbox(
+        host: State<'_, Arc<AttachmentHost>>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.load_remote_project_outbox())
+            .await
+            .map_err(|_| "Pending remote actions unavailable".to_owned())?
+    }
+    #[tauri::command]
+    async fn save_remote_project_outbox(
+        host: State<'_, Arc<AttachmentHost>>,
+        snapshot: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || host.save_remote_project_outbox(&snapshot))
+            .await
+            .map_err(|_| "Pending remote actions could not be confirmed".to_owned())?
+    }
+    #[tauri::command]
+    async fn remote_fleet_project_context(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        offer: String,
+        correlation: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.remote_fleet_project_context(
+                &objective,
+                &offer,
+                &correlation,
+                &attachment_review_trust(),
+            )
+        })
+        .await
+        .map_err(|_| "Original project context unavailable".to_owned())?
+    }
+    #[tauri::command]
     async fn remote_fleet_project(
         host: State<'_, Arc<AttachmentHost>>,
         selection: String,
@@ -7901,6 +7939,9 @@ mod desktop {
                 fleet_activity,
                 remote_fleet_reviews,
                 remote_fleet_project,
+                remote_fleet_project_context,
+                load_remote_project_outbox,
+                save_remote_project_outbox,
                 inspect_remote_fleet_review,
                 render_remote_fleet_artifact,
                 fleet_saved_reviews,

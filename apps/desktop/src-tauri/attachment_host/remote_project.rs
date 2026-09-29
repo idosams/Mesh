@@ -23,6 +23,8 @@ impl Request {
             return Err(INVALID.into());
         }
         let value = Json::parse(raw).map_err(|_| INVALID)?;
+        mesh_daemon::project_attachment::validate_remote_project_action(&value)
+            .map_err(|_| INVALID)?;
         let Json::Object(fields) = &value else {
             return Err(INVALID.into());
         };
@@ -96,6 +98,63 @@ impl Request {
     }
 }
 impl AttachmentHost {
+    /// Read retained retry inputs without dispatching actions or creating native history.
+    pub fn load_remote_project_outbox(&self) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let saved = match &state.storage {
+            Some(store) => store
+                .load_remote_project_outbox()
+                .map_err(|_| "Pending remote project inputs need reconciliation")?,
+            None => mesh_daemon::project_attachment::RemoteProjectOutbox {
+                revision: 0,
+                entries: vec![],
+            },
+        };
+        Ok(saved.to_json().encode())
+    }
+    /// Persist exact retry inputs before dispatch; this does not execute any action.
+    pub fn save_remote_project_outbox(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot = mesh_daemon::project_attachment::RemoteProjectOutbox::parse(snapshot)
+            .map_err(|_| INVALID)?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        Ok(state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_remote_project_outbox(snapshot.revision, snapshot.entries)
+            .map_err(|_| "Pending remote project inputs changed or could not be saved")?
+            .to_json()
+            .encode())
+    }
+    /// Discover the independently verified original project and fixed observed main for a result.
+    pub fn remote_fleet_project_context(
+        &self,
+        objective: &str,
+        offer: &str,
+        correlation: &str,
+        trust: &mesh_daemon::TrustedReviewers,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let (offer, correlation) = Self::remote_review_ids(offer, correlation)?;
+            let history = self.fleet_history(objective)?;
+            let project = history
+                .retained_remote_project_source(offer, correlation)
+                .map_err(|_| "Original project could not be verified")?;
+            let source = self.review_history(&project)?;
+            history
+                .retained_remote_project_context(offer, correlation, &source, trust)
+                .map(|v| v.encode())
+                .map_err(|_| "Original project context could not be verified".into())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (objective, offer, correlation, trust);
+            Err("Native remote project actions are unavailable on this platform".into())
+        }
+    }
     /// Act only on an exact received result and independently selected native original project.
     pub fn remote_fleet_project(
         &self,

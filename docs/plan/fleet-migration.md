@@ -3757,3 +3757,38 @@ OS-key acceptance. Full `npm test` passed: 3,586 native tests, 17 skipped, 148.4
 checks and all 44 daemon-demo checks. One slow comparison test completed; no process-leak warning
 occurred. Earlier reliability issues remain open. Graphical controls and durable remote action
 retry state remain outstanding; the native command alone is not the completed user workflow.
+
+
+## R63: durable remote project workflow in parallel review panels
+
+Depends on R62 / PR #193. New canonical implementation; replaces no legacy commit. Remote saved
+panels now prepare a result for its original project, save a private project version, create its
+original-project review and open that exact review through the existing attachment review surface.
+Native context resolution verifies the received result, independently admitted project and observed
+main. The fixed base, offer/correlation and retry identity are retained before dispatch. Rendering
+never resolves paths or grants main approval/application authority. English and Hebrew copy are added.
+
+`mesh.remote-project-outbox/v1` holds at most eight closed, content-free requests under a native
+catalog identity and revision check (131,072-byte record limit). Same-request project/selection/main
+substitution refuses. Atomic create-only staging and durable rename preserve interrupted metadata;
+foreign, malformed, stale and partial state refuses without repair. Existing outbox and pin formats
+are unchanged. This is retry metadata, not a content-retention guarantee or execution authority.
+
+Reopening loads pending inputs without automatically submitting actions. Explicit reads recover
+status; exact retries preserve uncertain work. Closing panels does not remove pending requests.
+Removing an entry deletes only metadata. Independent actions retain separate identities and results;
+changed completed outcomes refuse while the last verified snapshot remains visible. Missing-state
+native reads do not provision work. Private imports, exact reviews, human main approval and applying
+original files remain separate boundaries.
+
+Focused native storage tests cover restart, exact replay, stale revisions, changed fixed input,
+foreign catalog copies and preserved partial state. Three native project journeys also verify context
+and recorded recovery. Controller tests cover failed/lost save acknowledgments before dispatch, lost
+import replies and restart without replay, disposal during persistence, concurrent independent imports,
+substituted replies and exact project-review navigation. Rendered tests keep pending actions visible
+without panels. The first broad desktop run exposed five existing fixtures that omitted the new
+read-only outbox load; their exact allowed-call expectations were updated, retaining no-launch/no-write
+assertions. Full `npm test` passed: 3,588 native tests, 17 skipped, 148.020 s, 170 rendered
+tests, 598 desktop tests and all 44 daemon-demo checks. One slow comparison test completed; no
+process-leak warning occurred. Earlier reliability issues remain open. This is not signed packaged
+or second-host acceptance.
