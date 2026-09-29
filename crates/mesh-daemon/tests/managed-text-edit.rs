@@ -2475,6 +2475,8 @@ fn a_managed_save_cannot_settle_a_replacement_workspace_with_the_same_sequence()
     fs::write(first.join("docs/note.txt"), "changed in original\n").expect("external edit");
     let signing = SigningKey::from_bytes(&[0x79; 32]);
     let public = PublicKey::from_bytes(signing.verifying_key().to_bytes());
+    let (signing_tx, signing_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
     let saving = Arc::clone(&daemon);
     let save = std::thread::spawn(move || {
         saving.save_managed_file_privately(
@@ -2483,6 +2485,11 @@ fn a_managed_save_cannot_settle_a_replacement_workspace_with_the_same_sequence()
             inspected_executable(&saving, "docs/note.txt"),
             public,
             |payload| {
+                // Hold the real save inside its workspace authority guard. Observing pending
+                // state alone leaves only a 50 ms window: the save can legitimately finish
+                // while this test thread is descheduled before it starts workspace.open.
+                signing_tx.send(()).expect("report save holds authority");
+                release_rx.recv().expect("release original save");
                 Ok::<_, core::convert::Infallible>(MeshSignature::from_bytes(
                     signing.sign(payload.as_bytes()).to_bytes(),
                 ))
@@ -2490,20 +2497,9 @@ fn a_managed_save_cannot_settle_a_replacement_workspace_with_the_same_sequence()
         )
     });
 
-    let deadline = std::time::Instant::now() + Duration::from_secs(2);
-    loop {
-        if daemon
-            .checkpoint_snapshot()
-            .is_ok_and(|snapshot| snapshot.pending_meaningful().is_some())
-        {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the original save never reached its durable pending state"
-        );
-        std::thread::yield_now();
-    }
+    signing_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("the original save reached its signing boundary");
     let (opened_tx, opened_rx) = mpsc::channel();
     let opening = {
         let daemon = Arc::clone(&daemon);
@@ -2513,9 +2509,13 @@ fn a_managed_save_cannot_settle_a_replacement_workspace_with_the_same_sequence()
             opened_tx.send(result).expect("report replacement open");
         })
     };
+    let blocked = opened_rx.recv_timeout(Duration::from_millis(10));
+    release_tx
+        .send(())
+        .expect("allow original save to complete");
     assert!(
-        opened_rx.recv_timeout(Duration::from_millis(10)).is_err(),
-        "workspace.open must wait for the original managed save and settlement"
+        matches!(blocked, Err(mpsc::RecvTimeoutError::Timeout)),
+        "workspace.open must wait while the original managed save holds authority"
     );
 
     let saved = save.join().expect("save thread").expect("original save");

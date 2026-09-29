@@ -3026,3 +3026,20 @@ log is preserved; corrected focused and full validation remain required.
 The corrected three-case native composition suite passed in 0.78 seconds. Complete daemon lint
 with warnings denied and repository/docs/license/storage/format checks passed. Full hosted checks
 remain required; native loopback composition is not actual second-machine SSH acceptance.
+
+## Validation follow-up: managed-save replacement synchronization
+
+New canonical test-only work tracked in [#158](https://github.com/idosams/Mesh/issues/158),
+based on R31 merge `bef131c69224c427ade919c680940b32f7f4efc3`. No preserved implementation
+commit is replaced. R31 passed all seven PR checks, but its
+[combined-main macOS run](https://github.com/idosams/Mesh/actions/runs/36548847897/job/109341756509)
+failed: 3,533 native tests passed, one managed-save replacement test failed, 17 skipped. The
+remaining six checks passed; combined main must not be reported green.
+
+The test observed a pending checkpoint before starting replacement, leaving a 50 ms scheduling
+window in which the original save could correctly finish. It now pauses the real signing callback
+while the native workspace authority guard is held, checks that replacement cannot finish, and
+releases the save. Exact durable assertions still require the original workspace to settle and
+the replacement's identically numbered checkpoint to remain pending. No production code, timeout
+threshold, retry or skip changes. Focused native and full hosted validation are pending. This
+follow-up does not resolve native event registration issue #37 or process startup issue #133.
