@@ -186,3 +186,27 @@ retained installation/input evidence is preserved. A restarted service cannot re
 reservation or adopt a process from a PID. SSH admission/configuration, signed remote result recovery,
 renewed leases and actual remote deployment remain unfinished. Do not describe these local native
 modes as verified second-machine execution.
+
+### Native SSH connection boundary
+
+The macOS fleet API provides `NativeSshDestination` and `NativeSshConnection` for explicitly
+configured worker connections. An operator must separately install an SSH subsystem named
+`mesh-worker-v1` that runs the admitted signed Mesh binary's `--worker connect` mode against the
+private resident endpoint. Mesh does not edit SSH configuration, accounts, keys or host trust.
+No desktop or agent command exposes this transport yet.
+
+Configuration uses a literal DNS/IPv4 host, account, port, and existing absolute private identity
+and known-host files. Paths are restricted to ASCII letters, digits, slash, period, underscore and
+hyphen; unsupported names/IPv6 literals refuse. File contents must remain operator-controlled.
+Ambient SSH configuration, agent authentication, password prompts, forwarding and multiplexed
+connections are disabled. Unsupported SSH options fail rather than falling back to weaker settings.
+Encrypted identities requiring interaction refuse in this noninteractive route.
+
+The fixed subsystem receives task-bearing Mesh frames through stdin/stdout. Callers must still
+perform the native coordinator/worker proofs before transfer. Pipe I/O shares one absolute budget
+(up to 300 seconds); spawn and OS reaping are outside that bound. On any protocol/I/O error, drop
+the connection and retain assignment uncertainty for explicit reconciliation. Closing its input
+does not close output; dropping the connection kills/reaps only the local SSH client, never sends
+worker cancellation and never grants a new launch. Diagnostics are drained without retaining raw
+text. A local-client exit status is not a remote result receipt. Actual SSH deployment and
+second-machine disconnect/result recovery remain unverified.

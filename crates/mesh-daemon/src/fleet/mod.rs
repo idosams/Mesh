@@ -70,9 +70,13 @@ pub use worker_directory::{
 };
 mod remote_input;
 mod remote_transport;
+#[cfg(target_os = "macos")]
+mod ssh_transport;
 #[cfg(unix)]
 pub use remote_input::NativeRemoteInputReceiver;
 pub use remote_transport::{RemoteFrame, RemoteFrameReader, RemoteFrameWriter};
+#[cfg(target_os = "macos")]
+pub use ssh_transport::{NativeSshConnection, NativeSshDestination, SshPipe};
 #[cfg(unix)]
 mod remote_materialization;
 #[cfg(unix)]

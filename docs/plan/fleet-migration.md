@@ -2957,3 +2957,31 @@ The exact provider fixture also missed ten seconds outside Mesh and then exited 
 `_dyld_start` before program entry. This narrows the local startup investigation without identifying
 the underlying OS cause or resolving [#133](https://github.com/idosams/Mesh/issues/133). No running
 process was stopped and the test deadline remains unchanged.
+
+## R30 native SSH connection ownership (in progress)
+
+New canonical work tracked in [#152](https://github.com/idosams/Mesh/issues/152), based on merged
+[#151](https://github.com/idosams/Mesh/pull/151), `16fdf498610a6ba4bf30ede2e6f1d01f712f0b30`.
+No preserved source commits are replaced. R29 passed all seven PR checks: macOS full `npm test`
+passed 3,523 Rust tests (17 skipped), the authenticated reconnect/provider regression, desktop
+checks and all four renderer cases; Linux passed 3,250 (7 skipped). All seven combined-main checks passed in run `36545003482`.
+The earlier local provider-startup failure and its independent reproduction remain unresolved in #133.
+
+The native SSH destination accepts explicit host/account/port and existing private identity and
+known-host files. It invokes the installed system OpenSSH with closed options and fixed
+`mesh-worker-v1` subsystem. It never constructs a remote shell command, chooses remote paths from
+task input, enrolls trust, installs a worker or changes SSH/account configuration. File identity and
+metadata are checked around spawn; operator control of these files throughout the connection is
+required. This is not filesystem immutability against other same-user programs.
+
+Input/output use nonblocking native pipes and one unchanged absolute deadline. A separate reader
+drains stderr into fixed memory, retains no diagnostic contents and exposes only a saturating byte
+count. Closing input preserves output; dropping the handle terminates and reaps only its owned local
+SSH child. Process spawn/reaping are OS operations, not claimed bounded by the pipe deadline. EOF,
+client status, transport loss or deadline expiry confer no remote completion/retry authority.
+
+Validation is in progress. The standalone check initially selected the surrounding fleet test module;
+correcting only its harness test-path resolution compiled the actual new source with warnings denied.
+Direct lint passed. Focused runtime tests and full canonical checks remain required. This API is not
+yet wired to coordinator dispatch or presentation. Mesh mutual proof, lease renewal, signed-result
+recovery, a provisioned second machine and eligible packaged/signing acceptance remain required.
