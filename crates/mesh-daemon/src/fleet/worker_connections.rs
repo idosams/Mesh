@@ -20,6 +20,8 @@ struct Transfer<'a> {
 pub enum WorkerConnectionOutcome {
     /// Fresh signed retained facts were written; this grants no execution or retry authority.
     StatusReplied,
+    /// Fresh signed saved-result offer observation; this does not transfer or import content.
+    ResultReplied,
     /// A signed durable lease acknowledgment was written; peer receipt and liveness stay unknown.
     LeaseReplied,
     /// EOF before materialization. The original reservation and partial input remain resident-owned.
@@ -116,6 +118,22 @@ impl<'a> NativeWorkerConnections<'a> {
             self.installation.verify()?;
             RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
             return Ok(WorkerConnectionOutcome::LeaseReplied);
+        }
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-result-query/v1")
+        {
+            let query = super::RemoteSavedResultQuery::decode(encoded)
+                .and_then(|q| q.verify(&self.policy))
+                .map_err(|_| refused())?;
+            let registry = self.installation.registry(
+                query.coordinator(),
+                query.objective(),
+                query.limits().clone(),
+            )?;
+            let reply = query.reply(&registry, sign).map_err(|_| refused())?;
+            self.installation.verify()?;
+            RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
+            return Ok(WorkerConnectionOutcome::ResultReplied);
         }
         self.destination.verify()?;
         let dispatch = RemoteDispatch::decode(encoded)
