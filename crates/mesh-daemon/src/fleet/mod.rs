@@ -25,7 +25,8 @@ pub use input_transfer::{
 };
 #[cfg(unix)]
 pub use received_host::{
-    ReceivedWorkerHost, ReceivedWorkerLaunch, ReceivedWorkerObservation, ReceivedWorkerSupervisor,
+    ReceivedWorkerHost, ReceivedWorkerLaunch, ReceivedWorkerMailbox, ReceivedWorkerObservation,
+    ReceivedWorkerRequest, ReceivedWorkerSupervisor,
 };
 #[cfg(unix)]
 pub use receiving_broker::{

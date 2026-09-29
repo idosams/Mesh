@@ -524,3 +524,23 @@ Snapshot and cancellation require exact retained admission facts. This collectio
 control endpoint or a restart adopter. Native provisioning must supply the same guarded worker ledger
 across objectives/connections; the collection does not replace durable admission or launch checks.
 Deployment, native execution-key provisioning and authenticated result recovery remain required.
+
+
+### Resident loop and bounded native control
+
+`ReceivedWorkerSupervisor::serve` drives native observation independently of broker connection
+lifetimes. `ReceivedWorkerMailbox` admits at most 32 pending typed requests. Native callers use
+`try_send` and retain any rejected original request, including its single-use handoff. The loop
+checks every retained owner before handling another request and waits up to 50 ms when idle.
+That interval is not a deadline for blocking native filesystem/startup work.
+
+Full or disconnected reply/observation channels cannot block polling. Observation samples may be
+dropped under backpressure; consumers must drain older samples and inspect timestamps, not infer
+freshness from a queued response. Durable native history remains authoritative. Losing every
+control sender leaves polling active without a busy loop.
+
+Only a separate native stop flag returns from the loop. It leaves the supervisor and pending
+mailbox with their caller, and completes an already dequeued request before returning at the next
+boundary. It does not revoke authority, cancel work, remove slots or prove termination. The service
+owner must retain these objects. No transport codec, installed entry point or remote shutdown
+permission is introduced here.
