@@ -87,7 +87,11 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         let body = self.receipt_body()?;
         let (root, _) = self.destination.receiving_store().map_err(store_error)?;
         let path = manifest_path(self.manifest.bundle());
+        let retained = self.retained_receipt(runtime, &body)?;
         if read_manifest(&root, &path).map_err(store_error)?.is_none() {
+            if retained.is_some() {
+                return Err(refused());
+            }
             match root.filesystem().write_new_file(
                 &path,
                 self.manifest.encoded().as_bytes(),
@@ -116,6 +120,12 @@ impl<'a> NativeRemoteResultReceiver<'a> {
             return Err(refused());
         }
         if let Some(receipt) = self.retained_receipt(runtime, &body)? {
+            if read_manifest(&root, &path).map_err(store_error)?.as_deref()
+                != Some(self.manifest.encoded().as_bytes())
+            {
+                return Err(refused());
+            }
+            self.check(runtime)?;
             return Ok(receipt);
         }
         let digest =
@@ -137,6 +147,12 @@ impl<'a> NativeRemoteResultReceiver<'a> {
         if self.receipt_body()? != body {
             return Err(refused());
         }
+        if read_manifest(&root, &path).map_err(store_error)?.as_deref()
+            != Some(self.manifest.encoded().as_bytes())
+        {
+            return Err(refused());
+        }
+        self.check(runtime)?;
         Ok(receipt)
     }
     /// Reopen only an already recorded receipt using the exact native destination and current

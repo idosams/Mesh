@@ -276,6 +276,13 @@ fn native_result_receipt_resumes_verified_content_without_input_admission_or_wor
     );
     fs::rename(&manifest_path, store.join("preserved-partial-manifest")).unwrap();
     let receipt = receiver.record_content_receipt(&mut runtime).unwrap();
+    fs::rename(&manifest_path, store.join("preserved-recorded-manifest")).unwrap();
+    assert!(receiver.record_content_receipt(&mut runtime).is_err());
+    assert!(
+        !manifest_path.exists(),
+        "an existing receipt cannot silently recreate missing metadata"
+    );
+    fs::rename(store.join("preserved-recorded-manifest"), &manifest_path).unwrap();
     assert_eq!(
         receiver
             .record_content_receipt(&mut runtime)

@@ -485,6 +485,7 @@ frame; a lost reply can be reconciled without launching work again.
 `reopen_content_receipt` takes a freshly native-admitted destination, the exact original signed offer
 and current coordinator assignment. It checks the retained manifest, ledger and every content hash.
 Missing, partial, non-private, linked, replaced or conflicting metadata refuses and is preserved.
+A missing manifest beside an existing receipt also refuses republication without recreating it.
 An interrupted manifest write can leave partial evidence requiring explicit reconciliation; this
 never becomes a completion receipt. Existing stores without these files remain valid input/result
 stores, but cannot claim a recorded content receipt. This receipt is not retention policy or the
