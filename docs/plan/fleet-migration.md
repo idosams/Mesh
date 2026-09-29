@@ -2804,3 +2804,52 @@ return of the same handoff on queue exhaustion/disconnection. Complete native te
 and full hosted validation are pending; repository/docs/license/storage checks passed. This increment supplies an embedding loop, not an installed
 worker binary or listener. Persistent execution identity, deployment, renewed-lease and signed-result
 recovery, real second-machine and packaged acceptance remain required.
+
+
+R26 merged in [PR #145](https://github.com/idosams/Mesh/pull/145) as
+`a59e0b1995aef85b7c8977394aa0b5aeecd1e026`, including tested head
+`c56f7a06d1497b51ddd99b5c3af4a3b0ae7598c1`. All seven PR and combined-main jobs passed.
+Linux passed 3,247 tests / 7 skipped; macOS Rust passed 3,501 / 17 skipped, full `npm test`,
+the 44-check daemon demo and all four renderer cases passed. The separate outside-sandbox native
+run failed six unchanged provider-startup deadlines (four passed); [#133](https://github.com/idosams/Mesh/issues/133)
+remains open. These failed logs are retained, distinct from hosted success.
+
+## R27 persistent native worker actor identity
+
+New canonical work on merged #145, tracked in [#146](https://github.com/idosams/Mesh/issues/146).
+No preserved source commits are replaced. `AppleActorCustody` supplies explicit create-only macOS
+execution-key persistence, expected-public-key reopening and per-signature identity loading.
+The existing ephemeral software signer and the separate P-256 human-approval credential are unchanged.
+No new dependency, ledger record, wire format, rotation, deletion or fallback is introduced.
+
+The native bridge first checks the existing exact Apple-signed Mesh desktop identity, then uses its
+explicit app-private group and a worker-only generic-password service. Data Protection, no sync and
+after-first-unlock device-only accessibility are required; native reads disallow interaction.
+Missing, inaccessible, malformed and substituted identities refuse. Seed material never leaves the
+custody API; it does enter process memory for signing. The guarantee is `AppleKeychain` / `OsGated`,
+which cannot supply human approval authority. In-flight signatures are not retrospectively revoked
+by deleting an item; current assignment/lease checks remain the transport's responsibility.
+
+The build-time and test-time export scans now include the new Rust module. The support matrix and
+its regression explicitly allow this one macOS backend and continue to refuse unimplemented OS
+backends. Deterministic tests cover duplicate creation without replacement, repeated reopen/sign,
+wrong identity, backend loss and substitution. Native Objective-C tests validate stored length,
+type, accessibility, synchronization, service, account and access group before any output copy.
+The ordinary test executable must fail the read-only application preflight before a provisioning
+call; no user keychain item is created by these tests.
+
+Initial local native testing passed 26 cases and failed the old assertion that no persistent
+backend exists. The corrected assertion requires exactly macOS AppleKeychain source support;
+all other platform expectations and human-authority refusals remain. The failed log is retained.
+Corrected local validation passed all 45 focused tests (28 unit, 14 isolation, 3 native approval
+bridge), crate clippy with warnings denied, Objective-C syntax with warnings denied and
+repository/docs/license/storage checks. Full hosted checks are pending. Actual create/reopen/sign under an
+eligible signed app, worker-directory provisioning and resident transport integration remain
+unfinished; fixture storage is not OS keychain acceptance.
+
+
+The unchanged R26 native executable was rechecked outside the sandbox after local native test
+startup became prompt and available disk space was observed at 3.8 GiB (previously about 361 MiB).
+All ten received-host tests passed in 6.89 seconds. No source, timeout or assertion changed and
+prior failed logs remain preserved. This is a passing focused rerun, not proof that storage pressure
+caused the earlier delay or that full native reliability is resolved; issue #133 remains open.

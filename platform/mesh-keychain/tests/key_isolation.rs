@@ -141,8 +141,12 @@ fn the_test_time_scan_does_not_fire_on_holding_the_key() {
 }
 
 /// Every source of the crate under test, so the two scans below cannot drift apart from it.
-const CRATE_SOURCES: [(&str, &str); 5] = [
+const CRATE_SOURCES: [(&str, &str); 6] = [
     ("lib.rs", include_str!("../src/lib.rs")),
+    (
+        "actor_keychain.rs",
+        include_str!("../src/actor_keychain.rs"),
+    ),
     (
         "secure_enclave.rs",
         include_str!("../src/secure_enclave.rs"),
@@ -284,6 +288,10 @@ fn normalised(line: &str) -> String {
 fn no_source_in_this_crate_implements_human_key_custody() {
     for (name, source) in [
         ("lib.rs", include_str!("../src/lib.rs")),
+        (
+            "actor_keychain.rs",
+            include_str!("../src/actor_keychain.rs"),
+        ),
         (
             "secure_enclave.rs",
             include_str!("../src/secure_enclave.rs"),
@@ -535,8 +543,12 @@ fn no_platform_reaches_hardware_isolation_for_an_actor_key_without_an_external_t
     for platform in Platform::ALL {
         assert_eq!(
             reachable_today(platform),
-            IsolationClass::InProcess,
-            "{platform} claims more than the software fallback"
+            if platform == Platform::MacOs {
+                IsolationClass::OsGated
+            } else {
+                IsolationClass::InProcess
+            },
+            "{platform} must match implemented source custody"
         );
         assert_eq!(
             reachable_if_every_backend_were_built(platform),
