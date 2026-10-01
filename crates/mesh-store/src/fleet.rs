@@ -132,6 +132,24 @@ impl FleetStore {
         Self::open_inner(path, initialize, Some(authority))
     }
 
+    /// Open an independent connection to this exact native-guarded ledger. The retained native
+    /// authority is shared, including its lifetime pins; no caller-selected path or initialization
+    /// is accepted. This does not copy a transaction, authenticate an actor or adopt execution.
+    /// Callers must replay current events and retain ordinary expected-revision checks.
+    pub fn reopen_guarded_connection(&self) -> Result<Self, FleetStoreError> {
+        let authority = self
+            .authority
+            .as_ref()
+            .ok_or(FleetStoreError::AuthorityChanged)?;
+        authority.check()?;
+        let path = self
+            .connection
+            .path()
+            .filter(|path| !path.is_empty())
+            .ok_or(FleetStoreError::InvalidInput)?;
+        Self::open_inner(Path::new(path), false, Some(Arc::clone(authority)))
+    }
+
     fn check_authority(&self) -> Result<(), FleetStoreError> {
         check_authority(self.authority.as_deref())
     }
@@ -709,6 +727,118 @@ mod tests {
                 .map(|_| ())
                 .map_err(|_| FleetStoreError::AuthorityChanged)
         }
+    }
+
+    #[test]
+    fn independent_guarded_connections_share_commits_revision_checks_and_authority() {
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let authority = Arc::new(BudgetAuthority(AtomicU64::new(1000)));
+        let mut first = FleetStore::open_guarded(&db, true, authority.clone()).unwrap();
+        let mut second = first.reopen_guarded_connection().unwrap();
+        first.append("objective", 0, "first", "saved").unwrap();
+        assert_eq!(second.revision("objective").unwrap(), 1);
+        assert!(matches!(
+            second.append("objective", 0, "competing", "refused"),
+            Err(FleetStoreError::StaleRevision { actual: 1 })
+        ));
+        assert!(matches!(
+            second
+                .append_with_outcome("objective", 0, "first", "saved")
+                .unwrap(),
+            FleetAppendOutcome::Replayed(_)
+        ));
+        second.append("objective", 1, "second", "received").unwrap();
+        assert_eq!(first.revision("objective").unwrap(), 2);
+        drop(first);
+        assert_eq!(second.events("objective", 0, 4).unwrap().len(), 2);
+        // The second connection owns the same authority even after its source is dropped.
+        assert_eq!(Arc::strong_count(&authority), 2);
+        authority.0.store(0, Ordering::SeqCst);
+        assert!(matches!(
+            second.revision("objective"),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        assert!(matches!(
+            second.reopen_guarded_connection(),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        assert!(matches!(
+            second.append("objective", 2, "third", "refused"),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        authority.0.store(100, Ordering::SeqCst);
+        assert_eq!(second.revision("objective").unwrap(), 2);
+    }
+
+    #[test]
+    fn independent_connection_refuses_unguarded_or_missing_history() {
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        let unguarded = FleetStore::open(&db).unwrap();
+        assert!(matches!(
+            unguarded.reopen_guarded_connection(),
+            Err(FleetStoreError::AuthorityChanged)
+        ));
+        drop(unguarded);
+        let authority = Arc::new(BudgetAuthority(AtomicU64::new(100)));
+        let store = FleetStore::open_guarded(&db, false, authority).unwrap();
+        std::fs::rename(&db, db.with_extension("preserved")).unwrap();
+        assert!(store.reopen_guarded_connection().is_err());
+        assert!(
+            !db.exists(),
+            "a new connection cannot recreate missing history"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn independent_connection_retains_native_file_identity_refusal() {
+        use std::os::unix::fs::MetadataExt as _;
+        #[derive(Debug)]
+        struct Identity {
+            path: std::path::PathBuf,
+            device: u64,
+            inode: u64,
+        }
+        impl FleetStoreAuthority for Identity {
+            fn check(&self) -> Result<(), FleetStoreError> {
+                let m = std::fs::symlink_metadata(&self.path)
+                    .map_err(|_| FleetStoreError::AuthorityChanged)?;
+                if m.is_file() && m.dev() == self.device && m.ino() == self.inode {
+                    Ok(())
+                } else {
+                    Err(FleetStoreError::AuthorityChanged)
+                }
+            }
+        }
+        let dir = Directory::new();
+        let db = dir.0.canonicalize().unwrap().join("fleet.sqlite");
+        drop(FleetStore::open(&db).unwrap());
+        let metadata = std::fs::metadata(&db).unwrap();
+        let authority = Arc::new(Identity {
+            path: db.clone(),
+            device: metadata.dev(),
+            inode: metadata.ino(),
+        });
+        let first = FleetStore::open_guarded(&db, false, authority).unwrap();
+        let second = first.reopen_guarded_connection().unwrap();
+        std::fs::rename(&db, db.with_extension("preserved")).unwrap();
+        std::fs::write(&db, b"replacement must remain untouched").unwrap();
+        for connection in [&first, &second] {
+            assert!(matches!(
+                connection.reopen_guarded_connection(),
+                Err(FleetStoreError::AuthorityChanged)
+            ));
+            assert!(matches!(
+                connection.revision("objective"),
+                Err(FleetStoreError::AuthorityChanged)
+            ));
+        }
+        assert_eq!(
+            std::fs::read(&db).unwrap(),
+            b"replacement must remain untouched"
+        );
     }
 
     #[test]
