@@ -21,8 +21,10 @@ use mesh_types::{Blake3, ContentDigest};
 pub use crate::CheckpointSigner;
 
 mod received;
+mod remote_observation;
 mod remote_project_input;
 pub(in crate::fleet) use received::received_clock;
+pub use remote_observation::{RemoteObservation, RemoteObservationKind, RemoteObservationOutcome};
 pub use remote_project_input::RemoteProjectInput;
 
 /// Private allocation policy implemented by the native host, never supplied over agent IPC.
