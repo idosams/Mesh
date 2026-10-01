@@ -475,3 +475,9 @@ Remote original-project import now binds its parent review at the first authenti
 claim. Event replay preserves that exact identity through later duplicate saves and retries, without
 rewriting history. Missing or ambiguous evidence at admission stays refused; late review completion
 cannot silently authorize import. This does not complete remote dependency/revocation or retention.
+
+Native retained fleet history now prepares single-use remote lease-status and result-discovery
+observations. SSH waits occur outside the fleet mutex; reply verification rechecks the exact native
+assignment before accepting facts. This preserves access to live views and cancellation during a
+network wait. Native coordinator configuration and application controls remain to be integrated;
+fixture transport coverage is not real second-host or packaged proof.

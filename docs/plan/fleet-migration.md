@@ -3885,3 +3885,33 @@ leak; the original log is retained and reliability issue #172 remains unresolved
 are pending.
 Earlier remote ancestors, complete revocation policy, retention, packaged acceptance and real
 second-host/provider measurements remain required.
+
+## R67: unlocked native remote observations through retained fleet history
+
+Depends on merged R66 / PR #197. New canonical implementation; replaces no legacy commit.
+`FleetHistory` can prepare a single-use current-lease status query or bounded saved-result discovery
+query using independently admitted native identities. The query retains its exact service and
+assignment challenge. Its SSH exchange holds no fleet mutex; reply acceptance reacquires the service
+and revalidates the current durable context. Slow/disconnected workers therefore do not hold the
+service lock needed for views or cancellation. A changed run refuses the old reply.
+
+No mutable runtime, generic signing payload or renderer-selected SSH policy is exposed. The caller
+must supply native-admitted SSH configuration. No lease renewal, automatic retry, adoption, dispatch,
+allocation or import authority is added. Dropped prepared queries perform no network work. Existing
+query wire formats and persisted history remain unchanged. Full native operator configuration and
+application controls still need integration; these APIs alone are not a completed operator journey.
+
+Three focused native regressions passed (0.043 s), exercising both query kinds, unlocked transport,
+no history mutation, direct store reopen, changed run context, disconnected/malformed replies and
+identity/cursor refusal before signing. The first fixture reopen tried to reclaim an existing launch
+and correctly refused; the fixture now reopens the ledger directly. Full `npm test` passed: 3,595 native tests (145.188 s, 17 skipped, one slow),
+170 rendered tests, 599 desktop tests and all 44 daemon-demo checks. No process-leak warning occurred;
+existing reliability issues remain unresolved. Hosted validation remains pending. Tests use authenticated fixture signatures and an in-process transport boundary;
+real SSH, another machine, OS custody and packaged acceptance remain unproven.
+
+The first hosted Linux compile/lint run exposed an ungated module referencing the existing
+macOS-only remote transport APIs. The observation module and its reexports now use the same macOS
+boundary. The corrected full local gate passed again: 3,595 native tests (147.920 s, 17 skipped),
+170 rendered tests, 599 desktop tests and all 44 daemon-demo checks, without a process-leak warning.
+Original failed logs and the ongoing original macOS verification were preserved. Fresh hosted Linux
+verification is required before merge.
