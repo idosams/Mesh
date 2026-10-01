@@ -118,8 +118,11 @@ fn config(value: Json) -> Result<Configuration, String> {
         protected,
     })
 }
-#[allow(unsafe_code)]
 fn load(path: &Path) -> Result<Configuration, String> {
+    config(load_private_json(path)?)
+}
+#[allow(unsafe_code)]
+pub(crate) fn load_private_json(path: &Path) -> Result<Json, String> {
     unsafe extern "C" {
         fn geteuid() -> u32;
     }
@@ -163,10 +166,8 @@ fn load(path: &Path) -> Result<Configuration, String> {
     {
         return Err(UNAVAILABLE.into());
     }
-    config(
-        Json::parse(std::str::from_utf8(&bytes).map_err(|_| UNAVAILABLE)?)
-            .map_err(|_| UNAVAILABLE)?,
-    )
+    Json::parse(std::str::from_utf8(&bytes).map_err(|_| UNAVAILABLE)?)
+        .map_err(|_| UNAVAILABLE.into())
 }
 struct Actor(Arc<AppleActorCustody>);
 impl CheckpointSigner for Actor {

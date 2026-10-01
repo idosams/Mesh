@@ -3915,3 +3915,30 @@ boundary. The corrected full local gate passed again: 3,595 native tests (147.92
 170 rendered tests, 599 desktop tests and all 44 daemon-demo checks, without a process-leak warning.
 Original failed logs and the ongoing original macOS verification were preserved. Fresh hosted Linux
 verification is required before merge.
+
+## R68: explicit native coordinator status and discovery commands
+
+Depends on R67 / PR #198, including its platform correction. New canonical implementation; replaces
+no legacy commit. Before GUI setup, the signed macOS app accepts `--coordinator status` and
+`--coordinator results` with a private closed configuration. It reopens existing native installation
+custody, admits strict SSH policy and opens retained fleet history through the existing guarded
+catalogue. It uses R67 one-use unlocked observations. Another catalogue owner refuses without
+adoption. No missing fleet, assignment or identity is provisioned by these commands.
+
+The local `mesh.coordinator-observation-config/v1` has twelve exact fields. Arguments and page
+cursors are bounded; private-file loading reuses the worker's permission/no-follow/size checks.
+Existing worker configuration decoding still wraps that same shared reader. Output distinguishes
+unknown work from a verified empty page and preserves signed offers for native follow-up. Output
+contains private correlation, not authority. Existing persisted fleet and remote wire formats are
+unchanged. No UI control, dispatch, lease renewal, automatic retry or result ingestion is claimed.
+
+Nine focused desktop-native tests passed (2.690 s): exact command routing, closed configuration,
+keys/paths/cursors, private-file permissions/symlinks/size and unchanged contents, unknown/empty
+output, existing worker configuration/provisioning and unsigned refusal before any config/key access.
+The parent platform correction was fast-forwarded with hashes proving all child changes unchanged.
+Full `npm test` passed: 3,600 native tests (147.383 s, 17 skipped, one slow), 170 rendered tests,
+599 desktop tests and all 44 daemon-demo checks, without a process-leak warning. The first full gate
+passed all native tests but failed the existing exact startup-order assertion; that assertion now
+requires the new coordinator route and retains every previous route and GUI-order check. Hosted
+validation remains pending. Eligible signed-app custody, real SSH/second-host
+operation, app controls and full fleet acceptance remain required.

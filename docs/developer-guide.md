@@ -539,3 +539,59 @@ input operation and original-project predecessor are different identities. Reval
 around operations that yield. The handle proves historical correspondence, not current dependency
 eligibility, execution authorization, approval or a retention policy. Remote result import still
 requires authenticated result correspondence and the separate native import boundary.
+
+### Native coordinator observations
+
+An eligible signed macOS Mesh application can inspect an already-recorded remote assignment before
+opening its graphical window:
+
+```text
+Mesh.app/Contents/MacOS/mesh-desktop --coordinator status /absolute/private/coordinator.json
+Mesh.app/Contents/MacOS/mesh-desktop --coordinator results /absolute/private/coordinator.json 0
+```
+
+The configuration file and its containing directory must belong to the current user and have no
+group/other permissions (normally file `0600`, directory `0700`). The file must be a single-link regular file of at most 16 KiB. Use exactly these fields; the example key is a placeholder to
+replace with the independently verified worker public key:
+
+```json
+{
+  "schema": "mesh.coordinator-observation-config/v1",
+  "installation": "/absolute/private/coordinator-identity",
+  "fleets": "/absolute/private/mesh-fleets",
+  "objective": "recorded-objective-id",
+  "lane": "recorded-lane-id",
+  "run": "recorded-run-id",
+  "host": "worker.example.test",
+  "account": "mesh",
+  "port": 22,
+  "identity": "/absolute/private/ssh-key",
+  "known_hosts": "/absolute/private/known-hosts",
+  "worker": "abababababababababababababababababababababababababababababababab"
+}
+```
+
+`installation` is an existing dedicated native installation created by the explicit worker identity
+provisioning command. Its public key must already be the coordinator identity trusted by the remote
+worker; local capture's temporary key cannot replace it. This command only reopens custody and never
+provisions or falls back to a temporary key. `fleets` is the existing app-owned fleet catalogue;
+the objective, lane, run and remote assignment must already exist. Another process owning the
+catalogue causes refusal, without takeover or worker adoption. The command is not a remote dispatch
+setup wizard and cannot create a missing assignment.
+
+The host/account and existing private SSH identity/known-hosts files pass the native transport's
+checks. The fixed `mesh-worker-v1` SSH subsystem must already be configured on the worker. Mesh does
+not enroll host trust, accept arbitrary SSH options, use an agent or proxy, or change SSH settings.
+Both commands perform one bounded observation. Disconnect/timeout remains unknown; no reconnect,
+lease renewal, automatic retry, provider execution or original-project import follows.
+
+Status outputs `mesh.coordinator-status/v1` with the verified target, observation time and retained
+facts. Results outputs `mesh.coordinator-results/v1`; a null `page` means unrecorded/unknown work,
+whereas an empty verified page is a distinct result. Pass the returned `after` cursor explicitly for
+the next page; accepted input cursors are canonical decimal values from 0 through 4096. Offers and
+status correlation can contain private task information, so keep command output local. They confer
+no main approval. App controls and composed result ingestion remain separate integration work.
+
+Native parser, private-file and unsigned-refusal tests cover this command. A successful source build
+or unsigned refusal does not establish signed-app custody, a real SSH connection, second-host
+recovery or packaged end-to-end acceptance.
