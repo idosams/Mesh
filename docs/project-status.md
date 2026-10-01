@@ -470,3 +470,8 @@ ancestry for private original-project import and review. Native checks retain th
 base and refuse cancelled or replaced ancestors around signing. Earlier remote ancestors and the
 complete remote dependency/revocation policy remain unsupported. This does not authorize dispatch,
 guarantee retention or establish packaged/second-host acceptance.
+
+Remote original-project import now binds its parent review at the first authenticated remote launch
+claim. Event replay preserves that exact identity through later duplicate saves and retries, without
+rewriting history. Missing or ambiguous evidence at admission stays refused; late review completion
+cannot silently authorize import. This does not complete remote dependency/revocation or retention.

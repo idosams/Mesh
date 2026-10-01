@@ -18,6 +18,7 @@ mod received_host;
 mod receiving_broker;
 #[cfg(unix)]
 mod receiving_session;
+mod remote_parent;
 #[cfg(unix)]
 pub use input_transfer::{
     transfer_remote_input, RemoteInputTransferOutcome, RemoteInputTransferReceipt,
@@ -326,6 +327,8 @@ pub struct State {
     pub lanes: BTreeMap<String, Lane>,
     /// Acknowledged capture intents and immutable outcomes, retained across restart.
     pub checkpoints: BTreeMap<String, Checkpoint>,
+    // Derived at first remote admission from the committed event prefix; never rebound.
+    remote_parent_reviews: BTreeMap<String, remote_parent::ParentReview>,
     /// Explicit deletion intents and exact prepared operations, never inferred from missing files.
     pub file_deletions: BTreeMap<String, FileDeletion>,
     /// Durable requests remain readable independently of worker attempts.
@@ -847,12 +850,18 @@ impl State {
                 if target.base != assignment.input {
                     return refuse("remote-input-mismatch");
                 }
+                let parent_review = self.select_remote_parent(lane)?;
                 let current = current_run(&mut self.lanes, lane, run)?;
                 if current.state != RunState::Launching || current.launch_owner.is_some() {
                     return refuse("launch-needs-reconciliation");
                 }
                 current.launch_owner = Some(format!("remote:{}", assignment.id));
                 current.remote = Some(assignment.clone());
+                if let Some(selection) = parent_review {
+                    self.remote_parent_reviews
+                        .entry(lane.clone())
+                        .or_insert(selection);
+                }
             }
             Command::AdvanceRemoteLease {
                 lane,

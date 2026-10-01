@@ -66,6 +66,12 @@ impl RemoteProjectInput<'_> {
             .lanes
             .get(remote_lane)
             .ok_or_else(|| refusal("fleet-remote-child-missing"))?;
+        let (checkpoint, bundle) = state
+            .remote_parent_review(remote_lane)
+            .map_err(runtime_error)?;
+        if checkpoint != self.selection.checkpoint || bundle != self.selection.bundle {
+            return Err(refusal("fleet-remote-parent-selection-mismatch"));
+        }
         if project.id() != self.project.id()
             || lane.parent.as_deref() != Some(&self.selection.lane)
             || lane.source_project.as_deref() != Some(project.id())
@@ -318,27 +324,14 @@ impl FleetHistory {
             match lane.parent.as_deref() {
                 None => None,
                 Some(parent) => {
-                    let mut matches = state.checkpoints.iter().filter_map(|(id, cp)| {
-                        (cp.lane == parent
-                            && cp
-                                .result
-                                .as_ref()
-                                .is_some_and(|r| r.complete && r.version == lane.base))
-                        .then_some(cp.review)
-                        .flatten()
-                        .map(|bundle| SavedReviewSelection {
-                            lane: parent.into(),
-                            checkpoint: id.clone(),
-                            version: lane.base,
-                            bundle,
-                        })
-                    });
-                    let selection = matches
-                        .next()
-                        .ok_or_else(|| refusal("fleet-remote-parent-review-missing"))?;
-                    if matches.next().is_some() {
-                        return Err(refusal("fleet-remote-parent-review-ambiguous"));
-                    }
+                    let (checkpoint, bundle) =
+                        state.remote_parent_review(lane_id).map_err(runtime_error)?;
+                    let selection = SavedReviewSelection {
+                        lane: parent.into(),
+                        checkpoint: checkpoint.into(),
+                        version: lane.base,
+                        bundle,
+                    };
                     Some(selection)
                 }
             }

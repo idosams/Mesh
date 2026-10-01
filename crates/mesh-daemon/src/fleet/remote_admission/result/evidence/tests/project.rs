@@ -84,6 +84,18 @@ fn project_import_journey(fault: u8) {
                 },
             )
             .unwrap();
+        let earlier = runtime.state().checkpoints[checkpoint].clone();
+        runtime
+            .record(
+                "later-parent-checkpoint",
+                Command::BeginCheckpoint {
+                    id: "aaa-later-parent".into(),
+                    lane: parent_lane.into(),
+                    origin: earlier.origin,
+                    input_digest: earlier.input_digest,
+                },
+            )
+            .unwrap();
         runtime
             .record(
                 "parent-complete",
@@ -149,6 +161,29 @@ fn project_import_journey(fault: u8) {
     proof
         .verify_and_claim(&mut runtime, "peer", &peer_signature)
         .unwrap();
+    if let Some((_, selection)) = &parent {
+        let selected = selection.to_json();
+        let checkpoint = selected.get("checkpoint").and_then(Json::as_text).unwrap();
+        let earlier = runtime.state().checkpoints[checkpoint].clone();
+        runtime
+            .record(
+                "finish-later-parent",
+                Command::FinishCheckpoint {
+                    id: "aaa-later-parent".into(),
+                    result: earlier.result.unwrap(),
+                },
+            )
+            .unwrap();
+        runtime
+            .record(
+                "review-later-parent",
+                Command::SubmitReview {
+                    checkpoint: "aaa-later-parent".into(),
+                    bundle: earlier.review.unwrap(),
+                },
+            )
+            .unwrap();
+    }
     // Signed worker fixture: retain the old object under a new name and create a distinct object
     // at the old path. The coordinator materializes real independent native local history below.
     let mut initial = original.clone();

@@ -3859,3 +3859,29 @@ is required before merge; the original failed logs and running macOS job were pr
 Remote ancestors are not yet composed into this local ancestry chain. Complete remote dependency
 revocation/selection policy, real second-host operation, retention and packaged end-to-end acceptance
 remain required. These native/renderer tests do not establish those outcomes or human main approval.
+
+## R66: immutable parent review binding at remote admission
+
+Depends on merged R65 / PR #196. New canonical implementation; replaces no legacy commit. Replay now
+captures the unique completed parent checkpoint/review at the lane's first authenticated remote
+launch claim. Later saves, late completion/review submission and retries cannot replace that
+selection. Native retained import and ancestry verification use the captured identity instead of
+searching all current checkpoints by version. Root remote lanes and ordinary local delegation keep
+their existing behavior.
+
+The binding is a projection of the existing committed event prefix; command wire formats, persisted
+records and candidate provenance formats are unchanged. Existing streams reconstruct the same
+historical selection on reopen without appending or rewriting events. Missing or ambiguous evidence
+at the first remote admission remains refused even if a later review would make today's search
+unique; no read or retry silently adopts new authority. An explicit recovery path for such lanes
+remains future work. This selection is historical evidence, not dependency eligibility or approval.
+
+The focused cross-platform runtime regression passed across unique, ambiguous, unfinished and
+unreviewed parent cases, subsequent duplicate checkpoints, retries and store reopen (0.047 s).
+All six native direct/delegated import and recovery journeys passed (3.800 s), now including a parent
+checkpoint completed and reviewed after admission. Full `npm test` passed: 3,592 native tests (144.926 s, 17 skipped), 170 rendered tests,
+599 desktop tests and all 44 daemon-demo checks. One native folder-opening test reported a process
+leak; the original log is retained and reliability issue #172 remains unresolved. Hosted checks
+are pending.
+Earlier remote ancestors, complete revocation policy, retention, packaged acceptance and real
+second-host/provider measurements remain required.

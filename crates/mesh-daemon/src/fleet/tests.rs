@@ -1294,3 +1294,123 @@ fn remote_assignment_cannot_replace_local_claim_or_reuse_another_lanes_identity(
     );
     assert!(runtime.state().lanes["other"].runs[0].remote.is_none());
 }
+
+#[test]
+fn remote_parent_review_is_bound_at_admission_and_never_reselected_on_retry_or_replay() {
+    fn checkpoint(r: &mut Runtime, id: &str, finish: bool, review: bool) {
+        send(
+            r,
+            Command::BeginCheckpoint {
+                id: id.into(),
+                lane: "parent".into(),
+                origin: AgentOrigin {
+                    actor: "actor".into(),
+                    session: "session".into(),
+                    run: "parent-run".into(),
+                    generation: "ab".repeat(16),
+                },
+                input_digest: "cd".repeat(16),
+            },
+        );
+        if finish {
+            send(
+                r,
+                Command::FinishCheckpoint {
+                    id: id.into(),
+                    result: CheckpointResult {
+                        complete: true,
+                        version: RecordDigest::from_bytes([1; 32]),
+                        workspace_digest: "cd".repeat(16),
+                        saved_changes: 0,
+                        issue: None,
+                    },
+                },
+            );
+        }
+        if review {
+            send(
+                r,
+                Command::SubmitReview {
+                    checkpoint: id.into(),
+                    bundle: RecordDigest::from_bytes([7; 32]),
+                },
+            );
+        }
+    }
+    // A unique complete review, ambiguity, unfinished checkpoint, and absent review.
+    for mode in 0..4 {
+        let fixture = Fixture::new();
+        let mut r = fixture.runtime();
+        send(&mut r, start());
+        register_lane(&mut r, "parent", None);
+        send(&mut r, dispatch("parent", "parent-run"));
+        send(&mut r, observe("parent", "parent-run", RunState::Running));
+        checkpoint(&mut r, "original", mode != 2, mode < 2);
+        if mode == 1 {
+            checkpoint(&mut r, "also-original", true, true);
+        }
+        register_lane(&mut r, "worker", Some("parent"));
+        send(&mut r, dispatch("worker", "run"));
+        send(&mut r, remote_claim(remote_assignment()));
+        let bound = r.state().remote_parent_reviews["worker"].clone();
+        match mode {
+            0 => assert_eq!(
+                r.state().remote_parent_review("worker").unwrap(),
+                ("original", RecordDigest::from_bytes([7; 32]))
+            ),
+            1 => assert!(matches!(
+                r.state().remote_parent_review("worker"),
+                Err(Error::Refused("fleet-remote-parent-review-ambiguous"))
+            )),
+            _ => assert!(matches!(
+                r.state().remote_parent_review("worker"),
+                Err(Error::Refused("fleet-remote-parent-review-missing"))
+            )),
+        }
+        if mode == 2 {
+            send(
+                &mut r,
+                Command::FinishCheckpoint {
+                    id: "original".into(),
+                    result: CheckpointResult {
+                        complete: true,
+                        version: RecordDigest::from_bytes([1; 32]),
+                        workspace_digest: "cd".repeat(16),
+                        saved_changes: 0,
+                        issue: None,
+                    },
+                },
+            );
+        }
+        if mode >= 2 {
+            send(
+                &mut r,
+                Command::SubmitReview {
+                    checkpoint: "original".into(),
+                    bundle: RecordDigest::from_bytes([7; 32]),
+                },
+            );
+        }
+        // A lower-sorting later checkpoint must not replace the selected identity.
+        checkpoint(&mut r, "aaa-later", true, true);
+        send(&mut r, observe("worker", "run", RunState::Failed));
+        send(&mut r, dispatch("worker", "retry"));
+        let mut retry = remote_assignment();
+        retry.id = "assignment-two".into();
+        send(
+            &mut r,
+            Command::ClaimRemoteLaunch {
+                lane: "worker".into(),
+                run: "retry".into(),
+                assignment: retry,
+            },
+        );
+        assert_eq!(r.state().remote_parent_reviews["worker"], bound);
+        let revision = r.state().revision;
+        drop(r);
+        let reopened = fixture.runtime();
+        assert_eq!(reopened.state().remote_parent_reviews["worker"], bound);
+        assert_eq!(reopened.state().revision, revision);
+        assert_eq!(fixture.store().revision("objective").unwrap(), revision);
+    }
+}
