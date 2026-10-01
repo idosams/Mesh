@@ -400,3 +400,13 @@ acceptance remains unverified.
  Remote panel selections and view choices are saved privately. Reopening verifies the same native
 history before showing content. If saving is uncertain, keep the current panels and retry; reloading
 the saved set replaces unsaved local choices. Missing history stays listed without restarting agents.
+
+### Remote results based on local lanes
+
+A received result can be prepared for its original project when its input is one exact recorded
+review from a local parent lane. Mesh verifies the complete local ancestry and keeps the original
+project base fixed through preparation, import and review. An unavailable, ambiguous or replaced
+ancestor stops the action; Mesh does not guess a different input. Cancellation or a stopping ancestor
+prevents new imports, while completed outcomes remain available for inspection. Main approval and
+applying files to the original folder remain separate actions. An ancestry chain containing earlier
+remote results still requires additional native support.

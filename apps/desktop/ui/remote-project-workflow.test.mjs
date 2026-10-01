@@ -65,3 +65,25 @@ test('a changed completed outcome is refused and the previous verified result re
  const f=fixture();let corrupt=false;const h=createRemoteProjectWorkflow({changed(){},requestId:()=>hex('e',32),invoke:async(c,a)=>{const v=await f.invoke(c,a);if(c==='remote_fleet_project'&&corrupt&&v.result?.target)v.result.target=hex('f');return v;}});
  await h.load();await h.prepare(selected);await h.retry(hex('e',32),'import');corrupt=true;await h.retry(hex('e',32),'read');assert.equal(state(h).entries[0].outcome.target,hex('7'));assert.ok(state(h).entries[0].error);assert.equal(f.stored().entries.length,1);
 });
+
+function delegatedCandidate(e) {
+ const v=candidate(e),p=v.provenance;p.schema='mesh.remote-project-candidate/v2';
+ p.ancestry={schema:'mesh.remote-project-ancestry/v1',selection:{lane:'parent-child',checkpoint:'parent-result',version:hex('b'),bundle:hex('c')},input_manifest:hex('d'),original_version:p.source_version,steps:[
+  {lane:'parent-root',source_version:p.source_version,starting_version:hex('8'),result_version:hex('9')},
+  {lane:'parent-child',source_version:hex('9'),starting_version:hex('a'),result_version:hex('b')},
+ ]};return v;
+}
+test('delegated candidate validates complete closed ancestry and preserves private import flow',()=>{
+ const e=input('stage'),valid={schema:'mesh.desktop-remote-project-result/v1',selection:e,result:delegatedCandidate(e)};
+ assert.equal(remoteProjectResult(valid,e).candidate.provenance.schema,'mesh.remote-project-candidate/v2');
+ const imported=input('import');const result=outcome(imported);result.candidate=delegatedCandidate(imported);
+ assert.equal(remoteProjectResult({schema:valid.schema,selection:imported,result},imported).outcome.state,'imported');
+ for(const change of [
+  a=>a.original_version=hex('f'), a=>a.steps=[], a=>a.steps.push(...Array(33).fill(a.steps[0])),
+  a=>a.steps[1].source_version=hex('f'), a=>a.steps[1].lane=a.steps[0].lane,
+  a=>a.selection.version=hex('f'), a=>a.selection.lane='different-parent',
+  a=>a.steps[0].path='/tmp/foreign', a=>delete a.steps[0].starting_version,
+  a=>a.steps[0].lane=valid.result.provenance.selection.lane,
+ ]) {const v=structuredClone(valid);change(v.result.provenance.ancestry);assert.throws(()=>remoteProjectResult(v,e));}
+ const legacy=structuredClone(valid);legacy.result.provenance.schema='mesh.remote-project-candidate/v1';assert.throws(()=>remoteProjectResult(legacy,e));
+});

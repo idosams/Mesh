@@ -6,10 +6,12 @@ use crate::TrustedReviewers;
 use std::collections::BTreeMap;
 
 /// Native inputs for exact remote candidate preparation; no filesystem path or approval grant.
-/// This direct-input phase refuses delegated inputs until their complete lineage can be verified.
+/// Delegated inputs require a native retained ancestry proof; raw manifests never supply lineage.
 pub struct RemoteProjectCandidateRequest<'a> {
     /// Exact original-project manifest admitted for the remote assignment.
     pub input: &'a RemoteInputManifest,
+    /// Retained original-project ancestry for a delegated local saved input.
+    pub ancestry: Option<&'a crate::fleet::service::RemoteProjectInput<'a>>,
     /// Durably recorded remote-to-local review correlation.
     pub correlation: &'a RemoteLocalReviewReceipt,
     /// Native admitted original project, never a peer-selected path.
@@ -21,6 +23,12 @@ pub struct RemoteProjectCandidateRequest<'a> {
     /// Exact observed project main head, or no main yet.
     pub expected_main: Option<&'a str>,
 }
+impl RemoteProjectCandidateRequest<'_> {
+    fn original_version(&self) -> RecordDigest {
+        self.ancestry
+            .map_or(self.input.input(), |input| input.root_version())
+    }
+}
 impl NativeRemoteResultReceiver<'_> {
     fn project_context(
         &self,
@@ -31,8 +39,14 @@ impl NativeRemoteResultReceiver<'_> {
         self.verify_complete(runtime)?;
         let state = runtime.state();
         let lane = state.lanes.get(&self.lane).ok_or_else(refused)?;
-        if lane.parent.is_some()
-            || lane.source_project.as_deref() != Some(request.source.id())
+        match request.ancestry {
+            Some(ancestry) => ancestry
+                .verify_remote_child(runtime, &self.lane, request.source, request.input, eligible)
+                .map_err(|_| refused())?,
+            None if lane.parent.is_some() => return Err(refused()),
+            None => {}
+        }
+        if lane.source_project.as_deref() != Some(request.source.id())
             || lane.base != request.input.input()
             || (eligible
                 && (state.cancelled
@@ -89,8 +103,15 @@ impl NativeRemoteResultReceiver<'_> {
         let revision = runtime.state().revision;
         let receipt = request.correlation;
         let source = request.source;
-        let provenance = Json::object([
-            ("schema", Json::text("mesh.remote-project-candidate/v1")),
+        let mut provenance_fields = vec![
+            (
+                "schema",
+                Json::text(if request.ancestry.is_some() {
+                    "mesh.remote-project-candidate/v2"
+                } else {
+                    "mesh.remote-project-candidate/v1"
+                }),
+            ),
             ("objective", Json::text(runtime.objective())),
             ("selection", receipt.selection()),
             ("evidence", Json::text(evidence.digest().to_string())),
@@ -101,7 +122,7 @@ impl NativeRemoteResultReceiver<'_> {
             ("source_project", Json::text(source.id())),
             (
                 "source_version",
-                Json::text(request.input.input().to_string()),
+                Json::text(request.original_version().to_string()),
             ),
             (
                 "expected_main",
@@ -109,7 +130,11 @@ impl NativeRemoteResultReceiver<'_> {
             ),
             ("attribution", Json::text("authenticated-remote-result")),
             ("approval_authority", Json::Bool(false)),
-        ]);
+        ];
+        if let Some(ancestry) = request.ancestry {
+            provenance_fields.push(("ancestry", ancestry.provenance()));
+        }
+        let provenance = Json::object(provenance_fields);
         let result = receipt
             .with_review(
                 self.destination,
@@ -121,7 +146,7 @@ impl NativeRemoteResultReceiver<'_> {
                         .map_err(|error| io::Error::other(error.to_string()))?;
                     // Validate the original history before any candidate allocation is made.
                     let origins = source.with_fleet_input(
-                        request.input.input(),
+                        request.original_version(),
                         request.reviewers,
                         |project, main| {
                             if eligible
@@ -130,14 +155,21 @@ impl NativeRemoteResultReceiver<'_> {
                                 return Err(io::Error::other("remote candidate main changed"));
                             }
                             let original = project
-                                .historical_workspace_preview(request.input.input())
+                                .historical_workspace_preview(request.original_version())
                                 .map_err(|error| io::Error::other(error.to_string()))?;
-                            evidence.evidence().correspondence().project_origins(
-                                request.input,
-                                &original,
-                                &self.manifest,
-                                &snapshot,
-                            )
+                            match request.ancestry {
+                                Some(ancestry) => ancestry.remote_origins(
+                                    evidence.evidence().correspondence(),
+                                    &self.manifest,
+                                    &snapshot,
+                                ),
+                                None => evidence.evidence().correspondence().project_origins(
+                                    request.input,
+                                    &original,
+                                    &self.manifest,
+                                    &snapshot,
+                                ),
+                            }
                         },
                     )?;
                     let candidate = source.stage_fleet_candidate(
@@ -159,7 +191,7 @@ impl NativeRemoteResultReceiver<'_> {
                                 return Err(io::Error::other("remote candidate revision changed"));
                             }
                             source.with_fleet_input(
-                                request.input.input(),
+                                request.original_version(),
                                 request.reviewers,
                                 |_, main| {
                                     if eligible
@@ -176,7 +208,7 @@ impl NativeRemoteResultReceiver<'_> {
                         },
                     )?;
                     source.with_fleet_input(
-                        request.input.input(),
+                        request.original_version(),
                         request.reviewers,
                         |project, main| {
                             if eligible
@@ -226,7 +258,7 @@ impl NativeRemoteResultReceiver<'_> {
             |project, target, snapshot, origins, candidate| {
                 crate::fleet::project_import::compile(
                     project,
-                    request.input.input(),
+                    request.original_version(),
                     target,
                     snapshot,
                     origins,

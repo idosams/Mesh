@@ -7,7 +7,8 @@ use crate::project_attachment::{AttachmentStorage, ObservationLimits};
 use std::fs;
 
 fn project_import_journey(fault: u8) {
-    let cancel_while_signing = fault == 1;
+    let delegated = fault >= 3;
+    let cancel_while_signing = fault % 3 == 1;
     let mut setup = Setup::new();
     let source_path = setup.f.path.join("original-project");
     let metadata = setup.f.path.join("original-metadata");
@@ -56,26 +57,70 @@ fn project_import_journey(fault: u8) {
             },
         )
         .unwrap();
-    runtime
-        .record(
-            "lane",
-            Command::CreateAttachedLane {
-                id: "lane".into(),
-                project: source.id().into(),
-                goal: setup.f.work.goal.clone(),
-                provider: "codex".into(),
-                base: input_version,
-            },
-        )
-        .unwrap();
+    let parent = delegated.then(|| native_parent(&setup, &source, input_version));
+    if let Some((service, selection)) = &parent {
+        setup.manifest = service
+            .prepare_remote_review_input(selection)
+            .unwrap()
+            .manifest()
+            .clone();
+        setup.f.work.assignment.input = setup.manifest.input();
+        setup.f.work.assignment.bundle = setup.manifest.bundle();
+        runtime.refresh().unwrap();
+        let selected = selection.to_json();
+        let parent_lane = selected.get("lane").and_then(Json::as_text).unwrap();
+        let checkpoint = selected.get("checkpoint").and_then(Json::as_text).unwrap();
+        let origin = runtime.state().checkpoints[checkpoint].origin.clone();
+        runtime
+            .record(
+                "lane",
+                Command::Delegate {
+                    id: "lane".into(),
+                    parent: parent_lane.into(),
+                    goal: setup.f.work.goal.clone(),
+                    provider: "codex".into(),
+                    base: setup.manifest.input(),
+                    origin,
+                },
+            )
+            .unwrap();
+        runtime
+            .record(
+                "parent-complete",
+                Command::Observe {
+                    lane: parent_lane.into(),
+                    run: "parent-run".into(),
+                    state: crate::fleet::RunState::Succeeded,
+                },
+            )
+            .unwrap();
+    } else {
+        runtime
+            .record(
+                "lane",
+                Command::CreateAttachedLane {
+                    id: "lane".into(),
+                    project: source.id().into(),
+                    goal: setup.f.work.goal.clone(),
+                    provider: "codex".into(),
+                    base: input_version,
+                },
+            )
+            .unwrap();
+    }
+    let ancestry = parent.as_ref().map(|(service, selection)| {
+        service
+            .prepare_remote_project_input(selection, &source, &trusted)
+            .unwrap()
+    });
     runtime
         .record(
             "bind",
             Command::BindWorkspace {
                 lane: "lane".into(),
                 binding: WorkspaceBinding {
-                    source_version: input_version,
-                    starting_version: Some(input_version),
+                    source_version: setup.manifest.input(),
+                    starting_version: Some(setup.manifest.input()),
                     root: "native-root".into(),
                     digest: "native-digest".into(),
                     installation: "native-installation".into(),
@@ -208,8 +253,20 @@ fn project_import_journey(fault: u8) {
     let correlation = receiver
         .record_local_review(&mut runtime, &setup.manifest, &evidence, &local, actor)
         .unwrap();
+    if let Some(ancestry) = &ancestry {
+        assert!(ancestry
+            .verify_remote_child(&runtime, "missing", &source, &setup.manifest, false)
+            .is_err());
+        let wrong =
+            RemoteInputManifest::new(input_version, setup.manifest.entries().to_vec()).unwrap();
+        assert_ne!(wrong.input(), setup.manifest.input());
+        assert!(ancestry
+            .verify_remote_child(&runtime, "lane", &source, &wrong, false)
+            .is_err());
+    }
     let request_id = "b".repeat(32);
     let request = RemoteProjectCandidateRequest {
+        ancestry: ancestry.as_ref(),
         input: &setup.manifest,
         correlation: &correlation,
         source: &source,
@@ -218,6 +275,7 @@ fn project_import_journey(fault: u8) {
         expected_main: None,
     };
     let retained = crate::fleet::RetainedRemoteProjectRequest {
+        ancestry: ancestry.as_ref(),
         offer: RecordDigest::from_bytes(*Blake3::digest_bytes(offer.as_bytes()).as_bytes()),
         correlation: correlation.digest(),
         source: &source,
@@ -243,16 +301,38 @@ fn project_import_journey(fault: u8) {
             .unwrap(),
         source.id()
     );
-    let context = runtime
-        .retained_remote_project_context(retained.offer, retained.correlation, &source, &trusted)
-        .unwrap();
+    let context = if let Some((service, _)) = &parent {
+        crate::fleet::service::FleetHistory(service.clone())
+            .retained_remote_project_context(
+                retained.offer,
+                retained.correlation,
+                &source,
+                &trusted,
+            )
+            .unwrap()
+    } else {
+        runtime
+            .retained_remote_project_context(
+                retained.offer,
+                retained.correlation,
+                &source,
+                &trusted,
+            )
+            .unwrap()
+    };
     assert_eq!(context.get("observed_main"), Some(&Json::Null));
     assert_eq!(
         context.get("input"),
-        Some(&Json::text(input_version.to_string()))
+        Some(&Json::text(setup.manifest.input().to_string()))
     );
     assert_eq!(context.get("approval_authority"), Some(&Json::Bool(false)));
-    let candidate = runtime.stage_retained_remote_project(&retained).unwrap();
+    let candidate = if let Some((service, _)) = &parent {
+        crate::fleet::service::FleetHistory(service.clone())
+            .stage_retained_remote_project(&retained)
+            .unwrap()
+    } else {
+        runtime.stage_retained_remote_project(&retained).unwrap()
+    };
     let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
         &setup.destination,
         &offer,
@@ -333,16 +413,37 @@ fn project_import_journey(fault: u8) {
         calls: Default::default(),
         refuse: false,
         cancel: cancel_while_signing.then(|| setup.f.path.join("project-coordinator.sqlite")),
-        replace: (fault == 2).then(|| {
-            setup
-                .f
-                .path
-                .join("allocations")
-                .join(format!("result-{}", "a".repeat(32)))
-        }),
+        replace: match fault {
+            2 => Some(
+                setup
+                    .f
+                    .path
+                    .join("allocations")
+                    .join(format!("result-{}", "a".repeat(32))),
+            ),
+            5 => {
+                let (service, selection) = parent.as_ref().unwrap();
+                let selected = selection.to_json();
+                let lane = selected.get("lane").and_then(Json::as_text).unwrap();
+                Some(std::path::PathBuf::from(
+                    service.native_state().unwrap().lanes[lane]
+                        .workspace
+                        .as_ref()
+                        .unwrap()
+                        .root(),
+                ))
+            }
+            _ => None,
+        },
     };
     drop(receiver);
-    let mut outcome = runtime.import_retained_remote_project(&retained, &signer);
+    let mut outcome = if let Some((service, _)) = &parent {
+        crate::fleet::service::FleetHistory(service.clone())
+            .import_retained_remote_project(&retained, &signer)
+            .map_err(|_| crate::fleet::Error::Refused("test-service-import"))
+    } else {
+        runtime.import_retained_remote_project(&retained, &signer)
+    };
     let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
         &setup.destination,
         &offer,
@@ -361,9 +462,19 @@ fn project_import_journey(fault: u8) {
                 Ok(())
             })
             .unwrap();
-        assert!(correlation
-            .reopen(&setup.destination, receiver.manifest(), &trusted)
-            .is_err());
+        if fault == 5 {
+            assert!(ancestry.as_ref().unwrap().verify().is_err());
+            assert!(
+                correlation
+                    .reopen(&setup.destination, receiver.manifest(), &trusted)
+                    .is_ok(),
+                "remote history remains intact when only its ancestor was replaced"
+            );
+        } else {
+            assert!(correlation
+                .reopen(&setup.destination, receiver.manifest(), &trusted)
+                .is_err());
+        }
         // Restore only this test-created empty substitute, preserving the retained original.
         fs::remove_dir(path).unwrap();
         fs::rename(path.with_extension("preserved"), path).unwrap();
@@ -431,6 +542,18 @@ fn project_import_journey(fault: u8) {
             Some(&Json::Null)
         );
     }
+    if delegated {
+        let reopened = crate::fleet::service::FleetHistory(reopen_parent_service(&setup));
+        let before = reopened.0.native_state().unwrap();
+        assert_eq!(
+            reopened
+                .inspect_retained_remote_project_import(&retained, public(&signer.key))
+                .unwrap(),
+            recovered
+        );
+        assert_eq!(reopened.0.native_state().unwrap(), before);
+    }
+
     let receiver = NativeRemoteResultReceiver::reopen_content_receipt(
         &setup.destination,
         &offer,
@@ -564,4 +687,120 @@ fn remote_import_cancelled_while_signing_retains_pending_intent_without_appendin
 #[test]
 fn remote_import_replaced_allocation_during_signing_refuses_and_exact_pending_intent_recovers() {
     project_import_journey(2);
+}
+
+fn native_parent(
+    setup: &Setup,
+    source: &crate::project_attachment::ProvisionedAttachment,
+    version: RecordDigest,
+) -> (
+    std::sync::Arc<crate::fleet::service::FleetService>,
+    crate::fleet::service::SavedReviewSelection,
+) {
+    use crate::fleet::service::SavedReviewSelection;
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::sync::Arc;
+    let root = setup.f.path.join("native-parent-lanes");
+    fs::create_dir(&root).unwrap();
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let service = reopen_parent_service(setup);
+    let lane = service
+        .create_root_from_attachment(
+            "parent",
+            "Prepare delegated input",
+            "codex",
+            source,
+            version,
+        )
+        .unwrap();
+    service
+        .native_command(
+            "parent-dispatch",
+            Command::Dispatch {
+                lane: lane.clone(),
+                run: "parent-run".into(),
+            },
+        )
+        .unwrap();
+    let signer = Arc::new(ImportSigner {
+        key: SigningKey::from_bytes(&[73; 32]),
+        calls: std::sync::atomic::AtomicUsize::new(0),
+        refuse: false,
+        cancel: None,
+        replace: None,
+    });
+    let credential = service
+        .grant_with_signer(&lane, "parent-run", "parent-session", signer)
+        .unwrap();
+    service
+        .native_command(
+            "parent-running",
+            Command::Observe {
+                lane: lane.clone(),
+                run: "parent-run".into(),
+                state: crate::fleet::RunState::Running,
+            },
+        )
+        .unwrap();
+    let saved = service
+        .agent_call(
+            credential.transport_value(),
+            "checkpoint",
+            &Json::object([("request", Json::text("parent-result"))]),
+        )
+        .unwrap();
+    assert_eq!(saved.get("complete"), Some(&Json::Bool(true)));
+    let checkpoint = saved.get("checkpoint").and_then(Json::as_text).unwrap();
+    let review = service
+        .agent_call(
+            credential.transport_value(),
+            "submit_review",
+            &Json::object([("checkpoint", Json::text(checkpoint))]),
+        )
+        .unwrap();
+    let selection = SavedReviewSelection::new(
+        &lane,
+        checkpoint,
+        saved.get("version").and_then(Json::as_text).unwrap(),
+        review.get("bundle").and_then(Json::as_text).unwrap(),
+    )
+    .unwrap();
+    (service, selection)
+}
+#[test]
+fn delegated_remote_result_imports_through_native_parent_ancestry_and_recovers() {
+    project_import_journey(3);
+}
+#[test]
+fn delegated_remote_import_cancelled_during_signing_retains_pending_intent() {
+    project_import_journey(4);
+}
+
+fn reopen_parent_service(setup: &Setup) -> std::sync::Arc<crate::fleet::service::FleetService> {
+    use crate::fleet::service::{FleetService, NativeLaneAllocator};
+    use std::sync::Arc;
+    let root = setup.f.path.join("native-parent-lanes");
+    let allocator = NativeLaneAllocator::open(
+        &root,
+        crate::TrustedReviewers::default(),
+        crate::CheckpointRuntimeParameters::selected_defaults(),
+        vec![],
+    )
+    .unwrap();
+    Arc::new(
+        FleetService::new(
+            Runtime::open(
+                FleetStore::open(setup.f.path.join("project-coordinator.sqlite")).unwrap(),
+                "objective",
+            )
+            .unwrap(),
+            Arc::new(allocator),
+            ["codex".to_owned()].into_iter().collect(),
+        )
+        .unwrap(),
+    )
+}
+#[test]
+fn delegated_remote_import_replaced_ancestor_during_signing_preserves_pending_and_recovers() {
+    project_import_journey(5);
 }

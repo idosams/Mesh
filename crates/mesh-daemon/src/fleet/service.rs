@@ -316,11 +316,18 @@ impl FleetHistory {
         source: &crate::project_attachment::ProvisionedAttachment,
         trust: &TrustedReviewers,
     ) -> Result<Json, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .retained_remote_project_context(offer, correlation, source, trust)
-            .map_err(runtime_error)
+        let request = super::RetainedRemoteProjectRequest {
+            offer,
+            correlation,
+            source,
+            reviewers: trust,
+            request: "00000000000000000000000000000000",
+            expected_main: None,
+            ancestry: None,
+        };
+        self.with_retained_project_ancestry(&request, |runtime, request| {
+            runtime.retained_remote_project_context_with(request)
+        })
     }
     /// Recover an exact remote import's recorded actor/outcome without loading a private key.
     #[cfg(target_os = "macos")]
@@ -328,11 +335,9 @@ impl FleetHistory {
         &self,
         request: &super::RetainedRemoteProjectRequest<'_>,
     ) -> Result<Option<(mesh_types::PublicKey, Json)>, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .recorded_retained_remote_project_import(request)
-            .map_err(runtime_error)
+        self.with_retained_project_ancestry(request, |runtime, request| {
+            runtime.recorded_retained_remote_project_import(request)
+        })
     }
     /// Stage a received remote result from retained native selectors and original-project history.
     #[cfg(target_os = "macos")]
@@ -340,11 +345,9 @@ impl FleetHistory {
         &self,
         request: &super::RetainedRemoteProjectRequest<'_>,
     ) -> Result<Json, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .stage_retained_remote_project(request)
-            .map_err(runtime_error)
+        self.with_retained_project_ancestry(request, |runtime, request| {
+            runtime.stage_retained_remote_project(request)
+        })
     }
     /// Read a retained remote import outcome without a private signing key.
     #[cfg(target_os = "macos")]
@@ -353,11 +356,9 @@ impl FleetHistory {
         request: &super::RetainedRemoteProjectRequest<'_>,
         actor: mesh_types::PublicKey,
     ) -> Result<Json, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .inspect_retained_remote_project_import(request, actor)
-            .map_err(runtime_error)
+        self.with_retained_project_ancestry(request, |runtime, request| {
+            runtime.inspect_retained_remote_project_import(request, actor)
+        })
     }
     /// Import through native signing/recovery; exact eligibility is checked around signing.
     #[cfg(target_os = "macos")]
@@ -366,11 +367,9 @@ impl FleetHistory {
         request: &super::RetainedRemoteProjectRequest<'_>,
         signer: &dyn super::CandidateImportSigner,
     ) -> Result<Json, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .import_retained_remote_project(request, signer)
-            .map_err(runtime_error)
+        self.with_retained_project_ancestry(request, |runtime, request| {
+            runtime.import_retained_remote_project(request, signer)
+        })
     }
     /// Read or create the exact original-project review for a received result.
     #[cfg(target_os = "macos")]
@@ -379,11 +378,9 @@ impl FleetHistory {
         request: &super::RetainedRemoteProjectRequest<'_>,
         create: bool,
     ) -> Result<Json, Unavailable> {
-        self.0
-            .lock()?
-            .runtime
-            .review_retained_remote_project_import(request, create)
-            .map_err(runtime_error)
+        self.with_retained_project_ancestry(request, |runtime, request| {
+            runtime.review_retained_remote_project_import(request, create)
+        })
     }
     /// Native offline remote review discovery, separate from local checkpoints and agent sessions.
     #[cfg(target_os = "macos")]

@@ -15,6 +15,8 @@ pub struct RetainedRemoteProjectRequest<'a> {
     pub request: &'a str,
     /// Observed original-project main; no automatic rebasing is performed.
     pub expected_main: Option<&'a str>,
+    /// Native retained local ancestry, required for delegated input.
+    pub ancestry: Option<&'a crate::fleet::service::RemoteProjectInput<'a>>,
 }
 impl Runtime {
     /// Locate a registered original project by retained result identities, never a peer path.
@@ -28,9 +30,6 @@ impl Runtime {
             .filter(|v| v.digest() == correlation)
             .ok_or_else(refused)?;
         let lane = self.state().lanes.get(&receipt.lane).ok_or_else(refused)?;
-        if lane.parent.is_some() {
-            return Err(refused());
-        }
         lane.source_project.clone().ok_or_else(refused)
     }
     /// Verify exact received history and report current original-project main without staging.
@@ -48,11 +47,22 @@ impl Runtime {
             reviewers,
             request: "00000000000000000000000000000000",
             expected_main: None,
+            ancestry: None,
         };
-        self.with_retained_remote_project(&request, |receiver, runtime, native| {
+        self.retained_remote_project_context_with(&request)
+    }
+    pub(in crate::fleet) fn retained_remote_project_context_with(
+        &mut self,
+        request: &RetainedRemoteProjectRequest<'_>,
+    ) -> Result<Json, Error> {
+        let source = request.source;
+        let reviewers = request.reviewers;
+        let offer = request.offer;
+        let correlation = request.correlation;
+        self.with_retained_remote_project(request, |receiver, runtime, native| {
             receiver.project_context(runtime, native, false)?;
             let main = source
-                .with_fleet_input(native.input.input(), reviewers, |_, main| Ok(main))
+                .with_fleet_input(native.original_version(), reviewers, |_, main| Ok(main))
                 .map_err(store_error)?;
             Ok(Json::object([
                 ("schema", Json::text("mesh.remote-project-context/v1")),
@@ -139,15 +149,38 @@ impl Runtime {
             .lanes
             .get(&correlation.lane)
             .ok_or_else(refused)?;
-        if lane.parent.is_some() || lane.source_project.as_deref() != Some(request.source.id()) {
+        if lane.source_project.as_deref() != Some(request.source.id()) {
             return Err(refused());
         }
-        let input = request
-            .source
-            .prepare_remote_input(&lane.base.to_string())
-            .map_err(store_error)?;
+        let input = match request.ancestry {
+            Some(ancestry) => {
+                ancestry
+                    .verify_remote_child(
+                        self,
+                        &correlation.lane,
+                        request.source,
+                        ancestry.native_manifest(),
+                        false,
+                    )
+                    .map_err(|_| refused())?;
+                None
+            }
+            None if lane.parent.is_some() => return Err(refused()),
+            None => Some(
+                request
+                    .source
+                    .prepare_remote_input(&lane.base.to_string())
+                    .map_err(store_error)?,
+            ),
+        };
+        let manifest = match (request.ancestry, input.as_ref()) {
+            (Some(ancestry), None) => ancestry.native_manifest(),
+            (None, Some(input)) => input.manifest(),
+            _ => return Err(refused()),
+        };
         let native = RemoteProjectCandidateRequest {
-            input: input.manifest(),
+            ancestry: request.ancestry,
+            input: manifest,
             correlation: &correlation,
             source: request.source,
             reviewers: request.reviewers,
@@ -155,7 +188,12 @@ impl Runtime {
             expected_main: request.expected_main,
         };
         let result = action(&receiver, self, &native)?;
-        input.verify_roots().map_err(store_error)?;
+        if let Some(input) = &input {
+            input.verify_roots().map_err(store_error)?;
+        }
+        if let Some(ancestry) = request.ancestry {
+            ancestry.verify_runtime(self).map_err(|_| refused())?;
+        }
         if self.retained_remote_local_review(request.offer)?.as_ref() != Some(&correlation)
             || self.remote_review_location(&correlation)?.as_deref() != Some(&location)
             || destination.history_binding().map_err(store_error)? != binding

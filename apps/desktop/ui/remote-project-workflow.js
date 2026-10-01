@@ -25,16 +25,35 @@ function context(raw,s) {
   check(v.observed_main===null || (keys(v.observed_main,'head,bundle,target') && ['head','bundle','target'].every(k=>hex(v.observed_main[k]))));
   return v;
 }
+function ancestry(v,p) {
+  const id=v=>typeof v==='string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(v);
+  check(keys(v,'schema,selection,input_manifest,original_version,steps') && v.schema==='mesh.remote-project-ancestry/v1'
+    && hex(v.input_manifest) && v.original_version===p.source_version && hex(v.original_version)
+    && keys(v.selection,'lane,checkpoint,version,bundle') && id(v.selection.lane) && id(v.selection.checkpoint)
+    && hex(v.selection.version) && hex(v.selection.bundle) && v.selection.lane!==p.selection.lane
+    && Array.isArray(v.steps) && v.steps.length>0 && v.steps.length<=33);
+  const seen=new Set();
+  v.steps.forEach((step,i)=>{
+    check(keys(step,'lane,source_version,starting_version,result_version') && id(step.lane) && !seen.has(step.lane)
+      && ['source_version','starting_version','result_version'].every(k=>hex(step[k]))
+      && step.source_version===(i===0?v.original_version:v.steps[i-1].result_version)
+      && step.lane!==p.selection.lane);
+    seen.add(step.lane);
+  });
+  const leaf=v.steps.at(-1);check(leaf.lane===v.selection.lane && leaf.result_version===v.selection.version);
+}
 function candidate(v,e) {
   check(keys(v,'schema,candidate,project,provenance,content_digest,files,directories,bytes,state,approval_authority') && v.schema==='mesh.fleet-project-candidate/v1'
     && /^candidate-[a-f0-9]{64}$/.test(v.candidate) && v.project===e.project && hex(v.content_digest) && v.state==='staged' && v.approval_authority===false
     && ['files','directories','bytes'].every(k=>Number.isSafeInteger(v[k])&&v[k]>=0));
-  const p=v.provenance;check(keys(p,'schema,objective,selection,evidence,correspondence,source_project,source_version,expected_main,attribution,approval_authority')
-    && p.schema==='mesh.remote-project-candidate/v1' && p.objective===e.objective && p.source_project===e.project && p.expected_main===e.expected_main
+  const p=v.provenance;const delegated=p?.schema==='mesh.remote-project-candidate/v2';
+  check(keys(p,'schema,objective,selection,evidence,correspondence,source_project,source_version,expected_main,attribution,approval_authority'+(delegated?',ancestry':''))
+    && (delegated || p.schema==='mesh.remote-project-candidate/v1') && p.objective===e.objective && p.source_project===e.project && p.expected_main===e.expected_main
     && p.selection?.offer===e.offer && p.selection?.correlation===e.correlation && hex(p.evidence) && hex(p.correspondence) && hex(p.source_version)
     && p.attribution==='authenticated-remote-result' && p.approval_authority===false);
   check(keys(p.selection,'offer,correlation,lane,run,version,bundle,remote_version') && ['offer','correlation','version','bundle','remote_version'].every(k=>hex(p.selection[k]))
     && ['lane','run'].every(k=>typeof p.selection[k]==='string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(p.selection[k])));
+  if(delegated)ancestry(p.ancestry,p);
   return v;
 }
 function imported(v,e) {
