@@ -462,3 +462,9 @@ Explicit status reads and exact retries preserve uncertain outcomes; separate re
 independently. English/Hebrew controls and refusal/restart tests cover this source workflow. Native
 human approval and original-folder application remain separate. Packaged, real SSH/second-host and
 OS-key acceptance are still unverified; transitive lineage and retention remain open.
+
+Native delegated-input preparation now retains complete local ancestry, original-project object
+correspondence and exact saved export bytes together. Reads revalidate the recorded selection and
+all retained allocation identities, including after restart without worker adoption. This is native
+historical evidence; integrating it with authenticated remote-result import and current dependency
+eligibility remains required. It neither authorizes dispatch nor guarantees content retention.

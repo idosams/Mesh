@@ -3792,3 +3792,26 @@ assertions. Full `npm test` passed: 3,588 native tests, 17 skipped, 148.020 s, 1
 tests, 598 desktop tests and all 44 daemon-demo checks. One slow comparison test completed; no
 process-leak warning occurred. Earlier reliability issues remain open. This is not signed packaged
 or second-host acceptance.
+
+## R64: retained native ancestry for delegated remote input
+
+Depends on R63 / PR #194. New canonical implementation; replaces no legacy commit. Native callers
+can prepare a `RemoteProjectInput` from an exact local saved review and independently admitted
+original project. It retains the original input, complete bounded local ancestry and every native
+history allocation. Exported input identity stays distinct from the original-project predecessor;
+object correspondence comes from the complete historical chain, never matching current filenames.
+
+Every manifest, predecessor, correspondence and chunk read revalidates the recorded selection,
+lineage and directory identities. Chunk reads also verify after reading. Later working edits do not
+replace saved bytes. The handle can be reopened through retained history without worker adoption.
+It introduces no persisted format, signing, execution, dependency eligibility or approval authority.
+Holding directory handles is not a retention/GC guarantee; missing content still refuses.
+
+The native delegated-project journey covers exact parent/child history, later unrelated parent work,
+later unsaved child work, wrong-review refusal, replaced-ancestor refusal on both metadata and bytes,
+and restart without acquiring execution. Focused verification passed (one journey, 2.122 s).
+Full `npm test` passed: 3,588 native tests, 17 skipped, 150.903 s; 170 rendered tests,
+598 desktop tests and all 44 daemon-demo checks. One slow test completed; no process-leak warning
+occurred. Earlier reliability issues remain open. Composition with authenticated remote result correspondence,
+transitive remote ancestors and current dependency/revocation checks remain the next required work;
+this input handle alone does not enable delegated remote imports or complete remote acceptance.

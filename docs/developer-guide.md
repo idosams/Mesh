@@ -528,3 +528,14 @@ The returned `AuthenticatedRemoteResultEvidence` is a current authenticated obse
 import authority. It writes no CAS, working files or import state. Durable evidence retention and
 coordinator original-project candidate preparation still need to bind this exact offer/evidence
 to native source custody before any review import. Real second-machine acceptance remains required.
+
+### Delegated input ancestry
+
+Native integrations preparing a local saved result for remote work can use
+`FleetService::prepare_remote_project_input` or the history-only `FleetHistory` equivalent. The
+returned borrowed handle retains each ancestor allocation and the original-project input. Use its
+verified `manifest`, `original_version`, `original_objects` and `read_chunk` accessors; the delegated
+input operation and original-project predecessor are different identities. Revalidate the handle
+around operations that yield. The handle proves historical correspondence, not current dependency
+eligibility, execution authorization, approval or a retention policy. Remote result import still
+requires authenticated result correspondence and the separate native import boundary.

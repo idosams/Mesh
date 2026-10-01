@@ -892,15 +892,65 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
             == Some(&Json::text("upstream.txt"))
             && row.get("source") == Some(&Json::Null)));
     assert!(!mapping.encode().contains("unrelated-later.txt"));
+    let retained_input = service
+        .prepare_remote_project_input(&selection, &f.history, &TrustedReviewers::default())
+        .unwrap();
+    assert_eq!(
+        retained_input.manifest().unwrap().input().to_string(),
+        text(&selection.to_json(), "version")
+    );
+    assert_eq!(
+        retained_input.original_version().unwrap().to_string(),
+        text(&lineage[0], "source_version")
+    );
+    assert!(!retained_input.original_objects().unwrap().is_empty());
+    let retained_manifest = retained_input.manifest().unwrap().clone();
+    let retained_origins = retained_input.original_objects().unwrap().clone();
+    let work_chunk = retained_manifest
+        .entries()
+        .iter()
+        .find_map(|entry| match entry {
+            mesh_daemon::fleet::RemoteInputEntry::File { path, chunks, .. }
+                if path == "work.txt" =>
+            {
+                Some(chunks[0].digest)
+            }
+            _ => None,
+        })
+        .unwrap();
+    fs::write(child_root.join("work.txt"), "later unsaved child work\n").unwrap();
+    assert_eq!(
+        retained_input.read_chunk(work_chunk).unwrap(),
+        b"child result\n"
+    );
+    let wrong_review = SavedReviewSelection::new(
+        child_lane,
+        text(&selection.to_json(), "checkpoint"),
+        text(&selection.to_json(), "version"),
+        &"ab".repeat(32),
+    )
+    .unwrap();
+    assert!(service
+        .prepare_remote_project_input(&wrong_review, &f.history, &TrustedReviewers::default())
+        .is_err());
+    assert_eq!(service.native_state().unwrap(), before);
     let moved = root.with_extension("temporarily-moved");
     fs::rename(&root, &moved).unwrap();
     fs::create_dir(&root).unwrap();
+    assert!(
+        retained_input.verify().is_err(),
+        "retained input rejects a replaced ancestor"
+    );
+    assert!(retained_input.read_chunk(work_chunk).is_err());
+    assert!(retained_input.original_objects().is_err());
     let refused = service
         .saved_project_mapping(&selection, &f.history, &TrustedReviewers::default(), None)
         .is_err();
     fs::remove_dir(&root).unwrap();
     fs::rename(&moved, &root).unwrap();
     assert!(refused, "a replaced ancestor must refuse the whole mapping");
+    retained_input.verify().unwrap();
+    drop(retained_input);
     let candidate_request = "b".repeat(32);
     let candidate_root = f.history.metadata_path().join("fleet-candidates");
     let versions_before = f
@@ -1221,6 +1271,18 @@ fn delegated_project_mapping_includes_exact_ancestry_and_survives_restart() {
     assert_eq!(
         fs::read(retained.join("import.json")).unwrap(),
         import_receipt
+    );
+    let reopened_input = history
+        .prepare_remote_project_input(&selection, &f.history, &TrustedReviewers::default())
+        .unwrap();
+    assert_eq!(reopened_input.manifest().unwrap(), &retained_manifest);
+    assert_eq!(
+        reopened_input.original_objects().unwrap(),
+        &retained_origins
+    );
+    assert_eq!(
+        reopened_input.read_chunk(work_chunk).unwrap(),
+        b"child result\n"
     );
     let before = reopened.snapshot().unwrap();
     assert_eq!(
