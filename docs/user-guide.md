@@ -406,7 +406,9 @@ the saved set replaces unsaved local choices. Missing history stays listed witho
 A received result can be prepared for its original project when its input is one exact recorded
 review from a local parent lane. Mesh verifies the complete local ancestry and keeps the original
 project base fixed through preparation, import and review. An unavailable, ambiguous or replaced
-ancestor stops the action; Mesh does not guess a different input. Cancellation or a stopping ancestor
+ancestor stops the action; Mesh does not guess a different input. The parent review is fixed when
+remote execution is first admitted. Later saves cannot change it. If no unique completed review
+existed then, adding a review later does not silently unblock that remote lane. Cancellation or a stopping ancestor
 prevents new imports, while completed outcomes remain available for inspection. Main approval and
 applying files to the original folder remain separate actions. An ancestry chain containing earlier
 remote results still requires additional native support.
