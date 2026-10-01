@@ -169,6 +169,7 @@ impl AttachmentHost {
             let source = self.review_history(&selected.project)?;
             let history = self.fleet_history(&selected.objective)?;
             let request = mesh_daemon::fleet::RetainedRemoteProjectRequest {
+                ancestry: None,
                 offer,
                 correlation,
                 source: &source,

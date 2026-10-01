@@ -3815,3 +3815,47 @@ Full `npm test` passed: 3,588 native tests, 17 skipped, 150.903 s; 170 rendered 
 occurred. Earlier reliability issues remain open. Composition with authenticated remote result correspondence,
 transitive remote ancestors and current dependency/revocation checks remain the next required work;
 this input handle alone does not enable delegated remote imports or complete remote acceptance.
+
+## R65: remote results composed with retained local ancestry
+
+Depends on R64 / PR #195. New canonical implementation; replaces no legacy commit. A received
+remote result may now derive from a recorded local parent review. Native service code resolves one
+complete parent checkpoint/review at the assigned input, opens its ancestry outside the fleet mutex,
+then performs the closed action under that mutex. Missing or ambiguous parent reviews refuse; a
+caller cannot substitute a renderer-selected manifest or ancestry. Validation inside the action does
+not reacquire the fleet mutex.
+
+The delegated input and original-project predecessor remain distinct. Authenticated remote object
+correspondence is composed with complete native local ancestry: renames retain original object
+identity while additions/replacements remain new. Native eligibility checks reject cancellation and
+stopping/cancelled ancestors around signing. Replaced ancestry refuses before append; durable pending
+intent remains recoverable after the exact original identity is restored. Historical inspection does
+not grant mutation authority and does not erase a completed import after cancellation.
+
+Direct candidate provenance remains `mesh.remote-project-candidate/v1`. Delegated candidates use
+`mesh.remote-project-candidate/v2`, adding closed `mesh.remote-project-ancestry/v1` evidence with the
+exact parent selection, manifest, original predecessor and bounded local steps. Existing candidate,
+import and outbox envelopes remain unchanged. Desktop readers accept both provenance versions and
+validate complete step linkage, unique lanes, exact root/leaf bindings and closed fields. Older
+readers refuse the new provenance; there is no automatic data rewrite or approval migration.
+
+Six native journeys passed (4.04 s): existing direct import/recovery, delegated service import and
+recorded recovery, cancellation during signing, and ancestor replacement during signing. The
+expanded fixture uses a real native allocated parent and saved review with fixture signing keys;
+newly opened history services recover the same outcome without changing lifecycle state. Initial
+fixture failures skipped a required running observation and retained a receiving-store owner during
+reopen; both were corrected without changing production guards. Eight desktop workflow tests passed,
+including malformed ancestry refusals. Full `npm test` passed: 3,591 native tests, 17 skipped,
+150.044 s; 170 rendered tests, 599 desktop tests and all 44 daemon-demo checks. One slow test
+completed; no process-leak warning occurred. Existing reliability issues remain open. The first
+full gate stopped on a test-helper return-binding lint; it was corrected without weakening checks.
+
+Initial hosted Linux compile/lint checks caught a macOS-only correspondence type referenced by
+ungated import helpers. Five macOS-only helper guards now match their native consumers; shared
+retained-input verification remains cross-platform. The corrected full local gate passed again:
+3,591 native tests (148.927 s, 17 skipped), desktop and daemon-demo checks. Hosted Linux verification
+is required before merge; the original failed logs and running macOS job were preserved.
+
+Remote ancestors are not yet composed into this local ancestry chain. Complete remote dependency
+revocation/selection policy, real second-host operation, retention and packaged end-to-end acceptance
+remain required. These native/renderer tests do not establish those outcomes or human main approval.

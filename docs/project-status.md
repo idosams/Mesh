@@ -465,6 +465,8 @@ OS-key acceptance are still unverified; transitive lineage and retention remain 
 
 Native delegated-input preparation now retains complete local ancestry, original-project object
 correspondence and exact saved export bytes together. Reads revalidate the recorded selection and
-all retained allocation identities, including after restart without worker adoption. This is native
-historical evidence; integrating it with authenticated remote-result import and current dependency
-eligibility remains required. It neither authorizes dispatch nor guarantees content retention.
+all retained allocation identities, including after restart without worker adoption. Received remote results can now compose authenticated correspondence with this retained local
+ancestry for private original-project import and review. Native checks retain the distinct original
+base and refuse cancelled or replaced ancestors around signing. Earlier remote ancestors and the
+complete remote dependency/revocation policy remain unsupported. This does not authorize dispatch,
+guarantee retention or establish packaged/second-host acceptance.
