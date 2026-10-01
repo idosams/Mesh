@@ -3942,3 +3942,24 @@ passed all native tests but failed the existing exact startup-order assertion; t
 requires the new coordinator route and retains every previous route and GUI-order check. Hosted
 validation remains pending. Eligible signed-app custody, real SSH/second-host
 operation, app controls and full fleet acceptance remain required.
+
+
+## R69: independent connections retain the native fleet ledger authority
+
+New canonical prerequisite for unlocked result ingestion; replaces no legacy commit. Based on
+merged R67 / PR #198; independent of R68's coordinator observation command. A guarded fleet store
+can reopen a separate connection using its own SQLite filename and the same retained native
+authority. It accepts no new caller-selected path and never initializes missing history. Unguarded
+stores refuse. Every connection retains the existing before/after identity checks, transactional
+revision enforcement and exact request idempotency. No schema or wire format changes occur.
+
+Three focused regressions passed (0.023 s): committed events are visible in both directions; stale
+writers refuse and exact retries replay; authority survives dropping the original connection and
+revocation reaches the remaining connection; missing/replaced history is not initialized or modified.
+The initial focused build caught a mistyped existing method name in the test, corrected before these
+runs. The full local gate passed on the PR #198 base: 3,598 native tests (146.401 s, 17 skipped),
+170 rendered tests, 599 desktop tests and all 44 daemon-demo checks, with no process-leak warning.
+The increment is now reconciled onto merged PR #199; combined validation and hosted checks are pending.
+This storage API alone does not connect ingestion
+to the native service, add operator controls, adopt workers or approve main. Those remain subsequent
+increments, alongside the full outstanding fleet acceptance plan.

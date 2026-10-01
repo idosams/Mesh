@@ -488,3 +488,9 @@ and a recorded remote assignment in an available fleet catalogue. They observe r
 without taking over workers or creating missing history. Source tests cover closed configuration
 and unsigned refusal; signed-app custody and real SSH/second-host operation remain unverified.
 Graphical controls, remote dispatch setup and composed ingestion are still separate required work.
+
+
+Guarded fleet storage now supports independent connections retaining the exact native authority and
+ordinary revision/idempotency checks. Missing history cannot be recreated by reopening a connection.
+This is a prerequisite for moving result ingestion outside the service mutex; the service integration
+and end-to-end responsiveness evidence remain outstanding.
