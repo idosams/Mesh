@@ -481,3 +481,10 @@ observations. SSH waits occur outside the fleet mutex; reply verification rechec
 assignment before accepting facts. This preserves access to live views and cancellation during a
 network wait. Native coordinator configuration and application controls remain to be integrated;
 fixture transport coverage is not real second-host or packaged proof.
+
+The macOS native application now has explicit coordinator status and paged-result discovery
+commands before GUI startup. They require an existing private native identity, configured SSH trust,
+and a recorded remote assignment in an available fleet catalogue. They observe retained facts
+without taking over workers or creating missing history. Source tests cover closed configuration
+and unsigned refusal; signed-app custody and real SSH/second-host operation remain unverified.
+Graphical controls, remote dispatch setup and composed ingestion are still separate required work.

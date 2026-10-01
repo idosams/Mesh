@@ -17,6 +17,8 @@ mod attachment_capture;
 #[cfg(unix)]
 mod attachment_host;
 mod attachment_recovery;
+#[cfg(target_os = "macos")]
+mod coordinator_observation;
 #[cfg(unix)]
 mod fleet_host;
 #[cfg(unix)]
@@ -13167,6 +13169,13 @@ mod mesh_mcp_mode_tests {
 #[cfg(target_os = "macos")]
 fn main() {
     if build_identity::run_if_requested() {
+        return;
+    }
+    if let Some(result) = coordinator_observation::run_if_requested() {
+        if let Err(problem) = result {
+            eprintln!("Mesh coordinator: {problem}");
+            std::process::exit(1);
+        }
         return;
     }
     if let Some(result) = worker_installation::run_if_requested() {
