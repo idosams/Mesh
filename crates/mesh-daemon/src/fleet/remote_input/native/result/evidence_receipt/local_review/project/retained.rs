@@ -17,6 +17,55 @@ pub struct RetainedRemoteProjectRequest<'a> {
     pub expected_main: Option<&'a str>,
 }
 impl Runtime {
+    /// Locate a registered original project by retained result identities, never a peer path.
+    pub fn retained_remote_project_source(
+        &self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+    ) -> Result<String, Error> {
+        let receipt = self
+            .retained_remote_local_review(offer)?
+            .filter(|v| v.digest() == correlation)
+            .ok_or_else(refused)?;
+        let lane = self.state().lanes.get(&receipt.lane).ok_or_else(refused)?;
+        if lane.parent.is_some() {
+            return Err(refused());
+        }
+        lane.source_project.clone().ok_or_else(refused)
+    }
+    /// Verify exact received history and report current original-project main without staging.
+    pub fn retained_remote_project_context(
+        &mut self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+        source: &ProvisionedAttachment,
+        reviewers: &TrustedReviewers,
+    ) -> Result<Json, Error> {
+        let request = RetainedRemoteProjectRequest {
+            offer,
+            correlation,
+            source,
+            reviewers,
+            request: "00000000000000000000000000000000",
+            expected_main: None,
+        };
+        self.with_retained_remote_project(&request, |receiver, runtime, native| {
+            receiver.project_context(runtime, native, false)?;
+            let main = source
+                .with_fleet_input(native.input.input(), reviewers, |_, main| Ok(main))
+                .map_err(store_error)?;
+            Ok(Json::object([
+                ("schema", Json::text("mesh.remote-project-context/v1")),
+                ("objective", Json::text(runtime.objective())),
+                ("offer", Json::text(offer.to_string())),
+                ("correlation", Json::text(correlation.to_string())),
+                ("project", Json::text(source.id())),
+                ("input", Json::text(native.input.input().to_string())),
+                ("observed_main", main),
+                ("approval_authority", Json::Bool(false)),
+            ]))
+        })
+    }
     fn with_retained_remote_project<T>(
         &mut self,
         request: &RetainedRemoteProjectRequest<'_>,

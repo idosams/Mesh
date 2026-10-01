@@ -382,7 +382,21 @@ Choose **Pin saved review** to keep a received snapshot in an independent panel.
 choices in one panel do not replace another. Native history verifies each exact saved review and
 artifact; missing history shows an unavailable state rather than restarting a worker.
 
-These panels show the received result tree. Original-project comparison and import are not available
-from them yet. They cannot approve Mesh main. Remote panel selections and view choices are saved privately. Reopening verifies the same native
+These panels show the received result tree. Choose **Prepare for original project** to verify its
+original project, fix the observed main and privately prepare the received result. Exact retry inputs
+are saved before the action. Under **Remote project actions**, choose **Save as a project version**,
+then **Create project review** and **Open this project review**. The project's existing review surface
+handles inspection and separate human approval. These remote panels cannot approve Mesh main or
+replace working files.
+
+Pending actions remain visible after closing a panel or restarting. Reopening never repeats them:
+choose **Read saved import status** to inspect retained truth, or **Retry the exact request** to repeat
+the saved action. If main or source history changed, the exact operation may refuse; it never silently
+changes its base. **Remove retry entry** removes only retry metadata, not versions or running work.
+Up to eight requests can remain retained. Unavailable or interrupted metadata requires reconciliation
+and is preserved. This workflow is covered by source/native tests; packaged and real second-machine
+acceptance remains unverified.
+
+ Remote panel selections and view choices are saved privately. Reopening verifies the same native
 history before showing content. If saving is uncertain, keep the current panels and retry; reloading
 the saved set replaces unsaved local choices. Missing history stays listed without restarting agents.

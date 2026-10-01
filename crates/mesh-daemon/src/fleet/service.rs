@@ -292,6 +292,34 @@ impl SavedReviewSelection {
 #[derive(Clone)]
 pub struct FleetHistory(pub(crate) Arc<FleetService>);
 impl FleetHistory {
+    /// Resolve only the registered source identity; context verification follows before acting.
+    #[cfg(target_os = "macos")]
+    pub fn retained_remote_project_source(
+        &self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+    ) -> Result<String, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .retained_remote_project_source(offer, correlation)
+            .map_err(runtime_error)
+    }
+    /// Verify the retained result and current original-project main without staging or signing.
+    #[cfg(target_os = "macos")]
+    pub fn retained_remote_project_context(
+        &self,
+        offer: RecordDigest,
+        correlation: RecordDigest,
+        source: &crate::project_attachment::ProvisionedAttachment,
+        trust: &TrustedReviewers,
+    ) -> Result<Json, Unavailable> {
+        self.0
+            .lock()?
+            .runtime
+            .retained_remote_project_context(offer, correlation, source, trust)
+            .map_err(runtime_error)
+    }
     /// Recover an exact remote import's recorded actor/outcome without loading a private key.
     #[cfg(target_os = "macos")]
     pub fn recorded_retained_remote_project_import(

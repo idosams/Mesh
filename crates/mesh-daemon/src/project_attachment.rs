@@ -254,3 +254,6 @@ fn read_receipt(store: &PinnedWorkspaceRoot) -> io::Result<String> {
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
+
+mod remote_project_outbox;
+pub use remote_project_outbox::{validate_remote_project_action, RemoteProjectOutbox};

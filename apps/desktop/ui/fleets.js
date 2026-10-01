@@ -84,7 +84,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot() } })); }
   const reviews = createFleetReviews({ invoke, changed: publish, otherPinCount: () => remoteReviews.snapshot().remoteReviewPins.length, laneFor: (objective, lane) =>
     fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
-  const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish,
+  const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish, requestId,
     otherPinCount: () => reviews.snapshot().reviewPins.length,
     objectiveFor: objective => fleets.find(f => f.objective === objective && f.ownership !== 'unavailable') });
   const plan = () => {

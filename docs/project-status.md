@@ -451,3 +451,14 @@ recorded import inspection/recovery and imported-review actions. Completed outco
 signing key; pending/new work uses the existing native signer rules. Closed-request and missing-state
 refusal tests pass alongside native recovery journeys. Graphical action controls and durable retry
 state are not yet wired, and positive packaged/OS-key acceptance remains unverified.
+
+
+### Remote original-project workflow in review panels
+
+Received-result panels now expose original-project preparation, private version saving, imported
+review creation and exact navigation to the existing project review surface. A separate native retry
+store retains fixed inputs before dispatch and survives panel closure/restart without automatic replay.
+Explicit status reads and exact retries preserve uncertain outcomes; separate requests can progress
+independently. English/Hebrew controls and refusal/restart tests cover this source workflow. Native
+human approval and original-folder application remain separate. Packaged, real SSH/second-host and
+OS-key acceptance are still unverified; transitive lineage and retention remain open.

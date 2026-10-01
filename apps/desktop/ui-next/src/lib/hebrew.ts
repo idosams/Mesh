@@ -1,5 +1,20 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"This is the received result tree. Prepare a private project version to review it against the original project.":"זו תמונת התוצאה שהתקבלה. הכינו גרסה פרטית של הפרויקט כדי לסקור אותה מול הפרויקט המקורי.",
+"Prepare for original project":"הכנה לפרויקט המקורי",
+"Remote project actions":"פעולות תוצאה מרוחקת בפרויקט",
+"Retry inputs are saved before an action. Reopening does not repeat it. Saving a private version does not approve main or replace working files.":"נתוני הניסיון החוזר נשמרים לפני הפעולה. פתיחה מחדש אינה חוזרת עליה. שמירת גרסה פרטית אינה מאשרת את הגרסה הראשית ואינה מחליפה קובצי עבודה.",
+"Reload pending project actions":"טעינה מחדש של פעולות הפרויקט הממתינות",
+"Verifying the original project…":"הפרויקט המקורי נבדק…",
+"Read saved import status":"קריאת מצב הייבוא השמור",
+"Remove retry entry":"הסרת רשומת ניסיון חוזר",
+"Removing a retry entry does not delete versions or cancel work.":"הסרת רשומת ניסיון חוזר אינה מוחקת גרסאות ואינה מבטלת עבודה.",
+"This exact project action could not be confirmed. Its retry inputs are retained; retry or read its status.":"לא ניתן לאמת את הפעולה המדויקת בפרויקט. נתוני הניסיון החוזר נשמרו; נסו שוב או קראו את מצבה.",
+"Pending remote project actions could not be loaded. Retry loading before continuing.":"לא ניתן לטעון את הפעולות המרוחקות הממתינות בפרויקט. נסו לטעון שוב לפני ההמשך.",
+"Finish or remove a pending project action before preparing another.":"סיימו או הסירו פעולה ממתינה בפרויקט לפני הכנת פעולה נוספת.",
+"The original project could not be verified. Refresh before preparing this result.":"לא ניתן לאמת את הפרויקט המקורי. רעננו לפני הכנת התוצאה.",
+"Retry inputs could not be removed. Existing work is retained.":"לא ניתן להסיר את נתוני הניסיון החוזר. העבודה הקיימת נשמרה.",
+
 "Remote result": "תוצאה מרוחקת",
 "Received saved snapshot": "תמונת מצב שמורה שהתקבלה",
 "Pinned remote review": "סקירה מרוחקת מוצמדת",
