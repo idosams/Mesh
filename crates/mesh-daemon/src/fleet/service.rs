@@ -22,6 +22,10 @@ pub use crate::CheckpointSigner;
 
 mod received;
 #[cfg(target_os = "macos")]
+mod remote_ingestion;
+#[cfg(target_os = "macos")]
+pub use remote_ingestion::RemoteHistoryIngestionRequest;
+#[cfg(target_os = "macos")]
 mod remote_observation;
 mod remote_project_input;
 pub(in crate::fleet) use received::received_clock;

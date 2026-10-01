@@ -3963,3 +3963,32 @@ The increment is now reconciled onto merged PR #199; combined validation and hos
 This storage API alone does not connect ingestion
 to the native service, add operator controls, adopt workers or approve main. Those remain subsequent
 increments, alongside the full outstanding fleet acceptance plan.
+
+
+## R70: unlocked selected-result ingestion through retained fleet history
+
+Depends on merged R69 / PR #200. New canonical implementation; replaces no legacy commit. The macOS
+native `FleetHistory` surface now receives a selected authenticated result using a closed request
+with native-admitted identities, input, destination and trust. It opens an independent connection
+to the same guarded ledger under the service lock, then releases that lock before the composed
+receive/evidence/materialize/review operation. The public caller gets no mutable runtime or generic
+mutation closure. The existing ingestion flow retains revision checks, exact offer identity and
+completed offline replay. It adds no schema or protocol change, renewal, retry, worker adoption,
+original-project write or protected-main authority.
+
+Three focused native regressions passed (2.198 s). A real private catalogue and attached project
+exercise unlocked view/cancellation, refreshed cancellation in the second runtime, history-only
+restart and replaced-catalogue refusal while original file bytes remain unchanged. The existing
+authenticated native socket ingestion journey also runs through this service bridge: separate live
+readers must finish within two seconds inside each transport exchange; exact result bytes and saved
+review are checked; completed replay needs no network/signature, and replaced storage refuses.
+The original direct-runtime journey still passes. Full `npm test` passed: 3,605 native tests
+(148.366 s, 17 skipped), 170 rendered tests, 599 desktop tests and all 44 daemon-demo checks.
+Two existing native tests reported process-leak warnings: the mismatched-saved-input remote-delivery
+refusal and the configured-reviewer authority refusal. Logs are retained; reliability issue #172
+remains unresolved. This is not a leak-free acceptance claim. Reconciliation onto merged PR #200
+preserved every changed source byte and the parent tree. Hosted validation remains pending.
+
+These fixture tests do not prove real SSH, a second machine, OS signing custody or packaged graphical
+acceptance. Operator configuration, dispatch/receiving controls and the remaining complete fleet
+plan are still required. This bridge does not itself configure a remote peer.

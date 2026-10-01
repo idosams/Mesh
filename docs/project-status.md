@@ -494,3 +494,10 @@ Guarded fleet storage now supports independent connections retaining the exact n
 ordinary revision/idempotency checks. Missing history cannot be recreated by reopening a connection.
 This is a prerequisite for moving result ingestion outside the service mutex; the service integration
 and end-to-end responsiveness evidence remain outstanding.
+
+
+Native retained history now composes selected remote result receiving and local review through an
+independent guarded ledger connection. Network/file work holds no fleet service mutex; native
+fixture readers remain available during transport, and completed results recover offline without
+worker adoption. The closed native caller must still supply independently admitted configuration.
+Operator receiving controls, real SSH/second-host and packaged acceptance remain outstanding.
