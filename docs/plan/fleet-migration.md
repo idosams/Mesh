@@ -3850,6 +3850,12 @@ including malformed ancestry refusals. Full `npm test` passed: 3,591 native test
 completed; no process-leak warning occurred. Existing reliability issues remain open. The first
 full gate stopped on a test-helper return-binding lint; it was corrected without weakening checks.
 
+Initial hosted Linux compile/lint checks caught a macOS-only correspondence type referenced by
+ungated import helpers. Five macOS-only helper guards now match their native consumers; shared
+retained-input verification remains cross-platform. The corrected full local gate passed again:
+3,591 native tests (148.927 s, 17 skipped), desktop and daemon-demo checks. Hosted Linux verification
+is required before merge; the original failed logs and running macOS job were preserved.
+
 Remote ancestors are not yet composed into this local ancestry chain. Complete remote dependency
 revocation/selection policy, real second-host operation, retention and packaged end-to-end acceptance
 remain required. These native/renderer tests do not establish those outcomes or human main approval.

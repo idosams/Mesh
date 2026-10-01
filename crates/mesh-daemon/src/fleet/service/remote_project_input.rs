@@ -51,6 +51,7 @@ impl RemoteProjectInput<'_> {
             .map_err(|_| refusal("fleet-project-input-roots-changed"))?;
         Ok(())
     }
+    #[cfg(target_os = "macos")]
     pub(in crate::fleet) fn verify_remote_child(
         &self,
         runtime: &Runtime,
@@ -89,12 +90,15 @@ impl RemoteProjectInput<'_> {
         }
         Ok(())
     }
+    #[cfg(target_os = "macos")]
     pub(in crate::fleet) fn native_manifest(&self) -> &super::super::RemoteInputManifest {
         self.input.manifest()
     }
+    #[cfg(target_os = "macos")]
     pub(in crate::fleet) fn root_version(&self) -> RecordDigest {
         self.original.manifest().input()
     }
+    #[cfg(target_os = "macos")]
     pub(in crate::fleet) fn provenance(&self) -> Json {
         Json::object([
             ("schema", Json::text("mesh.remote-project-ancestry/v1")),
@@ -133,6 +137,7 @@ impl RemoteProjectInput<'_> {
             ),
         ])
     }
+    #[cfg(target_os = "macos")]
     pub(in crate::fleet) fn remote_origins(
         &self,
         correspondence: &super::super::RemoteResultCorrespondence,
