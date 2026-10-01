@@ -3908,3 +3908,10 @@ and correctly refused; the fixture now reopens the ledger directly. Full `npm te
 170 rendered tests, 599 desktop tests and all 44 daemon-demo checks. No process-leak warning occurred;
 existing reliability issues remain unresolved. Hosted validation remains pending. Tests use authenticated fixture signatures and an in-process transport boundary;
 real SSH, another machine, OS custody and packaged acceptance remain unproven.
+
+The first hosted Linux compile/lint run exposed an ungated module referencing the existing
+macOS-only remote transport APIs. The observation module and its reexports now use the same macOS
+boundary. The corrected full local gate passed again: 3,595 native tests (147.920 s, 17 skipped),
+170 rendered tests, 599 desktop tests and all 44 daemon-demo checks, without a process-leak warning.
+Original failed logs and the ongoing original macOS verification were preserved. Fresh hosted Linux
+verification is required before merge.
