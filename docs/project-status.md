@@ -509,3 +509,10 @@ protects original/history storage, reuses the unlocked ingestion service and rep
 identities. It requires a previously admitted assignment and eligible signed application; tests
 cover native saved-input selection and refusals, not real SSH/OS-custody acceptance. Graphical
 receiving and coordinator dispatch/provisioning remain outstanding.
+
+
+Native coordinator source now connects saved-project fleet creation to an explicit initial remote
+input transfer. Stable request lookup recovers catalogue identities after lost output without
+adopting execution. The service leaves live views available during network waits and refuses repeat,
+cancelled or restored starts. Input acceptance does not establish provider startup. The full source gate passed, including 3,615 native tests; real signed-app/OS-key, SSH/second-host, restart reconciliation
+and graphical operator acceptance remain outstanding.

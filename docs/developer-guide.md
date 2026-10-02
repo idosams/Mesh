@@ -650,3 +650,66 @@ identities. This is a private saved result, not imported or approved project mai
 after commit leaves the saved result intact; retain the configuration for explicit recovery. No
 lease renewal, automatic retry, provider launch or original-folder write occurs. CLI source and
 fixture validation do not establish signed-app, OS-custody, real SSH or second-machine acceptance.
+
+
+### Native initial remote input delivery
+
+An eligible signed macOS Mesh application accepts `--coordinator start <absolute-private-config>`
+before GUI startup. The command creates one native fleet/root from an existing saved project version,
+records one attempt and transfers immutable input to the independently configured worker. It uses
+the existing Apple-held coordinator identity, SSH admission and signed worker proof. A receiving
+acknowledgment means `input-materialized` or `input-retained`; it does not prove provider startup or
+completion. The resident worker must already be provisioned and independently configured.
+
+The owner-private JSON file uses the closed `mesh.coordinator-start-config/v1` schema:
+
+```json
+{
+  "schema": "mesh.coordinator-start-config/v1",
+  "connection": {
+    "schema": "mesh.coordinator-peer-config/v1",
+    "installation": "/absolute/private/coordinator-identity",
+    "fleets": "/absolute/private/fleets",
+    "host": "worker.example.test",
+    "account": "mesh",
+    "port": 22,
+    "identity": "/absolute/private/ssh-key",
+    "known_hosts": "/absolute/private/known-hosts",
+    "worker": "<64 lowercase hexadecimal public-key characters>"
+  },
+  "storage": "/absolute/private/project-attachments",
+  "project": "<64 lowercase hexadecimal project characters>",
+  "request": "<32 lowercase hexadecimal request characters>",
+  "version": "<64 lowercase hexadecimal saved-version characters>",
+  "goal": "Perform the authorized work on this saved version",
+  "provider": "codex",
+  "limits": {"lanes": 2, "concurrency": 1, "depth": 1, "retries": 0},
+  "lease_until_ms": 1
+}
+```
+
+Replace the placeholders with existing native identities. Set `lease_until_ms` to an explicit future
+Unix deadline in milliseconds, at most one hour away and within the worker's independent limit; the
+example value deliberately refuses. `provider` is `codex` or `claude`; this initial configuration
+admits that single provider. The fleet root must already exist, be private, and lie outside the
+original project, attachment metadata/storage and coordinator installation. No input manifest,
+executable command or lane filesystem destination is accepted from the configuration.
+
+Retain the complete configuration before invoking it. The request deterministically selects its
+objective, and native creation derives the lane. The run is `start-<request>` and the assignment is
+`assignment-<request>`. The returned `mesh.coordinator-start-result/v1` contains these identities and
+transfer correlation for the existing status/results/receive commands. Their v1 formats remain
+unchanged. Copy the admitted peer fields and returned objective/lane/run into the observation
+configuration; no key or original-project content is emitted.
+
+If output is lost or any stage fails, use `--coordinator created <same-absolute-private-config>`.
+This reads retained catalogue facts by request without opening the original project, SSH or signing
+custody. It reports an absent entry as `fleet: null`, damaged/incomplete entries as unavailable,
+and recovered history as `restored-unattached`. The original app eligibility and private-file rules
+still apply. An expired deadline is allowed for this read. Reading facts grants no retry authority.
+
+Repeating `start` after an existing attempt or after reopening a bound lane refuses. Do not change
+request IDs, rotate the run, renew the deadline or recreate directories to conceal an uncertain
+outcome. Initial-transfer reconciliation after restart remains a separate, unfinished native
+capability. Original files and protected main stay under their existing human approval boundary.
+GUI start/receiving controls, real OS-key and second-host acceptance remain required.

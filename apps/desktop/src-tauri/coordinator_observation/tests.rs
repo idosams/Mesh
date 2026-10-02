@@ -40,6 +40,12 @@ fn coordinator_arguments_are_explicit_and_bounded() {
         parse(&args(&["--coordinator", "receive", "/private/config"])).unwrap(),
         Some((Action::Receive, PathBuf::from("/private/config")))
     );
+    for (name, expected) in [("start", Action::Start), ("created", Action::Created)] {
+        assert_eq!(
+            parse(&args(&["--coordinator", name, "/private/config"])).unwrap(),
+            Some((expected, PathBuf::from("/private/config")))
+        );
+    }
     assert!(parse(&args(&["--worker", "identity", "/private/config"]))
         .unwrap()
         .is_none());
@@ -57,7 +63,7 @@ fn coordinator_arguments_are_explicit_and_bounded() {
 }
 #[test]
 fn coordinator_config_refuses_unknown_fields_noncanonical_keys_and_unbounded_identity() {
-    assert_eq!(config(value()).unwrap().port, 22);
+    assert_eq!(config(value()).unwrap().connection.port, 22);
     for (field, replacement) in [
         (
             "schema",
@@ -142,7 +148,13 @@ fn coordinator_unknown_result_is_distinct_from_verified_empty_page() {
 #[test]
 fn unsigned_coordinator_refuses_before_loading_config_or_opening_custody() {
     assert!(AppleActorCustody::availability().is_err());
-    for action in [Action::Status, Action::Results(0), Action::Receive] {
+    for action in [
+        Action::Status,
+        Action::Results(0),
+        Action::Receive,
+        Action::Start,
+        Action::Created,
+    ] {
         assert_eq!(
             run(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
             "Coordinator identity requires an eligible signed Mesh application"
