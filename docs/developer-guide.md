@@ -595,3 +595,58 @@ no main approval. App controls and composed result ingestion remain separate int
 Native parser, private-file and unsigned-refusal tests cover this command. A successful source build
 or unsigned refusal does not establish signed-app custody, a real SSH connection, second-host
 recovery or packaged end-to-end acceptance.
+
+
+### Explicit coordinator result receiving (macOS)
+
+An eligible signed Mesh application can receive one selected remote result into native private
+storage without launching another worker or blocking the fleet service lock:
+
+```sh
+/path/to/Mesh.app/Contents/MacOS/mesh-desktop --coordinator receive /absolute/private/receive.json
+```
+
+The owner-private regular configuration uses the same bounded 16 KiB reader as the worker and
+observation commands (private parent, no symlink or hard-link file). It has exactly seven fields:
+
+```json
+{
+  "schema": "mesh.coordinator-receive-config/v1",
+  "connection": { "schema": "mesh.coordinator-observation-config/v1", "installation": "/absolute/coordinator-identity", "fleets": "/absolute/fleets", "objective": "fleet-id", "lane": "lane-id", "run": "run-id", "host": "worker.example.test", "account": "mesh", "port": 22, "identity": "/absolute/ssh/key", "known_hosts": "/absolute/ssh/known_hosts", "worker": "64-lowercase-hex-worker-key" },
+  "input": { "kind": "project", "storage": "/absolute/attachment-storage", "project": "64-lowercase-hex-project-id", "version": "64-lowercase-hex-saved-version" },
+  "store": "/absolute/private-receiving-store",
+  "allocations": "/absolute/private-received-results",
+  "allocation": "32-lowercase-hex-stable-native-request",
+  "offer": "exact signed offer string selected from coordinator results"
+}
+```
+
+Replace the descriptive identity placeholders with the actual canonical identifiers. `connection`
+is the complete existing observation configuration, with its independently trusted worker key,
+SSH identity and known-hosts file. Its coordinator identity must already match the retained
+assignment; this command does not adopt an ephemeral capture identity or create an assignment.
+The exact offer string comes from authenticated `--coordinator results` output. It is bounded to
+8 KiB and must pass the native signature and assignment checks before receiving writes. A parsed
+configuration alone grants no authority. Keep the complete file private; it contains task correlation.
+
+For a managed saved input, replace `input` with exactly
+`{"kind":"review","lane":"parent-lane","checkpoint":"saved-checkpoint","version":"64-lowercase-hex","bundle":"64-lowercase-hex"}`.
+Mesh resolves and verifies the saved native history itself. No input manifest, shell command, raw
+per-file destination or main-approval choice is accepted. Project input reads a saved version, not
+the current original folder. The current original directory must still be identifiable so it can
+be protected from destination overlap. Retained review inputs keep the existing history checks.
+
+The receiving store and allocation parent must already be distinct, admissible private directories.
+Mesh protects the coordinator installation and fleet catalogue, plus the original project and its
+retained storage for project inputs. It does not create missing directories or overwrite existing
+allocations. Preserve the same configuration and allocation identity across an uncertain result;
+only an explicit rerun may recover an acknowledged local review. Completed ingestion reopens its
+retained content/evidence without network or signing, while the command still requires the existing
+native context and eligible application. Partial unacknowledged work remains preserved and may
+require reconciliation; never rotate the allocation identity to bypass that refusal.
+
+Success prints `mesh.coordinator-received-result/v1` with `correlation`, `version` and `review`
+identities. This is a private saved result, not imported or approved project main. A stdout failure
+after commit leaves the saved result intact; retain the configuration for explicit recovery. No
+lease renewal, automatic retry, provider launch or original-folder write occurs. CLI source and
+fixture validation do not establish signed-app, OS-custody, real SSH or second-machine acceptance.

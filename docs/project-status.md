@@ -501,3 +501,11 @@ independent guarded ledger connection. Network/file work holds no fleet service 
 fixture readers remain available during transport, and completed results recover offline without
 worker adoption. The closed native caller must still supply independently admitted configuration.
 Operator receiving controls, real SSH/second-host and packaged acceptance remain outstanding.
+
+
+The macOS native coordinator command now receives an exact selected remote result from a private
+configuration, resolving input from an existing saved project version or managed lane review. It
+protects original/history storage, reuses the unlocked ingestion service and reports local review
+identities. It requires a previously admitted assignment and eligible signed application; tests
+cover native saved-input selection and refusals, not real SSH/OS-custody acceptance. Graphical
+receiving and coordinator dispatch/provisioning remain outstanding.
