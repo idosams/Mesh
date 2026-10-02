@@ -427,6 +427,44 @@ impl NativeFleetDirectory {
         Ok(super::service::FleetHistory(entry.service.clone()))
     }
 
+    /// Refuse allocation beneath independently protected original/history/identity directories.
+    /// The catalogue root stays descriptor-pinned; this neither creates nor adopts a fleet.
+    pub fn verify_outside(&self, protected: &[ProtectedWorkspaceRoot]) -> io::Result<()> {
+        self.owner.check()?;
+        for root in protected {
+            if self.owner.root.is_within(*root)? {
+                return Err(unavailable());
+            }
+        }
+        self.owner.check()
+    }
+
+    /// Find retained facts by the original native creation request after an uncertain reply.
+    /// This only selects a catalogue row; it never allocates, adopts or dispatches a lane.
+    /// Missing/incomplete entries remain distinct from a usable execution service.
+    pub fn attached_request_snapshot(&self, request: &str) -> io::Result<Json> {
+        if !valid_request(request) {
+            return Err(unavailable());
+        }
+        let selected = objective(request);
+        let snapshot = self.snapshot()?;
+        let rows = snapshot
+            .get("fleets")
+            .and_then(Json::as_array)
+            .ok_or_else(unavailable)?;
+        Ok(Json::object([
+            ("schema", Json::text("mesh.native-fleet-request/v1")),
+            ("request", Json::text(request)),
+            (
+                "fleet",
+                rows.iter()
+                    .find(|row| row.get("objective").and_then(Json::as_text) == Some(&selected))
+                    .cloned()
+                    .unwrap_or(Json::Null),
+            ),
+        ]))
+    }
+
     /// Recover bounded saved facts without requiring source projects online or launching workers.
     /// Unreadable/incomplete entries stay visible; restored lanes have no adopted live context.
     pub fn snapshot(&self) -> io::Result<Json> {

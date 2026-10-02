@@ -154,3 +154,15 @@ pub fn deliver_remote_input_over_ssh(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(in crate::fleet) fn deliver_for_test<R: Read, W: Write>(
+    mut request: RemoteInputTransferRequest<'_>,
+    intent: RemoteInputDeliveryIntent,
+    input: R,
+    output: W,
+    mut sign: impl FnMut(&SigningPayload) -> Result<Signature, String>,
+) -> io::Result<RemoteInputTransferOutcome> {
+    let prepared = prepare(&mut request, intent, &mut sign)?;
+    deliver(request, prepared, input, output, sign)
+}

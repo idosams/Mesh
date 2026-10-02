@@ -24,7 +24,11 @@ mod received;
 #[cfg(target_os = "macos")]
 mod remote_ingestion;
 #[cfg(target_os = "macos")]
+mod remote_start;
+#[cfg(target_os = "macos")]
 pub use remote_ingestion::RemoteHistoryIngestionRequest;
+#[cfg(target_os = "macos")]
+pub use remote_start::RemoteNativeStartRequest;
 #[cfg(target_os = "macos")]
 mod remote_observation;
 mod remote_project_input;

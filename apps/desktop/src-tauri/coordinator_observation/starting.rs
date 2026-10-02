@@ -1,0 +1,196 @@
+//! Closed native creation and initial input transfer, plus read-only lost-output recovery.
+use super::receiving::{closed, hexadecimal, path, text};
+use super::*;
+use mesh_daemon::{
+    fleet::{
+        catalog::{AttachedFleetRequest, FleetProviderPolicy},
+        service::RemoteNativeStartRequest,
+        Limits, RemoteAssignment, RemoteInputTransferOutcome,
+    },
+    project_attachment::AttachmentStorage,
+};
+use std::time::{SystemTime, UNIX_EPOCH};
+struct StartConfiguration {
+    connection: ConnectionConfiguration,
+    storage: PathBuf,
+    project: String,
+    request: AttachedFleetRequest,
+    policy: FleetProviderPolicy,
+    lease_until_ms: u64,
+}
+fn configuration(value: Json) -> Result<StartConfiguration, String> {
+    closed(
+        &value,
+        &[
+            "schema",
+            "connection",
+            "storage",
+            "project",
+            "request",
+            "version",
+            "goal",
+            "provider",
+            "limits",
+            "lease_until_ms",
+        ],
+    )?;
+    if text(&value, "schema")? != "mesh.coordinator-start-config/v1" {
+        return Err(UNAVAILABLE.into());
+    }
+    let peer = value.get("connection").ok_or(UNAVAILABLE)?;
+    closed(
+        peer,
+        &[
+            "schema",
+            "installation",
+            "fleets",
+            "host",
+            "account",
+            "port",
+            "identity",
+            "known_hosts",
+            "worker",
+        ],
+    )?;
+    if text(peer, "schema")? != "mesh.coordinator-peer-config/v1" {
+        return Err(UNAVAILABLE.into());
+    }
+    let connection = connection_config(peer)?;
+    let limit = value.get("limits").ok_or(UNAVAILABLE)?;
+    closed(limit, &["lanes", "concurrency", "depth", "retries"])?;
+    let number = |name| limit.get(name).and_then(Json::as_u64).ok_or(UNAVAILABLE);
+    let limits = Limits {
+        lanes: number("lanes")?,
+        concurrency: number("concurrency")?,
+        depth: number("depth")?,
+        retries: number("retries")?,
+    };
+    let request = AttachedFleetRequest::new(
+        text(&value, "request")?,
+        text(&value, "goal")?,
+        text(&value, "version")?,
+        limits,
+    )
+    .map_err(|_| UNAVAILABLE)?;
+    let provider = text(&value, "provider")?;
+    let policy = FleetProviderPolicy::new(provider, &[provider.into()]).map_err(|_| UNAVAILABLE)?;
+    let project = text(&value, "project")?;
+    if !hexadecimal(project, 64) {
+        return Err(UNAVAILABLE.into());
+    }
+    let lease_until_ms = value
+        .get("lease_until_ms")
+        .and_then(Json::as_u64)
+        .filter(|n| *n != 0)
+        .ok_or(UNAVAILABLE)?;
+    Ok(StartConfiguration {
+        connection,
+        storage: path(&value, "storage")?,
+        project: project.into(),
+        request,
+        policy,
+        lease_until_ms,
+    })
+}
+fn validate_deadline(until: u64, now: u64) -> Result<(), String> {
+    if until <= now || until.saturating_sub(now) > 3_600_000 {
+        return Err(UNAVAILABLE.into());
+    }
+    Ok(())
+}
+pub(super) fn run(path: &Path, inspect_only: bool) -> Result<(), String> {
+    let selected = configuration(crate::worker_service::load_private_json(path)?)?;
+    // Recovery does not need the original project, a usable lease, SSH access or a signing key.
+    if inspect_only {
+        let directory = NativeFleetDirectory::open(
+            &selected.connection.fleets,
+            TrustedReviewers::default(),
+            CheckpointRuntimeParameters::selected_defaults(),
+        )
+        .map_err(|_| UNAVAILABLE)?;
+        return output(
+            directory
+                .attached_request_snapshot(&selected.request.request)
+                .map_err(|_| UNAVAILABLE)?,
+        );
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|d| u64::try_from(d.as_millis()).ok())
+        .ok_or(UNAVAILABLE)?;
+    validate_deadline(selected.lease_until_ms, now)?;
+    let NativeContext {
+        installation,
+        custody,
+        peer,
+        directory,
+    } = open_context(&selected.connection)?;
+    let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
+    let attachment = AttachmentStorage::open(&selected.storage)
+        .and_then(|s| s.reopen(&selected.project))
+        .map_err(|_| UNAVAILABLE)?;
+    let protected = [
+        &selected.storage,
+        &selected.connection.installation,
+        attachment.project().root(),
+        attachment.metadata_path(),
+    ]
+    .into_iter()
+    .map(|path| ProtectedWorkspaceRoot::inspect(path).map_err(|_| UNAVAILABLE))
+    .collect::<Result<Vec<_>, _>>()?;
+    directory
+        .verify_outside(&protected)
+        .map_err(|_| UNAVAILABLE)?;
+    let source = attachment
+        .prepare_remote_input(&selected.request.version.to_string())
+        .map_err(|_| UNAVAILABLE)?;
+    // The catalogue admits a private allocation outside the original project. It owns destination
+    // selection; no caller-authored manifest, lane path or renderer authority is accepted here.
+    let service = directory
+        .create_attached_with_providers(&attachment, &selected.request, &selected.policy)
+        .map_err(|_| UNAVAILABLE)?;
+    let objective = service.objective().map_err(|_| UNAVAILABLE)?;
+    let state = service.native_state().map_err(|_| UNAVAILABLE)?;
+    let mut roots = state.lanes.values().filter(|lane| lane.parent.is_none());
+    let lane = roots.next().ok_or(UNAVAILABLE)?.id.clone();
+    if roots.next().is_some() {
+        return Err(UNAVAILABLE.into());
+    }
+    let run = format!("start-{}", selected.request.request);
+    let outcome = service.start_remote_input_over_ssh(&peer, RemoteNativeStartRequest {
+        lane: &lane, run: &run,
+        assignment: RemoteAssignment {
+            id: format!("assignment-{}", selected.request.request),
+            worker_key: hex(selected.connection.worker.as_bytes()),
+            input: source.manifest().input(), bundle: source.manifest().bundle(),
+            lease_sequence: 1, lease_until_ms: selected.lease_until_ms,
+        }, source: &source, coordinator, worker: selected.connection.worker,
+    }, Duration::from_secs(25), |payload| {
+        installation.identity().map_err(|_| UNAVAILABLE)?;
+        custody.sign(payload).map_err(|_| UNAVAILABLE.into())
+    }).map_err(|_| "Remote start outcome requires reconciliation; retain this configuration and use --coordinator created before any further action")?;
+    installation.identity().map_err(|_| UNAVAILABLE)?;
+    let (disposition, receipt) = match outcome {
+        RemoteInputTransferOutcome::Materialized(receipt) => ("input-materialized", receipt),
+        RemoteInputTransferOutcome::Retained(receipt) => ("input-retained", receipt),
+    };
+    output(Json::object([
+        ("schema", Json::text("mesh.coordinator-start-result/v1")),
+        ("request", Json::text(selected.request.request)),
+        ("objective", Json::text(objective)),
+        ("lane", Json::text(lane)),
+        ("run", Json::text(run)),
+        ("disposition", Json::text(disposition)),
+        ("correlation", receipt.correlation().clone()),
+    ]))
+}
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+fn output(value: Json) -> Result<(), String> {
+    let mut stdout = io::stdout().lock();
+    writeln!(stdout,"{}",value.encode()).and_then(|()|stdout.flush()).map_err(|_| "Start output unavailable; retain the same configuration and inspect --coordinator created".into())
+}
+#[cfg(test)]
+mod tests;

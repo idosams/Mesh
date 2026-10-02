@@ -25,7 +25,7 @@ struct ReceiveConfiguration {
     allocation: String,
     offer: String,
 }
-fn closed(value: &Json, names: &[&str]) -> Result<(), String> {
+pub(super) fn closed(value: &Json, names: &[&str]) -> Result<(), String> {
     let Json::Object(fields) = value else {
         return Err(UNAVAILABLE.into());
     };
@@ -38,21 +38,21 @@ fn closed(value: &Json, names: &[&str]) -> Result<(), String> {
     }
     Ok(())
 }
-fn text<'a>(value: &'a Json, name: &str) -> Result<&'a str, String> {
+pub(super) fn text<'a>(value: &'a Json, name: &str) -> Result<&'a str, String> {
     value
         .get(name)
         .and_then(Json::as_text)
         .filter(|s| !s.is_empty() && !s.contains('\0'))
         .ok_or_else(|| UNAVAILABLE.into())
 }
-fn path(value: &Json, name: &str) -> Result<PathBuf, String> {
+pub(super) fn path(value: &Json, name: &str) -> Result<PathBuf, String> {
     let p = PathBuf::from(text(value, name)?);
     if !p.is_absolute() {
         return Err(UNAVAILABLE.into());
     }
     Ok(p)
 }
-fn hexadecimal(value: &str, length: usize) -> bool {
+pub(super) fn hexadecimal(value: &str, length: usize) -> bool {
     value.len() == length
         && value
             .bytes()
@@ -168,15 +168,15 @@ pub(super) fn run(path: &Path) -> Result<(), String> {
         custody,
         peer,
         directory,
-    } = open_context(&selected.connection)?;
+    } = open_context(&selected.connection.connection)?;
     let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
     let history = directory
         .history(&selected.connection.objective)
         .map_err(|_| UNAVAILABLE)?;
     let mut protected = Vec::new();
     for path in [
-        &selected.connection.installation,
-        &selected.connection.fleets,
+        &selected.connection.connection.installation,
+        &selected.connection.connection.fleets,
     ] {
         protected.push(ProtectedWorkspaceRoot::inspect(path).map_err(|_| UNAVAILABLE)?);
     }
@@ -197,7 +197,7 @@ pub(super) fn run(path: &Path) -> Result<(), String> {
                 lane: &selected.connection.lane,
                 run: &selected.connection.run,
                 coordinator,
-                worker: selected.connection.worker,
+                worker: selected.connection.connection.worker,
                 input: input.manifest(),
                 offer: &selected.offer,
                 destination: &destination,

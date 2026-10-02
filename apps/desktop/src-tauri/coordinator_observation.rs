@@ -1,5 +1,6 @@
 //! Explicit native coordinator commands; no renderer or worker supplies configuration.
 mod receiving;
+mod starting;
 use mesh_crypto::KeyCustody as _;
 use mesh_daemon::{
     fleet::{
@@ -23,6 +24,8 @@ enum Action {
     Status,
     Results(u64),
     Receive,
+    Start,
+    Created,
 }
 fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     if args.first().map(String::as_str) != Some("--coordinator") {
@@ -31,12 +34,14 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     let action = match args.get(1).map(String::as_str) {
         Some("status") if args.len() == 3 => Action::Status,
         Some("receive") if args.len() == 3 => Action::Receive,
+        Some("start") if args.len() == 3 => Action::Start,
+        Some("created") if args.len() == 3 => Action::Created,
         Some("results") if args.len() == 4 => {
             let after: u64 = args[3].parse().map_err(|_| UNAVAILABLE)?;
             if after > 4096 || after.to_string() != args[3] { return Err(UNAVAILABLE.into()); }
             Action::Results(after)
         }
-        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive <absolute-config>".into()),
+        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive|start|created <absolute-config>".into()),
     };
     let path = PathBuf::from(&args[2]);
     if !path.is_absolute() {
@@ -45,11 +50,14 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     Ok(Some((action, path)))
 }
 struct Configuration {
-    installation: PathBuf,
-    fleets: PathBuf,
+    connection: ConnectionConfiguration,
     objective: String,
     lane: String,
     run: String,
+}
+struct ConnectionConfiguration {
+    installation: PathBuf,
+    fleets: PathBuf,
     host: String,
     account: String,
     port: u16,
@@ -89,13 +97,6 @@ fn config(value: Json) -> Result<Configuration, String> {
             .filter(|s| !s.is_empty() && s.len() <= 4096 && !s.contains('\0'))
             .ok_or(UNAVAILABLE)
     };
-    let path = |name| -> Result<PathBuf, String> {
-        let p = PathBuf::from(text(name)?);
-        if !p.is_absolute() {
-            return Err(UNAVAILABLE.into());
-        }
-        Ok(p)
-    };
     if text("schema")? != "mesh.coordinator-observation-config/v1" {
         return Err(UNAVAILABLE.into());
     }
@@ -109,6 +110,28 @@ fn config(value: Json) -> Result<Configuration, String> {
             return Err(UNAVAILABLE.into());
         }
     }
+    Ok(Configuration {
+        connection: connection_config(&value)?,
+        objective: text("objective")?.into(),
+        lane: text("lane")?.into(),
+        run: text("run")?.into(),
+    })
+}
+fn connection_config(value: &Json) -> Result<ConnectionConfiguration, String> {
+    let text = |name| {
+        value
+            .get(name)
+            .and_then(Json::as_text)
+            .filter(|s| !s.is_empty() && s.len() <= 4096 && !s.contains('\0'))
+            .ok_or(UNAVAILABLE)
+    };
+    let path = |name| -> Result<PathBuf, String> {
+        let p = PathBuf::from(text(name)?);
+        if !p.is_absolute() {
+            return Err(UNAVAILABLE.into());
+        }
+        Ok(p)
+    };
     let key = text("worker")?;
     if key.len() != 64
         || !key
@@ -127,12 +150,9 @@ fn config(value: Json) -> Result<Configuration, String> {
         .and_then(|p| u16::try_from(p).ok())
         .filter(|p| *p != 0)
         .ok_or(UNAVAILABLE)?;
-    Ok(Configuration {
+    Ok(ConnectionConfiguration {
         installation: path("installation")?,
         fleets: path("fleets")?,
-        objective: text("objective")?.into(),
-        lane: text("lane")?.into(),
-        run: text("run")?.into(),
         host: text("host")?.into(),
         account: text("account")?.into(),
         port,
@@ -151,6 +171,9 @@ pub fn run_if_requested() -> Option<Result<(), String>> {
 fn run(action: Action, path: &Path) -> Result<(), String> {
     AppleActorCustody::availability()
         .map_err(|_| "Coordinator identity requires an eligible signed Mesh application")?;
+    if action == Action::Start || action == Action::Created {
+        return starting::run(path, action == Action::Created);
+    }
     if action == Action::Receive {
         return receiving::run(path);
     }
@@ -160,7 +183,7 @@ fn run(action: Action, path: &Path) -> Result<(), String> {
         custody,
         peer,
         directory,
-    } = open_context(&config)?;
+    } = open_context(&config.connection)?;
     let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
     let history = directory
         .history(&config.objective)
@@ -168,14 +191,16 @@ fn run(action: Action, path: &Path) -> Result<(), String> {
     let kind = match action {
         Action::Status => RemoteObservationKind::CurrentLease,
         Action::Results(after) => RemoteObservationKind::Results { after },
-        Action::Receive => unreachable!("receiving uses its closed native operation"),
+        Action::Receive | Action::Start | Action::Created => {
+            unreachable!("receiving uses its closed native operation")
+        }
     };
     let observation = history
         .prepare_remote_observation(
             &config.lane,
             &config.run,
             coordinator,
-            config.worker,
+            config.connection.worker,
             kind,
             |payload| {
                 installation.identity().map_err(|_| UNAVAILABLE)?;
@@ -234,7 +259,7 @@ struct NativeContext {
     peer: NativeSshDestination,
     directory: NativeFleetDirectory,
 }
-fn open_context(config: &Configuration) -> Result<NativeContext, String> {
+fn open_context(config: &ConnectionConfiguration) -> Result<NativeContext, String> {
     let expected =
         ProtectedWorkspaceRoot::inspect(&config.installation).map_err(|_| UNAVAILABLE)?;
     let (installation, custody) =

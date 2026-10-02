@@ -4017,3 +4017,31 @@ This adds explicit receiving, not automatic dispatch, renewal, worker adoption, 
 import, human approval or GUI receiving controls. Native context configuration and exact assignment
 identity remain operator prerequisites. Real signed-app/OS-key, SSH and second-host acceptance,
 retention/revocation and the full remaining fleet plan stay required.
+
+
+## R72: native initial remote input delivery and request recovery
+
+Depends on merged R71 / PR #202 (`858bcb318559ad78016feeffd4e7673adbfb6fbe`). New canonical
+implementation; replaces no legacy commit. R71 passed all seven PR checks and all seven combined-main
+checks in run 37059772782. Original commits, dirty legacy work and deprecation history remain preserved.
+
+The macOS pre-GUI `start` command resolves a saved original-project version, creates a native fleet
+with an exact provider/limit policy, derives stable attempt identities and invokes authenticated
+initial input delivery. A closed current-session service operation records dispatch before network
+work and holds no service mutex during transfer. It retains an independent guarded ledger, rejects
+any existing attempt or missing current workspace, validates fixed lease/key/input before dispatch,
+and preserves all unknown outcomes without retry, renewal or worker adoption. Existing observation
+and receiving configuration formats remain compatible.
+
+The separate `created` command finds native catalogue facts by the retained creation request, including
+after restart or lost output. It requires no original-project or transport access and cannot return
+execution ownership. Allocation rejects protected original/history/identity roots. An input receipt
+is explicitly not provider startup/completion or main approval. Fourteen initial focused regressions
+passed (2.263 s). The final full `npm test` passed: 3,615 native tests (154.630 s, one slow,
+17 skipped), 170 rendered tests, 599 desktop tests and all 44 daemon-demo checks. The final tests
+also compare materialized saved bytes against newer original bytes and refuse cancellation during
+transport and automatic execution reattachment after request lookup. No process-leak warning
+occurred; existing reliability issues remain open. Hosted CI is pending. This does not claim actual
+OS-held keys, SSH, a second machine, packaged UI or velocity/resource measurements.
+The complete fleet objective, explicit restart reconciliation, GUI controls, retention and complete
+remote dependency/revocation remain outstanding.
