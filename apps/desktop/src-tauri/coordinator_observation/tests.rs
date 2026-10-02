@@ -1,6 +1,6 @@
 use super::*;
 use std::os::unix::fs::{symlink, PermissionsExt as _};
-fn value() -> Json {
+pub(super) fn value() -> Json {
     Json::object([
         (
             "schema",
@@ -35,6 +35,10 @@ fn coordinator_arguments_are_explicit_and_bounded() {
         ]))
         .unwrap(),
         Some((Action::Results(4096), PathBuf::from("/private/config")))
+    );
+    assert_eq!(
+        parse(&args(&["--coordinator", "receive", "/private/config"])).unwrap(),
+        Some((Action::Receive, PathBuf::from("/private/config")))
     );
     assert!(parse(&args(&["--worker", "identity", "/private/config"]))
         .unwrap()
@@ -138,7 +142,7 @@ fn coordinator_unknown_result_is_distinct_from_verified_empty_page() {
 #[test]
 fn unsigned_coordinator_refuses_before_loading_config_or_opening_custody() {
     assert!(AppleActorCustody::availability().is_err());
-    for action in [Action::Status, Action::Results(0)] {
+    for action in [Action::Status, Action::Results(0), Action::Receive] {
         assert_eq!(
             run(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
             "Coordinator identity requires an eligible signed Mesh application"

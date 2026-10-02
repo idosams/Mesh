@@ -3992,3 +3992,28 @@ preserved every changed source byte and the parent tree. Hosted validation remai
 These fixture tests do not prove real SSH, a second machine, OS signing custody or packaged graphical
 acceptance. Operator configuration, dispatch/receiving controls and the remaining complete fleet
 plan are still required. This bridge does not itself configure a remote peer.
+
+
+## R71: native operator command receives an exact selected remote result
+
+Depends on merged R70 / PR #201. New canonical implementation; replaces no legacy commit. The
+macOS pre-GUI coordinator command now supports `receive` with a bounded owner-private configuration.
+It reuses the admitted coordinator/SSH/catalogue context, selects existing saved project or managed
+review input, protects source/history and native ownership directories from destination overlap,
+and invokes the unlocked R70 ingestion service. It accepts no authored manifest or arbitrary
+per-file output paths and emits only local receipt/version/review identities after verification.
+The existing status/results configuration and persisted/wire formats are unchanged.
+
+Eight focused native tests passed (1.591 s): explicit CLI parsing, closed configuration/refusal,
+private file rules, saved-versus-live input bytes, protected original/retained storage, result output
+and unsigned-app refusal before config/key access. The initial build found two unsupported desktop
+imports; they now use the existing daemon digest alias and software signer only in the test fixture.
+The production path retains Apple custody and its eligible-signed-application requirement. Full
+`npm test` passed: 3,608 native tests (149.185 s, 17 skipped, one slow), 170 rendered tests,
+599 desktop tests and all 44 daemon-demo checks. No process-leak warning occurred in this run;
+existing reliability issues remain unresolved. Hosted verification remains pending.
+
+This adds explicit receiving, not automatic dispatch, renewal, worker adoption, original-project
+import, human approval or GUI receiving controls. Native context configuration and exact assignment
+identity remain operator prerequisites. Real signed-app/OS-key, SSH and second-host acceptance,
+retention/revocation and the full remaining fleet plan stay required.

@@ -1,4 +1,5 @@
-//! Explicit native read-only coordinator command; no renderer or worker supplies configuration.
+//! Explicit native coordinator commands; no renderer or worker supplies configuration.
+mod receiving;
 use mesh_crypto::KeyCustody as _;
 use mesh_daemon::{
     fleet::{
@@ -21,6 +22,7 @@ const UNAVAILABLE: &str = "The coordinator observation is unavailable or require
 enum Action {
     Status,
     Results(u64),
+    Receive,
 }
 fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     if args.first().map(String::as_str) != Some("--coordinator") {
@@ -28,12 +30,13 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     }
     let action = match args.get(1).map(String::as_str) {
         Some("status") if args.len() == 3 => Action::Status,
+        Some("receive") if args.len() == 3 => Action::Receive,
         Some("results") if args.len() == 4 => {
             let after: u64 = args[3].parse().map_err(|_| UNAVAILABLE)?;
             if after > 4096 || after.to_string() != args[3] { return Err(UNAVAILABLE.into()); }
             Action::Results(after)
         }
-        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after>".into()),
+        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive <absolute-config>".into()),
     };
     let path = PathBuf::from(&args[2]);
     if !path.is_absolute() {
@@ -148,39 +151,24 @@ pub fn run_if_requested() -> Option<Result<(), String>> {
 fn run(action: Action, path: &Path) -> Result<(), String> {
     AppleActorCustody::availability()
         .map_err(|_| "Coordinator identity requires an eligible signed Mesh application")?;
+    if action == Action::Receive {
+        return receiving::run(path);
+    }
     let config = config(crate::worker_service::load_private_json(path)?)?;
-    let expected =
-        ProtectedWorkspaceRoot::inspect(&config.installation).map_err(|_| UNAVAILABLE)?;
-    let (installation, custody) =
-        NativeWorkerInstallation::reopen(&config.installation, expected, &[], |account, key| {
-            AppleActorCustody::open(account, key).map_err(|_| io::Error::other(UNAVAILABLE))
-        })
-        .map_err(|_| UNAVAILABLE)?;
+    let NativeContext {
+        installation,
+        custody,
+        peer,
+        directory,
+    } = open_context(&config)?;
     let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
-    let peer = NativeSshDestination::admit(
-        &config.host,
-        &config.account,
-        config.port,
-        &config.identity,
-        &config.known_hosts,
-    )
-    .map_err(|_| UNAVAILABLE)?;
-    let directory = NativeFleetDirectory::open(
-        &config.fleets,
-        TrustedReviewers::default(),
-        CheckpointRuntimeParameters {
-            idle_interval: None,
-            maximum_uncheckpointed_bytes: None,
-            maximum_uncheckpointed_interval: None,
-        },
-    )
-    .map_err(|_| UNAVAILABLE)?;
     let history = directory
         .history(&config.objective)
         .map_err(|_| UNAVAILABLE)?;
     let kind = match action {
         Action::Status => RemoteObservationKind::CurrentLease,
         Action::Results(after) => RemoteObservationKind::Results { after },
+        Action::Receive => unreachable!("receiving uses its closed native operation"),
     };
     let observation = history
         .prepare_remote_observation(
@@ -239,3 +227,43 @@ fn render(result: RemoteObservationOutcome) -> Json {
 }
 #[cfg(test)]
 mod tests;
+
+struct NativeContext {
+    installation: NativeWorkerInstallation,
+    custody: AppleActorCustody,
+    peer: NativeSshDestination,
+    directory: NativeFleetDirectory,
+}
+fn open_context(config: &Configuration) -> Result<NativeContext, String> {
+    let expected =
+        ProtectedWorkspaceRoot::inspect(&config.installation).map_err(|_| UNAVAILABLE)?;
+    let (installation, custody) =
+        NativeWorkerInstallation::reopen(&config.installation, expected, &[], |account, key| {
+            AppleActorCustody::open(account, key).map_err(|_| io::Error::other(UNAVAILABLE))
+        })
+        .map_err(|_| UNAVAILABLE)?;
+    let peer = NativeSshDestination::admit(
+        &config.host,
+        &config.account,
+        config.port,
+        &config.identity,
+        &config.known_hosts,
+    )
+    .map_err(|_| UNAVAILABLE)?;
+    let directory = NativeFleetDirectory::open(
+        &config.fleets,
+        TrustedReviewers::default(),
+        CheckpointRuntimeParameters {
+            idle_interval: None,
+            maximum_uncheckpointed_bytes: None,
+            maximum_uncheckpointed_interval: None,
+        },
+    )
+    .map_err(|_| UNAVAILABLE)?;
+    Ok(NativeContext {
+        installation,
+        custody,
+        peer,
+        directory,
+    })
+}
