@@ -1,6 +1,7 @@
 //! Session-bound native selections for read-only graphical remote observations.
 use super::*;
 mod profiles;
+mod receipts;
 mod recovery;
 pub(crate) mod setup;
 use ring::rand::{SecureRandom as _, SystemRandom};
@@ -8,6 +9,7 @@ use std::sync::Mutex;
 const BUSY: &str = "Another remote observation is in progress";
 const ELIGIBILITY: &str = "Remote observation requires an eligible signed Mesh application";
 struct Selection {
+    offers: std::collections::BTreeMap<String, mesh_daemon::fleet::RemoteSavedResultOffer>,
     profile_source: Option<String>,
     identity_file: setup::BoundPath,
     hosts_file: setup::BoundPath,
@@ -60,8 +62,8 @@ impl RemotePanel {
     pub(crate) fn read(&self, id: &str, action: &str, after: u64) -> Result<String, String> {
         let operation = kind(action, after)?;
         eligible()?;
-        let held = self.0.try_lock().map_err(|_| BUSY)?;
-        let selected = held.as_ref().filter(|s| s.id == id).ok_or(UNAVAILABLE)?;
+        let mut held = self.0.try_lock().map_err(|_| BUSY)?;
+        let selected = held.as_mut().filter(|s| s.id == id).ok_or(UNAVAILABLE)?;
         selected.verify()?;
         let context = open_connection(&selected.config.connection)?;
         if context
@@ -96,6 +98,25 @@ impl RemotePanel {
             .map_err(|_| UNAVAILABLE)?;
         selected.verify()?;
         context.installation.identity().map_err(|_| UNAVAILABLE)?;
+        if let RemoteObservationOutcome::Results(page) = &result {
+            let mut offers = std::collections::BTreeMap::new();
+            if let Some(page) = page {
+                if page.offers.len() > 16 {
+                    return Err(UNAVAILABLE.into());
+                }
+                for offer in &page.offers {
+                    let summary = offer.public_summary();
+                    let digest = summary
+                        .get("offer")
+                        .and_then(Json::as_text)
+                        .ok_or(UNAVAILABLE)?;
+                    if offers.insert(digest.to_owned(), offer.clone()).is_some() {
+                        return Err(UNAVAILABLE.into());
+                    }
+                }
+            }
+            selected.offers = offers;
+        }
         Ok(project(&selected.id, result).encode())
     }
 }
@@ -224,6 +245,7 @@ fn admit_selection(
         .fill(&mut bytes)
         .map_err(|_| UNAVAILABLE)?;
     let selection = Selection {
+        offers: Default::default(),
         profile_source: None,
         identity_file,
         hosts_file,

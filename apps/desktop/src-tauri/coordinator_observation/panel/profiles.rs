@@ -44,7 +44,7 @@ fn bindings(s: &Selection) -> Json {
         ("hosts_file", s.hosts_file.fingerprint()),
     ])
 }
-fn value(s: &Selection) -> Result<Json, String> {
+pub(super) fn value(s: &Selection) -> Result<Json, String> {
     s.verify()?;
     Ok(Json::object([
         ("schema", Json::text("mesh.native-saved-connection/v1")),

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply } from './remote-observation.js';
+import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply, receiptAttemptsReply, receivedResultReply } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
 const status = () => ({ schema: 'mesh.remote-panel-observation/v2', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
@@ -183,4 +183,53 @@ test('invalid or regressed page preserves the previous verified results without 
   h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'results' }); await settle();
   fail = true; h.intent({ type: 'results-next' }); await settle(); assert.equal(h.projections.at(-1).results.after, 16); assert.ok(h.projections.at(-1).error); assert.equal(calls.length,3);
   fail = false; revision = 16; h.intent({ type: 'results' }); await settle(); assert.equal(h.projections.at(-1).results.revision, '17'); assert.ok(h.projections.at(-1).error); h.dispose();
+});
+
+const receiptOffer = 'd'.repeat(64);
+const receiptEntry = () => ({ offer: receiptOffer, checkpoint: 'checkpoint', version: 'e'.repeat(64) });
+const receiptAttempts = () => ({ schema: 'mesh.remote-panel-receipt-attempts/v1', id, entries: [receiptEntry()] });
+const receivedResult = () => ({ schema: 'mesh.remote-panel-received-result/v1', id, offer: receiptOffer, objective: 'fleet-one', lane: 'lane-one', run: 'run-one', correlation: 'f'.repeat(64), version: 'e'.repeat(64), review: 'c'.repeat(64) });
+test('receipt projections bind exact selection and offer and strip private native data', () => {
+  assert.equal(receiptAttemptsReply(receiptAttempts(), selectionReply(selected())).length, 1);
+  assert.throws(() => receiptAttemptsReply({ ...receiptAttempts(), id: 'b'.repeat(64) }, selectionReply(selected())));
+  assert.throws(() => receiptAttemptsReply({ ...receiptAttempts(), entries: [receiptEntry(), receiptEntry()] }, selectionReply(selected())));
+  assert.throws(() => receiptAttemptsReply({ ...receiptAttempts(), entries: Array(65).fill(receiptEntry()) }, selectionReply(selected())));
+  const value = receivedResultReply({ ...receivedResult(), path: '/private/receiving' }, selectionReply(selected()), receiptOffer);
+  assert.equal(value.path, undefined);
+  for (const patch of [{ offer: 'a'.repeat(64) }, { id: 'b'.repeat(64) }, { lane: 'different' }, { review: '../path' }]) {
+    assert.throws(() => receivedResultReply({ ...receivedResult(), ...patch }, selectionReply(selected()), receiptOffer));
+  }
+});
+test('download sends only a retained page selector and rejects arbitrary offers', async () => {
+  const calls = [], page = resultPage(0, 1); page.entries[0].offer = receiptOffer;
+  const h = harness(async (name, args) => { calls.push([name, args]); return name === 'pick_remote_observation' ? selected() : name === 'read_remote_observation' ? page : receivedResult(); });
+  h.intent({ type: 'choose' }); await settle();
+  h.intent({ type: 'download-result', offer: receiptOffer }); await settle(); assert.equal(calls.length, 1);
+  h.intent({ type: 'results' }); await settle();
+  h.intent({ type: 'download-result', offer: 'f'.repeat(64) }); await settle(); assert.equal(calls.length, 2);
+  h.intent({ type: 'download-result', offer: receiptOffer, path: '/renderer/path', allocation: 'forged' }); await settle();
+  assert.deepEqual(calls.at(-1), ['remote_result_receipt', { id, action: 'receive', offer: receiptOffer }]);
+  assert.equal(h.projections.at(-1).received.correlation, 'f'.repeat(64)); h.dispose();
+});
+test('recovery requires loaded native intent and an inflight receipt cannot be duplicated', async () => {
+  const calls = []; let release;
+  const h = harness(async (name, args) => { calls.push([name, args]); if (name === 'pick_remote_observation') return selected(); if (args.action === 'list') return receiptAttempts(); return new Promise(resolve => { release = resolve; }); });
+  h.intent({ type: 'choose' }); await settle();
+  h.intent({ type: 'recover-result', offer: receiptOffer }); await settle(); assert.equal(calls.length, 1);
+  h.intent({ type: 'receipt-list' }); await settle();
+  h.intent({ type: 'recover-result', offer: receiptOffer }); await settle();
+  h.intent({ type: 'recover-result', offer: receiptOffer }); h.intent({ type: 'forget' });
+  assert.equal(calls.length, 3); assert.equal(h.projections.at(-1).busy, true);
+  release({ ...receivedResult(), offer: 'b'.repeat(64) }); await settle();
+  assert.equal(h.projections.at(-1).received, null); assert.match(h.projections.at(-1).error, /could not be confirmed/);
+  assert.equal(h.projections.at(-1).receiptAttempts.length, 1);
+  assert.deepEqual(calls.at(-1), ['remote_result_receipt', { id, action: 'recover', offer: receiptOffer }]); h.dispose();
+});
+test('a changed selection clears saved download and completion projections', async () => {
+  const h = harness(async (name, args) => name === 'pick_remote_observation' ? selected() : args.action === 'list' ? receiptAttempts() : receivedResult());
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'receipt-list' }); await settle();
+  h.intent({ type: 'recover-result', offer: receiptOffer }); await settle();
+  assert.ok(h.projections.at(-1).received);
+  h.intent({ type: 'choose' }); await settle();
+  assert.equal(h.projections.at(-1).receiptAttempts, null); assert.equal(h.projections.at(-1).received, null); h.dispose();
 });

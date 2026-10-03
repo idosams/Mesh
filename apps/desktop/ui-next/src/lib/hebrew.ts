@@ -1,5 +1,19 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Working with the remote connection…":"מבצע פעולה בחיבור המרוחק…",
+
+"Download for review":"הורד לבדיקה",
+"Listing a result does not download or accept it. Download creates a private copy for review.":"הצגת תוצאה אינה מורידה או מאשרת אותה. הורדה יוצרת עותק פרטי לבדיקה.",
+"Saved downloads":"הורדות שמורות",
+"Load saved downloads":"טען הורדות שמורות",
+"Recover only the saved download attempt. A completed copy is checked again; interrupted work may resume. This does not start agents or approve work.":"שחזר רק את ניסיון ההורדה השמור. עותק שהושלם נבדק מחדש; עבודה שנקטעה עשויה להתחדש. פעולה זו אינה מפעילה סוכנים או מאשרת עבודה.",
+"No saved downloads for this connection.":"אין הורדות שמורות לחיבור זה.",
+"Check or resume saved download":"בדוק או המשך הורדה שמורה",
+"A private saved copy is ready for review. It has not been approved or applied to the original project.":"עותק פרטי שמור מוכן לבדיקה. הוא לא אושר ולא הוחל על הפרויקט המקורי.",
+"Show downloaded reviews":"הצג בדיקות של תוצאות שהורדו",
+"Download could not be confirmed. Use saved downloads to check the original attempt. No work was approved or applied.":"לא ניתן לאמת את ההורדה. השתמש בהורדות שמורות לבדיקת הניסיון המקורי. לא אושרה ולא הוחלה עבודה.",
+"Saved downloads are unavailable for this connection.":"ההורדות השמורות אינן זמינות לחיבור זה.",
+
 "More saved results exist beyond this page.":"קיימות תוצאות שמורות נוספות מעבר לעמוד זה.",
 "Next results":"תוצאות הבאות",
 "Previous results":"תוצאות קודמות",

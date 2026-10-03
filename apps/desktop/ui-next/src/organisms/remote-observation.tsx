@@ -1,3 +1,4 @@
+import { RemoteReceiptAttempts, type ReceiptAttempt, type ReceivedResult } from "./remote-receipt-attempts";
 import { RemoteResults, type RemoteResultPage } from "./remote-result-page";
 import { RemoteConnectionProfiles, type RemoteProfiles } from "./remote-connection-profiles";
 import { RemoteConnectionSetup, type RemoteSetupDraft, type RemoteSetupFleet, type RemoteSetupPreset } from "./remote-connection-setup";
@@ -5,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
-type Projection = { recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
+type Projection = { receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
   results: RemoteResultPage | null };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
@@ -37,7 +38,7 @@ export function RemoteObservationView({ projection: p, fleets = [] }: { projecti
         <Button variant="secondary" disabled={disabled} onClick={() => send("reconnect-input")}>{t("Resume saved input transfer")}</Button>
         {p.recovery && <p role="status">{t(p.recovery.disposition === "input-materialized" ? "The saved input is materialized on the worker. This does not establish that an agent is running." : "The worker retained the saved input. This does not establish that an agent is running.")}</p>}
       </section>}
-      {p.busy && <p role="status">{t("Reading native connection information…")}</p>}
+      {p.busy && <p role="status">{t("Working with the remote connection…")}</p>}
       {p.error && <p role="alert">{t(p.error)}</p>}
       {p.status && <div className="grid gap-1 text-sm" aria-label={t("Last verified worker observation")}>
         <p>{t(p.status.admitted ? "The worker recorded this assignment." : "The worker has no admission record for this assignment.")}</p>
@@ -45,6 +46,7 @@ export function RemoteObservationView({ projection: p, fleets = [] }: { projecti
         <p>{t("Observed at")}: <bdi dir="ltr">{timestamp(p.status.observed, t("Observation time unavailable"))}</bdi></p>
         {p.status.leaseUntil && <p>{t("Lease ends at")}: <bdi dir="ltr">{timestamp(p.status.leaseUntil, t("Observation time unavailable"))}</bdi></p>}
       </div>}
+      {p.selection && <RemoteReceiptAttempts attempts={p.receiptAttempts ?? null} received={p.received ?? null} disabled={disabled} />}
       {p.results && <RemoteResults page={p.results} disabled={disabled} />}
     </div>
   </details>;

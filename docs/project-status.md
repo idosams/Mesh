@@ -604,3 +604,29 @@ Native application-data parents may be readable/searchable by other users, as in
 ordinary startup layout. Group/other-writable parents refuse. Receiving folders stay owner-only,
 and the catalogue binding and receipts remain owner-only files; no permissions are changed on
 an existing parent or project.
+
+
+## Graphical remote result download and saved-attempt recovery
+
+In the macOS remote worker panel, **Find saved remote results**, then **Download for review** on
+one exact result. Native code retains at most the last authenticated page's sixteen signed offers;
+the renderer supplies only its current selection and an offer digest. The app-owned catalogue
+creates/reopens private receiving storage, retains the exact offer/configuration/allocation before
+I/O, reconstructs the original immutable input and uses the existing guarded ingestion service.
+The app's fleet owner is reused; no second catalogue owner is opened for the command.
+
+**Load saved downloads** lists exact attempts for the current native connection and bindings.
+After reopening that connection, **Check or resume saved download** uses the original retained
+intent and allocation, without requiring the remote result to be on the current page. Completed
+replay revalidates local content/history without another transfer; incomplete stages may resume
+only through existing guarded ingestion. Partial/unacknowledged allocations and changed native
+bindings still refuse and remain preserved. Listing alone never transfers content. No automatic
+retry, provider launch, original-project write or protected-main approval is requested.
+
+Only a verified completed receipt enables **Show downloaded reviews**, which opens the existing
+fleet received-result queue for parallel pinned review. A stale/mismatched native reply does not
+show completion. Errors retain native attempts for explicit recovery. The UI is localized in
+English/Hebrew and disables duplicate in-flight actions. Storage formats remain unchanged; paired
+native/UI receipt envelopes are new v1 messages. Eligible native signing remains required. Actual
+packaged signed-app/SSH second-host download and recovery acceptance are still unverified; the
+fixed user test checkpoint is unchanged.
