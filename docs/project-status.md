@@ -941,3 +941,14 @@ late replies, revision regression, hidden views and retained errors. Full valida
 native, 185 rendered and 646 desktop tests plus the real daemon demo. Hosted checks and merge
 remain pending. This is source-level functionality; signed packaged and actual second-host fleet
 acceptance, terminal reconciliation and the full fleet plan remain unfinished.
+
+
+### Installed Codex application layout (R118)
+
+The packaged local fleet acceptance preparation found that the installed Codex CLI had moved
+inside a nested app bundle, while desktop discovery searched only the older resource path.
+Explicit-path native provider tests did not cover this desktop boundary. Discovery now supports
+both layouts in the existing supported application locations, preserving regular-file checks and
+native adapter admission. Two native regression tests failed with legacy-only discovery; all three focused tests now pass.
+Full validation passed 3,771 native, 183 rendered and 641 desktop tests plus the real daemon demo.
+Hosted delivery and actual corrected packaged provider launch remain pending.

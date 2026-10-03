@@ -521,3 +521,12 @@ Leaving the view stops scheduling new reads; already-started native reads may fi
 saved reviews stay independently pinned. These are signed historical records, not proof of current
 process activity, stopped ownership or permission to launch another attempt. The configured remote
 connection's **Read recorded execution** action remains available independently.
+
+
+### Installed Codex discovery
+
+Mesh finds the Codex CLI in supported ChatGPT or Codex app bundles under system Applications or
+your Applications folder. Both the current nested CLI bundle and the older resource layout are
+supported; the current layout is preferred within each app. Mesh does not accept executable paths
+from a fleet card or search arbitrary shell commands. The native provider adapter still checks the
+selected executable before starting an agent. An installed provider account remains required.

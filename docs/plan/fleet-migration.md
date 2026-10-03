@@ -5296,3 +5296,37 @@ pass; the rendered baseline failed as expected before card integration. Full val
 passed 24. The incorrect initial library-target invocation is retained separately. Hosted checks
 and merge remain pending. Real signed packaged/second-host acceptance and all other phases
 remain required; the fixed user checkpoint is unchanged.
+
+
+## R118 — discover the current installed Codex CLI bundle
+
+Tracks [issue #253](https://github.com/idosams/Mesh/issues/253). Based on merged canonical main
+`97e263ffd602b4232c5b1dc77fa54bc686deec18`; new implementation replaces no preserved source commit.
+All four old desktop candidates were absent on the acceptance host, while the regular executable
+existed in the nested `codex-cli/CodexCLI.app/Contents/MacOS/codex` layout. Native real-provider
+acceptance used an explicit executable path and therefore did not prove desktop discovery.
+
+Discovery supports both bounded app layouts in system/user Applications, prefers the current
+layout within each app, and retains final-link refusal and provider-adapter admission. No
+renderer path or arbitrary command search is added. Native filesystem tests cover all supported
+locations, legacy/current precedence, missing/directory/link candidates and fallback; two baseline
+tests failed before the correction. All three focused tests pass. The full canonical gate passed
+3,771 Rust tests in 160.643s (1 slow, 17 skipped), 183 rendered tests, 641 desktop tests and all
+44 real daemon demo checks. Hosted delivery and corrected packaged provider launch remain pending.
+
+The pre-fix main package was preserved with its exact embedded revision and valid ad-hoc seal.
+Its actual visible-window existing-project journey passed: capture external edits, two immutable
+pins, independent lane, restart/resume/detach and original Git preservation. It explicitly reports
+no provider launch and no protected-main approval. This is separate evidence, not proof of the
+provider discovery correction or completion of the fleet plan. The fixed user checkpoint remains
+unchanged.
+
+
+R118 combined acceptance validation: reconciled the original discovery implementation
+`eec5b09feea199008611f000f12aa9b9c87aaaf4` with R117's published current-main head
+`87fb29bed8751b9c708bbc176fa6e58d7291fab2`. All implementation files merged without conflict;
+both documentation records were preserved. The full gate passed 3,774 Rust tests in 160.031s
+(1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 real daemon checks.
+The original published PR254 head remains fixed until its original CI is terminal. The combined
+package and actual provider-launch acceptance are still pending; no signing or full-plan exit is
+claimed.

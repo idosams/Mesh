@@ -32,6 +32,9 @@ mod artifact_preview;
 #[cfg(unix)]
 mod review_inspection;
 
+#[cfg(target_os = "macos")]
+mod codex_installation;
+
 #[cfg(unix)]
 mod codex_workspace;
 #[cfg(unix)]
@@ -4235,18 +4238,11 @@ mod desktop {
 
     #[cfg(target_os = "macos")]
     fn codex_cli_path() -> Option<PathBuf> {
-        let mut candidates = vec![
-            PathBuf::from("/Applications/ChatGPT.app/Contents/Resources/codex"),
-            PathBuf::from("/Applications/Codex.app/Contents/Resources/codex"),
-        ];
+        let mut applications = vec![PathBuf::from("/Applications")];
         if let Some(home) = std::env::var_os("HOME") {
-            let applications = PathBuf::from(home).join("Applications");
-            candidates.push(applications.join("ChatGPT.app/Contents/Resources/codex"));
-            candidates.push(applications.join("Codex.app/Contents/Resources/codex"));
+            applications.push(PathBuf::from(home).join("Applications"));
         }
-        candidates.into_iter().find(|candidate| {
-            fs::symlink_metadata(candidate).is_ok_and(|metadata| metadata.file_type().is_file())
-        })
+        crate::codex_installation::find_cli(&applications)
     }
 
     #[cfg(target_os = "macos")]
