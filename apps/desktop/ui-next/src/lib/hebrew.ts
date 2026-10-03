@@ -1,5 +1,18 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"The active selection lasts until Mesh closes. Saved settings must be opened explicitly. Reading observations does not start agents or approve work.":"הבחירה הפעילה נשמרת עד לסגירת Mesh. יש לפתוח הגדרות שמורות במפורש. קריאת המצב אינה מפעילה סוכנים ואינה מאשרת עבודה.",
+"Use an existing coordinator identity and SSH files. Mesh does not create keys or enroll host trust. Use Save current connection to keep these settings for later.":"השתמשו בזהות מתאם קיימת ובקובצי SSH קיימים. Mesh אינו יוצר מפתחות ואינו מוסיף אמון במארחים. שמרו את החיבור הנוכחי כדי להשתמש בהגדרות בהמשך.",
+"Saved worker connections":"חיבורים שמורים לסוכנים",
+"Saved connections":"חיבורים שמורים",
+"Load saved connections":"טעינת חיבורים שמורים",
+"Recover interrupted settings save":"שחזור שמירת הגדרות שנקטעה",
+"Open saved settings":"פתיחת הגדרות שמורות",
+"Remove saved settings":"הסרת הגדרות שמורות",
+"Connection name":"שם החיבור",
+"Save current connection":"שמירת החיבור הנוכחי",
+"Open saved settings to use or edit them. Mesh checks the original files and identities again. Opening settings does not contact the worker.":"פתחו הגדרות שמורות כדי להשתמש בהן או לערוך אותן. Mesh בודק שוב את הקבצים והזהויות המקוריים. פתיחת ההגדרות אינה יוצרת קשר עם הסוכן.",
+"After opening and editing saved settings, save the current connection to replace that entry. Removing settings keeps the active selection, credentials and work history.":"לאחר פתיחה ועריכה של הגדרות שמורות, שמרו את החיבור הנוכחי כדי לעדכן את הרשומה. הסרת הגדרות משאירה את הבחירה הפעילה, פרטי ההזדהות והיסטוריית העבודה.",
+
 "Connection settings last until Mesh closes. Reading observations does not start agents or approve work.":"הגדרות החיבור נשמרות עד לסגירת Mesh. קריאת המצב אינה מפעילה סוכנים ואינה מאשרת עבודה.",
 "Set up a worker connection":"הגדרת חיבור לסוכן",
 "Use an existing coordinator identity and SSH files. Mesh does not create keys or enroll host trust. Settings apply to this session only.":"השתמשו בזהות מתאם קיימת ובקובצי SSH קיימים. Mesh אינו יוצר מפתחות ואינו מוסיף אמון במארחים. ההגדרות חלות רק על ההפעלה הנוכחית.",

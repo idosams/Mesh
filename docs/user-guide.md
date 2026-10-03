@@ -412,3 +412,22 @@ existed then, adding a review later does not silently unblock that remote lane. 
 prevents new imports, while completed outcomes remain available for inspection. Main approval and
 applying files to the original folder remain separate actions. An ancestry chain containing earlier
 remote results still requires additional native support.
+
+
+## Saved remote worker connections
+
+Under **Agent fleets → Inspect a remote worker**, set up a connection with the native file selectors
+and public worker fields. **Load saved connections**, enter a connection name, and choose **Save
+current connection** to keep its settings. After restarting Mesh, choose **Load saved connections**
+and **Open saved settings** explicitly. Opening verifies the original files and identities; it does
+not contact or start the worker. Use **Read worker status** when you want an observation.
+
+To edit a saved entry, open it, change and apply the setup form, then save the current connection.
+To create a separate entry, clear the selected setup files and select them again. **Remove saved
+settings** keeps the active selection, credentials and work history. If a settings save was
+interrupted, **Recover interrupted settings save** can finish the retained save; conflicting records
+remain untouched. Changed keys or identity folders require a new native selection.
+
+This route requires an eligible signed application and an already configured worker. The local
+ad-hoc checkpoint does not establish that journey. Remote launch, receipt and reconnect controls
+and real second-host acceptance remain unfinished.

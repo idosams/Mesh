@@ -767,7 +767,7 @@ route requires the configuration's `fleets` path to be this application's fleet 
 objective/lane/run to identify retained work there. It reuses the catalogue's current native owner;
 it does not open a competing owner or import an external fleet directory. The app must be eligible
 for Apple-held coordinator custody, and the worker subsystem and private SSH files must already be
-configured as described above. Editable connection profiles remain unfinished.
+configured as described above. Named connection settings can be saved as described below.
 
 The selected configuration is captured natively for this session. The page receives an opaque
 selection ID and public target labels, never credential paths or signing data. The selection binds
@@ -804,5 +804,21 @@ reload, clear the draft before selecting files again if the renderer lost its dr
 Then explicitly read status or results. Locally recorded attempts need not have a remote assignment;
 those reads still require the existing signed remote assignment and peer proof. A refused setup
 preserves the active selection. Existing private configuration import remains available.
-Settings/drafts are session-only. Persistent editable profiles, remote start/receive/reconnect
-controls and signed-app/second-host acceptance remain unfinished.
+Active selections and drafts are session-only. To retain settings, use **Load saved connections**,
+enter a name, then **Save current connection**. Up to sixteen entries are supported. **Open saved
+settings** explicitly rechecks the original directory/coordinator identities and key/trust file
+metadata, re-admits native custody/SSH policy, and fills the setup form. It does not contact, start,
+renew or adopt a worker. Edit the opened form, use those settings, then save to replace that entry.
+To create a separate entry instead, clear the selected setup files and select the files again.
+**Remove saved settings** removes only that entry; it retains the active selection, credentials and
+work history. Closing Mesh never automatically restores an active connection.
+
+The native-only `mesh.native-remote-connection-settings/v1` catalogue record uses owner-only files,
+canonical bounded JSON, catalogue device/inode binding and expected-revision writes. Each entry
+contains `mesh.native-saved-connection/v1` configuration and original identity bindings, never key
+contents. Paths remain native-only. A pending write prevents further normal reads/writes until
+**Recover interrupted settings save** explicitly publishes its exact next revision. Invalid,
+foreign, linked or conflicting records are preserved and refused. Recovery never opens the listed
+credential paths or contacts a worker. Unknown schemas are refused; existing stores with no record
+start at revision zero and require no migration. These settings grant no execution/approval authority.
+Remote start/receive/reconnect controls and signed-app/second-host acceptance remain unfinished.

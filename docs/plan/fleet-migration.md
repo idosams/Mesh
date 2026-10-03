@@ -4200,3 +4200,25 @@ tests and 44 daemon-demo checks. No process-leak warning occurred; #172 remains 
 Hosted validation and a packaged setup journey remain pending.
 This remains session-only setup. Persisted profiles, start/receive/reconnect controls, real remote
 packaged acceptance and all remaining requirements of the full plan remain open.
+
+
+## R79: explicit saved remote connection settings
+
+R79 is new canonical work, replacing no legacy commit. It builds on R78 / PR #209's exact published
+`d1e1c31cdae8dea28d861798a433999661ced66d`. All seven R78 checks passed in run 37119239231;
+PR #207 combined-main run 37119199807 also passed. R78 merge and R79 publication are pending.
+
+The native catalogue holds up to sixteen named settings records with expected-revision atomic writes,
+owner-only files, original directory/file/coordinator bindings and explicit interrupted-save recovery.
+The UI loads, opens, saves and removes settings through closed native operations. Private paths stay
+native-only; reopening re-admits the original identities and files and fills the editable public form.
+None of these operations contacts, launches or adopts a worker. Removal retains credentials, work
+history and the active session. Unknown/foreign/linked/stale/partial data is preserved and refused;
+recovery publishes only an exact next revision. Existing catalogues need no migration.
+
+Initial focused verification passed: 31 native tests (7.700 s), fourteen controller tests and 175
+rendered/typecheck checks. The complete local gate passed: 3,643 native tests (149.230 s, one slow,
+17 skipped), 175 rendered tests, 615 desktop tests and the real daemon demo. No process-leak warning
+occurred; reliability issues #37 and #172 remain unresolved. Hosted checks remain pending. Signed-app
+profile restoration, packaged remote operations and all remaining fleet acceptance are still open.
+The fixed R71 user checkpoint and existing dirty legacy checkout remain unchanged.

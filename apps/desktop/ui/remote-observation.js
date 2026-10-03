@@ -20,6 +20,25 @@ export function setupInput(value) {
     && /^(0|[1-9][0-9]{0,4})$/.test(value.port) && Number(value.port) >= 1 && Number(value.port) <= 65535);
   return { host: value.host, account: value.account, port: Number(value.port), worker: value.worker, objective: value.objective, lane: value.lane, run: value.run };
 }
+const labelText = value => typeof value === 'string' && value.trim().length > 0 && new TextEncoder().encode(value).length <= 128 && !/[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
+export function profilesReply(raw) {
+  const value = parse(raw);
+  require(value?.schema === 'mesh.remote-connection-profiles/v1' && decimal(value.revision)
+    && BigInt(value.revision) <= 18446744073709551615n && Array.isArray(value.entries) && value.entries.length <= 16);
+  const entries = value.entries.map(entry => {
+    require(hex(entry?.id) && labelText(entry.label) && hex(entry.worker) && ['host', 'objective', 'lane', 'run'].every(key => name(entry[key])));
+    return Object.freeze(Object.fromEntries(['id', 'label', 'host', 'worker', 'objective', 'lane', 'run'].map(key => [key, entry[key]])));
+  });
+  require(new Set(entries.map(entry => entry.id)).size === entries.length);
+  return Object.freeze({ revision: value.revision, entries: Object.freeze(entries) });
+}
+export function profileOpenReply(raw, entry) {
+  const value = parse(raw);
+  require(value?.schema === 'mesh.remote-profile-open/v1' && value.profile === entry.id && value.label === entry.label);
+  const selection = selectionReply(value.selection), draft = draftReply(value.draft), input = setupInput(value.input);
+  require(draft.installation && draft.identity && draft.hosts && ['host', 'worker', 'objective', 'lane', 'run'].every(key => selection[key] === entry[key] && input[key] === entry[key]));
+  return { selection, draft, preset: { id: draft.id, input: { ...input, port: String(input.port) } } };
+}
 export function observationReply(raw, id, kind) {
   const value = parse(raw);
   require(value?.schema === 'mesh.remote-panel-observation/v1' && value.id === id && value.kind === kind);
@@ -34,19 +53,30 @@ export function observationReply(raw, id, kind) {
   return { kind, available: value.available, count: value.count, revision: value.revision, hasMore: value.has_more };
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
-  let draft = null;
+  let draft = null, profiles = null, preset = null;
   let selection = null, status = null, results = null, busy = false, error = '', disposed = false;
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
+  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget'].includes(type) || (['status', 'results', 'forget'].includes(type) && !selection)) return;
+    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove'].includes(type) || (['status', 'results', 'forget'].includes(type) && !selection)) return;
     if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
     if (type === 'configure' && !(draft?.installation && draft?.identity && draft?.hosts)) return;
+    if (type === 'profile-save' && (!selection || !profiles || !labelText(event.detail.label))) return;
+    const entry = profiles?.entries.find(item => item.id === event.detail.profile);
+    if (['profile-open', 'profile-remove'].includes(type) && !entry) return;
     busy = true; error = ''; publish();
     try {
-      if (type === 'clear-setup') {
-        draft = draftReply(await invoke('clear_remote_setup'));
+      if (type.startsWith('profile')) {
+        const action = ({ 'profiles-list': 'list', 'profiles-recover': 'recover', 'profile-save': 'save', 'profile-open': 'open', 'profile-remove': 'remove' })[type];
+        const args = { action, selection: action === 'save' ? selection.id : '', label: action === 'save' ? event.detail.label : '', profile: ['open', 'remove'].includes(action) ? entry.id : '', revision: ['list', 'recover'].includes(action) ? '' : profiles.revision };
+        const raw = await invoke('remote_connection_profiles', args);
+        if (action === 'open') {
+          const opened = profileOpenReply(raw, entry);
+          selection = opened.selection; draft = opened.draft; preset = opened.preset; status = null; results = null;
+        } else profiles = profilesReply(raw);
+      } else if (type === 'clear-setup') {
+        draft = draftReply(await invoke('clear_remote_setup')); preset = null;
       } else if (type === 'pick-setup') {
         const raw = await invoke('pick_remote_setup_file', { draft: draft?.id ?? '', part: event.detail.part });
         if (raw !== null) draft = draftReply(raw);
