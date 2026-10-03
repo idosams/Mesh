@@ -4206,7 +4206,10 @@ packaged acceptance and all remaining requirements of the full plan remain open.
 
 R79 is new canonical work, replacing no legacy commit. It builds on R78 / PR #209's exact published
 `d1e1c31cdae8dea28d861798a433999661ced66d`. All seven R78 checks passed in run 37119239231;
-PR #207 combined-main run 37119199807 also passed. R78 merge and R79 publication are pending.
+PR #207 combined-main run 37119199807 also passed. R78 merged as
+`30065a1e536bedd3cf0d47c5a44ba67a06aab064`. R79 integrates that main merge with an unchanged
+implementation tree from tested commit `2016b93`; only this delivery record changes afterward.
+R79 publication and R78 combined-main verification are pending.
 
 The native catalogue holds up to sixteen named settings records with expected-revision atomic writes,
 owner-only files, original directory/file/coordinator bindings and explicit interrupted-save recovery.
