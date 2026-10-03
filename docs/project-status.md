@@ -748,3 +748,11 @@ verified, unavailable or unrecorded input with its observation time. Old facts r
 failure; changing the selected connection clears them. No launch or retry authority is added.
 Native CLI `--coordinator inspect-input` uses the same route. The full local gate passed; fresh
 hosted validation and signed packaged/real-host acceptance remain required for this increment.
+
+### Received-workspace initialization ownership (source increment)
+
+The original received workspace now retains an independent native allocation lock before writing
+initialization intent and through its session lifetime. A competing cooperating initializer refuses
+without replacing input or receipts. Read-only inspection remains available. This supplies per-attempt
+exclusion for upcoming restart recovery; it does not reopen an interrupted workspace, prove an old
+process stopped, release capacity or authorize replacement execution.

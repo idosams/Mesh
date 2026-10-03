@@ -5,6 +5,9 @@ use crate::ipc::{nothing_to_recover, Json, Operations as _, StartupSummary};
 use crate::{CheckpointRuntimeParameters, LiveDaemon, TrustedReviewers};
 use std::sync::Arc;
 
+mod ownership;
+use ownership::InitializationOwner;
+
 const INTENT: &str = "initialization.json";
 const RECEIPT: &str = "workspace.json";
 
@@ -17,6 +20,8 @@ pub struct ReceivedWorkerWorkspace {
     receipt: Json,
     intent: String,
     admission: RemoteAdmissionReceipt,
+    // Retained through the original workspace/session lifetime; never a process-liveness proof.
+    initialization_owner: InitializationOwner,
 }
 impl ReceivedWorkerWorkspace {
     /// Retained coordinator/objective/assignment attribution from the original input reservation.
@@ -71,6 +76,7 @@ impl ReceivedWorkerWorkspace {
     /// Recheck the original input, allocation custody, current installation and retained initial
     /// operation. Later working edits do not rewrite the original source-to-worker mapping.
     pub fn verify(&self) -> io::Result<()> {
+        self.initialization_owner.verify()?;
         self.input.verify()?;
         let state = self.daemon.workspace_state().map_err(|_| invalid())?;
         if state.root != self.binding.root
@@ -124,6 +130,9 @@ impl RemoteInputAllocation {
         reviewers: TrustedReviewers,
         checkpoint: CheckpointRuntimeParameters,
     ) -> io::Result<ReceivedWorkerWorkspace> {
+        self.verify_roots()?;
+        let initialization_owner = InitializationOwner::acquire(&self.allocation)?;
+        // Complete content verification happens once ownership is held, before any writes.
         self.verify()?;
         let admission = self.admission.take().ok_or_else(invalid)?;
         let assignment = &admission.work().assignment;
@@ -200,6 +209,7 @@ impl RemoteInputAllocation {
             receipt,
             intent,
             admission,
+            initialization_owner,
         };
         result.verify()?;
         Ok(result)

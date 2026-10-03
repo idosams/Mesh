@@ -4590,3 +4590,23 @@ passed 40 tests in 10.853s. Initial compile failures are retained. Full `npm tes
 3,683 native tests in 152.623s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests
 and all 44 real-daemon checks. Fresh hosted checks and actual signed packaged/real-host acceptance
 remain pending.
+
+## R95 — exclusive received-workspace initialization ownership
+
+New canonical implementation following R94/PR227; replaces no preserved source commit. An
+independent nonblocking native directory lock now serializes initialization of one physical input
+allocation, including callers sharing the same worker installation. The original workspace retains
+that owner through its native session lifetime, and revalidates the original directory on use.
+Competing initialization refuses before intent or workspace writes. Read-only inspection is unchanged.
+
+This is a prerequisite for purpose-specific restart recovery, not a recovery or relaunch API. Lock
+release alone proves neither process termination nor safe retry. Existing launch/admission records,
+leases, immutable inputs and preserved partial initialization must still govern any future recovery.
+No persisted format changes or lock files are introduced; existing workspaces are not adopted.
+The final focused received-workspace/host suite passed 19 tests in 2.694s. Full `npm test`
+passed 3,686 native tests in 150.125s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests
+and all 44 real-daemon checks. Nextest reported one LEAK warning in the unrelated CAS round-trip
+`every_size_promotes_and_reads_back_byte_for_byte` test; its log is preserved and the reliability
+investigation remains open. An earlier version also passed its complete gate before removal of a
+redundant pre-lock content scan. Fresh hosted validation, interrupted-initialization recovery and
+full real-host acceptance remain pending.

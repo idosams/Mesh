@@ -270,3 +270,67 @@ fn changed_mapping_and_worker_escape_invalidate_retained_workspace() {
     assert!(moved.exists());
     assert_eq!(fs::read(parent.join("files/src/tool")).unwrap(), BYTES);
 }
+
+#[test]
+fn competing_initializer_refuses_before_intent_and_retains_original_input() {
+    let fixture = Fixture::new();
+    let input = fixture.allocation(manifest(false), "objective", true);
+    let root = input.allocation.clone();
+    let path = input.path().parent().unwrap().to_owned();
+    let owner = InitializationOwner::acquire(&root).unwrap();
+    assert!(InitializationOwner::acquire(&root.clone()).is_err());
+    assert!(initialize(input).is_err());
+    assert!(!path.join(INTENT).exists());
+    assert!(!path.join(RECEIPT).exists());
+    assert!(!path.join("workspace.mesh").exists());
+    assert_eq!(fs::read(path.join("files/src/tool")).unwrap(), BYTES);
+    owner.verify().unwrap();
+    drop(owner);
+    // Reacquisition proves only lock release; no reservation, workspace or launch is recreated.
+    InitializationOwner::acquire(&root)
+        .unwrap()
+        .verify()
+        .unwrap();
+}
+
+#[test]
+fn original_workspace_retains_initialization_owner_until_drop() {
+    let fixture = Fixture::new();
+    let input = fixture.allocation(manifest(false), "objective", true);
+    let root = input.allocation.clone();
+    let path = input.path().parent().unwrap().to_owned();
+    let workspace = initialize(input).unwrap();
+    let receipt = fs::read(path.join(RECEIPT)).unwrap();
+    assert!(InitializationOwner::acquire(&root).is_err());
+    workspace.verify().unwrap();
+    assert_eq!(fs::read(path.join(RECEIPT)).unwrap(), receipt);
+    drop(workspace);
+    InitializationOwner::acquire(&root)
+        .unwrap()
+        .verify()
+        .unwrap();
+    assert_eq!(fs::read(path.join(RECEIPT)).unwrap(), receipt);
+}
+
+#[test]
+fn busy_allocation_refuses_before_rescanning_input_content() {
+    let fixture = Fixture::new();
+    let input = fixture.allocation(manifest(false), "objective", true);
+    let root = input.allocation.clone();
+    let path = input.path().parent().unwrap().to_owned();
+    let _owner = InitializationOwner::acquire(&root).unwrap();
+    fs::write(
+        input.path().join("src/tool"),
+        b"other owner's retained content",
+    )
+    .unwrap();
+    let error = initialize(input)
+        .err()
+        .expect("competing owner must refuse");
+    assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
+    assert_eq!(
+        fs::read(path.join("files/src/tool")).unwrap(),
+        b"other owner's retained content"
+    );
+    assert!(!path.join(INTENT).exists());
+}
