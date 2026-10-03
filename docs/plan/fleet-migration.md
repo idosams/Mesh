@@ -5089,3 +5089,32 @@ entries. The combined 11 focused recovery tests passed in 1.441 seconds. The com
 `npm test` gate passed 3,750 native tests in 159.586 seconds (one slow, 17 skipped),
 182 rendered checks, 636 desktop tests and the real-daemon proof. Fresh hosted checks and
 merges remain pending; no product behavior, assertion or skip changed during consolidation.
+
+## R110 — process death preserves uncertain launch intent
+
+This canonical test increment depends on published R109/PR242 at
+`a690c3a67e7837232b848b76db5fed0d9c6d75f1`. It replaces no preserved source commit
+and changes no production behavior.
+
+The owned subprocess campaign adds a third explicit phase: after successful initialization
+acknowledgment and atomic launch-intent reservation, before provider admission/spawn. The
+parent observes that phase, SIGKILLs and reaps the child, then attempts a fresh authenticated
+recovery. Both peers refuse recovery while the original launch receipt remains unchanged.
+The test also preserves the exact workspace mapping, original admission/input identities and
+bytes, single allocation and unchanged coordinator state. Earlier prelaunch phases continue
+to recover normally. The focused run passed both entries and all three phases in 0.849 seconds.
+
+This tests the uncertain intent boundary, not actual provider-process death, liveness or safe
+capacity release. It grants no restart/adoption permission based on PID death or released locks.
+The full local gate passed 3,747 native tests in 161.534 seconds (one slow, 17 skipped),
+182 rendered checks, 636 desktop tests and 44 daemon checks. Hosted validation,
+real-provider/SSH/packaged acceptance and terminal reconciliation remain required. The fixed user checkpoint remains unchanged.
+
+R110 consolidation: original run `37152553178` passed all seven hosted checks.
+This increment now stacks on reconciled R109/PR242 at
+`553678fa3b145a4e742358376c02839a01935966`, retaining R108 signing-fault coverage.
+All 11 focused wire tests, including three owned-process kill phases, passed in 1.729 seconds.
+The combined full gate passed 3,750 native tests in 156.020 seconds (one slow, 17 skipped),
+182 rendered checks, 636 desktop tests and the real-daemon proof. Fresh exact-head hosted
+checks and merged delivery remain pending. No production behavior or verification threshold
+changed; real-provider, second-host and capacity-release acceptance remain unfinished.
