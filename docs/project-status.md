@@ -756,3 +756,12 @@ initialization intent and through its session lifetime. A competing cooperating 
 without replacing input or receipts. Read-only inspection remains available. This supplies per-attempt
 exclusion for upcoming restart recovery; it does not reopen an interrupted workspace, prove an old
 process stopped, release capacity or authorize replacement execution.
+
+### Received initialization failure retention
+
+Received worker initialization now preserves its partial copy, pending markers and any written
+private history when import fails or its prepared handle is dropped. A changed working copy is
+retained for inspection rather than removed by ordinary import rollback. Focused fault tests and the
+full local gate pass; hosted validation and canonical delivery are tracked in R96 of the migration ledger. This is required
+recovery groundwork, not a resume button or permission to launch another process. Normal project
+imports keep their existing behavior; the fixed user checkpoint is unchanged.
