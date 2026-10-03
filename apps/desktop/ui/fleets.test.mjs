@@ -310,3 +310,19 @@ test('missing native review history produces a visible queue error without start
   assert.doesNotMatch(queue.error,/private native history/);assert.equal(calls.filter(c=>c.command==='remote_fleet_reviews').length,1);
   const before=calls.length;h.intent({type:'remote-results',objective:'../../private'});h.intent({type:'remote-results',objective,path:'/forged'});await settle();assert.equal(calls.length,before);h.dispose();
 });
+
+
+test('remote assignments retain exact worker and lease identities and reject malformed facts', () => {
+  const value = catalogue(), lane = value.fleets[0].state.lanes[0];
+  const remote = { assignment: 'assignment-one', worker: 'e'.repeat(64), lease_sequence: '18446744073709551615', lease_until_ms: '18446744073709551615' };
+  lane.run = { id: 'remote-one', state: 'running', remote };
+  assert.deepEqual(fleetCatalogue(value)[0].lanes[0].run.remote, {
+    assignment: remote.assignment, worker: remote.worker, leaseSequence: remote.lease_sequence, leaseUntil: remote.lease_until_ms,
+  });
+  for (const mutation of [{ worker: '../worker' }, { assignment: '' }, { lease_sequence: '0' }, { lease_sequence: '01' },
+    { lease_until_ms: '18446744073709551616' }, { lease_until_ms: 1000 }, { extra: 'untrusted' }]) {
+    lane.run.remote = { ...remote, ...mutation }; assert.throws(() => fleetCatalogue(value));
+  }
+  lane.run.remote = null; assert.equal(fleetCatalogue(value)[0].lanes[0].run.remote, null);
+  delete lane.run.remote; assert.equal(fleetCatalogue(value)[0].lanes[0].run.remote, null);
+});

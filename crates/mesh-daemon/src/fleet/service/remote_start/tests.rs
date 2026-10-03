@@ -443,3 +443,63 @@ fn cancellation_during_transport_is_observable_and_prevents_peer_challenge() {
 }
 
 mod reconnect;
+
+#[test]
+fn fleet_snapshot_retains_remote_assignment_without_claiming_worker_observation() {
+    let f = Fixture::new();
+    let before = f.service.snapshot().unwrap();
+    assert_eq!(
+        before.get("lanes").unwrap().as_array().unwrap()[0].get("run"),
+        Some(&Json::Null)
+    );
+    let request = f.request();
+    let assignment = request.assignment.clone();
+    assert!(f
+        .service
+        .start_remote_input(request, |request, _| -> io::Result<()> {
+            request
+                .runtime
+                .record(
+                    "fixture-remote-claim",
+                    Command::ClaimRemoteLaunch {
+                        lane: request.lane.into(),
+                        run: request.run.into(),
+                        assignment: assignment.clone(),
+                    },
+                )
+                .unwrap();
+            Err(io::Error::other(
+                "fixture transport unavailable after claim",
+            ))
+        })
+        .is_err());
+    let state = f.service.native_state().unwrap();
+    let snapshot = f.directory.snapshot().unwrap();
+    let run = snapshot.get("fleets").unwrap().as_array().unwrap()[0]
+        .get("state")
+        .unwrap()
+        .get("lanes")
+        .unwrap()
+        .as_array()
+        .unwrap()[0]
+        .get("run")
+        .unwrap();
+    assert_eq!(run.get("id"), Some(&Json::text("native-run")));
+    assert_eq!(
+        run.get("remote"),
+        Some(&Json::object([
+            ("assignment", Json::text(&assignment.id)),
+            ("worker", Json::text(&assignment.worker_key)),
+            (
+                "lease_sequence",
+                Json::text(assignment.lease_sequence.to_string())
+            ),
+            (
+                "lease_until_ms",
+                Json::text(assignment.lease_until_ms.to_string())
+            ),
+        ]))
+    );
+    assert_eq!(f.service.native_state().unwrap(), state);
+    assert_eq!(state.lanes[&f.lane].runs.len(), 1);
+}

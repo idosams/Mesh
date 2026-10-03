@@ -6,7 +6,7 @@ import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetRe
 import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
-type Lane = { id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string } | null };
+type Lane = { id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string; remote?: { assignment: string; worker: string; leaseSequence: string; leaseUntil: string } | null } | null };
 type ProviderPolicy = { coordinator: string; providers: string[] };
 type Fleet = { policy?: ProviderPolicy | null; objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
@@ -105,10 +105,21 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
           <Button variant="secondary" disabled={disabled || !current || fleet.cancelled} onClick={() => send({ type: "stop", objective: fleet.objective })}>{t("Stop agents")}</Button></div>
         <p className="text-xs text-muted-foreground">{activity?.observedAt ? age(activity.observedAt, t) : t("No worker observations in this app session")}</p>
         <ul className="grid max-h-[36rem] gap-3 overflow-auto">{fleet.lanes.map(lane => {
-          const worker = current && lane.run ? activity?.workers.find(worker => worker.lane === lane.id && worker.run === lane.run?.id) : null;
+          const worker = current && lane.run && !lane.run.remote ? activity?.workers.find(worker => worker.lane === lane.id && worker.run === lane.run?.id) : null;
           return <li key={lane.id} className="grid gap-1 rounded border border-border p-2 text-sm">
             <p className="font-medium">{t(lane.parent ? "Worker lane" : "Coordinator lane")} · <bdi dir="ltr">{lane.provider}</bdi></p><p dir="auto" className="whitespace-pre-wrap break-words">{lane.goal}</p>
             <p>{lane.run ? <>{!worker && <>{t("Last saved state")}: </>}{t(states[lane.run.state])}</> : t(!current ? "Saved lane · recovery required" : lane.allocated ? "Waiting to start" : "Allocation needs attention")}</p>
+            {lane.run?.remote && <div className="grid gap-1 text-xs">
+              <p>{t("Remote worker · last coordinator record")}</p>
+              <p>{t("Remote execution has not been observed in this view")}</p>
+              <details className="break-all"><summary>{t("Remote assignment")}</summary>
+                <p>{t("Assignment")}: <bdi dir="ltr">{lane.run.remote.assignment}</bdi></p>
+                <p>{t("Worker identity")}: <bdi dir="ltr">{lane.run.remote.worker}</bdi></p>
+                <p>{t("Recorded lease revision")}: <bdi dir="ltr">{lane.run.remote.leaseSequence}</bdi></p>
+                <p>{t("Recorded lease deadline (Unix ms)")}: <bdi dir="ltr">{lane.run.remote.leaseUntil}</bdi></p>
+                <p>{t("A lease deadline does not prove the worker stopped.")}</p>
+              </details>
+            </div>}
             {worker && <p className="text-xs">{age(worker.observedAt, t)} · {worker.activity ? <bdi dir="ltr">{worker.activity}</bdi> : t("No activity reported")} · {worker.events} {t("events")}</p>}
             <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable"} />
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
