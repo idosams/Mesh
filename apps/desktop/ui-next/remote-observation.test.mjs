@@ -44,3 +44,10 @@ test('saved connection controls expose metadata operations, escape labels and di
   p.busy = true; html = module.exports.render(p); for (const button of html.matchAll(/<button([^>]*)>/g)) assert.match(button[1], /disabled=""/);
   module.exports.setLocale('he'); try { assert.match(module.exports.render(p), /פתיחת הגדרות שמורות/); } finally { module.exports.setLocale('en'); }
 });
+
+test('explicit input recovery distinguishes input acceptance from an agent running', () => {
+  const p = projection(); p.recovery = { disposition: 'input-retained' };
+  const html = module.exports.render(p);
+  assert.match(html, /Resume saved input transfer/); assert.match(html, /must still retain its reservation/);
+  assert.match(html, /does not establish that an agent is running/);
+});

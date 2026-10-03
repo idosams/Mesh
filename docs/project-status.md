@@ -540,3 +540,10 @@ now retain native configuration and original identity/file bindings outside the 
 save, remove and interrupted-save recovery are explicit actions; reopening re-admits the original
 files and identities without contacting or adopting a worker. The renderer receives public fields
 only. Remote execution/recovery controls and signed-app/second-host acceptance remain unfinished.
+
+
+The remote panel now exposes explicit initial-input recovery through the existing catalogue owner.
+Native history derives an attached root version or exact reviewed parent checkpoint; renderer input
+contains only the current connection ID. Transfer retains the original assignment and never renews,
+adopts or creates another attempt. Lost worker reservations, missing parent/source history, complete
+remote launch/receipt UI and real signed-app/second-host acceptance remain unfinished.

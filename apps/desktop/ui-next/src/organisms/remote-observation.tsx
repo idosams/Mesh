@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
-type Projection = { profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
+type Projection = { recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
   results: null | { available: boolean; count: number; revision: string | null; hasMore: boolean } };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
@@ -31,6 +31,11 @@ export function RemoteObservationView({ projection: p, fleets = [] }: { projecti
       {p.selection && <Button variant="secondary" disabled={disabled} onClick={() => send("forget")}>{t("Forget this selection")}</Button>}</div>
       {p.selection && <><dl className="grid gap-1 break-all text-sm">{[["Host", p.selection.host], ["Worker identity", p.selection.worker], ["Fleet", p.selection.objective], ["Lane", p.selection.lane], ["Attempt", p.selection.run]].map(([label, value]) => <div key={label}><dt className="font-medium">{t(label)}</dt><dd><bdi dir="ltr">{value}</bdi></dd></div>)}</dl>
       <div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => send("status")}>{t("Read worker status")}</Button><Button disabled={disabled} onClick={() => send("results")}>{t("Find saved remote results")}</Button></div></>}
+      {p.selection && <section className="grid gap-2 rounded border p-3" aria-label={t("Resume saved input transfer")}>
+        <p className="text-sm">{t("Resume only the original interrupted input transfer. The worker must still retain its reservation. This does not create another attempt or extend its lease.")}</p>
+        <Button variant="secondary" disabled={disabled} onClick={() => send("reconnect-input")}>{t("Resume saved input transfer")}</Button>
+        {p.recovery && <p role="status">{t(p.recovery.disposition === "input-materialized" ? "The saved input is materialized on the worker. This does not establish that an agent is running." : "The worker retained the saved input. This does not establish that an agent is running.")}</p>}
+      </section>}
       {p.busy && <p role="status">{t("Reading native connection information…")}</p>}
       {p.error && <p role="alert">{t(p.error)}</p>}
       {p.status && <div className="grid gap-1 text-sm" aria-label={t("Last verified worker observation")}>
