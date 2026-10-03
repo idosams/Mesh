@@ -4130,3 +4130,44 @@ network connection. Full `npm test` passed: 3,626 native tests (150.432 s, one s
 17 skipped), 170 rendered tests, 601 desktop tests and 44 daemon-demo checks. No process-leak
 warning occurred; this does not resolve #172. Hosted validation is pending. This is setup
 groundwork, not graphical connection management, authenticated SSH or second-host acceptance.
+
+## R77: graphical native remote observation panel
+
+R75 / PR #206 merged as `6b4d4048e3f050f6b242ffb582226bdabc71a35f` after all seven exact-head
+checks passed; combined-main run 37116710513 also passed. R76 / PR #207 is separately published,
+with its original run 37116690725 successful; retargeting and final main integration remain pending.
+R77 starts from canonical R75 main and replaces no legacy commit. It is independent of R76.
+
+The fleet UI can select an existing private coordinator configuration in a native file chooser,
+then explicitly read authenticated worker status or first-page saved-result discovery. Native code
+owns the immutable configuration, random session selector, exact directory/coordinator identity and
+original SSH file admission. Only public labels and bounded observations cross to the renderer.
+The existing application catalogue owner supplies the retained history, avoiding a competing open.
+Unsigned applications refuse before configuration/custody access. Only status/results operations
+are exposed; no start, renewal, receive, retry, adoption or protected-main authority is added.
+
+Twenty-one focused native tests passed (10.501 s), including live catalogue reuse and refusal of
+foreign/missing catalogue roots. Six controller tests cover opaque selection, forged/mismatched
+replies, duplicate suppression, cancellation, forgetting and stale observations. The rendered panel
+covers escaping, busy controls, Hebrew labels and honest historical/unknown status. The first full
+gate stopped on three needless-return lint errors in the new command wrappers; they were corrected.
+The full rerun passed: 3,627 native tests (150.953 s, one slow, 17 skipped), 173 rendered tests,
+607 desktop tests and 44 daemon-demo checks. No process-leak warning occurred; #172 remains open.
+Hosted verification is pending.
+Persistent editable profiles, remote execution/recovery controls, result pagination/import, packaged
+signed-app/SSH/second-host acceptance and the complete fleet plan remain required. The fixed user
+checkpoint has not changed.
+
+### R76/R77 combined-main integration
+
+R77 / PR #208 merged as `0a3b4cb57fbbbbf1f029b8713e467080fe44b26f` after all seven exact-head
+checks in run 37117438917 passed. Combined-main run 37118015370 is pending. The exact sealed
+`aca0980fb53c089e14b0bb1ff157437e4abaa97d` app passed the existing-project packaged journey:
+attachment/capture, two pinned comparisons, independent line, restart/resume/detach and unchanged
+Git. This is graphical regression evidence, not remote-control/SSH/provider/main-approval proof.
+Manual inspection of the remote panel was blocked by the locked Mac; no security setting changed.
+
+R76 / PR #207's original stacked run 37116690725 and main-targeted run 37117509243 both passed
+all seven checks. It now integrates R77 main after those runs ended. Both ledger entries are retained;
+no implementation conflict occurred. Full local verification of the combined tree and fresh hosted
+checks are pending. Neither older passing run substitutes for the new integrated revision.
