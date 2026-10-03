@@ -488,3 +488,7 @@ Remote workers retain the original input allocation identity before acknowledgin
 materialized input. This helps later recovery distinguish retained work, but it does not yet
 make a lost worker reservation resumable. Preserve uncertain work and its original assignment;
 a saved record or missing acknowledgment is not permission to start another agent.
+
+Native recovery can verify whether an acknowledged remote input still occupies its recorded
+allocation with its original contents. This read-only check does not resume an agent or authorize
+a replacement attempt. Graphical worker-restart reconciliation remains unfinished.
