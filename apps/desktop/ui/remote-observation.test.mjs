@@ -270,3 +270,33 @@ test('changed prepared inputs cannot present a ready request', async () => {
   const h=harness(async name=>name==='clear_remote_setup'?creationDraft():{schema:'mesh.remote-creation-prepared/v1',draft:id,entry:{...creationEntryFixture(),version:'e'.repeat(64)}});
   h.intent({type:'clear-setup'});await settle();h.intent({type:'creation-prepare',input:creationInputFixture()});await settle();assert.equal(h.projections.at(-1).creations,null);assert.equal(h.projections.at(-1).creationStatus,null);h.dispose();
 });
+
+const inspection = (disposition = 'verified') => ({ schema: 'mesh.remote-panel-observation/v2', id, kind: 'input-inspection', observed_ms: '1001', disposition });
+test('input inspection accepts only explicit native outcomes and strips unrelated authority', () => {
+  for (const disposition of ['verified', 'unrecorded', 'unavailable']) assert.deepEqual(observationReply({ ...inspection(disposition), restart: true, path: '/private' }, id, 'input-inspection'), { kind: 'input-inspection', observed: '1001', disposition });
+  for (const disposition of ['running', 'ready', '', null]) assert.throws(() => observationReply(inspection(disposition), id, 'input-inspection'));
+  assert.throws(() => observationReply(status(), id, 'input-inspection'));
+  assert.throws(() => observationReply(inspection(), 'b'.repeat(64), 'input-inspection'));
+});
+test('inspection is explicit and keeps status separate; failures retain dated facts and selection changes clear them', async () => {
+  const calls = []; let fail = false;
+  const h = harness(async (name, args) => {
+    calls.push([name, args]);
+    if (name === 'pick_remote_observation') return selected();
+    if (name === 'forget_remote_observation') return;
+    if (args.action === 'status') return status();
+    if (fail) throw Error('offline');
+    return inspection();
+  });
+  h.intent({ type: 'input-inspection' }); await settle(); assert.equal(calls.length, 0);
+  h.intent({ type: 'choose' }); await settle(); assert.equal(calls.length, 1);
+  h.intent({ type: 'status' }); await settle(); assert.equal(h.projections.at(-1).inspection, null);
+  h.intent({ type: 'input-inspection', id: 'forged', after: 999, path: '/private' }); await settle();
+  assert.deepEqual(calls.at(-1), ['read_remote_observation', { id, action: 'input-inspection', after: 0 }]);
+  assert.equal(h.projections.at(-1).inspection.disposition, 'verified');
+  assert.equal(h.projections.at(-1).status.observed, '1000');
+  fail = true; h.intent({ type: 'input-inspection' }); await settle();
+  assert.equal(h.projections.at(-1).inspection.observed, '1001'); assert.match(h.projections.at(-1).error, /out of date/);
+  h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).inspection, null);
+  h.dispose();
+});

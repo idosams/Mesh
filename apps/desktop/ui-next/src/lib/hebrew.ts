@@ -1,5 +1,12 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+  "Original input inspection": "בדיקת הקלט המקורי",
+  "Inspect original input": "בדיקת הקלט המקורי",
+  "Check the original saved input on the worker. This can take time for large inputs and does not resume or restart work.": "בדיקת הקלט המקורי שנשמר אצל הסוכן. בדיקת קלט גדול עשויה לקחת זמן ואינה מחדשת או מפעילה מחדש עבודה.",
+  "The original input was verified at the observation time. This does not establish that an agent is running or can be restarted.": "הקלט המקורי אומת בזמן התצפית. אין בכך הוכחה שסוכן פועל או שניתן להפעילו מחדש.",
+  "The worker has no retained input record. This does not prove that no work was started.": "לסוכן אין רשומת קלט שמורה. אין בכך הוכחה שלא התחילה עבודה.",
+  "The worker could not verify the original input. Preserve the existing attempt for reconciliation.": "הסוכן לא הצליח לאמת את הקלט המקורי. יש לשמור את הניסיון הקיים לצורך בירור.",
+
 "Saved remote reviews":"סקירות מרוחקות שמורות",
 "Fleet status has not loaded for these saved reviews.":"מצב הצי טרם נטען עבור הסקירות השמורות האלה.",
 "Sending input authorizes the configured worker to begin this attempt. A delivery receipt alone does not prove the agent started successfully.":"שליחת הקלט מאפשרת למחשב המרוחק שהוגדר להתחיל את הניסיון הזה. אישור מסירה לבדו אינו מוכיח שהסוכן התחיל בהצלחה.",

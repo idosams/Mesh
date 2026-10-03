@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
-type Projection = { creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
+type Projection = { inspection?: { observed: string; disposition: "unrecorded" | "verified" | "unavailable" } | null; creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
   results: RemoteResultPage | null };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
@@ -35,6 +35,14 @@ export function RemoteObservationView({ projection: p, fleets = [], projects = [
       {p.selection && <Button variant="secondary" disabled={disabled} onClick={() => send("forget")}>{t("Forget this selection")}</Button>}</div>
       {p.selection && <><dl className="grid gap-1 break-all text-sm">{[["Host", p.selection.host], ["Worker identity", p.selection.worker], ["Fleet", p.selection.objective], ["Lane", p.selection.lane], ["Attempt", p.selection.run]].map(([label, value]) => <div key={label}><dt className="font-medium">{t(label)}</dt><dd><bdi dir="ltr">{value}</bdi></dd></div>)}</dl>
       <div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => send("status")}>{t("Read worker status")}</Button><Button disabled={disabled} onClick={() => send("results")}>{t("Find saved remote results")}</Button></div></>}
+      {p.selection && <section className="grid gap-2 rounded border p-3" aria-label={t("Original input inspection")}>
+        <p className="text-sm">{t("Check the original saved input on the worker. This can take time for large inputs and does not resume or restart work.")}</p>
+        <Button variant="secondary" disabled={disabled} onClick={() => send("input-inspection")}>{t("Inspect original input")}</Button>
+        {p.inspection && <div role="status">
+          <p>{t(p.inspection.disposition === "verified" ? "The original input was verified at the observation time. This does not establish that an agent is running or can be restarted." : p.inspection.disposition === "unrecorded" ? "The worker has no retained input record. This does not prove that no work was started." : "The worker could not verify the original input. Preserve the existing attempt for reconciliation.")}</p>
+          <p>{t("Observed at")}: <bdi dir="ltr">{timestamp(p.inspection.observed, t("Observation time unavailable"))}</bdi></p>
+        </div>}
+      </section>}
       {p.selection && <section className="grid gap-2 rounded border p-3" aria-label={t("Resume saved input transfer")}>
         <p className="text-sm">{t("Resume only the original interrupted input transfer. The worker must still retain its reservation. This does not create another attempt or extend its lease.")}</p>
         <Button variant="secondary" disabled={disabled} onClick={() => send("reconnect-input")}>{t("Resume saved input transfer")}</Button>
