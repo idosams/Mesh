@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
-type Projection = { inspection?: { observed: string; disposition: "unrecorded" | "verified" | "unavailable" } | null; creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
+type Projection = { originalRecovery?: { disposition: "initialization-recovered" } | null; inspection?: { observed: string; disposition: "unrecorded" | "verified" | "unavailable" } | null; creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
   results: RemoteResultPage | null };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
@@ -47,6 +47,11 @@ export function RemoteObservationView({ projection: p, fleets = [], projects = [
         <p className="text-sm">{t("Resume only the original interrupted input transfer. The worker must still retain its reservation. This does not create another attempt or extend its lease.")}</p>
         <Button variant="secondary" disabled={disabled} onClick={() => send("reconnect-input")}>{t("Resume saved input transfer")}</Button>
         {p.recovery && <p role="status">{t(p.recovery.disposition === "input-materialized" ? "The saved input is materialized on the worker. This does not establish that an agent is running." : "The worker retained the saved input. This does not establish that an agent is running.")}</p>}
+      </section>}
+      {p.selection && <section className="grid gap-2 rounded border p-3" aria-label={t("Recover original worker workspace")}>
+        <p className="text-sm">{t("Recover the original saved input after interrupted setup. This may start its assigned agent once setup is recovered. Existing or uncertain execution cannot be restarted here.")}</p>
+        <Button variant="secondary" disabled={disabled} onClick={() => send("recover-original")}>{t("Recover original worker workspace")}</Button>
+        {p.originalRecovery && <p role="status">{t("The original workspace setup was recovered. Read worker status to check execution; recovery does not prove that the agent is running.")}</p>}
       </section>}
       {p.busy && <p role="status">{t("Working with the remote connection…")}</p>}
       {p.error && <p role="alert">{t(p.error)}</p>}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply, receiptAttemptsReply, receivedResultReply } from './remote-observation.js';
+import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply, originalRecoveryReply, receiptAttemptsReply, receivedResultReply } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
 const status = () => ({ schema: 'mesh.remote-panel-observation/v2', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
@@ -298,5 +298,38 @@ test('inspection is explicit and keeps status separate; failures retain dated fa
   fail = true; h.intent({ type: 'input-inspection' }); await settle();
   assert.equal(h.projections.at(-1).inspection.observed, '1001'); assert.match(h.projections.at(-1).error, /out of date/);
   h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).inspection, null);
+  h.dispose();
+});
+
+const originalRecovered = () => ({ schema: 'mesh.remote-panel-original-recovery/v1', id, objective: 'fleet-one', lane: 'lane-one', run: 'run-one', disposition: 'initialization-recovered' });
+test('original recovery rejects mismatched attempts and strips non-authoritative extra claims', () => {
+  assert.deepEqual(originalRecoveryReply({ ...originalRecovered(), running: true, path: '/private' }, selected()), { disposition: 'initialization-recovered' });
+  for (const [key, value] of [['id', 'b'.repeat(64)], ['objective', 'other'], ['lane', 'other'], ['run', 'other'], ['schema', 'mesh.remote-panel-original-recovery/v2'], ['disposition', 'running']]) {
+    assert.throws(() => originalRecoveryReply({ ...originalRecovered(), [key]: value }, selected()));
+  }
+});
+test('original recovery uses retained selection once, preserves observations and never retries after failure', async () => {
+  const calls = []; let resolve, fail = false;
+  const h = harness(async (name, args) => {
+    calls.push([name, args]);
+    if (name === 'pick_remote_observation') return selected();
+    if (name === 'read_remote_observation') return status();
+    if (fail) throw new Error('lost reply');
+    return new Promise(done => { resolve = done; });
+  });
+  h.intent({ type: 'recover-original' }); await settle(); assert.equal(calls.length, 0);
+  h.intent({ type: 'choose' }); await settle();
+  h.intent({ type: 'status' }); await settle();
+  const prior = h.projections.at(-1).status;
+  h.intent({ type: 'recover-original', id: 'forged', path: '/private', run: 'other' }); await settle();
+  h.intent({ type: 'recover-original' }); h.intent({ type: 'forget' }); await settle();
+  assert.equal(calls.length, 3); assert.deepEqual(calls.at(-1), ['recover_original_remote_worker', { id }]);
+  resolve(originalRecovered()); await settle();
+  assert.equal(h.projections.at(-1).originalRecovery.disposition, 'initialization-recovered');
+  assert.equal(h.projections.at(-1).status, prior);
+  fail = true; h.intent({ type: 'recover-original' }); await settle(); await settle();
+  assert.equal(calls.length, 4); assert.equal(h.projections.at(-1).originalRecovery, null);
+  assert.equal(h.projections.at(-1).selection.id, id); assert.equal(h.projections.at(-1).status, prior);
+  assert.match(h.projections.at(-1).error, /could not be confirmed/);
   h.dispose();
 });
