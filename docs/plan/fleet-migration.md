@@ -5030,3 +5030,24 @@ static-rendered and native refusal tests, not signed packaged or second-host acc
 
 The full remote fault/uncertain-execution campaign and packaged real-provider/second-host
 recovery remain required. The fixed user checkpoint is unchanged.
+
+## R108 — connected recovery signing-fault and lease-race coverage
+
+This canonical test increment depends on published R107/PR240 at
+`f31c2000fd0e612b038322606685a336bfa34cd7`. It replaces no preserved source commit
+and changes no production behavior, protocol, threshold or test skip.
+
+Three connected wire tests passed in 0.799 seconds across six scenarios. Worker signer failure
+or a signature from the wrong configured key before recovery refuses without initialization or
+coordinator history changes. The same failures during the final receipt retain the completed
+exclusive handoff; another authenticated recovery refuses while that owner remains held.
+Worker lease advancement during the proof signature refuses the old recovery proof without
+initialization. Advancement during final-receipt signing suppresses that stale reply while
+retaining the recovered handoff. Every scenario verifies original input bytes and absence of
+launch intent.
+
+These are Unix-stream native fixture exchanges with independently reopened guarded ledgers,
+not actual process-kill, SSH second-host or packaged native-custody evidence. The full local
+gate passed 3,748 native tests in 156.004 seconds (one slow, 17 skipped), 182 rendered
+checks, 636 desktop tests and 44 real-daemon checks. Hosted validation and merge remain pending. Process termination/restart, remote cancellation delivery,
+uncertain execution reconciliation and the full fleet acceptance campaign remain required.
