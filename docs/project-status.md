@@ -646,3 +646,27 @@ owner-only, single-link, bounded files. At most 64 are retained within the catal
 without repair, deletion or eviction. Consumers must independently re-admit all native bindings
 before an explicit action. Graphical fresh-start setup and request recovery are the next integration
 steps in issue #218; this foundation does not establish a signed packaged or real second-host journey.
+
+## Desktop fresh remote creation and original-attempt inspection
+
+The native setup draft can prepare peer configuration without a fake fleet/lane/run. The desktop
+form selects an attached saved version, goal, one provider and limits; a native draft-derived
+creation key, fixed fifteen-minute deadline, private configuration and original native bindings
+are retained before any fleet allocation or transport. Exact repeated preparation retains the
+original deadline. Public projections contain request metadata, never private key/trust paths.
+
+Explicit send reuses the app-owned catalogue/service and existing saved-input dispatch. The shared
+CLI/native transfer helper is unchanged in authority: it refuses all already-dispatched attempts
+and input acceptance does not prove provider execution. Restart listing never dispatches. Explicit
+inspection finds the original catalogue request and, where its exact attempt exists, selects it
+for the existing observation/reconnect controls. No automatic retry, lease renewal, process
+adoption, source write or protected-main approval is added. The existing request-journal format
+stays v1; desktop native configuration/bindings and public UI envelopes are additive v1 schemas.
+
+Controller/rendered tests and native admission/host-journal tests cover the flow's deterministic
+boundaries. Eligible signing and actual SSH remain external acceptance requirements. A live signed
+packaged fresh-start/recovery journey, successful remote provider execution, missing-assignment/lost-reservation
+reconciliation and the full fleet acceptance plan remain unfinished.
+
+The existing worker service queues execution after input materialization. The desktop send copy
+explicitly describes that authorization while keeping input receipts distinct from provider liveness.

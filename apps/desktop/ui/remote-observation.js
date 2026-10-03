@@ -1,3 +1,4 @@
+import { creationInput, creationList, creationPrepared, creationOutcome } from "./remote-creation.js";
 // Native chooser selections are opaque. This controller never accepts a configuration path.
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
 const hex = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -89,13 +90,14 @@ export function observationReply(raw, id, kind, before = 0) {
 
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
+  let creations = null, creationStatus = null;
   let draft = null, profiles = null, preset = null, receiptAttempts = null, received = null;
   let selection = null, status = null, results = null, recovery = null, busy = false, error = '', disposed = false;
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { receiptAttempts, received, recovery, profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
+  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { creations, creationStatus, receiptAttempts, received, recovery, profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove', 'receipt-list', 'download-result', 'recover-result'].includes(type) || (['status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input', 'receipt-list', 'download-result', 'recover-result'].includes(type) && !selection)) return;
+    if (!['creation-prepare','creation-list','creation-inspect','creation-send','choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove', 'receipt-list', 'download-result', 'recover-result'].includes(type) || (['status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input', 'receipt-list', 'download-result', 'recover-result'].includes(type) && !selection)) return;
     if (type === 'results-next' && !(results?.available && results.hasMore)) return;
     if (type === 'results-previous' && !(results?.available && results.before > 0)) return;
     if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
@@ -107,9 +109,32 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
     if (type === 'download-result' && !results?.entries.some(item => item.offer === receiptOffer)) return;
     if (type === 'recover-result' && !receiptAttempts?.some(item => item.offer === receiptOffer)) return;
     if (['download-result', 'recover-result'].includes(type)) received = null;
+    const creation = creations?.find(item=>item.request===event.detail?.request);
+    if (type==='creation-prepare' && !(draft?.installation && draft?.identity && draft?.hosts)) return;
+    if (['creation-inspect','creation-send'].includes(type) && !creation) return;
+    if (type==='creation-send' && !(creationStatus?.request===creation.request && ['prepared','ready'].includes(creationStatus.kind))) return;
+    if (['creation-prepare','creation-inspect','creation-send'].includes(type)) creationStatus = null;
     busy = true; error = ''; publish();
     try {
-      if (type.startsWith('profile')) {
+      if (type.startsWith('creation-')) {
+        const action=type.slice('creation-'.length);
+        const input=action==='prepare'?creationInput(event.detail.input):null;
+        const raw=await invoke('remote_creation',{action,id:action==='prepare'?draft.id:creation?.request??'',input:input?JSON.stringify(input):''});
+        if(action==='list') {creations=creationList(raw);creationStatus=null;}
+        else if(action==='prepare') {
+          const entry=creationPrepared(raw,draft.id,input);
+          creations=[...(creations??[]).filter(e=>e.request!==entry.request),entry];
+          creationStatus={request:entry.request,kind:'prepared'};
+        } else {
+          const result=creationOutcome(raw,action,creation.request);
+          if(action==='inspect') {
+            const next=result.selection===null?null:selectionReply(result.selection);
+            require(next===null || (next.run===`start-${creation.request}` && next.host===creation.host && next.worker===creation.worker));
+            selection=next;status=null;results=null;recovery=null;receiptAttempts=null;received=null;
+          }
+          creationStatus={request:result.request,kind:result.kind,disposition:result.disposition};
+        }
+      } else if (type.startsWith('profile')) {
         const action = ({ 'profiles-list': 'list', 'profiles-recover': 'recover', 'profile-save': 'save', 'profile-open': 'open', 'profile-remove': 'remove' })[type];
         const args = { action, selection: action === 'save' ? selection.id : '', label: action === 'save' ? event.detail.label : '', profile: ['open', 'remove'].includes(action) ? entry.id : '', revision: ['list', 'recover'].includes(action) ? '' : profiles.revision };
         const raw = await invoke('remote_connection_profiles', args);
@@ -148,7 +173,7 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
           results = observation;
         }
       }
-    } catch { error = ['download-result', 'recover-result'].includes(type) ? 'Download could not be confirmed. Use saved downloads to check the original attempt. No work was approved or applied.' : type === 'receipt-list' ? 'Saved downloads are unavailable for this connection.' : type === 'reconnect-input' ? 'Input transfer outcome could not be confirmed. Keep the original assignment, inspect worker status, and resume only explicitly. No new attempt was requested.' : 'Remote observation is unavailable. Previous observations may be out of date. Check the signed application, private configuration and worker connection.'; }
+    } catch { error = type.startsWith('creation-') ? 'Remote creation could not be confirmed. Load saved requests and inspect the original attempt before another action.' : ['download-result', 'recover-result'].includes(type) ? 'Download could not be confirmed. Use saved downloads to check the original attempt. No work was approved or applied.' : type === 'receipt-list' ? 'Saved downloads are unavailable for this connection.' : type === 'reconnect-input' ? 'Input transfer outcome could not be confirmed. Keep the original assignment, inspect worker status, and resume only explicitly. No new attempt was requested.' : 'Remote observation is unavailable. Previous observations may be out of date. Check the signed application, private configuration and worker connection.'; }
     finally { busy = false; publish(); }
   }
   document.addEventListener('mesh:remote-observation-intent', intent);

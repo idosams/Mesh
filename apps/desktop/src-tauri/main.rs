@@ -919,6 +919,33 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn remote_creation(
+        app: tauri::AppHandle,
+        action: String,
+        id: String,
+        input: String,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                panel.creation(&action, &id, &input, &host)
+            })
+            .await
+            .map_err(|_| "Creation outcome needs reconciliation".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, action, id, input);
+            Err("Remote creation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn remote_result_receipt(
         app: tauri::AppHandle,
         id: String,
@@ -8162,6 +8189,7 @@ mod desktop {
                 remote_connection_profiles,
                 reconnect_remote_input,
                 remote_result_receipt,
+                remote_creation,
                 configure_remote_observation,
                 read_remote_observation,
                 forget_remote_observation,

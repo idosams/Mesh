@@ -1,5 +1,19 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Sending input authorizes the configured worker to begin this attempt. A delivery receipt alone does not prove the agent started successfully.":"שליחת הקלט מאפשרת למחשב המרוחק שהוגדר להתחיל את הניסיון הזה. אישור מסירה לבדו אינו מוכיח שהסוכן התחיל בהצלחה.",
+"Prepare new remote work":"הכנת עבודה מרוחקת חדשה",
+"Choose saved work and retain its exact request before sending input. No existing attempt is needed. The fixed lease lasts fifteen minutes from preparation.":"בחרו עבודה שמורה ושמרו את הבקשה המדויקת לפני שליחת הקלט. אין צורך בניסיון קיים. ההרשאה הקבועה תקפה לחמש עשרה דקות מרגע ההכנה.",
+"Save remote creation request":"שמירת בקשה ליצירת עבודה מרוחקת",
+"To prepare a different request, clear and reselect the native setup files. Existing saved requests remain available.":"להכנת בקשה אחרת, נקו ובחרו מחדש את קובצי ההגדרה. בקשות שכבר נשמרו נשארות זמינות.",
+"Saved remote creation requests":"בקשות שמורות ליצירת עבודה מרוחקת",
+"Load saved requests":"טעינת בקשות שמורות",
+"Inspect original creation attempt":"בדיקת ניסיון היצירה המקורי",
+"Send saved input to worker":"שליחת הקלט השמור למחשב המרוחק",
+"Input delivery was confirmed. This does not establish that an agent is running.":"מסירת הקלט אושרה. אין בכך הוכחה שסוכן פועל.",
+"A retained fleet exists. Inspect its selected attempt and resume only the original input transfer if needed.":"קיים צי שמור. בדקו את הניסיון שנבחר והמשיכו רק את העברת הקלט המקורית במידת הצורך.",
+"The request is retained. Sending input is a separate explicit action.":"הבקשה נשמרה. שליחת הקלט היא פעולה מפורשת ונפרדת.",
+"No saved remote creation requests were returned.":"לא הוחזרו בקשות שמורות ליצירת עבודה מרוחקת.",
+"Remote creation could not be confirmed. Load saved requests and inspect the original attempt before another action.":"לא ניתן לאשר את יצירת העבודה המרוחקת. טענו בקשות שמורות ובדקו את הניסיון המקורי לפני פעולה נוספת.",
 "Working with the remote connection…":"מבצע פעולה בחיבור המרוחק…",
 
 "Download for review":"הורד לבדיקה",

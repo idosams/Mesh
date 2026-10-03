@@ -75,3 +75,14 @@ test('saved download recovery exposes review only after a verified completion an
   assert.match(html, /<button[^>]*disabled=""[^>]*>Show downloaded reviews<\/button>/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>Check or resume saved download<\/button>/);
 });
+
+test('fresh creation is available without an old fleet and retained attempts remain separate from execution', () => {
+  const p=projection();p.selection=null;p.status=null;p.results=null;
+  p.creations=[{request:'a'.repeat(32),project:'project',version:'version',goal:'<script>goal</script>',provider:'codex',host:'worker',worker:'key',lease_until_ms:'9999999999999',limits:{lanes:4,concurrency:2,depth:1,retries:0}}];
+  let html=module.exports.render(p);assert.match(html,/Prepare new remote work/);assert.match(html,/No existing attempt is needed/);assert.match(html,/Sending input authorizes the configured worker/);assert.match(html,/&lt;script&gt;goal&lt;\/script&gt;/);
+  assert.match(html,/<button[^>]*disabled=""[^>]*>Send saved input to worker<\/button>/);
+  p.creationStatus={request:'a'.repeat(32),kind:'prepared'};html=module.exports.render(p);assert.doesNotMatch(html,/<button[^>]*disabled=""[^>]*>Send saved input to worker<\/button>/);
+  p.creationStatus.kind='sent';html=module.exports.render(p);assert.match(html,/does not establish that an agent is running/);assert.match(html,/<button[^>]*disabled=""[^>]*>Send saved input to worker<\/button>/);
+  p.busy=true;html=module.exports.render(p);for(const button of html.matchAll(/<button([^>]*)>/g))assert.match(button[1],/disabled=""/);
+  module.exports.setLocale('he');try{assert.match(module.exports.render(p),/בקשות שמורות ליצירת עבודה מרוחקת/);}finally{module.exports.setLocale('en');}
+});
