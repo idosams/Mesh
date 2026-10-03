@@ -819,6 +819,27 @@ impl PreparedFolderImport {
         })
     }
 
+    /// Retain both original directory objects across confirmation and live-service installation.
+    pub(crate) fn presented_handoff_roots(
+        &self,
+    ) -> Result<(PinnedWorkspaceRoot, PinnedWorkspaceRoot), FolderImportError> {
+        if self.presented_store.is_none() {
+            return Err(FolderImportError::OwnershipMismatch {
+                destination: self.destination.clone(),
+            });
+        }
+        self.destination_pinned
+            .ensure_namespace_identity()
+            .and_then(|()| self.destination_parent_pinned.ensure_namespace_identity())
+            .map_err(|error| {
+                FolderImportError::io("verify import handoff", &self.destination, error)
+            })?;
+        Ok((
+            self.destination_pinned.clone(),
+            self.destination_parent_pinned.clone(),
+        ))
+    }
+
     fn write_confirmation_receipt(
         &self,
         managed: &Snapshot,

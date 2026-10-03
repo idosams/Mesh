@@ -1095,6 +1095,8 @@ pub struct OpenWorkspace {
     /// store's presented child and private state is its sibling. Keeping both descriptors is the
     /// structural separation: neither side reaches the other with a relative path.
     storage_pinned_root: PinnedWorkspaceRoot,
+    /// Original displayed private-store namespace when I/O uses a stable native reference.
+    storage_namespace: Option<PinnedWorkspaceRoot>,
     /// Stable identity of the private namespace selected at open.
     storage_identity: WorkspaceDirectoryIdentity,
     physical_identity: WorkspaceDirectoryIdentity,
@@ -1133,6 +1135,22 @@ enum WorkspaceOpenRecovery {
     WorkingFiles,
     MetadataOnly,
     HistoryOnly,
+}
+
+struct PreparedWorkspaceAuthority {
+    root: PinnedWorkspaceRoot,
+    storage: PinnedWorkspaceRoot,
+    // None keeps the existing transient-index contract used during unconfirmed preparation.
+    original_storage: Option<PinnedWorkspaceRoot>,
+}
+impl PreparedWorkspaceAuthority {
+    fn transient(root: PinnedWorkspaceRoot, storage: PinnedWorkspaceRoot) -> Self {
+        Self {
+            root,
+            storage,
+            original_storage: None,
+        }
+    }
 }
 
 impl OpenWorkspace {
@@ -1297,7 +1315,7 @@ impl OpenWorkspace {
             Some(&storage_path),
             trusted,
             false,
-            Some((pinned, storage)),
+            Some(PreparedWorkspaceAuthority::transient(pinned, storage)),
             WorkspaceOpenRecovery::HistoryOnly,
         )
     }
@@ -1319,7 +1337,35 @@ impl OpenWorkspace {
             Some(storage_root),
             trusted_reviewers,
             true,
-            Some((pinned_root, storage_pinned_root)),
+            Some(PreparedWorkspaceAuthority::transient(
+                pinned_root,
+                storage_pinned_root,
+            )),
+            WorkspaceOpenRecovery::WorkingFiles,
+        )
+    }
+
+    /// Reopen a confirmed import with its original pins and a durable index confined to the
+    /// private directory's native reference. The display namespace remains a separate guard.
+    pub(crate) fn reopen_import_layout(
+        root: &Path,
+        pinned_root: PinnedWorkspaceRoot,
+        original_storage: PinnedWorkspaceRoot,
+        trusted: &crate::TrustedReviewers,
+    ) -> Result<Self, OpenFailure> {
+        let (reference, storage) = original_storage
+            .stable_namespace()
+            .map_err(OpenFailure::Unreachable)?;
+        Self::open_layout_inner(
+            root,
+            Some(&reference),
+            trusted,
+            false,
+            Some(PreparedWorkspaceAuthority {
+                root: pinned_root,
+                storage,
+                original_storage: Some(original_storage),
+            }),
             WorkspaceOpenRecovery::WorkingFiles,
         )
     }
@@ -1366,7 +1412,10 @@ impl OpenWorkspace {
             Some(metadata),
             trusted,
             create_missing,
-            Some((pinned.clone(), pinned)),
+            Some(PreparedWorkspaceAuthority::transient(
+                pinned.clone(),
+                pinned,
+            )),
             WorkspaceOpenRecovery::MetadataOnly,
         )
     }
@@ -1376,14 +1425,24 @@ impl OpenWorkspace {
         explicit_storage_root: Option<&Path>,
         trusted_reviewers: &crate::TrustedReviewers,
         create_missing: bool,
-        prepared: Option<(PinnedWorkspaceRoot, PinnedWorkspaceRoot)>,
+        prepared: Option<PreparedWorkspaceAuthority>,
         recovery: WorkspaceOpenRecovery,
     ) -> Result<Self, OpenFailure> {
         let started = Instant::now();
         if create_missing && prepared.is_none() {
             fs::create_dir_all(root).map_err(OpenFailure::Unreachable)?;
         }
-        let uses_prepared_authority = prepared.is_some();
+        let uses_transient_index = prepared
+            .as_ref()
+            .is_some_and(|authority| authority.original_storage.is_none());
+        let storage_namespace = prepared
+            .as_ref()
+            .and_then(|authority| authority.original_storage.clone());
+        if let Some(original) = &storage_namespace {
+            original
+                .ensure_namespace_identity()
+                .map_err(OpenFailure::Unreachable)?;
+        }
         let selected_root = WorkspaceRoot::new(root.to_path_buf());
         let (
             resolved_root,
@@ -1393,7 +1452,12 @@ impl OpenWorkspace {
             storage_pinned_root,
             storage_identity,
             _initialization_guard,
-        ) = if let Some((pinned_root, storage_pinned_root)) = prepared {
+        ) = if let Some(PreparedWorkspaceAuthority {
+            root: pinned_root,
+            storage: storage_pinned_root,
+            ..
+        }) = prepared
+        {
             let initialization_guard = crate::workspace_custody::lock_workspace_initialization(
                 &pinned_root,
             )
@@ -1536,7 +1600,7 @@ impl OpenWorkspace {
 
         let records = scan.into_records();
         let database = storage_root.database();
-        let store = if uses_prepared_authority {
+        let store = if uses_transient_index {
             open_and_rebuild_transient_index(&records, boundary)?
         } else {
             open_and_rebuild_index(&database, &records, boundary)?
@@ -1593,6 +1657,7 @@ impl OpenWorkspace {
             physical_root,
             storage_root,
             storage_pinned_root,
+            storage_namespace,
             storage_identity,
             physical_identity,
             pinned_root,
@@ -1782,6 +1847,9 @@ impl OpenWorkspace {
 
     /// Refuse a workspace directory that was replaced after this instance opened.
     pub(crate) fn ensure_physical_root(&self) -> io::Result<()> {
+        if let Some(original) = &self.storage_namespace {
+            original.ensure_namespace_identity()?;
+        }
         if workspace_directory_identity(self.physical_root.as_path())? == self.physical_identity
             && workspace_directory_identity(self.storage_root.as_path())? == self.storage_identity
         {
@@ -5696,6 +5764,147 @@ mod tests {
     use mesh_store::{
         frame_record, journal_records, no_session, OperationRecord, RecordDigest, StoredRecord,
     };
+
+    fn confirmed_import_for_pinned_handoff(
+        name: &str,
+    ) -> (PathBuf, PathBuf, PinnedWorkspaceRoot, PinnedWorkspaceRoot) {
+        let root = scratch(name);
+        let source = root.join("source");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("work.txt"), b"original saved work").unwrap();
+        let store = root.join("worker.mesh");
+        let prepared = crate::PreparedFolderImport::prepare_received_with_parent(
+            &source,
+            &store,
+            &[],
+            crate::ProtectedWorkspaceRoot::inspect(&root).unwrap(),
+        )
+        .unwrap();
+        let (working, storage) = prepared.presented_handoff_roots().unwrap();
+        let (confirmed, _) = prepared.confirm_into_workspace_without_origin().unwrap();
+        (
+            root,
+            confirmed.destination().to_path_buf(),
+            working,
+            storage,
+        )
+    }
+
+    #[test]
+    fn pinned_import_handoff_uses_durable_original_index_and_reopens_normally() {
+        let (root, presented, working, storage) =
+            confirmed_import_for_pinned_handoff("pinned-import-positive");
+        let open = OpenWorkspace::reopen_import_layout(
+            &presented,
+            working,
+            storage,
+            &crate::TrustedReviewers::default(),
+        )
+        .unwrap();
+        assert_eq!(open.root().as_path(), presented);
+        assert_eq!(open.operations(), 1);
+        assert!(open.storage_namespace.is_some());
+        assert_ne!(
+            open.database_file(),
+            root.join("worker.mesh").join(DATABASE_FILE_NAME)
+        );
+        assert!(
+            fs::metadata(root.join("worker.mesh").join(DATABASE_FILE_NAME))
+                .unwrap()
+                .len()
+                > 0
+        );
+        let installation = open.installation();
+        drop(open);
+        let reopened = OpenWorkspace::reopen_with_trusted_reviewers(
+            &presented,
+            &crate::TrustedReviewers::default(),
+        )
+        .unwrap();
+        assert_eq!(reopened.operations(), 1);
+        assert_eq!(reopened.installation(), installation);
+        drop(reopened);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pinned_import_handoff_refuses_displaced_store_before_mutable_open() {
+        let (root, presented, working, storage) =
+            confirmed_import_for_pinned_handoff("pinned-import-refuse");
+        let original = root.join("worker.mesh");
+        let retained = root.join("retained");
+        fs::rename(&original, &retained).unwrap();
+        // Supply a complete, independently initialized replacement. A pathname-only reopen
+        // could successfully admit this workspace, so refusal must depend on the original pins.
+        let (replacement_root, _, replacement_working, replacement_storage) =
+            confirmed_import_for_pinned_handoff("pinned-import-valid-replacement");
+        drop((replacement_working, replacement_storage));
+        fs::rename(replacement_root.join("worker.mesh"), &original).unwrap();
+        assert!(OpenWorkspace::reopen_import_layout(
+            &presented,
+            working,
+            storage,
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+        for directory in [&original, &retained] {
+            assert_eq!(
+                fs::metadata(directory.join(DATABASE_FILE_NAME))
+                    .unwrap()
+                    .len(),
+                0
+            );
+            assert_eq!(
+                fs::read(directory.join(PRESENTED_DIRECTORY_NAME).join("work.txt")).unwrap(),
+                b"original saved work"
+            );
+        }
+        // The replacement is otherwise usable under a fresh explicit open; inherited import
+        // authority must not be allowed to select it merely because its displayed name matches.
+        let replacement = OpenWorkspace::reopen_with_trusted_reviewers(
+            &presented,
+            &crate::TrustedReviewers::default(),
+        )
+        .unwrap();
+        assert_eq!(replacement.operations(), 1);
+        drop(replacement);
+        fs::remove_dir_all(replacement_root).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pinned_import_handoff_checks_original_store_even_when_working_directory_is_restored() {
+        let (root, presented, working, storage) =
+            confirmed_import_for_pinned_handoff("pinned-import-storage-guard");
+        let open = OpenWorkspace::reopen_import_layout(
+            &presented,
+            working,
+            storage,
+            &crate::TrustedReviewers::default(),
+        )
+        .unwrap();
+        let original = root.join("worker.mesh");
+        let retained = root.join("retained");
+        fs::rename(&original, &retained).unwrap();
+        fs::create_dir(&original).unwrap();
+        fs::rename(retained.join(PRESENTED_DIRECTORY_NAME), &presented).unwrap();
+        open.pinned_root().ensure_namespace_identity().unwrap();
+        assert!(open.ensure_physical_root().is_err());
+        // A path-based SQLite open through the retained native reference still reaches only
+        // the original private directory, including sidecars, despite its new display name.
+        let probe = open
+            .database_file()
+            .parent()
+            .unwrap()
+            .join("handoff-probe.sqlite");
+        let driver = mesh_store::Sqlite::open(&probe).unwrap();
+        let store = mesh_store::Store::open(driver).unwrap();
+        drop(store);
+        assert!(retained.join("handoff-probe.sqlite").is_file());
+        assert!(!original.join("handoff-probe.sqlite").exists());
+        drop(open);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     fn scratch(name: &str) -> PathBuf {
         let mut path = std::env::temp_dir();

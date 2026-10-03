@@ -8704,6 +8704,9 @@ impl LiveDaemon {
             .and_then(|runtime| runtime.machine().snapshot().last_meaningful())
             .map(|checkpoint| checkpoint.stamp().content_hash());
         let summary = summarise(&opened, automatic_review_target);
+        opened
+            .ensure_physical_root()
+            .map_err(OpenFailure::Unreachable)?;
         // Installation and recovery admission are part of the workspace-open transition. A
         // failure leaves the daemon holding its prior workspace, so counting the preceding fold
         // as a completed open would publish work that the daemon refused to admit.
@@ -9356,16 +9359,23 @@ impl LiveDaemon {
         prepared: crate::PreparedFolderImport,
         exact: impl FnOnce(&OpenWorkspace) -> bool,
     ) -> Result<WorkspaceSummary, Unavailable> {
+        let (working, storage) = prepared
+            .presented_handoff_roots()
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
         let (confirmed, _) = prepared
             .confirm_into_workspace_without_origin()
             .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
         let presented = confirmed.destination();
-        let _custody =
-            crate::workspace_custody::lock_workspace_path_initialization(presented, false)
-                .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
-        let index = workspace_storage_root(presented)
-            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?
-            .join(DATABASE_FILE_NAME);
+        let _custody = crate::workspace_custody::lock_workspace_initialization(&working)
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        let (reference, _stable_storage) = storage
+            .stable_namespace()
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        working
+            .ensure_namespace_identity()
+            .and_then(|()| storage.ensure_namespace_identity())
+            .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        let index = reference.join(DATABASE_FILE_NAME);
         if !SqliteRecoveryState::quiesce_default_isolated(
             recovery_database(&index),
             &index,
@@ -9375,9 +9385,13 @@ impl LiveDaemon {
         {
             return Err(workspace_version_refusal("fleet-attachment-import-failed"));
         }
-        let candidate =
-            OpenWorkspace::reopen_with_trusted_reviewers(presented, &self.trusted_reviewers)
-                .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
+        let candidate = OpenWorkspace::reopen_import_layout(
+            presented,
+            working,
+            storage,
+            &self.trusted_reviewers,
+        )
+        .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
         if !exact(&candidate) {
             return Err(workspace_version_refusal(
                 "fleet-attachment-content-changed",
