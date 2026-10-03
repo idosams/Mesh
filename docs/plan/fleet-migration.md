@@ -4045,3 +4045,33 @@ occurred; existing reliability issues remain open. Hosted CI is pending. This do
 OS-held keys, SSH, a second machine, packaged UI or velocity/resource measurements.
 The complete fleet objective, explicit restart reconciliation, GUI controls, retention and complete
 remote dependency/revocation remain outstanding.
+
+
+## R73: explicit original-assignment input reconnect after coordinator restart
+
+Depends on merged R72 / PR #203 (`714e28d46191ba37e1cb92d49b2367eca0af3e86`). New canonical
+implementation; replaces no legacy commit. R72's exact-head run 37061729924 passed all seven checks;
+its combined-main run 37079919613 also passed all seven checks. The user's tested R71 checkpoint remains
+fixed at `858bcb318559ad78016feeffd4e7673adbfb6fbe` with separate application state.
+
+The native history service now composes the existing explicit input reconnect through an independent
+guarded ledger. It exposes no dispatch/mutable runtime or replacement assignment/lease. The macOS
+`reconnect-input` command reuses admitted peer and saved project/review configuration under the same
+eligible-app/private-file rules. Its output reports input disposition only. Existing wire, observation
+and receiving formats remain unchanged; no worker or local execution context is adopted.
+
+Nineteen focused tests passed (2.771 s), including an authenticated chunk-loss journey followed by
+catalogue restart. The same worker reservation materializes exact saved bytes while original files
+have newer external edits. One admission/allocation/run and the complete unchanged coordinator state
+are asserted, along with live-reader responsiveness and wrong-worker/missing-claim/replaced-catalogue
+refusal. The initial build caught test cleanup ownership errors; their log is retained. Additional
+negative ledger-state coverage refuses expired/renewed leases, cancellation, running or local
+ownership, changed input and wrong runs before signing. The full `npm test` passed: 3,620 native
+tests (151.018 s, one slow, 17 skipped), 170 rendered tests, 599 desktop tests and all 44 daemon-demo
+checks. The original run reported one process-leak warning in
+`attachment-background::repeated_signals_coalesce_while_a_save_is_in_flight`; issue #172 remains
+unresolved. A bounded 30-repeat probe passed without reproducing the warning; this does not
+establish a lifecycle fix. Hosted CI is pending. These fixtures do not establish
+OS custody, real SSH, a second host or packaged operator acceptance. Lost worker reservations,
+complete dependency/revocation/retention, GUI controls, real-provider acceptance and measurements
+remain part of the full objective.

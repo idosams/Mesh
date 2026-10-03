@@ -45,6 +45,9 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
+        Self::with_bytes(b"saved input\n")
+    }
+    fn with_bytes(bytes: &[u8]) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "mesh-native-start-{}-{}",
@@ -64,7 +67,7 @@ impl Fixture {
             fs::create_dir(&path).unwrap();
             fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
         }
-        fs::write(root.join("original/work.txt"), b"saved input\n").unwrap();
+        fs::write(root.join("original/work.txt"), bytes).unwrap();
         let attachment = AttachmentStorage::open(&root.join("metadata"))
             .unwrap()
             .provision(&root.join("original"))
@@ -438,3 +441,5 @@ fn cancellation_during_transport_is_observable_and_prevents_peer_challenge() {
     assert!(state.cancelled);
     assert!(state.lanes[&f.lane].runs[0].remote.is_none());
 }
+
+mod reconnect;

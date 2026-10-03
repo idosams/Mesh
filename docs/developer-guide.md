@@ -713,3 +713,26 @@ request IDs, rotate the run, renew the deadline or recreate directories to conce
 outcome. Initial-transfer reconciliation after restart remains a separate, unfinished native
 capability. Original files and protected main stay under their existing human approval boundary.
 GUI start/receiving controls, real OS-key and second-host acceptance remain required.
+
+### Explicit initial-input reconnect
+
+`--coordinator reconnect-input <absolute-private-config>` is an explicit continuation of an
+already claimed initial input transfer. It may reopen the coordinator's retained catalogue after
+restart; it does not adopt a local lane, dispatch another attempt or renew a lease. The original
+worker must still retain its receiving reservation. Completed/running work, cancelled work,
+expired or renewed leases, changed input, a different worker and missing claims refuse.
+
+The closed `mesh.coordinator-input-reconnect-config/v1` JSON object has exactly three fields:
+`schema`, `connection` and `input`. `connection` is the existing complete
+`mesh.coordinator-observation-config/v1` object with the original objective/lane/run and independently
+admitted peer. `input` is the same project or saved-review selection used by the receive command.
+There is no assignment, replacement lease, allocation or manifest field. Existing receive and
+observation configurations remain unchanged. The app eligibility, owner-private file and native
+signing rules apply before the operation can contact the worker.
+
+Retain the original configuration and identities. The response schema
+`mesh.coordinator-input-reconnect/v1` contains a disposition (`input-materialized` or `input-retained`)
+and the existing transfer correlation. Materialization is not provider startup/completion or review
+acceptance. A failure may follow a durable worker change; inspect the same assignment rather than
+creating another request or treating a timeout as termination. This command cannot reconstruct lost
+worker reservations or resolve an assignment that was never durably claimed by the coordinator.

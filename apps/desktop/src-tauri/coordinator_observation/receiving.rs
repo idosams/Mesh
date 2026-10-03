@@ -9,7 +9,7 @@ use mesh_daemon::{
     project_attachment::AttachmentStorage,
 };
 
-enum Input {
+pub(super) enum Input {
     Project {
         storage: PathBuf,
         project: String,
@@ -76,7 +76,27 @@ fn configuration(value: Json) -> Result<ReceiveConfiguration, String> {
     }
     let connection = config(value.get("connection").ok_or(UNAVAILABLE)?.clone())?;
     let selected = value.get("input").ok_or(UNAVAILABLE)?;
-    let input = match text(selected, "kind")? {
+    let input = input_selection(selected)?;
+    let allocation = text(&value, "allocation")?;
+    if !hexadecimal(allocation, 32) {
+        return Err(UNAVAILABLE.into());
+    }
+    let offer = text(&value, "offer")?;
+    // Signature and exact assignment are checked by native ingestion before any receiving writes.
+    if offer.len() > 8192 || Json::parse(offer).is_err() {
+        return Err(UNAVAILABLE.into());
+    }
+    Ok(ReceiveConfiguration {
+        connection,
+        input,
+        store: path(&value, "store")?,
+        allocations: path(&value, "allocations")?,
+        allocation: allocation.into(),
+        offer: offer.into(),
+    })
+}
+pub(super) fn input_selection(selected: &Json) -> Result<Input, String> {
+    Ok(match text(selected, "kind")? {
         "project" => {
             closed(selected, &["kind", "storage", "project", "version"])?;
             let project = text(selected, "project")?;
@@ -106,26 +126,9 @@ fn configuration(value: Json) -> Result<ReceiveConfiguration, String> {
             )
         }
         _ => return Err(UNAVAILABLE.into()),
-    };
-    let allocation = text(&value, "allocation")?;
-    if !hexadecimal(allocation, 32) {
-        return Err(UNAVAILABLE.into());
-    }
-    let offer = text(&value, "offer")?;
-    // Signature and exact assignment are checked by native ingestion before any receiving writes.
-    if offer.len() > 8192 || Json::parse(offer).is_err() {
-        return Err(UNAVAILABLE.into());
-    }
-    Ok(ReceiveConfiguration {
-        connection,
-        input,
-        store: path(&value, "store")?,
-        allocations: path(&value, "allocations")?,
-        allocation: allocation.into(),
-        offer: offer.into(),
     })
 }
-fn input_source(
+pub(super) fn input_source(
     input: &Input,
     history: &FleetHistory,
     protected: &mut Vec<ProtectedWorkspaceRoot>,
