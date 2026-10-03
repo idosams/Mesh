@@ -5253,3 +5253,27 @@ acceptance. The full fleet plan, second provider/host, matched harness baseline,
 resource and human coordination measurements remain required. This documentation-only
 increment uses the actual acceptance run plus documentation checks; it does not claim a new
 full repository gate or a statistically repeatable speed improvement.
+
+
+## R118 — discover the current installed Codex CLI bundle
+
+Tracks [issue #253](https://github.com/idosams/Mesh/issues/253). Based on merged canonical main
+`97e263ffd602b4232c5b1dc77fa54bc686deec18`; new implementation replaces no preserved source commit.
+All four old desktop candidates were absent on the acceptance host, while the regular executable
+existed in the nested `codex-cli/CodexCLI.app/Contents/MacOS/codex` layout. Native real-provider
+acceptance used an explicit executable path and therefore did not prove desktop discovery.
+
+Discovery supports both bounded app layouts in system/user Applications, prefers the current
+layout within each app, and retains final-link refusal and provider-adapter admission. No
+renderer path or arbitrary command search is added. Native filesystem tests cover all supported
+locations, legacy/current precedence, missing/directory/link candidates and fallback; two baseline
+tests failed before the correction. All three focused tests pass. The full canonical gate passed
+3,771 Rust tests in 160.643s (1 slow, 17 skipped), 183 rendered tests, 641 desktop tests and all
+44 real daemon demo checks. Hosted delivery and corrected packaged provider launch remain pending.
+
+The pre-fix main package was preserved with its exact embedded revision and valid ad-hoc seal.
+Its actual visible-window existing-project journey passed: capture external edits, two immutable
+pins, independent lane, restart/resume/detach and original Git preservation. It explicitly reports
+no provider launch and no protected-main approval. This is separate evidence, not proof of the
+provider discovery correction or completion of the fleet plan. The fixed user checkpoint remains
+unchanged.

@@ -916,3 +916,14 @@ The [measurement record](plan/evidence/fleet-four-worker-2026-10-04.json) binds 
 results to the source revision, binary hashes and preserved raw evidence. GUI latency,
 provider cost, resource usage, human coordination and accepted-main timing remain
 unmeasured; this does not complete packaged, second-provider or second-host acceptance.
+
+
+### Installed Codex application layout (R118)
+
+The packaged local fleet acceptance preparation found that the installed Codex CLI had moved
+inside a nested app bundle, while desktop discovery searched only the older resource path.
+Explicit-path native provider tests did not cover this desktop boundary. Discovery now supports
+both layouts in the existing supported application locations, preserving regular-file checks and
+native adapter admission. Two native regression tests failed with legacy-only discovery; all three focused tests now pass.
+Full validation passed 3,771 native, 183 rendered and 641 desktop tests plus the real daemon demo.
+Hosted delivery and actual corrected packaged provider launch remain pending.

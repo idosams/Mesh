@@ -499,3 +499,12 @@ a saved record or missing acknowledgment is not permission to start another agen
 Native recovery can verify whether an acknowledged remote input still occupies its recorded
 allocation with its original contents. This read-only check does not resume an agent or authorize
 a replacement attempt. Graphical worker-restart reconciliation remains unfinished.
+
+
+### Installed Codex discovery
+
+Mesh finds the Codex CLI in supported ChatGPT or Codex app bundles under system Applications or
+your Applications folder. Both the current nested CLI bundle and the older resource layout are
+supported; the current layout is preferred within each app. Mesh does not accept executable paths
+from a fleet card or search arbitrary shell commands. The native provider adapter still checks the
+selected executable before starting an agent. An installed provider account remains required.
