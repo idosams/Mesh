@@ -4656,3 +4656,29 @@ checks. Nextest reported one LEAK warning in the existing background-capture tes
 reliability investigation remains open. Fresh hosted checks remain required. This is private initialization machinery, not an authenticated restart operation: original
 admission/lease/launch checks, partial working-file completion, native workspace reconstruction,
 receipt reconciliation and graphical recovery controls remain required by the full acceptance map.
+
+## R98 — retained received-file prefix completion
+
+New canonical implementation following R97/PR230; replaces no preserved source commit. The native
+received-copy path can complete an existing exact input-file prefix by appending only its missing
+suffix. It validates the complete original source and both file identities, compares the prefix
+again through the writable descriptor, and verifies final source/content/identity before success.
+Private canonical modes, a single regular-file link and the original source executable state are
+required; interrupted executable-mode finalization is applied only to the original output inode.
+Copies use fixed-size buffers rather than loading a potentially large received file into memory.
+
+Conflicting or extra bytes, changed source, replaced paths, links, unexpected executable state and
+noncanonical permissions refuse without truncating or replacing retained work. Ordinary import
+collisions keep their existing refusal. No persisted formats or launch authority change. This is the
+copy completion machinery needed by restart recovery; reopening original prepared-workspace markers,
+index/receipt reconciliation and the authenticated original-attempt resume operation are still pending.
+
+Seven new regressions cover every byte cut, repeated completion, executable and empty files, buffer
+boundaries, conflicts, links/permissions, same-inode edits and replacement during inspection, changed
+source/displaced parent, and ordinary-import refusal. The final focused suite passed 35 tests in
+3.422s, including special-permission refusal. Full `npm test` passed 3,703 native tests in 151.832s
+(one slow, 17 skipped), 181 rendered checks, 634 desktop tests and all 44 real-daemon checks. Nextest
+reported one LEAK warning in the existing checkpoint-storage test
+`a_manifest_cannot_enter_metadata_when_its_chunk_is_absent`; the original log is preserved and the
+reliability investigation remains open. Fresh hosted checks and the full fleet acceptance map remain
+required.

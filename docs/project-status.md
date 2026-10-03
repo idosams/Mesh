@@ -773,3 +773,11 @@ its required payloads. It preserves conflicting history and does not append an a
 initial history again. Byte-cut/refusal tests and the full local gate pass; the preserved process-leak
 warning, fresh hosted validation and delivery are tracked in R97 of the migration ledger. This internal path does not yet let a user resume an interrupted remote
 worker: input-copy and workspace/receipt reconstruction plus authenticated recovery remain unfinished.
+
+### Received partial-file completion
+
+Native received copying can append the verified missing suffix of its original file while retaining
+the same physical file. Changed or conflicting work is preserved and refused. The streaming path
+has byte-cut, permission and replacement regressions; R98 in the migration ledger tracks validation
+and delivery. This does not yet expose remote resume: original-attempt authority, prepared workspace
+reopening and receipt reconciliation remain required before authenticated recovery can proceed.
