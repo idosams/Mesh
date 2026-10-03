@@ -2,6 +2,7 @@
 pub(crate) mod panel;
 mod receiving;
 mod reconnecting;
+mod recovering;
 mod starting;
 use mesh_crypto::KeyCustody as _;
 use mesh_daemon::{
@@ -28,6 +29,7 @@ enum Action {
     Results(u64),
     Receive,
     ReconnectInput,
+    RecoverOriginal,
     Start,
     Created,
 }
@@ -40,6 +42,7 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
         Some("inspect-input") if args.len() == 3 => Action::InputInspection,
         Some("receive") if args.len() == 3 => Action::Receive,
         Some("reconnect-input") if args.len() == 3 => Action::ReconnectInput,
+        Some("recover-original") if args.len() == 3 => Action::RecoverOriginal,
         Some("start") if args.len() == 3 => Action::Start,
         Some("created") if args.len() == 3 => Action::Created,
         Some("results") if args.len() == 4 => {
@@ -47,7 +50,7 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
             if after > 4096 || after.to_string() != args[3] { return Err(UNAVAILABLE.into()); }
             Action::Results(after)
         }
-        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive|start|created|reconnect-input|inspect-input <absolute-config>".into()),
+        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive|start|created|reconnect-input|inspect-input|recover-original <absolute-config>".into()),
     };
     let path = PathBuf::from(&args[2]);
     if !path.is_absolute() {
@@ -189,6 +192,9 @@ fn execute(action: Action, path: &Path) -> Result<Json, String> {
     if action == Action::Start || action == Action::Created {
         return starting::execute(path, action == Action::Created);
     }
+    if action == Action::RecoverOriginal {
+        return recovering::execute(path);
+    }
     if action == Action::ReconnectInput {
         return reconnecting::execute(path);
     }
@@ -210,7 +216,11 @@ fn execute(action: Action, path: &Path) -> Result<Json, String> {
         Action::Status => RemoteObservationKind::CurrentLease,
         Action::InputInspection => RemoteObservationKind::InputInspection,
         Action::Results(after) => RemoteObservationKind::Results { after },
-        Action::Receive | Action::Start | Action::Created | Action::ReconnectInput => {
+        Action::Receive
+        | Action::Start
+        | Action::Created
+        | Action::ReconnectInput
+        | Action::RecoverOriginal => {
             unreachable!("receiving uses its closed native operation")
         }
     };
@@ -240,6 +250,7 @@ fn output_failure(action: &Action) -> &'static str {
         Action::Start | Action::Created => "Start output unavailable; retain the same configuration and inspect --coordinator created",
         Action::Receive => "Saved result output could not be written; retain the same receive configuration for explicit recovery",
         Action::ReconnectInput => "Input reconnect output unavailable; inspect the original retained assignment",
+        Action::RecoverOriginal => "Recovery output unavailable; inspect the original retained assignment before any further action",
     }
 }
 

@@ -943,3 +943,19 @@ English/Hebrew and disables duplicate in-flight actions. Storage formats remain 
 native/UI receipt envelopes are new v1 messages. Eligible native signing remains required. Actual
 packaged signed-app/SSH second-host download and recovery acceptance are still unverified; the
 fixed user test checkpoint is unchanged.
+
+### Explicit original worker initialization recovery
+
+`--coordinator recover-original <absolute-private-config>` uses the existing closed
+`mesh.coordinator-observation-config/v1` configuration to select an existing objective/lane/run
+and independently configured SSH peer. It requires eligible native signing custody and a worker
+with original-recovery routing enabled. It recovers acknowledged original input initialization;
+it does not resend input, renew the lease or adopt uncertain provider execution. The worker may
+queue the recovered original workspace for its configured supervisor through the normal launch
+intent boundary. This is an explicit mutation, not status polling.
+
+The exchange uses a guarded independent ledger connection without holding the fleet service lock.
+Its signed receipt reports `initialization-recovered`, not provider completion. If transport,
+signing or output fails, retain the original configuration and inspect its status before further
+action; never create a replacement assignment or infer released capacity. Desktop recovery controls
+and real second-host acceptance are still unfinished.

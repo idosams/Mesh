@@ -25,6 +25,8 @@ mod received;
 mod remote_ingestion;
 #[cfg(target_os = "macos")]
 mod remote_reconnect;
+mod remote_recovery;
+pub use remote_recovery::RemoteHistoryRecoveryRequest;
 #[cfg(target_os = "macos")]
 mod remote_start;
 #[cfg(target_os = "macos")]
