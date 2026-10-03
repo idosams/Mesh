@@ -16,10 +16,11 @@ fn sign(key: &SigningKey, payload: &SigningPayload) -> Result<Signature, String>
         key.sign(payload.as_bytes()).to_bytes(),
     ))
 }
+use signing::guarded_runtime;
 fn history(f: &Fixture) -> FleetHistory {
     FleetHistory(Arc::new(
         FleetService::new(
-            f.runtime(true),
+            guarded_runtime(f),
             Arc::new(NoAllocation),
             ["codex".into()].into(),
         )
@@ -387,3 +388,5 @@ fn execution_service_reads_original_worker_completion_without_adopting_it() {
         assert_eq!(h.0.native_state().unwrap(), coordinator_before);
     }
 }
+
+mod signing;

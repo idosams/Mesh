@@ -5210,6 +5210,32 @@ Validation passed: 45 focused native tests, 49 focused controller/rendered tests
 641 desktop tests, and the real daemon demo. Hosted exact-head checks and merge remain pending. Real signed packaged SSH observation, multiple remote workers and terminal
 reconciliation remain required by the full plan. The fixed user checkpoint is unchanged.
 
+## R114 — keep fleet observations available during native signing
+
+Tracks [issue #247](https://github.com/idosams/Mesh/issues/247). A regression reproduced
+that observation preparation held the shared fleet service mutex inside native signing,
+preventing concurrent views and cancellation. The failing baseline is retained separately.
+Preparation now opens an independent connection to the same guarded native ledger before
+releasing the service lock. Signing retains its existing pre/post context checks; transport
+and final reply validation preserve their existing boundaries. No unguarded fallback, new
+history initialization, peer-selected path, execution adoption or capacity release is added.
+
+This is new canonical work on R112/PR #245 and replaces no preserved implementation commit.
+The initial base covered current lease, input inspection and results. Reconciliation now includes
+R113/PR #246 and extends the same signing/cancellation/authority regressions to recorded execution. Initial validation passed: eight focused tests
+and the full gate with 3,764 Rust tests in 158.100s (1 slow, 17 skipped), 182 rendered tests,
+636 desktop tests and the real daemon demo. The baseline failure, inspection-fixture correction
+and test-only lint failure are preserved. Combined validation and hosted delivery remain pending.
+Packaged responsiveness and the full parallel fleet acceptance journey remain required.
+
+
+R114 combined validation: reconciled with published R113 head
+`aca8930e04aba8ce9055ee723e578a200d9a1143`, preserving both test groups and documentation.
+All four observation kinds are covered by the signing availability, concurrent cancellation
+and lost-authority regressions. All 49 focused native tests passed in 0.431s. The full gate
+passed 3,768 Rust tests in 160.764s (1 slow, 17 skipped), 183 rendered tests, 641 desktop
+tests and the real daemon demo. Exact-head hosted validation and merge remain pending.
+
 
 ## R115 — refresh real four-worker native acceptance
 

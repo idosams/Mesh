@@ -894,6 +894,17 @@ canonical gate (3,764 Rust, 183 rendered and 641 desktop tests plus the real dae
 Hosted exact-head checks and merge remain pending; packaged signed remote acceptance and the
 full fleet plan remain open. The fixed user testing checkpoint does not include this work.
 
+### Fleet observation signing responsiveness (R114)
+
+A focused regression reproduced the shared service lock being held during native observation
+signing. Preparation now retains guarded history on an independent connection and releases the
+lock before signing, allowing concurrent views and cancellation. Stale context and lost authority
+still refuse the query. Eight focused tests and the full gate passed (3,764 Rust, 182 rendered,
+636 desktop tests and the real daemon demo). After combining the execution panel, all 49 focused
+native tests and the full gate passed (3,768 Rust, 183 rendered, 641 desktop tests and the daemon
+demo). Hosted delivery remains pending; packaged responsiveness is not yet established.
+This correction does not resolve terminal capacity reconciliation or the full fleet objective.
+
 
 ### Current real Codex four-worker measurement (R115)
 
