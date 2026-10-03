@@ -126,6 +126,7 @@ impl<'a> NativeWorkerConnections<'a> {
                 "mesh.worker-status-query/v1"
                     | "mesh.worker-status-query/v2"
                     | "mesh.worker-status-query/v3"
+                    | "mesh.worker-status-query/v4"
             )
         ) {
             let query = super::RemoteWorkerStatusQuery::decode(encoded)

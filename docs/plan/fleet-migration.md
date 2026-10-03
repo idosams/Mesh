@@ -5158,3 +5158,34 @@ all recovery tests and the R109/R110/R111 migration records. All 20 combined foc
 in 3.304 seconds. Full `npm test` passed 3,755 native tests in 161.913 seconds (one slow,
 17 skipped), 182 rendered checks, 636 desktop tests and the real-daemon proof. Fresh hosted
 checks and merge remain pending. This reconciliation changes no product behavior or gate.
+
+## R112 — signed historical execution status
+
+This canonical increment depends on published R111/PR244 at
+`474289bc96aa403b2aaa5d76d65997c6c264f2ef`; it replaces no preserved source commit.
+The additive `mesh.worker-status-query/v4` and reply use independent signing domains and the
+existing bounded, fresh exact-attempt exchange. They carry original admission/launch/current-lease
+facts plus the historical session revision and state. The worker compares the facts again after
+signing; changed worker history suppresses the reply. Changed coordinator context, stale responses,
+wrong signers and older response versions refuse. v1/v2/v3 remain unchanged. No allocation,
+workspace inspection, service construction, launch, retry or capacity release occurs.
+
+The native connection routes v4 without creating transfer or recovery ownership. The original
+input-inspection routing test is retained unchanged; execution-status routing is covered by a
+separate new module. No existing assertion was removed. New schema checks reject extra fields,
+execution without a retained launch, invalid revision/state combinations and out-of-range revisions.
+All 50 focused status/compatibility tests passed in 7.976 seconds. The full `npm test` gate passed
+3,758 native tests in 157.971 seconds (one slow, 17 skipped), 182 rendered checks, 636 desktop
+tests and the real-daemon proof. Hosted checks and merged delivery remain pending. This is native
+fixture/protocol evidence; desktop projection, real SSH second-host acceptance, native custody
+and capacity-release reconciliation remain required. The fixed user checkpoint is unchanged.
+
+R112 consolidation: original exact-head run `37155381526` passed all seven hosted checks.
+R111 combined-head run `37155813980` also passed all seven. PR243 merged at
+`63f98e152a1514314c159042846f04e223be988f`; the related R111 reconciliation at
+`ff29d6da53a39134b82c743f103fe7c972fa183a` has a source tree identical to checked
+`7d950ed3e90c118e7c4247d70690e97b3ff58111`. This increment retains all R109–R112
+records and recovery tests. All 61 combined focused tests passed in 8.596 seconds. The full
+`npm test` gate passed 3,760 native tests in 159.966 seconds (one slow, 17 skipped),
+182 rendered checks, 636 desktop tests and the real-daemon proof. No assertion or product
+behavior changed during reconciliation. Fresh exact-head hosted validation remains required.

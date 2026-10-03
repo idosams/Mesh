@@ -60,9 +60,10 @@ mod remote;
 mod remote_admission;
 #[cfg(target_os = "macos")]
 pub use remote_admission::status::{
-    inspect_remote_worker_current_lease_over_ssh, inspect_remote_worker_input_over_ssh,
-    inspect_remote_worker_over_ssh, RemoteWorkerStatusChallenge, RemoteWorkerStatusQuery,
-    RemoteWorkerStatusReceipt, RemoteWorkerStatusRequest, VerifiedRemoteWorkerStatusQuery,
+    inspect_remote_worker_current_lease_over_ssh, inspect_remote_worker_execution_over_ssh,
+    inspect_remote_worker_input_over_ssh, inspect_remote_worker_over_ssh, RemoteRecordedExecution,
+    RemoteWorkerStatusChallenge, RemoteWorkerStatusQuery, RemoteWorkerStatusReceipt,
+    RemoteWorkerStatusRequest, VerifiedRemoteWorkerStatusQuery,
 };
 #[cfg(unix)]
 pub use remote_admission::{RemoteAdmissionChallenge, RemoteAdmissionProof};
