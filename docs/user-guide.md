@@ -429,5 +429,12 @@ interrupted, **Recover interrupted settings save** can finish the retained save;
 remain untouched. Changed keys or identity folders require a new native selection.
 
 This route requires an eligible signed application and an already configured worker. The local
-ad-hoc checkpoint does not establish that journey. Remote launch, receipt and reconnect controls
+ad-hoc checkpoint does not establish that journey. Remote launch/result-receipt controls, lost-worker recovery
 and real second-host acceptance remain unfinished.
+
+
+If a worker input transfer was interrupted, explicitly open its original connection and choose
+**Resume saved input transfer**. Mesh uses the saved version recorded for that attempt, even if your
+working files have changed. The worker must still retain the original reservation. Input acceptance
+does not mean an agent is running. If Mesh cannot confirm the outcome, inspect worker status before
+another explicit resume; it does not request a replacement attempt or automatically retry.

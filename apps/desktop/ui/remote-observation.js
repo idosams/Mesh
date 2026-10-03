@@ -39,6 +39,13 @@ export function profileOpenReply(raw, entry) {
   require(draft.installation && draft.identity && draft.hosts && ['host', 'worker', 'objective', 'lane', 'run'].every(key => selection[key] === entry[key] && input[key] === entry[key]));
   return { selection, draft, preset: { id: draft.id, input: { ...input, port: String(input.port) } } };
 }
+export function inputRecoveryReply(raw, selection) {
+  const value = parse(raw);
+  require(value?.schema === 'mesh.remote-panel-input-recovery/v1' && value.id === selection.id
+    && ['objective', 'lane', 'run'].every(key => value[key] === selection[key])
+    && ['input-materialized', 'input-retained'].includes(value.disposition));
+  return { disposition: value.disposition };
+}
 export function observationReply(raw, id, kind) {
   const value = parse(raw);
   require(value?.schema === 'mesh.remote-panel-observation/v1' && value.id === id && value.kind === kind);
@@ -54,12 +61,12 @@ export function observationReply(raw, id, kind) {
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
   let draft = null, profiles = null, preset = null;
-  let selection = null, status = null, results = null, busy = false, error = '', disposed = false;
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
+  let selection = null, status = null, results = null, recovery = null, busy = false, error = '', disposed = false;
+  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { recovery, profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove'].includes(type) || (['status', 'results', 'forget'].includes(type) && !selection)) return;
+    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove'].includes(type) || (['status', 'results', 'forget', 'reconnect-input'].includes(type) && !selection)) return;
     if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
     if (type === 'configure' && !(draft?.installation && draft?.identity && draft?.hosts)) return;
     if (type === 'profile-save' && (!selection || !profiles || !labelText(event.detail.label))) return;
@@ -73,7 +80,7 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
         const raw = await invoke('remote_connection_profiles', args);
         if (action === 'open') {
           const opened = profileOpenReply(raw, entry);
-          selection = opened.selection; draft = opened.draft; preset = opened.preset; status = null; results = null;
+          selection = opened.selection; draft = opened.draft; preset = opened.preset; status = null; results = null; recovery = null;
         } else profiles = profilesReply(raw);
       } else if (type === 'clear-setup') {
         draft = draftReply(await invoke('clear_remote_setup')); preset = null;
@@ -83,18 +90,20 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
       } else if (type === 'configure') {
         const input = setupInput(event.detail.input);
         selection = selectionReply(await invoke('configure_remote_observation', { draft: draft.id, input: JSON.stringify(input) }));
-        status = null; results = null;
+        status = null; results = null; recovery = null;
       } else if (type === 'choose') {
         const raw = await invoke('pick_remote_observation');
-        if (raw !== null) { selection = selectionReply(raw); status = null; results = null; }
+        if (raw !== null) { selection = selectionReply(raw); status = null; results = null; recovery = null; }
+      } else if (type === 'reconnect-input') {
+        recovery = inputRecoveryReply(await invoke('reconnect_remote_input', { id: selection.id }), selection);
       } else if (type === 'forget') {
         await invoke('forget_remote_observation', { id: selection.id });
-        selection = null; status = null; results = null;
+        selection = null; status = null; results = null; recovery = null;
       } else {
         const observation = observationReply(await invoke('read_remote_observation', { id: selection.id, action: type, after: 0 }), selection.id, type);
         if (type === 'status') status = observation; else results = observation;
       }
-    } catch { error = 'Remote observation is unavailable. Previous observations may be out of date. Check the signed application, private configuration and worker connection.'; }
+    } catch { error = type === 'reconnect-input' ? 'Input transfer outcome could not be confirmed. Keep the original assignment, inspect worker status, and resume only explicitly. No new attempt was requested.' : 'Remote observation is unavailable. Previous observations may be out of date. Check the signed application, private configuration and worker connection.'; }
     finally { busy = false; publish(); }
   }
   document.addEventListener('mesh:remote-observation-intent', intent);

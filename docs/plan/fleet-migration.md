@@ -4225,3 +4225,24 @@ rendered/typecheck checks. The complete local gate passed: 3,643 native tests (1
 occurred; reliability issues #37 and #172 remain unresolved. Hosted checks remain pending. Signed-app
 profile restoration, packaged remote operations and all remaining fleet acceptance are still open.
 The fixed R71 user checkpoint and existing dirty legacy checkout remain unchanged.
+
+
+## R80: graphical continuation of retained input transfers
+
+R80 is new canonical work replacing no legacy commit. It depends on published R79 / PR #210 head
+`2cc394ba245702b3ace0cd789d6de5034cbff8b4`; the original PR and R78 combined-main runs remain active.
+The explicit recovery button sends only an opaque native selection. History resolves the original
+attached-project version or complete reviewed parent checkpoint. The current catalogue owner and
+existing reconnect transport preserve original assignment, peer, lease, cancellation and saved-input
+checks; no worker adoption, replacement attempt or automatic retry is added. Receipt wording does
+not claim provider liveness. Missing sources/parent proofs or lost worker reservations remain errors.
+
+Seventeen controller tests and 176 rendered/typecheck checks passed. The first native compilation
+caught a missing generation field in a new test fixture; corrected without changing production rules.
+The focused rerun passed all 34 native tests (8.304 s), including interrupted transfer and coordinator
+restart with no execution adoption. The full local gate passed: 3,646 native tests (152.402 s, one
+slow, 17 skipped), 176 rendered tests, 618 desktop tests, repository/docs/license/storage checks and
+the real daemon demo. No process-leak warning occurred; #37/#172 remain open. Publication and hosted
+checks are pending. R79's original run 37120274025 and R78 combined-main run 37120248363 both passed.
+Real signed-app
+remote recovery and the complete remaining fleet plan are not established by fixture tests.

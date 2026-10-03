@@ -1,5 +1,11 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Resume saved input transfer":"המשך העברת הקלט השמור",
+"Resume only the original interrupted input transfer. The worker must still retain its reservation. This does not create another attempt or extend its lease.":"המשיכו רק את העברת הקלט המקורית שנקטעה. ההקצאה המקורית חייבת עדיין להיות שמורה אצל הסוכן. הפעולה אינה יוצרת ניסיון נוסף ואינה מאריכה את תוקף ההקצאה.",
+"The saved input is materialized on the worker. This does not establish that an agent is running.":"הקלט השמור נוצר במחשב הסוכן. אין בכך הוכחה שסוכן פועל.",
+"The worker retained the saved input. This does not establish that an agent is running.":"הסוכן שמר את הקלט. אין בכך הוכחה שסוכן פועל.",
+"Input transfer outcome could not be confirmed. Keep the original assignment, inspect worker status, and resume only explicitly. No new attempt was requested.":"לא ניתן לאמת את תוצאת העברת הקלט. שמרו את ההקצאה המקורית, בדקו את מצב הסוכן והמשיכו רק במפורש. לא התבקש ניסיון חדש.",
+
 "The active selection lasts until Mesh closes. Saved settings must be opened explicitly. Reading observations does not start agents or approve work.":"הבחירה הפעילה נשמרת עד לסגירת Mesh. יש לפתוח הגדרות שמורות במפורש. קריאת המצב אינה מפעילה סוכנים ואינה מאשרת עבודה.",
 "Use an existing coordinator identity and SSH files. Mesh does not create keys or enroll host trust. Use Save current connection to keep these settings for later.":"השתמשו בזהות מתאם קיימת ובקובצי SSH קיימים. Mesh אינו יוצר מפתחות ואינו מוסיף אמון במארחים. שמרו את החיבור הנוכחי כדי להשתמש בהגדרות בהמשך.",
 "Saved worker connections":"חיבורים שמורים לסוכנים",

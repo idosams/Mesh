@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply } from './remote-observation.js';
+import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
 const status = () => ({ schema: 'mesh.remote-panel-observation/v1', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
@@ -133,4 +133,26 @@ test('profile recovery is explicit and pending actions suppress duplicates', asy
   h.intent({ type: 'profiles-list' }); await settle(); assert.equal(calls.length, 1);
   assert.deepEqual(calls[0][1], { action: 'recover', selection: '', label: '', profile: '', revision: '' });
   release(profiles()); await settle(); assert.equal(h.projections.at(-1).profiles.revision, '4'); h.dispose();
+});
+
+const recovered = () => ({ schema: 'mesh.remote-panel-input-recovery/v1', id, objective: 'fleet-one', lane: 'lane-one', run: 'run-one', disposition: 'input-retained' });
+test('input recovery verifies exact selection and outcome without claiming worker liveness', () => {
+  assert.equal(inputRecoveryReply(recovered(), selected()).disposition, 'input-retained');
+  for (const key of ['id', 'objective', 'lane', 'run', 'disposition']) assert.throws(() => inputRecoveryReply({ ...recovered(), [key]: 'different' }, selected()));
+});
+test('input recovery sends only native selection and never retries after an uncertain reply', async () => {
+  const calls = []; let release;
+  const h = harness(async (name, args) => { calls.push([name, args]); return name === 'pick_remote_observation' ? selected() : new Promise(resolve => { release = resolve; }); });
+  h.intent({ type: 'choose' }); await settle();
+  h.intent({ type: 'reconnect-input', id: 'forged', input: '/forged', lease: 999 }); await settle();
+  h.intent({ type: 'reconnect-input' }); await settle(); assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], ['reconnect_remote_input', { id }]);
+  release({ ...recovered(), run: 'wrong' }); await settle(); assert.equal(calls.length, 2);
+  assert.match(h.projections.at(-1).error, /No new attempt/); assert.equal(h.projections.at(-1).recovery, null); h.dispose();
+});
+test('successful recovery is displayed and forgetting clears its selection-bound outcome', async () => {
+  const h = harness(async name => name === 'pick_remote_observation' ? selected() : name === 'reconnect_remote_input' ? recovered() : undefined);
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'reconnect-input' }); await settle();
+  assert.equal(h.projections.at(-1).recovery.disposition, 'input-retained');
+  h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).recovery, null); h.dispose();
 });

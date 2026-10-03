@@ -919,6 +919,26 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn reconnect_remote_input(app: tauri::AppHandle, id: String) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || panel.reconnect_input(&id, &host))
+                .await
+                .map_err(|_| "Input transfer outcome needs reconciliation".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, id);
+            Err("Remote input recovery is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn read_remote_observation(
         app: tauri::AppHandle,
         id: String,
@@ -8115,6 +8135,7 @@ mod desktop {
                 pick_remote_setup_file,
                 clear_remote_setup,
                 remote_connection_profiles,
+                reconnect_remote_input,
                 configure_remote_observation,
                 read_remote_observation,
                 forget_remote_observation,

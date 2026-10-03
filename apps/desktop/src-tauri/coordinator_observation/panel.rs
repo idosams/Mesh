@@ -1,6 +1,7 @@
 //! Session-bound native selections for read-only graphical remote observations.
 use super::*;
 mod profiles;
+mod recovery;
 pub(crate) mod setup;
 use ring::rand::{SecureRandom as _, SystemRandom};
 use std::sync::Mutex;

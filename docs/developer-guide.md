@@ -821,4 +821,21 @@ contents. Paths remain native-only. A pending write prevents further normal read
 foreign, linked or conflicting records are preserved and refused. Recovery never opens the listed
 credential paths or contacts a worker. Unknown schemas are refused; existing stores with no record
 start at revision zero and require no migration. These settings grant no execution/approval authority.
-Remote start/receive/reconnect controls and signed-app/second-host acceptance remain unfinished.
+Remote start/result-receipt controls, lost-worker recovery and signed-app/second-host acceptance remain unfinished.
+
+
+### Resume an interrupted input transfer in the app
+
+After explicitly selecting or opening the original connection, choose **Resume saved input transfer**.
+Native history resolves the original attached project version or an exact completed, reviewed parent
+checkpoint. No editable path, manifest, new attempt or lease is accepted from the renderer. Mesh uses
+the current catalogue owner and rechecks original file/coordinator identities before transport and
+signing. The existing transfer verifies the immutable assignment, input, worker, cancellation and lease.
+
+Only an already claimed, still-launching initial transfer is eligible. The worker must retain its
+original receiving reservation. An unavailable source, absent reviewed parent, changed assignment,
+newer attempt, cancellation or expired lease refuses; the app does not guess or create a replacement.
+An input receipt means accepted input, not a running or completed provider. Errors retain uncertainty;
+inspect status and resume only through another explicit action. No automatic retry or worker adoption
+occurs. This does not recover a lost worker reservation, expose remote launch/result receipt, or prove
+a real signed-app/second-host journey.

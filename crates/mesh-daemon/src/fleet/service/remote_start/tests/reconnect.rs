@@ -124,6 +124,16 @@ fn native_input_reconnect_survives_coordinator_restart_without_adoption_or_new_a
         .unwrap();
         let history = reopened.history(&objective).unwrap();
         assert!(reopened.current_service(&objective).is_err());
+        assert_eq!(
+            history.retained_remote_input(&lane, "native-run").unwrap(),
+            crate::fleet::service::RetainedRemoteInput::Project {
+                project: before.lanes[&lane].source_project.clone().unwrap(),
+                version: source.manifest().input().to_string(),
+            }
+        );
+        assert!(history
+            .retained_remote_input(&lane, "replacement-run")
+            .is_err());
         let wrong_worker = public(&SigningKey::from_bytes(&[70; 32]));
         assert!(history
             .reconnect_remote_input(

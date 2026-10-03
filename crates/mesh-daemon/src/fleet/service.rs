@@ -30,7 +30,7 @@ mod remote_start;
 #[cfg(target_os = "macos")]
 pub use remote_ingestion::RemoteHistoryIngestionRequest;
 #[cfg(target_os = "macos")]
-pub use remote_reconnect::RemoteHistoryInputRequest;
+pub use remote_reconnect::{RemoteHistoryInputRequest, RetainedRemoteInput};
 #[cfg(target_os = "macos")]
 pub use remote_start::RemoteNativeStartRequest;
 #[cfg(target_os = "macos")]
