@@ -860,3 +860,13 @@ service cancellation during signing prevents the request. Focused native tests a
 local gate passed (3,744 native tests plus desktop and daemon checks); hosted validation
 and delivery are pending in R106. Graphical controls, successful signed second-host
 execution and packaged acceptance remain unfinished.
+
+### Desktop original workspace recovery (in validation)
+
+The remote panel now offers explicit original-workspace recovery through the selected native
+connection. Copy explains possible assigned-agent startup and distinguishes recovered setup
+from running execution. Duplicate requests are suppressed and uncertain outcomes preserve the
+original selection and observations. Focused controller/rendering and native refusal tests passed;
+R107 full local validation passed (3,745 native tests plus desktop and daemon checks);
+hosted validation and delivery are pending. Signed packaged and real second-host recovery
+remain unverified.

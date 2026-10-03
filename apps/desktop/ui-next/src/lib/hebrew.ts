@@ -1,5 +1,10 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Recover original worker workspace": "שחזור סביבת העבודה המקורית של הסוכן",
+"Recover the original saved input after interrupted setup. This may start its assigned agent once setup is recovered. Existing or uncertain execution cannot be restarted here.": "שחזור הקלט המקורי שנשמר לאחר שההכנה נקטעה. פעולה זו עשויה להפעיל את הסוכן שהוקצה לאחר השלמת ההכנה. לא ניתן להפעיל מחדש מכאן ביצוע קיים או שמצבו אינו ודאי.",
+"The original workspace setup was recovered. Read worker status to check execution; recovery does not prove that the agent is running.": "הכנת סביבת העבודה המקורית שוחזרה. קראו את מצב הסוכן כדי לבדוק את הביצוע; השחזור אינו מוכיח שהסוכן פועל.",
+"Recovery could not be confirmed. Keep this attempt and read worker status before another action.": "לא ניתן לאמת את השחזור. שמרו את הניסיון הזה וקראו את מצב הסוכן לפני פעולה נוספת.",
+
   "Original input inspection": "בדיקת הקלט המקורי",
   "Inspect original input": "בדיקת הקלט המקורי",
   "Check the original saved input on the worker. This can take time for large inputs and does not resume or restart work.": "בדיקת הקלט המקורי שנשמר אצל הסוכן. בדיקת קלט גדול עשויה לקחת זמן ואינה מחדשת או מפעילה מחדש עבודה.",

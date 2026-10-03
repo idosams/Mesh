@@ -99,3 +99,16 @@ test('original input inspection is dated, explicit, localized and never presente
   module.exports.setLocale('he'); try { assert.match(module.exports.render(p), /בדיקת הקלט המקורי/); } finally { module.exports.setLocale('en'); }
   p.selection = null; assert.doesNotMatch(module.exports.render(p), /Inspect original input/);
 });
+
+test('original recovery explicitly describes execution effects and retains observation distinctions', () => {
+  const p = projection(); p.originalRecovery = { disposition: 'initialization-recovered' };
+  let html = module.exports.render(p);
+  assert.match(html, /may start its assigned agent/); assert.match(html, /does not prove that the agent is running/);
+  assert.match(html, /does not establish that the process is still running/);
+  p.busy = true; html = module.exports.render(p);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Recover original worker workspace<\/button>/);
+  module.exports.setLocale('he'); html = module.exports.render(p);
+  assert.match(html, /שחזור סביבת העבודה המקורית/); assert.doesNotMatch(html, /Recover original worker workspace/);
+  module.exports.setLocale('en'); p.selection = null;
+  assert.doesNotMatch(module.exports.render(p), /Recover original worker workspace/);
+});
