@@ -260,7 +260,8 @@ impl RemoteReceivingConnection<'_, '_> {
             .materialize_reserved(reservation)
             .map_err(|_| Error::Refused("remote-receiving-materialization"))?;
         self.facts()?;
-        let registry = self.session.registry.take().ok_or(Error::InvalidHistory)?;
+        let mut registry = self.session.registry.take().ok_or(Error::InvalidHistory)?;
+        registry.retain_materialization(&allocation)?;
         self.session.receiver = None;
         Ok((allocation, registry))
     }
