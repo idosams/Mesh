@@ -59,7 +59,7 @@ fn worker_child() {
         .unwrap()
         .parse()
         .unwrap();
-    assert!([1, 2].contains(&phase));
+    assert!([1, 2, 3].contains(&phase));
     let stream =
         UnixStream::connect(std::env::var_os("MESH_RECOVERY_CRASH_TEST_SOCKET").unwrap()).unwrap();
     stream
@@ -76,7 +76,7 @@ fn worker_child() {
     .verify(&policy(&s))
     .unwrap();
     let mut calls = 0;
-    let _outcome = serve_remote_recovery(
+    let outcome = serve_remote_recovery(
         RemoteRecoveryWorkerRequest {
             request,
             registry: guarded(&s),
@@ -89,18 +89,31 @@ fn worker_child() {
         |p| {
             calls += 1;
             if calls == phase {
-                let mut marker = fs::File::create(s.f.path.join("crash-phase-ready")).unwrap();
-                marker.write_all(phase.to_string().as_bytes()).unwrap();
-                marker.sync_all().unwrap();
-                loop {
-                    std::thread::park();
-                }
+                mark_and_wait(&s, phase);
             }
             sign(&s.f.worker, p)
         },
     )
     .unwrap();
-    panic!("fixture must be killed at its selected phase");
+    assert_eq!(phase, 3);
+    let handoff = *outcome.handoff;
+    let reservation = handoff
+        .registry
+        .reserve_launch(handoff.workspace, "codex", now().unwrap())
+        .unwrap();
+    assert!(matches!(
+        reservation,
+        crate::fleet::RemoteLaunchOutcome::Reserved(_)
+    ));
+    mark_and_wait(&s, phase);
+}
+fn mark_and_wait(s: &Setup, phase: usize) -> ! {
+    let mut marker = fs::File::create(s.f.path.join("crash-phase-ready")).unwrap();
+    marker.write_all(phase.to_string().as_bytes()).unwrap();
+    marker.sync_all().unwrap();
+    loop {
+        std::thread::park();
+    }
 }
 struct OwnedChild {
     child: Child,
@@ -118,8 +131,8 @@ fn identity(path: &Path) -> (u64, u64) {
     (m.dev(), m.ino())
 }
 #[test]
-fn killed_worker_recovers_same_acknowledged_input_and_initial_mapping() {
-    for phase in [1, 2] {
+fn killed_worker_recovers_original_input_but_never_reuses_launch_intent() {
+    for phase in [1, 2, 3] {
         let (s, mut runtime, registry) = ready();
         let admission = registry.receipts().unwrap().remove(0);
         drop(registry);
@@ -198,7 +211,7 @@ fn killed_worker_recovers_same_acknowledged_input_and_initial_mapping() {
                 {
                     break;
                 }
-                if exchange.is_finished() {
+                if phase != 3 && exchange.is_finished() {
                     panic!(
                         "phase {phase}: coordinator ended before kill: {:?}",
                         exchange.join().unwrap().err()
@@ -214,13 +227,50 @@ fn killed_worker_recovers_same_acknowledged_input_and_initial_mapping() {
             }
             owned.child.kill().unwrap();
             assert_eq!(owned.child.wait().unwrap().signal(), Some(9));
-            assert!(
-                exchange.join().unwrap().is_err(),
-                "a killed exchange cannot be confirmed"
+            assert_eq!(
+                exchange.join().unwrap().is_ok(),
+                phase == 3,
+                "only the acknowledged initialization may be confirmed before intent/crash"
             );
         });
         let mapping = fs::read_to_string(allocation.join("workspace.json")).ok();
-        assert_eq!(mapping.is_some(), phase == 2);
+        assert_eq!(mapping.is_some(), phase >= 2);
+        if phase == 3 {
+            let original_launch = guarded(&s).launch_receipt("assignment").unwrap().unwrap();
+            let before = runtime.state().clone();
+            let (a, b) = pair();
+            std::thread::scope(|scope| {
+                let serving = scope.spawn(|| worker(&s, guarded(&s), b, None));
+                assert!(recover_remote_worker(
+                    client(&s, &mut runtime),
+                    a.try_clone().unwrap(),
+                    a,
+                    |p| sign(&s.f.coordinator, p)
+                )
+                .is_err());
+                assert!(serving.join().unwrap().is_err());
+            });
+            assert_eq!(runtime.state(), &before);
+            assert!(guarded(&s).launch_receipt("assignment").unwrap().unwrap() == original_launch);
+            assert!(guarded(&s).receipts().unwrap()[0] == admission);
+            assert_eq!(
+                fs::read_to_string(allocation.join("workspace.json")).unwrap(),
+                mapping.unwrap()
+            );
+            assert_eq!(
+                fs::read(allocation.join("files/result.txt")).unwrap(),
+                s.bytes
+            );
+            assert_eq!(
+                paths.iter().map(|p| identity(p)).collect::<Vec<_>>(),
+                original
+            );
+            assert_eq!(
+                fs::read_dir(s.f.path.join("allocations")).unwrap().count(),
+                1
+            );
+            continue;
+        }
         let (a, b) = pair();
         let outcome = std::thread::scope(|scope| {
             let serving = scope.spawn(|| worker(&s, guarded(&s), b, None));
