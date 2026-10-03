@@ -422,6 +422,13 @@ current connection** to keep its settings. After restarting Mesh, choose **Load 
 and **Open saved settings** explicitly. Opening verifies the original files and identities; it does
 not contact or start the worker. Use **Read worker status** when you want an observation.
 
+Choose **Inspect original input** to explicitly check the original saved input on the worker.
+Mesh shows a timestamp and whether those original files were verified, could not be verified, or
+have no retained record. Missing records do not prove no work started. Verification does not show
+that an agent is running or authorize restarting one. Large input checks can expire; keep the
+original attempt and investigate uncertainty. This check does not change saved reviews or resume
+an input transfer. The native equivalent is `--coordinator inspect-input <absolute-config>`.
+
 To edit a saved entry, open it, change and apply the setup form, then save the current connection.
 To create a separate entry, clear the selected setup files and select them again. **Remove saved
 settings** keeps the active selection, credentials and work history. If a settings save was

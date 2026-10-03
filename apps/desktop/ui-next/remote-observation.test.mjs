@@ -86,3 +86,16 @@ test('fresh creation is available without an old fleet and retained attempts rem
   p.busy=true;html=module.exports.render(p);for(const button of html.matchAll(/<button([^>]*)>/g))assert.match(button[1],/disabled=""/);
   module.exports.setLocale('he');try{assert.match(module.exports.render(p),/בקשות שמורות ליצירת עבודה מרוחקת/);}finally{module.exports.setLocale('en');}
 });
+
+test('original input inspection is dated, explicit, localized and never presented as restart authority', () => {
+  const p = projection(); p.inspection = { observed: '1001', disposition: 'verified' };
+  let html = module.exports.render(p);
+  assert.match(html, /Inspect original input/); assert.match(html, /verified at the observation time/);
+  assert.match(html, /does not establish that an agent is running or can be restarted/);
+  assert.match(html, /1970-01-01T00:00:01.001Z/);
+  p.inspection.disposition = 'unrecorded'; assert.match(module.exports.render(p), /does not prove that no work was started/);
+  p.inspection.disposition = 'unavailable'; assert.match(module.exports.render(p), /could not verify the original input/);
+  p.busy = true; assert.match(module.exports.render(p), /<button[^>]*disabled=""[^>]*>Inspect original input<\/button>/);
+  module.exports.setLocale('he'); try { assert.match(module.exports.render(p), /בדיקת הקלט המקורי/); } finally { module.exports.setLocale('en'); }
+  p.selection = null; assert.doesNotMatch(module.exports.render(p), /Inspect original input/);
+});

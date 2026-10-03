@@ -4575,3 +4575,18 @@ failures are retained in delivery evidence. Full local `npm test` passed: 3,682 
 desktop checks and all 44 daemon demonstration checks. Fresh hosted checks remain pending.
 Desktop presentation, signed packaged and real-host acceptance, interrupted initialization
 and uncertain launch reconciliation remain required.
+
+## R94 — explicit desktop and CLI original-input inspection
+
+New canonical implementation depending on R93/PR226; replaces no preserved source commit. Adds a
+separate native observation kind, worker-panel action and CLI `inspect-input` route. Fresh v3
+replies revalidate the exact attempt after I/O outside the service lock. The renderer receives only
+a timestamp and closed disposition, never private paths or execution authority. English/Hebrew
+copy distinguishes input verification from process liveness and safe restart. Ordinary status and
+saved-result observations remain independent; selection changes clear the inspection. No persisted
+format changes. The existing panel envelope gains an explicit kind; unsupported old renderers
+refuse it. Focused controller/rendered tests passed 40 tests; focused native observation tests
+passed 40 tests in 10.853s. Initial compile failures are retained. Full `npm test` passed
+3,683 native tests in 152.623s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests
+and all 44 real-daemon checks. Fresh hosted checks and actual signed packaged/real-host acceptance
+remain pending.
