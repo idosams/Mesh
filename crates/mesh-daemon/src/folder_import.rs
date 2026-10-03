@@ -39,7 +39,9 @@ use crate::workspace::OpenWorkspace;
 
 mod received_copy;
 mod received_genesis;
-mod received_record;
+pub(crate) mod received_record;
+mod received_recovery;
+pub(crate) use received_recovery::ReceivedImportHandoff;
 
 const CLAIM_MARKER: &[u8] = b"mesh-folder-import/1 claim\n";
 const OWNED_MARKER_PREFIX: &str = "mesh-folder-import/1 owned";

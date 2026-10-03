@@ -266,6 +266,40 @@ impl RemoteReceivingConnection<'_, '_> {
         Ok((allocation, registry))
     }
 
+    /// Continue only the original acknowledged initialization after fresh connection authentication.
+    /// This returns the same guarded ledger and one exclusively held workspace, never a launch
+    /// permit or an adopted process. Existing launch intent always requires separate reconciliation.
+    pub fn resume_initialization(
+        &mut self,
+        reviewers: crate::TrustedReviewers,
+        checkpoint: crate::CheckpointRuntimeParameters,
+    ) -> Result<(super::ReceivedWorkerWorkspace, RemoteAdmissionRegistry), Error> {
+        self.check()?;
+        if self.session.reservation.is_some() || self.session.receiver.is_some() {
+            return refuse("remote-recovery-original-transfer-owned");
+        }
+
+        let registry = self
+            .session
+            .registry
+            .as_ref()
+            .ok_or(Error::InvalidHistory)?;
+        let admission = self.session.receipt.as_ref().ok_or(Error::InvalidHistory)?;
+        let result = registry.recover_initialization(
+            self.session.destination,
+            admission,
+            reviewers,
+            checkpoint,
+        );
+        self.session.terminal = true;
+        self.authenticated = false;
+        let workspace = result?;
+        let registry = self.session.registry.take().ok_or(Error::InvalidHistory)?;
+        self.session.receiver = None;
+        self.session.reservation = None;
+        Ok((workspace, registry))
+    }
+
     fn check(&self) -> Result<(), Error> {
         if !self.authenticated || self.refused || self.session.terminal {
             return refuse("remote-receiving-authentication-required");

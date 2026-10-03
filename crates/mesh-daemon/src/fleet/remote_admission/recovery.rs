@@ -1,0 +1,51 @@
+//! Original initialization recovery is reachable only through an authenticated receiving connection.
+use super::*;
+use crate::fleet::{ReceivedWorkerWorkspace, RemoteInputDestination};
+use crate::{CheckpointRuntimeParameters, TrustedReviewers};
+
+impl RemoteAdmissionRegistry {
+    pub(in crate::fleet) fn recover_initialization(
+        &self,
+        destination: &RemoteInputDestination,
+        admission: &RemoteAdmissionReceipt,
+        reviewers: TrustedReviewers,
+        checkpoint: CheckpointRuntimeParameters,
+    ) -> Result<ReceivedWorkerWorkspace, Error> {
+        // An ordinary path-opened ledger cannot promote a historical receipt into mutable authority.
+        let _guarded = self.store.reopen_guarded_connection()?;
+        let materialization = self
+            .materialization_receipt(&admission.work.assignment.id)?
+            .filter(|receipt| receipt.admission() == admission)
+            .ok_or(Error::Refused("remote-recovery-materialization-missing"))?;
+        let check = || -> Result<(), Error> {
+            let now = super::super::service::received_clock()
+                .map_err(|_| Error::Refused("remote-recovery-clock"))?;
+            let lease = self.effective_lease(admission)?;
+            if now == 0 || now < lease.accepted_ms || now >= lease.until_ms {
+                return refuse("remote-recovery-lease-expired");
+            }
+            if self
+                .launch_receipt(&admission.work.assignment.id)?
+                .is_some()
+            {
+                return refuse("remote-recovery-launch-already-recorded");
+            }
+            if self
+                .materialization_receipt(&admission.work.assignment.id)?
+                .as_ref()
+                != Some(&materialization)
+            {
+                return refuse("remote-recovery-materialization-changed");
+            }
+            Ok(())
+        };
+        check()?;
+        let workspace = destination
+            .recover_worker_workspace(&materialization, reviewers, checkpoint, || {
+                check().map_err(|_| std::io::Error::other("original recovery authority changed"))
+            })
+            .map_err(|_| Error::Refused("remote-recovery-initialization-refused"))?;
+        check()?;
+        Ok(workspace)
+    }
+}

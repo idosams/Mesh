@@ -4803,3 +4803,50 @@ and all 44 real-daemon checks, without a leak warning. This validates the shared
 and unchanged macOS path; Linux-specific descriptor execution still requires fresh hosted proof.
 The original PR234 run is terminal: macOS and five other checks passed, Linux failed. The
 preceding merged PR233 main run `37143376511` passed. Neither original run was restarted.
+
+
+## R102 — native continuation of original worker initialization
+
+New canonical implementation based on merged R101/PR234 at
+`51babc5f47ff53d477de24b8a5aedd4b020095e0`; replaces no preserved source commit.
+A freshly authenticated native receiving connection can continue its acknowledged original
+initialization. An independently reopened guarded ledger, original materialization receipt,
+current effective lease and absence of any launch record are required. The original allocation's
+exclusive initializer lock is held before mutable work and retained by the returned workspace.
+An active input-transfer reservation is refused intact; inspection-only receipts remain read-only.
+
+The operation reopens recorded parent/allocation/input identities and verifies the original input.
+It completes exact intent prefixes and reconstructs pending imports from complete canonical,
+private ownership markers read through retained directory handles. Partial copies, initial journal
+and confirmation receipts use the existing in-place continuation rules. Confirmed imports require
+an exact canonical receipt and matching original work, then use R101's pinned durable handoff;
+a populated derived index is never sent through unconfirmed ingestion. Both private directories
+must retain mode 0700. Missing or incomplete ownership, changed roots, conflicting bytes and later
+user edits are preserved and refused. The exact original worker mapping is finished in place.
+
+Registry, lease, launch absence and allocation identities are checked again across phases, and
+native input/content checks run again before return. The operation grants no process adoption or
+launch permission; ordinary reserve_launch remains the atomic single-intent boundary. No persisted
+format changes. Repeated completed recovery retains the same installation, initial operation and
+receipt; a live prior owner excludes another initializer.
+
+The first connected focused run passed 23 tests, including authenticated recovery before import,
+partial copy/journal, confirmed workspace, torn worker receipt, repeated recovery, busy ownership,
+unguarded/unauthenticated refusal, existing launch, changed user/input content, directory replacement,
+permissions and conflicting receipts. The first fixture used an obsolete working-folder name; its
+failure log was retained and corrected to the repository constant. The additional active-transfer
+regression passed (five recovery tests total). The first full gate stopped on a needless-borrow
+lint; its log is retained. After correction, `npm test` passed 3,725 native tests (one slow,
+17 skipped), 181 rendered checks, 634 desktop tests and 44 real-daemon checks, without leak
+warnings. Review then found the shared retained-file reader in a macOS-only module; it was
+moved unchanged into the common worker module for Linux compilation. The final portability correction passed the same complete local gate: 3,725 native tests
+in 157.390 seconds (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and
+44 real-daemon checks, without leak warnings. Hosted Linux/macOS checks and merge remain pending. The test authority retains and checks actual directory and
+ledger identities; this is native integration evidence, not a packaged remote-host proof.
+
+This source increment is not a desktop resume button or a complete broker recovery protocol.
+A dedicated versioned recovery challenge must support the current renewed assignment while retaining
+original admission provenance; the existing admission challenge binds the initial assignment and
+cannot authenticate a renewed one. Native socket/frame routing, user recovery controls, expiry and
+cancellation fault coverage, every-write/process-kill campaigns, uncertain launched processes and
+real second-host reconnect acceptance remain required. The full acceptance map is unchanged.

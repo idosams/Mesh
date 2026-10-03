@@ -2,23 +2,6 @@
 use super::*;
 use crate::fleet::{RemoteInputSource, RemoteLaunchReceipt};
 use mesh_store::RecordDigest;
-const MAX_RECEIPT: u64 = 1_048_576;
-fn retained(root: &PinnedWorkspaceRoot, name: &str) -> io::Result<String> {
-    let file = root.filesystem().read_only().read_file(Path::new(name))?;
-    let metadata = file.metadata()?;
-    if metadata.nlink() != 1
-        || metadata.permissions().mode() & 0o077 != 0
-        || metadata.len() > MAX_RECEIPT
-    {
-        return Err(invalid());
-    }
-    let mut bytes = Vec::new();
-    file.take(MAX_RECEIPT + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_RECEIPT {
-        return Err(invalid());
-    }
-    String::from_utf8(bytes).map_err(|_| invalid())
-}
 impl RemoteInputDestination {
     pub(in crate::fleet) fn reopen_saved_review(
         &self,
