@@ -4520,3 +4520,18 @@ checks and all repository/docs/license/storage/real-daemon demo gates. The restr
 retained after socket permission and native capture failures; no code or assertions changed
 between those runs. Publication and fresh hosted checks remain required. Restart reconciliation, pre-launch initialization recovery,
 uncertain provider execution, capacity release and signed real-host acceptance remain required.
+
+## R91 — inspect acknowledged input after restart
+
+New canonical work, replacing no legacy commit; depends on R90 / #223 and tracks #222. An
+independent branch from main preserves the published dependency's tested source and CI. Native
+inspection reopens only the recorded parent/allocation/files identities, validates the bounded
+private manifest against the original assignment and reuses full input verification. No
+admission reservation is reconstructed, and no file or ledger mutation occurs.
+
+Three focused regressions passed (0.491 s): restart readback without initialization/launch,
+byte-identical directory substitution refusal, and changed content/invalid manifest preservation.
+Full `npm test` passed: 3,677 native tests (150.711 s, one slow, 17 skipped), 180 rendered
+checks, 632 desktop tests and repository/docs/license/storage/real-daemon demo gates.
+Publication and fresh hosted checks remain required. Native graphical reconciliation and
+complete initialization/provider/second-host recovery remain required.

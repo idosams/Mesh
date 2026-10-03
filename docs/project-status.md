@@ -698,3 +698,18 @@ Old admissions without this record remain readable but have unknown materializat
 absence never proves that no input or process exists. No automatic backfill or adoption occurs.
 This is the first native foundation for #222, not completed worker restart recovery. Signed
 packaged, real second-host and full fleet acceptance remain outstanding.
+
+## Read-only acknowledged input inspection
+
+Native worker recovery can now inspect an acknowledged allocation from its durable
+materialization receipt after reopening the destination. Inspection checks the original parent,
+allocation and files directory identities before reading a bounded private manifest, verifies
+the exact assigned input and complete file inventory/bytes, and rechecks identity afterward.
+A byte-identical replacement directory is refused. Changed or missing input, and linked, public or malformed
+manifests, remain preserved; inspection does not repair it.
+
+The reader does not initialize a workspace, create a handoff, recreate a reservation, renew a
+lease, adopt a provider or write to the ledger. Successful input inspection is not execution
+liveness or permission to retry. This extends #222's native recovery foundation; graphical
+reconciliation, interrupted initialization, provider recovery and signed second-host acceptance
+remain unfinished. Existing persistence formats are unchanged.
