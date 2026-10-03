@@ -4473,3 +4473,10 @@ worker service's execution queue after materialization and exposes original requ
 controller, rendered/typecheck and docs checks validate that clarification separately. No runtime
 behavior changed after the full gate. Hosted publication and actual signed/second-host acceptance
 remain pending.
+
+R88 delivery reconciliation: R85 PR #216 merged ordinarily after all seven exact checks passed,
+main `68e7e69e16639f927e689d3d2074721a5a719de5`. R87 #219 original CI and R84 combined-main
+passed. R86 #217 now targets main at `089440f4d34943f61f770dca3776aa78fc4fb0c8`; R87 #219
+uses that parent at `8f7fce6eec878b8a5d1679d5e327de7920be0cff`. Both preserve their previously
+checked implementation trees and require fresh CI. R88 integrated the published parent with a
+tree identical to locally verified `1c35c49`; only this delivery record changed afterward.
