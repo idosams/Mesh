@@ -5,7 +5,7 @@ use super::{
     CaptureSchedule, ProjectAttachment,
 };
 use crate::ipc::Json;
-use crate::root_authority::PinnedWorkspaceRoot;
+use crate::root_authority::{PinnedWorkspaceRoot, ProtectedWorkspaceRoot};
 use crate::CheckpointSigner;
 use mesh_types::{Blake3, ContentDigest as _};
 use std::ffi::OsStr;
@@ -32,6 +32,7 @@ pub struct ProvisionedAttachment {
 /// Persistent registration information; discovery does not require the original project online.
 #[derive(Clone)]
 pub struct RegisteredAttachment {
+    pub(super) identity: ProtectedWorkspaceRoot,
     id: String,
     root: PathBuf,
     detached: bool,
@@ -63,7 +64,7 @@ pub(super) fn valid_id(id: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
-fn registered_root(receipt: &str) -> io::Result<PathBuf> {
+fn registered_root(receipt: &str) -> io::Result<(PathBuf, ProtectedWorkspaceRoot)> {
     let parsed = Json::parse(receipt).map_err(|_| invalid("invalid attachment receipt"))?;
     let root = parsed
         .get("root")
@@ -99,7 +100,10 @@ fn registered_root(receipt: &str) -> io::Result<PathBuf> {
     {
         return Err(invalid("noncanonical attachment receipt"));
     }
-    Ok(PathBuf::from(root))
+    Ok((
+        PathBuf::from(root),
+        ProtectedWorkspaceRoot::from_directory_token(&format!("{device}:{inode}"))?,
+    ))
 }
 
 impl AttachmentStorage {
@@ -136,9 +140,10 @@ impl AttachmentStorage {
             if receipt_id(&receipt) != id {
                 return Err(invalid("catalog receipt identity changed"));
             }
-            let root = registered_root(&receipt)?;
+            let (root, identity) = registered_root(&receipt)?;
             store.ensure_namespace_identity()?;
             registrations.push(RegisteredAttachment {
+                identity,
                 id: id.to_owned(),
                 root,
                 detached: super::detachment::detached(&store)?,

@@ -29,7 +29,19 @@ impl RemoteResultInbox {
         }
         let parent_pin = PinnedWorkspaceRoot::open(parent.to_path_buf())?;
         parent_pin.ensure_protected_identity(expected_parent)?;
-        private(&parent_pin)?;
+        parent_pin.ensure_namespace_identity()?;
+        // Desktop application-data parents may be readable/searchable by other users. The
+        // receiving children stay private; another user must not be able to replace entries.
+        if parent_pin
+            .try_clone_directory()?
+            .metadata()?
+            .permissions()
+            .mode()
+            & 0o022
+            != 0
+        {
+            return Err(invalid());
+        }
         for identity in protected {
             if parent_pin.is_within(*identity)? {
                 return Err(invalid());

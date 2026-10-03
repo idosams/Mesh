@@ -4344,3 +4344,43 @@ passed: 3,657 native tests (153.018 s, one slow, one process-leak warning, 17 sk
 177 rendered checks, 621 desktop tests and all repository/docs/license/storage/demo gates.
 The warning occurred in `mesh-approval` text-diff context coverage; #37/#172 remain unresolved.
 Fresh hosted Linux/macOS validation is required.
+
+
+## R85: catalogue-owned inbox identity
+
+New canonical work replacing no legacy commit. Based on published R84 PR #215
+`a6f439dcbf7e2b8b15f5c5d9076d05723aaa5f80`; canonical main
+`d58178cf4e3e00bc9ed8e5d39ce440176e5e94f1` was integrated on this separate branch with an
+identical implementation tree, preserving running PR checks. R82 PR #213 is merged; R83 PR #214
+original seven checks passed; R84 original checks and R82 combined-main remain active.
+The native catalogue now creates/reopens an inbox only against its independently retained
+external binding, protects catalogue and every saved original-project identity, and refuses
+orphaned/partial/substituted state. No new transfer, execution, source write or main authority.
+Three focused tests passed (0.101 s): lazy first provision and catalogue restart, renamed detached
+source protection, and preserved unbound/substituted inbox refusal. One unused import observed in
+the focused compile was removed before the pending full gate. New binding format is additive;
+no automatic migration, repair or adoption. Local full gate passed: 3,660 native tests (151.629 s,
+one slow, 17 skipped), 177 rendered checks, 621 desktop tests, repository/docs/license/storage
+checks and the real daemon demo. No process-leak warning occurred. Dependency PR #215 has a
+Linux compilation failure because intent exports did not match the existing macOS signed-result
+API boundary; correction and hosted delivery remain required. Desktop
+receipt and the complete remaining fleet acceptance plan are still required.
+
+
+R85 reconciled delivery base: PR #214 is retargeted to main at content-identical head
+`c12ece07893e5cb057475a098ad2fba5eff6f6e4`; corrected PR #215 head
+`674060bf03d85e3ba5518e85d0e93397bb226f63` is published and integrated here. Their original
+runs are terminal and fresh hosted checks are required. R82 combined-main passed. Both ledger
+sections were retained when resolving their append-only documentation conflict. Catalogue
+full-gate revalidation on the corrected platform boundary is pending.
+
+Second R85 full gate passed on the corrected dependency: 3,661 native tests (153.103 s, one slow,
+17 skipped), 177 rendered checks, 621 desktop tests and all remaining gates/demo; no leak warning.
+Desktop startup inspection then identified a normal readable application-data parent layout.
+Inbox creation/catalogue admission now allow read/search permissions on the parent while refusing
+group/other writes; receiving folders and records remain private. Added an actual 0755-parent
+create/reopen/private-child regression and 0770/0777 refusal checks. Final full revalidation passed:
+3,662 native tests (149.419 s, one slow, one process-leak warning, 17 skipped), 177 rendered
+checks, 621 desktop tests and all repository/docs/license/storage/demo gates. The warning occurred
+in `a_refused_open_is_published_too_so_a_subscriber_learns_about_it`; #37/#172 remain open.
+Corrected PR #215 hosted Linux tests and lint passed; macOS and full hosted delivery remain pending.
