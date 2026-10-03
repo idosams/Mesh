@@ -1007,3 +1007,13 @@ This history does not establish current process liveness or death, release worke
 restart work or advance protected main. No launch record and incomplete setup remain uncertain.
 The wire path requires the signed execution protocol on both peers; there is no automatic
 fallback or retry. Signed packaged remote acceptance is still outstanding.
+
+### Remote observation and native signing
+
+Fleet observation preparation retains an independent connection to the same native-guarded
+ledger, then releases the shared service lock before invoking signing custody. Views and
+cancellation can proceed while signing waits. A context change during signing suppresses the
+query, and transport still runs outside the service lock before final reply revalidation.
+Embedding callers must supply guarded native history; unguarded databases and missing or
+revoked authority are refused without initializing replacement history. This does not alter
+the status, inspection or result wire versions or grant execution authority.
