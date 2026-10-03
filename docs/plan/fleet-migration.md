@@ -4230,7 +4230,10 @@ The fixed R71 user checkpoint and existing dirty legacy checkout remain unchange
 ## R80: graphical continuation of retained input transfers
 
 R80 is new canonical work replacing no legacy commit. It depends on published R79 / PR #210 head
-`2cc394ba245702b3ace0cd789d6de5034cbff8b4`; the original PR and R78 combined-main runs remain active.
+`2cc394ba245702b3ace0cd789d6de5034cbff8b4`. R79 passed all seven original checks and merged as
+`8137082bde3f4af9f651d97196b6ce25e03cc3aa`. R78 combined-main passed. R80 integrates the R79 merge
+with the implementation tree unchanged from fully tested `45d7877`; only this delivery record changes.
+R79 combined-main and R80 hosted verification are pending.
 The explicit recovery button sends only an opaque native selection. History resolves the original
 attached-project version or complete reviewed parent checkpoint. The current catalogue owner and
 existing reconnect transport preserve original assignment, peer, lease, cancellation and saved-input
