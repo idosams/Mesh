@@ -1,5 +1,7 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Saved remote reviews":"סקירות מרוחקות שמורות",
+"Fleet status has not loaded for these saved reviews.":"מצב הצי טרם נטען עבור הסקירות השמורות האלה.",
 "Sending input authorizes the configured worker to begin this attempt. A delivery receipt alone does not prove the agent started successfully.":"שליחת הקלט מאפשרת למחשב המרוחק שהוגדר להתחיל את הניסיון הזה. אישור מסירה לבדו אינו מוכיח שהסוכן התחיל בהצלחה.",
 "Prepare new remote work":"הכנת עבודה מרוחקת חדשה",
 "Choose saved work and retain its exact request before sending input. No existing attempt is needed. The fixed lease lasts fifteen minutes from preparation.":"בחרו עבודה שמורה ושמרו את הבקשה המדויקת לפני שליחת הקלט. אין צורך בניסיון קיים. ההרשאה הקבועה תקפה לחמש עשרה דקות מרגע ההכנה.",

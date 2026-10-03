@@ -85,8 +85,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   const reviews = createFleetReviews({ invoke, changed: publish, otherPinCount: () => remoteReviews.snapshot().remoteReviewPins.length, laneFor: (objective, lane) =>
     fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
   const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish, requestId,
-    otherPinCount: () => reviews.snapshot().reviewPins.length,
-    objectiveFor: objective => fleets.find(f => f.objective === objective && f.ownership !== 'unavailable') });
+    otherPinCount: () => reviews.snapshot().reviewPins.length });
   const plan = () => {
     if (timer !== null) cancel(timer);
     timer = visible && !disposed ? schedule(() => { timer = null; void refresh(); }, 2000) : null;

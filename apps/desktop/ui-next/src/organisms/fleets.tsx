@@ -73,7 +73,7 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
     {projection.error && <p role="alert" className="text-sm">{t(projection.error)}</p>}
     {projection.feedback && <p role="status" className="break-words text-sm">{t(projection.feedback)}</p>}
     <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "refresh" })}>{t("Refresh fleets")}</Button>
-    {!projection.fleets.length && <p className="text-sm text-muted-foreground">{t(projection.error ? "Saved fleets could not be loaded." : "No fleets yet. Manual work and externally run harnesses remain available below.")}</p>}
+    {!projection.fleets.length && <p className="text-sm text-muted-foreground">{t(Object.keys(projection.remoteReviewQueues ?? {}).length ? "Fleet status has not loaded for these saved reviews." : projection.error ? "Saved fleets could not be loaded." : "No fleets yet. Manual work and externally run harnesses remain available below.")}</p>}
     {projection.reviewOutbox && <FleetPendingReviewOperations value={projection.reviewOutbox} />}
     <FleetReviewPanels pins={projection.reviewPins ?? []} notice={projection.reviewNotice ?? ""} persistence={projection.reviewPersistence} />
     <RemoteReviewPanels workflow={projection.remoteProjectWorkflow} pins={projection.remoteReviewPins ?? []} notice={projection.remoteReviewNotice ?? ""} persistence={projection.remoteReviewPersistence} />
@@ -84,7 +84,14 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
 export function FleetCards({ projection, projects, disabled }: { projection: Projection; projects: Source[]; disabled: boolean }) {
   const t = useTranslation();
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-2">{projection.fleets.map(fleet => {
+    <div className="grid items-start gap-4 xl:grid-cols-2">
+      {Object.entries(projection.remoteReviewQueues ?? {}).filter(([objective]) => !projection.fleets.some(fleet => fleet.objective === objective)).map(([objective, queue]) => <article key={objective} className="grid min-w-0 gap-3 rounded border border-border p-3">
+        <h4 className="font-semibold">{t("Saved remote reviews")}</h4>
+        <p className="text-sm">{t("Fleet status has not loaded for these saved reviews.")}</p>
+        <details className="break-all text-xs"><summary>{t("Fleet identity")}</summary><bdi dir="ltr">{objective}</bdi></details>
+        <RemoteSavedResults objective={objective} queue={queue} available={projection.available && (projection.remoteReviewPersistence?.editable ?? true)} />
+      </article>)}
+      {projection.fleets.map(fleet => {
       const activity = fleet.ownership === "current-host" ? projection.activity.find(row => row.objective === fleet.objective) : undefined;
       const current = fleet.ownership === "current-host";
       const ready = Boolean(fleet.policy) && current && !fleet.cancelled && !activity && fleet.lanes.length > 0 && fleet.lanes.every(lane => lane.allocated && !lane.run);
@@ -93,7 +100,7 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
         <details className="break-all text-xs"><summary>{t("Fleet identity")}</summary><bdi dir="ltr">{fleet.objective}</bdi></details>
         <p className="text-sm">{projection.error ? <>{t("Status may be out of date")} · </> : ""}{t(!current ? fleet.ownership === "restored-unattached" ? "Saved state · workers need recovery before execution" : "Fleet unavailable · retained work needs recovery" : fleet.cancelled ? "Stopped scheduling · worker ownership retained" : activity?.status === "needs-attention" ? "Needs attention · new agents will not start" : activity?.stopRequested ? "Stop requested" : activity ? "Monitoring agents" : fleet.lanes.some(lane => !lane.allocated) ? "Lane allocation incomplete" : fleet.lanes.some(lane => lane.run) ? "Saved run status · no live observations" : "Provisioned · agents have not started")}</p>
         <FleetPolicy policy={fleet.policy} />
-        <RemoteSavedResults objective={fleet.objective} queue={projection.remoteReviewQueues?.[fleet.objective]} available={projection.available && fleet.ownership !== "unavailable" && (projection.remoteReviewPersistence?.editable ?? true)} />
+        <RemoteSavedResults objective={fleet.objective} queue={projection.remoteReviewQueues?.[fleet.objective]} available={projection.available && (projection.remoteReviewPersistence?.editable ?? true)} />
         <div className="flex flex-wrap gap-2"><Button disabled={disabled || Boolean(projection.error) || !ready} onClick={() => send({ type: "start", objective: fleet.objective })}>{t("Start agents")}</Button>
           <Button variant="secondary" disabled={disabled || !current || fleet.cancelled} onClick={() => send({ type: "stop", objective: fleet.objective })}>{t("Stop agents")}</Button></div>
         <p className="text-xs text-muted-foreground">{activity?.observedAt ? age(activity.observedAt, t) : t("No worker observations in this app session")}</p>
