@@ -4990,6 +4990,17 @@ signing success or packaged provider acceptance. Graphical recovery, uncertain-e
 reconciliation and the full fleet acceptance campaign remain required. The fixed checkpoint is
 unchanged.
 
+R106 hosted correction: original run `37150128362` passed macOS and five checks overall,
+but Linux test/clippy compilation exposed a missing platform guard around the macOS-only
+SSH coordinator service. The module and export now use the same macOS boundary as existing
+SSH reconnect/start/observation services. Cross-platform wire and worker recovery remain
+available and tested on Linux; no test assertion or required check was weakened. Failed logs
+are retained. PR238 merged at `4bc99f27cbdb89ceb3afa109b6af543937546634`; R106 was
+reconciled with that main by a related-history merge with identical complete source tree before
+the two platform guards were added. The corrected full local gate passed 3,744 native tests in 160.379 seconds (one slow,
+17 skipped), 181 rendered checks, 634 desktop tests and 44 daemon checks. Hosted Linux
+verification and PR239 delivery remain pending.
+
 ## R107 — explicit desktop original workspace recovery
 
 This canonical increment depends on published R106/PR239 at
