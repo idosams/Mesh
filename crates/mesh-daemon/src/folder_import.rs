@@ -39,6 +39,7 @@ use crate::workspace::OpenWorkspace;
 
 mod received_copy;
 mod received_genesis;
+mod received_record;
 
 const CLAIM_MARKER: &[u8] = b"mesh-folder-import/1 claim\n";
 const OWNED_MARKER_PREFIX: &str = "mesh-folder-import/1 owned";
@@ -818,6 +819,31 @@ impl PreparedFolderImport {
         })
     }
 
+    fn write_confirmation_receipt(
+        &self,
+        managed: &Snapshot,
+        ingested: bool,
+    ) -> Result<(), FolderImportError> {
+        let bytes = confirmed_receipt_bytes(
+            self.destination_identity,
+            self.presented_store.as_ref(),
+            &self.snapshot,
+            managed,
+            ingested,
+        );
+        let result = match self.purpose {
+            ImportPurpose::Received => {
+                received_record::finish(&self.destination_parent_pinned, &self.receipt, &bytes)
+            }
+            ImportPurpose::User => self.destination_parent_pinned.filesystem().write_new_file(
+                &self.receipt,
+                &bytes,
+                fs::Permissions::from_mode(0o600),
+            ),
+        };
+        result.map_err(|error| FolderImportError::io("create marker", &self.receipt, error))
+    }
+
     /// The exact summary awaiting confirmation.
     #[must_use]
     pub const fn summary(&self) -> &ImportSummary {
@@ -892,20 +918,7 @@ impl PreparedFolderImport {
             self.cleanup_on_failure()?;
             return Err(problem);
         }
-        self.destination_parent_pinned
-            .filesystem()
-            .write_new_file(
-                &self.receipt,
-                &confirmed_receipt_bytes(
-                    self.destination_identity,
-                    self.presented_store.as_ref(),
-                    &self.snapshot,
-                    &self.snapshot,
-                    false,
-                ),
-                fs::Permissions::from_mode(0o600),
-            )
-            .map_err(|error| FolderImportError::io("create marker", &self.receipt, error))?;
+        self.write_confirmation_receipt(&self.snapshot, false)?;
         self.destination_parent_pinned
             .filesystem()
             .remove_file(&self.owned_marker)
@@ -1105,20 +1118,7 @@ impl PreparedFolderImport {
         }
         let managed_snapshot =
             without_derived_index(complete_managed_snapshot, self.presented_store.is_some());
-        self.destination_parent_pinned
-            .filesystem()
-            .write_new_file(
-                &self.receipt,
-                &confirmed_receipt_bytes(
-                    self.destination_identity,
-                    self.presented_store.as_ref(),
-                    &self.snapshot,
-                    &managed_snapshot,
-                    true,
-                ),
-                fs::Permissions::from_mode(0o600),
-            )
-            .map_err(|error| FolderImportError::io("create marker", &self.receipt, error))?;
+        self.write_confirmation_receipt(&managed_snapshot, true)?;
         self.destination_parent_pinned
             .filesystem()
             .remove_file(&self.owned_marker)
@@ -2473,17 +2473,20 @@ fn ingest_private_workspace(
     // first confirmed open rebuilds it from the journal through the ordinary recovery path.
     let storage_filesystem = storage_pinned.filesystem();
     let database_relative = Path::new(DATABASE_FILE_NAME);
-    storage_filesystem
-        .write_new_file(database_relative, &[], fs::Permissions::from_mode(0o600))
-        .and_then(|()| storage_filesystem.sync_file(database_relative))
-        .and_then(|()| storage_filesystem.sync_dir(Path::new("")))
-        .map_err(|error| {
-            FolderImportError::io(
-                "prepare derived index",
-                storage_root.join(DATABASE_FILE_NAME),
-                error,
-            )
-        })?;
+    let index = match purpose {
+        ImportPurpose::Received => received_record::finish(storage_pinned, database_relative, &[]),
+        ImportPurpose::User => storage_filesystem
+            .write_new_file(database_relative, &[], fs::Permissions::from_mode(0o600))
+            .and_then(|()| storage_filesystem.sync_file(database_relative))
+            .and_then(|()| storage_filesystem.sync_dir(Path::new(""))),
+    };
+    index.map_err(|error| {
+        FolderImportError::io(
+            "prepare derived index",
+            storage_root.join(DATABASE_FILE_NAME),
+            error,
+        )
+    })?;
 
     Ok(ManagedImportOutcome {
         operation: operation_id,
@@ -3588,6 +3591,117 @@ mod copy_security_tests {
             ProtectedWorkspaceRoot::inspect(store.parent().unwrap()).unwrap(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn received_confirmation_completes_every_real_receipt_prefix() {
+        use std::os::unix::fs::MetadataExt as _;
+        let (root, source, store) = received_fixture("received-receipt-prefix");
+        let prepared = prepare_received(&source, &store);
+        let receipt = prepared.receipt.clone();
+        let expected = confirmed_receipt_bytes(
+            prepared.destination_identity,
+            prepared.presented_store.as_ref(),
+            &prepared.snapshot,
+            &prepared.snapshot,
+            true,
+        );
+        fs::write(&receipt, []).unwrap();
+        fs::set_permissions(&receipt, fs::Permissions::from_mode(0o600)).unwrap();
+        let inode = fs::metadata(&receipt).unwrap().ino();
+        for cut in 0..=expected.len() {
+            fs::write(&receipt, &expected[..cut]).unwrap();
+            prepared
+                .write_confirmation_receipt(&prepared.snapshot, true)
+                .unwrap();
+            assert_eq!(fs::read(&receipt).unwrap(), expected, "cut {cut}");
+            assert_eq!(fs::metadata(&receipt).unwrap().ino(), inode);
+            assert!(prepared.owned_marker.exists());
+        }
+        let (confirmed, _) = prepared.confirm_into_workspace_without_origin().unwrap();
+        assert_eq!(fs::read(&receipt).unwrap(), expected);
+        assert_eq!(fs::metadata(&receipt).unwrap().ino(), inode);
+        assert!(ConfirmedFolderImport::open(confirmed.destination()).is_ok());
+        assert!(!markers(confirmed.destination()).unwrap().owned.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_repeated_ingestion_retains_journal_and_empty_index_before_confirmation() {
+        use std::os::unix::fs::MetadataExt as _;
+        let (root, source, store) = received_fixture("received-repeat-ingestion");
+        let prepared = prepare_received(&source, &store);
+        let ingest = || {
+            ingest_private_workspace(
+                &prepared.destination,
+                &prepared.destination_pinned,
+                &store,
+                &prepared.destination_parent_pinned,
+                &prepared.snapshot,
+                ImportPurpose::Received,
+            )
+            .unwrap()
+        };
+        let first = ingest();
+        let journal = store.join(crate::workspace::RECORD_FILE_NAME);
+        let expected = fs::read(&journal).unwrap();
+        let database = store.join(DATABASE_FILE_NAME);
+        let inode = fs::metadata(&database).unwrap().ino();
+        let repeated = ingest();
+        assert_eq!(first.operation(), repeated.operation());
+        assert_eq!(fs::read(&journal).unwrap(), expected);
+        assert_eq!(fs::metadata(&database).unwrap().ino(), inode);
+        assert_eq!(fs::metadata(&database).unwrap().len(), 0);
+        let (_, confirmed) = prepared.confirm_into_workspace_without_origin().unwrap();
+        assert_eq!(confirmed.operation(), first.operation());
+        assert_eq!(fs::read(&journal).unwrap(), expected);
+        assert_eq!(fs::metadata(&database).unwrap().ino(), inode);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_conflicting_finalization_retains_work_and_owned_marker() {
+        for index in [false, true] {
+            let (root, source, store) = received_fixture("received-finalization-conflict");
+            let prepared = prepare_received(&source, &store);
+            let owned = prepared.owned_marker.clone();
+            let path = if index {
+                store.join(DATABASE_FILE_NAME)
+            } else {
+                prepared.receipt.clone()
+            };
+            fs::write(&path, b"later retained bytes").unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            assert!(prepared.confirm_into_workspace_without_origin().is_err());
+            assert_eq!(fs::read(path).unwrap(), b"later retained bytes");
+            assert!(owned.exists());
+            assert_eq!(
+                fs::read(source.join("work.txt")).unwrap(),
+                b"original input\n"
+            );
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn user_confirmation_remains_create_only() {
+        let (root, source, store) = received_fixture("user-receipt-collision");
+        let prepared = PreparedFolderImport::prepare_presented(&source, &store).unwrap();
+        let expected = confirmed_receipt_bytes(
+            prepared.destination_identity,
+            prepared.presented_store.as_ref(),
+            &prepared.snapshot,
+            &prepared.snapshot,
+            true,
+        );
+        fs::write(&prepared.receipt, &expected[..17]).unwrap();
+        fs::set_permissions(&prepared.receipt, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(prepared
+            .write_confirmation_receipt(&prepared.snapshot, true)
+            .is_err());
+        assert_eq!(fs::read(&prepared.receipt).unwrap(), &expected[..17]);
+        drop(prepared);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
