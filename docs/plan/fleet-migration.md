@@ -4504,3 +4504,19 @@ process-leak warning occurred; #37/#172 remain unresolved. Full log retained sep
 PR #217 fresh hosted checks passed; dependent #219/#220 and combined-main remain pending at
 last inspection. This increment's hosted checks and all actual signed/second-host acceptance
 remain required.
+
+## R90 — durable acknowledged input allocation identity
+
+New canonical implementation; replaces no legacy commit. Depends on R89 / #221 and tracks #222.
+The receiving session records its original admission and native parent/allocation/files identities
+in an immutable `mesh.remote-materialization/v1` ledger event before handing materialized input
+to the broker. Bounded readback survives restart without reopening files or reconstructing a
+reservation. Exact repeats retain one record; conflict, invalid context and malformed history
+refuse. Earlier admissions are not backfilled. Missing records remain uncertain.
+
+Focused receiving regressions passed (8 tests, 0.313 s). Full `npm test` passed with host
+permissions: 3,674 native tests (156.092 s, one slow, 17 skipped), 632 desktop tests, rendered
+checks and all repository/docs/license/storage/real-daemon demo gates. The restricted run was
+retained after socket permission and native capture failures; no code or assertions changed
+between those runs. Publication and fresh hosted checks remain required. Restart reconciliation, pre-launch initialization recovery,
+uncertain provider execution, capacity release and signed real-host acceptance remain required.
