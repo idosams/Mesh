@@ -992,3 +992,14 @@ agent through its worker supervisor. Existing launch intents remain uncertain an
 restarted with this action. After an unconfirmed response, keep the same selection and read worker
 status; do not infer that nothing happened or that another attempt is safe. Previous observations
 and pinned reviews stay available. Successful signed packaged/second-host acceptance is pending.
+
+
+### Remote observation and native signing
+
+Fleet observation preparation retains an independent connection to the same native-guarded
+ledger, then releases the shared service lock before invoking signing custody. Views and
+cancellation can proceed while signing waits. A context change during signing suppresses the
+query, and transport still runs outside the service lock before final reply revalidation.
+Embedding callers must supply guarded native history; unguarded databases and missing or
+revoked authority are refused without initializing replacement history. This does not alter
+the status, inspection or result wire versions or grant execution authority.

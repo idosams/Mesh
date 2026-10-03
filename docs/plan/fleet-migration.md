@@ -5189,3 +5189,23 @@ records and recovery tests. All 61 combined focused tests passed in 8.596 second
 `npm test` gate passed 3,760 native tests in 159.966 seconds (one slow, 17 skipped),
 182 rendered checks, 636 desktop tests and the real-daemon proof. No assertion or product
 behavior changed during reconciliation. Fresh exact-head hosted validation remains required.
+
+
+## R114 — keep fleet observations available during native signing
+
+Tracks [issue #247](https://github.com/idosams/Mesh/issues/247). A regression reproduced
+that observation preparation held the shared fleet service mutex inside native signing,
+preventing concurrent views and cancellation. The failing baseline is retained separately.
+Preparation now opens an independent connection to the same guarded native ledger before
+releasing the service lock. Signing retains its existing pre/post context checks; transport
+and final reply validation preserve their existing boundaries. No unguarded fallback, new
+history initialization, peer-selected path, execution adoption or capacity release is added.
+
+This is new canonical work on R112/PR #245 and replaces no preserved implementation commit.
+It applies to all observation kinds on that base (current lease, input inspection and results).
+The R113 desktop execution path is a separate published dependent increment; combined coverage
+must include its execution kind after reconciliation. Initial validation passed: eight focused tests
+and the full gate with 3,764 Rust tests in 158.100s (1 slow, 17 skipped), 182 rendered tests,
+636 desktop tests and the real daemon demo. The baseline failure, inspection-fixture correction
+and test-only lint failure are preserved. Combined validation and hosted delivery remain pending.
+Packaged responsiveness and the full parallel fleet acceptance journey remain required.

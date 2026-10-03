@@ -881,3 +881,14 @@ original selection and observations. Focused controller/rendering and native ref
 R107 full local validation passed (3,745 native tests plus desktop and daemon checks);
 hosted validation and delivery are pending. Signed packaged and real second-host recovery
 remain unverified.
+
+
+### Fleet observation signing responsiveness (R114)
+
+A focused regression reproduced the shared service lock being held during native observation
+signing. Preparation now retains guarded history on an independent connection and releases the
+lock before signing, allowing concurrent views and cancellation. Stale context and lost authority
+still refuse the query. Eight focused tests and the full gate passed (3,764 Rust, 182 rendered,
+636 desktop tests and the real daemon demo). Combined execution-panel validation and hosted
+delivery remain pending; packaged responsiveness is not yet established.
+This correction does not resolve terminal capacity reconciliation or the full fleet objective.

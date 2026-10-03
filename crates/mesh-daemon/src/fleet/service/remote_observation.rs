@@ -1,4 +1,4 @@
-//! Native remote reads: prepare under the service lock, exchange outside it, then revalidate.
+//! Native remote reads: retain guarded history, sign and exchange outside the service lock.
 use super::*;
 use crate::fleet::{
     NativeSshDestination, RemoteFrame, RemoteFrameReader, RemoteFrameWriter,
@@ -44,7 +44,8 @@ pub struct RemoteObservation {
 }
 impl FleetHistory {
     /// Prepare a fresh signed observation using independently admitted coordinator/worker keys.
-    /// The callback signs only the closed native query. No network I/O occurs under the fleet lock.
+    /// The callback signs only the closed native query. Signing and network I/O occur outside the
+    /// fleet lock; an independent connection retains the same native ledger authority.
     pub fn prepare_remote_observation(
         &self,
         lane: &str,
@@ -54,8 +55,23 @@ impl FleetHistory {
         kind: RemoteObservationKind,
         sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
     ) -> Result<RemoteObservation, Unavailable> {
-        let mut inner = self.0.lock()?;
-        let runtime = &mut inner.runtime;
+        let mut retained_runtime = {
+            let inner = self.0.lock()?;
+            let store = inner
+                .runtime
+                .store
+                .reopen_guarded_connection()
+                .map_err(|_| {
+                    Unavailable::new(
+                        "remote-observation-history",
+                        "Native observation history is unavailable.",
+                    )
+                })?;
+            Runtime::open(store, inner.runtime.objective()).map_err(runtime_error)?
+        };
+        // Native signing may wait for custody. Keep views and cancellation available throughout,
+        // then let the challenge re-read this exact guarded history before returning wire bytes.
+        let runtime = &mut retained_runtime;
         let (challenge, frame) = match kind {
             RemoteObservationKind::CurrentLease => {
                 let c = RemoteWorkerStatusChallenge::issue_with_current_lease(
