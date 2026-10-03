@@ -4682,3 +4682,29 @@ reported one LEAK warning in the existing checkpoint-storage test
 `a_manifest_cannot_enter_metadata_when_its_chunk_is_absent`; the original log is preserved and the
 reliability investigation remains open. Fresh hosted checks and the full fleet acceptance map remain
 required.
+
+
+## R99 — require the corrected concurrent test runner
+
+New canonical workflow correction based on merged R98/PR231 at
+`33af10c7022a8b4e97c056424579329a1420e9b1`; replaces no preserved implementation commit.
+The local runner was nextest 0.9.143. Upstream nextest 0.9.145 fixes inherited sibling capture
+pipes on Apple platforms ([upstream PR #3553](https://github.com/nextest-rs/nextest/pull/3553)),
+which can falsely report a test as leaking output handles. Mesh now declares 0.9.145 as its
+minimum runner version, using nextest's own version check, and documents the setup requirement.
+Hosted installs already use current nextest. No assertions, deadlines, leak settings, retries or
+skips change; no product lifecycle defect is claimed fixed.
+
+The official universal macOS 0.9.145 archive was verified against its published SHA256
+`52ecaedb4f5af9267ef7ed02bc937d2a15a94ff96cb663080e81311f798c9905` and run from a separate
+temporary location, preserving the existing 0.9.143 installation. On merged PR231, all 3,703
+native tests passed in 153.495s (one slow, 17 skipped), without a leak warning. This is one native
+suite observation, not full packaged/fleet acceptance or proof of all historical warning causes.
+The original logs and tool identities are retained; #172 and #37 remain open. The built-in version
+check refused 0.9.143 with exit 92 and accepted 0.9.145 with exit 0. An initial probe without Cargo
+on PATH exited 102 and was retained, then corrected without changing the version requirement.
+Full `npm test` passed on this increment with the isolated fixed runner: 3,703 native tests in
+160.781s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests, and all 44 real-daemon
+checks; no leak warning. All seven checks also passed on the preceding merged PR231 main
+([run 37140182566](https://github.com/idosams/Mesh/actions/runs/37140182566)). Fresh hosted
+checks on this increment and its eventual combined main remain required.
