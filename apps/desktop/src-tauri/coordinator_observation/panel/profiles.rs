@@ -35,7 +35,7 @@ fn public_input(c: &Configuration) -> Json {
         ("run", Json::text(&c.run)),
     ])
 }
-fn bindings(s: &Selection) -> Json {
+pub(super) fn bindings(s: &Selection) -> Json {
     Json::object([
         ("installation", Json::text(s.installation.directory_token())),
         ("fleets", Json::text(s.fleets.directory_token())),
@@ -52,7 +52,7 @@ pub(super) fn value(s: &Selection) -> Result<Json, String> {
         ("bindings", bindings(s)),
     ]))
 }
-fn decode(entry: &RemoteConnectionSettings) -> Result<(Configuration, Json), String> {
+pub(super) fn decode(entry: &RemoteConnectionSettings) -> Result<(Configuration, Json), String> {
     receiving::closed(&entry.value, &["schema", "configuration", "bindings"])?;
     if entry.value.get("schema").and_then(Json::as_text) != Some("mesh.native-saved-connection/v1")
     {
@@ -74,7 +74,7 @@ fn decode(entry: &RemoteConnectionSettings) -> Result<(Configuration, Json), Str
         b,
     ))
 }
-fn verify_paths(c: &Configuration, b: &Json) -> Result<(), String> {
+pub(super) fn verify_paths(c: &Configuration, b: &Json) -> Result<(), String> {
     let installation =
         ProtectedWorkspaceRoot::inspect(&c.connection.installation).map_err(|_| UNAVAILABLE)?;
     let fleets = ProtectedWorkspaceRoot::inspect(&c.connection.fleets).map_err(|_| UNAVAILABLE)?;

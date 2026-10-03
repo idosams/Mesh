@@ -1,3 +1,4 @@
+import { RemoteExecution, type RecordedExecution } from "./remote-execution";
 import { RemoteObservation } from "./remote-observation";
 import { RemoteReviewPanels, RemoteSavedResults, type RemoteReviewPin, type RemoteReviewQueue, type RemoteProjectWorkflow } from "./remote-fleet-reviews";
 import { useEffect, useState } from "react";
@@ -11,7 +12,7 @@ type ProviderPolicy = { coordinator: string; providers: string[] };
 type Fleet = { policy?: ProviderPolicy | null; objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { remoteProjectWorkflow?:RemoteProjectWorkflow; remoteReviewPersistence?: FleetReviewPersistence; remoteReviewPins?: RemoteReviewPin[]; remoteReviewQueues?: Record<string, RemoteReviewQueue>; remoteReviewNotice?: string; reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { policy?: ProviderPolicy; id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type Projection = { remoteObservations?: Record<string, { run: string; assignment: string; worker: string; value: RecordedExecution | null; busy: boolean; error: string }>; remoteProjectWorkflow?:RemoteProjectWorkflow; remoteReviewPersistence?: FleetReviewPersistence; remoteReviewPins?: RemoteReviewPin[]; remoteReviewQueues?: Record<string, RemoteReviewQueue>; remoteReviewNotice?: string; reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { policy?: ProviderPolicy; id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
 const send = (detail: Record<string, unknown>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const states: Record<string, string> = { launching: "Starting", running: "Working", waiting: "Waiting", reconciling: "Needs recovery", stopping: "Stop requested · ownership reserved", succeeded: "Execution completed", failed: "Execution failed", cancelled: "Cancelled" };
@@ -106,12 +107,17 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
         <p className="text-xs text-muted-foreground">{activity?.observedAt ? age(activity.observedAt, t) : t("No worker observations in this app session")}</p>
         <ul className="grid max-h-[36rem] gap-3 overflow-auto">{fleet.lanes.map(lane => {
           const worker = current && lane.run && !lane.run.remote ? activity?.workers.find(worker => worker.lane === lane.id && worker.run === lane.run?.id) : null;
+          const remoteRow = projection.remoteObservations?.[`${fleet.objective}/${lane.id}`];
+          const remote = remoteRow && lane.run?.remote && remoteRow.run === lane.run.id
+            && remoteRow.assignment === lane.run.remote.assignment && remoteRow.worker === lane.run.remote.worker ? remoteRow : null;
           return <li key={lane.id} className="grid gap-1 rounded border border-border p-2 text-sm">
             <p className="font-medium">{t(lane.parent ? "Worker lane" : "Coordinator lane")} · <bdi dir="ltr">{lane.provider}</bdi></p><p dir="auto" className="whitespace-pre-wrap break-words">{lane.goal}</p>
             <p>{lane.run ? <>{!worker && <>{t("Last saved state")}: </>}{t(states[lane.run.state])}</> : t(!current ? "Saved lane · recovery required" : lane.allocated ? "Waiting to start" : "Allocation needs attention")}</p>
             {lane.run?.remote && <div className="grid gap-1 text-xs">
               <p>{t("Remote worker · last coordinator record")}</p>
-              <p>{t("Remote execution has not been observed in this view")}</p>
+              {remote?.value ? <RemoteExecution value={remote.value} /> : <p>{t("Remote execution has not been observed in this view")}</p>}
+              {remote?.busy && <p role="status">{t("Refreshing this remote lane")}</p>}
+              {remote?.error && <p role="status">{t(remote.error)} {t("Check the saved connection for this lane.")}</p>}
               <details className="break-all"><summary>{t("Remote assignment")}</summary>
                 <p>{t("Assignment")}: <bdi dir="ltr">{lane.run.remote.assignment}</bdi></p>
                 <p>{t("Worker identity")}: <bdi dir="ltr">{lane.run.remote.worker}</bdi></p>

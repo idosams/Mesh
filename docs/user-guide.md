@@ -508,7 +508,16 @@ Its saved coordinator state is separate from a fresh worker observation. The det
 original assignment, worker identity and exact recorded lease values. A deadline does not prove
 that execution stopped. Local activity is never presented as evidence for that remote lane.
 
-Use the configured remote connection's **Read recorded execution** action for its authenticated
-historical observation. Independent automatic observations for all remote lanes are still being
-implemented; this overview does not yet provide them. Existing saved reviews stay independently
-pinned while the fleet catalogue refreshes.
+While the fleet overview is visible, remote lanes refresh their authenticated recorded execution
+independently, using one matching saved connection for each exact objective, lane, run and worker.
+Save that connection through the remote worker panel first. Missing or ambiguous saved connections,
+ineligible signing custody and unavailable workers are reported per lane; they do not stop local
+review. At most four reads run concurrently. Reads are scheduled no more often than every five
+seconds per lane, with transport deadlines; this is not a measured freshness guarantee.
+
+Each card keeps its last verified observation time and revision beside any refresh error. A new
+attempt clears old facts, and late or contradictory replies cannot replace the new lane's state.
+Leaving the view stops scheduling new reads; already-started native reads may finish. Existing
+saved reviews stay independently pinned. These are signed historical records, not proof of current
+process activity, stopped ownership or permission to launch another attempt. The configured remote
+connection's **Read recorded execution** action remains available independently.

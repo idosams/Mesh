@@ -48,6 +48,22 @@ pub struct RemoteObservation {
     frame: RemoteFrame,
 }
 impl FleetHistory {
+    /// Read the current attempt's retained remote identity without granting execution authority.
+    pub fn remote_observation_assignment(
+        &self,
+        lane: &str,
+        run: &str,
+    ) -> Result<super::super::RemoteAssignment, Unavailable> {
+        let state = self.0.native_state()?;
+        state
+            .lanes
+            .get(lane)
+            .and_then(|lane| lane.runs.last())
+            .filter(|current| current.id == run)
+            .and_then(|current| current.remote.clone())
+            .ok_or_else(|| refusal("remote-observation-assignment-unavailable"))
+    }
+
     /// Prepare a fresh signed observation using independently admitted coordinator/worker keys.
     /// The callback signs only the closed native query. Signing and network I/O occur outside the
     /// fleet lock; an independent connection retains the same native ledger authority.

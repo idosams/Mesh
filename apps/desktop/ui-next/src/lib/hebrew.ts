@@ -1,5 +1,8 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Refreshing this remote lane": "רענון נתיב העבודה המרוחק",
+"Remote observation unavailable. Last verified history is retained.": "התצפית המרוחקת אינה זמינה. ההיסטוריה המאומתת האחרונה נשמרת.",
+"Check the saved connection for this lane.": "יש לבדוק את החיבור השמור לנתיב עבודה זה.",
 "Assignment": "הקצאה",
 "Remote worker · last coordinator record": "סוכן מרוחק · הרישום האחרון אצל המתאם",
 "Remote execution has not been observed in this view": "ביצוע מרוחק טרם נצפה בתצוגה זו",
