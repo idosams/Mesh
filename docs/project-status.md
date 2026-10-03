@@ -801,3 +801,15 @@ also passed 3,712 native tests, 181 rendered checks, 634 desktop tests and all 4
 R100 in the migration ledger tracks hosted validation and delivery. This does not yet expose a resume action or reconstruct
 launch authority; original ownership/admission/lease checks and the remaining recovery journey
 are still required.
+
+
+### Original-directory import handoff (source increment)
+
+Confirmed saved-work and received-worker imports now retain their original working and private
+storage directories while opening the live workspace. Durable index and recovery-database access
+use verified native directory references, and the displayed private-store identity remains checked.
+A complete replacement workspace at the same name is refused before mutable reopening. Normal
+explicit reopening of a confirmed workspace remains supported. The focused regressions and full
+local gate passed; R101 in the migration ledger records exact validation and hosted-delivery status.
+This does not yet reconstruct interrupted imports or expose authenticated remote resume. The user
+checkpoint remains a fixed earlier packaged build while this recovery work continues.

@@ -29,6 +29,33 @@ CREATE TABLE IF NOT EXISTS mesh_recovery_observation (
 ) STRICT;
 ";
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
+#[path = "sqlite_native_vfs.rs"]
+mod native_vfs;
+
+fn open_bound_connection(
+    filename: impl AsRef<Path>,
+    flags: OpenFlags,
+    namespace: &Path,
+) -> rusqlite::Result<Connection> {
+    #[cfg(target_os = "linux")]
+    if namespace
+        .as_os_str()
+        .as_encoded_bytes()
+        .starts_with(b"/proc/self/fd/")
+    {
+        native_vfs::register()?;
+        return Connection::open_with_flags_and_vfs(
+            filename,
+            flags | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            native_vfs::NAME,
+        );
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = namespace;
+    Connection::open_with_flags(filename, flags)
+}
+
 /// A live connection to one workspace's `metadata.sqlite`.
 #[derive(Debug)]
 pub struct Sqlite {
@@ -47,7 +74,8 @@ impl Sqlite {
     /// [`SqliteError`] when SQLite cannot open the supplied path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteError> {
         let path = path.as_ref().to_path_buf();
-        let connection = Connection::open(&path).map_err(SqliteError::driver)?;
+        let connection = open_bound_connection(&path, OpenFlags::default(), &path)
+            .map_err(SqliteError::driver)?;
         Ok(Self { path, connection })
     }
 
@@ -195,9 +223,10 @@ impl SqliteRecoveryState {
         let opened_path = canonical_database_path(path)?;
         let path = opened_path.as_path();
         refuse_database_family_aliases(path)?;
-        let connection = Connection::open_with_flags(
+        let connection = open_bound_connection(
             path,
             OpenFlags::default() | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            path,
         )
         .map_err(SqliteRecoveryStateError::driver)?;
         restrict_database_family_to_owner(path)?;
@@ -695,6 +724,57 @@ fn verify_recovery_pragmas(connection: &Connection) -> Result<(), SqliteRecovery
     Ok(())
 }
 
+// Native callers retain the directory object for the lifetime of these kernel references.
+// Resolving them back to an ordinary pathname would lose that binding (and macOS volfs does
+// not support ordinary component-by-component canonicalization). This recognizes only exact
+// kernel syntax and a live directory; it is not workspace or execution authorization.
+fn native_database_parent(parent: &Path) -> Result<bool, SqliteRecoveryStateError> {
+    #[cfg(target_os = "macos")]
+    if let Some(raw) = parent.to_str().and_then(|path| path.strip_prefix("/.vol/")) {
+        use std::os::unix::fs::MetadataExt as _;
+        if let Some((device, inode)) = raw.split_once('/') {
+            if let (Ok(device), Ok(inode)) = (device.parse::<u64>(), inode.parse::<u64>()) {
+                if raw == format!("{device}/{inode}") {
+                    let metadata = std::fs::symlink_metadata(parent)
+                        .map_err(|error| SqliteRecoveryStateError::new(error.to_string()))?;
+                    if metadata.is_dir()
+                        && !metadata.file_type().is_symlink()
+                        && metadata.dev() == device
+                        && metadata.ino() == inode
+                    {
+                        return Ok(true);
+                    }
+                    return Err(SqliteRecoveryStateError::new(
+                        "the native database directory reference changed",
+                    ));
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(raw) = parent
+        .to_str()
+        .and_then(|path| path.strip_prefix("/proc/self/fd/"))
+    {
+        let raw = raw.strip_suffix("/.").unwrap_or(raw);
+        if let Ok(descriptor) = raw.parse::<u32>() {
+            if descriptor.to_string() == raw {
+                let metadata = std::fs::metadata(parent)
+                    .map_err(|error| SqliteRecoveryStateError::new(error.to_string()))?;
+                if metadata.is_dir() {
+                    return Ok(true);
+                }
+                return Err(SqliteRecoveryStateError::new(
+                    "the native database reference is not a directory",
+                ));
+            }
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let _ = parent;
+    Ok(false)
+}
+
 fn canonical_database_path(path: &Path) -> Result<PathBuf, SqliteRecoveryStateError> {
     if path == Path::new(":memory:") {
         return Ok(path.to_path_buf());
@@ -706,8 +786,12 @@ fn canonical_database_path(path: &Path) -> Result<PathBuf, SqliteRecoveryStateEr
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let parent = std::fs::canonicalize(parent)
-        .map_err(|error| SqliteRecoveryStateError::new(error.to_string()))?;
+    let parent = if native_database_parent(parent)? {
+        parent.to_path_buf()
+    } else {
+        std::fs::canonicalize(parent)
+            .map_err(|error| SqliteRecoveryStateError::new(error.to_string()))?
+    };
     Ok(parent.join(file_name))
 }
 
@@ -717,7 +801,22 @@ fn refuse_database_path_alias(
 ) -> Result<(), SqliteRecoveryStateError> {
     let recovery_path = canonical_database_path(recovery_path)?;
     let legacy_index_path = canonical_database_path(legacy_index_path)?;
-    if recovery_path == legacy_index_path {
+    let mut same_file = recovery_path == legacy_index_path;
+    #[cfg(unix)]
+    if recovery_path.is_absolute()
+        && legacy_index_path.is_absolute()
+        && recovery_path.file_name() == legacy_index_path.file_name()
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let metadata = |path: &Path| {
+            std::fs::metadata(path.parent().expect("absolute database parent"))
+                .map_err(|error| SqliteRecoveryStateError::new(error.to_string()))
+        };
+        let left = metadata(&recovery_path)?;
+        let right = metadata(&legacy_index_path)?;
+        same_file |= (left.dev(), left.ino()) == (right.dev(), right.ino());
+    }
+    if same_file {
         return Err(SqliteRecoveryStateError::new(
             "the recovery database must be separate from the disposable index",
         ));
@@ -862,11 +961,12 @@ fn load_legacy_snapshot(
     if !path.exists() {
         return Ok(None);
     }
-    let connection = Connection::open_with_flags(
+    let connection = open_bound_connection(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        path,
     )
     .map_err(SqliteRecoveryStateError::driver)?;
     let table_exists = connection
@@ -932,12 +1032,13 @@ fn load_immutable_snapshot(
         ));
     }
     let uri = immutable_database_uri(path)?;
-    let connection = Connection::open_with_flags(
+    let connection = open_bound_connection(
         uri,
         OpenFlags::SQLITE_OPEN_READ_ONLY
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW
             | OpenFlags::SQLITE_OPEN_URI,
+        path,
     )
     .map_err(SqliteRecoveryStateError::driver)?;
     let primary_table_exists = connection
@@ -1470,5 +1571,140 @@ mod tests {
             .expect("winning bytes");
         assert_eq!(bytes, b"winning-row");
         let _ = fs::remove_dir_all(&root);
+    }
+}
+
+#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
+mod native_reference_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    struct Fixture {
+        root: PathBuf,
+        original: PathBuf,
+        reference: PathBuf,
+        _directory: std::fs::File,
+    }
+    impl Fixture {
+        fn new() -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "mesh-recovery-native-ref-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            let original = root.join("original");
+            std::fs::create_dir_all(&original).unwrap();
+            let directory = std::fs::File::open(&original).unwrap();
+            #[cfg(target_os = "macos")]
+            let reference = {
+                use std::os::unix::fs::MetadataExt as _;
+                let m = directory.metadata().unwrap();
+                PathBuf::from(format!("/.vol/{}/{}", m.dev(), m.ino()))
+            };
+            #[cfg(target_os = "linux")]
+            let reference = {
+                use std::os::fd::AsRawFd as _;
+                PathBuf::from(format!("/proc/self/fd/{}/.", directory.as_raw_fd()))
+            };
+            Self {
+                root,
+                original,
+                reference,
+                _directory: directory,
+            }
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+    #[test]
+    fn native_wal_connections_keep_original_directory_after_rename() {
+        let fixture = Fixture::new();
+        let database = fixture.reference.join("index.sqlite");
+        let first = Sqlite::open(&database).unwrap();
+        first.connection.execute_batch(
+            "PRAGMA journal_mode=WAL; CREATE TABLE retained(value INTEGER); INSERT INTO retained VALUES(1);"
+        ).unwrap();
+        let retained = fixture.root.join("retained");
+        std::fs::rename(&fixture.original, &retained).unwrap();
+        std::fs::create_dir(&fixture.original).unwrap();
+        let second = Sqlite::open(&database).unwrap();
+        second
+            .connection
+            .execute("INSERT INTO retained VALUES(2)", [])
+            .unwrap();
+        assert_eq!(
+            first
+                .connection
+                .query_row("SELECT sum(value) FROM retained", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        assert!(retained.join("index.sqlite-wal").is_file());
+        assert!(retained.join("index.sqlite-shm").is_file());
+        assert_eq!(std::fs::read_dir(&fixture.original).unwrap().count(), 0);
+        drop(second);
+        drop(first);
+        let reopened = Sqlite::open(&database).unwrap();
+        assert_eq!(
+            reopened
+                .connection
+                .query_row("SELECT count(*) FROM retained", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        drop(reopened);
+        assert_eq!(std::fs::read_dir(&fixture.original).unwrap().count(), 0);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn native_index_refuses_leaf_links_without_touching_target() {
+        let fixture = Fixture::new();
+        let target = fixture.root.join("unrelated.sqlite");
+        std::fs::write(&target, b"unrelated preserved bytes").unwrap();
+        let database = fixture.reference.join("index.sqlite");
+        std::os::unix::fs::symlink(&target, fixture.original.join("index.sqlite")).unwrap();
+        assert!(Sqlite::open(&database).is_err());
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"unrelated preserved bytes"
+        );
+    }
+
+    #[test]
+    fn native_recovery_database_keeps_its_directory_reference_after_rename() {
+        let fixture = Fixture::new();
+        let database = fixture.reference.join("recovery.sqlite");
+        let index = fixture.reference.join("index.sqlite");
+        assert_eq!(canonical_database_path(&database).unwrap(), database);
+        drop(SqliteRecoveryState::open_isolated(&database, &index, b"view").unwrap());
+        let retained = fixture.root.join("retained");
+        std::fs::rename(&fixture.original, &retained).unwrap();
+        std::fs::create_dir(&fixture.original).unwrap();
+        drop(SqliteRecoveryState::open_isolated(&database, &index, b"view").unwrap());
+        assert!(retained.join("recovery.sqlite").is_file());
+        assert_eq!(std::fs::read_dir(&fixture.original).unwrap().count(), 0);
+    }
+    #[test]
+    fn native_and_display_paths_cannot_alias_recovery_and_index_even_before_creation() {
+        let fixture = Fixture::new();
+        for (recovery, index) in [
+            (
+                fixture.reference.join("same.sqlite"),
+                fixture.original.join("same.sqlite"),
+            ),
+            (
+                fixture.original.join("same.sqlite"),
+                fixture.reference.join("same.sqlite"),
+            ),
+        ] {
+            assert!(SqliteRecoveryState::open_isolated(&recovery, &index, b"view").is_err());
+            assert!(!fixture.original.join("same.sqlite").exists());
+        }
     }
 }
