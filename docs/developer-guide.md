@@ -10,11 +10,19 @@ durable workspace state; clients use the local IPC protocol rather than opening 
 - Git
 - The Rust toolchain pinned in `rust-toolchain.toml`
 - Node.js 22.18 or newer (the locked Vite build and direct TypeScript tests require it)
-- `cargo-nextest`
+- `cargo-nextest` 0.9.145 or newer
 - The native Tauri prerequisites for your operating system
 
 On macOS, install Xcode command-line tools. On Linux, install the WebKitGTK and application-indicator
 development packages named in `.github/workflows/rust.yml`.
+
+The repository requires nextest 0.9.145 or newer. Earlier versions can report false handle leaks
+on macOS when concurrently started tests inherit sibling output pipes; see the
+[upstream fix](https://github.com/nextest-rs/nextest/pull/3553). Check the installed version with
+`cargo nextest --version` and the repository requirement with `cargo nextest show-config version`.
+Update with `cargo install cargo-nextest --locked --version 0.9.145`, or use a newer supported
+release. Do not bypass the version check or change leak thresholds to make a validation pass.
+The hosted workflow installs current nextest and reads the same repository configuration.
 
 ## Verify a checkout
 

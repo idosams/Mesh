@@ -34,6 +34,15 @@ fixed reviews and preserved dirty Git state. It did not launch a provider or app
 main. Real second-host recovery, successful second-provider acceptance, signed native approval,
 full dependency/fault acceptance and current end-to-end fleet measurements remain unfinished.
 
+## Test-runner reliability
+
+Validation requires nextest 0.9.145 or newer, including the upstream fix for sibling output-pipe
+inheritance on Apple platforms. An isolated 0.9.145 run on merged PR231 passed all 3,703 native
+tests without leak warnings; this supports using the corrected runner but does not establish that
+every historical warning had that cause. The broader [process-lifecycle investigation](https://github.com/idosams/Mesh/issues/172)
+and [capture-startup investigation](https://github.com/idosams/Mesh/issues/37) remain open. No
+leak threshold, test deadline, assertion or skip was changed. See the developer guide for setup.
+
 ## Historical source baseline — PR #120
 
 The combined implementation assessed here is `b08674d4f5ec963204984d2e09e6dacda884fd66`

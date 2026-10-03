@@ -1,3 +1,7 @@
+# 0.9.145 fixes inherited sibling capture pipes on Apple platforms (nextest PR #3553).
+# Keep leak detection and deadlines unchanged; older runners can report false handle leaks.
+nextest-version = "0.9.145"
+
 [[profile.default.overrides]]
 # This wall-clock boundary test intentionally sleeps across two checkpoint timers.
 # Reserve the complete nextest worker pool so unrelated CPU and I/O pressure cannot
