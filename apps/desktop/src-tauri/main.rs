@@ -1013,6 +1013,34 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn read_remote_fleet_observation(
+        app: tauri::AppHandle,
+        objective: String,
+        lane: String,
+        run: String,
+        assignment: String,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                panel.read_fleet(&objective, &lane, &run, &assignment, &host)
+            })
+            .await
+            .map_err(|_| "Remote observation stopped unexpectedly".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, objective, lane, run, assignment);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn read_remote_observation(
         app: tauri::AppHandle,
         id: String,
@@ -8215,6 +8243,7 @@ mod desktop {
                 remote_creation,
                 configure_remote_observation,
                 read_remote_observation,
+                read_remote_fleet_observation,
                 forget_remote_observation,
                 pick_folder,
                 attach_existing_project,

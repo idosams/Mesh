@@ -5274,3 +5274,25 @@ regression. The full canonical gate passed 3,769 Rust tests in 158.580s (1 slow,
 184 rendered tests, 642 desktop tests and all 44 real daemon demo checks. Baseline controller and
 rendered failures, the empty native filter and corrected pre-claim fixture failure are retained.
 Hosted PR validation and merge remain pending; the fixed user checkpoint is unchanged.
+
+
+## R117 — independent authenticated observations across remote lanes
+
+Continues [issue #250](https://github.com/idosams/Mesh/issues/250) on R116/PR #251 head
+`baf2cc6597d6b7cb9e77c1d244d3d1c4f543dfdf`. New canonical work; no preserved implementation is
+replaced. Native reads select the exact retained lane/run/assignment and one matching saved
+connection, preserving original file/directory bindings and rechecking settings and assignment
+after the authenticated exchange. Four bounded read permits and per-attempt exclusion leave the
+selected-worker panel independent. There is no launch, lease renewal, process adoption or capacity
+release. Existing wire signatures and persisted schemas are unchanged; the desktop command adds
+`mesh.remote-fleet-observation/v1`, carrying the existing signed execution projection.
+
+Visible-view polling retains dated observations per lane, bounds concurrent reads and per-lane
+frequency, drops replaced-attempt replies and refuses backward/contradictory execution history.
+Errors remain per lane without replacing saved reviews. Initial native and controller regressions
+pass; the rendered baseline failed as expected before card integration. Full validation passed:
+3,771 Rust tests in 159.009s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all
+44 real daemon demo checks. The focused native panel suite passed 24 tests, and controller tests
+passed 24. The incorrect initial library-target invocation is retained separately. Hosted checks
+and merge remain pending. Real signed packaged/second-host acceptance and all other phases
+remain required; the fixed user checkpoint is unchanged.

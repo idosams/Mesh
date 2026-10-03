@@ -200,3 +200,16 @@ test('remote lanes disclose retained assignment and never join local activity as
   module.exports.setLocale('he');
   try { assert.match(render(value), /סוכן מרוחק/); } finally { module.exports.setLocale('en'); }
 });
+
+
+test('each remote lane shows its own dated observation and retains it beside a refresh failure', () => {
+  const value = props(), lane = value.projection.fleets[0].lanes[0];
+  lane.run = { id: 'attempt-one', state: 'running', remote: { assignment: 'assignment-one', worker: 'e'.repeat(64), leaseSequence: '2', leaseUntil: '1000' } };
+  value.projection.remoteObservations = { 'fleet-one/lane-one': { run: 'attempt-one', assignment: 'assignment-one', worker: 'e'.repeat(64), busy: false, error: 'Remote observation unavailable. Last verified history is retained.', value: { observed: '1000', admitted: true, launchRecorded: true, recorded: { revision: '7', state: 'waiting' } } } };
+  const html = render(value);
+  assert.match(html, /Waiting for input or dependencies/);
+  assert.match(html, /1970-01-01T00:00:01.000Z/);
+  assert.match(html, /Remote observation unavailable/);
+  value.projection.remoteObservations['fleet-one/lane-one'].run = 'older-attempt';
+  assert.doesNotMatch(render(value), /Waiting for input or dependencies/);
+});

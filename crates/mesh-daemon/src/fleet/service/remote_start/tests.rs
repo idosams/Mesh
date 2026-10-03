@@ -500,6 +500,22 @@ fn fleet_snapshot_retains_remote_assignment_without_claiming_worker_observation(
             ),
         ]))
     );
+    let history = f
+        .directory
+        .history(&f.service.objective().unwrap())
+        .unwrap();
+    assert_eq!(
+        history
+            .remote_observation_assignment(&f.lane, "native-run")
+            .unwrap(),
+        assignment
+    );
+    assert!(history
+        .remote_observation_assignment(&f.lane, "another-run")
+        .is_err());
+    assert!(history
+        .remote_observation_assignment("another-lane", "native-run")
+        .is_err());
     assert_eq!(f.service.native_state().unwrap(), state);
     assert_eq!(state.lanes[&f.lane].runs.len(), 1);
 }

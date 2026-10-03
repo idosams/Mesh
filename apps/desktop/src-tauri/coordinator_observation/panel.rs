@@ -1,6 +1,7 @@
 //! Session-bound native selections for read-only graphical remote observations.
 use super::*;
 mod creation;
+mod fleet;
 mod profiles;
 mod receipts;
 mod recovery;
@@ -23,7 +24,7 @@ struct Selection {
     history: mesh_daemon::fleet::service::FleetHistory,
 }
 #[derive(Default)]
-pub(crate) struct RemotePanel(Mutex<Option<Selection>>, Mutex<setup::Draft>);
+pub(crate) struct RemotePanel(Mutex<Option<Selection>>, Mutex<setup::Draft>, fleet::Reads);
 fn eligible() -> Result<(), String> {
     AppleActorCustody::availability().map_err(|_| ELIGIBILITY.into())
 }
@@ -67,24 +68,29 @@ impl RemotePanel {
         eligible()?;
         let mut held = self.0.try_lock().map_err(|_| BUSY)?;
         let selected = held.as_mut().filter(|s| s.id == id).ok_or(UNAVAILABLE)?;
-        selected.verify()?;
-        let context = open_connection(&selected.config.connection)?;
+        selected.read(operation)
+    }
+}
+impl Selection {
+    fn read(&mut self, operation: RemoteObservationKind) -> Result<String, String> {
+        self.verify()?;
+        let context = open_connection(&self.config.connection)?;
         if context
             .installation
             .identity()
             .map_err(|_| UNAVAILABLE)?
             .worker()
-            != selected.coordinator
+            != self.coordinator
         {
             return Err(UNAVAILABLE.into());
         }
-        let observation = selected
+        let observation = self
             .history
             .prepare_remote_observation(
-                &selected.config.lane,
-                &selected.config.run,
-                selected.coordinator,
-                selected.config.connection.worker,
+                &self.config.lane,
+                &self.config.run,
+                self.coordinator,
+                self.config.connection.worker,
                 operation,
                 |payload| {
                     context.installation.identity().map_err(|_| UNAVAILABLE)?;
@@ -97,9 +103,9 @@ impl RemotePanel {
             .map_err(|_| UNAVAILABLE)?;
         // Retain the original file metadata admission across reads, not fresh replacement paths.
         let result = observation
-            .read_over_ssh(&selected.peer, Duration::from_secs(25))
+            .read_over_ssh(&self.peer, Duration::from_secs(25))
             .map_err(|_| UNAVAILABLE)?;
-        selected.verify()?;
+        self.verify()?;
         context.installation.identity().map_err(|_| UNAVAILABLE)?;
         if let RemoteObservationOutcome::Results(page) = &result {
             let mut offers = std::collections::BTreeMap::new();
@@ -118,12 +124,10 @@ impl RemotePanel {
                     }
                 }
             }
-            selected.offers = offers;
+            self.offers = offers;
         }
-        Ok(project(&selected.id, result).encode())
+        Ok(project(&self.id, result).encode())
     }
-}
-impl Selection {
     fn verify(&self) -> Result<(), String> {
         self.identity_file.verify()?;
         self.hosts_file.verify()?;
