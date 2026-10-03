@@ -7,7 +7,7 @@ use mesh_daemon::{
         service::RemoteNativeStartRequest,
         Limits, RemoteAssignment, RemoteInputTransferOutcome,
     },
-    project_attachment::AttachmentStorage,
+    project_attachment::{AttachmentStorage, RemoteStartRequest},
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 struct StartConfiguration {
@@ -99,7 +99,8 @@ fn validate_deadline(until: u64, now: u64) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
-    let selected = configuration(crate::worker_service::load_private_json(path)?)?;
+    let original = crate::worker_service::load_private_json(path)?;
+    let selected = configuration(original.clone())?;
     // Recovery does not need the original project, a usable lease, SSH access or a signing key.
     if inspect_only {
         let directory = NativeFleetDirectory::open(
@@ -118,6 +119,10 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
         .and_then(|d| u64::try_from(d.as_millis()).ok())
         .ok_or(UNAVAILABLE)?;
     validate_deadline(selected.lease_until_ms, now)?;
+    // Persist the exact request before catalogue allocation, signing or transport. A lost output
+    // cannot silently change peer, source, policy or deadline under the same idempotency key.
+    let storage = AttachmentStorage::open(&selected.storage).map_err(|_| UNAVAILABLE)?;
+    retain_configuration(&storage, &selected, &original)?;
     let NativeContext {
         installation,
         custody,
@@ -125,9 +130,7 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
         directory,
     } = open_context(&selected.connection)?;
     let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
-    let attachment = AttachmentStorage::open(&selected.storage)
-        .and_then(|s| s.reopen(&selected.project))
-        .map_err(|_| UNAVAILABLE)?;
+    let attachment = storage.reopen(&selected.project).map_err(|_| UNAVAILABLE)?;
     let protected = [
         &selected.storage,
         &selected.connection.installation,
@@ -182,6 +185,16 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
         ("disposition", Json::text(disposition)),
         ("correlation", receipt.correlation().clone()),
     ]))
+}
+fn retain_configuration(
+    storage: &AttachmentStorage,
+    selected: &StartConfiguration,
+    original: &Json,
+) -> Result<(), String> {
+    storage.retain_remote_start_request(&RemoteStartRequest {
+        request: selected.request.request.clone(),
+        value: original.clone(),
+    }).map_err(|_| "Original remote creation request could not be retained or differs from this retry; preserve it for reconciliation".into())
 }
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()

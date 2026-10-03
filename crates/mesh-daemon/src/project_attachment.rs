@@ -20,6 +20,8 @@ const MAX_RECEIPT_BYTES: u64 = 65_536;
 mod detachment;
 mod fleet_pins;
 mod remote_connections;
+mod remote_starts;
+pub use remote_starts::RemoteStartRequest;
 mod remote_fleet_pins;
 mod remote_inbox;
 pub use remote_connections::{RemoteConnectionSettings, RemoteConnectionSettingsState};

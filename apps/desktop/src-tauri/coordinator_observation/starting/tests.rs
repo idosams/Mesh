@@ -60,3 +60,37 @@ fn fixed_deadline_refuses_expired_or_overlong_without_refreshing_retry_authority
         assert!(validate_deadline(until, now).is_err());
     }
 }
+
+#[test]
+fn creation_inputs_are_retained_before_any_connection_and_cannot_change_on_retry() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let root = std::env::temp_dir().join(format!(
+        "mesh-start-config-retention-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&root).unwrap();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let storage = AttachmentStorage::open(&root).unwrap();
+    let original = value();
+    let selected = configuration(original.clone()).unwrap();
+    retain_configuration(&storage, &selected, &original).unwrap();
+    // None of the placeholder project, key or peer paths need exist for this private journal.
+    drop(storage);
+    let storage = AttachmentStorage::open(&root).unwrap();
+    assert_eq!(storage.remote_start_requests().unwrap()[0].value, original);
+    for field in ["lease_until_ms", "goal"] {
+        let Json::Object(mut fields) = original.clone() else {
+            unreachable!()
+        };
+        fields.iter_mut().find(|(k, _)| k == field).unwrap().1 = if field == "goal" {
+            Json::text("Different goal")
+        } else {
+            Json::Number(123456790)
+        };
+        let changed = Json::Object(fields);
+        let changed_selection = configuration(changed.clone()).unwrap();
+        assert!(retain_configuration(&storage, &changed_selection, &changed).is_err());
+    }
+    assert_eq!(storage.remote_start_requests().unwrap()[0].value, original);
+    std::fs::remove_dir_all(root).unwrap();
+}

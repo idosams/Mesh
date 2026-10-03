@@ -4416,3 +4416,28 @@ PR #216 retains its dependency at `a0007a7638eb853f666711c636f1816006adc545`. Bo
 updates preserved their tested implementation trees and start fresh CI. R86 integrates that stack
 with a tree identical to tested implementation `9c37676`; only this delivery record changes afterward.
 R83 combined-main and the new exact-head PR runs remain pending.
+
+## R87: retain original remote creation inputs before side effects
+
+New canonical work replacing no legacy commit, based on published R86 PR #217 at
+`d214e3454514e458c96f5697a9da10440d00b5d1`. Tracks fresh desktop start/recovery in
+[issue #218](https://github.com/idosams/Mesh/issues/218). The native attachment catalogue now
+retains immutable private creation inputs before allocation/custody/transport; the current native
+start command uses it. An exact repeat is idempotent, changed inputs refuse. Records bind physical
+catalogue identity, private bounded single-link files and the original 32-character creation key.
+Capacity is 64 within the existing 256-entry catalogue discovery bound. No deletion, migration,
+automatic retry, lease refresh or execution authority is introduced. Existing created inspection
+remains read-only. Graphical setup/recovery and app-owned catalogue integration remain next steps;
+all remaining fleet acceptance requirements remain open.
+
+Focused verification passed six tests (0.527 s), including restart, changed input refusal,
+partial/public/linked/copied/renamed/oversized records and capacity preserving exact replay.
+An unused import observed during that compile was removed before the full gate. The original
+focused process was preserved through completion. Full local and hosted validation pending.
+PR #215 exact CI and R83 combined-main passed; dependent #216/#217 runs remain active.
+
+R87 full local gate passed: 3,668 native tests (157.046 s, one slow, 17 skipped), 178 rendered
+checks, 625 desktop tests and all repository/docs/license/storage/real-daemon demo gates. No
+process-leak warning occurred; #37/#172 remain unresolved. Full log retained separately. R86
+PR #217 original hosted checks passed; R85 #216 macOS CI remains active. Hosted validation of
+this new increment and the complete graphical/remote acceptance remain required.
