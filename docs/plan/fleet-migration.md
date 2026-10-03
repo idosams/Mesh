@@ -4553,3 +4553,25 @@ Full `npm test` passed: 3,677 native tests (150.711 s, one slow, 17 skipped), 18
 checks, 632 desktop tests and repository/docs/license/storage/real-daemon demo gates.
 Publication and fresh hosted checks remain required. Native graphical reconciliation and
 complete initialization/provider/second-host recovery remain required.
+
+## R93 — explicit signed retained-input inspection
+
+New canonical implementation; no preserved source commit is replaced. Depends on merged R90/PR223
+and R91/PR224 and follows the R92 acceptance-map documentation. Adds status protocol v3 with
+distinct query/reply signing domains and closed `input_inspection` facts. The explicit native SSH
+request and resident worker endpoint verify original retained input before and after signing.
+Malformed ledger evidence refuses; missing receipts remain unrecorded uncertainty; changed or
+unavailable storage reports unavailable. None grants allocation, process ownership, retry, lease
+renewal or capacity release. No persisted format changes.
+
+v1/v2 encoding and ledger-only behavior remain unchanged. Old replies cannot satisfy a v3 request;
+old workers refuse the unsupported schema. Input verification is intentionally explicit because it
+reads the bounded complete input tree twice and can exceed the existing 30-second freshness window.
+Expiry remains a refusal, not a retry instruction. The worker reports the originally materialized
+input, not a later saved result or current provider liveness.
+
+Focused status and endpoint suite passed 45 tests in 6.261s. Initial compile and test-authoring
+failures are retained in delivery evidence. Full local `npm test` passed: 3,682 native tests in 152.638s (one slow, 17 skipped),
+desktop checks and all 44 daemon demonstration checks. Fresh hosted checks remain pending.
+Desktop presentation, signed packaged and real-host acceptance, interrupted initialization
+and uncertain launch reconciliation remain required.

@@ -94,7 +94,11 @@ impl<'a> NativeWorkerConnections<'a> {
         let envelope = crate::ipc::Json::parse(encoded).map_err(|_| refused())?;
         if matches!(
             envelope.get("schema").and_then(crate::ipc::Json::as_text),
-            Some("mesh.worker-status-query/v1" | "mesh.worker-status-query/v2")
+            Some(
+                "mesh.worker-status-query/v1"
+                    | "mesh.worker-status-query/v2"
+                    | "mesh.worker-status-query/v3"
+            )
         ) {
             let query = super::RemoteWorkerStatusQuery::decode(encoded)
                 .and_then(|q| q.verify(&self.policy))
@@ -104,7 +108,9 @@ impl<'a> NativeWorkerConnections<'a> {
                 query.objective(),
                 query.limits().clone(),
             )?;
-            let reply = query.reply(&registry, sign).map_err(|_| refused())?;
+            let reply = query
+                .reply_with_input_inspection(&registry, self.destination, sign)
+                .map_err(|_| refused())?;
             self.installation.verify()?;
             RemoteFrameWriter::new(&mut output).write_frame(&reply)?;
             return Ok(WorkerConnectionOutcome::StatusReplied);
