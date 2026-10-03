@@ -18,7 +18,23 @@ Creating independent lanes and starting a managed fleet are optional. Agents may
 child lanes and submit immutable results; they cannot approve protected Mesh main. Applying an
 accepted result to the original folder is a separate, explicitly confirmed native operation.
 
-## Implemented source coverage
+## Delivery and acceptance checkpoint — 3 October 2026
+
+Canonical delivery now includes [PR #223](https://github.com/idosams/Mesh/pull/223):
+remote input materialization records survive restart without granting replacement execution.
+[PR #224](https://github.com/idosams/Mesh/pull/224) adds read-only verification of those
+original files and physical identities; it is merged after all seven exact-head checks passed. Combined-main checks are running.
+The [dated acceptance map](plan/fleet-acceptance.md) distinguishes merged implementation,
+local tests, packaged evidence and the remaining full-plan journeys.
+
+Recent delivery also includes explicit desktop remote creation and downloaded-review access
+independent of live fleet status. The packaged existing-project journey recorded in
+[PR #221](https://github.com/idosams/Mesh/pull/221) passed at `6b82368`, including two
+fixed reviews and preserved dirty Git state. It did not launch a provider or approve protected
+main. Real second-host recovery, successful second-provider acceptance, signed native approval,
+full dependency/fault acceptance and current end-to-end fleet measurements remain unfinished.
+
+## Historical source baseline — PR #120
 
 The combined implementation assessed here is `b08674d4f5ec963204984d2e09e6dacda884fd66`
 ([PR #120](https://github.com/idosams/Mesh/pull/120)). Its source includes:

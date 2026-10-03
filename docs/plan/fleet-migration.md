@@ -3,7 +3,25 @@
 Canonical repository: **idosams/Mesh**. Mesh-internal is deprecated for development and remains
 historical evidence. The full [fleet objective](fleet-orchestration.md) is unchanged.
 
-## Current delivery checkpoint (2026-09-28)
+## Delivery checkpoint (2026-10-03)
+
+Canonical main is `b009f2761f3eb1d397b0902ffb2dd3fc43565b0a`, including
+[PR #224](https://github.com/idosams/Mesh/pull/224), merged at 15:28:15 UTC.
+Its head `1149a841902d42d5d924b33f3dc9fafd0746ecff` passed all seven
+[hosted checks](https://github.com/idosams/Mesh/actions/runs/37132831828) before normal merge.
+The preceding PR223 combined-main run passed; the new
+[combined-main run](https://github.com/idosams/Mesh/actions/runs/37133352356) is running.
+The [acceptance map](fleet-acceptance.md) records evidence and remaining requirements
+across the complete plan. This documentation increment adds no product behavior and replaces
+no preserved implementation commit; it preserves the older dated observations below.
+
+The original work, superseded heads and verification logs remain preserved. Ancestry-only
+reconciliations retained identical source trees and received fresh hosted checks. The earlier
+checkpoints below are historical observations, including then-pending runs and failure causes.
+Mesh-internal #1488 remains open: its latest observed failures concern legacy Linux system
+libraries and dependency policy. No check bypass or repository settings change was performed.
+
+## Historical delivery checkpoint (2026-09-28)
 
 Canonical main is verified through [PR #116](https://github.com/idosams/Mesh/pull/116) at
 `9c4f7ee97de427aa5d57320ae61d54b4e8f8e401`, merged at 18:36:32 UTC. PRs #71–#116
