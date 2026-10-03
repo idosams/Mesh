@@ -4962,3 +4962,41 @@ merged delivery remain pending.
 The coordinator SSH/native application action and desktop recovery controls remain required.
 Cancellation delivery during remote work, uncertain-execution reconciliation, the full fault campaign
 and packaged second-host acceptance remain open. The fixed user checkpoint is unchanged.
+
+## R106 — explicit native coordinator recovery action
+
+This canonical increment depends on published R105/PR238 at
+`7eeae97f52e684b7f0b531398f54dbbf8a9db8ad`; it replaces no preserved source commit.
+The parent exact-head run `37149462676` has six passing checks; macOS remains running.
+PR237 combined-main run `37149424198` passed all checks.
+
+The native `recover-original` coordinator command selects the original attempt from the existing
+closed private configuration and uses the admitted SSH destination plus eligible native signing
+custody. FleetHistory opens a separately guarded connection, releasing the service mutex before
+transport and signing so live views and cancellation continue. The wire client refreshes that
+connection around signatures and exchanges. No generic runtime escapes, dispatch retry, input
+resend, lease renewal, uncertain-capacity release or protected-main authority is added.
+
+Ten focused tests passed in 4.603 seconds, including service-lock availability during exchange and
+signing, unchanged history after disconnect and cancellation through the service during signing
+preventing request output. Two earlier failed fixture runs are retained: the initial tests used
+unguarded stores and correctly refused; the second still used the old call sites. Production
+authority checks were not relaxed. The complete local gate passed 3,744 native tests in
+160.137 seconds (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and 44
+real-daemon checks. Hosted validation and merged delivery remain pending.
+
+This is native source integration with configuration/output refusal tests, not real SSH, native
+signing success or packaged provider acceptance. Graphical recovery, uncertain-execution
+reconciliation and the full fleet acceptance campaign remain required. The fixed checkpoint is
+unchanged.
+
+R106 hosted correction: original run `37150128362` passed macOS and five checks overall,
+but Linux test/clippy compilation exposed a missing platform guard around the macOS-only
+SSH coordinator service. The module and export now use the same macOS boundary as existing
+SSH reconnect/start/observation services. Cross-platform wire and worker recovery remain
+available and tested on Linux; no test assertion or required check was weakened. Failed logs
+are retained. PR238 merged at `4bc99f27cbdb89ceb3afa109b6af543937546634`; R106 was
+reconciled with that main by a related-history merge with identical complete source tree before
+the two platform guards were added. The corrected full local gate passed 3,744 native tests in 160.379 seconds (one slow,
+17 skipped), 181 rendered checks, 634 desktop tests and 44 daemon checks. Hosted Linux
+verification and PR239 delivery remain pending.

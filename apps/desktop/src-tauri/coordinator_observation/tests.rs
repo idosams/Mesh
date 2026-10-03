@@ -40,7 +40,11 @@ fn coordinator_arguments_are_explicit_and_bounded() {
         parse(&args(&["--coordinator", "receive", "/private/config"])).unwrap(),
         Some((Action::Receive, PathBuf::from("/private/config")))
     );
-    for (name, expected) in [("start", Action::Start), ("created", Action::Created)] {
+    for (name, expected) in [
+        ("start", Action::Start),
+        ("created", Action::Created),
+        ("recover-original", Action::RecoverOriginal),
+    ] {
         assert_eq!(
             parse(&args(&["--coordinator", name, "/private/config"])).unwrap(),
             Some((expected, PathBuf::from("/private/config")))
@@ -52,6 +56,13 @@ fn coordinator_arguments_are_explicit_and_bounded() {
     for v in [
         vec!["--coordinator"],
         vec!["--coordinator", "launch", "/private/config"],
+        vec!["--coordinator", "recover-original", "relative"],
+        vec![
+            "--coordinator",
+            "recover-original",
+            "/private/config",
+            "retry",
+        ],
         vec!["--coordinator", "status", "relative"],
         vec!["--coordinator", "status", "/private/config", "0"],
         vec!["--coordinator", "results", "/private/config", "01"],
@@ -155,6 +166,7 @@ fn unsigned_coordinator_refuses_before_loading_config_or_opening_custody() {
         Action::Start,
         Action::Created,
         Action::ReconnectInput,
+        Action::RecoverOriginal,
     ] {
         assert_eq!(
             run(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
@@ -216,6 +228,7 @@ fn output_failure_retains_native_result_and_requires_explicit_reconciliation() {
         Action::Created,
         Action::Receive,
         Action::ReconnectInput,
+        Action::RecoverOriginal,
     ] {
         for fail_flush in [false, true] {
             let mut output = OutputSink {
@@ -249,6 +262,7 @@ fn direct_native_operation_retains_the_eligible_application_boundary() {
         Action::Created,
         Action::Receive,
         Action::ReconnectInput,
+        Action::RecoverOriginal,
     ] {
         assert_eq!(
             execute(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
