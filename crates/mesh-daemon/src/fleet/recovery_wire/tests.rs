@@ -365,4 +365,5 @@ fn missing_or_wrong_commit_preserves_acknowledged_input() {
     }
 }
 
+mod process_crash;
 mod signing_faults;
