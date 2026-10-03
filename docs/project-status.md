@@ -547,3 +547,10 @@ Native history derives an attached root version or exact reviewed parent checkpo
 contains only the current connection ID. Transfer retains the original assignment and never renews,
 adopts or creates another attempt. Lost worker reservations, missing parent/source history, complete
 remote launch/receipt UI and real signed-app/second-host acceptance remain unfinished.
+
+
+Remote result discovery now displays individual saved-result identities and explicit bounded previous/
+next pages. The non-empty-page cursor bug is fixed: the UI validates the returned next cursor against
+the requested cursor and row count. Private offer correlation stays native-only; no download, result
+receipt or acceptance is inferred from the list. Graphical result receipt and signed remote acceptance
+remain unfinished.

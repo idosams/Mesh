@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply, inputRecoveryReply } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
-const status = () => ({ schema: 'mesh.remote-panel-observation/v1', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
+const status = () => ({ schema: 'mesh.remote-panel-observation/v2', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
 class CustomEvent extends Event { constructor(type, options = {}) { super(type); this.detail = options.detail; } }
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(invoke) {
@@ -45,7 +45,7 @@ test('chooser cancellation preserves selection and forgetting clears displayed o
   h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).selection, null); assert.equal(h.projections.at(-1).status, null); h.dispose();
 });
 test('missing results are not presented as an empty verified history', () => {
-  const value = { schema: 'mesh.remote-panel-observation/v1', id, kind: 'results', available: false, revision: null, after: null, count: 0, has_more: false };
+  const value = { schema: 'mesh.remote-panel-observation/v2', id, kind: 'results', available: false, revision: null, after: null, count: 0, has_more: false, entries: [] };
   assert.equal(observationReply(value, id, 'results').available, false);
   assert.throws(() => observationReply({ ...value, count: 1 }, id, 'results'));
   assert.equal(observationReply({ ...value, available: true, revision: '0', after: 0 }, id, 'results').available, true);
@@ -155,4 +155,32 @@ test('successful recovery is displayed and forgetting clears its selection-bound
   h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'reconnect-input' }); await settle();
   assert.equal(h.projections.at(-1).recovery.disposition, 'input-retained');
   h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).recovery, null); h.dispose();
+});
+
+const resultEntry = n => ({ offer: n.toString(16).padStart(64, '0'), checkpoint: `checkpoint-${n}`, version: 'b'.repeat(64), review: 'c'.repeat(64), manifest: 'd'.repeat(64) });
+const resultPage = (before, revision) => { const count = Math.min(16, revision - before); return { schema: 'mesh.remote-panel-observation/v2', id, kind: 'results', available: true, revision: String(revision), after: before + count, count, has_more: before + count < revision, entries: Array.from({ length: count }, (_, i) => resultEntry(before + i + 1)) }; };
+test('nonempty first pages and later pages validate the returned cursor rather than expecting zero', () => {
+  const first = observationReply(resultPage(0, 17), id, 'results'); assert.equal(first.after, 16); assert.equal(first.count, 16);
+  const next = observationReply(resultPage(16, 17), id, 'results', 16); assert.equal(next.after, 17); assert.equal(next.entries[0].checkpoint, 'checkpoint-17'); assert.equal(next.hasMore, false);
+  assert.throws(() => observationReply(resultPage(16, 17), id, 'results', 0));
+  assert.throws(() => observationReply({ ...resultPage(0, 17), after: 0 }, id, 'results'));
+  assert.throws(() => observationReply({ ...resultPage(0, 17), entries: [] }, id, 'results'));
+  assert.throws(() => observationReply({ ...resultPage(0, 17), entries: Array(16).fill(resultEntry(1)) }, id, 'results'));
+  assert.throws(() => observationReply(resultPage(0, 4097), id, 'results'));
+  assert.equal(observationReply({ ...resultPage(0, 1), entries: [{ ...resultEntry(1), target: '/private' }] }, id, 'results').entries[0].target, undefined);
+});
+test('next and previous page reads use the verified cursor and keep a bounded current page', async () => {
+  const calls = [], h = harness(async (name, args) => { calls.push([name, args]); return name === 'pick_remote_observation' ? selected() : resultPage(args.after, 17); });
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'results-next' }); await settle(); assert.equal(calls.length, 1);
+  h.intent({ type: 'results', after: 800 }); await settle();
+  h.intent({ type: 'results-next', after: 800 }); await settle(); assert.equal(calls.at(-1)[1].after, 16); assert.equal(h.projections.at(-1).results.entries.length, 1);
+  h.intent({ type: 'results-next' }); await settle(); assert.equal(calls.length, 3);
+  h.intent({ type: 'results-previous', after: 800 }); await settle(); assert.equal(calls.at(-1)[1].after, 0); assert.equal(h.projections.at(-1).results.entries.length, 16); h.dispose();
+});
+test('invalid or regressed page preserves the previous verified results without retry', async () => {
+  let revision = 17, fail = false; const calls = [];
+  const h = harness(async (name, args) => { calls.push([name,args]); if (name === 'pick_remote_observation') return selected(); return fail ? { ...resultPage(args.after, revision), id: 'wrong' } : resultPage(args.after, revision); });
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'results' }); await settle();
+  fail = true; h.intent({ type: 'results-next' }); await settle(); assert.equal(h.projections.at(-1).results.after, 16); assert.ok(h.projections.at(-1).error); assert.equal(calls.length,3);
+  fail = false; revision = 16; h.intent({ type: 'results' }); await settle(); assert.equal(h.projections.at(-1).results.revision, '17'); assert.ok(h.projections.at(-1).error); h.dispose();
 });

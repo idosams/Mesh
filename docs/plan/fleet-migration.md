@@ -4249,3 +4249,21 @@ the real daemon demo. No process-leak warning occurred; #37/#172 remain open. Pu
 checks are pending. R79's original run 37120274025 and R78 combined-main run 37120248363 both passed.
 Real signed-app
 remote recovery and the complete remaining fleet plan are not established by fixture tests.
+
+
+## R81: bounded remote result pages and non-empty-page cursor fix
+
+R81 is new canonical work replacing no legacy commit, based on published R80 / PR #211 head
+`4f307e5f74343f8da180d9efb8ab7eb7357e5a30`. Original R80 and R79 combined-main checks remain active.
+The old controller expected a returned cursor of zero, incorrectly refusing valid non-empty result
+pages. The new bundled v2 observation validates returned cursor/request/count/revision relationships,
+limits rows to sixteen, rejects duplicate identities and revision rollback, and retains the previous
+verified page on failure. Native public summaries expose offer/checkpoint/version/review/manifest
+identities only. Explicit previous/next controls replace the current page; no content is downloaded.
+No persisted format changes or receipt/import authority are added.
+
+Twenty controller tests, 177 rendered/typecheck checks and fifteen focused native panel tests passed
+(3.481 s). The full local gate passed, including the signed-offer summary regression: 3,648 native tests
+(152.481 s, one slow, 17 skipped), 177 rendered tests, 621 desktop tests, repository/docs/license/storage
+checks and the real daemon demo. No process-leak warning occurred; #37/#172 remain open. Hosted
+delivery is pending. Real signed-app/SSH/second-host acceptance and graphical receipt remain unfinished.

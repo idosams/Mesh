@@ -1,3 +1,4 @@
+import { RemoteResults, type RemoteResultPage } from "./remote-result-page";
 import { RemoteConnectionProfiles, type RemoteProfiles } from "./remote-connection-profiles";
 import { RemoteConnectionSetup, type RemoteSetupDraft, type RemoteSetupFleet, type RemoteSetupPreset } from "./remote-connection-setup";
 import { useEffect, useState } from "react";
@@ -6,7 +7,7 @@ import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
 type Projection = { recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
-  results: null | { available: boolean; count: number; revision: string | null; hasMore: boolean } };
+  results: RemoteResultPage | null };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
 const timestamp = (value: string, fallback: string) => { const date = new Date(Number(value)); return Number.isFinite(date.getTime()) ? date.toISOString() : fallback; };
 const send = (type: string) => document.dispatchEvent(new CustomEvent("mesh:remote-observation-intent", { detail: { type } }));
@@ -44,7 +45,7 @@ export function RemoteObservationView({ projection: p, fleets = [] }: { projecti
         <p>{t("Observed at")}: <bdi dir="ltr">{timestamp(p.status.observed, t("Observation time unavailable"))}</bdi></p>
         {p.status.leaseUntil && <p>{t("Lease ends at")}: <bdi dir="ltr">{timestamp(p.status.leaseUntil, t("Observation time unavailable"))}</bdi></p>}
       </div>}
-      {p.results && <div className="text-sm" role="status">{!p.results.available ? t("Saved result history is unavailable for this assignment.") : <><p>{t("Saved result offers in this page")}: {p.results.count}</p><p>{t("Result discovery does not download or accept the work. Use the existing result recovery flow to receive it.")}</p>{p.results.hasMore && <p>{t("More saved results exist beyond this first page.")}</p>}</>}</div>}
+      {p.results && <RemoteResults page={p.results} disabled={disabled} />}
     </div>
   </details>;
 }

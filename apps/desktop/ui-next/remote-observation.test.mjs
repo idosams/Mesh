@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { RemoteObservationView } from "./src/organisms/remote-observation.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports = { setLocale, render: projection => renderToStaticMarkup(React.createElement(RemoteObservationView, { projection })) };`, resolveDir: new URL('.', import.meta.url).pathname }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
 const module = { exports: {} }; Function('require', 'module', 'exports', output.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
-const projection = () => ({ selection: { id: 'opaque', host: '<script>host</script>', worker: 'worker', objective: 'fleet', lane: 'lane', run: 'run' }, busy: false, available: true, error: '', status: { observed: '1000', admitted: true, launchRecorded: true, leaseUntil: '18446744073709551615' }, results: { available: true, count: 0, revision: '0', hasMore: true } });
+const projection = () => ({ selection: { id: 'opaque', host: '<script>host</script>', worker: 'worker', objective: 'fleet', lane: 'lane', run: 'run' }, busy: false, available: true, error: '', status: { observed: '1000', admitted: true, launchRecorded: true, leaseUntil: '18446744073709551615' }, results: { available: true, count: 0, revision: '0', hasMore: true, before: 0, after: 0, entries: [] } });
 test('worker panel escapes identities and distinguishes retained launch records from running agents', () => {
   const html = module.exports.render(projection());
   assert.match(html, /&lt;script&gt;host&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>/);
@@ -50,4 +50,14 @@ test('explicit input recovery distinguishes input acceptance from an agent runni
   const html = module.exports.render(p);
   assert.match(html, /Resume saved input transfer/); assert.match(html, /must still retain its reservation/);
   assert.match(html, /does not establish that an agent is running/);
+});
+
+test('remote result page exposes separate identities, escapes labels and bounds navigation', () => {
+  const p = projection(); p.results = { available: true, count: 1, revision: '17', hasMore: false, before: 16, after: 17, entries: [{ offer: 'offer', checkpoint: '<script>x</script>', version: 'version', review: 'review', manifest: 'manifest' }] };
+  const html = module.exports.render(p);
+  assert.match(html, /Saved result<!-- --> 17|Saved result 17/);
+  assert.match(html, /&lt;script&gt;x&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /have not been downloaded or accepted/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Next results<\/button>/);
+  assert.match(html, /<bdi dir="ltr">version<\/bdi>/);
 });
