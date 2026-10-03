@@ -5253,3 +5253,24 @@ acceptance. The full fleet plan, second provider/host, matched harness baseline,
 resource and human coordination measurements remain required. This documentation-only
 increment uses the actual acceptance run plus documentation checks; it does not claim a new
 full repository gate or a statistically repeatable speed improvement.
+
+
+## R116 — retain remote assignment identity in the fleet overview
+
+First source increment for [issue #250](https://github.com/idosams/Mesh/issues/250), based on
+R114's published reconciled head `56fd1784928734b4a3436798bef4fb84706d1662` (PR #248).
+New canonical implementation; no preserved source commit is replaced. The existing native
+catalogue adds nullable remote assignment metadata to its current run projection. Exact u64
+lease values cross the renderer boundary as decimal strings. Persisted formats and execution
+commands are unchanged; legacy replies omitting the field remain readable.
+
+Controller and rendered baseline regressions failed because assignment metadata was dropped and
+matching local activity could be shown for a remote lane. Cards now retain the original native
+identities and disclose that remote execution is not observed by this view. Read-only snapshots
+of a real persisted assignment must retain execution state and its single original attempt.
+Independent signed multi-lane observations, packaged proof and the full plan remain unfinished.
+Validation passed: 20 controller tests, 14 rendered fleet tests and the native persisted-assignment
+regression. The full canonical gate passed 3,769 Rust tests in 158.580s (1 slow, 17 skipped),
+184 rendered tests, 642 desktop tests and all 44 real daemon demo checks. Baseline controller and
+rendered failures, the empty native filter and corrected pre-claim fixture failure are retained.
+Hosted PR validation and merge remain pending; the fixed user checkpoint is unchanged.

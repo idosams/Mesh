@@ -499,3 +499,16 @@ a saved record or missing acknowledgment is not permission to start another agen
 Native recovery can verify whether an acknowledged remote input still occupies its recorded
 allocation with its original contents. This read-only check does not resume an agent or authorize
 a replacement attempt. Graphical worker-restart reconciliation remains unfinished.
+
+
+### Remote lanes in the fleet overview
+
+A lane with a retained remote assignment is labeled **Remote worker · last coordinator record**.
+Its saved coordinator state is separate from a fresh worker observation. The details retain the
+original assignment, worker identity and exact recorded lease values. A deadline does not prove
+that execution stopped. Local activity is never presented as evidence for that remote lane.
+
+Use the configured remote connection's **Read recorded execution** action for its authenticated
+historical observation. Independent automatic observations for all remote lanes are still being
+implemented; this overview does not yet provide them. Existing saved reviews stay independently
+pinned while the fleet catalogue refreshes.
