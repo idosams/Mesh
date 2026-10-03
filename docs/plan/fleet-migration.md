@@ -4254,7 +4254,10 @@ remote recovery and the complete remaining fleet plan are not established by fix
 ## R81: bounded remote result pages and non-empty-page cursor fix
 
 R81 is new canonical work replacing no legacy commit, based on published R80 / PR #211 head
-`4f307e5f74343f8da180d9efb8ab7eb7357e5a30`. Original R80 and R79 combined-main checks remain active.
+`4f307e5f74343f8da180d9efb8ab7eb7357e5a30`. R80 run 37120867263 passed all seven checks and
+merged as `df8e609a3adab251b876fa3c8e00d21ea208cde0`. R79 combined-main run 37120839893 passed.
+R81 integrates the R80 main merge with a content-identical implementation tree to tested `e67ed4f`;
+only this delivery record changes afterward. R80 combined-main and R81 hosted checks remain pending.
 The old controller expected a returned cursor of zero, incorrectly refusing valid non-empty result
 pages. The new bundled v2 observation validates returned cursor/request/count/revision relationships,
 limits rows to sixteen, rejects duplicate identities and revision rollback, and retains the previous
