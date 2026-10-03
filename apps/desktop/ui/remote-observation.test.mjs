@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startRemoteObservation, selectionReply, observationReply } from './remote-observation.js';
+import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
 const status = () => ({ schema: 'mesh.remote-panel-observation/v1', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
@@ -54,4 +54,42 @@ test('unrecognized actions never dispatch authority-bearing operations', async (
   let calls = 0; const h = harness(async () => { calls++; return selected(); });
   for (const type of ['start', 'receive', 'reconnect-input', 'status']) h.intent({ type });
   await settle(); assert.equal(calls, 0); h.dispose(); h.intent({ type: 'choose' }); await settle(); assert.equal(calls, 0);
+});
+
+const draft = (overrides = {}) => ({ schema: 'mesh.remote-setup-draft/v1', id: 'd'.repeat(64), installation: true, identity: true, hosts: true, ...overrides });
+const form = () => ({ host: 'worker.example', account: 'mesh', port: '22', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
+test('setup accepts only public form fields and strips renderer-authored paths', () => {
+  const input = setupInput({ ...form(), identity: '/forged', fleets: '/forged' });
+  assert.equal(input.port, 22); assert.equal(input.identity, undefined); assert.equal(input.fleets, undefined);
+  for (const port of ['0', '022', '65536', '1e3', '-1']) assert.throws(() => setupInput({ ...form(), port }));
+  assert.throws(() => draftReply({ ...draft(), identity: '/forged' }));
+});
+test('native picker tokens bind configuration and cancelled picker retains draft', async () => {
+  const calls = []; let cancelled = false;
+  const h = harness(async (name, args) => { calls.push([name, args]); return name === 'pick_remote_setup_file' ? cancelled ? null : draft() : selected(); });
+  h.intent({ type: 'pick-setup', part: 'identity', path: '/forged' }); await settle();
+  assert.deepEqual(calls[0], ['pick_remote_setup_file', { draft: '', part: 'identity' }]);
+  cancelled = true; h.intent({ type: 'pick-setup', part: 'hosts' }); await settle();
+  assert.equal(h.projections.at(-1).draft.id, 'd'.repeat(64));
+  h.intent({ type: 'configure', input: { ...form(), identity: '/forged' } }); await settle();
+  assert.equal(calls.at(-1)[0], 'configure_remote_observation');
+  assert.equal(calls.at(-1)[1].draft, 'd'.repeat(64));
+  assert.equal(JSON.parse(calls.at(-1)[1].input).identity, undefined);
+  assert.equal(h.projections.at(-1).selection.id, id); h.dispose();
+});
+test('incomplete drafts cannot configure and clearing setup does not forget active selection', async () => {
+  const calls = [], h = harness(async name => { calls.push(name); return name === 'pick_remote_observation' ? selected() : draft({ installation: false, identity: false, hosts: false }); });
+  h.intent({ type: 'configure', input: form() }); await settle(); assert.equal(calls.length, 0);
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'clear-setup' }); await settle();
+  assert.equal(h.projections.at(-1).selection.id, id); assert.equal(h.projections.at(-1).draft.identity, false);
+  h.intent({ type: 'configure', input: form() }); await settle(); assert.equal(calls.includes('configure_remote_observation'), false); h.dispose();
+});
+test('refused setup preserves the active connection and suppresses duplicate configuration', async () => {
+  let reject; const calls = [];
+  const h = harness(async name => { calls.push(name); if (name === 'pick_remote_observation') return selected(); if (name === 'pick_remote_setup_file') return draft(); return new Promise((_, failure) => { reject = failure; }); });
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'pick-setup', part: 'identity' }); await settle();
+  h.intent({ type: 'configure', input: form() }); await settle(); h.intent({ type: 'configure', input: form() });
+  reject(new Error('changed file')); await settle();
+  assert.equal(calls.filter(name => name === 'configure_remote_observation').length, 1);
+  assert.equal(h.projections.at(-1).selection.id, id); assert.ok(h.projections.at(-1).error); h.dispose();
 });

@@ -27,3 +27,11 @@ test('Hebrew panel translates controls while retaining literal worker identities
     assert.match(html, /<bdi dir="ltr">worker<\/bdi>/);
   } finally { module.exports.setLocale('en'); }
 });
+
+test('connection setup offers native selectors and disables use until complete without credential path fields', () => {
+  const html = module.exports.render(projection());
+  for (const label of ['Choose coordinator identity folder', 'Choose private SSH identity', 'Choose trusted hosts file', 'Clear selected setup files']) assert.ok(html.includes(label));
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Use these connection settings<\/button>/);
+  assert.match(html, /Settings apply to this session only/);
+  assert.doesNotMatch(html, /type="file"|type="password"/);
+});

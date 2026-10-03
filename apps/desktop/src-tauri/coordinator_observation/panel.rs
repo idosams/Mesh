@@ -1,5 +1,6 @@
 //! Session-bound native selections for read-only graphical remote observations.
 use super::*;
+pub(crate) mod setup;
 use ring::rand::{SecureRandom as _, SystemRandom};
 use std::sync::Mutex;
 const BUSY: &str = "Another remote observation is in progress";
@@ -14,7 +15,7 @@ struct Selection {
     history: mesh_daemon::fleet::service::FleetHistory,
 }
 #[derive(Default)]
-pub(crate) struct RemotePanel(Mutex<Option<Selection>>);
+pub(crate) struct RemotePanel(Mutex<Option<Selection>>, Mutex<setup::Draft>);
 fn eligible() -> Result<(), String> {
     AppleActorCustody::availability().map_err(|_| ELIGIBILITY.into())
 }
@@ -38,32 +39,7 @@ impl RemotePanel {
         eligible()?;
         let mut held = self.0.try_lock().map_err(|_| BUSY)?;
         let config = config(crate::worker_service::load_private_json(path)?)?;
-        let installation = ProtectedWorkspaceRoot::inspect(&config.connection.installation)
-            .map_err(|_| UNAVAILABLE)?;
-        let fleets =
-            ProtectedWorkspaceRoot::inspect(&config.connection.fleets).map_err(|_| UNAVAILABLE)?;
-        let history =
-            host.configured_remote_history(&config.connection.fleets, &config.objective)?;
-        let context = open_connection(&config.connection)?;
-        let coordinator = context
-            .installation
-            .identity()
-            .map_err(|_| UNAVAILABLE)?
-            .worker();
-        let mut bytes = [0; 32];
-        SystemRandom::new()
-            .fill(&mut bytes)
-            .map_err(|_| UNAVAILABLE)?;
-        let selection = Selection {
-            id: bytes.iter().map(|b| format!("{b:02x}")).collect(),
-            config,
-            peer: context.peer,
-            installation,
-            fleets,
-            coordinator,
-            history,
-        };
-        selection.verify()?;
+        let selection = admit_selection(config, host)?;
         let result = selection.render().encode();
         *held = Some(selection);
         Ok(result)
@@ -209,6 +185,39 @@ fn project(id: &str, result: RemoteObservationOutcome) -> Json {
     }
     Json::object(fields)
 }
+
+fn admit_selection(
+    config: Configuration,
+    host: &crate::attachment_host::AttachmentHost,
+) -> Result<Selection, String> {
+    let installation = ProtectedWorkspaceRoot::inspect(&config.connection.installation)
+        .map_err(|_| UNAVAILABLE)?;
+    let fleets =
+        ProtectedWorkspaceRoot::inspect(&config.connection.fleets).map_err(|_| UNAVAILABLE)?;
+    let history = host.configured_remote_history(&config.connection.fleets, &config.objective)?;
+    let context = open_connection(&config.connection)?;
+    let coordinator = context
+        .installation
+        .identity()
+        .map_err(|_| UNAVAILABLE)?
+        .worker();
+    let mut bytes = [0; 32];
+    SystemRandom::new()
+        .fill(&mut bytes)
+        .map_err(|_| UNAVAILABLE)?;
+    let selection = Selection {
+        id: bytes.iter().map(|b| format!("{b:02x}")).collect(),
+        config,
+        peer: context.peer,
+        installation,
+        fleets,
+        coordinator,
+        history,
+    };
+    selection.verify()?;
+    Ok(selection)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

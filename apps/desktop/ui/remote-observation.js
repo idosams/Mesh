@@ -10,6 +10,16 @@ export function selectionReply(raw) {
     && ['host', 'objective', 'lane', 'run'].every(key => name(value[key])));
   return Object.freeze({ id: value.id, host: value.host, worker: value.worker, objective: value.objective, lane: value.lane, run: value.run });
 }
+export function draftReply(raw) {
+  const value = parse(raw);
+  require(value?.schema === 'mesh.remote-setup-draft/v1' && hex(value.id) && ['installation', 'identity', 'hosts'].every(key => typeof value[key] === 'boolean'));
+  return Object.freeze({ id: value.id, installation: value.installation, identity: value.identity, hosts: value.hosts });
+}
+export function setupInput(value) {
+  require(value && ['host', 'account', 'objective', 'lane', 'run'].every(key => name(value[key])) && value.account.length <= 64 && hex(value.worker)
+    && /^(0|[1-9][0-9]{0,4})$/.test(value.port) && Number(value.port) >= 1 && Number(value.port) <= 65535);
+  return { host: value.host, account: value.account, port: Number(value.port), worker: value.worker, objective: value.objective, lane: value.lane, run: value.run };
+}
 export function observationReply(raw, id, kind) {
   const value = parse(raw);
   require(value?.schema === 'mesh.remote-panel-observation/v1' && value.id === id && value.kind === kind);
@@ -24,15 +34,27 @@ export function observationReply(raw, id, kind) {
   return { kind, available: value.available, count: value.count, revision: value.revision, hasMore: value.has_more };
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
+  let draft = null;
   let selection = null, status = null, results = null, busy = false, error = '', disposed = false;
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
+  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['choose', 'status', 'results', 'forget'].includes(type) || (type !== 'choose' && !selection)) return;
+    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget'].includes(type) || (['status', 'results', 'forget'].includes(type) && !selection)) return;
+    if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
+    if (type === 'configure' && !(draft?.installation && draft?.identity && draft?.hosts)) return;
     busy = true; error = ''; publish();
     try {
-      if (type === 'choose') {
+      if (type === 'clear-setup') {
+        draft = draftReply(await invoke('clear_remote_setup'));
+      } else if (type === 'pick-setup') {
+        const raw = await invoke('pick_remote_setup_file', { draft: draft?.id ?? '', part: event.detail.part });
+        if (raw !== null) draft = draftReply(raw);
+      } else if (type === 'configure') {
+        const input = setupInput(event.detail.input);
+        selection = selectionReply(await invoke('configure_remote_observation', { draft: draft.id, input: JSON.stringify(input) }));
+        status = null; results = null;
+      } else if (type === 'choose') {
         const raw = await invoke('pick_remote_observation');
         if (raw !== null) { selection = selectionReply(raw); status = null; results = null; }
       } else if (type === 'forget') {

@@ -812,6 +812,84 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn pick_remote_setup_file(
+        app: tauri::AppHandle,
+        draft: String,
+        part: String,
+    ) -> Result<Option<String>, String> {
+        #[cfg(target_os = "macos")]
+        {
+            use crate::coordinator_observation::panel::{setup::Part, RemotePanel};
+            let panel = app.state::<Arc<RemotePanel>>().inner().clone();
+            panel.available()?;
+            let part = Part::parse(&part)?;
+            let dialog = app.dialog().file();
+            let selected = if part.is_directory() {
+                dialog
+                    .set_title("Choose coordinator identity folder")
+                    .blocking_pick_folder()
+            } else {
+                dialog
+                    .set_title("Choose existing private connection file")
+                    .blocking_pick_file()
+            };
+            let Some(file) = selected else {
+                return Ok(None);
+            };
+            let path = file
+                .into_path()
+                .map_err(|_| "The selected native file is unavailable")?;
+            tauri::async_runtime::spawn_blocking(move || panel.pick_setup(&draft, part, &path))
+                .await
+                .map_err(|_| "Connection setup stopped unexpectedly".to_owned())?
+                .map(Some)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, draft, part);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
+    async fn clear_remote_setup(app: tauri::AppHandle) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            app.state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .clear_setup()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = app;
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
+    async fn configure_remote_observation(
+        app: tauri::AppHandle,
+        draft: String,
+        input: String,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || panel.configure(&draft, &input, &host))
+                .await
+                .map_err(|_| "Connection setup stopped unexpectedly".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, draft, input);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn read_remote_observation(
         app: tauri::AppHandle,
         id: String,
@@ -8005,6 +8083,9 @@ mod desktop {
             })
             .invoke_handler(tauri::generate_handler![
                 pick_remote_observation,
+                pick_remote_setup_file,
+                clear_remote_setup,
+                configure_remote_observation,
                 read_remote_observation,
                 forget_remote_observation,
                 pick_folder,
