@@ -98,7 +98,7 @@ pub use remote_input::{
 #[cfg(unix)]
 pub use remote_materialization::{
     ReceivedResultWorkspace, ReceivedWorkerWorkspace, RemoteInputAllocation,
-    RemoteInputDestination, RemoteResultAllocation, RemoteResultInbox,
+    RemoteInputDestination, RemoteReceiptIntent, RemoteResultAllocation, RemoteResultInbox,
 };
 #[cfg(unix)]
 mod remote_peer;

@@ -2,6 +2,9 @@
 use super::*;
 use crate::ipc::Json;
 
+mod intents;
+pub use intents::RemoteReceiptIntent;
+
 const NAME: &str = "remote-results";
 const RECEIPT: &str = "inbox.json";
 
