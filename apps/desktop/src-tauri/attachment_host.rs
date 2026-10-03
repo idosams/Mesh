@@ -318,6 +318,28 @@ impl AttachmentHost {
         action(held.as_ref())
     }
 
+    // A native chooser configuration can select retained history only inside this app's catalogue.
+    // Return the existing owner handle instead of opening competing storage from a UI command.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn configured_remote_history(
+        &self,
+        path: &Path,
+        objective: &str,
+    ) -> Result<mesh_daemon::fleet::service::FleetHistory, String> {
+        if path != self.fleet_path {
+            return Err(
+                "The connection configuration must reference this Mesh application's fleet storage"
+                    .into(),
+            );
+        }
+        self.with_fleets(false, |directory| {
+            directory
+                .ok_or("Fleet history is unavailable")?
+                .history(objective)
+                .map_err(|_| "Fleet history is unavailable".into())
+        })
+    }
+
     #[cfg(not(target_os = "macos"))]
     pub fn current_fleet(
         &self,
@@ -1412,6 +1434,16 @@ mod tests {
         );
         let objective = format!("fleet-{}", "a".repeat(64));
         assert!(host.remote_fleet_reviews(&objective, 0, None).is_err());
+        #[cfg(target_os = "macos")]
+        {
+            assert!(host
+                .configured_remote_history(&root.join("fleets"), &objective)
+                .is_err());
+            assert!(host
+                .configured_remote_history(&root.join("foreign"), &objective)
+                .is_err());
+        }
+
         assert!(host
             .remote_fleet_review(&objective, &"b".repeat(64), &"c".repeat(64))
             .is_err());
@@ -2453,6 +2485,21 @@ mod tests {
             allocated
         );
         let receipt = Json::parse(&allocated).unwrap();
+        assert!(
+            host.configured_remote_history(
+                &root.join("fleets"),
+                receipt.get("objective").unwrap().as_text().unwrap()
+            )
+            .is_ok(),
+            "remote reads must reuse the live catalogue owner"
+        );
+        assert!(host
+            .configured_remote_history(
+                &root.join("other-fleets"),
+                receipt.get("objective").unwrap().as_text().unwrap()
+            )
+            .is_err());
+
         assert_eq!(
             receipt.get("schema"),
             Some(&Json::text(if policy.is_some() {

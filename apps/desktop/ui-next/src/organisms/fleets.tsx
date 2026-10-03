@@ -1,3 +1,4 @@
+import { RemoteObservation } from "./remote-observation";
 import { RemoteReviewPanels, RemoteSavedResults, type RemoteReviewPin, type RemoteReviewQueue, type RemoteProjectWorkflow } from "./remote-fleet-reviews";
 import { useEffect, useState } from "react";
 import { useTranslation } from "../lib/localization";
@@ -46,6 +47,7 @@ export function Fleets({ projects, histories, sourceError }: { projects: Source[
   return <section aria-label={t("Agent fleets")} data-mesh-proof="agent-fleets" className="grid gap-4 rounded-lg border border-border p-4">
     <div><h3 className="text-xl font-semibold">{t("Agent fleets")}</h3>
       <p className="text-sm text-muted-foreground">{t("Optional agents work in independent lanes created from a saved version. Keep using your original project and harness as usual.")}</p></div>
+    <RemoteObservation />
     <details><summary className="cursor-pointer font-medium">{t("Provision a fleet from saved work")}</summary>
       <div className="mt-3 grid gap-3">
         <label className="grid gap-1 text-sm">{t("Project")}<select dir="ltr" className="min-h-11 rounded border bg-background p-2" value={input.id} disabled={formDisabled} onChange={event => setInput({ id: event.target.value, version: "" })}>

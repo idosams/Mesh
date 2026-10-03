@@ -525,3 +525,9 @@ its receiving reservation. Full source validation passed: 3,620 native tests, 17
 599 desktop tests and 44 daemon-demo checks. One background-capture test reported a process-leak
 warning; issue #172 remains unresolved. This is not general lost-worker recovery or real
 SSH/second-host acceptance.
+
+The graphical fleet surface includes a session-only native configuration picker and explicit remote
+status/result-discovery reads for the application's retained fleet history. Public target labels and
+bounded observations are displayed without exposing credential paths or adopting a worker. This is
+not an editable persistent connection profile, remote launch/receive/reconnect UI, live process proof
+or packaged second-host acceptance. See the developer guide and latest migration-ledger increment.

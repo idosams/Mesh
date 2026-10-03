@@ -1,4 +1,5 @@
 //! Explicit native coordinator commands; no renderer or worker supplies configuration.
+pub(crate) mod panel;
 mod receiving;
 mod reconnecting;
 mod starting;
@@ -289,7 +290,12 @@ struct NativeContext {
     peer: NativeSshDestination,
     directory: NativeFleetDirectory,
 }
-fn open_context(config: &ConnectionConfiguration) -> Result<NativeContext, String> {
+struct NativeConnection {
+    installation: NativeWorkerInstallation,
+    custody: AppleActorCustody,
+    peer: NativeSshDestination,
+}
+fn open_connection(config: &ConnectionConfiguration) -> Result<NativeConnection, String> {
     let expected =
         ProtectedWorkspaceRoot::inspect(&config.installation).map_err(|_| UNAVAILABLE)?;
     let (installation, custody) =
@@ -305,6 +311,18 @@ fn open_context(config: &ConnectionConfiguration) -> Result<NativeContext, Strin
         &config.known_hosts,
     )
     .map_err(|_| UNAVAILABLE)?;
+    Ok(NativeConnection {
+        installation,
+        custody,
+        peer,
+    })
+}
+fn open_context(config: &ConnectionConfiguration) -> Result<NativeContext, String> {
+    let NativeConnection {
+        installation,
+        custody,
+        peer,
+    } = open_connection(config)?;
     let directory = NativeFleetDirectory::open(
         &config.fleets,
         TrustedReviewers::default(),
