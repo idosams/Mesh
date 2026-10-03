@@ -738,3 +738,13 @@ fresh coordinator/worker authentication and pre/post-signing verification. Routi
 queries remain ledger-only. Inspection never resumes work, adopts a process or authorizes retry.
 The SSH helper and resident worker route are connected; desktop controls and actual signed
 packaged/second-host acceptance remain unfinished. See the [acceptance map](plan/fleet-acceptance.md).
+
+### Explicit desktop original-input inspection (source increment)
+
+The worker panel now exposes **Inspect original input** separately from routine status and transfer
+resume. Native service preparation signs the exact v3 request, releases the fleet lock for the
+exchange and revalidates the attempt before projecting the result. English/Hebrew UI presents
+verified, unavailable or unrecorded input with its observation time. Old facts remain dated on
+failure; changing the selected connection clears them. No launch or retry authority is added.
+Native CLI `--coordinator inspect-input` uses the same route. The full local gate passed; fresh
+hosted validation and signed packaged/real-host acceptance remain required for this increment.

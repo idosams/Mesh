@@ -167,3 +167,78 @@ fn native_identity_and_cursor_refusals_happen_before_signing() {
             .is_err());
     }
 }
+
+#[test]
+fn explicit_input_inspection_releases_lock_and_revalidates_the_original_attempt() {
+    use crate::fleet::receiving_session::tests::Setup;
+    for change in [false, true] {
+        let setup = Setup::new();
+        let f = &setup.f;
+        let h = history(f);
+        let before = h.0.native_state().unwrap();
+        let read = h
+            .prepare_remote_observation(
+                "lane",
+                "run",
+                public(&f.coordinator),
+                public(&f.worker),
+                RemoteObservationKind::InputInspection,
+                |p| sign(&f.coordinator, p),
+            )
+            .unwrap();
+        let result = read.exchange(|frame| {
+            assert!(h.0.inner.try_lock().is_ok());
+            let RemoteFrame::Control(bytes) = frame else {
+                panic!("control")
+            };
+            let policy = RemoteDispatchPolicy {
+                coordinator: public(&f.coordinator),
+                worker: public(&f.worker),
+                provider: "codex",
+                maximum: crate::fleet::Limits {
+                    lanes: 2,
+                    concurrency: 1,
+                    depth: 1,
+                    retries: 1,
+                },
+                max_lease_ms: 60_000,
+            };
+            let reply = RemoteWorkerStatusQuery::decode(std::str::from_utf8(&bytes).unwrap())
+                .unwrap()
+                .verify(&policy)
+                .unwrap()
+                .reply_with_input_inspection(&f.registry(), &setup.destination, |p| {
+                    sign(&f.worker, p)
+                })
+                .unwrap();
+            if change {
+                h.0.native_command(
+                    "changed-during-inspection",
+                    Command::Observe {
+                        lane: "lane".into(),
+                        run: "run".into(),
+                        state: RunState::Running,
+                    },
+                )
+                .unwrap();
+            }
+            Ok(reply)
+        });
+        if change {
+            assert!(result.is_err());
+        } else {
+            let RemoteObservationOutcome::InputInspection(receipt) = result.unwrap() else {
+                panic!("inspection")
+            };
+            assert_eq!(receipt.input_inspection(), Some("unrecorded"));
+            assert_eq!(h.0.native_state().unwrap(), before);
+        }
+        assert_eq!(h.0.native_state().unwrap().lanes["lane"].runs.len(), 1);
+        assert_eq!(
+            std::fs::read_dir(f.path.join("allocations"))
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+}
