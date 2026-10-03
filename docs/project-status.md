@@ -824,3 +824,12 @@ replacement. Conflicting work, replaced directories, another initializer and exi
 refuse intact. This does not adopt an uncertain process or release capacity. R102 records validation.
 Dedicated broker recovery authentication/routing (including renewed assignments), desktop controls
 and real-host fault acceptance remain unfinished; the fixed user checkpoint does not include this.
+
+### Renewed-lease recovery authentication (in validation)
+
+A distinct native recovery proof binds original admission and directory identities to the current
+worker lease. Coordinator signing rechecks cancellation and the selected work after the signer
+returns; worker recovery rechecks proof expiry and exact lease throughout initialization. This is
+connected to native recovery, but broker/supervisor/desktop routing and real second-host acceptance
+remain unfinished. R103 in the delivery ledger tracks tests and publication; this is not included in
+the fixed user checkpoint.

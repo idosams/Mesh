@@ -11,6 +11,24 @@ impl RemoteAdmissionRegistry {
         reviewers: TrustedReviewers,
         checkpoint: CheckpointRuntimeParameters,
     ) -> Result<ReceivedWorkerWorkspace, Error> {
+        self.recover_initialization_guarded(
+            destination,
+            admission,
+            reviewers,
+            checkpoint,
+            || Ok(()),
+        )
+    }
+
+    fn recover_initialization_guarded(
+        &self,
+        destination: &RemoteInputDestination,
+        admission: &RemoteAdmissionReceipt,
+        reviewers: TrustedReviewers,
+        checkpoint: CheckpointRuntimeParameters,
+        authorize: impl Fn() -> Result<(), Error>,
+    ) -> Result<ReceivedWorkerWorkspace, Error> {
+        authorize()?;
         // An ordinary path-opened ledger cannot promote a historical receipt into mutable authority.
         let _guarded = self.store.reopen_guarded_connection()?;
         let materialization = self
@@ -18,6 +36,7 @@ impl RemoteAdmissionRegistry {
             .filter(|receipt| receipt.admission() == admission)
             .ok_or(Error::Refused("remote-recovery-materialization-missing"))?;
         let check = || -> Result<(), Error> {
+            authorize()?;
             let now = super::super::service::received_clock()
                 .map_err(|_| Error::Refused("remote-recovery-clock"))?;
             let lease = self.effective_lease(admission)?;
@@ -49,3 +68,6 @@ impl RemoteAdmissionRegistry {
         Ok(workspace)
     }
 }
+
+mod authentication;
+pub use authentication::{RemoteRecoveryChallenge, RemoteRecoveryProof};
