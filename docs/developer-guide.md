@@ -849,3 +849,20 @@ public result rows and validates the returned cursor (the cursor after those row
 cursor). Old projection shapes are refused by the paired renderer. This is session IPC only; saved
 connection and fleet persistence formats are unchanged. Pages replace each other rather than growing
 an unbounded list. Discovery never downloads result content or authorizes import.
+
+
+### Saved input for native result receipt
+
+`FleetHistory::saved_remote_input` resolves an exact recorded remote attempt's original project
+version or complete reviewed parent checkpoint independently of whether that attempt is still
+running, cancelled, expired or superseded. `prepare_saved_remote_input` exports those immutable
+bytes from independently admitted native history, compares both version and manifest against the
+original assignment, then rereads the assignment and selector before returning. Missing/substituted
+project handles, missing bindings or mismatched manifests refuse without repairing history.
+
+This read/export grants no transport, execution or approval authority. The existing graphical
+reconnect uses it only after its stricter latest/claimed/launching/initial-lease checks, and transport
+still rechecks cancellation and the original assignment. The separate receipt lookup is groundwork
+for graphical result receiving; native receiving destination/intent management and download controls
+remain unfinished. Existing explicit CLI receipt and its independent authenticated ingestion checks
+are unchanged. No persisted format changes are introduced.

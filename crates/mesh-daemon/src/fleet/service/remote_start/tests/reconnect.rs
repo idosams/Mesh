@@ -134,6 +134,28 @@ fn native_input_reconnect_survives_coordinator_restart_without_adoption_or_new_a
         assert!(history
             .retained_remote_input(&lane, "replacement-run")
             .is_err());
+        let project_id = before.lanes[&lane].source_project.as_ref().unwrap();
+        let restored_project = AttachmentStorage::open(&root.join("metadata"))
+            .unwrap()
+            .reopen(project_id)
+            .unwrap();
+        assert!(history
+            .prepare_saved_remote_input(&lane, "native-run", None)
+            .is_err());
+        let restored_source = history
+            .prepare_saved_remote_input(&lane, "native-run", Some(&restored_project))
+            .unwrap();
+        assert_eq!(
+            restored_source.manifest().input(),
+            source.manifest().input()
+        );
+        assert_eq!(
+            restored_source.manifest().bundle(),
+            source.manifest().bundle()
+        );
+        // Continue the actual interrupted transport using the newly reconstructed immutable source.
+        let source = restored_source;
+
         let wrong_worker = public(&SigningKey::from_bytes(&[70; 32]));
         assert!(history
             .reconnect_remote_input(
@@ -383,5 +405,66 @@ fn native_history_reconnect_refuses_stale_or_conflicting_retained_authority_befo
             "{kind}"
         );
         assert_eq!(f.service.native_state().unwrap(), before, "{kind}");
+    }
+}
+
+#[test]
+fn saved_input_export_checks_original_manifest_and_project_without_reviving_cancelled_work() {
+    for wrong_bundle in [false, true] {
+        let f = Fixture::new();
+        f.service
+            .native_command(
+                "dispatch-input-fixture",
+                Command::Dispatch {
+                    lane: f.lane.clone(),
+                    run: "native-run".into(),
+                },
+            )
+            .unwrap();
+        let mut assignment = f.request().assignment;
+        assignment.lease_until_ms = 1;
+        if wrong_bundle {
+            assignment.bundle = RecordDigest::from_bytes([82; 32]);
+        }
+        f.service
+            .native_command(
+                "claim-input-fixture",
+                Command::ClaimRemoteLaunch {
+                    lane: f.lane.clone(),
+                    run: "native-run".into(),
+                    assignment,
+                },
+            )
+            .unwrap();
+        f.service
+            .native_command("cancel-input-fixture", Command::Cancel)
+            .unwrap();
+        fs::write(f.root.join("original/work.txt"), b"later mutable work").unwrap();
+        let history = f
+            .directory
+            .history(&f.service.objective().unwrap())
+            .unwrap();
+        let before = f.service.native_state().unwrap();
+        assert!(history
+            .retained_remote_input(&f.lane, "native-run")
+            .is_err());
+        let other = Fixture::new();
+        assert!(history
+            .prepare_saved_remote_input(&f.lane, "native-run", Some(&other.attachment))
+            .is_err());
+        let prepared =
+            history.prepare_saved_remote_input(&f.lane, "native-run", Some(&f.attachment));
+        if wrong_bundle {
+            assert!(prepared.is_err());
+        } else {
+            let source = prepared.unwrap();
+            assert_eq!(source.manifest().input(), f.source.manifest().input());
+            assert_eq!(source.manifest().bundle(), f.source.manifest().bundle());
+        }
+        assert_eq!(f.service.native_state().unwrap(), before);
+        assert_eq!(
+            fs::read(f.root.join("original/work.txt")).unwrap(),
+            b"later mutable work"
+        );
     }
 }

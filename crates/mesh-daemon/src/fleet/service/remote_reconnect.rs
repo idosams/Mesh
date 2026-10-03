@@ -48,6 +48,23 @@ fn retained_input(
     if state.cancelled || assignment.input != lane.base || assignment.lease_sequence != 1 {
         return Err(unavailable());
     }
+    saved_input(state, &lane.id, run)
+}
+fn saved_input(
+    state: &super::super::State,
+    lane: &str,
+    run: &str,
+) -> io::Result<RetainedRemoteInput> {
+    let lane = state.lanes.get(lane).ok_or_else(unavailable)?;
+    let attempt = lane
+        .runs
+        .iter()
+        .find(|r| r.id == run)
+        .ok_or_else(unavailable)?;
+    let assignment = attempt.remote.as_ref().ok_or_else(unavailable)?;
+    if assignment.input != lane.base {
+        return Err(unavailable());
+    }
     if let Some(parent) = &lane.parent {
         let (id, checkpoint) = state
             .checkpoints
@@ -93,6 +110,62 @@ impl FleetHistory {
             lane,
             run,
         )
+    }
+
+    /// Resolve the exact immutable source for a recorded remote result, including completed,
+    /// cancelled or superseded attempts. This read grants no reconnect or execution permission.
+    pub fn saved_remote_input(&self, lane: &str, run: &str) -> io::Result<RetainedRemoteInput> {
+        saved_input(
+            &self.0.native_state().map_err(|_| unavailable())?,
+            lane,
+            run,
+        )
+    }
+
+    /// Export and verify the saved input against the original recorded assignment. Project handles
+    /// are independently admitted by native code; absent, substituted or mismatched history refuses.
+    /// Mutable working bytes, execution ownership and lease renewal are never used.
+    pub fn prepare_saved_remote_input(
+        &self,
+        lane: &str,
+        run: &str,
+        project: Option<&crate::project_attachment::ProvisionedAttachment>,
+    ) -> io::Result<RemoteInputSource> {
+        let state = self.0.native_state().map_err(|_| unavailable())?;
+        let selection = saved_input(&state, lane, run)?;
+        let original = state
+            .lanes
+            .get(lane)
+            .and_then(|lane| lane.runs.iter().find(|r| r.id == run))
+            .and_then(|run| run.remote.as_ref())
+            .ok_or_else(unavailable)?;
+        let source = match &selection {
+            RetainedRemoteInput::Project {
+                project: id,
+                version,
+            } => {
+                let project = project.filter(|p| p.id() == id).ok_or_else(unavailable)?;
+                project.prepare_remote_input(version)?
+            }
+            RetainedRemoteInput::Review(review) => self
+                .prepare_remote_review_input(review)
+                .map_err(|_| unavailable())?,
+        };
+        let after = self.0.native_state().map_err(|_| unavailable())?;
+        let assignment = after
+            .lanes
+            .get(lane)
+            .and_then(|lane| lane.runs.iter().find(|r| r.id == run))
+            .and_then(|run| run.remote.as_ref())
+            .ok_or_else(unavailable)?;
+        if saved_input(&after, lane, run)? != selection
+            || assignment != original
+            || source.manifest().input() != assignment.input
+            || source.manifest().bundle() != assignment.bundle
+        {
+            return Err(unavailable());
+        }
+        Ok(source)
     }
 
     /// Reconnect only a claimed, still-launching initial-lease input transfer. The existing peer
@@ -218,6 +291,47 @@ mod tests {
                 _ => lane.base = RecordDigest::from_bytes([3; 32]),
             }
             assert!(retained_input(&state, "lane", "run").is_err());
+        }
+    }
+    #[test]
+    fn result_source_survives_completion_cancellation_and_newer_attempt_without_reconnect() {
+        let original = state();
+        let expected = saved_input(&original, "lane", "run").unwrap();
+        for phase in [RunState::Succeeded, RunState::Failed, RunState::Cancelled] {
+            let mut state = original.clone();
+            state.cancelled = true;
+            let lane = state.lanes.get_mut("lane").unwrap();
+            lane.runs[0].state = phase;
+            lane.runs[0].remote.as_mut().unwrap().lease_sequence = 3;
+            lane.runs.push(Run {
+                id: "newer".into(),
+                state: RunState::Launching,
+                launch_owner: None,
+                remote: None,
+            });
+            assert_eq!(saved_input(&state, "lane", "run").unwrap(), expected);
+            assert!(retained_input(&state, "lane", "run").is_err());
+            assert!(saved_input(&state, "lane", "newer").is_err());
+            assert!(saved_input(&state, "lane", "unknown").is_err());
+        }
+    }
+    #[test]
+    fn result_source_never_infers_missing_binding_or_accepts_another_assignment_input() {
+        for change in 0..4 {
+            let mut state = state();
+            let lane = state.lanes.get_mut("lane").unwrap();
+            match change {
+                0 => lane.workspace = None,
+                1 => lane.source_project = None,
+                2 => {
+                    lane.workspace.as_mut().unwrap().source_version =
+                        RecordDigest::from_bytes([8; 32])
+                }
+                _ => {
+                    lane.runs[0].remote.as_mut().unwrap().input = RecordDigest::from_bytes([8; 32])
+                }
+            }
+            assert!(saved_input(&state, "lane", "run").is_err());
         }
     }
     #[test]

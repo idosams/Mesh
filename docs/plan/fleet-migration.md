@@ -4257,7 +4257,9 @@ R81 is new canonical work replacing no legacy commit, based on published R80 / P
 `4f307e5f74343f8da180d9efb8ab7eb7357e5a30`. R80 run 37120867263 passed all seven checks and
 merged as `df8e609a3adab251b876fa3c8e00d21ea208cde0`. R79 combined-main run 37120839893 passed.
 R81 integrates the R80 main merge with a content-identical implementation tree to tested `e67ed4f`;
-only this delivery record changes afterward. R80 combined-main and R81 hosted checks remain pending.
+only this delivery record changes afterward. R80 combined-main run `37121395516` passed.
+R81 PR #212 passed all seven exact-head checks (run `37121419464`) and merged ordinarily
+at `01b6e04b34bcf6ccf0bfa9c31dec6f89630101aa`; combined-main verification is pending.
 The old controller expected a returned cursor of zero, incorrectly refusing valid non-empty result
 pages. The new bundled v2 observation validates returned cursor/request/count/revision relationships,
 limits rows to sixteen, rejects duplicate identities and revision rollback, and retains the previous
@@ -4270,3 +4272,28 @@ Twenty controller tests, 177 rendered/typecheck checks and fifteen focused nativ
 (152.481 s, one slow, 17 skipped), 177 rendered tests, 621 desktop tests, repository/docs/license/storage
 checks and the real daemon demo. No process-leak warning occurred; #37/#172 remain open. Hosted
 delivery is pending. Real signed-app/SSH/second-host acceptance and graphical receipt remain unfinished.
+
+
+## R82: exact saved-input preparation for result receipt
+
+R82 is new canonical work replacing no legacy commit, based on published R81 / PR #212 head
+`d14683b4482bc10b1754000eccb34b708144ad62`. PR #212 is now merged after all seven checks passed,
+and R80 combined-main passed. R82 integrates canonical main `01b6e04b34bcf6ccf0bfa9c31dec6f89630101aa`
+with a content-identical implementation tree to tested `6924348`; only delivery documentation
+changes afterward. R81 combined-main and R82 hosted delivery remain pending.
+Historical result input lookup now supports exact recorded completed/cancelled/superseded attempts,
+without weakening reconnect's latest/claimed/launching/initial-lease rules. Native preparation
+exports the original attached version or exact reviewed parent source, validates both input version
+and manifest against the assignment, and rereads the selector/assignment before returning. The
+reconnect panel consumes this verified source rather than independently rebuilding it. No new
+transport, execution authority, renderer paths, persisted format or automatic adoption is added.
+
+Eight focused native tests passed (2.301 s), including actual coordinator restart/interrupted-transfer
+continuation using a newly reconstructed immutable source after the original project changed. Added
+combined-gate coverage checks substituted projects, cancelled/expired work and wrong assignment
+manifests without mutating history or working files. Full local validation passed: 3,651 native
+tests (155.722 s, one slow, 17 skipped), 177 rendered tests, 621 desktop tests, repository/docs/license/
+storage checks and the real daemon demo. No process-leak warning occurred; #37/#172 remain open.
+Hosted delivery is pending.
+Graphical receipt destination/intent management and download controls remain required, along with
+all remaining fleet acceptance. The fixed user checkpoint is unchanged.

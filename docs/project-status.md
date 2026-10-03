@@ -554,3 +554,10 @@ next pages. The non-empty-page cursor bug is fixed: the UI validates the returne
 the requested cursor and row count. Private offer correlation stays native-only; no download, result
 receipt or acceptance is inferred from the list. Graphical result receipt and signed remote acceptance
 remain unfinished.
+
+
+Native saved-input reconstruction now separates historical result lookup from reconnect eligibility.
+It verifies an exact recorded assignment's input version and manifest against native saved history,
+including after cancellation or newer attempts, without recreating execution authority. Reconnect
+keeps its stricter eligibility checks. Graphical receipt storage/intents and download controls remain
+unfinished; this native preparation is not evidence of a completed remote receipt journey.
