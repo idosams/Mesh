@@ -64,6 +64,8 @@ type BeforeWorkspaceCommitHook = Box<dyn FnOnce()>;
 thread_local! {
     static BEFORE_SNAPSHOT_ENTRY_OPEN: std::cell::RefCell<Option<SnapshotEntryHook>> =
         std::cell::RefCell::new(None);
+    static BEFORE_PREPARED_COPY: std::cell::RefCell<Option<BeforeWorkspaceIngestHook>> =
+        std::cell::RefCell::new(None);
     static BEFORE_WORKSPACE_INGEST: std::cell::RefCell<Option<BeforeWorkspaceIngestHook>> =
         std::cell::RefCell::new(None);
     static BEFORE_WORKSPACE_COMMIT: std::cell::RefCell<Option<BeforeWorkspaceCommitHook>> =
@@ -364,6 +366,43 @@ pub(crate) fn preview_open_workspace_import(
     Ok(snapshot.summary)
 }
 
+/// Received allocations retain every partial import for purpose-specific native recovery.
+/// Ordinary user imports keep their existing rollback contract.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImportPurpose {
+    User,
+    Received,
+}
+impl ImportPurpose {
+    fn failed_copy<'a>(
+        self,
+        problem: FolderImportError,
+        destination: &Path,
+        identity: DirectoryIdentity,
+        markers: impl IntoIterator<Item = &'a PathBuf>,
+    ) -> FolderImportError {
+        match self {
+            Self::Received => problem,
+            Self::User => cleanup_or(problem, destination, identity, markers),
+        }
+    }
+    fn failed_store<'a>(
+        self,
+        problem: FolderImportError,
+        storage_root: &Path,
+        identity: DirectoryIdentity,
+        destination: &Path,
+        markers: impl IntoIterator<Item = &'a PathBuf>,
+    ) -> FolderImportError {
+        match self {
+            Self::Received => problem,
+            Self::User => {
+                cleanup_presented_prepare_or(problem, storage_root, identity, destination, markers)
+            }
+        }
+    }
+}
+
 /// A verified managed copy waiting for the user to confirm its exact summary.
 #[derive(Debug)]
 pub struct PreparedFolderImport {
@@ -379,6 +418,7 @@ pub struct PreparedFolderImport {
     snapshot: Snapshot,
     source_private_fence: bool,
     active: bool,
+    purpose: ImportPurpose,
 }
 
 impl PreparedFolderImport {
@@ -391,7 +431,7 @@ impl PreparedFolderImport {
     /// The source is never opened for writing. Any failure after destination creation attempts to
     /// remove only the marker-owned destination.
     pub fn prepare(source: &Path, destination: &Path) -> Result<Self, FolderImportError> {
-        Self::prepare_inner(source, destination, None, false, None, false)
+        Self::prepare_inner(source, destination, None, false, None, ImportPurpose::User)
     }
 
     /// Copy one existing folder into the `mounts/` child of a new external private store.
@@ -403,7 +443,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, &[], None, false)
+        Self::prepare_presented_inner(source, storage_root, false, &[], None, ImportPurpose::User)
     }
 
     /// Copy into a new presented store only when its pinned parent remains outside every exact
@@ -413,7 +453,14 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, false, protected, None, false)
+        Self::prepare_presented_inner(
+            source,
+            storage_root,
+            false,
+            protected,
+            None,
+            ImportPurpose::User,
+        )
     }
 
     /// Copy only the user content of an exact zero-history workspace into a presented folder.
@@ -421,7 +468,7 @@ impl PreparedFolderImport {
         source: &Path,
         storage_root: &Path,
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, &[], None, false)
+        Self::prepare_presented_inner(source, storage_root, true, &[], None, ImportPurpose::User)
     }
 
     /// Copy an admitted zero-history workspace while keeping the new store outside every exact
@@ -431,7 +478,14 @@ impl PreparedFolderImport {
         storage_root: &Path,
         protected: &[ProtectedWorkspaceRoot],
     ) -> Result<Self, FolderImportError> {
-        Self::prepare_presented_inner(source, storage_root, true, protected, None, false)
+        Self::prepare_presented_inner(
+            source,
+            storage_root,
+            true,
+            protected,
+            None,
+            ImportPurpose::User,
+        )
     }
 
     /// Require the native caller's retained destination parent before creating any entry.
@@ -447,12 +501,13 @@ impl PreparedFolderImport {
             false,
             protected,
             expected_parent,
-            false,
+            ImportPurpose::User,
         )
     }
 
     /// Native received baselines may be empty: their complete manifest is checked after ingestion.
-    /// Ordinary user imports retain the existing no-importable-entries refusal.
+    /// Errors and dropped handles preserve partial files, journal and markers for native recovery.
+    /// Ordinary user imports retain their rollback and no-importable-entries behavior.
     pub(crate) fn prepare_received_with_parent(
         source: &Path,
         storage_root: &Path,
@@ -465,7 +520,7 @@ impl PreparedFolderImport {
             false,
             protected,
             Some(expected_parent),
-            true,
+            ImportPurpose::Received,
         )
     }
 
@@ -475,7 +530,7 @@ impl PreparedFolderImport {
         source_private_fence: bool,
         protected: &[ProtectedWorkspaceRoot],
         expected_parent: Option<ProtectedWorkspaceRoot>,
-        allow_empty: bool,
+        purpose: ImportPurpose,
     ) -> Result<Self, FolderImportError> {
         let source = validated_source(source)?;
         let storage_root = absolute_destination(storage_root)?;
@@ -545,11 +600,11 @@ impl PreparedFolderImport {
             fs::Permissions::from_mode(0o600),
         ) {
             let problem = FolderImportError::io("create marker", &marker, error);
-            return Err(cleanup_or(problem, &storage_root, identity, [&marker]));
+            return Err(purpose.failed_copy(problem, &storage_root, identity, [&marker]));
         }
         if let Err(error) = pinned_parent.sync() {
             let problem = FolderImportError::io("sync_dir", &parent, error);
-            return Err(cleanup_or(problem, &storage_root, identity, [&marker]));
+            return Err(purpose.failed_copy(problem, &storage_root, identity, [&marker]));
         }
         let presented = PresentedStore {
             root: storage_root.clone(),
@@ -562,16 +617,12 @@ impl PreparedFolderImport {
             Some(presented),
             source_private_fence,
             Some(pinned_store),
-            allow_empty,
+            purpose,
         ) {
             Ok(prepared) => Ok(prepared),
-            Err(problem) => Err(cleanup_presented_prepare_or(
-                problem,
-                &storage_root,
-                identity,
-                &destination,
-                [&marker],
-            )),
+            Err(problem) => {
+                Err(purpose.failed_store(problem, &storage_root, identity, &destination, [&marker]))
+            }
         }
     }
 
@@ -581,7 +632,7 @@ impl PreparedFolderImport {
         presented_store: Option<PresentedStore>,
         source_private_fence: bool,
         pinned_parent: Option<PinnedWorkspaceRoot>,
-        allow_empty: bool,
+        purpose: ImportPurpose,
     ) -> Result<Self, FolderImportError> {
         let source = validated_source(source)?;
         let source_identity = directory_identity(&source)?;
@@ -615,7 +666,7 @@ impl PreparedFolderImport {
         }
 
         let before = import_snapshot_for_layout(&source, source_private_fence)?;
-        if !allow_empty {
+        if purpose == ImportPurpose::User {
             require_import_entries(&source, &before)?;
         }
         if presented_store.is_none() {
@@ -647,7 +698,9 @@ impl PreparedFolderImport {
             match destination_parent_pinned.create_child_directory(destination_name) {
                 Ok(root) => root,
                 Err(error) => {
-                    let _ = parent_filesystem.remove_file(&markers.claim);
+                    if purpose == ImportPurpose::User {
+                        let _ = parent_filesystem.remove_file(&markers.claim);
+                    }
                     return Err(FolderImportError::io("create_dir", &destination, error));
                 }
             };
@@ -661,7 +714,7 @@ impl PreparedFolderImport {
             fs::Permissions::from_mode(0o600),
         ) {
             let problem = FolderImportError::io("create marker", &markers.owned, error);
-            return Err(cleanup_or(
+            return Err(purpose.failed_copy(
                 problem,
                 &destination,
                 destination_identity,
@@ -669,7 +722,7 @@ impl PreparedFolderImport {
             ));
         }
         if let Err(error) = parent_filesystem.remove_file(&markers.claim) {
-            return Err(cleanup_or(
+            return Err(purpose.failed_copy(
                 FolderImportError::io("remove_file", &markers.claim, error),
                 &destination,
                 destination_identity,
@@ -677,6 +730,12 @@ impl PreparedFolderImport {
             ));
         }
 
+        #[cfg(test)]
+        BEFORE_PREPARED_COPY.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
         if let Err(problem) = copy_snapshot_with_destination_root(
             &source,
             source_identity,
@@ -685,7 +744,7 @@ impl PreparedFolderImport {
             &destination_pinned,
             &before,
         ) {
-            return Err(cleanup_or(
+            return Err(purpose.failed_copy(
                 problem,
                 &destination,
                 destination_identity,
@@ -695,7 +754,7 @@ impl PreparedFolderImport {
         let after_source = match import_snapshot_for_layout(&source, source_private_fence) {
             Ok(value) => value,
             Err(problem) => {
-                return Err(cleanup_or(
+                return Err(purpose.failed_copy(
                     problem,
                     &destination,
                     destination_identity,
@@ -712,7 +771,7 @@ impl PreparedFolderImport {
         ) {
             Ok(value) => value,
             Err(problem) => {
-                return Err(cleanup_or(
+                return Err(purpose.failed_copy(
                     problem,
                     &destination,
                     destination_identity,
@@ -722,7 +781,7 @@ impl PreparedFolderImport {
         };
         let differences = differences(&before, &after_source, &copied);
         if !differences.is_empty() {
-            return Err(cleanup_or(
+            return Err(purpose.failed_copy(
                 FolderImportError::VerificationMismatch { paths: differences },
                 &destination,
                 destination_identity,
@@ -731,7 +790,7 @@ impl PreparedFolderImport {
         }
         if let Err(error) = destination_parent_pinned.sync() {
             let problem = FolderImportError::io("sync_dir", &parent, error);
-            return Err(cleanup_or(
+            return Err(purpose.failed_copy(
                 problem,
                 &destination,
                 destination_identity,
@@ -751,6 +810,7 @@ impl PreparedFolderImport {
             snapshot: before,
             source_private_fence,
             active: true,
+            purpose,
         })
     }
 
@@ -825,7 +885,7 @@ impl PreparedFolderImport {
         let differences = differences(&self.snapshot, &source, &copied);
         if !differences.is_empty() {
             let problem = FolderImportError::VerificationMismatch { paths: differences };
-            self.rollback_inner()?;
+            self.cleanup_on_failure()?;
             return Err(problem);
         }
         self.destination_parent_pinned
@@ -942,13 +1002,13 @@ impl PreparedFolderImport {
         let differences = differences(&self.snapshot, &source, &copied);
         if !differences.is_empty() {
             let problem = FolderImportError::VerificationMismatch { paths: differences };
-            self.rollback_inner()?;
+            self.cleanup_on_failure()?;
             return Err(problem);
         }
 
         if self.presented_store.is_none() {
             if let Err(problem) = reject_reserved_workspace_path(&self.snapshot) {
-                self.rollback_inner()?;
+                self.cleanup_on_failure()?;
                 return Err(problem);
             }
         }
@@ -1035,7 +1095,7 @@ impl PreparedFolderImport {
         changed.dedup();
         if !changed.is_empty() {
             let problem = FolderImportError::VerificationMismatch { paths: changed };
-            self.rollback_inner()?;
+            self.cleanup_on_failure()?;
             return Err(problem);
         }
         let managed_snapshot =
@@ -1081,7 +1141,24 @@ impl PreparedFolderImport {
         self.rollback_inner()
     }
 
+    fn cleanup_on_failure(&mut self) -> Result<(), FolderImportError> {
+        if self.purpose == ImportPurpose::Received {
+            return Ok(());
+        }
+        self.rollback_inner()
+    }
+
     fn rollback_inner(&mut self) -> Result<(), FolderImportError> {
+        if self.purpose == ImportPurpose::Received {
+            return Err(FolderImportError::io(
+                "retain received initialization",
+                &self.destination,
+                io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "received initialization requires purpose-specific native recovery",
+                ),
+            ));
+        }
         if !self.active {
             return Ok(());
         }
@@ -1098,7 +1175,7 @@ impl PreparedFolderImport {
 
 impl Drop for PreparedFolderImport {
     fn drop(&mut self) {
-        let _ = self.rollback_inner();
+        let _ = self.cleanup_on_failure();
     }
 }
 
@@ -3452,6 +3529,149 @@ mod copy_security_tests {
         assert!(!destination.join("result.txt").exists());
         assert!(!displaced.join("result.txt").exists());
         let _ = fs::remove_dir_all(root);
+    }
+
+    fn received_fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let root = scratch(name);
+        let source = root.join("source");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("work.txt"), b"original input\n").unwrap();
+        let store = root.join("worker.mesh");
+        (root, source, store)
+    }
+
+    fn prepare_received(source: &Path, store: &Path) -> PreparedFolderImport {
+        PreparedFolderImport::prepare_received_with_parent(
+            source,
+            store,
+            &[],
+            ProtectedWorkspaceRoot::inspect(store.parent().unwrap()).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn received_drop_retains_original_copy_and_ownership_marker() {
+        let (root, source, store) = received_fixture("received-drop");
+        let prepared = prepare_received(&source, &store);
+        let destination = prepared.destination.clone();
+        let identity = directory_identity(&destination).unwrap();
+        let marker = prepared.owned_marker.clone();
+        let marker_bytes = fs::read(&marker).unwrap();
+        drop(prepared);
+        assert_eq!(directory_identity(&destination).unwrap(), identity);
+        assert_eq!(
+            fs::read(destination.join("work.txt")).unwrap(),
+            b"original input\n"
+        );
+        assert_eq!(fs::read(marker).unwrap(), marker_bytes);
+        assert!(
+            PreparedFolderImport::prepare_received_with_parent(
+                &source,
+                &store,
+                &[],
+                ProtectedWorkspaceRoot::inspect(&root).unwrap(),
+            )
+            .is_err(),
+            "retention must not authorize an automatic retry"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_copy_error_retains_partial_destination_and_markers() {
+        let (root, source, store) = received_fixture("received-copy-error");
+        let source_file = source.join("work.txt");
+        BEFORE_PREPARED_COPY.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                fs::remove_file(source_file).unwrap();
+            }));
+        });
+        assert!(PreparedFolderImport::prepare_received_with_parent(
+            &source,
+            &store,
+            &[],
+            ProtectedWorkspaceRoot::inspect(&root).unwrap(),
+        )
+        .is_err());
+        let destination = store.join(crate::workspace::PRESENTED_DIRECTORY_NAME);
+        assert!(destination.is_dir());
+        let marker = markers(&destination).unwrap().owned;
+        verify_owned_marker(&marker, &destination).unwrap();
+        assert!(!markers(&destination).unwrap().receipt.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_changed_copy_is_preserved_when_confirmation_refuses() {
+        let (root, source, store) = received_fixture("received-changed-copy");
+        let prepared = prepare_received(&source, &store);
+        let destination = prepared.destination.clone();
+        let marker = prepared.owned_marker.clone();
+        fs::write(destination.join("work.txt"), b"later working edit\n").unwrap();
+        assert!(matches!(
+            prepared.confirm_into_workspace_without_origin(),
+            Err(FolderImportError::VerificationMismatch { .. })
+        ));
+        assert_eq!(
+            fs::read(destination.join("work.txt")).unwrap(),
+            b"later working edit\n"
+        );
+        assert_eq!(
+            fs::read(source.join("work.txt")).unwrap(),
+            b"original input\n"
+        );
+        assert!(marker.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_post_commit_error_preserves_original_journal_and_work() {
+        let (root, source, store) = received_fixture("received-post-commit");
+        let prepared = prepare_received(&source, &store);
+        let destination = prepared.destination.clone();
+        let marker = prepared.owned_marker.clone();
+        let source_file = source.join("work.txt");
+        BEFORE_WORKSPACE_COMMIT.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                fs::write(source_file, b"source changed during commit\n").unwrap();
+            }));
+        });
+        assert!(matches!(
+            prepared.confirm_into_workspace_without_origin(),
+            Err(FolderImportError::VerificationMismatch { .. })
+        ));
+        assert!(
+            fs::metadata(store.join(crate::workspace::RECORD_FILE_NAME))
+                .unwrap()
+                .len()
+                > 0
+        );
+        assert_eq!(
+            fs::read(destination.join("work.txt")).unwrap(),
+            b"original input\n"
+        );
+        assert_eq!(
+            fs::read(source.join("work.txt")).unwrap(),
+            b"source changed during commit\n"
+        );
+        assert!(marker.exists());
+        assert!(!markers(&destination).unwrap().receipt.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn received_generic_rollback_cannot_delete_retained_work() {
+        let (root, source, store) = received_fixture("received-rollback-refusal");
+        let prepared = prepare_received(&source, &store);
+        let destination = prepared.destination.clone();
+        assert!(prepared.rollback().is_err());
+        assert_eq!(
+            fs::read(destination.join("work.txt")).unwrap(),
+            b"original input\n"
+        );
+        assert!(markers(&destination).unwrap().owned.exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

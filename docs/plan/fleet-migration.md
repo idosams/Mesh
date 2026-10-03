@@ -4610,3 +4610,26 @@ and all 44 real-daemon checks. Nextest reported one LEAK warning in the unrelate
 investigation remains open. An earlier version also passed its complete gate before removal of a
 redundant pre-lock content scan. Fresh hosted validation, interrupted-initialization recovery and
 full real-host acceptance remain pending.
+
+## R96 — retain failed received initialization for recovery
+
+New canonical implementation following R95/PR228; replaces no preserved source commit. Received
+worker import used the ordinary project's rollback path, including cleanup on a dropped prepared
+handle and on errors after journal ingestion. This could remove the partial worker copy and durable
+history that purpose-specific interrupted-initialization recovery needs to inspect.
+
+The native received-import purpose now retains created directories, copied content, pending markers
+and any private history on failure or drop. Explicit rollback on that prepared received handle
+refuses. Ordinary project imports retain their existing rollback behavior. Successful initialization
+still performs all exact-content, physical-identity and receipt checks. No persisted format changes,
+launch authority or automatic retry are added. Retained paths remain unavailable to create-only
+initialization; native recovery must validate and continue the original attempt. The existing generic
+`recover_pending_import` remains a rollback API and must not be used to resume received work.
+
+Five new fault regressions cover dropped preparation, copy failure, changed working content,
+post-journal confirmation failure and explicit prepared-handle rollback refusal. The focused import
+security/received-workspace suite passed 23 tests in 0.880s. Full `npm test` passed 3,691 native
+tests in 150.512s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and all 44 real-daemon
+checks. No LEAK warning was reported in this run; it does not resolve the earlier reliability
+investigation. Fresh hosted validation remains pending. Purpose-specific partial initialization completion, authenticated recovery controls and the
+full fleet acceptance map remain unfinished.
