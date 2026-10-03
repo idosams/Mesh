@@ -4270,3 +4270,25 @@ Twenty controller tests, 177 rendered/typecheck checks and fifteen focused nativ
 (152.481 s, one slow, 17 skipped), 177 rendered tests, 621 desktop tests, repository/docs/license/storage
 checks and the real daemon demo. No process-leak warning occurred; #37/#172 remain open. Hosted
 delivery is pending. Real signed-app/SSH/second-host acceptance and graphical receipt remain unfinished.
+
+
+## R82: exact saved-input preparation for result receipt
+
+R82 is new canonical work replacing no legacy commit, based on published R81 / PR #212 head
+`d14683b4482bc10b1754000eccb34b708144ad62`. Its original checks and R80 combined-main are active.
+Historical result input lookup now supports exact recorded completed/cancelled/superseded attempts,
+without weakening reconnect's latest/claimed/launching/initial-lease rules. Native preparation
+exports the original attached version or exact reviewed parent source, validates both input version
+and manifest against the assignment, and rereads the selector/assignment before returning. The
+reconnect panel consumes this verified source rather than independently rebuilding it. No new
+transport, execution authority, renderer paths, persisted format or automatic adoption is added.
+
+Eight focused native tests passed (2.301 s), including actual coordinator restart/interrupted-transfer
+continuation using a newly reconstructed immutable source after the original project changed. Added
+combined-gate coverage checks substituted projects, cancelled/expired work and wrong assignment
+manifests without mutating history or working files. Full local validation passed: 3,651 native
+tests (155.722 s, one slow, 17 skipped), 177 rendered tests, 621 desktop tests, repository/docs/license/
+storage checks and the real daemon demo. No process-leak warning occurred; #37/#172 remain open.
+Hosted delivery is pending.
+Graphical receipt destination/intent management and download controls remain required, along with
+all remaining fleet acceptance. The fixed user checkpoint is unchanged.

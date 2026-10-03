@@ -14,20 +14,22 @@ impl RemotePanel {
         let held = self.0.try_lock().map_err(|_| BUSY)?;
         let selected = held.as_ref().filter(|s| s.id == id).ok_or(UNAVAILABLE)?;
         selected.verify()?;
-        let source = match selected
+        let project = match selected
             .history
             .retained_remote_input(&selected.config.lane, &selected.config.run)
             .map_err(|_| UNAVAILABLE)?
         {
-            RetainedRemoteInput::Project { project, version } => host
-                .review_history(&project)?
-                .prepare_remote_input(&version)
-                .map_err(|_| UNAVAILABLE)?,
-            RetainedRemoteInput::Review(selection) => selected
-                .history
-                .prepare_remote_review_input(&selection)
-                .map_err(|_| UNAVAILABLE)?,
+            RetainedRemoteInput::Project { project, .. } => Some(host.review_history(&project)?),
+            RetainedRemoteInput::Review(_) => None,
         };
+        let source = selected
+            .history
+            .prepare_saved_remote_input(
+                &selected.config.lane,
+                &selected.config.run,
+                project.as_ref(),
+            )
+            .map_err(|_| UNAVAILABLE)?;
         let context = open_connection(&selected.config.connection)?;
         if context
             .installation
