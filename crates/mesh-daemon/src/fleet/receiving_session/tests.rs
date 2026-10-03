@@ -178,6 +178,22 @@ fn disconnect_requires_new_proof_and_preserves_original_transfer_through_native_
         parts
     };
     assert!(session.connect().is_err());
+    let materialized = registry
+        .materialization_receipt("assignment")
+        .unwrap()
+        .unwrap();
+    assert!(materialized.admission() == allocation.admission.as_ref().unwrap());
+    assert_eq!(
+        materialized.directory_identities(),
+        &allocation.retained_identity().unwrap()
+    );
+    assert!(
+        s.f.registry()
+            .materialization_receipt("assignment")
+            .unwrap()
+            .as_ref()
+            == Some(&materialized)
+    );
     assert_eq!(
         fs::read(allocation.path().join("result.txt")).unwrap(),
         s.bytes
@@ -334,4 +350,59 @@ fn lease_expired_after_authentication_refuses_before_store_creation() {
     c.session.work.assignment.lease_until_ms = 1;
     assert!(c.receive(s.manifest_frame()).is_err());
     s.assert_empty_store();
+}
+
+#[test]
+fn durable_materialization_precedes_handoff_and_changed_input_cannot_rewrite_it() {
+    let s = Setup::new();
+    let mut runtime = s.f.runtime(true);
+    let mut session = s.session();
+    let mut connection = session.connect().unwrap();
+    let signature = s.sign(&connection, &mut runtime);
+    connection.authenticate(&signature).unwrap();
+    assert!(s
+        .f
+        .registry()
+        .materialization_receipt("assignment")
+        .unwrap()
+        .is_none());
+    connection.receive(s.manifest_frame()).unwrap();
+    connection.receive(s.part(0, 7)).unwrap();
+    assert!(connection.materialize().is_err());
+    assert!(s
+        .f
+        .registry()
+        .materialization_receipt("assignment")
+        .unwrap()
+        .is_none());
+    connection.receive(s.part(7, s.bytes.len())).unwrap();
+    let (allocation, mut registry) = connection.materialize().unwrap();
+    let original = registry
+        .materialization_receipt("assignment")
+        .unwrap()
+        .unwrap();
+    assert!(registry.retain_materialization(&allocation).unwrap() == original);
+    assert!(registry
+        .materialization_receipt("another-assignment")
+        .is_err());
+    fs::write(allocation.path().join("result.txt"), b"changed input").unwrap();
+    assert!(registry.retain_materialization(&allocation).is_err());
+    drop(registry);
+    assert!(
+        s.f.registry()
+            .materialization_receipt("assignment")
+            .unwrap()
+            .as_ref()
+            == Some(&original)
+    );
+    assert!(s
+        .f
+        .registry()
+        .launch_receipt("assignment")
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        fs::read(allocation.path().join("result.txt")).unwrap(),
+        b"changed input"
+    );
 }

@@ -341,3 +341,8 @@ fn admission_json(
 pub(in crate::fleet) mod authentication;
 #[cfg(unix)]
 pub use authentication::{RemoteAdmissionChallenge, RemoteAdmissionProof};
+
+#[cfg(unix)]
+mod materialization;
+#[cfg(unix)]
+pub use materialization::RemoteMaterializationReceipt;
