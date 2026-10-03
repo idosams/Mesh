@@ -516,3 +516,12 @@ input transfer. Stable request lookup recovers catalogue identities after lost o
 adopting execution. The service leaves live views available during network waits and refuses repeat,
 cancelled or restored starts. Input acceptance does not establish provider startup. The full source gate passed, including 3,615 native tests; real signed-app/OS-key, SSH/second-host, restart reconciliation
 and graphical operator acceptance remain outstanding.
+
+
+Native coordinator input recovery now has an explicit command for an already claimed initial
+transfer. Retained catalogue history can resume its exact saved input after coordinator restart,
+without adopting the local lane or dispatching/renewing an attempt. The resident worker must retain
+its receiving reservation. Full source validation passed: 3,620 native tests, 170 rendered tests,
+599 desktop tests and 44 daemon-demo checks. One background-capture test reported a process-leak
+warning; issue #172 remains unresolved. This is not general lost-worker recovery or real
+SSH/second-host acceptance.

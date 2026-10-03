@@ -154,6 +154,7 @@ fn unsigned_coordinator_refuses_before_loading_config_or_opening_custody() {
         Action::Receive,
         Action::Start,
         Action::Created,
+        Action::ReconnectInput,
     ] {
         assert_eq!(
             run(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
