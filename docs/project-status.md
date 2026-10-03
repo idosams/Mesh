@@ -790,3 +790,14 @@ the same physical file. Changed or conflicting work is preserved and refused. Th
 has byte-cut, permission and replacement regressions; R98 in the migration ledger tracks validation
 and delivery. This does not yet expose remote resume: original-attempt authority, prepared workspace
 reopening and receipt reconciliation remain required before authenticated recovery can proceed.
+
+### Received-import finalization (source increment)
+
+Received initialization can complete an exact import-receipt prefix and accept an already-created
+empty index placeholder without replacing either file. Conflicting or populated files and changed
+physical ownership refuse intact; ordinary imports remain create-only. The focused suite passed
+36 tests, including every real receipt byte cut and repeated ingestion. The full local gate
+also passed 3,712 native tests, 181 rendered checks, 634 desktop tests and all 44 daemon checks.
+R100 in the migration ledger tracks hosted validation and delivery. This does not yet expose a resume action or reconstruct
+launch authority; original ownership/admission/lease checks and the remaining recovery journey
+are still required.

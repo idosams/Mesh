@@ -4708,3 +4708,30 @@ Full `npm test` passed on this increment with the isolated fixed runner: 3,703 n
 checks; no leak warning. All seven checks also passed on the preceding merged PR231 main
 ([run 37140182566](https://github.com/idosams/Mesh/actions/runs/37140182566)). Fresh hosted
 checks on this increment and its eventual combined main remain required.
+
+## R100 — complete received-import finalization in place
+
+New canonical implementation following R98/PR231 and the R99/PR232 runner correction;
+replaces no preserved source commit. Received imports can now finish an exact canonical
+confirmation-receipt prefix in place and recognize an existing empty derived-index placeholder.
+The helper uses pinned directories, private mode 0600 and single-link regular files, compares
+both bytes and inode through an independent writable descriptor, appends only the missing
+suffix, syncs and verifies the completed record and namespace. It never truncates or replaces
+an existing file. Populated indexes, conflicting receipts, links, changed permissions, replaced
+files and displaced parents refuse while preserving retained work and pending ownership.
+Ordinary user imports remain create-only. Persisted receipt formats are unchanged.
+
+Nine regressions cover every real import-receipt byte cut, successful confirmation after
+completion, repeated original ingestion without changing its journal or index inode, conflicting
+finalization with retained ownership, ordinary-import collision refusal, and generic prefix,
+empty-index, mode/link and replacement races. The focused folder-import suite passed 36 tests
+in 3.273s. Full `npm test` passed: 3,712 native tests in 156.505s (one slow, 17 skipped),
+181 rendered checks, 634 desktop tests and all 44 real-daemon checks. No leak warning was
+reported. Fresh hosted checks and combined-main verification remain required.
+
+This completes the low-level file/journal/index/import-receipt continuation mechanisms; it is
+not the native original-attempt resume operation. Reopening original pending/confirmed import
+ownership, completing the worker mapping receipt, guarded admission/current-lease checks,
+pre-launch handoff, authenticated desktop recovery and uncertain-execution reconciliation
+remain in the full acceptance plan. Populated derived indexes require the confirmed-workspace
+reopen path; they are never reset by this unconfirmed-ingestion helper.
