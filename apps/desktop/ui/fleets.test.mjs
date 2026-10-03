@@ -275,3 +275,38 @@ test('unknown catalogue policy cannot start agents', async () => {
   await settle(); h.intent({ type: 'start', objective }); await settle();
   assert.equal(calls.includes('start_attached_fleet'), false); h.dispose();
 });
+
+test('downloaded review navigation reads native history when fleet polling is missing or failed', async () => {
+  for (const status of ['missing','failed','unavailable']) {
+    const calls=[];const h=harness(async(command,args)=>{
+      calls.push({command,args});
+      if(command==='load_remote_project_outbox')return{schema:'mesh.remote-project-outbox/v1',revision:'0',entries:[]};
+      if(command==='load_remote_fleet_pins')return{schema:'mesh.desktop-remote-fleet-pin-selectors/v1',revision:'0',pins:[]};
+      if(command==='load_fleet_pins')return savedPins();
+      if(command==='load_fleet_review_outbox')return{schema:'mesh.fleet-review-outbox/v1',revision:'0',entries:[]};
+      if(command==='attached_fleets') {
+        if(status==='failed')throw new Error('private status detail');
+        return{schema:'mesh.native-fleets/v1',fleets:status==='missing'?[]:[{objective,ownership:'unavailable',state:null,policy:null}]};
+      }
+      if(command==='fleet_activity')return activity();
+      if(command==='remote_fleet_reviews')return{schema:'mesh.desktop-remote-reviews/v1',objective,after:0,snapshot:0,next:null,entries:[]};
+      throw new Error(command);
+    });
+    await settle();h.intent({type:'remote-results',objective});await settle();
+    assert.deepEqual(calls.filter(c=>c.command==='remote_fleet_reviews'),[{command:'remote_fleet_reviews',args:{objective,after:0,snapshot:null}}],status);
+    assert.equal(h.projections.at(-1).remoteReviewQueues[objective].page.snapshot,0);
+    assert.equal(calls.some(c=>/^(start|provision|reconnect|remote_creation)/.test(c.command)),false);h.dispose();
+  }
+});
+test('missing native review history produces a visible queue error without starting or repairing work', async () => {
+  const calls=[];const h=harness(async(command,args)=>{
+    calls.push({command,args});
+    if(command==='attached_fleets')return{schema:'mesh.native-fleets/v1',fleets:[]};
+    if(command==='fleet_activity')return activity();
+    throw new Error('unavailable private native history');
+  });
+  await settle();h.intent({type:'remote-results',objective});await settle();
+  const queue=h.projections.at(-1).remoteReviewQueues[objective];assert.ok(queue);assert.match(queue.error,/could not be verified/);assert.equal(queue.page,undefined);
+  assert.doesNotMatch(queue.error,/private native history/);assert.equal(calls.filter(c=>c.command==='remote_fleet_reviews').length,1);
+  const before=calls.length;h.intent({type:'remote-results',objective:'../../private'});h.intent({type:'remote-results',objective,path:'/forged'});await settle();assert.equal(calls.length,before);h.dispose();
+});

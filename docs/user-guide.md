@@ -477,3 +477,9 @@ After restart, saved requests load without dispatching. Changed native files or 
 records and work remain preserved. To prepare a different request, clear and reselect the setup
 files. This flow requires an eligible signed application and a configured worker; the fixed local
 test checkpoint does not contain it. Signed packaged and real second-host acceptance remain pending.
+
+Downloaded remote reviews remain accessible while live fleet status is missing or unavailable.
+**Show downloaded reviews** reads the exact native retained history directly. Until the fleet's
+status card loads, its result list appears under **Saved remote reviews**; it moves into the card
+when status arrives. Existing pinned reviews stay fixed. A failed history read shows an error and
+keeps pinning unavailable until a verified read succeeds. Reviewing does not start or recover agents.

@@ -670,3 +670,17 @@ reconciliation and the full fleet acceptance plan remain unfinished.
 
 The existing worker service queues execution after input materialization. The desktop send copy
 explicitly describes that authorization while keeping input receipts distinct from provider liveness.
+
+## Remote review navigation independent of live status
+
+The desktop no longer discards a received-result navigation request because its fleet is absent
+from the last status poll. A closed, bounded objective selector goes to the existing native
+retained-history reader, which remains responsible for catalogue admission and exact page/content
+verification. No new native authority or persistence format is introduced. Unknown/missing native
+history produces a visible queue error rather than a silent no-op; no storage is initialized by the
+read. Up to sixteen queues and eight combined pinned panels remain enforced.
+
+Queues whose status card is not loaded render independently and move into the card when it appears.
+Unavailable execution ownership does not suppress an explicit retained-history read. Failed reads
+cannot enable pinning and do not replace existing pinned selections. This improves the deterministic
+download-to-review path; actual signed packaged and second-host acceptance still remain required.

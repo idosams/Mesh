@@ -45,7 +45,7 @@ export function remoteArtifactSide(raw, selection, change, side, kind, page) {
     pageNumber: answer.page_number, pageCount: answer.page_count, textSource: answer.text_source, textLines: answer.text_lines,
     textSections: answer.text_sections?.map(s => ({ label: s.label, lineStart: s.line_start, lineCount: s.line_count })) ?? null, textTruncated: answer.text_truncated };
 }
-export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherPinCount = () => 0, requestId }) {
+export function createRemoteFleetReviews({ invoke, changed, otherPinCount = () => 0, requestId }) {
   let queues = {}, pins = [], next = 1n, generation = 0, disposed = false, notice = '';
   const publish = () => { if (!disposed) changed(); };
   const project = createRemoteProjectWorkflow({ invoke, changed: publish, requestId });
@@ -114,7 +114,8 @@ export function createRemoteFleetReviews({ invoke, changed, objectiveFor, otherP
       if (v.type === 'remote-pins-retry' && shape === 'type') { void control(() => storage.retry()); return true; }
       if (v.type === 'remote-pins-reload' && shape === 'type') { void control(() => storage.reload()); return true; }
       if (!editable && !['remote-results','remote-results-next','remote-results-close','remote-retry'].includes(v.type)) return true;
-      if (v.type === 'remote-results' && shape === 'objective,type' && objective(v.objective) && objectiveFor(v.objective)) {
+      // Native retained history is the oracle; live fleet polling is not a prerequisite for review.
+      if (v.type === 'remote-results' && shape === 'objective,type' && objective(v.objective)) {
         if (!queues[v.objective] && Object.keys(queues).length >= 16) return true;
         void page(v.objective); return true;
       }
