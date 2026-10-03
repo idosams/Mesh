@@ -5051,3 +5051,35 @@ not actual process-kill, SSH second-host or packaged native-custody evidence. Th
 gate passed 3,748 native tests in 156.004 seconds (one slow, 17 skipped), 182 rendered
 checks, 636 desktop tests and 44 real-daemon checks. Hosted validation and merge remain pending. Process termination/restart, remote cancellation delivery,
 uncertain execution reconciliation and the full fleet acceptance campaign remain required.
+
+## R111 — retained original execution observations
+
+This canonical increment starts from merged R108/PR241 at
+`84ed9df8e1034f62489d9298cc73db4a107d6b14`. It replaces no preserved source commit.
+PR241 merged normally after exact-head run `37152877276` passed all seven checks.
+A temporary-directory loss interrupted the old checkout before feature edits. Surviving metadata
+and files were archived, prior all-ref bundles retained, and canonical Mesh was cloned into a
+durable development directory. Original dirty Mesh-internal and the fixed user checkpoint remain
+untouched. No unrelated histories were merged or completed implementation discarded.
+
+The native registry reads the exact original launch/session namespace without opening workspaces,
+constructing services, issuing credentials, dispatching processes or changing capacity. It validates
+the original setup prefix and exact lane/run/provider/input/installation configuration, replays
+bounded pages to the starting revision, and rechecks the launch receipt and revision before return.
+Missing session records and interrupted setup remain explicitly uncertain. Run observations are
+historical facts; even terminal states do not establish descendant termination or release capacity.
+The session namespace and persisted command schemas are unchanged. Signed wire and desktop
+projection follow separately; full terminal reconciliation, packaged and second-host acceptance
+remain required.
+
+All nine focused tests passed in 2.239 seconds, covering every setup prefix, persisted successful,
+failed and cancelled outcomes, stopping after cancellation, malformed/cross-assignment history,
+revoked native ledger authority, completion beyond one replay page and retained admission capacity.
+Existing local and broker fixture-provider journeys now assert the independently read completion,
+including a lost broker final reply. The corrected full `npm test` gate passed 3,753 native tests
+in 155.431 seconds (one slow, 17 skipped), 182 rendered checks, 636 desktop tests and the
+real-daemon proof. No production checks or thresholds were weakened. Failed fixture compile/path
+and broker-registry configuration runs are retained. The first full attempt also exposed missing
+generated Tauri files in the damaged temporary cache; validation moved to a fresh durable cache.
+Hosted checks and merged delivery remain pending. This does not claim a real commercial provider,
+signed packaged application, remote SSH acceptance or capacity release.

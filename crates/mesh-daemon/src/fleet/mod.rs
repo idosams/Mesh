@@ -71,7 +71,10 @@ pub use remote_admission::{
     RemoteInputReservation, RemoteWork, RemoteWorkerLease,
 };
 #[cfg(unix)]
-pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
+pub use remote_admission::{
+    RemoteExecutionObservation, RemoteExecutionState, RemoteLaunchOutcome, RemoteLaunchReceipt,
+    RemoteLaunchReservation,
+};
 #[cfg(unix)]
 pub use remote_admission::{RemoteRecoveryChallenge, RemoteRecoveryProof};
 #[cfg(target_os = "macos")]
