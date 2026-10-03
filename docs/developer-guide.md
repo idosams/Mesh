@@ -749,3 +749,10 @@ internals, original folder identity, remaining file content and the persisted pi
 and failures remain in its printed private temporary folder. The installed app and user checkpoint
 are not replaced. This command does not establish provider execution, protected-main approval,
 external-harness attribution or second-host acceptance.
+
+Coordinator execution now returns its verified native result separately from CLI output. Existing
+`status`, `results`, `start`, `created`, `receive` and `reconnect-input` arguments and response schemas
+are unchanged. A closed output stream may lose a response after durable work; it never retries the
+operation. Keep the original configuration and use the action's explicit recovery path. The native
+operation still checks signed-app eligibility before opening configuration or custody. This boundary
+is groundwork for graphical controls, not a renderer API accepting configuration or credential paths.

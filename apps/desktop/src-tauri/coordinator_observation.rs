@@ -15,7 +15,7 @@ use mesh_daemon::{
 use mesh_keychain::AppleActorCustody;
 use mesh_types::PublicKey;
 use std::{
-    io::{self, Write as _},
+    io,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -172,16 +172,25 @@ pub fn run_if_requested() -> Option<Result<(), String>> {
     }
 }
 fn run(action: Action, path: &Path) -> Result<(), String> {
+    let failure = output_failure(&action);
+    let result = execute(action, path)?;
+    write_result(&mut io::stdout().lock(), &result, failure)
+}
+
+// Native callers consume a verified result directly. Presentation/output failure must never
+// dispatch, renew, receive or reconnect a second time. This is not a renderer command and accepts
+// only the existing privately loaded native configuration; no arbitrary runtime escapes.
+fn execute(action: Action, path: &Path) -> Result<Json, String> {
     AppleActorCustody::availability()
         .map_err(|_| "Coordinator identity requires an eligible signed Mesh application")?;
     if action == Action::Start || action == Action::Created {
-        return starting::run(path, action == Action::Created);
+        return starting::execute(path, action == Action::Created);
     }
     if action == Action::ReconnectInput {
-        return reconnecting::run(path);
+        return reconnecting::execute(path);
     }
     if action == Action::Receive {
-        return receiving::run(path);
+        return receiving::execute(path);
     }
     let config = config(crate::worker_service::load_private_json(path)?)?;
     let NativeContext {
@@ -218,11 +227,26 @@ fn run(action: Action, path: &Path) -> Result<(), String> {
         .read_over_ssh(&peer, Duration::from_secs(25))
         .map_err(|_| UNAVAILABLE)?;
     installation.identity().map_err(|_| UNAVAILABLE)?;
-    let output = render(result);
-    let mut stdout = io::stdout().lock();
-    writeln!(stdout, "{}", output.encode())
-        .and_then(|()| stdout.flush())
-        .map_err(|_| "Verified observation output could not be written".into())
+    Ok(render(result))
+}
+
+fn output_failure(action: &Action) -> &'static str {
+    match action {
+        Action::Status | Action::Results(_) => "Verified observation output could not be written",
+        Action::Start | Action::Created => "Start output unavailable; retain the same configuration and inspect --coordinator created",
+        Action::Receive => "Saved result output could not be written; retain the same receive configuration for explicit recovery",
+        Action::ReconnectInput => "Input reconnect output unavailable; inspect the original retained assignment",
+    }
+}
+
+fn write_result(
+    writer: &mut impl io::Write,
+    result: &Json,
+    failure: &'static str,
+) -> Result<(), String> {
+    writeln!(writer, "{}", result.encode())
+        .and_then(|()| writer.flush())
+        .map_err(|_| failure.into())
 }
 fn render(result: RemoteObservationOutcome) -> Json {
     match result {

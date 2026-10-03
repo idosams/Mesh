@@ -162,3 +162,97 @@ fn unsigned_coordinator_refuses_before_loading_config_or_opening_custody() {
         );
     }
 }
+
+struct OutputSink {
+    bytes: Vec<u8>,
+    remaining: Option<usize>,
+    fail_flush: bool,
+    flushes: usize,
+}
+impl io::Write for OutputSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let count = bytes.len().min(2).min(self.remaining.unwrap_or(usize::MAX));
+        if count == 0 && !bytes.is_empty() {
+            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed"));
+        }
+        self.bytes.extend_from_slice(&bytes[..count]);
+        if let Some(remaining) = self.remaining.as_mut() {
+            *remaining -= count;
+        }
+        Ok(count)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.flushes += 1;
+        if self.fail_flush {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed"))
+        } else {
+            Ok(())
+        }
+    }
+}
+#[test]
+fn structured_result_is_preserved_across_short_cli_writes() {
+    let result = render(RemoteObservationOutcome::Results(None));
+    let original = result.encode();
+    let mut output = OutputSink {
+        bytes: vec![],
+        remaining: None,
+        fail_flush: false,
+        flushes: 0,
+    };
+    write_result(&mut output, &result, output_failure(&Action::Results(0))).unwrap();
+    assert_eq!(output.bytes, format!("{original}\n").as_bytes());
+    assert_eq!(output.flushes, 1);
+    assert_eq!(result.encode(), original);
+}
+#[test]
+fn output_failure_retains_native_result_and_requires_explicit_reconciliation() {
+    let result = render(RemoteObservationOutcome::Results(None));
+    let original = result.encode();
+    for action in [
+        Action::Status,
+        Action::Results(0),
+        Action::Start,
+        Action::Created,
+        Action::Receive,
+        Action::ReconnectInput,
+    ] {
+        for fail_flush in [false, true] {
+            let mut output = OutputSink {
+                bytes: vec![],
+                remaining: if fail_flush { None } else { Some(7) },
+                fail_flush,
+                flushes: 0,
+            };
+            assert_eq!(
+                write_result(&mut output, &result, output_failure(&action)).unwrap_err(),
+                output_failure(&action)
+            );
+            assert_eq!(result.encode(), original);
+            if fail_flush {
+                assert_eq!(output.bytes, format!("{original}\n").as_bytes());
+                assert_eq!(output.flushes, 1);
+            } else {
+                assert_eq!(output.bytes, original.as_bytes()[..7]);
+                assert_eq!(output.flushes, 0);
+            }
+        }
+    }
+}
+#[test]
+fn direct_native_operation_retains_the_eligible_application_boundary() {
+    assert!(AppleActorCustody::availability().is_err());
+    for action in [
+        Action::Status,
+        Action::Results(0),
+        Action::Start,
+        Action::Created,
+        Action::Receive,
+        Action::ReconnectInput,
+    ] {
+        assert_eq!(
+            execute(action, Path::new("/unused-mesh-coordinator-config")).unwrap_err(),
+            "Coordinator identity requires an eligible signed Mesh application"
+        );
+    }
+}
