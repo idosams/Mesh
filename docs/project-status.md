@@ -765,3 +765,11 @@ retained for inspection rather than removed by ordinary import rollback. Focused
 full local gate pass; hosted validation and canonical delivery are tracked in R96 of the migration ledger. This is required
 recovery groundwork, not a resume button or permission to launch another process. Normal project
 imports keep their existing behavior; the fixed user checkpoint is unchanged.
+
+### Received initial-history completion
+
+Received initialization can complete only the exact intended initial journal prefix after verifying
+its required payloads. It preserves conflicting history and does not append an already-complete
+initial history again. Byte-cut/refusal tests and the full local gate pass; the preserved process-leak
+warning, fresh hosted validation and delivery are tracked in R97 of the migration ledger. This internal path does not yet let a user resume an interrupted remote
+worker: input-copy and workspace/receipt reconstruction plus authenticated recovery remain unfinished.

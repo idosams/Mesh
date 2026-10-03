@@ -4633,3 +4633,26 @@ tests in 150.512s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests
 checks. No LEAK warning was reported in this run; it does not resolve the earlier reliability
 investigation. Fresh hosted validation remains pending. Purpose-specific partial initialization completion, authenticated recovery controls and the
 full fleet acceptance map remain unfinished.
+
+## R97 — exact received initial-history completion
+
+New canonical implementation following R96/PR229; replaces no preserved source commit. Received
+initial ingestion now derives the complete canonical initial journal before writing it, accepts only
+an exact existing prefix, verifies/promotes all required payloads through the existing durable commit
+checks in a transient index, and appends only the missing suffix. A complete initial journal is not
+appended again. Conflicting bytes or later records refuse without truncation or replacement.
+
+The existing file is opened without create/truncate authority or blocking on a substituted FIFO;
+regular-file, private permissions, single-link and exact descriptor identity checks bind the observed
+prefix through append and final verification. Namespace changes refuse. Ordinary import ingestion
+retains its existing behavior. Journal/receipt formats are unchanged.
+
+Five new regressions include every byte cut of a real generated initial journal, repeated completion,
+changed prefixes/later tails, linked/shared files, replaced generations and missing payloads. The
+focused import/received-workspace suite passed 28 tests in 3.379s. Full `npm test` passed 3,696 native
+tests in 158.456s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and all 44 real-daemon
+checks. Nextest reported one LEAK warning in the existing background-capture test
+`stopping_during_signing_prevents_that_capture_from_being_committed`; its log is preserved and the
+reliability investigation remains open. Fresh hosted checks remain required. This is private initialization machinery, not an authenticated restart operation: original
+admission/lease/launch checks, partial working-file completion, native workspace reconstruction,
+receipt reconciliation and graphical recovery controls remain required by the full acceptance map.
