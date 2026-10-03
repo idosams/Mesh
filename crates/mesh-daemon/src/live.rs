@@ -9295,33 +9295,50 @@ impl LiveDaemon {
         manifest: &crate::fleet::RemoteInputManifest,
     ) -> Result<WorkspaceSummary, Unavailable> {
         self.install_imported_lane(prepared, |candidate| {
-            if !candidate.names_answered()
-                || !candidate.conditions().is_empty()
-                || candidate.operations() != 1
-                || candidate.private_version().concurrent_changes() != 1
-            {
-                return false;
-            }
-            let versions = candidate.workspace_versions();
-            let [initial] = versions.as_slice() else {
-                return false;
-            };
-            let Ok(snapshot) = candidate.historical_workspace_preview(initial.operation()) else {
-                return false;
-            };
-            let settled = match SqliteRecoveryState::inspect_isolated_read_only(
-                recovery_database(candidate.database_file()),
-                candidate.database_file(),
-                LIVE_WORKSPACE_VIEW,
-            ) {
-                Ok(None) => true,
-                Ok(Some(value)) => value == RecoverySnapshot::default(),
-                Err(_) => false,
-            };
-            manifest.matches_saved_content(&snapshot)
-                && native_tree_matches_snapshot(candidate, &snapshot)
-                && settled
+            Self::received_candidate_is_exact(candidate, manifest)
         })
+    }
+
+    pub(crate) fn install_recovered_received_lane(
+        &self,
+        handoff: crate::folder_import::ReceivedImportHandoff,
+        manifest: &crate::fleet::RemoteInputManifest,
+    ) -> Result<WorkspaceSummary, Unavailable> {
+        self.install_confirmed_import(handoff, |candidate| {
+            Self::received_candidate_is_exact(candidate, manifest)
+        })
+    }
+
+    fn received_candidate_is_exact(
+        candidate: &OpenWorkspace,
+        manifest: &crate::fleet::RemoteInputManifest,
+    ) -> bool {
+        if !candidate.names_answered()
+            || !candidate.conditions().is_empty()
+            || candidate.operations() != 1
+            || candidate.private_version().concurrent_changes() != 1
+        {
+            return false;
+        }
+        let versions = candidate.workspace_versions();
+        let [initial] = versions.as_slice() else {
+            return false;
+        };
+        let Ok(snapshot) = candidate.historical_workspace_preview(initial.operation()) else {
+            return false;
+        };
+        let settled = match SqliteRecoveryState::inspect_isolated_read_only(
+            recovery_database(candidate.database_file()),
+            candidate.database_file(),
+            LIVE_WORKSPACE_VIEW,
+        ) {
+            Ok(None) => true,
+            Ok(Some(value)) => value == RecoverySnapshot::default(),
+            Err(_) => false,
+        };
+        manifest.matches_saved_content(&snapshot)
+            && native_tree_matches_snapshot(candidate, &snapshot)
+            && settled
     }
 
     pub(crate) fn verify_received_lane_binding(
@@ -9365,7 +9382,27 @@ impl LiveDaemon {
         let (confirmed, _) = prepared
             .confirm_into_workspace_without_origin()
             .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
-        let presented = confirmed.destination();
+        self.install_confirmed_import(
+            crate::folder_import::ReceivedImportHandoff {
+                destination: confirmed.destination().to_path_buf(),
+                working,
+                storage,
+            },
+            exact,
+        )
+    }
+
+    fn install_confirmed_import(
+        &self,
+        handoff: crate::folder_import::ReceivedImportHandoff,
+        exact: impl FnOnce(&OpenWorkspace) -> bool,
+    ) -> Result<WorkspaceSummary, Unavailable> {
+        let crate::folder_import::ReceivedImportHandoff {
+            destination,
+            working,
+            storage,
+        } = handoff;
+        let presented = destination.as_path();
         let _custody = crate::workspace_custody::lock_workspace_initialization(&working)
             .map_err(|_| workspace_version_refusal("fleet-attachment-import-failed"))?;
         let (reference, _stable_storage) = storage

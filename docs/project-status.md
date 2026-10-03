@@ -813,3 +813,14 @@ explicit reopening of a confirmed workspace remains supported. The focused regre
 local gate passed; R101 in the migration ledger records exact validation and hosted-delivery status.
 This does not yet reconstruct interrupted imports or expose authenticated remote resume. The user
 checkpoint remains a fixed earlier packaged build while this recovery work continues.
+
+
+### Original worker initialization recovery (native source increment)
+
+An authenticated native receiving session can continue an original acknowledged initialization
+under the guarded worker ledger and exclusive allocation ownership. It handles pending and confirmed
+imports, preserves original history and identity, and finishes matching partial receipts without
+replacement. Conflicting work, replaced directories, another initializer and existing launch records
+refuse intact. This does not adopt an uncertain process or release capacity. R102 records validation.
+Dedicated broker recovery authentication/routing (including renewed assignments), desktop controls
+and real-host fault acceptance remain unfinished; the fixed user checkpoint does not include this.

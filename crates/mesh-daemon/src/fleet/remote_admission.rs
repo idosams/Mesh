@@ -346,3 +346,6 @@ pub use authentication::{RemoteAdmissionChallenge, RemoteAdmissionProof};
 mod materialization;
 #[cfg(unix)]
 pub use materialization::RemoteMaterializationReceipt;
+
+#[cfg(unix)]
+mod recovery;

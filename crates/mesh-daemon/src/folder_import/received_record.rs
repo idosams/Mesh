@@ -46,7 +46,7 @@ fn inspect(root: &PinnedWorkspaceRoot, path: &Path, expected: &[u8]) -> io::Resu
     Ok(prefix)
 }
 
-pub(super) fn finish(root: &PinnedWorkspaceRoot, path: &Path, expected: &[u8]) -> io::Result<()> {
+pub(crate) fn finish(root: &PinnedWorkspaceRoot, path: &Path, expected: &[u8]) -> io::Result<()> {
     root.ensure_namespace_identity()?;
     let prefix = match inspect(root, path, expected) {
         Ok(prefix) => prefix,

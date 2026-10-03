@@ -406,3 +406,5 @@ fn durable_materialization_precedes_handoff_and_changed_input_cannot_rewrite_it(
         b"changed input"
     );
 }
+
+mod recovery;
