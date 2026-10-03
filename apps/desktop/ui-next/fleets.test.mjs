@@ -171,3 +171,16 @@ test('saved provider policy is visible before start and unknown policy disables 
   assert.match(render(value), /Provider choices unavailable/);
   assert.match(render(value), /<button[^>]*disabled=""[^>]*>Start agents<\/button>/);
 });
+
+test('received review queues remain visible without fleet status and are not duplicated when status arrives', () => {
+  const value=props();value.projection.available=true;value.projection.fleets=[];
+  const objective='fleet-one';value.projection.remoteReviewQueues={[objective]:{loading:false,error:'',page:{snapshot:1,next:null,rows:[{sequence:1,offer:"offer",selection:{version:"saved-version",correlation:"correlation"}}]}}};
+  let html=render(value);assert.match(html,/Saved remote reviews/);assert.match(html,/Fleet status has not loaded/);assert.match(html,/fleet-one/);assert.match(html,/<button(?![^>]*disabled=)[^>]*>Pin saved review<\/button>/);
+  assert.doesNotMatch(html,/>Start agents<|>Stop agents</);
+  value.projection.fleets=props().projection.fleets;html=render(value);assert.doesNotMatch(html,/Fleet status has not loaded/);assert.equal((html.match(/aria-label="Remote saved results"/g)??[]).length,1);
+  value.projection.fleets[0].ownership='unavailable';value.projection.fleets[0].lanes=[];
+  html=render(value);assert.match(html,/Fleet unavailable/);assert.doesNotMatch(html,/Fleet status has not loaded/);assert.equal((html.match(/aria-label="Remote saved results"/g)??[]).length,1);
+  value.projection.fleets=[];value.projection.remoteReviewQueues[objective].error='Remote results could not be verified. Refresh to retry.';
+  html=render(value);assert.match(html,/role="alert"/);assert.match(html,/could not be verified/);assert.match(html,/<button[^>]*disabled=""[^>]*>Pin saved review<\/button>/);
+  module.exports.setLocale('he');try{assert.match(render(value),/מצב הצי טרם נטען/);}finally{module.exports.setLocale('en');}
+});

@@ -4480,3 +4480,27 @@ passed. R86 #217 now targets main at `089440f4d34943f61f770dca3776aa78fc4fb0c8`;
 uses that parent at `8f7fce6eec878b8a5d1679d5e327de7920be0cff`. Both preserve their previously
 checked implementation trees and require fresh CI. R88 integrated the published parent with a
 tree identical to locally verified `1c35c49`; only this delivery record changed afterward.
+
+## R89: received-result review independent of fleet polling
+
+New canonical work replacing no legacy commit, based on R88 PR #220 head
+`59961a67d4e01f42751343a8f4b36f7f121dd341`. Corrects the download-to-review integration gap:
+`remote-results` was silently ignored unless cached fleet status admitted its objective. The
+existing native history reader now verifies the explicit bounded selection independently; queues
+render even before their fleet card loads. Arrival of status avoids a duplicate list, while existing
+pins remain fixed. Unavailable native history is visible and refuses pinning; no agent action,
+storage creation, native authority or persisted-format change is introduced. Related to #163/#218.
+
+Focused verification passed 31 controller/persistence tests and 180 rendered/typecheck checks.
+Regressions cover missing/failed/unavailable fleet polling, no dispatch/repair, malformed selectors,
+native failure, sixteen-queue capacity, unchanged existing pins, fallback visibility and localization.
+Final rendered assertions additionally cover enabled verified pins, duplicate-list prevention and
+failed-read refusal. Full local and hosted verification pending; signed packaged/real second-host
+review and the complete remaining fleet objective are still required. Published CI remains intact.
+
+R89 full local gate passed: 3,672 native tests (154.891 s, one slow, 17 skipped), 180 rendered
+checks, 632 desktop tests and all repository/docs/license/storage/real-daemon demo gates. No
+process-leak warning occurred; #37/#172 remain unresolved. Full log retained separately. R86
+PR #217 fresh hosted checks passed; dependent #219/#220 and combined-main remain pending at
+last inspection. This increment's hosted checks and all actual signed/second-host acceptance
+remain required.

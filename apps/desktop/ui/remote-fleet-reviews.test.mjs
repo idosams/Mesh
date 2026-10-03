@@ -8,7 +8,7 @@ const result = n => ({ schema: 'mesh.remote-saved-review/v1', objective, ...sele
 const settle = () => new Promise(resolve => setImmediate(resolve));
 function harness(otherPinCount = () => 0) {
   const calls = [];
-  const controller = createRemoteFleetReviews({ invoke: (command, args) => new Promise((resolve, reject) => calls.push({ command, args, resolve, reject })), changed() {}, objectiveFor: name => name === objective, otherPinCount });
+  const controller = createRemoteFleetReviews({ invoke: (command, args) => new Promise((resolve, reject) => calls.push({ command, args, resolve, reject })), changed() {}, otherPinCount });
   return { calls, controller, open: () => controller.handle({ type: 'remote-results', objective }), pin: n => controller.handle({ type: 'remote-pin', objective, offer: selector(n).offer, correlation: selector(n).correlation }) };
 }
 test('bounded native page binds fixed snapshot and exposes interrupted registration', () => {
@@ -60,4 +60,15 @@ test('remote artifact binds correlation, exact file, side and rendered page', as
   for (const mutate of [v => v.offer = 'f'.repeat(64), v => v.correlation = 'f'.repeat(64), v => v.preview.content_digest = '0'.repeat(64), v => v.preview.page_number = 2, v => v.preview.image_data_url = 'file:///tmp/private', v => v.preview.rendering_authorizes_approval = true]) {
     const bad = answer(); mutate(bad); assert.throws(() => remoteArtifactSide(bad, selection, change, 'after', 'pdf', 1));
   }
+});
+
+test('independent native history reads remain bounded and preserve existing pinned selections', async () => {
+  const h=harness();h.open();h.calls[0].resolve(page());await settle();h.pin(1);h.calls[1].resolve(result(1));await settle();
+  const original=h.controller.snapshot().remoteReviewPins[0];
+  for(let n=1;n<=17;n++)h.controller.handle({type:'remote-results',objective:`fleet-${n.toString(16).padStart(64,'0')}`});
+  assert.equal(Object.keys(h.controller.snapshot().remoteReviewQueues).length,16);
+  assert.equal(h.calls.filter(c=>c.command==='remote_fleet_reviews').length,16);
+  assert.deepEqual(h.controller.snapshot().remoteReviewPins[0],original);
+  for(const call of h.calls.slice(2))call.reject(new Error('history unavailable'));await settle();
+  assert.deepEqual(h.controller.snapshot().remoteReviewPins[0],original);
 });

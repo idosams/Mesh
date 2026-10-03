@@ -16,7 +16,7 @@ test('remote selector schema rejects content, malformed identities, duplicate se
 });
 test('restart restores exact remote selectors while unavailable history neither launches nor deletes them', async () => {
   const stored = snapshot([pin()]), calls = [];
-  const c = createRemoteFleetReviews({ invoke: async (command, args) => { calls.push({ command, args }); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return stored; throw new Error('history unavailable'); }, changed() {}, objectiveFor: () => null });
+  const c = createRemoteFleetReviews({ invoke: async (command, args) => { calls.push({ command, args }); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return stored; throw new Error('history unavailable'); }, changed() {} });
   await c.loadSaved(); await settle();
   const state = c.snapshot(); assert.equal(state.remoteReviewPins.length, 1); assert.deepEqual(state.remoteReviewPins[0].selection, selection); assert.match(state.remoteReviewPins[0].error, /unavailable/);
   assert.deepEqual(calls.map(c => c.command), ['load_remote_fleet_pins','inspect_remote_fleet_review','load_remote_project_outbox']);
@@ -30,7 +30,7 @@ test('lost save acknowledgement is reconciled without duplicate publication and 
     if (command === 'save_remote_fleet_pins') { saves++; const requested = remotePinSnapshot(args.snapshot); stored = { ...requested, revision: String(BigInt(stored.revision) + 1n) }; if (lose) { lose = false; throw new Error('lost reply'); } return stored; }
     if (command === 'remote_fleet_reviews') return { schema: 'mesh.desktop-remote-reviews/v1', objective, after: 0, snapshot: 1, next: null, entries: [{ sequence: 1, offer: selection.offer, selection: Object.fromEntries(Object.entries(selection).filter(([k]) => k !== 'objective')) }] };
     if (command === 'inspect_remote_fleet_review') return result(); throw new Error(command);
-  }, changed() {}, objectiveFor: () => true });
+  }, changed() {} });
   await c.loadSaved(); c.handle({ type: 'remote-results', objective }); await settle(); c.handle({ type: 'remote-pin', objective, offer: selection.offer, correlation: selection.correlation }); await settle();
   assert.equal(c.snapshot().remoteReviewPersistence.phase, 'error'); assert.equal(c.snapshot().remoteReviewPins.length, 1);
   assert.deepEqual(stored.pins, [pin()]); assert.doesNotMatch(JSON.stringify(stored), /bundle_changes|preview|content_digest/);
@@ -39,7 +39,7 @@ test('lost save acknowledgement is reconciled without duplicate publication and 
 });
 test('unknown stored data freezes edits without replacing the saved record', async () => {
   let writes = 0;
-  const c = createRemoteFleetReviews({ invoke: async command => { if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'future', pins: [] }; writes++; throw new Error(command); }, changed() {}, objectiveFor: () => true });
+  const c = createRemoteFleetReviews({ invoke: async command => { if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'future', pins: [] }; writes++; throw new Error(command); }, changed() {} });
   await c.loadSaved(); assert.equal(c.snapshot().remoteReviewPersistence.editable, false);
   c.handle({ type: 'remote-pin', objective, offer: selection.offer, correlation: selection.correlation }); await settle(); assert.equal(writes, 0); c.dispose();
 });
@@ -50,7 +50,7 @@ test('concurrent saved changes are preserved until explicit reload', async () =>
     if (command === 'inspect_remote_fleet_review') throw new Error('unavailable');
     if (command === 'save_remote_fleet_pins') { saves++; throw new Error('concurrent change'); }
     throw new Error(command);
-  }, changed() {}, objectiveFor: () => true });
+  }, changed() {} });
   await c.loadSaved(); await settle(); c.handle({ type: 'remote-close', pin: 'remote-1' }); await settle();
   stored = { schema, revision: '2', pins: [{ ...pin(), key: '2', correlation: '9'.repeat(64) }] };
   c.handle({ type: 'remote-pins-retry' }); await settle(); assert.equal(saves, 1); assert.equal(c.snapshot().remoteReviewPins.length, 0); assert.equal(c.snapshot().remoteReviewPersistence.phase, 'error');
