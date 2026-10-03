@@ -313,3 +313,6 @@ mod client;
 mod worker;
 pub use client::{recover_remote_worker, RemoteRecoveryClientRequest, RemoteRecoveryReceipt};
 pub use worker::{serve_remote_recovery, RemoteRecoveryBrokerOutcome, RemoteRecoveryWorkerRequest};
+
+#[cfg(test)]
+mod tests;
