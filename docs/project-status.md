@@ -630,3 +630,19 @@ English/Hebrew and disables duplicate in-flight actions. Storage formats remain 
 native/UI receipt envelopes are new v1 messages. Eligible native signing remains required. Actual
 packaged signed-app/SSH second-host download and recovery acceptance are still unverified; the
 fixed user test checkpoint is unchanged.
+
+## Retained remote creation requests
+
+Native coordinator start now retains its exact private configuration in the attachment catalogue
+before fleet allocation, custody or transport. The immutable request shares the catalogue's
+32-character creation key. Repeating identical inputs is idempotent; changing the peer, saved
+version, goal, provider, limits or deadline under that key refuses. Reading retained inputs does
+not allocate, connect, renew a lease or assert completion. The existing `created` inspection
+remains read-only and compatible with earlier configurations.
+
+The additive `mesh.native-remote-start-request/v1` records bind the physical catalogue and use
+owner-only, single-link, bounded files. At most 64 are retained within the catalogue's existing
+256-entry discovery bound. Partial, copied, substituted, oversized or conflicting records refuse
+without repair, deletion or eviction. Consumers must independently re-admit all native bindings
+before an explicit action. Graphical fresh-start setup and request recovery are the next integration
+steps in issue #218; this foundation does not establish a signed packaged or real second-host journey.
