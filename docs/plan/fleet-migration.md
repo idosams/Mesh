@@ -4407,3 +4407,12 @@ delivery pending. Existing storage formats are
 unchanged; native/UI receipt messages are paired v1 additions. Real signed packaged/second-host
 SSH acceptance remains required, along with the complete outstanding fleet plan. The fixed user
 checkpoint is not replaced.
+
+
+R86 delivery reconciliation: R83 PR #214 merged ordinarily at
+`a443da3dff36bc7dcbe6354f04c01d8baa7b91eb` after all seven exact checks passed. Corrected
+R84 and R85 original CI passed. PR #215 now targets main at `1cb08ea115e9f48647fcaccec0a94badd351fbd0`;
+PR #216 retains its dependency at `a0007a7638eb853f666711c636f1816006adc545`. Both ancestry
+updates preserved their tested implementation trees and start fresh CI. R86 integrates that stack
+with a tree identical to tested implementation `9c37676`; only this delivery record changes afterward.
+R83 combined-main and the new exact-head PR runs remain pending.
