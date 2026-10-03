@@ -5051,3 +5051,41 @@ not actual process-kill, SSH second-host or packaged native-custody evidence. Th
 gate passed 3,748 native tests in 156.004 seconds (one slow, 17 skipped), 182 rendered
 checks, 636 desktop tests and 44 real-daemon checks. Hosted validation and merge remain pending. Process termination/restart, remote cancellation delivery,
 uncertain execution reconciliation and the full fleet acceptance campaign remain required.
+
+## R109 — owned worker-process kill and original recovery
+
+This canonical test increment depends on R107/PR240 at
+`49faa84d352c2100ea42e82b1310138bada99372`, independently of the published R108 signing
+fault tests in PR241. It replaces no preserved source commit and changes no product behavior.
+
+An owned subprocess reopens the acknowledged original fixture input and guarded worker ledger,
+then serves the real signed recovery exchange. The parent waits for an explicit phase marker,
+sends SIGKILL only to that child and reaps it. The two phases are before the worker proof signature
+and after completed initialization but before the final receipt signature. A new authenticated
+exchange recovers after termination. Assertions preserve original allocation/file/store identities,
+input bytes, immutable admission, exactly one allocation and no launch intent. When initialization
+was completed before the kill, the entire recovered workspace mapping is identical. Child cleanup
+kills and reaps on failure; streams have bounded deadlines and child output uses no inherited pipes.
+
+The focused run passed both test entries in 0.630 seconds, including both kill phases. The child
+entry is inert when invoked without the isolated fixture environment. Earlier failed builds and
+runs are retained: receipt assertions were corrected without adding private Debug output, and
+the accepted test socket explicitly switches from inherited nonblocking mode to bounded blocking
+I/O. No production guard or timeout was weakened. The full local gate passed 3,747 native
+tests in 159.753 seconds (one slow, 17 skipped), 182 rendered checks, 636 desktop tests
+and 44 real-daemon checks. Hosted validation and merge remain pending.
+
+This proves local Unix subprocess termination during prelaunch recovery. It does not prove death
+after provider launch, safe uncertain-capacity release, every partial write boundary, actual SSH
+second-host recovery, native signing custody or packaged real-provider acceptance. Those remain
+required by the full fleet plan. The fixed user checkpoint is unchanged.
+
+R108/R109 consolidation: both published originals passed all seven hosted checks
+(runs `37152188050` and `37152165239`). After PR240 merged at
+`8e3a912ffafb4b9d46670c0c78738154be62fa6c`, R108 was reconciled onto canonical main
+with an identical complete source tree at `de7a3d3a2a35734a3903adf8ac68038812759a42`.
+R109 now stacks on that published PR241 revision and retains both test modules and both ledger
+entries. The combined 11 focused recovery tests passed in 1.441 seconds. The combined full
+`npm test` gate passed 3,750 native tests in 159.586 seconds (one slow, 17 skipped),
+182 rendered checks, 636 desktop tests and the real-daemon proof. Fresh hosted checks and
+merges remain pending; no product behavior, assertion or skip changed during consolidation.
