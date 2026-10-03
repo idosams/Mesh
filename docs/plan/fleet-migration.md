@@ -4926,8 +4926,10 @@ controls remain required to expose this path to users. The fixed user checkpoint
 This dependent canonical increment uses R104/PR237 at
 `b527a623b5db7db1d8a2569b718c31dac4449662`. R104's original run `37148099153` passed
 all seven checks; its unchanged source tree was reconciled with merged R103/main and retargeted
-to main. Fresh exact-head run `37148801347` remains in progress. R103/PR236 merged normally
-at `92c0caf5a08e22b25155610386c1a7884bfaffae`; its combined-main checks remain running.
+to main. Fresh exact-head run `37148801347` passed all seven checks. PR237 merged normally
+at `b169f6e9a08aac9421bcdc3b10397eb855a84ece`; R105 was reconciled with that main
+through a related-history merge with full source-tree equality. R103/PR236 merged normally
+at `92c0caf5a08e22b25155610386c1a7884bfaffae`; its combined-main run `37148640109` passed.
 R105 is new canonical implementation, replacing no preserved source commit. Preserved working
 commit `9cc6db081e6ef8bd2a2a9149852d694864c61ce0` and related-history reconciliation
 `26a446b69d9395574758b60c42e9f6983a83205c` retain its implementation history.
