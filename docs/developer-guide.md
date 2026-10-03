@@ -242,8 +242,19 @@ is not retry permission. Unknown, mismatched or concurrently advancing history r
 
 Replay stops at the revision observed at the start and reads bounded pages, including completion
 beyond the first page. The original session namespace and persisted command format are unchanged.
-This native read seam is not yet included in signed status replies or the desktop projection;
-those follow in separate increments before terminal reconciliation can be accepted end to end.
+Native coordinators can query these facts with `inspect_remote_worker_execution_over_ssh` or
+`RemoteWorkerStatusChallenge::issue_with_execution_observation`. The additive v4 status query/reply
+uses separate signing domains and the existing fresh 30-second, exact-attempt, bounded-frame
+contract. It includes admission, launch, current lease and recorded execution revision/state.
+Older v1/v2/v3 requests and replies keep their formats and cannot satisfy an explicit v4 query;
+unsupported workers refuse rather than silently downgrade. The worker rechecks the facts after
+signing, so a state change suppresses the stale reply. No workspace inspection is performed.
+
+`reports_execution()` distinguishes older responses from v4. A null recorded execution means no
+retained launch, not permission to retry. Unrecorded session state means retained launch intent
+with no committed session commands; incomplete setup means only its original prefix is present.
+Recorded running/completion remains historical evidence. Desktop presentation and safe terminal
+reconciliation still follow separately; this protocol alone releases no capacity.
 
 
 Native coordinators can call `inspect_remote_worker_over_ssh` with the exact current attempt and

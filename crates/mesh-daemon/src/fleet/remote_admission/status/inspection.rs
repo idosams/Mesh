@@ -32,6 +32,9 @@ impl VerifiedRemoteWorkerStatusQuery {
     ) -> Result<Json, Error> {
         // Authenticate registry and exact assignment before any retained-path access.
         let base = self.facts(registry)?;
+        if self.query.version == StatusVersion::Execution {
+            return self.execution_facts(registry, base);
+        }
         if self.query.version != StatusVersion::Inspected {
             return Ok(base);
         }
