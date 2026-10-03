@@ -37,6 +37,7 @@ use crate::root_authority::PinnedWorkspaceRoot;
 use crate::root_authority::ProtectedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
 
+mod received_copy;
 mod received_genesis;
 
 const CLAIM_MARKER: &[u8] = b"mesh-folder-import/1 claim\n";
@@ -745,6 +746,7 @@ impl PreparedFolderImport {
             destination_identity,
             &destination_pinned,
             &before,
+            purpose,
         ) {
             return Err(purpose.failed_copy(
                 problem,
@@ -2067,6 +2069,7 @@ fn copy_snapshot(
         destination_identity,
         &destination_root,
         snapshot,
+        ImportPurpose::User,
     )
 }
 
@@ -2077,6 +2080,7 @@ fn copy_snapshot_with_destination_root(
     destination_identity: DirectoryIdentity,
     destination_root: &PinnedWorkspaceRoot,
     snapshot: &Snapshot,
+    purpose: ImportPurpose,
 ) -> Result<(), FolderImportError> {
     let source_root = PinnedWorkspaceRoot::open(source.to_path_buf())
         .map_err(|error| FolderImportError::io("pin source directory", source, error))?;
@@ -2120,8 +2124,10 @@ fn copy_snapshot_with_destination_root(
         }
         let mut copied_bytes = 0_u64;
         let mut copied_hasher = Blake3::hasher();
-        destination_filesystem
-            .write_new_file_with(&file.relative_path, metadata.permissions(), |output| {
+        let copied = destination_filesystem.write_new_file_with(
+            &file.relative_path,
+            metadata.permissions(),
+            |output| {
                 let mut buffer = [0_u8; FILE_IO_BUFFER_BYTES];
                 loop {
                     let read = input.read(&mut buffer)?;
@@ -2135,8 +2141,20 @@ fn copy_snapshot_with_destination_root(
                     output.write_all(&buffer[..read])?;
                 }
                 Ok(())
-            })
-            .map_err(|error| FolderImportError::io("write destination file", &to, error))?;
+            },
+        );
+        match copied {
+            Ok(()) => {}
+            Err(error)
+                if purpose == ImportPurpose::Received
+                    && error.kind() == io::ErrorKind::AlreadyExists =>
+            {
+                received_copy::finish(&source_root, destination_root, file)
+                    .map_err(|error| FolderImportError::io("complete received file", &to, error))?;
+                continue;
+            }
+            Err(error) => return Err(FolderImportError::io("write destination file", &to, error)),
+        }
         if copied_bytes != file.bytes || copied_hasher.finalize() != file.digest {
             return Err(FolderImportError::VerificationMismatch {
                 paths: vec![file.relative_path.clone()],
