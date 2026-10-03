@@ -928,3 +928,16 @@ malformed-fact and English/Hebrew checks cover the new projection. The full gate
 184 rendered and 642 desktop tests plus the real daemon demo. Hosted validation and merge remain
 pending. Independent fleet-wide remote refresh and signed packaged/second-host acceptance remain
 open in [issue #250](https://github.com/idosams/Mesh/issues/250).
+
+
+### Independent remote fleet observations (R117)
+
+Visible fleet cards now request authenticated original-attempt execution records independently,
+with at most four native reads, per-lane failure/age and retained last verified history. Each read
+matches one saved native connection to the current assignment, revalidates original physical
+bindings and refuses changed assignments/settings. The existing selected-worker panel and saved
+review queues remain independent. Native and controller tests cover bounded reads, exact identity,
+late replies, revision regression, hidden views and retained errors. Full validation passed 3,771
+native, 185 rendered and 646 desktop tests plus the real daemon demo. Hosted checks and merge
+remain pending. This is source-level functionality; signed packaged and actual second-host fleet
+acceptance, terminal reconciliation and the full fleet plan remain unfinished.
