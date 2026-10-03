@@ -4335,6 +4335,17 @@ demo. No process-leak warning occurred; #37/#172 remain open. Hosted delivery is
 intent integration remain required, together with the complete outstanding fleet acceptance plan.
 
 
+R84 hosted correction: original run `37123118390` found a Linux unresolved signed-result import.
+Intent implementation and exports now use the same macOS boundary as the existing signed-result
+and ingestion APIs; the underlying inbox remains Unix-capable. No gate is weakened. The failed
+job logs are retained. Original run terminated failed; its macOS job passed. Canonical main
+was integrated with an identical implementation tree before this correction. Local revalidation
+passed: 3,657 native tests (153.018 s, one slow, one process-leak warning, 17 skipped),
+177 rendered checks, 621 desktop tests and all repository/docs/license/storage/demo gates.
+The warning occurred in `mesh-approval` text-diff context coverage; #37/#172 remain unresolved.
+Fresh hosted Linux/macOS validation is required.
+
+
 ## R85: catalogue-owned inbox identity
 
 New canonical work replacing no legacy commit. Based on published R84 PR #215
@@ -4354,3 +4365,11 @@ checks and the real daemon demo. No process-leak warning occurred. Dependency PR
 Linux compilation failure because intent exports did not match the existing macOS signed-result
 API boundary; correction and hosted delivery remain required. Desktop
 receipt and the complete remaining fleet acceptance plan are still required.
+
+
+R85 reconciled delivery base: PR #214 is retargeted to main at content-identical head
+`c12ece07893e5cb057475a098ad2fba5eff6f6e4`; corrected PR #215 head
+`674060bf03d85e3ba5518e85d0e93397bb226f63` is published and integrated here. Their original
+runs are terminal and fresh hosted checks are required. R82 combined-main passed. Both ledger
+sections were retained when resolving their append-only documentation conflict. Catalogue
+full-gate revalidation on the corrected platform boundary is pending.

@@ -577,7 +577,8 @@ receipt intents, authenticated result selection and graphical receipt/recovery r
 
 ## Retained native receipt selections
 
-An admitted receiving inbox can retain up to 64 immutable `mesh.remote-receipt-intent/v1` records.
+On macOS, matching the existing signed-result and ingestion API, an admitted receiving inbox can
+retain up to 64 immutable `mesh.remote-receipt-intent/v1` records.
 Each record binds the exact signed offer, stable allocation, inbox installation and private native
 configuration. Identical retention is idempotent; changed context for the same offer refuses.
 Listing revalidates signatures, canonical records, physical inbox identity and bounded private
