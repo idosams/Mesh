@@ -30,6 +30,7 @@ fn eligible() -> Result<(), String> {
 fn kind(action: &str, after: u64) -> Result<RemoteObservationKind, String> {
     match (action, after) {
         ("status", 0) => Ok(RemoteObservationKind::CurrentLease),
+        ("execution", 0) => Ok(RemoteObservationKind::Execution),
         ("input-inspection", 0) => Ok(RemoteObservationKind::InputInspection),
         ("results", 0..=4096) => Ok(RemoteObservationKind::Results { after }),
         _ => Err(UNAVAILABLE.into()),
@@ -160,6 +161,27 @@ impl Selection {
         ])
     }
 }
+fn execution_summary(recorded: mesh_daemon::fleet::RemoteRecordedExecution) -> Json {
+    use mesh_daemon::fleet::{RemoteExecutionState, RunState};
+    let word = match recorded.state {
+        RemoteExecutionState::Unrecorded => "unrecorded",
+        RemoteExecutionState::SetupIncomplete => "setup-incomplete",
+        RemoteExecutionState::Recorded(state) => match state {
+            RunState::Launching => "launching",
+            RunState::Running => "running",
+            RunState::Waiting => "waiting",
+            RunState::Reconciling => "reconciling",
+            RunState::Stopping => "stopping",
+            RunState::Succeeded => "succeeded",
+            RunState::Failed => "failed",
+            RunState::Cancelled => "cancelled",
+        },
+    };
+    Json::object([
+        ("revision", Json::text(recorded.revision.to_string())),
+        ("state", Json::text(word)),
+    ])
+}
 fn project(id: &str, result: RemoteObservationOutcome) -> Json {
     let mut fields = vec![
         ("schema", Json::text("mesh.remote-panel-observation/v2")),
@@ -186,6 +208,32 @@ fn project(id: &str, result: RemoteObservationOutcome) -> Json {
                         .and_then(|x| x.get("until_ms"))
                         .and_then(Json::as_u64)
                         .map_or(Json::Null, |n| Json::text(n.to_string())),
+                ),
+            ]);
+        }
+        RemoteObservationOutcome::Execution(receipt) => {
+            fields.extend([
+                ("kind", Json::text("execution")),
+                ("observed_ms", Json::text(receipt.observed_ms().to_string())),
+                (
+                    "admitted",
+                    Json::Bool(!matches!(
+                        receipt.facts().get("admission"),
+                        None | Some(Json::Null)
+                    )),
+                ),
+                (
+                    "launch_recorded",
+                    Json::Bool(!matches!(
+                        receipt.facts().get("launch"),
+                        None | Some(Json::Null)
+                    )),
+                ),
+                (
+                    "execution",
+                    receipt
+                        .recorded_execution()
+                        .map_or(Json::Null, execution_summary),
                 ),
             ]);
         }
@@ -337,5 +385,44 @@ mod tests {
         assert!(matches!(result.get("available"), Some(Json::Bool(false))));
         assert!(matches!(result.get("revision"), Some(Json::Null)));
         assert_eq!(result.get("entries"), Some(&Json::Array(vec![])));
+    }
+}
+
+#[cfg(test)]
+mod execution_tests {
+    use super::*;
+    use mesh_daemon::fleet::{RemoteExecutionState, RemoteRecordedExecution, RunState};
+    #[test]
+    fn execution_kind_and_projection_keep_exact_revision_and_historical_state() {
+        assert!(matches!(
+            kind("execution", 0),
+            Ok(RemoteObservationKind::Execution)
+        ));
+        assert!(kind("execution", 1).is_err());
+        for (revision, state, word) in [
+            (0, RemoteExecutionState::Unrecorded, "unrecorded"),
+            (2, RemoteExecutionState::SetupIncomplete, "setup-incomplete"),
+            (
+                9223372036854775807,
+                RemoteExecutionState::Recorded(RunState::Stopping),
+                "stopping",
+            ),
+            (
+                6,
+                RemoteExecutionState::Recorded(RunState::Succeeded),
+                "succeeded",
+            ),
+        ] {
+            let projection = execution_summary(RemoteRecordedExecution { revision, state });
+            assert_eq!(
+                projection.get("revision").and_then(Json::as_text),
+                Some(revision.to_string().as_str())
+            );
+            assert_eq!(projection.get("state").and_then(Json::as_text), Some(word));
+            let Json::Object(fields) = projection else {
+                panic!("object");
+            };
+            assert_eq!(fields.len(), 2);
+        }
     }
 }

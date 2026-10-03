@@ -5191,6 +5191,25 @@ records and recovery tests. All 61 combined focused tests passed in 8.596 second
 behavior changed during reconciliation. Fresh exact-head hosted validation remains required.
 
 
+## R113 — coordinator and desktop recorded execution
+
+Depends on R111/PR #244 and R112/PR #245. This increment exposes signed v4 worker
+execution history through the fleet service, explicit `--coordinator execution` command,
+and selected remote worker panel. Existing status, input inspection and result discovery
+remain separate operations. It introduces no replacement for preserved source commits.
+
+The renderer receives only the native-selected identity, observation time, admission/launch
+facts and the original session revision/state. Revisions remain decimal strings. Unknown
+progress, incomplete setup, stopping and recorded terminal states have distinct English and
+Hebrew presentation. Reads cannot allocate, adopt execution, release capacity, restart an
+agent or approve work. Selection changes clear prior execution observations; failed reads
+retain prior facts with an explicit stale-data message.
+
+Validation passed: 45 focused native tests, 49 focused controller/rendered tests, and the full
+`npm test` gate: 3,764 Rust tests in 160.533s (1 slow, 17 skipped), 183 rendered tests,
+641 desktop tests, and the real daemon demo. Hosted exact-head checks and merge remain pending. Real signed packaged SSH observation, multiple remote workers and terminal
+reconciliation remain required by the full plan. The fixed user checkpoint is unchanged.
+
 ## R114 — keep fleet observations available during native signing
 
 Tracks [issue #247](https://github.com/idosams/Mesh/issues/247). A regression reproduced
@@ -5202,10 +5221,17 @@ and final reply validation preserve their existing boundaries. No unguarded fall
 history initialization, peer-selected path, execution adoption or capacity release is added.
 
 This is new canonical work on R112/PR #245 and replaces no preserved implementation commit.
-It applies to all observation kinds on that base (current lease, input inspection and results).
-The R113 desktop execution path is a separate published dependent increment; combined coverage
-must include its execution kind after reconciliation. Initial validation passed: eight focused tests
+The initial base covered current lease, input inspection and results. Reconciliation now includes
+R113/PR #246 and extends the same signing/cancellation/authority regressions to recorded execution. Initial validation passed: eight focused tests
 and the full gate with 3,764 Rust tests in 158.100s (1 slow, 17 skipped), 182 rendered tests,
 636 desktop tests and the real daemon demo. The baseline failure, inspection-fixture correction
 and test-only lint failure are preserved. Combined validation and hosted delivery remain pending.
 Packaged responsiveness and the full parallel fleet acceptance journey remain required.
+
+
+R114 combined validation: reconciled with published R113 head
+`aca8930e04aba8ce9055ee723e578a200d9a1143`, preserving both test groups and documentation.
+All four observation kinds are covered by the signing availability, concurrent cancellation
+and lost-authority regressions. All 49 focused native tests passed in 0.431s. The full gate
+passed 3,768 Rust tests in 160.764s (1 slow, 17 skipped), 183 rendered tests, 641 desktop
+tests and the real daemon demo. Exact-head hosted validation and merge remain pending.

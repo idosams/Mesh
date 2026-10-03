@@ -883,12 +883,24 @@ hosted validation and delivery are pending. Signed packaged and real second-host
 remain unverified.
 
 
+### Recorded remote execution presentation (R113)
+
+The coordinator and desktop now expose an explicit read of the original worker's signed
+execution history, including incomplete setup and a stop request whose termination is not
+confirmed. The panel retains the observation time and exact recorded revision and clears facts
+when the selected connection changes. This extends R111/R112 without implying live process
+proof, capacity release, another authorized attempt or accepted work. Focused validation passed (45 native and 49 controller/rendered tests), followed by the full
+canonical gate (3,764 Rust, 183 rendered and 641 desktop tests plus the real daemon demo).
+Hosted exact-head checks and merge remain pending; packaged signed remote acceptance and the
+full fleet plan remain open. The fixed user testing checkpoint does not include this work.
+
 ### Fleet observation signing responsiveness (R114)
 
 A focused regression reproduced the shared service lock being held during native observation
 signing. Preparation now retains guarded history on an independent connection and releases the
 lock before signing, allowing concurrent views and cancellation. Stale context and lost authority
 still refuse the query. Eight focused tests and the full gate passed (3,764 Rust, 182 rendered,
-636 desktop tests and the real daemon demo). Combined execution-panel validation and hosted
-delivery remain pending; packaged responsiveness is not yet established.
+636 desktop tests and the real daemon demo). After combining the execution panel, all 49 focused
+native tests and the full gate passed (3,768 Rust, 183 rendered, 641 desktop tests and the daemon
+demo). Hosted delivery remains pending; packaged responsiveness is not yet established.
 This correction does not resolve terminal capacity reconciliation or the full fleet objective.

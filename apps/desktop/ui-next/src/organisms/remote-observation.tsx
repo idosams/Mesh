@@ -1,3 +1,4 @@
+import { RemoteExecution, type RecordedExecution } from "./remote-execution";
 import { RemoteCreationRequests, type CreationEntry, type CreationStatus, type CreationSource, type CreationHistories } from "./remote-creation";
 import { RemoteReceiptAttempts, type ReceiptAttempt, type ReceivedResult } from "./remote-receipt-attempts";
 import { RemoteResults, type RemoteResultPage } from "./remote-result-page";
@@ -7,7 +8,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../atoms/button";
 import { useTranslation } from "../lib/localization";
 type Selection = { id: string; host: string; worker: string; objective: string; lane: string; run: string };
-type Projection = { originalRecovery?: { disposition: "initialization-recovered" } | null; inspection?: { observed: string; disposition: "unrecorded" | "verified" | "unavailable" } | null; creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
+type Projection = { execution?: RecordedExecution | null; originalRecovery?: { disposition: "initialization-recovered" } | null; inspection?: { observed: string; disposition: "unrecorded" | "verified" | "unavailable" } | null; creations?: CreationEntry[] | null; creationStatus?: CreationStatus | null; receiptAttempts?: ReceiptAttempt[] | null; received?: ReceivedResult | null; recovery?: { disposition: string } | null; profiles?: RemoteProfiles | null; preset?: RemoteSetupPreset | null; draft?: RemoteSetupDraft | null; selection: Selection | null; busy: boolean; available: boolean; error: string;
   status: null | { observed: string; admitted: boolean; launchRecorded: boolean; leaseUntil: string | null };
   results: RemoteResultPage | null };
 const empty: Projection = { selection: null, status: null, results: null, busy: false, available: false, error: "" };
@@ -34,7 +35,7 @@ export function RemoteObservationView({ projection: p, fleets = [], projects = [
       <div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => send("choose")}>{t("Choose connection configuration")}</Button>
       {p.selection && <Button variant="secondary" disabled={disabled} onClick={() => send("forget")}>{t("Forget this selection")}</Button>}</div>
       {p.selection && <><dl className="grid gap-1 break-all text-sm">{[["Host", p.selection.host], ["Worker identity", p.selection.worker], ["Fleet", p.selection.objective], ["Lane", p.selection.lane], ["Attempt", p.selection.run]].map(([label, value]) => <div key={label}><dt className="font-medium">{t(label)}</dt><dd><bdi dir="ltr">{value}</bdi></dd></div>)}</dl>
-      <div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => send("status")}>{t("Read worker status")}</Button><Button disabled={disabled} onClick={() => send("results")}>{t("Find saved remote results")}</Button></div></>}
+      <div className="flex flex-wrap gap-2"><Button disabled={disabled} onClick={() => send("status")}>{t("Read worker status")}</Button><Button disabled={disabled} onClick={() => send("execution")}>{t("Read recorded execution")}</Button><Button disabled={disabled} onClick={() => send("results")}>{t("Find saved remote results")}</Button></div></>}
       {p.selection && <section className="grid gap-2 rounded border p-3" aria-label={t("Original input inspection")}>
         <p className="text-sm">{t("Check the original saved input on the worker. This can take time for large inputs and does not resume or restart work.")}</p>
         <Button variant="secondary" disabled={disabled} onClick={() => send("input-inspection")}>{t("Inspect original input")}</Button>
@@ -55,6 +56,7 @@ export function RemoteObservationView({ projection: p, fleets = [], projects = [
       </section>}
       {p.busy && <p role="status">{t("Working with the remote connection…")}</p>}
       {p.error && <p role="alert">{t(p.error)}</p>}
+      {p.selection && p.execution && <RemoteExecution value={p.execution} />}
       {p.status && <div className="grid gap-1 text-sm" aria-label={t("Last verified worker observation")}>
         <p>{t(p.status.admitted ? "The worker recorded this assignment." : "The worker has no admission record for this assignment.")}</p>
         <p>{t(p.status.launchRecorded ? "A launch record exists. This does not establish that the process is still running." : "No launch record was returned.")}</p>

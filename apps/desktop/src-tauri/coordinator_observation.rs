@@ -25,6 +25,7 @@ const UNAVAILABLE: &str = "The coordinator observation is unavailable or require
 #[derive(Debug, PartialEq, Eq)]
 enum Action {
     Status,
+    Execution,
     InputInspection,
     Results(u64),
     Receive,
@@ -39,6 +40,7 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
     }
     let action = match args.get(1).map(String::as_str) {
         Some("status") if args.len() == 3 => Action::Status,
+        Some("execution") if args.len() == 3 => Action::Execution,
         Some("inspect-input") if args.len() == 3 => Action::InputInspection,
         Some("receive") if args.len() == 3 => Action::Receive,
         Some("reconnect-input") if args.len() == 3 => Action::ReconnectInput,
@@ -50,7 +52,7 @@ fn parse(args: &[String]) -> Result<Option<(Action, PathBuf)>, String> {
             if after > 4096 || after.to_string() != args[3] { return Err(UNAVAILABLE.into()); }
             Action::Results(after)
         }
-        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive|start|created|reconnect-input|inspect-input|recover-original <absolute-config>".into()),
+        _ => return Err("Use --coordinator status <absolute-config> or --coordinator results <absolute-config> <after> or --coordinator receive|start|created|reconnect-input|inspect-input|execution|recover-original <absolute-config>".into()),
     };
     let path = PathBuf::from(&args[2]);
     if !path.is_absolute() {
@@ -214,6 +216,7 @@ fn execute(action: Action, path: &Path) -> Result<Json, String> {
         .map_err(|_| UNAVAILABLE)?;
     let kind = match action {
         Action::Status => RemoteObservationKind::CurrentLease,
+        Action::Execution => RemoteObservationKind::Execution,
         Action::InputInspection => RemoteObservationKind::InputInspection,
         Action::Results(after) => RemoteObservationKind::Results { after },
         Action::Receive
@@ -246,7 +249,7 @@ fn execute(action: Action, path: &Path) -> Result<Json, String> {
 
 fn output_failure(action: &Action) -> &'static str {
     match action {
-        Action::Status | Action::InputInspection | Action::Results(_) => "Verified observation output could not be written",
+        Action::Status | Action::Execution | Action::InputInspection | Action::Results(_) => "Verified observation output could not be written",
         Action::Start | Action::Created => "Start output unavailable; retain the same configuration and inspect --coordinator created",
         Action::Receive => "Saved result output could not be written; retain the same receive configuration for explicit recovery",
         Action::ReconnectInput => "Input reconnect output unavailable; inspect the original retained assignment",
@@ -267,6 +270,12 @@ fn render(result: RemoteObservationOutcome) -> Json {
     match result {
         RemoteObservationOutcome::CurrentLease(receipt) => Json::object([
             ("schema", Json::text("mesh.coordinator-status/v1")),
+            ("target", receipt.target().clone()),
+            ("observed_ms", Json::Number(receipt.observed_ms())),
+            ("facts", receipt.facts().clone()),
+        ]),
+        RemoteObservationOutcome::Execution(receipt) => Json::object([
+            ("schema", Json::text("mesh.coordinator-execution/v1")),
             ("target", receipt.target().clone()),
             ("observed_ms", Json::Number(receipt.observed_ms())),
             ("facts", receipt.facts().clone()),

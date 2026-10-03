@@ -49,12 +49,13 @@ fn kind(index: usize) -> RemoteObservationKind {
     match index {
         0 => RemoteObservationKind::CurrentLease,
         1 => RemoteObservationKind::InputInspection,
-        _ => RemoteObservationKind::Results { after: 0 },
+        2 => RemoteObservationKind::Results { after: 0 },
+        _ => RemoteObservationKind::Execution,
     }
 }
 #[test]
 fn signing_does_not_hold_fleet_mutex_and_preserves_parallel_observation() {
-    for index in 0..3 {
+    for index in 0..4 {
         let setup = crate::fleet::receiving_session::tests::Setup::new();
         let f = &setup.f;
         let h = history(f);
@@ -113,13 +114,14 @@ fn signing_does_not_hold_fleet_mutex_and_preserves_parallel_observation() {
             (0, RemoteObservationOutcome::CurrentLease(_))
                 | (1, RemoteObservationOutcome::InputInspection(_))
                 | (2, RemoteObservationOutcome::Results(None))
+                | (3, RemoteObservationOutcome::Execution(_))
         ));
         assert_eq!(h.0.native_state().unwrap(), before);
     }
 }
 #[test]
 fn cancellation_during_signing_suppresses_every_prepared_query() {
-    for index in 0..3 {
+    for index in 0..4 {
         let f = Fixture::new();
         let h = history(&f);
         assert!(h
@@ -144,7 +146,7 @@ fn cancellation_during_signing_suppresses_every_prepared_query() {
 }
 #[test]
 fn signing_failure_and_revoked_guard_never_produce_a_query() {
-    for index in 0..3 {
+    for index in 0..4 {
         let f = Fixture::new();
         let (runtime, authority) = guarded(&f);
         let h = FleetHistory(Arc::new(

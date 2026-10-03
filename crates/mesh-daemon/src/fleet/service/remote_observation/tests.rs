@@ -244,4 +244,149 @@ fn explicit_input_inspection_releases_lock_and_revalidates_the_original_attempt(
     }
 }
 
+#[test]
+fn execution_observation_is_explicit_read_only_and_context_bound() {
+    let f = Fixture::new();
+    let h = history(&f);
+    let before = h.0.native_state().unwrap();
+    let prepare_execution = || {
+        h.prepare_remote_observation(
+            "lane",
+            "run",
+            public(&f.coordinator),
+            public(&f.worker),
+            RemoteObservationKind::Execution,
+            |p| sign(&f.coordinator, p),
+        )
+        .unwrap()
+    };
+    let observed = prepare_execution()
+        .exchange(|frame| {
+            assert!(h.0.inner.try_lock().is_ok());
+            let RemoteFrame::Control(ref bytes) = frame else {
+                panic!("control");
+            };
+            assert!(std::str::from_utf8(bytes).unwrap().contains("query/v4"));
+            Ok(reply(&f, frame, false))
+        })
+        .unwrap();
+    let RemoteObservationOutcome::Execution(receipt) = observed else {
+        panic!("execution");
+    };
+    assert!(receipt.reports_execution());
+    assert_eq!(receipt.recorded_execution(), None);
+    assert_eq!(h.0.native_state().unwrap(), before);
+    assert!(prepare_execution()
+        .exchange(|_| Err(io::Error::other("offline")))
+        .is_err());
+    assert!(prepare_execution()
+        .exchange(|_| Ok(RemoteFrame::Control(b"invalid".to_vec())))
+        .is_err());
+    assert_eq!(h.0.native_state().unwrap(), before);
+    assert!(prepare_execution()
+        .exchange(|frame| {
+            let signed = reply(&f, frame, false);
+            h.0.native_command(
+                "context-advanced",
+                Command::Observe {
+                    lane: "lane".into(),
+                    run: "run".into(),
+                    state: RunState::Running,
+                },
+            )
+            .unwrap();
+            Ok(signed)
+        })
+        .is_err());
+    assert_eq!(h.0.native_state().unwrap().lanes["lane"].runs.len(), 1);
+}
+
+#[test]
+fn execution_service_reads_original_worker_completion_without_adopting_it() {
+    use crate::fleet::{
+        NativeRemoteInputReceiver, RemoteAdmissionOutcome, RemoteExecutionState,
+        RemoteLaunchOutcome,
+    };
+    let s = crate::fleet::receiving_session::tests::Setup::new();
+    let mut registry = s.f.registry();
+    let RemoteAdmissionOutcome::Reserved(input) = registry
+        .reserve(
+            s.f.work.clone(),
+            "0123456789abcdef0123456789abcdef",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
+        .unwrap()
+    else {
+        panic!("input");
+    };
+    let mut receiver =
+        NativeRemoteInputReceiver::new(&s.destination, s.manifest.clone(), &s.f.work.assignment)
+            .unwrap();
+    receiver.accept(s.digest, 0, &s.bytes, true).unwrap();
+    let workspace = receiver
+        .materialize_reserved(input)
+        .unwrap()
+        .into_worker_workspace(
+            crate::TrustedReviewers::default(),
+            crate::CheckpointRuntimeParameters::selected_defaults(),
+        )
+        .unwrap();
+    let RemoteLaunchOutcome::Reserved(reservation) = registry
+        .reserve_launch(
+            workspace,
+            "codex",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
+        .unwrap()
+    else {
+        panic!("launch");
+    };
+    let worker = reservation.into_native_session().unwrap();
+    let h = history(&s.f);
+    let coordinator_before = h.0.native_state().unwrap();
+    for (request, state) in [
+        ("worker-running", RunState::Running),
+        ("worker-done", RunState::Succeeded),
+    ] {
+        worker
+            .native_command(
+                request,
+                Command::Observe {
+                    lane: "lane".into(),
+                    run: "run".into(),
+                    state,
+                },
+            )
+            .unwrap();
+        let original = worker.native_state().unwrap();
+        let observation = h
+            .prepare_remote_observation(
+                "lane",
+                "run",
+                public(&s.f.coordinator),
+                public(&s.f.worker),
+                RemoteObservationKind::Execution,
+                |p| sign(&s.f.coordinator, p),
+            )
+            .unwrap();
+        let RemoteObservationOutcome::Execution(receipt) = observation
+            .exchange(|frame| Ok(reply(&s.f, frame, false)))
+            .unwrap()
+        else {
+            panic!("execution");
+        };
+        let recorded = receipt.recorded_execution().unwrap();
+        assert_eq!(recorded.state, RemoteExecutionState::Recorded(state));
+        assert_eq!(recorded.revision, original.revision);
+        assert_eq!(worker.native_state().unwrap(), original);
+        assert_eq!(h.0.native_state().unwrap(), coordinator_before);
+    }
+}
+
 mod signing;
