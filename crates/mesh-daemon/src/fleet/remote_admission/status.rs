@@ -16,30 +16,35 @@ const REPLY_DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v1.fleet-worker
 enum StatusVersion {
     Initial,
     Effective,
+    Inspected,
 }
 impl StatusVersion {
     fn query(self) -> &'static str {
         match self {
             Self::Initial => QUERY,
             Self::Effective => "mesh.worker-status-query/v2",
+            Self::Inspected => "mesh.worker-status-query/v3",
         }
     }
     fn reply(self) -> &'static str {
         match self {
             Self::Initial => REPLY,
             Self::Effective => "mesh.worker-status-reply/v2",
+            Self::Inspected => "mesh.worker-status-reply/v3",
         }
     }
     fn query_domain(self) -> DomainSeparator {
         match self {
             Self::Initial => QUERY_DOMAIN,
             Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-query"),
+            Self::Inspected => DomainSeparator::new("mesh.v3.fleet-worker-status-query"),
         }
     }
     fn reply_domain(self) -> DomainSeparator {
         match self {
             Self::Initial => REPLY_DOMAIN,
             Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-reply"),
+            Self::Inspected => DomainSeparator::new("mesh.v3.fleet-worker-status-reply"),
         }
     }
 }
@@ -443,6 +448,7 @@ impl RemoteWorkerStatusQuery {
         let version = match text(&schema, "schema")? {
             QUERY => StatusVersion::Initial,
             "mesh.worker-status-query/v2" => StatusVersion::Effective,
+            "mesh.worker-status-query/v3" => StatusVersion::Inspected,
             _ => return Err(invalid()),
         };
         let v = parse_envelope(encoded, version.query())?;
@@ -529,10 +535,17 @@ impl VerifiedRemoteWorkerStatusQuery {
             .find(|r| r.work.assignment.id == text(t, "assignment").unwrap());
         let Some(a) = receipt else {
             let mut facts = vec![("admission", Json::Null), ("launch", Json::Null)];
-            if self.query.version == StatusVersion::Effective {
+            if self.query.version != StatusVersion::Initial {
                 facts.push(("effective_lease", Json::Null));
             }
-            return canonical_facts(&Json::object(facts), self.query.version);
+            return canonical_facts(
+                &Json::object(facts),
+                if self.query.version == StatusVersion::Initial {
+                    StatusVersion::Initial
+                } else {
+                    StatusVersion::Effective
+                },
+            );
         };
         if identity(&registry.coordinator, &registry.objective, &a.work).encode() != t.encode() {
             return Err(invalid());
@@ -565,7 +578,7 @@ impl VerifiedRemoteWorkerStatusQuery {
             ]),
         };
         let mut facts = vec![("admission", admission), ("launch", launch)];
-        if self.query.version == StatusVersion::Effective {
+        if self.query.version != StatusVersion::Initial {
             let current = registry.effective_lease(&a)?;
             facts.push((
                 "effective_lease",
@@ -576,7 +589,14 @@ impl VerifiedRemoteWorkerStatusQuery {
                 ]),
             ));
         }
-        canonical_facts(&Json::object(facts), self.query.version)
+        canonical_facts(
+            &Json::object(facts),
+            if self.query.version == StatusVersion::Initial {
+                StatusVersion::Initial
+            } else {
+                StatusVersion::Effective
+            },
+        )
     }
     /// Sign only current guarded ledger facts; recheck them after signing. No materialization,
     /// process adoption, retry permission, lease mutation or concurrency release occurs.
@@ -595,8 +615,17 @@ impl VerifiedRemoteWorkerStatusQuery {
         sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
         time: u64,
     ) -> Result<RemoteFrame, Error> {
+        self.reply_with_destination_at(registry, None, sign, time)
+    }
+    fn reply_with_destination_at(
+        &self,
+        registry: &RemoteAdmissionRegistry,
+        destination: Option<&crate::fleet::RemoteInputDestination>,
+        sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+        time: u64,
+    ) -> Result<RemoteFrame, Error> {
         fresh(&self.query.body, time)?;
-        let facts = self.facts(registry)?;
+        let facts = self.inspected_facts(registry, destination)?;
         let body = Json::object([
             (
                 "query",
@@ -608,7 +637,7 @@ impl VerifiedRemoteWorkerStatusQuery {
         let p = payload(self.query.version.reply_domain(), &body);
         let signature = sign(&p).map_err(|_| invalid())?;
         Ed25519::verify(&self.worker, p.as_bytes(), &signature).map_err(|_| invalid())?;
-        if facts.encode() != self.facts(registry)?.encode() {
+        if facts.encode() != self.inspected_facts(registry, destination)?.encode() {
             return Err(invalid());
         }
         let encoded = envelope(self.query.version.reply(), body, &signature);
@@ -621,6 +650,9 @@ impl VerifiedRemoteWorkerStatusQuery {
 fn canonical_facts(v: &Json, version: StatusVersion) -> Result<Json, Error> {
     if version == StatusVersion::Initial {
         return canonical_base_facts(v);
+    }
+    if version == StatusVersion::Inspected {
+        return inspection::canonical_inspected_facts(v);
     }
     closed(v, &["admission", "launch", "effective_lease"])?;
     let base = canonical_base_facts(&Json::object([
@@ -788,3 +820,6 @@ pub(in crate::fleet) mod renewal;
 
 #[path = "result.rs"]
 pub(in crate::fleet) mod result;
+
+mod inspection;
+pub use inspection::inspect_remote_worker_input_over_ssh;

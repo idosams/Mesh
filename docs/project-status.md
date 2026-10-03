@@ -729,3 +729,12 @@ lease, adopt a provider or write to the ledger. Successful input inspection is n
 liveness or permission to retry. This extends #222's native recovery foundation; graphical
 reconciliation, interrupted initialization, provider recovery and signed second-host acceptance
 remain unfinished. Existing persistence formats are unchanged.
+
+### Explicit retained-input inspection (source increment)
+
+The native remote status protocol now has an explicit v3 inspection request. It reports whether
+the original acknowledged input is unrecorded, verified at observation time, or unavailable, with
+fresh coordinator/worker authentication and pre/post-signing verification. Routine v1/v2 status
+queries remain ledger-only. Inspection never resumes work, adopts a process or authorizes retry.
+The SSH helper and resident worker route are connected; desktop controls and actual signed
+packaged/second-host acceptance remain unfinished. See the [acceptance map](plan/fleet-acceptance.md).
