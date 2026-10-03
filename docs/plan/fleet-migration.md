@@ -4169,5 +4169,7 @@ Manual inspection of the remote panel was blocked by the locked Mac; no security
 
 R76 / PR #207's original stacked run 37116690725 and main-targeted run 37117509243 both passed
 all seven checks. It now integrates R77 main after those runs ended. Both ledger entries are retained;
-no implementation conflict occurred. Full local verification of the combined tree and fresh hosted
-checks are pending. Neither older passing run substitutes for the new integrated revision.
+no implementation conflict occurred. Full local verification of the combined tree passed: 3,629
+native tests (151.067 s, one slow, 17 skipped), 173 rendered tests, 607 desktop tests and 44
+daemon-demo checks. No process-leak warning occurred; #172 remains unresolved. Fresh hosted checks
+are pending. Neither older passing run substitutes for the new integrated revision.
