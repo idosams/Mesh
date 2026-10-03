@@ -971,6 +971,28 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn recover_original_remote_worker(
+        app: tauri::AppHandle,
+        id: String,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || panel.recover_original(&id))
+                .await
+                .map_err(|_| "Original recovery outcome needs reconciliation".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, id);
+            Err("Original worker recovery is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn reconnect_remote_input(app: tauri::AppHandle, id: String) -> Result<String, String> {
         #[cfg(target_os = "macos")]
         {
@@ -8188,6 +8210,7 @@ mod desktop {
                 clear_remote_setup,
                 remote_connection_profiles,
                 reconnect_remote_input,
+                recover_original_remote_worker,
                 remote_result_receipt,
                 remote_creation,
                 configure_remote_observation,

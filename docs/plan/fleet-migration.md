@@ -4989,3 +4989,33 @@ This is native source integration with configuration/output refusal tests, not r
 signing success or packaged provider acceptance. Graphical recovery, uncertain-execution
 reconciliation and the full fleet acceptance campaign remain required. The fixed checkpoint is
 unchanged.
+
+## R107 — explicit desktop original workspace recovery
+
+This canonical increment depends on published R106/PR239 at
+`b0aa5262f77ecc1929da5c168a66addd9ddb9319`; it replaces no preserved source commit.
+R105/PR238 exact-head run `37149462676` passed all seven checks. PR239's original
+run `37150128362` remains running; neither parent is merged at this entry.
+
+The remote panel now exposes a distinct original-workspace recovery action. It retains the native
+selection, admitted peer and file identities; the renderer supplies only the opaque selected ID.
+Native code checks the eligible application, selection and installation before and after signing
+and after the exchange. The projection contains only the authenticated initialization disposition
+and exact selection/attempt correlation, not private proof or filesystem contents.
+
+English and Hebrew copy states that recovery may start the originally assigned agent and cannot
+restart existing or uncertain execution. A successful reply does not claim the provider is running.
+Duplicate clicks are suppressed; failure clears the new recovery result, preserves the selected
+attempt and previous observations, and never retries automatically. Recovery does not replace
+pinned reviews, download a result or approve protected main.
+
+All 43 focused controller/rendering tests passed, including strict attempt/schema/disposition
+matching, opaque bridge arguments, duplicate suppression, lost-reply uncertainty, preserved
+observations and localized disabled/hidden controls. Both native panel signing-boundary tests
+passed in 0.691 seconds. The full local gate passed 3,745 native tests in 155.588 seconds
+(one slow, 17 skipped), 182 rendered checks, 636 desktop tests and 44 real-daemon checks.
+Hosted validation and merged delivery remain pending. These are controller,
+static-rendered and native refusal tests, not signed packaged or second-host acceptance.
+
+The full remote fault/uncertain-execution campaign and packaged real-provider/second-host
+recovery remain required. The fixed user checkpoint is unchanged.

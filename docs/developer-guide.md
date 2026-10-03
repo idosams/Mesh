@@ -959,3 +959,11 @@ Its signed receipt reports `initialization-recovered`, not provider completion. 
 signing or output fails, retain the original configuration and inspect its status before further
 action; never create a replacement assignment or infer released capacity. Desktop recovery controls
 and real second-host acceptance are still unfinished.
+
+The desktop remote panel exposes **Recover original worker workspace** for the current native
+connection selection. This uses the same recovery operation as the coordinator command. Read
+the displayed effect before using it: successful setup recovery may start the originally assigned
+agent through its worker supervisor. Existing launch intents remain uncertain and cannot be
+restarted with this action. After an unconfirmed response, keep the same selection and read worker
+status; do not infer that nothing happened or that another attempt is safe. Previous observations
+and pinned reviews stay available. Successful signed packaged/second-host acceptance is pending.
