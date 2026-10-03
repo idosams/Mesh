@@ -29,6 +29,33 @@ CREATE TABLE IF NOT EXISTS mesh_recovery_observation (
 ) STRICT;
 ";
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
+#[path = "sqlite_native_vfs.rs"]
+mod native_vfs;
+
+fn open_bound_connection(
+    filename: impl AsRef<Path>,
+    flags: OpenFlags,
+    namespace: &Path,
+) -> rusqlite::Result<Connection> {
+    #[cfg(target_os = "linux")]
+    if namespace
+        .as_os_str()
+        .as_encoded_bytes()
+        .starts_with(b"/proc/self/fd/")
+    {
+        native_vfs::register()?;
+        return Connection::open_with_flags_and_vfs(
+            filename,
+            flags | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            native_vfs::NAME,
+        );
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = namespace;
+    Connection::open_with_flags(filename, flags)
+}
+
 /// A live connection to one workspace's `metadata.sqlite`.
 #[derive(Debug)]
 pub struct Sqlite {
@@ -47,7 +74,8 @@ impl Sqlite {
     /// [`SqliteError`] when SQLite cannot open the supplied path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SqliteError> {
         let path = path.as_ref().to_path_buf();
-        let connection = Connection::open(&path).map_err(SqliteError::driver)?;
+        let connection = open_bound_connection(&path, OpenFlags::default(), &path)
+            .map_err(SqliteError::driver)?;
         Ok(Self { path, connection })
     }
 
@@ -195,9 +223,10 @@ impl SqliteRecoveryState {
         let opened_path = canonical_database_path(path)?;
         let path = opened_path.as_path();
         refuse_database_family_aliases(path)?;
-        let connection = Connection::open_with_flags(
+        let connection = open_bound_connection(
             path,
             OpenFlags::default() | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            path,
         )
         .map_err(SqliteRecoveryStateError::driver)?;
         restrict_database_family_to_owner(path)?;
@@ -932,11 +961,12 @@ fn load_legacy_snapshot(
     if !path.exists() {
         return Ok(None);
     }
-    let connection = Connection::open_with_flags(
+    let connection = open_bound_connection(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        path,
     )
     .map_err(SqliteRecoveryStateError::driver)?;
     let table_exists = connection
@@ -1002,12 +1032,13 @@ fn load_immutable_snapshot(
         ));
     }
     let uri = immutable_database_uri(path)?;
-    let connection = Connection::open_with_flags(
+    let connection = open_bound_connection(
         uri,
         OpenFlags::SQLITE_OPEN_READ_ONLY
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW
             | OpenFlags::SQLITE_OPEN_URI,
+        path,
     )
     .map_err(SqliteRecoveryStateError::driver)?;
     let primary_table_exists = connection
@@ -1588,6 +1619,63 @@ mod native_reference_tests {
             let _ = std::fs::remove_dir_all(&self.root);
         }
     }
+    #[test]
+    fn native_wal_connections_keep_original_directory_after_rename() {
+        let fixture = Fixture::new();
+        let database = fixture.reference.join("index.sqlite");
+        let first = Sqlite::open(&database).unwrap();
+        first.connection.execute_batch(
+            "PRAGMA journal_mode=WAL; CREATE TABLE retained(value INTEGER); INSERT INTO retained VALUES(1);"
+        ).unwrap();
+        let retained = fixture.root.join("retained");
+        std::fs::rename(&fixture.original, &retained).unwrap();
+        std::fs::create_dir(&fixture.original).unwrap();
+        let second = Sqlite::open(&database).unwrap();
+        second
+            .connection
+            .execute("INSERT INTO retained VALUES(2)", [])
+            .unwrap();
+        assert_eq!(
+            first
+                .connection
+                .query_row("SELECT sum(value) FROM retained", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        assert!(retained.join("index.sqlite-wal").is_file());
+        assert!(retained.join("index.sqlite-shm").is_file());
+        assert_eq!(std::fs::read_dir(&fixture.original).unwrap().count(), 0);
+        drop(second);
+        drop(first);
+        let reopened = Sqlite::open(&database).unwrap();
+        assert_eq!(
+            reopened
+                .connection
+                .query_row("SELECT count(*) FROM retained", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        drop(reopened);
+        assert_eq!(std::fs::read_dir(&fixture.original).unwrap().count(), 0);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn native_index_refuses_leaf_links_without_touching_target() {
+        let fixture = Fixture::new();
+        let target = fixture.root.join("unrelated.sqlite");
+        std::fs::write(&target, b"unrelated preserved bytes").unwrap();
+        let database = fixture.reference.join("index.sqlite");
+        std::os::unix::fs::symlink(&target, fixture.original.join("index.sqlite")).unwrap();
+        assert!(Sqlite::open(&database).is_err());
+        assert_eq!(
+            std::fs::read(&target).unwrap(),
+            b"unrelated preserved bytes"
+        );
+    }
+
     #[test]
     fn native_recovery_database_keeps_its_directory_reference_after_rename() {
         let fixture = Fixture::new();

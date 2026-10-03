@@ -4772,3 +4772,34 @@ Reconstructing pending/confirmed ownership from bounded pinned receipts, guarded
 lease checks, worker mapping completion, authenticated recovery UI, uncertain-process reconciliation
 and the full real-host fault journey remain in the acceptance plan. The fixed user checkpoint at
 `13fedd9f94706fc0f3ac6bc7f5e6d6302735faa8` does not include this source increment.
+
+
+R101 hosted correction: original PR234 Linux run `37143422615` failed received-worker
+initialization (998 tests passed before two failures stopped that job). The bundled SQLite unix
+VFS resolves `/proc/self/fd` links in its full-path callback, which conflicts with the existing
+`SQLITE_OPEN_NOFOLLOW` recovery opens. Merely dropping that flag would also leave SQLite using
+an ordinary resolved pathname. The original failed run is preserved; this revision remains unmerged.
+
+The correction registers a process-lifetime copy of SQLite's bundled unix VFS with only its
+full-path callback specialized for a validated `/proc/self/fd/<fd>/<single filename>`. The native
+caller retains the directory descriptor; the callback requires that it still names a directory,
+rejects traversal, malformed descriptors and linked/nonregular/multiply linked database leaves,
+and bounds the output buffer. All other paths use the original callback. SQLite's native file,
+locking, sync, journal and WAL operations remain intact, including `O_NOFOLLOW`, and recovery
+opens keep `SQLITE_OPEN_NOFOLLOW`. Both the ordinary index and recovery/read-only connections
+select this adapter for Linux descriptor references. Registration is serialized and never replaces
+the process default VFS. The small FFI boundary documents buffer and registration lifetimes.
+
+New regressions keep two WAL connections and their sidecars in the original directory across a
+rename/replacement, verify retained contents after reopen, and refuse database leaf links. A
+cross-platform callback test also verifies ordinary-path delegation and symlink refusal. Its first
+macOS run correctly refused the test's `/var` alias; the test now supplies the canonical ordinary
+parent, as production recovery does. That failed test log is preserved. Updated full validation
+and a fresh exact-head hosted Linux run are required before this correction is delivered.
+
+The corrected focused macOS run passed all four applicable tests in 0.054s. Full `npm test`
+also passed 3,720 native tests (one slow, 17 skipped), 181 rendered checks, 634 desktop tests
+and all 44 real-daemon checks, without a leak warning. This validates the shared FFI adapter
+and unchanged macOS path; Linux-specific descriptor execution still requires fresh hosted proof.
+The original PR234 run is terminal: macOS and five other checks passed, Linux failed. The
+preceding merged PR233 main run `37143376511` passed. Neither original run was restarted.
