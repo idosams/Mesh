@@ -46,6 +46,28 @@ impl Fixture {
             now,
         }
     }
+    pub(in crate::fleet) fn reopen_existing(path: PathBuf) -> Self {
+        assert!(path.join("worker.sqlite").is_file());
+        let coordinator = SigningKey::from_bytes(&[5; 32]);
+        let worker = SigningKey::from_bytes(&[7; 32]);
+        let registry = RemoteAdmissionRegistry::new(
+            FleetStore::open(path.join("worker.sqlite")).unwrap(),
+            &key(&public(&coordinator)),
+            &key(&public(&worker)),
+            "objective",
+            limits(),
+        )
+        .unwrap();
+        let receipts = registry.receipts().unwrap();
+        assert_eq!(receipts.len(), 1);
+        Self {
+            path,
+            coordinator,
+            worker,
+            work: receipts[0].work().clone(),
+            now: now_ms().unwrap(),
+        }
+    }
     pub(in crate::fleet) fn registry(&self) -> RemoteAdmissionRegistry {
         RemoteAdmissionRegistry::new(
             FleetStore::open(self.path.join("worker.sqlite")).unwrap(),
