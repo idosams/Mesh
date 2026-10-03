@@ -5058,3 +5058,23 @@ This proves local Unix subprocess termination during prelaunch recovery. It does
 after provider launch, safe uncertain-capacity release, every partial write boundary, actual SSH
 second-host recovery, native signing custody or packaged real-provider acceptance. Those remain
 required by the full fleet plan. The fixed user checkpoint is unchanged.
+
+## R110 — process death preserves uncertain launch intent
+
+This canonical test increment depends on published R109/PR242 at
+`a690c3a67e7837232b848b76db5fed0d9c6d75f1`. It replaces no preserved source commit
+and changes no production behavior.
+
+The owned subprocess campaign adds a third explicit phase: after successful initialization
+acknowledgment and atomic launch-intent reservation, before provider admission/spawn. The
+parent observes that phase, SIGKILLs and reaps the child, then attempts a fresh authenticated
+recovery. Both peers refuse recovery while the original launch receipt remains unchanged.
+The test also preserves the exact workspace mapping, original admission/input identities and
+bytes, single allocation and unchanged coordinator state. Earlier prelaunch phases continue
+to recover normally. The focused run passed both entries and all three phases in 0.849 seconds.
+
+This tests the uncertain intent boundary, not actual provider-process death, liveness or safe
+capacity release. It grants no restart/adoption permission based on PID death or released locks.
+The full local gate passed 3,747 native tests in 161.534 seconds (one slow, 17 skipped),
+182 rendered checks, 636 desktop tests and 44 daemon checks. Hosted validation,
+real-provider/SSH/packaged acceptance and terminal reconciliation remain required. The fixed user checkpoint remains unchanged.
