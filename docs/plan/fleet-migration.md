@@ -4116,6 +4116,21 @@ Reliability issue #172 remains open: a separate instrumented full native run pas
 without reproducing a leak. Earlier focused direct probes used a different dependency build closure
 from the workspace suite and do not establish a cause or fix. No test threshold was changed.
 
+## R76: native SSH file paths with spaces
+
+R76 is new canonical setup work, replacing no legacy commit. It depends on R75 / PR #206
+(`cb99e4d3d8681620350c7f8be0f5a7dfffca3ec5`) and is published separately against that parent.
+Existing private identity and known-host files may live in directories such as `Application Support`.
+The identity remains one argument; the known-hosts option contains one quoted literal path.
+Expansion tokens, quotes, escapes and controls still refuse, and existing owner, mode, link, size
+and metadata-change checks remain enforced. Mesh does not create keys or enroll host trust.
+The new positive regression failed before the fix. All nine focused transport tests then passed
+(0.104 s), including inspection by the installed SSH parser with real placeholder files and no
+network connection. Full `npm test` passed: 3,626 native tests (150.432 s, one slow,
+17 skipped), 170 rendered tests, 601 desktop tests and 44 daemon-demo checks. No process-leak
+warning occurred; this does not resolve #172. Hosted validation is pending. This is setup
+groundwork, not graphical connection management, authenticated SSH or second-host acceptance.
+
 ## R77: graphical native remote observation panel
 
 R75 / PR #206 merged as `6b4d4048e3f050f6b242ffb582226bdabc71a35f` after all seven exact-head
@@ -4142,3 +4157,19 @@ Hosted verification is pending.
 Persistent editable profiles, remote execution/recovery controls, result pagination/import, packaged
 signed-app/SSH/second-host acceptance and the complete fleet plan remain required. The fixed user
 checkpoint has not changed.
+
+### R76/R77 combined-main integration
+
+R77 / PR #208 merged as `0a3b4cb57fbbbbf1f029b8713e467080fe44b26f` after all seven exact-head
+checks in run 37117438917 passed. Combined-main run 37118015370 is pending. The exact sealed
+`aca0980fb53c089e14b0bb1ff157437e4abaa97d` app passed the existing-project packaged journey:
+attachment/capture, two pinned comparisons, independent line, restart/resume/detach and unchanged
+Git. This is graphical regression evidence, not remote-control/SSH/provider/main-approval proof.
+Manual inspection of the remote panel was blocked by the locked Mac; no security setting changed.
+
+R76 / PR #207's original stacked run 37116690725 and main-targeted run 37117509243 both passed
+all seven checks. It now integrates R77 main after those runs ended. Both ledger entries are retained;
+no implementation conflict occurred. Full local verification of the combined tree passed: 3,629
+native tests (151.067 s, one slow, 17 skipped), 173 rendered tests, 607 desktop tests and 44
+daemon-demo checks. No process-leak warning occurred; #172 remains unresolved. Fresh hosted checks
+are pending. Neither older passing run substitutes for the new integrated revision.
