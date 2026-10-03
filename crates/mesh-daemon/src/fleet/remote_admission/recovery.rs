@@ -4,6 +4,23 @@ use crate::fleet::{ReceivedWorkerWorkspace, RemoteInputDestination};
 use crate::{CheckpointRuntimeParameters, TrustedReviewers};
 
 impl RemoteAdmissionRegistry {
+    pub(in crate::fleet) fn verify_recovery_scope(
+        &self,
+        coordinator: &str,
+        worker: &str,
+        objective: &str,
+        limits: &Limits,
+    ) -> Result<(), Error> {
+        let _guarded = self.store.reopen_guarded_connection()?;
+        if self.coordinator != coordinator
+            || self.worker != worker
+            || self.objective != objective
+            || &self.limits != limits
+        {
+            return refuse("remote-recovery-registry-scope");
+        }
+        Ok(())
+    }
     pub(in crate::fleet) fn recover_initialization(
         &self,
         destination: &RemoteInputDestination,

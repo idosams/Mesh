@@ -4920,3 +4920,45 @@ in 157.288 seconds (one slow, 17 skipped), 181 rendered checks, 634 desktop test
 
 The authenticated recovery wire exchange, worker-connection routing, coordinator action and desktop
 controls remain required to expose this path to users. The fixed user checkpoint stays unchanged.
+
+## R105 — authenticated original-recovery wire and native worker routing
+
+This dependent canonical increment uses R104/PR237 at
+`b527a623b5db7db1d8a2569b718c31dac4449662`. R104's original run `37148099153` passed
+all seven checks; its unchanged source tree was reconciled with merged R103/main and retargeted
+to main. Fresh exact-head run `37148801347` passed all seven checks. PR237 merged normally
+at `b169f6e9a08aac9421bcdc3b10397eb855a84ece`; R105 was reconciled with that main
+through a related-history merge with full source-tree equality. R103/PR236 merged normally
+at `92c0caf5a08e22b25155610386c1a7884bfaffae`; its combined-main run `37148640109` passed.
+R105 is new canonical implementation, replacing no preserved source commit. Preserved working
+commit `9cc6db081e6ef8bd2a2a9149852d694864c61ce0` and related-history reconciliation
+`26a446b69d9395574758b60c42e9f6983a83205c` retain its implementation history.
+
+The bounded wire exchange binds a fresh signed coordinator request, worker-signed R103 proof,
+coordinator recovery signature and worker-signed receipt to the exact original assignment. Closed
+canonical v1 schemas reject unknown fields and oversized control frames. Worker policy, original
+registry limits and current effective lease are independently checked. Coordinator cancellation and
+full lane/limits changes are checked around signing and exchanges. Original admission encoding and
+persisted formats are unchanged; older endpoints refuse the new distinct recovery request. Native
+worker connections require explicit recovery opt-in and independently installed roots and keys.
+
+Recovery retains the R104 exclusive handoff even if the final receipt signature/write fails.
+Native mailbox backpressure retains the same request; repeat recovery/dispatch refuses while the
+connection owner holds the original assignment. Launch still passes the original atomic intent and
+lease checks. A local reply write is not peer acceptance, and the signed receipt observes recovered
+initialization, not provider execution. No receipt adoption, automatic execution retry or uncertain
+capacity release is introduced.
+
+Eight focused regressions passed in 2.337 seconds: malformed/unknown/noncanonical requests,
+independent policy and original-limit checks, stale requests, renewed-lease mapping preservation,
+modified worker proofs/final receipts, cancellation during either coordinator signature, absent or
+invalid commit, native opt-in refusal and real local fixture-process handoff after final-reply loss.
+The native endpoint test retains ownership through closed-mailbox delivery and starts the fixture
+once after delivery becomes available. This is native fixture integration, not real-provider, SSH,
+Developer ID or second-host acceptance. The full local gate passed 3,742 native tests in 160.750 seconds (one slow, 17 skipped),
+181 rendered checks, 634 desktop tests and the real-daemon checks. Hosted validation and
+merged delivery remain pending.
+
+The coordinator SSH/native application action and desktop recovery controls remain required.
+Cancellation delivery during remote work, uncertain-execution reconciliation, the full fault campaign
+and packaged second-host acceptance remain open. The fixed user checkpoint is unchanged.
