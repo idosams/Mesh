@@ -4176,9 +4176,11 @@ are pending. Neither older passing run substitutes for the new integrated revisi
 
 ## R78: native in-app remote connection setup
 
-R78 is new canonical work, replacing no legacy commit, stacked on PR #207's published integrated
+R78 is new canonical work, replacing no legacy commit, based on PR #207's verified integrated
 head `f94470c3ba4418945626e7b0d674adae6d4510c6`. PR #208 and its combined-main checks passed.
-PR #207's fresh run 37118616368 remains pending. The fixed user checkpoint is unchanged.
+PR #207's fresh run 37118616368 passed all seven checks; it merged as
+`79c736d80e20abdfc0391021425dd4ea4af033f4`. R78 targets main after a content-identical ancestry
+merge. The fixed user checkpoint is unchanged.
 
 The remote observation panel now accepts public worker/account/port/identity fields and exact
 fleet/lane choices without requiring a hand-written configuration file. Native choosers retain
