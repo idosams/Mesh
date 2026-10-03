@@ -57,7 +57,21 @@ test('remote result page exposes separate identities, escapes labels and bounds 
   const html = module.exports.render(p);
   assert.match(html, /Saved result<!-- --> 17|Saved result 17/);
   assert.match(html, /&lt;script&gt;x&lt;\/script&gt;/); assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /have not been downloaded or accepted/);
+  assert.match(html, /Listing a result does not download or accept it/);
+  assert.match(html, /Download for review/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>Next results<\/button>/);
   assert.match(html, /<bdi dir="ltr">version<\/bdi>/);
+});
+
+
+test('saved download recovery exposes review only after a verified completion and disables busy actions', () => {
+  const p = projection(); p.receiptAttempts = [{ offer: 'offer', checkpoint: '<script>checkpoint</script>', version: 'version' }];
+  let html = module.exports.render(p);
+  assert.match(html, /Load saved downloads/); assert.match(html, /Check or resume saved download/);
+  assert.match(html, /&lt;script&gt;checkpoint&lt;\/script&gt;/); assert.doesNotMatch(html, /Show downloaded reviews/);
+  p.received = { offer: 'offer', correlation: 'correlation', version: 'version', review: 'review', objective: 'fleet' }; p.busy = true;
+  html = module.exports.render(p);
+  assert.match(html, /has not been approved or applied/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Show downloaded reviews<\/button>/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Check or resume saved download<\/button>/);
 });

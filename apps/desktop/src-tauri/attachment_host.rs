@@ -1225,6 +1225,25 @@ impl AttachmentHost {
     }
 
     #[cfg(target_os = "macos")]
+    pub(crate) fn remote_result_inbox(
+        &self,
+        protected: &[mesh_daemon::ProtectedWorkspaceRoot],
+        create: bool,
+    ) -> Result<Option<mesh_daemon::fleet::RemoteResultInbox>, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, create)?;
+        let Some(storage) = &state.storage else {
+            return Ok(None);
+        };
+        let parent = self.storage_path.parent().ok_or(UNAVAILABLE)?;
+        let identity =
+            mesh_daemon::ProtectedWorkspaceRoot::inspect(parent).map_err(|_| UNAVAILABLE)?;
+        storage
+            .remote_result_inbox(parent, identity, protected, create)
+            .map_err(|_| "Receiving storage needs reconciliation".into())
+    }
+
+    #[cfg(target_os = "macos")]
     pub(crate) fn connection_settings(
         &self,
         recover: bool,

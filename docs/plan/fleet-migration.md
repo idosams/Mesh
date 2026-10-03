@@ -4384,3 +4384,26 @@ create/reopen/private-child regression and 0770/0777 refusal checks. Final full 
 checks, 621 desktop tests and all repository/docs/license/storage/demo gates. The warning occurred
 in `a_refused_open_is_published_too_so_a_subscriber_learns_about_it`; #37/#172 remain open.
 Corrected PR #215 hosted Linux tests and lint passed; macOS and full hosted delivery remain pending.
+
+
+## R86: graphical exact-result download and explicit recovery
+
+New canonical work replacing no legacy commit, based on published R85 PR #216 head
+`97226882a4c3c6894f38cc651896c05c7edec17a`. Corrected R84 PR #215 original fresh checks passed;
+R85 original CI remains active. A bounded native cache retains the authenticated signed page,
+while the renderer supplies only selection/offer identities. Native commands reuse the app-owned
+catalogue/history, retain inbox binding and exact receipt intent before I/O, prepare original saved
+input, then use existing guarded ingestion. Explicit saved-attempt listing/recovery survives a
+connection reopen; completed replay verifies local copies. Verified completion links to the
+existing fleet result queue and parallel pinning. No paths/offers/manifests/allocations from the
+renderer, automatic retries, execution, original-folder writes or main approval are introduced.
+
+Twenty-four controller tests and 178 rendered/typecheck checks passed. Eighteen focused native
+panel/ingestion tests passed (4.566 s), including actual host inbox reopening, owner reuse and
+unsigned-app refusal before storage access. Full gate passed: 3,664 native tests (150.785 s,
+one slow, 17 skipped), 178 rendered checks, 625 desktop tests and all repository/docs/license/
+storage/demo gates. No process-leak warning occurred; #37/#172 remain unresolved. Hosted
+delivery pending. Existing storage formats are
+unchanged; native/UI receipt messages are paired v1 additions. Real signed packaged/second-host
+SSH acceptance remains required, along with the complete outstanding fleet plan. The fixed user
+checkpoint is not replaced.

@@ -6,6 +6,7 @@ const DOMAIN: DomainSeparator = DomainSeparator::new("mesh.v1.worker-saved-resul
 
 /// A worker-signed immutable offer. Receiving this does not prove that any content arrived.
 /// Private task correlation must not be printed to general logs.
+#[derive(Clone)]
 pub struct RemoteSavedResultOffer {
     body: Json,
     signature: Signature,
