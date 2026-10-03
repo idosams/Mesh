@@ -196,8 +196,10 @@ private resident endpoint. Mesh does not edit SSH configuration, accounts, keys 
 No desktop or agent command exposes this transport yet.
 
 Configuration uses a literal DNS/IPv4 host, account, port, and existing absolute private identity
-and known-host files. Paths are restricted to ASCII letters, digits, slash, period, underscore and
-hyphen; unsupported names/IPv6 literals refuse. File contents must remain operator-controlled.
+and known-host files. Paths allow ASCII letters, digits, slash, period, underscore, hyphen and
+spaces (including ordinary `Application Support` directories). Native code passes the identity as
+one argument and quotes the single known-hosts path for OpenSSH. Expansion tokens, quotes, escapes,
+control characters and unsupported names/IPv6 literals refuse. File contents must remain operator-controlled.
 Ambient SSH configuration, agent authentication, password prompts, forwarding and multiplexed
 connections are disabled. Unsupported SSH options fail rather than falling back to weaker settings.
 Encrypted identities requiring interaction refuse in this noninteractive route.

@@ -4115,3 +4115,18 @@ remote/provider/human-approval acceptance remain required. Hosted CI is pending.
 Reliability issue #172 remains open: a separate instrumented full native run passed all 3,621 tests
 without reproducing a leak. Earlier focused direct probes used a different dependency build closure
 from the workspace suite and do not establish a cause or fix. No test threshold was changed.
+
+## R76: native SSH file paths with spaces
+
+R76 is new canonical setup work, replacing no legacy commit. It depends on R75 / PR #206
+(`cb99e4d3d8681620350c7f8be0f5a7dfffca3ec5`) and is published separately against that parent.
+Existing private identity and known-host files may live in directories such as `Application Support`.
+The identity remains one argument; the known-hosts option contains one quoted literal path.
+Expansion tokens, quotes, escapes and controls still refuse, and existing owner, mode, link, size
+and metadata-change checks remain enforced. Mesh does not create keys or enroll host trust.
+The new positive regression failed before the fix. All nine focused transport tests then passed
+(0.104 s), including inspection by the installed SSH parser with real placeholder files and no
+network connection. Full `npm test` passed: 3,626 native tests (150.432 s, one slow,
+17 skipped), 170 rendered tests, 601 desktop tests and 44 daemon-demo checks. No process-leak
+warning occurred; this does not resolve #172. Hosted validation is pending. This is setup
+groundwork, not graphical connection management, authenticated SSH or second-host acceptance.

@@ -45,7 +45,7 @@ fn private_file(path: &Path) -> io::Result<Metadata> {
         || text.len() > 4096
         || !text
             .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+            .all(|b| b.is_ascii_alphanumeric() || b"/._- ".contains(&b))
     {
         return Err(refused());
     }
@@ -140,8 +140,12 @@ impl NativeSshDestination {
         ] {
             c.args(["-o", option]);
         }
-        c.arg("-o")
-            .arg(format!("UserKnownHostsFile={}", self.known_hosts.display()));
+        // OpenSSH parses this option as a list: quote the single admitted literal path.
+        // Admission excludes quotes, escapes, expansion tokens and control characters.
+        c.arg("-o").arg(format!(
+            "UserKnownHostsFile=\"{}\"",
+            self.known_hosts.display()
+        ));
         c.arg("-i")
             .arg(&self.identity)
             .arg("-p")

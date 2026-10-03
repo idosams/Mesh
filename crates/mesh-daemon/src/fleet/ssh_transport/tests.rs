@@ -115,6 +115,76 @@ fn installed_ssh_effective_policy_is_noninteractive_and_fixed_subsystem() {
         );
     }
 }
+#[test]
+fn private_paths_with_spaces_remain_single_literal_ssh_files() {
+    let f = Fixture::new();
+    let directory = f.0.join("Application Support");
+    std::fs::create_dir(&directory).unwrap();
+    let identity = directory.join("worker identity");
+    let hosts = directory.join("known hosts");
+    std::fs::rename(f.0.join("identity"), &identity).unwrap();
+    std::fs::rename(f.0.join("known-hosts"), &hosts).unwrap();
+    let destination =
+        NativeSshDestination::admit("worker.example.invalid", "worker", 22, &identity, &hosts)
+            .unwrap();
+    destination.verify().unwrap();
+    let command = destination.command();
+    let args: Vec<_> = command.get_args().collect();
+    let identity_argument = args.iter().position(|arg| *arg == "-i").unwrap() + 1;
+    assert_eq!(args[identity_argument], identity.as_os_str());
+    let hosts_option = format!("UserKnownHostsFile=\"{}\"", hosts.display());
+    assert_eq!(
+        args.iter()
+            .filter(|arg| **arg == hosts_option.as_str())
+            .count(),
+        1
+    );
+
+    // Inspect the installed parser with existing placeholder files, without contacting any host.
+    let mut inspection = Command::new("/usr/bin/ssh");
+    inspection
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .arg("-G")
+        .args(args);
+    let mut connection = NativeSshConnection::spawn(inspection, Duration::from_secs(10)).unwrap();
+    connection.close_input();
+    let mut output = String::new();
+    connection.output().read_to_string(&mut output).unwrap();
+    let identities: Vec<_> = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("identityfile "))
+        .collect();
+    assert_eq!(identities, vec![identity.to_str().unwrap()]);
+    let host_files: Vec<_> = output
+        .lines()
+        .filter_map(|line| line.strip_prefix("userknownhostsfile "))
+        .collect();
+    assert_eq!(host_files, vec![hosts.to_str().unwrap()]);
+    std::fs::write(&hosts, b"changed trust after admission").unwrap();
+    assert!(destination.verify().is_err());
+}
+
+#[test]
+fn private_paths_still_refuse_ssh_expansion_quotes_and_control_characters() {
+    let f = Fixture::new();
+    for name in [
+        "percent%h",
+        "tilde~",
+        "quote\"",
+        "single'",
+        "back\\slash",
+        "tab\t",
+        "newline\n",
+        "dollar${HOME}",
+    ] {
+        let path = f.0.join(name);
+        std::fs::write(&path, b"placeholder").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(private_file(&path).is_err(), "unsupported path admitted");
+    }
+}
+
 fn pipe(budget: Duration) -> (SshPipe, UnixStream) {
     let (stream, peer) = UnixStream::pair().unwrap();
     let file = File::from(std::os::fd::OwnedFd::from(stream));
