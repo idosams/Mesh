@@ -4,6 +4,8 @@ import { isAbsolute } from 'node:path';
 export const RENDERER_PROOF_PREFIX = 'mesh-renderer-proof:';
 const MAX_RENDERER_PROOF_BYTES = 4_096;
 const CLAIMS = Object.freeze({
+  'attached-projects': Object.freeze({ interaction: 'attach-capture-pin-fork', outcome: 'parallel-saved-comparisons-retained' }),
+  'attached-projects-restart': Object.freeze({ interaction: 'restore-resume-detach', outcome: 'saved-comparisons-survive-restart' }),
   onboarding: Object.freeze({
     interaction: 'preview-path-confirm-import', outcome: 'import-completed-after-busy',
   }),

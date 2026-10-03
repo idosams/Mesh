@@ -21,8 +21,9 @@ const SCREENSHOT_ENV: &str = "MESH_RENDERER_PROOF_SCREENSHOT";
 const AGENT_RESULT_NAME: &str = "agent-proof-result.txt";
 const AGENT_RESULT_BYTES: &[u8] = b"packaged agent handoff result\n";
 const MAX_REPORT_BYTES: usize = 4_096;
-const FAILURE_CODES: [&str; 33] = [
+const FAILURE_CODES: [&str; 34] = [
     "configuration",
+    "attached-projects",
     "onboarding-mount",
     "onboarding-path",
     "onboarding-preview",
@@ -56,7 +57,11 @@ const FAILURE_CODES: [&str; 33] = [
     "agent-handoff-start",
     "agent-handoff-finish",
 ];
-const CHECKPOINT_CODES: [&str; 58] = [
+const CHECKPOINT_CODES: [&str; 62] = [
+    "attached-initial",
+    "attached-second",
+    "attached-parallel",
+    "attached-resumed",
     "files-hebrew-verified",
     "onboarding-empty-refused",
     "files-mounted",
@@ -144,6 +149,8 @@ impl RendererProofConfiguration {
         }
         let surface = match surface.as_str() {
             "onboarding" => "onboarding",
+            "attached-projects" => "attached-projects",
+            "attached-projects-restart" => "attached-projects-restart",
             "files" => "files",
             "review" => "review",
             "versions" => "versions",
@@ -152,9 +159,11 @@ impl RendererProofConfiguration {
             _ => return None,
         };
         let (source, destination) = match (surface, source, destination) {
-            ("onboarding", Some(source), None) if !source.is_empty() && source.len() <= 4_096 => {
-                (Some(source), None)
-            }
+            (
+                "onboarding" | "attached-projects" | "attached-projects-restart",
+                Some(source),
+                None,
+            ) if !source.is_empty() && source.len() <= 4_096 => (Some(source), None),
             ("files", None, None) => (None, None),
             ("review", None, None) => (None, None),
             ("versions", None, None) => (None, None),
@@ -459,6 +468,13 @@ impl RendererProofRuntime {
         }
         let expected_claim = match configuration.surface {
             "onboarding" => ("preview-path-confirm-import", "import-completed-after-busy"),
+            "attached-projects" => (
+                "attach-capture-pin-fork",
+                "parallel-saved-comparisons-retained",
+            ),
+            "attached-projects-restart" => {
+                ("restore-resume-detach", "saved-comparisons-survive-restart")
+            }
             "files" => (
                 "expand-select-open-reveal-folders",
                 "native-file-and-folder-actions-completed",
@@ -778,6 +794,11 @@ impl RendererProofRuntime {
             .as_ref()
             .ok_or_else(|| "packaged renderer proof is not enabled".to_owned())?;
         let surface_matches = match configuration.surface {
+            "attached-projects" => matches!(
+                code,
+                "attached-initial" | "attached-second" | "attached-parallel"
+            ),
+            "attached-projects-restart" => code == "attached-resumed",
             "onboarding" => code.starts_with("onboarding-"),
             "files" => code.starts_with("files-"),
             "review" => code.starts_with("review-"),
@@ -807,8 +828,15 @@ mod tests {
             configuration: RendererProofConfiguration::from_values(
                 Some("ab".repeat(32)),
                 Some(surface.to_owned()),
-                matches!(surface, "onboarding" | "private-export" | "agent-handoff")
-                    .then(|| "/tmp/source".to_owned()),
+                matches!(
+                    surface,
+                    "onboarding"
+                        | "private-export"
+                        | "agent-handoff"
+                        | "attached-projects"
+                        | "attached-projects-restart"
+                )
+                .then(|| "/tmp/source".to_owned()),
                 (surface == "private-export").then(|| "/tmp/destination".to_owned()),
             ),
             completed: Mutex::new(false),
@@ -829,6 +857,34 @@ mod tests {
             ("outcome", Json::text(outcome)),
         ])
         .encode()
+    }
+
+    #[test]
+    fn attachment_journey_reports_and_checkpoints_are_bound_to_the_launch_phase() {
+        let first = runtime("attached-projects");
+        let restart = runtime("attached-projects-restart");
+        assert!(first.report_checkpoint("attached-initial").is_ok());
+        assert!(first.report_checkpoint("attached-resumed").is_err());
+        assert!(restart.report_checkpoint("attached-initial").is_err());
+        assert!(restart.report_checkpoint("attached-resumed").is_ok());
+        let claim = report(
+            "attached-projects",
+            "attach-capture-pin-fork",
+            "parallel-saved-comparisons-retained",
+        );
+        assert!(restart.accept(&claim).is_err());
+        assert!(first.accept(&claim).is_ok());
+        assert!(first.accept(&claim).is_err());
+        assert!(RendererProofRuntime::disabled()
+            .report_checkpoint("attached-initial")
+            .is_err());
+        assert!(RendererProofConfiguration::from_values(
+            Some("ab".repeat(32)),
+            Some("attached-projects".into()),
+            None,
+            None
+        )
+        .is_none());
     }
 
     #[test]

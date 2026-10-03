@@ -4075,3 +4075,19 @@ establish a lifecycle fix. Hosted CI is pending. These fixtures do not establish
 OS custody, real SSH, a second host or packaged operator acceptance. Lost worker reservations,
 complete dependency/revocation/retention, GUI controls, real-provider acceptance and measurements
 remain part of the full objective.
+
+## R74: packaged existing-project graphical acceptance
+
+R73 / PR #204 merged as `83fab700c675744fcd473360a45208a26772526a`; all seven exact-head
+checks and combined-main run 37110888516 passed. R74 is new canonical verification work and replaces
+no legacy commit. The existing CLI attachment proof cannot establish graphical attachment, and the
+older window proof covers imported workspaces. A separate exact-bundle runner now exercises dirty
+existing-project attachment, external edits, two parallel saved comparisons with exact text, an
+independent line, restart, explicit resume and detach. Native proof reports/checkpoints are closed
+and bound to their launch phase; renderer success alone is supplemented with independent file/Git
+and persisted-pin checks. Focused native proof tests passed (13). The first full run ended with
+72 failures under restricted hardware/socket/native-event access; its log is retained. The authorized
+full `npm test` rerun passed: 3,621 native tests (158.960 s, one slow, 17 skipped), 170 rendered
+tests, 601 desktop tests and 44 daemon-demo checks. One process-leak warning in
+`attachment-background::stopping_during_signing_prevents_that_capture_from_being_committed` remains
+unresolved under #172. A real packaged run remains pending. This does not complete the full fleet/provider/harness/main-approval objective.

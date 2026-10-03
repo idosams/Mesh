@@ -736,3 +736,16 @@ and the existing transfer correlation. Materialization is not provider startup/c
 acceptance. A failure may follow a durable worker change; inspect the same assignment rather than
 creating another request or treating a timeout as termination. This command cannot reconstruct lost
 worker reservations or resolve an assignment that was never durably claimed by the coordinator.
+
+### Packaged existing-project window journey
+
+`node apps/desktop/scripts/prove-attached-project-window.mjs --app /absolute/Mesh.app --revision <40-character-commit>`
+verifies the sealed exact-revision app before and after the journey. It creates a separate home and
+an isolated dirty Git project, then drives real attachment, history, comparison, pin, independent-line,
+resume and detach controls. External edits come from the enclosing verifier, not a simulated native
+reply. Saved comparison bytes and two retained selections are checked while newer edits continue;
+restart must restore stopped projects before explicit resume. The runner independently compares Git
+internals, original folder identity, remaining file content and the persisted pin record. Evidence
+and failures remain in its printed private temporary folder. The installed app and user checkpoint
+are not replaced. This command does not establish provider execution, protected-main approval,
+external-harness attribution or second-host acceptance.

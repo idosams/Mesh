@@ -1,3 +1,4 @@
+import { proveAttachedProjects } from './renderer-proof-attached.js';
 const CONFIGURATION_KEYS = ['schema', 'nonce', 'surface', 'source', 'destination'];
 const NONCE = /^[0-9a-f]{64}$/u;
 
@@ -7,8 +8,8 @@ function exactConfiguration(value) {
     || value.schema !== 'mesh-renderer-proof-config/v2'
     || typeof value.nonce !== 'string'
     || !NONCE.test(value.nonce)
-    || !['onboarding', 'files', 'review', 'versions', 'private-export', 'agent-handoff'].includes(value.surface)
-    || (value.surface === 'onboarding'
+    || !['onboarding', 'files', 'review', 'versions', 'private-export', 'agent-handoff', 'attached-projects', 'attached-projects-restart'].includes(value.surface)
+    || (['onboarding', 'attached-projects', 'attached-projects-restart'].includes(value.surface)
       && (typeof value.source !== 'string' || !value.source || value.destination !== null))
     || ((value.surface === 'files' || value.surface === 'review' || value.surface === 'versions')
       && (value.source !== null || value.destination !== null))
@@ -1126,7 +1127,9 @@ export async function runRendererProof({
 }) {
   const configuration = exactConfiguration(JSON.parse(await invoke('renderer_proof_configuration')));
   const dependencies = { document, invoke, getComputedStyle, delay, now };
-  const report = configuration.surface === 'onboarding'
+  const report = configuration.surface.startsWith('attached-projects')
+    ? await proveAttachedProjects(configuration, { ...dependencies, openReactPage, installInputValue, waitFor, visible })
+    : configuration.surface === 'onboarding'
     ? await proveOnboarding(configuration, dependencies)
     : configuration.surface === 'files'
       ? await proveFiles(configuration, dependencies)
@@ -1143,6 +1146,7 @@ export async function runRendererProof({
 
 export function rendererProofFailureCode(error) {
   const message = error instanceof Error ? error.message : '';
+  if (message.startsWith('attached proof:')) return 'attached-projects';
   if (message.includes('empty-folder') || message.includes('confirmation for an empty folder')) return 'onboarding-preview';
   if (message.includes('onboarding did not mount')) return 'onboarding-mount';
   if (message.includes('did not accept the proof path')) return 'onboarding-path';
