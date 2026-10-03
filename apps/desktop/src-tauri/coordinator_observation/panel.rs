@@ -30,6 +30,7 @@ fn eligible() -> Result<(), String> {
 fn kind(action: &str, after: u64) -> Result<RemoteObservationKind, String> {
     match (action, after) {
         ("status", 0) => Ok(RemoteObservationKind::CurrentLease),
+        ("input-inspection", 0) => Ok(RemoteObservationKind::InputInspection),
         ("results", 0..=4096) => Ok(RemoteObservationKind::Results { after }),
         _ => Err(UNAVAILABLE.into()),
     }
@@ -188,6 +189,16 @@ fn project(id: &str, result: RemoteObservationOutcome) -> Json {
                 ),
             ]);
         }
+        RemoteObservationOutcome::InputInspection(receipt) => {
+            fields.extend([
+                ("kind", Json::text("input-inspection")),
+                ("observed_ms", Json::text(receipt.observed_ms().to_string())),
+                (
+                    "disposition",
+                    receipt.input_inspection().map_or(Json::Null, Json::text),
+                ),
+            ]);
+        }
         RemoteObservationOutcome::Results(page) => {
             fields.extend([
                 ("kind", Json::text("results")),
@@ -268,9 +279,11 @@ mod tests {
     #[test]
     fn only_bounded_read_operations_are_accepted() {
         assert!(kind("status", 0).is_ok());
+        assert!(kind("input-inspection", 0).is_ok());
         assert!(kind("results", 4096).is_ok());
         for (action, after) in [
             ("status", 1),
+            ("input-inspection", 1),
             ("results", 4097),
             ("start", 0),
             ("receive", 0),
