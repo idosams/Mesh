@@ -881,3 +881,15 @@ original selection and observations. Focused controller/rendering and native ref
 R107 full local validation passed (3,745 native tests plus desktop and daemon checks);
 hosted validation and delivery are pending. Signed packaged and real second-host recovery
 remain unverified.
+
+
+### Recorded remote execution presentation (R113)
+
+The coordinator and desktop now expose an explicit read of the original worker's signed
+execution history, including incomplete setup and a stop request whose termination is not
+confirmed. The panel retains the observation time and exact recorded revision and clears facts
+when the selected connection changes. This extends R111/R112 without implying live process
+proof, capacity release, another authorized attempt or accepted work. Focused validation passed (45 native and 49 controller/rendered tests), followed by the full
+canonical gate (3,764 Rust, 183 rendered and 641 desktop tests plus the real daemon demo).
+Hosted exact-head checks and merge remain pending; packaged signed remote acceptance and the
+full fleet plan remain open. The fixed user testing checkpoint does not include this work.

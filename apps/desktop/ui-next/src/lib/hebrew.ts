@@ -1,5 +1,21 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Read recorded execution": "קריאת היסטוריית הביצוע",
+"Last recorded execution": "מצב הביצוע האחרון שנרשם",
+"Recorded revision": "גרסה מתועדת",
+"Launch recorded; progress unknown": "נרשמה הפעלה; ההתקדמות אינה ידועה",
+"Worker setup incomplete": "הכנת סביבת הסוכן לא הושלמה",
+"Agent launch recorded": "נרשמה הפעלת סוכן",
+"Agent activity recorded": "נרשמה פעילות סוכן",
+"Waiting for input or dependencies": "ממתין לקלט או לתלויות",
+"Execution needs reconciliation": "נדרשת בדיקת מצב הביצוע",
+"Stop requested; termination unconfirmed": "התבקשה עצירה; סיום התהליך לא אומת",
+"Successful completion recorded": "נרשם סיום מוצלח",
+"Failed completion recorded": "נרשם סיום בכישלון",
+"Cancellation completion recorded": "נרשם סיום בעקבות ביטול",
+"Execution state unavailable": "מצב הביצוע אינו זמין",
+"This is saved execution history. It does not confirm current process activity, release capacity, or authorize another attempt.": "זו היסטוריית ביצוע שמורה. היא אינה מאמתת פעילות נוכחית של התהליך, משחררת קיבולת או מתירה ניסיון נוסף.",
+
 "Recover original worker workspace": "שחזור סביבת העבודה המקורית של הסוכן",
 "Recover the original saved input after interrupted setup. This may start its assigned agent once setup is recovered. Existing or uncertain execution cannot be restarted here.": "שחזור הקלט המקורי שנשמר לאחר שההכנה נקטעה. פעולה זו עשויה להפעיל את הסוכן שהוקצה לאחר השלמת ההכנה. לא ניתן להפעיל מחדש מכאן ביצוע קיים או שמצבו אינו ודאי.",
 "The original workspace setup was recovered. Read worker status to check execution; recovery does not prove that the agent is running.": "הכנת סביבת העבודה המקורית שוחזרה. קראו את מצב הסוכן כדי לבדוק את הביצוע; השחזור אינו מוכיח שהסוכן פועל.",

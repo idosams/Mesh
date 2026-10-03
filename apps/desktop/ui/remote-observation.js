@@ -78,6 +78,22 @@ export function observationReply(raw, id, kind, before = 0) {
     require(decimal(value.observed_ms) && ['unrecorded', 'verified', 'unavailable'].includes(value.disposition));
     return { kind, observed: value.observed_ms, disposition: value.disposition };
   }
+  if (kind === 'execution') {
+    require(decimal(value.observed_ms) && BigInt(value.observed_ms) <= 18446744073709551615n
+      && typeof value.admitted === 'boolean' && typeof value.launch_recorded === 'boolean'
+      && (!value.launch_recorded || value.admitted));
+    let recorded = null;
+    if (value.launch_recorded) {
+      const item = value.execution;
+      require(item && decimal(item.revision) && BigInt(item.revision) <= 9223372036854775807n);
+      const revision = BigInt(item.revision);
+      require(revision === 0n ? item.state === 'unrecorded' : revision < 4n ? item.state === 'setup-incomplete'
+        : revision === 4n ? item.state === 'launching'
+        : ['launching', 'running', 'waiting', 'reconciling', 'stopping', 'succeeded', 'failed', 'cancelled'].includes(item.state));
+      recorded = Object.freeze({ revision: item.revision, state: item.state });
+    } else require(value.execution === null);
+    return Object.freeze({ kind, observed: value.observed_ms, admitted: value.admitted, launchRecorded: value.launch_recorded, recorded });
+  }
   if (kind === 'status') {
     require(decimal(value.observed_ms) && typeof value.admitted === 'boolean' && typeof value.launch_recorded === 'boolean'
       && (!value.launch_recorded || value.admitted) && (value.lease_until_ms === null || decimal(value.lease_until_ms)));
@@ -101,14 +117,14 @@ export function observationReply(raw, id, kind, before = 0) {
 
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
-  let creations = null, creationStatus = null, inspection = null, originalRecovery = null;
+  let creations = null, creationStatus = null, execution = null, inspection = null, originalRecovery = null;
   let draft = null, profiles = null, preset = null, receiptAttempts = null, received = null;
   let selection = null, status = null, results = null, recovery = null, busy = false, error = '', disposed = false;
-  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { originalRecovery, inspection, creations, creationStatus, receiptAttempts, received, recovery, profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
+  const publish = () => { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:remote-observation-projection', { detail: { execution, originalRecovery, inspection, creations, creationStatus, receiptAttempts, received, recovery, profiles, preset, draft, selection, status, results, busy, error, available: typeof invoke === 'function' } })); };
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['creation-prepare','creation-list','creation-inspect','creation-send','choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'input-inspection', 'results', 'results-next', 'results-previous', 'forget', 'recover-original', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove', 'receipt-list', 'download-result', 'recover-result'].includes(type) || (['status', 'input-inspection', 'results', 'results-next', 'results-previous', 'forget', 'recover-original', 'reconnect-input', 'receipt-list', 'download-result', 'recover-result'].includes(type) && !selection)) return;
+    if (!['creation-prepare','creation-list','creation-inspect','creation-send','choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'execution', 'input-inspection', 'results', 'results-next', 'results-previous', 'forget', 'recover-original', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove', 'receipt-list', 'download-result', 'recover-result'].includes(type) || (['status', 'execution', 'input-inspection', 'results', 'results-next', 'results-previous', 'forget', 'recover-original', 'reconnect-input', 'receipt-list', 'download-result', 'recover-result'].includes(type) && !selection)) return;
     if (type === 'results-next' && !(results?.available && results.hasMore)) return;
     if (type === 'results-previous' && !(results?.available && results.before > 0)) return;
     if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
@@ -142,7 +158,7 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
           if(action==='inspect') {
             const next=result.selection===null?null:selectionReply(result.selection);
             require(next===null || (next.run===`start-${creation.request}` && next.host===creation.host && next.worker===creation.worker));
-            selection=next;status=null;inspection=null;originalRecovery=null;results=null;recovery=null;receiptAttempts=null;received=null;
+            selection=next;status=null;execution=null;inspection=null;originalRecovery=null;results=null;recovery=null;receiptAttempts=null;received=null;
           }
           creationStatus={request:result.request,kind:result.kind,disposition:result.disposition};
         }
@@ -152,7 +168,7 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
         const raw = await invoke('remote_connection_profiles', args);
         if (action === 'open') {
           const opened = profileOpenReply(raw, entry);
-          selection = opened.selection; draft = opened.draft; preset = opened.preset; status = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
+          selection = opened.selection; draft = opened.draft; preset = opened.preset; status = null; execution = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
         } else profiles = profilesReply(raw);
       } else if (type === 'clear-setup') {
         draft = draftReply(await invoke('clear_remote_setup')); preset = null;
@@ -162,10 +178,10 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
       } else if (type === 'configure') {
         const input = setupInput(event.detail.input);
         selection = selectionReply(await invoke('configure_remote_observation', { draft: draft.id, input: JSON.stringify(input) }));
-        status = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
+        status = null; execution = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
       } else if (type === 'choose') {
         const raw = await invoke('pick_remote_observation');
-        if (raw !== null) { selection = selectionReply(raw); status = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null; }
+        if (raw !== null) { selection = selectionReply(raw); status = null; execution = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null; }
       } else if (['receipt-list', 'download-result', 'recover-result'].includes(type)) {
         const action = type === 'receipt-list' ? 'list' : type === 'download-result' ? 'receive' : 'recover';
         const raw = await invoke('remote_result_receipt', { id: selection.id, action, offer: action === 'list' ? '' : receiptOffer });
@@ -177,12 +193,17 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
         recovery = inputRecoveryReply(await invoke('reconnect_remote_input', { id: selection.id }), selection);
       } else if (type === 'forget') {
         await invoke('forget_remote_observation', { id: selection.id });
-        selection = null; status = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
+        selection = null; status = null; execution = null; inspection = null; originalRecovery = null; results = null; recovery = null; receiptAttempts = null; received = null;
       } else {
         const action = type.startsWith('results') ? 'results' : type;
         const after = type === 'results-next' ? results.after : type === 'results-previous' ? Math.max(0, results.before - 16) : 0;
         const observation = observationReply(await invoke('read_remote_observation', { id: selection.id, action, after }), selection.id, action, after);
-        if (type === 'status') status = observation; else if (type === 'input-inspection') inspection = observation; else {
+        if (type === 'status') status = observation; else if (type === 'execution') {
+          require(!execution?.recorded || (observation.recorded
+            && BigInt(observation.recorded.revision) >= BigInt(execution.recorded.revision)
+            && (observation.recorded.revision !== execution.recorded.revision || observation.recorded.state === execution.recorded.state)));
+          execution = observation;
+        } else if (type === 'input-inspection') inspection = observation; else {
           require(!observation.available || !results?.available || Number(observation.revision) >= Number(results.revision));
           results = observation;
         }

@@ -333,3 +333,71 @@ test('original recovery uses retained selection once, preserves observations and
   assert.match(h.projections.at(-1).error, /could not be confirmed/);
   h.dispose();
 });
+
+const execution = (overrides = {}) => ({ schema: 'mesh.remote-panel-observation/v2', id, kind: 'execution', observed_ms: '1000', admitted: true, launch_recorded: true, execution: { revision: '5', state: 'running' }, ...overrides });
+test('recorded execution validates revision and state without converting large integers or granting authority', () => {
+  for (const [revision, state] of [['0', 'unrecorded'], ['1', 'setup-incomplete'], ['3', 'setup-incomplete'], ['4', 'launching'], ['5', 'running'], ['9223372036854775807', 'stopping'], ['6', 'succeeded'], ['6', 'failed'], ['6', 'cancelled']]) {
+    const result = observationReply(execution({ execution: { revision, state, restart: true }, approve: true }), id, 'execution');
+    assert.deepEqual(result.recorded, { revision, state }); assert.equal(result.approve, undefined);
+  }
+  for (const item of [null, { revision: '00', state: 'unrecorded' }, { revision: '0', state: 'running' }, { revision: '3', state: 'launching' }, { revision: '4', state: 'succeeded' }, { revision: '9223372036854775808', state: 'running' }, { revision: 5, state: 'running' }, { revision: '5', state: 'completed' }]) {
+    assert.throws(() => observationReply(execution({ execution: item }), id, 'execution'));
+  }
+  for (const changes of [{ id: 'c'.repeat(64) }, { schema: 'mesh.remote-panel-observation/v1' }, { kind: 'status' }, { admitted: false }, { observed_ms: '18446744073709551616' }, { launch_recorded: false }]) {
+    assert.throws(() => observationReply(execution(changes), id, 'execution'));
+  }
+  assert.equal(observationReply(execution({ launch_recorded: false, execution: null }), id, 'execution').recorded, null);
+  assert.throws(() => observationReply(status(), id, 'execution'));
+});
+test('execution reads retain previous facts on failure and suppress duplicate requests without exposing paths', async () => {
+  const calls = []; let release, pending = false;
+  const h = harness(async (name, args) => { calls.push([name, args]); if (name === 'pick_remote_observation') return selected(); if (pending) return new Promise(resolve => { release = resolve; }); return execution(); });
+  h.intent({ type: 'execution' }); await settle(); assert.equal(calls.length, 0);
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'execution', path: '/forged', id: 'forged', after: 1 }); await settle();
+  assert.deepEqual(calls.at(-1), ['read_remote_observation', { id, action: 'execution', after: 0 }]);
+  assert.equal(h.projections.at(-1).execution.recorded.state, 'running');
+  pending = true; h.intent({ type: 'execution' }); await settle(); const count = calls.length;
+  h.intent({ type: 'execution' }); h.intent({ type: 'forget' }); assert.equal(calls.length, count);
+  release(execution({ id: 'c'.repeat(64) })); await settle();
+  assert.equal(h.projections.at(-1).execution.recorded.state, 'running'); assert.match(h.projections.at(-1).error, /out of date/);
+  h.dispose(); h.intent({ type: 'execution' }); await settle(); assert.equal(calls.length, count);
+});
+test('execution observations clear on choosing or forgetting a connection and cancelled chooser preserves them', async () => {
+  let cancel = false;
+  const h = harness(async name => name === 'pick_remote_observation' ? cancel ? null : selected() : name === 'read_remote_observation' ? execution() : undefined);
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'execution' }); await settle();
+  cancel = true; h.intent({ type: 'choose' }); await settle(); assert.equal(h.projections.at(-1).execution.recorded.state, 'running');
+  cancel = false; h.intent({ type: 'choose' }); await settle(); assert.equal(h.projections.at(-1).execution, null);
+  h.intent({ type: 'execution' }); await settle(); h.intent({ type: 'forget' }); await settle(); assert.equal(h.projections.at(-1).execution, null); h.dispose();
+});
+test('execution observations refuse regression or conflicting state within the same selected session', async () => {
+  let response = execution();
+  const h = harness(async name => name === 'pick_remote_observation' ? selected() : response);
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'execution' }); await settle();
+  for (const next of [execution({ execution: { revision: '4', state: 'launching' } }), execution({ execution: { revision: '5', state: 'succeeded' } }), execution({ launch_recorded: false, execution: null })]) {
+    response = next; h.intent({ type: 'execution' }); await settle();
+    assert.deepEqual(h.projections.at(-1).execution.recorded, { revision: '5', state: 'running' });
+    assert.match(h.projections.at(-1).error, /out of date/);
+  }
+  response = execution({ execution: { revision: '6', state: 'succeeded' } }); h.intent({ type: 'execution' }); await settle();
+  assert.equal(h.projections.at(-1).execution.recorded.state, 'succeeded'); assert.equal(h.projections.at(-1).error, ''); h.dispose();
+});
+test('configuration, saved profile and creation selection transitions clear prior execution observations', async () => {
+  const h = harness(async (name, args) => {
+    if (name === 'pick_remote_observation' || name === 'configure_remote_observation') return selected();
+    if (name === 'pick_remote_setup_file') return draft();
+    if (name === 'read_remote_observation') return execution();
+    if (name === 'remote_connection_profiles') return args.action === 'open' ? opened() : profiles();
+    if (name === 'remote_creation') return args.action === 'list'
+      ? { schema: 'mesh.remote-creation-list/v1', entries: [creationEntryFixture()] }
+      : { schema: 'mesh.remote-creation-inspected/v1', request: creationEntryFixture().request, allocated: true, selection: { ...selected(), run: `start-${creationEntryFixture().request}` } };
+    throw Error('unexpected operation');
+  });
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'pick-setup', part: 'identity' }); await settle();
+  h.intent({ type: 'profiles-list' }); await settle(); h.intent({ type: 'creation-list' }); await settle();
+  for (const action of [{ type: 'configure', input: form() }, { type: 'profile-open', profile: profile().id }, { type: 'creation-inspect', request: creationEntryFixture().request }]) {
+    h.intent({ type: 'execution' }); await settle(); assert.equal(h.projections.at(-1).execution.recorded.state, 'running');
+    h.intent(action); await settle(); assert.equal(h.projections.at(-1).error, ''); assert.equal(h.projections.at(-1).execution, null);
+  }
+  h.dispose();
+});

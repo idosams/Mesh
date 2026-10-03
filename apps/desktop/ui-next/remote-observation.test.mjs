@@ -112,3 +112,20 @@ test('original recovery explicitly describes execution effects and retains obser
   module.exports.setLocale('en'); p.selection = null;
   assert.doesNotMatch(module.exports.render(p), /Recover original worker workspace/);
 });
+
+test('recorded execution presents dated historical progress and explicit unknown, partial and stopping outcomes', () => {
+  const p = projection();
+  const states = { unrecorded: 'Launch recorded; progress unknown', 'setup-incomplete': 'Worker setup incomplete', running: 'Agent activity recorded', stopping: 'Stop requested; termination unconfirmed', succeeded: 'Successful completion recorded', failed: 'Failed completion recorded', cancelled: 'Cancellation completion recorded' };
+  for (const [state, label] of Object.entries(states)) {
+    p.execution = { observed: '1000', admitted: true, launchRecorded: true, recorded: { revision: '9223372036854775807', state } };
+    const html = module.exports.render(p);
+    assert.ok(html.includes(label)); assert.match(html, /1970-01-01T00:00:01.000Z/); assert.match(html, /9223372036854775807/);
+    assert.match(html, /does not confirm current process activity, release capacity, or authorize another attempt/);
+    assert.match(html, /Read worker status/); assert.match(html, /Inspect original input/);
+  }
+  p.execution.recorded = null; assert.match(module.exports.render(p), /No launch record was returned/);
+  p.execution.admitted = false; assert.match(module.exports.render(p), /no admission record/);
+  p.busy = true; assert.match(module.exports.render(p), /<button[^>]*disabled=""[^>]*>Read recorded execution<\/button>/);
+  module.exports.setLocale('he'); try { const html = module.exports.render(p); assert.match(html, /קריאת היסטוריית הביצוע/); assert.doesNotMatch(html, /Last recorded execution/); } finally { module.exports.setLocale('en'); }
+  p.selection = null; assert.doesNotMatch(module.exports.render(p), /Read recorded execution|Last recorded execution/);
+});

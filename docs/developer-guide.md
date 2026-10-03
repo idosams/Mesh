@@ -992,3 +992,18 @@ agent through its worker supervisor. Existing launch intents remain uncertain an
 restarted with this action. After an unconfirmed response, keep the same selection and read worker
 status; do not infer that nothing happened or that another attempt is safe. Previous observations
 and pinned reviews stay available. Successful signed packaged/second-host acceptance is pending.
+
+
+### Read recorded remote execution
+
+Use `--coordinator execution <absolute-config>` for a fresh authenticated observation of the
+original worker session. Its `mesh.coordinator-execution/v1` output contains the exact target,
+observation time and signed historical facts. Older status replies cannot satisfy this query.
+The desktop's **Read recorded execution** action uses the current native-selected connection
+and displays the saved revision and state alongside the existing worker status and input
+inspection controls. An unavailable read preserves the last observation as potentially stale.
+
+This history does not establish current process liveness or death, release worker capacity,
+restart work or advance protected main. No launch record and incomplete setup remain uncertain.
+The wire path requires the signed execution protocol on both peers; there is no automatic
+fallback or retry. Signed packaged remote acceptance is still outstanding.
