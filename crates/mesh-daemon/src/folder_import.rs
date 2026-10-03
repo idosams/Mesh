@@ -37,6 +37,8 @@ use crate::root_authority::PinnedWorkspaceRoot;
 use crate::root_authority::ProtectedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
 
+mod received_genesis;
+
 const CLAIM_MARKER: &[u8] = b"mesh-folder-import/1 claim\n";
 const OWNED_MARKER_PREFIX: &str = "mesh-folder-import/1 owned";
 const PRESENTED_OWNED_MARKER_PREFIX: &str = "mesh-folder-import/2 presented-owned";
@@ -1042,6 +1044,7 @@ impl PreparedFolderImport {
             &storage_root,
             &storage_pinned,
             &self.snapshot,
+            self.purpose,
         )?;
         verify_directory_identity(&self.source, self.source_identity)?;
         let opened = OpenWorkspace::open_prepared_layout(
@@ -2234,6 +2237,7 @@ fn ingest_private_workspace(
     storage_root: &Path,
     storage_pinned: &PinnedWorkspaceRoot,
     imported: &Snapshot,
+    purpose: ImportPurpose,
 ) -> Result<ManagedImportOutcome, FolderImportError> {
     let mut directories = imported.directories.iter().cloned().collect::<Vec<_>>();
     directories.sort_by(|left, right| {
@@ -2371,38 +2375,56 @@ fn ingest_private_workspace(
     };
     let manifest_count = checkpoint.manifests.len();
     let records = checkpoint.records();
-    let mut workspace = OpenWorkspace::open_prepared_layout(
-        destination,
-        destination_pinned.clone(),
-        storage_root,
-        storage_pinned.clone(),
-        &crate::TrustedReviewers::default(),
-    )
-    .map_err(|error| workspace_import_error(destination, error))?;
-    #[cfg(test)]
-    BEFORE_WORKSPACE_COMMIT.with(|hook| {
-        if let Some(hook) = hook.borrow_mut().take() {
-            hook();
-        }
-    });
-    let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
-        workspace.storage_root().as_path().to_path_buf(),
-        workspace.storage_pinned_root().filesystem(),
-    )
-    .map_err(|error| workspace_import_error(destination, error))?;
-    let mut promoter = CasChunkPromoter::new(&cas);
-    DurableCommit::new(
-        workspace.checkpoint_store_mut(),
-        &mut promoter,
-        cas_objects.into_values().collect(),
-        checkpoint,
-    )
-    .finish()
-    .map_err(|error| workspace_import_error(destination, error))?;
-    let linked_bytes = promoter.linked_bytes();
-    journal_records(workspace.checkpoint_journal_mut(), records.iter())
-        .map_err(|error| FolderImportError::io("append", workspace.record_file(), error))?;
-    drop(workspace);
+    let linked_bytes = if purpose == ImportPurpose::Received {
+        #[cfg(test)]
+        BEFORE_WORKSPACE_COMMIT.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
+        received_genesis::finish(
+            storage_pinned,
+            storage_root,
+            checkpoint,
+            cas_objects.into_values().collect(),
+        )
+        .map_err(|error| workspace_import_error(destination, error))?
+    } else {
+        let mut workspace = OpenWorkspace::open_prepared_layout(
+            destination,
+            destination_pinned.clone(),
+            storage_root,
+            storage_pinned.clone(),
+            &crate::TrustedReviewers::default(),
+        )
+        .map_err(|error| workspace_import_error(destination, error))?;
+        #[cfg(test)]
+        BEFORE_WORKSPACE_COMMIT.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
+        let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            workspace.storage_root().as_path().to_path_buf(),
+            workspace.storage_pinned_root().filesystem(),
+        )
+        .map_err(|error| workspace_import_error(destination, error))?;
+        let mut promoter = CasChunkPromoter::new(&cas);
+        DurableCommit::new(
+            workspace.checkpoint_store_mut(),
+            &mut promoter,
+            cas_objects.into_values().collect(),
+            checkpoint,
+        )
+        .finish()
+        .map_err(|error| workspace_import_error(destination, error))?;
+        let linked_bytes = promoter.linked_bytes();
+        journal_records(workspace.checkpoint_journal_mut(), records.iter())
+            .map_err(|error| FolderImportError::io("append", workspace.record_file(), error))?;
+        drop(workspace);
+
+        linked_bytes
+    };
 
     let reopened = OpenWorkspace::open_prepared_layout(
         destination,

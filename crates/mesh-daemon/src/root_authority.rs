@@ -432,6 +432,21 @@ impl PinnedRootFs {
         openat(&parent, &leaf, APPEND_EXISTING_FLAGS, 0)
     }
 
+    /// Existing private regular file only; never create, truncate or block on a substituted FIFO.
+    pub(crate) fn open_private_append_existing(&self, path: &Path) -> io::Result<File> {
+        self.require_writable()?;
+        let (parent, leaf) = self.parent_and_leaf(path)?;
+        let nonblocking = OPEN_INSPECT_FLAGS & !OPEN_READ_FLAGS;
+        let file = openat(&parent, &leaf, APPEND_EXISTING_FLAGS | nonblocking, 0)?;
+        let metadata = file.metadata()?;
+        if !metadata.is_file() || metadata.nlink() != 1 || metadata.mode() & 0o077 != 0 {
+            return Err(io::Error::other(
+                "received journal is not a private regular file",
+            ));
+        }
+        Ok(file)
+    }
+
     pub(crate) fn read_file(&self, path: &Path) -> io::Result<File> {
         let (parent, leaf) = self.parent_and_leaf(path)?;
         let flags = if self.read_only {
