@@ -4735,3 +4735,40 @@ ownership, completing the worker mapping receipt, guarded admission/current-leas
 pre-launch handoff, authenticated desktop recovery and uncertain-execution reconciliation
 remain in the full acceptance plan. Populated derived indexes require the confirmed-workspace
 reopen path; they are never reset by this unconfirmed-ingestion helper.
+
+
+## R101 — retain original directories through import handoff
+
+New canonical implementation following R100/PR233 at
+`18357b0980beb0d63e0293aaf365e4cfd2c0a849`; replaces no preserved source commit.
+Confirmed saved-work forks and received-worker imports retain their working and private-store
+directory descriptors through recovery-database quiescence and durable workspace reopening.
+Previously that handoff reopened the private index and recovery database through the displayed
+pathname after dropping prepared import authority. The new private path uses a verified native
+directory reference, while the original displayed directory remains a separate identity guard.
+The returned workspace retains that guard for subsequent access and is checked again before
+installation into the live daemon. Unconfirmed preparation still uses its transient index.
+
+SQLite recovery paths preserve only recognized live native directory references: macOS volume/inode
+references or Linux process-descriptor references whose descriptor remains held by the workspace.
+Ordinary paths retain their existing canonicalization. Recovery/index alias checks also compare
+parent directory physical identities when filenames match, so different spellings cannot admit
+the same database even before it exists. This changes no persisted format, provider admission,
+lease or protected-main authority. Native paths are an I/O binding, not execution authorization.
+
+Six regressions cover descriptor lifetime through directory rename, durable index reopening,
+refusal of an otherwise valid replacement workspace before mutable open, continued storage
+identity checking even when the original working directory is restored, native recovery access
+after rename, and recovery/index physical aliases. Fourteen focused tests passed in 0.863s.
+Full `npm test` passed 3,718 native tests in 153.758s (one slow, 17 skipped), the rendered and
+desktop suites and all 44 real-daemon checks, without a leak warning. After that full run, the
+replacement regression was strengthened to use a complete independent workspace and passed
+again in 0.252s; production implementation was unchanged. Original failed development logs are
+retained, including the discovery that canonicalizing native references broke received imports.
+Fresh exact-head hosted checks and combined-main verification remain required.
+
+This is the safe handoff needed by original-attempt recovery, not a complete resume operation.
+Reconstructing pending/confirmed ownership from bounded pinned receipts, guarded registry/current
+lease checks, worker mapping completion, authenticated recovery UI, uncertain-process reconciliation
+and the full real-host fault journey remain in the acceptance plan. The fixed user checkpoint at
+`13fedd9f94706fc0f3ac6bc7f5e6d6302735faa8` does not include this source increment.

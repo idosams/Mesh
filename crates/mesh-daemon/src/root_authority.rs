@@ -167,6 +167,27 @@ impl PinnedWorkspaceRoot {
         })
     }
 
+    /// Bind path-based storage families to this held directory, independently of ancestor names.
+    /// The returned root shares the original descriptor lifetime, including on Linux where the
+    /// kernel reference names that descriptor. Keep the original root to check displayed names.
+    pub(crate) fn stable_namespace(&self) -> io::Result<(PathBuf, Self)> {
+        self.ensure_namespace_identity()?;
+        #[cfg(target_os = "macos")]
+        let reference = {
+            let (device, inode) = self.identity()?;
+            ProtectedWorkspaceRoot { device, inode }.stable_reference()?
+        };
+        #[cfg(target_os = "linux")]
+        let reference = PathBuf::from(format!("/proc/self/fd/{}/.", self.directory.as_raw_fd()));
+        let pinned = Self {
+            namespace: reference.clone(),
+            directory: Arc::clone(&self.directory),
+        };
+        pinned.ensure_namespace_identity()?;
+        self.ensure_namespace_identity()?;
+        Ok((reference, pinned))
+    }
+
     pub(crate) fn filesystem(&self) -> PinnedRootFs {
         PinnedRootFs {
             namespace: self.namespace.clone(),
@@ -880,6 +901,41 @@ mod tests {
                 std::fs::copy(entry.path(), target).expect("copy file");
             }
         }
+    }
+
+    #[test]
+    fn stable_namespace_retains_original_directory_after_name_and_handle_changes() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let root = scratch("stable-storage");
+        let original = root.join("original");
+        std::fs::create_dir(&original).unwrap();
+        let pinned = PinnedWorkspaceRoot::open(original.clone()).unwrap();
+        let (reference, stable) = pinned.stable_namespace().unwrap();
+        drop(pinned);
+        let retained = root.join("retained");
+        std::fs::rename(&original, &retained).unwrap();
+        std::fs::create_dir(&original).unwrap();
+        std::fs::write(reference.join("path-write"), b"original private directory").unwrap();
+        stable
+            .filesystem()
+            .write_new_file(
+                Path::new("descriptor-write"),
+                b"same directory",
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        stable.ensure_namespace_identity().unwrap();
+        assert_eq!(
+            std::fs::read(retained.join("path-write")).unwrap(),
+            b"original private directory"
+        );
+        assert_eq!(
+            std::fs::read(retained.join("descriptor-write")).unwrap(),
+            b"same directory"
+        );
+        assert_eq!(std::fs::read_dir(&original).unwrap().count(), 0);
+        drop(stable);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
