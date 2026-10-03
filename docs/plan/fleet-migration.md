@@ -5344,3 +5344,21 @@ checks and merge are pending. The map preserves every full-plan exit, including 
 acceptance, real packaged fleet execution, native approval, second provider/host, retention,
 terminal reconciliation and legacy deprecation. Documentation and repository checks validate
 this reporting increment; no new runtime or full-gate result is claimed by a documentation edit.
+
+
+## R120 — collector process-crash campaign
+
+Tracks [issue #256](https://github.com/idosams/Mesh/issues/256) on R119/PR #255 head
+`4f21cca374646bbf87afabb8e5b71dfa4e21abe3`. New canonical verification; no preserved
+implementation commit is replaced and production collection behavior is unchanged.
+A disposable child performs real collection and acknowledges each of eight named boundaries;
+the parent confirms SIGKILL, reopens and checks exact retained bytes, removed subsets and
+old/new journal state before completing collection and journal compaction. A bounded handshake
+and owned-child cleanup prevent a missed stop point from passing or leaving a test process.
+Both focused tests passed in 0.556s. Disabling the production reference veto made the campaign
+fail on the missing retained chunk; production source was then restored byte-for-byte. The initial
+test compile error, lint failure and mutation failure are retained. The full gate passed 3,776 native
+tests in 158.640s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon
+checks. Hosted delivery remains pending. This is process-crash evidence, not power-loss,
+storage-exhaustion, native fleet retention
+policy or daemon scheduling acceptance. All full-plan exits remain intact.
