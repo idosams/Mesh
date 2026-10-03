@@ -453,3 +453,27 @@ an outcome is uncertain; inspect it with `--coordinator created` before deciding
 Changing that request's saved version, worker, goal, limits, provider or deadline is refused.
 A retained request is not evidence that input arrived or that an agent ran. There is no automatic
 retry or cleanup. The desktop flow for starting new remote work is still being completed.
+
+## Prepare fresh remote work in the desktop
+
+Under **Agent fleets → Inspect a remote worker → Set up a worker connection**, choose the existing
+native identity and SSH files and enter the worker's public connection details. **Prepare new
+remote work** does not require a fleet or an existing attempt. Choose an attached project's exact
+saved version, goal, provider and limits, then **Save remote creation request**. This retains the
+inputs privately; it does not contact the worker or allocate a fleet. The fixed initial lease lasts
+fifteen minutes from preparation and is never extended by retrying.
+
+Under **Saved remote creation requests**, inspect the retained inputs and choose **Send saved input
+to worker** explicitly. Mesh creates the independent fleet through the app's existing catalogue and
+sends the exact saved input. Sending authorizes the configured worker to queue execution of this
+attempt. Confirmed input delivery does not establish that a provider is running.
+If a reply is lost, choose **Load saved requests**, then **Inspect original creation attempt**.
+Inspection does not contact the worker. When the original attempt exists, it opens that selection
+in the worker panel for explicit status reads or **Resume saved input transfer**. A second dispatch
+of an already-started attempt refuses. Missing assignments, expired leases and lost worker
+reservations still require reconciliation; they do not authorize a replacement attempt.
+
+After restart, saved requests load without dispatching. Changed native files or identities refuse;
+records and work remain preserved. To prepare a different request, clear and reselect the setup
+files. This flow requires an eligible signed application and a configured worker; the fixed local
+test checkpoint does not contain it. Signed packaged and real second-host acceptance remain pending.

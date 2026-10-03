@@ -233,3 +233,40 @@ test('a changed selection clears saved download and completion projections', asy
   h.intent({ type: 'choose' }); await settle();
   assert.equal(h.projections.at(-1).receiptAttempts, null); assert.equal(h.projections.at(-1).received, null); h.dispose();
 });
+
+const creationInputFixture = () => ({connection:{host:'worker.example',account:'mesh',port:'22',worker:'b'.repeat(64)},project:'c'.repeat(64),version:'d'.repeat(64),goal:'Use the saved input',provider:'codex',limits:{lanes:4,concurrency:2,depth:1,retries:0}});
+const creationEntryFixture = () => ({request:'a'.repeat(32),project:'c'.repeat(64),version:'d'.repeat(64),goal:'Use the saved input',provider:'codex',host:'worker.example',worker:'b'.repeat(64),lease_until_ms:'9999999999999',limits:{lanes:4,concurrency:2,depth:1,retries:0}});
+const creationDraft = () => ({schema:'mesh.remote-setup-draft/v1',id,installation:true,identity:true,hosts:true});
+test('fresh remote preparation requires no existing run and strips renderer authority', async () => {
+  const calls=[];const h=harness(async(name,args)=>{calls.push([name,args]);if(name==='clear_remote_setup')return creationDraft();return {schema:'mesh.remote-creation-prepared/v1',draft:id,entry:{...creationEntryFixture(),identity:'/private/key'}};});
+  h.intent({type:'clear-setup'});await settle();
+  const input={...creationInputFixture(),request:'forged',storage:'/forged',lease_until_ms:999};input.connection.identity='/forged';
+  h.intent({type:'creation-prepare',input});await settle();
+  assert.equal(calls[1][0],'remote_creation');assert.equal(calls[1][1].id,id);assert.equal(calls[1][1].action,'prepare');
+  assert.deepEqual(JSON.parse(calls[1][1].input),{...creationInputFixture(),connection:{...creationInputFixture().connection,port:22}});
+  const p=h.projections.at(-1);assert.equal(p.creationStatus.kind,'prepared');assert.equal(p.creations[0].identity,undefined);assert.equal(p.selection,null);h.dispose();
+});
+test('lost send reply suppresses duplicate input dispatch until explicit native inspection', async () => {
+  const calls=[];let fail;
+  const h=harness(async(name,args)=>{calls.push([name,args]);if(name==='clear_remote_setup')return creationDraft();
+    if(args.action==='prepare')return{schema:'mesh.remote-creation-prepared/v1',draft:id,entry:creationEntryFixture()};
+    if(args.action==='send')return new Promise((_,reject)=>{fail=reject;});
+    return{schema:'mesh.remote-creation-inspected/v1',request:creationEntryFixture().request,allocated:true,selection:{...selected(),run:`start-${creationEntryFixture().request}`}};
+  });
+  h.intent({type:'clear-setup'});await settle();h.intent({type:'creation-prepare',input:creationInputFixture()});await settle();
+  const detail={type:'creation-send',request:creationEntryFixture().request};h.intent(detail);await settle();h.intent(detail);assert.equal(calls.filter(([,a])=>a?.action==='send').length,1);
+  fail(new Error('lost output'));await settle();h.intent(detail);await settle();assert.equal(calls.filter(([,a])=>a?.action==='send').length,1);
+  assert.match(h.projections.at(-1).error,/inspect the original/);assert.equal(h.projections.at(-1).creationStatus,null);
+  h.intent({type:'creation-inspect',request:detail.request});await settle();assert.equal(h.projections.at(-1).selection.run,`start-${detail.request}`);assert.equal(h.projections.at(-1).creationStatus.kind,'allocated');
+  h.intent(detail);await settle();assert.equal(calls.filter(([,a])=>a?.action==='send').length,1);h.dispose();
+});
+test('restarted creation listing does not dispatch and mismatched inspection cannot switch selection', async () => {
+  const calls=[];const h=harness(async(name,args)=>{calls.push([name,args]);return args.action==='list'?{schema:'mesh.remote-creation-list/v1',entries:[creationEntryFixture()]}:{schema:'mesh.remote-creation-inspected/v1',request:creationEntryFixture().request,allocated:true,selection:selected()};});
+  h.intent({type:'creation-list'});await settle();h.intent({type:'creation-send',request:creationEntryFixture().request});await settle();assert.equal(calls.length,1);
+  h.intent({type:'creation-inspect',request:'f'.repeat(32)});await settle();assert.equal(calls.length,1);
+  h.intent({type:'creation-inspect',request:creationEntryFixture().request});await settle();assert.equal(h.projections.at(-1).selection,null);assert.equal(h.projections.at(-1).creationStatus,null);assert.match(h.projections.at(-1).error,/could not be confirmed/);h.dispose();
+});
+test('changed prepared inputs cannot present a ready request', async () => {
+  const h=harness(async name=>name==='clear_remote_setup'?creationDraft():{schema:'mesh.remote-creation-prepared/v1',draft:id,entry:{...creationEntryFixture(),version:'e'.repeat(64)}});
+  h.intent({type:'clear-setup'});await settle();h.intent({type:'creation-prepare',input:creationInputFixture()});await settle();assert.equal(h.projections.at(-1).creations,null);assert.equal(h.projections.at(-1).creationStatus,null);h.dispose();
+});
