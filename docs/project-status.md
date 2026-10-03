@@ -18,6 +18,15 @@ Creating independent lanes and starting a managed fleet are optional. Agents may
 child lanes and submit immutable results; they cannot approve protected Mesh main. Applying an
 accepted result to the original folder is a separate, explicitly confirmed native operation.
 
+## Retained worker execution observations
+
+The native worker registry can read original session setup and recorded run outcomes after a
+restart, correlated to the retained launch receipt. This is read-only historical evidence; it
+cannot release occupied capacity, adopt a process or authorize another launch. Signed remote
+transport, desktop presentation and safe terminal reconciliation remain unfinished. Fixture
+provider-process outcomes and restart/refusal cases are covered by native regression tests;
+this is not signed packaged or second-host acceptance.
+
 ## Delivery and acceptance checkpoint — 3 October 2026
 
 Canonical delivery now includes [PR #223](https://github.com/idosams/Mesh/pull/223):

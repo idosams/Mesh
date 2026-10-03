@@ -15,10 +15,7 @@ impl ReceivedSession {
     fn scope(&self) -> String {
         // The launch stream already binds coordinator/objective/assignment. Domain separation
         // prevents session commands from being interpreted as admission or launch-intent events.
-        format!(
-            "remote-session-{}",
-            Blake3::digest_bytes(self.launch.stream.as_bytes())
-        )
+        crate::fleet::remote_admission::launch::session_scope(&self.launch.stream)
     }
 
     pub(super) fn verify(&self, runtime: &Runtime) -> Result<(), Unavailable> {

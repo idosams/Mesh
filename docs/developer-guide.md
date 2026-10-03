@@ -232,6 +232,20 @@ materialization only. Remote results, lease renewal and real second-machine acce
 
 ### Recovering retained worker facts
 
+Native worker owners can call `RemoteAdmissionRegistry::execution_observation` to read the
+original session's committed state after reopening its ledger. The result correlates the exact
+launch receipt and session revision and distinguishes unrecorded session setup, incomplete setup,
+and a recorded run state. A recorded running or terminal state is historical; it proves neither
+current process liveness nor descendant termination. It does not release an admission slot,
+construct a service, restart a provider, write history or approve a version. Missing launch intent
+is not retry permission. Unknown, mismatched or concurrently advancing history refuses.
+
+Replay stops at the revision observed at the start and reads bounded pages, including completion
+beyond the first page. The original session namespace and persisted command format are unchanged.
+This native read seam is not yet included in signed status replies or the desktop projection;
+those follow in separate increments before terminal reconciliation can be accepted end to end.
+
+
 Native coordinators can call `inspect_remote_worker_over_ssh` with the exact current attempt and
 independently configured execution keys. The signed query is fresh for 30 seconds and does not
 extend the connection or lease deadline. A signed reply binds the original query and current
