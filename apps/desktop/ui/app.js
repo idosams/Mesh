@@ -1,5 +1,6 @@
 import { reviewArtifactKind, validatedReviewArtifactPreview, reviewDiffTextIsSafe } from './review-artifact-validation.js';
 export { reviewArtifactKind, validatedReviewArtifactPreview } from './review-artifact-validation.js';
+import { startRemoteObservation } from './remote-observation.js';
 import { startFleets } from './fleets.js';
 import { startAttachedProjects } from './attached-projects.js';
 import { workspaceVersionsRetainedInteraction } from './workspace-versions-interaction-policy.js';
@@ -16,6 +17,7 @@ const appDocument = document;
 const invoke = appWindow.__TAURI__?.core?.invoke;
 startAttachedProjects({ document: appDocument, invoke, CustomEvent });
 startFleets({ document: appDocument, invoke, CustomEvent });
+startRemoteObservation({ document: appDocument, invoke, CustomEvent });
 const $ = (id) => appDocument.getElementById(id);
 const noticeSource = createNoticeSource(appDocument, CustomEvent);
 const model = { source: null, destination: null, preview: null, workspace: null, workspaceVerified: false, checkpoint: null, agentFolder: null, agentHandoff: null, agentLive: null, editor: null, folderChanges: [], nativeInspectionFailed: false, nativeCaptureEnabled: false, nativeCaptureAvailable: false, nativeCaptureChanging: false, exportPreview: null, exportBatchPreview: null, exportRoot: null, pullBackPrompt: null, restorePreview: null, restoreUndo: null, workspaceVersionPreview: null, workspaceVersionPreviewError: null, recent: null, activeFolder: null, approval: null };

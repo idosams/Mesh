@@ -756,3 +756,28 @@ are unchanged. A closed output stream may lose a response after durable work; it
 operation. Keep the original configuration and use the action's explicit recovery path. The native
 operation still checks signed-app eligibility before opening configuration or custody. This boundary
 is groundwork for graphical controls, not a renderer API accepting configuration or credential paths.
+
+### Graphical remote observations
+
+In **Agent fleets → Inspect a remote worker**, choose an existing private
+`mesh.coordinator-observation-config/v1` file using the native file chooser. This initial graphical
+route requires the configuration's `fleets` path to be this application's fleet catalogue and its
+objective/lane/run to identify retained work there. It reuses the catalogue's current native owner;
+it does not open a competing owner or import an external fleet directory. The app must be eligible
+for Apple-held coordinator custody, and the worker subsystem and private SSH files must already be
+configured as described above. Editable connection profiles remain unfinished.
+
+The selected configuration is captured natively for this session. The page receives an opaque
+selection ID and public target labels, never credential paths or signing data. The selection binds
+installation/fleet directory identity, coordinator identity and the originally admitted SSH files.
+Replacing those objects requires a new native selection. Cancelling the chooser retains the old
+selection; **Forget this selection** drops the session selection without deleting files or history.
+Closing Mesh forgets it; reopening does not automatically reconnect or adopt a remote process.
+
+**Read worker status** and **Find saved remote results** each perform one bounded authenticated
+read for the exact selection. They do not renew, start, receive, retry or approve work. A recorded
+launch is historical evidence, not proof of a live process. Result discovery shows the first bounded
+page count and whether more results exist; receipt/import and pagination remain in the native CLI
+recovery flows. Failed reads preserve the last observation with a stale warning. There is no
+background polling. Rendered tests and unsigned native refusal tests do not establish a real
+signed-app/SSH/second-host graphical journey.

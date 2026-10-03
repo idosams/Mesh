@@ -779,6 +779,77 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn pick_remote_observation(app: tauri::AppHandle) -> Result<Option<String>, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            panel.available()?;
+            let Some(file) = app
+                .dialog()
+                .file()
+                .set_title("Choose private coordinator observation configuration")
+                .blocking_pick_file()
+            else {
+                return Ok(None);
+            };
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            let path = file
+                .into_path()
+                .map_err(|_| "The selected configuration is unavailable")?;
+            tauri::async_runtime::spawn_blocking(move || panel.select(&path, &host))
+                .await
+                .map_err(|_| "Remote selection stopped unexpectedly".to_owned())?
+                .map(Some)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = app;
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
+    async fn read_remote_observation(
+        app: tauri::AppHandle,
+        id: String,
+        action: String,
+        after: u64,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            tauri::async_runtime::spawn_blocking(move || panel.read(&id, &action, after))
+                .await
+                .map_err(|_| "Remote observation stopped unexpectedly".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, id, action, after);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
+    async fn forget_remote_observation(app: tauri::AppHandle, id: String) -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        {
+            app.state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .forget(&id)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, id);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn attach_existing_project(
         host: State<'_, Arc<AttachmentHost>>,
         source: String,
@@ -7933,6 +8004,9 @@ mod desktop {
                 }
             })
             .invoke_handler(tauri::generate_handler![
+                pick_remote_observation,
+                read_remote_observation,
+                forget_remote_observation,
                 pick_folder,
                 attach_existing_project,
                 attached_projects,
@@ -8123,6 +8197,8 @@ mod desktop {
                 let native_capture = NativeCapturePreference::new(&app_data_dir);
                 app.manage(Arc::new(AttachmentHost::new(&app_data_dir)));
                 app.manage(Arc::new(crate::fleet_host::FleetHosts::default()));
+                #[cfg(target_os = "macos")]
+                app.manage(Arc::new(crate::coordinator_observation::panel::RemotePanel::default()));
                 let recent = RecentWorkspace::new(app_data_dir);
                 let recent_status =
                     reopen_remembered_workspace(&daemon, &recent, &active_workspace);
