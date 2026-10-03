@@ -4257,7 +4257,9 @@ R81 is new canonical work replacing no legacy commit, based on published R80 / P
 `4f307e5f74343f8da180d9efb8ab7eb7357e5a30`. R80 run 37120867263 passed all seven checks and
 merged as `df8e609a3adab251b876fa3c8e00d21ea208cde0`. R79 combined-main run 37120839893 passed.
 R81 integrates the R80 main merge with a content-identical implementation tree to tested `e67ed4f`;
-only this delivery record changes afterward. R80 combined-main and R81 hosted checks remain pending.
+only this delivery record changes afterward. R80 combined-main run `37121395516` passed.
+R81 PR #212 passed all seven exact-head checks (run `37121419464`) and merged ordinarily
+at `01b6e04b34bcf6ccf0bfa9c31dec6f89630101aa`; combined-main verification is pending.
 The old controller expected a returned cursor of zero, incorrectly refusing valid non-empty result
 pages. The new bundled v2 observation validates returned cursor/request/count/revision relationships,
 limits rows to sixteen, rejects duplicate identities and revision rollback, and retains the previous
@@ -4275,7 +4277,10 @@ delivery is pending. Real signed-app/SSH/second-host acceptance and graphical re
 ## R82: exact saved-input preparation for result receipt
 
 R82 is new canonical work replacing no legacy commit, based on published R81 / PR #212 head
-`d14683b4482bc10b1754000eccb34b708144ad62`. Its original checks and R80 combined-main are active.
+`d14683b4482bc10b1754000eccb34b708144ad62`. PR #212 is now merged after all seven checks passed,
+and R80 combined-main passed. R82 integrates canonical main `01b6e04b34bcf6ccf0bfa9c31dec6f89630101aa`
+with a content-identical implementation tree to tested `6924348`; only delivery documentation
+changes afterward. R81 combined-main and R82 hosted delivery remain pending.
 Historical result input lookup now supports exact recorded completed/cancelled/superseded attempts,
 without weakening reconnect's latest/claimed/launching/initial-lease rules. Native preparation
 exports the original attached version or exact reviewed parent source, validates both input version
