@@ -1,5 +1,13 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Assignment": "הקצאה",
+"Remote worker · last coordinator record": "סוכן מרוחק · הרישום האחרון אצל המתאם",
+"Remote execution has not been observed in this view": "ביצוע מרוחק טרם נצפה בתצוגה זו",
+"Remote assignment": "הקצאה מרוחקת",
+"Recorded lease revision": "גרסת החכירה המתועדת",
+"Recorded lease deadline (Unix ms)": "מועד החכירה המתועד (אלפיות שנייה של Unix)",
+"A lease deadline does not prove the worker stopped.": "מועד החכירה אינו מוכיח שהסוכן נעצר.",
+
 "Read recorded execution": "קריאת היסטוריית הביצוע",
 "Last recorded execution": "מצב הביצוע האחרון שנרשם",
 "Recorded revision": "גרסה מתועדת",

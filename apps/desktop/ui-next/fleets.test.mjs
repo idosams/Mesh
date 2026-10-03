@@ -184,3 +184,19 @@ test('received review queues remain visible without fleet status and are not dup
   html=render(value);assert.match(html,/role="alert"/);assert.match(html,/could not be verified/);assert.match(html,/<button[^>]*disabled=""[^>]*>Pin saved review<\/button>/);
   module.exports.setLocale('he');try{assert.match(render(value),/מצב הצי טרם נטען/);}finally{module.exports.setLocale('en');}
 });
+
+
+test('remote lanes disclose retained assignment and never join local activity as remote liveness', () => {
+  const value = props(), lane = value.projection.fleets[0].lanes[0];
+  lane.run = { id: 'attempt-one', state: 'running', remote: { assignment: 'assignment-one', worker: 'e'.repeat(64), leaseSequence: '2', leaseUntil: '1000' } };
+  value.projection.activity = [{ objective: 'fleet-one', status: 'monitoring', stopRequested: false, observedAt: '1000', workers: [{ lane: 'lane-one', run: 'attempt-one', activity: 'local-only-observation', events: '1', observedAt: '1000' }] }];
+  const html = render(value);
+  assert.match(html, /Remote worker · last coordinator record/);
+  assert.match(html, /Last saved state: Working/);
+  assert.match(html, /Remote execution has not been observed in this view/);
+  assert.doesNotMatch(html, /local-only-observation/);
+  assert.ok(html.includes('<bdi dir="ltr">assignment-one</bdi>'));
+  assert.ok(html.includes(`<bdi dir="ltr">${'e'.repeat(64)}</bdi>`));
+  module.exports.setLocale('he');
+  try { assert.match(render(value), /סוכן מרוחק/); } finally { module.exports.setLocale('en'); }
+});

@@ -23,6 +23,16 @@ export function fleetProviderPolicy(value, canonical = true) {
   return Object.freeze({ coordinator: value.coordinator, providers: Object.freeze(providers) });
 }
 
+function remoteAssignment(value) {
+  // Older catalogue replies omit this additive projection; omission proves no remote observation.
+  if (value === undefined || value === null) return null;
+  const positiveU64 = item => decimal(item) && BigInt(item) > 0n && BigInt(item) <= 18446744073709551615n;
+  require(typeof value === 'object' && Object.keys(value).sort().join(',') === 'assignment,lease_sequence,lease_until_ms,worker'
+    && identity(value.assignment) && value.assignment.length <= 96 && digest(value.worker)
+    && positiveU64(value.lease_sequence) && positiveU64(value.lease_until_ms));
+  return Object.freeze({ assignment: value.assignment, worker: value.worker, leaseSequence: value.lease_sequence, leaseUntil: value.lease_until_ms });
+}
+
 export function fleetCatalogue(raw) {
   const value = parse(raw);
   require(value?.schema === 'mesh.native-fleets/v1' && Array.isArray(value.fleets) && value.fleets.length <= 16);
@@ -44,7 +54,7 @@ export function fleetCatalogue(raw) {
       require(lane.run === null || (identity(lane.run?.id) && !runs.has(lane.run.id) && states.has(lane.run.state)));
       if (lane.run) runs.add(lane.run.id);
       return { id: lane.id, parent: lane.parent, sourceProject: lane.source_project, goal: lane.goal, provider: lane.provider,
-        base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state } : null };
+        base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
     });
     require(result.every(lane => lane.parent === null || (lane.parent !== lane.id && lanes.has(lane.parent))));
     require(!policy || result.every(lane => policy.providers.includes(lane.provider) && (lane.parent !== null || lane.provider === policy.coordinator)));

@@ -2952,6 +2952,23 @@ fn lane_summary(lane: &Lane) -> Json {
                     Json::object([
                         ("id", Json::text(&run.id)),
                         ("state", Json::text(super::wire::state_word(run.state))),
+                        (
+                            "remote",
+                            run.remote.as_ref().map_or(Json::Null, |assignment| {
+                                Json::object([
+                                    ("assignment", Json::text(&assignment.id)),
+                                    ("worker", Json::text(&assignment.worker_key)),
+                                    (
+                                        "lease_sequence",
+                                        Json::text(assignment.lease_sequence.to_string()),
+                                    ),
+                                    (
+                                        "lease_until_ms",
+                                        Json::text(assignment.lease_until_ms.to_string()),
+                                    ),
+                                ])
+                            }),
+                        ),
                     ])
                 })
                 .unwrap_or(Json::Null),

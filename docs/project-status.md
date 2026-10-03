@@ -916,3 +916,15 @@ The [measurement record](plan/evidence/fleet-four-worker-2026-10-04.json) binds 
 results to the source revision, binary hashes and preserved raw evidence. GUI latency,
 provider cost, resource usage, human coordination and accepted-main timing remain
 unmeasured; this does not complete packaged, second-provider or second-host acceptance.
+
+
+### Remote assignment overview (R116)
+
+The native fleet catalogue now retains each current remote attempt's assignment, worker identity
+and exact lease values. Desktop cards distinguish coordinator records from remote observations
+and suppress local-activity joins for those lanes. Existing local/legacy catalogues remain readable.
+Controller/rendered regressions reproduced the missing distinction; native persisted-attempt,
+malformed-fact and English/Hebrew checks cover the new projection. The full gate passed 3,769 native,
+184 rendered and 642 desktop tests plus the real daemon demo. Hosted validation and merge remain
+pending. Independent fleet-wide remote refresh and signed packaged/second-host acceptance remain
+open in [issue #250](https://github.com/idosams/Mesh/issues/250).
