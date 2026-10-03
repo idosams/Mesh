@@ -32,7 +32,7 @@ pub use received_host::{
 #[cfg(unix)]
 pub use receiving_broker::{
     serve_remote_receiving, RemoteReceivedHandoff, RemoteReceivingBrokerOutcome,
-    RemoteReceivingCommand,
+    RemoteReceivingCommand, RemoteRecoveredHandoff,
 };
 #[cfg(unix)]
 pub use receiving_session::{

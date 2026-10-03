@@ -4890,3 +4890,33 @@ supervisor integration, desktop recovery controls and cancellation delivery duri
 remain required. A fresh bounded signature cannot prove instantaneous knowledge of a later remote
 cancellation. Existing launch intents require separate uncertain-execution reconciliation. The fixed
 user checkpoint is unchanged, and the full fleet acceptance map remains open.
+
+## R104 — recovered workspace ownership through the native supervisor
+
+This is a dependent canonical increment on published R103/PR236 at
+`2472a89454ed05a646fc31189d0668e6b99838b2`. Its parent PR has passed six hosted checks, including Linux; macOS remains running
+at this entry. It replaces no preserved source commit.
+
+`RemoteRecoveredHandoff` retains the authenticated original workspace's exclusive initializer
+ownership and guarded registry. `ReceivedWorkerHost::start_recovered` consumes that ownership
+through the existing atomic `reserve_launch` boundary before provider startup. First-time input
+initialization shares the same final path; no launch checks are bypassed or receipt-to-reservation
+conversion added. The supervisor admits the original worker identity and capacity and records its
+slot before effects, retaining that slot after failed startup. Existing or uncertain resident entries
+refuse another start.
+
+The bounded resident mailbox accepts an explicit native-only recovered start request. Full or
+closed delivery returns the original request and held workspace. A lost/full startup reply does not
+remove the provider owner or stop resident observation. Neither connection loss, a free initializer
+lock, nor an expired lease is used as evidence of process termination or capacity release.
+
+Three focused native regressions passed in 1.047 seconds: a real local fixture process starts exactly
+once and finishes after startup-reply loss/control disconnect; mailbox backpressure returns the same
+verified workspace without startup; and signer failure retains the slot plus single launch intent
+while preserving original input. This is fixture-provider native integration, not a successful real
+Codex/Claude or second-host recovery run. The full local gate passed 3,734 native tests
+in 157.288 seconds (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and
+44 real-daemon checks, without leak warnings. Hosted checks and merged delivery remain pending.
+
+The authenticated recovery wire exchange, worker-connection routing, coordinator action and desktop
+controls remain required to expose this path to users. The fixed user checkpoint stays unchanged.

@@ -4,7 +4,7 @@ use super::provider::NativeAdapter;
 use super::service::FleetService;
 use super::{
     Command, RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation,
-    RemoteReceivedHandoff,
+    RemoteReceivedHandoff, RemoteRecoveredHandoff,
 };
 use crate::ipc::{
     nothing_to_recover, IpcServer, Json, Operations, ServerHandle, StartupSummary, Unavailable,
@@ -90,10 +90,31 @@ impl ReceivedWorkerHost {
             .allocation
             .into_worker_workspace(reviewers, checkpoint)
             .map_err(|_| unavailable("remote-host-input-refused"))?;
+        Self::start_recovered(
+            RemoteRecoveredHandoff {
+                workspace,
+                registry: handoff.registry,
+            },
+            adapter,
+            endpoint,
+            signers,
+        )
+    }
+
+    /// Consume an exclusively held recovered workspace and use the same atomic launch-intent
+    /// boundary as first initialization. Historical receipts alone cannot construct this handoff.
+    /// Failure preserves work and consumes ownership; it never authorizes another launch attempt.
+    pub fn start_recovered(
+        handoff: RemoteRecoveredHandoff,
+        adapter: impl Into<NativeAdapter>,
+        endpoint: &Path,
+        signers: Arc<dyn WorkerSignerFactory>,
+    ) -> Result<Self, Unavailable> {
+        let adapter = adapter.into();
         let reservation = handoff
             .registry
             .reserve_launch(
-                workspace,
+                handoff.workspace,
                 adapter.provider(),
                 super::service::received_clock()?,
             )
