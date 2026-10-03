@@ -173,6 +173,34 @@ impl Draft {
         ])
         .encode())
     }
+    pub(super) fn peer_configuration(
+        &self,
+        expected: &str,
+        input: &Json,
+        fleets: &Path,
+    ) -> Result<Json, String> {
+        if self.id.is_empty() || self.id != expected {
+            return Err(UNAVAILABLE.into());
+        }
+        receiving::closed(input, &["host", "account", "port", "worker"])?;
+        let mut pairs = vec![("schema", Json::text("mesh.coordinator-peer-config/v1"))];
+        for field in ["host", "account", "port", "worker"] {
+            pairs.push((field, input.get(field).ok_or(UNAVAILABLE)?.clone()));
+        }
+        for (field, bound) in [
+            ("installation", &self.installation),
+            ("identity", &self.identity),
+            ("known_hosts", &self.hosts),
+        ] {
+            let bound = bound.as_ref().ok_or(UNAVAILABLE)?;
+            bound.verify()?;
+            pairs.push((field, Json::text(bound.path.to_str().ok_or(UNAVAILABLE)?)));
+        }
+        pairs.push(("fleets", Json::text(fleets.to_str().ok_or(UNAVAILABLE)?)));
+        let value = Json::object(pairs);
+        connection_config(&value)?;
+        Ok(value)
+    }
     fn configuration(
         &self,
         expected: &str,
@@ -309,6 +337,31 @@ mod tests {
             r#"{{"host":"worker.example","account":"mesh","port":22,"worker":"{}","objective":"fleet-one","lane":"lane-one","run":"run-one"}}"#,
             "a".repeat(64)
         )
+    }
+    #[test]
+    fn fresh_peer_uses_native_paths_without_a_fake_lane_or_run() {
+        let f = Fixture::new();
+        let draft = f.draft();
+        let Json::Object(mut fields) = Json::parse(&input()).unwrap() else {
+            unreachable!()
+        };
+        fields.retain(|(key, _)| !["objective", "lane", "run"].contains(&key.as_str()));
+        let value = Json::Object(fields.clone());
+        let peer = draft
+            .peer_configuration(&draft.id, &value, &f.0.join("fleets"))
+            .unwrap();
+        assert_eq!(
+            peer.get("identity"),
+            Some(&Json::text(f.0.join("identity").to_string_lossy()))
+        );
+        assert!(peer.get("run").is_none());
+        fields.push(("identity".into(), Json::text("/forged")));
+        assert!(draft
+            .peer_configuration(&draft.id, &Json::Object(fields), &f.0)
+            .is_err());
+        assert!(draft.peer_configuration("stale", &value, &f.0).is_err());
+        std::fs::write(f.0.join("hosts"), b"changed trust").unwrap();
+        assert!(draft.peer_configuration(&draft.id, &value, &f.0).is_err());
     }
     #[test]
     fn reopened_profile_keeps_native_paths_and_edit_association_until_clear() {

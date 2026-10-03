@@ -10,15 +10,15 @@ use mesh_daemon::{
     project_attachment::{AttachmentStorage, RemoteStartRequest},
 };
 use std::time::{SystemTime, UNIX_EPOCH};
-struct StartConfiguration {
-    connection: ConnectionConfiguration,
-    storage: PathBuf,
-    project: String,
-    request: AttachedFleetRequest,
-    policy: FleetProviderPolicy,
-    lease_until_ms: u64,
+pub(super) struct StartConfiguration {
+    pub(super) connection: ConnectionConfiguration,
+    pub(super) storage: PathBuf,
+    pub(super) project: String,
+    pub(super) request: AttachedFleetRequest,
+    pub(super) policy: FleetProviderPolicy,
+    pub(super) lease_until_ms: u64,
 }
-fn configuration(value: Json) -> Result<StartConfiguration, String> {
+pub(super) fn configuration(value: Json) -> Result<StartConfiguration, String> {
     closed(
         &value,
         &[
@@ -92,7 +92,7 @@ fn configuration(value: Json) -> Result<StartConfiguration, String> {
         lease_until_ms,
     })
 }
-fn validate_deadline(until: u64, now: u64) -> Result<(), String> {
+pub(super) fn validate_deadline(until: u64, now: u64) -> Result<(), String> {
     if until <= now || until.saturating_sub(now) > 3_600_000 {
         return Err(UNAVAILABLE.into());
     }
@@ -129,7 +129,6 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
         peer,
         directory,
     } = open_context(&selected.connection)?;
-    let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
     let attachment = storage.reopen(&selected.project).map_err(|_| UNAVAILABLE)?;
     let protected = [
         &selected.storage,
@@ -151,6 +150,30 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
     let service = directory
         .create_attached_with_providers(&attachment, &selected.request, &selected.policy)
         .map_err(|_| UNAVAILABLE)?;
+    dispatch(
+        &selected,
+        &service,
+        &source,
+        NativeConnection {
+            installation,
+            custody,
+            peer,
+        },
+    )
+}
+/// Reuse an admitted app-owned service; never open a second fleet catalogue for a UI command.
+pub(super) fn dispatch(
+    selected: &StartConfiguration,
+    service: &mesh_daemon::fleet::service::FleetService,
+    source: &mesh_daemon::fleet::RemoteInputSource,
+    context: NativeConnection,
+) -> Result<Json, String> {
+    let NativeConnection {
+        installation,
+        custody,
+        peer,
+    } = context;
+    let coordinator = installation.identity().map_err(|_| UNAVAILABLE)?.worker();
     let objective = service.objective().map_err(|_| UNAVAILABLE)?;
     let state = service.native_state().map_err(|_| UNAVAILABLE)?;
     let mut roots = state.lanes.values().filter(|lane| lane.parent.is_none());
@@ -166,7 +189,7 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
             worker_key: hex(selected.connection.worker.as_bytes()),
             input: source.manifest().input(), bundle: source.manifest().bundle(),
             lease_sequence: 1, lease_until_ms: selected.lease_until_ms,
-        }, source: &source, coordinator, worker: selected.connection.worker,
+        }, source, coordinator, worker: selected.connection.worker,
     }, Duration::from_secs(25), |payload| {
         installation.identity().map_err(|_| UNAVAILABLE)?;
         custody.sign(payload).map_err(|_| UNAVAILABLE.into())
@@ -178,7 +201,7 @@ pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
     };
     Ok(Json::object([
         ("schema", Json::text("mesh.coordinator-start-result/v1")),
-        ("request", Json::text(selected.request.request)),
+        ("request", Json::text(&selected.request.request)),
         ("objective", Json::text(objective)),
         ("lane", Json::text(lane)),
         ("run", Json::text(run)),

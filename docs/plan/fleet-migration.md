@@ -4441,3 +4441,42 @@ checks, 625 desktop tests and all repository/docs/license/storage/real-daemon de
 process-leak warning occurred; #37/#172 remain unresolved. Full log retained separately. R86
 PR #217 original hosted checks passed; R85 #216 macOS CI remains active. Hosted validation of
 this new increment and the complete graphical/remote acceptance remain required.
+
+## R88: desktop fresh remote input creation and explicit inspection
+
+New canonical work replacing no legacy commit, implementing the next part of #218 on published
+R87 PR #219 `fb497eefb1fb6bf0c55525a0d0019b29490fc4d0`. A separate local branch integrated verified
+canonical main `692b536d4e3ec31c01f69c5cfe87415dd50dca3b` with an identical tree before edits;
+published heads and their original CI were not mutated. Publication will retain the dependency.
+
+A native peer-only setup path enables preparation without an existing run. Native code fixes and
+retains request/configuration/bindings/deadline before fleet allocation or network I/O. Explicit
+send uses the app-owned catalogue and shared native transfer helper; already-dispatched attempts
+refuse. Request listing and explicit original-attempt inspection support restart/lost-output
+recovery without dispatching, renewing or adopting processes. Exact inspection opens the original
+selection for existing status/reconnect controls. Public fields are validated and private fields
+stripped; duplicate in-flight sends and uninspected restart sends are suppressed. English/Hebrew
+controls distinguish confirmed input transfer from provider execution. Persisted request journal
+format is unchanged; paired desktop configuration and public envelopes are additive v1 schemas.
+
+Native compile passed. Twenty-eight controller tests, 179 rendered/typecheck checks and 37 focused
+native tests (16.056 s) passed. Coverage includes fake-path refusal, peer setup without a run,
+changed trust/stale draft, catalogue-owner reuse, journal restart, lost reply/duplicate suppression,
+cross-request replies, escaped/localized views and unsigned refusal before storage/network.
+Full gate pending. No signed packaged/real second-host or remote provider execution claim is made.
+Missing assignments, expired leases, lost reservations and all prior acceptance gaps remain open.
+
+R88 full gate passed: 3,672 native tests (155.235 s, one slow, 17 skipped), 179 rendered checks,
+629 desktop tests and all repository/docs/license/storage/real-daemon demo gates. No process-leak
+warning occurred; #37/#172 remain unresolved. Final presentation-only copy clarifies the existing
+worker service's execution queue after materialization and exposes original request/worker IDs;
+controller, rendered/typecheck and docs checks validate that clarification separately. No runtime
+behavior changed after the full gate. Hosted publication and actual signed/second-host acceptance
+remain pending.
+
+R88 delivery reconciliation: R85 PR #216 merged ordinarily after all seven exact checks passed,
+main `68e7e69e16639f927e689d3d2074721a5a719de5`. R87 #219 original CI and R84 combined-main
+passed. R86 #217 now targets main at `089440f4d34943f61f770dca3776aa78fc4fb0c8`; R87 #219
+uses that parent at `8f7fce6eec878b8a5d1679d5e327de7920be0cff`. Both preserve their previously
+checked implementation trees and require fresh CI. R88 integrated the published parent with a
+tree identical to locally verified `1c35c49`; only this delivery record changed afterward.

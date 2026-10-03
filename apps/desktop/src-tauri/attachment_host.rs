@@ -274,7 +274,7 @@ impl AttachmentHost {
     }
 
     #[cfg(target_os = "macos")]
-    fn with_fleets<T>(
+    pub(crate) fn with_fleets<T>(
         &self,
         create: bool,
         action: impl FnOnce(
@@ -1241,6 +1241,40 @@ impl AttachmentHost {
         storage
             .remote_result_inbox(parent, identity, protected, create)
             .map_err(|_| "Receiving storage needs reconciliation".into())
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn remote_start_storage_path(&self) -> &Path {
+        &self.storage_path
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn remote_start_requests(
+        &self,
+    ) -> Result<Vec<mesh_daemon::project_attachment::RemoteStartRequest>, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        state
+            .storage
+            .as_ref()
+            .map(|s| s.remote_start_requests())
+            .transpose()
+            .map(|entries| entries.unwrap_or_default())
+            .map_err(|_| "Saved creation requests need reconciliation".into())
+    }
+    #[cfg(target_os = "macos")]
+    pub(crate) fn retain_remote_start_request(
+        &self,
+        request: &mesh_daemon::project_attachment::RemoteStartRequest,
+    ) -> Result<(), String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .retain_remote_start_request(request)
+            .map_err(|_| "Saved creation request changed or needs reconciliation".into())
     }
 
     #[cfg(target_os = "macos")]
@@ -2454,6 +2488,41 @@ mod tests {
         fleet_provisioning_journey("legacy", None);
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn remote_creation_journal_reopens_without_a_second_catalogue_owner_or_launch() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-host-remote-creation-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let host = AttachmentHost::new(&root);
+        assert!(host.remote_start_requests().unwrap().is_empty());
+        let request = mesh_daemon::project_attachment::RemoteStartRequest {
+            request: "a".repeat(32),
+            value: Json::object([("native", Json::text("retained input"))]),
+        };
+        host.retain_remote_start_request(&request).unwrap();
+        assert!(!root.join("fleets").exists());
+        host.with_fleets(true, |d| {
+            assert!(d.is_some());
+            Ok(())
+        })
+        .unwrap();
+        host.with_fleets(false, |d| {
+            let snapshot = d
+                .unwrap()
+                .attached_request_snapshot(&request.request)
+                .unwrap();
+            assert_eq!(snapshot.get("fleet"), Some(&Json::Null));
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(host.remote_start_requests().unwrap(), vec![request.clone()]);
+        drop(host);
+        let restored = AttachmentHost::new(&root);
+        assert_eq!(restored.remote_start_requests().unwrap(), vec![request]);
+        drop(restored);
+        fs::remove_dir_all(root).unwrap();
+    }
     #[cfg(target_os = "macos")]
     #[test]
     fn fleet_provider_policy_receipts_bind_closed_input_and_exact_retries() {
