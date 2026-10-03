@@ -139,7 +139,7 @@ impl Selection {
 }
 fn project(id: &str, result: RemoteObservationOutcome) -> Json {
     let mut fields = vec![
-        ("schema", Json::text("mesh.remote-panel-observation/v1")),
+        ("schema", Json::text("mesh.remote-panel-observation/v2")),
         ("id", Json::text(id)),
     ];
     match result {
@@ -182,6 +182,15 @@ fn project(id: &str, result: RemoteObservationOutcome) -> Json {
                 (
                     "count",
                     Json::Number(page.as_ref().map_or(0, |p| p.offers.len() as u64)),
+                ),
+                (
+                    "entries",
+                    Json::Array(page.as_ref().map_or_else(Vec::new, |p| {
+                        p.offers
+                            .iter()
+                            .map(|offer| offer.public_summary())
+                            .collect()
+                    })),
                 ),
                 (
                     "has_more",
@@ -269,10 +278,28 @@ mod tests {
         assert!(panel.forget(&"a".repeat(64)).is_err());
     }
     #[test]
+    fn result_projection_keeps_the_returned_cursor_after_a_nonzero_page() {
+        let result = project(
+            "selection",
+            RemoteObservationOutcome::Results(Some(mesh_daemon::fleet::RemoteSavedResultPage {
+                revision: 16,
+                after: 16,
+                has_more: false,
+                offers: vec![],
+            })),
+        );
+        assert_eq!(result.get("after"), Some(&Json::Number(16)));
+        assert_eq!(result.get("entries"), Some(&Json::Array(vec![])));
+        assert_eq!(
+            result.get("schema"),
+            Some(&Json::text("mesh.remote-panel-observation/v2"))
+        );
+    }
+    #[test]
     fn missing_result_history_is_distinct_from_an_empty_verified_page() {
         let result = project("selection", RemoteObservationOutcome::Results(None));
         assert!(matches!(result.get("available"), Some(Json::Bool(false))));
         assert!(matches!(result.get("revision"), Some(Json::Null)));
-        assert!(result.get("offers").is_none());
+        assert_eq!(result.get("entries"), Some(&Json::Array(vec![])));
     }
 }

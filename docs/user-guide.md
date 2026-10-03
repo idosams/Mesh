@@ -438,3 +438,9 @@ If a worker input transfer was interrupted, explicitly open its original connect
 working files have changed. The worker must still retain the original reservation. Input acceptance
 does not mean an agent is running. If Mesh cannot confirm the outcome, inspect worker status before
 another explicit resume; it does not request a replacement attempt or automatically retry.
+
+
+**Find saved remote results** lists up to sixteen saved results at a time. Use **Next results** or
+**Previous results** to browse; choose **Find saved remote results** again to refresh from the first
+page. **Result identities** shows the exact saved version and review identifiers. A listed result
+has not been downloaded or accepted. Failed reads keep the previous page and show a warning.

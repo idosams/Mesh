@@ -365,3 +365,42 @@ fn native_result_receipt_resumes_verified_content_without_input_admission_or_wor
     )
     .is_err());
 }
+
+#[test]
+fn result_summary_exposes_only_exact_public_saved_identities() {
+    let f = Fixture::new();
+    let mut runtime = f.runtime(true);
+    let (body, manifest) = fixture_body(&f, &mut runtime);
+    let offer = RemoteSavedResultOffer::sign(body.clone(), |p| sign(&f.worker, p)).unwrap();
+    let summary = offer.public_summary();
+    assert_eq!(
+        summary.get("version"),
+        Some(&Json::text(manifest.input().to_string()))
+    );
+    assert_eq!(
+        summary.get("manifest"),
+        Some(&Json::text(manifest.bundle().to_string()))
+    );
+    assert_eq!(summary.get("checkpoint"), body.get("checkpoint"));
+    assert_eq!(summary.get("review"), body.get("review"));
+    assert_eq!(
+        summary.get("offer"),
+        Some(&Json::text(
+            Blake3::digest_bytes(offer.encode().as_bytes()).to_string()
+        ))
+    );
+    let Json::Object(fields) = summary else {
+        panic!("summary object")
+    };
+    assert_eq!(fields.len(), 5);
+    for private in [
+        "target",
+        "owner",
+        "mapping",
+        "initial",
+        "installation",
+        "signature",
+    ] {
+        assert!(fields.iter().all(|(key, _)| key != private));
+    }
+}

@@ -46,18 +46,30 @@ export function inputRecoveryReply(raw, selection) {
     && ['input-materialized', 'input-retained'].includes(value.disposition));
   return { disposition: value.disposition };
 }
-export function observationReply(raw, id, kind) {
+export function observationReply(raw, id, kind, before = 0) {
   const value = parse(raw);
-  require(value?.schema === 'mesh.remote-panel-observation/v1' && value.id === id && value.kind === kind);
+  require(value?.schema === 'mesh.remote-panel-observation/v2' && value.id === id && value.kind === kind);
   if (kind === 'status') {
     require(decimal(value.observed_ms) && typeof value.admitted === 'boolean' && typeof value.launch_recorded === 'boolean'
       && (!value.launch_recorded || value.admitted) && (value.lease_until_ms === null || decimal(value.lease_until_ms)));
     return { kind, observed: value.observed_ms, admitted: value.admitted, launchRecorded: value.launch_recorded, leaseUntil: value.lease_until_ms };
   }
   require(kind === 'results' && typeof value.available === 'boolean' && typeof value.has_more === 'boolean'
-    && Number.isSafeInteger(value.count) && value.count >= 0 && value.count <= 4096
-    && (value.available ? decimal(value.revision) && value.after === 0 : value.revision === null && value.after === null && value.count === 0 && !value.has_more));
-  return { kind, available: value.available, count: value.count, revision: value.revision, hasMore: value.has_more };
+    && Number.isSafeInteger(before) && before >= 0 && before <= 4096
+    && Number.isSafeInteger(value.count) && value.count >= 0 && value.count <= 16
+    && Array.isArray(value.entries) && value.entries.length === value.count);
+  if (value.available) {
+    require(decimal(value.revision) && Number(value.revision) <= 4096 && Number.isSafeInteger(value.after)
+      && value.after === before + value.count && value.after <= Number(value.revision)
+      && value.count === Math.min(16, Number(value.revision) - before) && value.has_more === (value.after < Number(value.revision)));
+  } else require(value.revision === null && value.after === null && value.count === 0 && !value.has_more);
+  const entries = value.entries.map(entry => {
+    require(entry && ['offer', 'version', 'review', 'manifest'].every(key => hex(entry[key])) && typeof entry.checkpoint === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(entry.checkpoint));
+    return Object.fromEntries(['offer', 'checkpoint', 'version', 'review', 'manifest'].map(key => [key, entry[key]]));
+  });
+  require(new Set(entries.map(entry => entry.offer)).size === entries.length && new Set(entries.map(entry => entry.checkpoint)).size === entries.length);
+  return { kind, available: value.available, count: value.count, revision: value.revision, hasMore: value.has_more, before, after: value.after, entries };
+
 }
 export function startRemoteObservation({ document, invoke, CustomEvent }) {
   let draft = null, profiles = null, preset = null;
@@ -66,7 +78,9 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
   async function intent(event) {
     if (disposed || busy || typeof invoke !== 'function') return;
     const type = event.detail?.type;
-    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'forget', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove'].includes(type) || (['status', 'results', 'forget', 'reconnect-input'].includes(type) && !selection)) return;
+    if (!['choose', 'pick-setup', 'clear-setup', 'configure', 'status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input', 'profiles-list', 'profiles-recover', 'profile-save', 'profile-open', 'profile-remove'].includes(type) || (['status', 'results', 'results-next', 'results-previous', 'forget', 'reconnect-input'].includes(type) && !selection)) return;
+    if (type === 'results-next' && !(results?.available && results.hasMore)) return;
+    if (type === 'results-previous' && !(results?.available && results.before > 0)) return;
     if (type === 'pick-setup' && !['installation', 'identity', 'hosts'].includes(event.detail.part)) return;
     if (type === 'configure' && !(draft?.installation && draft?.identity && draft?.hosts)) return;
     if (type === 'profile-save' && (!selection || !profiles || !labelText(event.detail.label))) return;
@@ -100,8 +114,13 @@ export function startRemoteObservation({ document, invoke, CustomEvent }) {
         await invoke('forget_remote_observation', { id: selection.id });
         selection = null; status = null; results = null; recovery = null;
       } else {
-        const observation = observationReply(await invoke('read_remote_observation', { id: selection.id, action: type, after: 0 }), selection.id, type);
-        if (type === 'status') status = observation; else results = observation;
+        const action = type.startsWith('results') ? 'results' : type;
+        const after = type === 'results-next' ? results.after : type === 'results-previous' ? Math.max(0, results.before - 16) : 0;
+        const observation = observationReply(await invoke('read_remote_observation', { id: selection.id, action, after }), selection.id, action, after);
+        if (type === 'status') status = observation; else {
+          require(!observation.available || !results?.available || Number(observation.revision) >= Number(results.revision));
+          results = observation;
+        }
       }
     } catch { error = type === 'reconnect-input' ? 'Input transfer outcome could not be confirmed. Keep the original assignment, inspect worker status, and resume only explicitly. No new attempt was requested.' : 'Remote observation is unavailable. Previous observations may be out of date. Check the signed application, private configuration and worker connection.'; }
     finally { busy = false; publish(); }

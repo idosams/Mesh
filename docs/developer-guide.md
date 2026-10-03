@@ -778,9 +778,12 @@ Closing Mesh forgets it; reopening does not automatically reconnect or adopt a r
 
 **Read worker status** and **Find saved remote results** each perform one bounded authenticated
 read for the exact selection. They do not renew, start, receive, retry or approve work. A recorded
-launch is historical evidence, not proof of a live process. Result discovery shows the first bounded
-page count and whether more results exist; receipt/import and pagination remain in the native CLI
-recovery flows. Failed reads preserve the last observation with a stale warning. There is no
+launch is historical evidence, not proof of a live process. Result discovery displays at most sixteen saved-result identities per page, with explicit previous
+and next controls. The renderer checks the native returned cursor, bounded row count and monotonic
+catalogue revision; failed or regressed reads preserve the last verified page with a warning.
+Each row exposes only offer/checkpoint/version/review/manifest identities. Private assignment facts,
+installation, launch ownership and signature stay native-only. These identities prove neither local
+content receipt nor approval; receipt/import still use the native CLI recovery flows. Failed reads preserve the last observation with a stale warning. There is no
 background polling. Rendered tests and unsigned native refusal tests do not establish a real
 signed-app/SSH/second-host graphical journey.
 
@@ -839,3 +842,10 @@ An input receipt means accepted input, not a running or completed provider. Erro
 inspect status and resume only through another explicit action. No automatic retry or worker adoption
 occurs. This does not recover a lost worker reservation, expose remote launch/result receipt, or prove
 a real signed-app/second-host journey.
+
+
+The bundled remote observation projection is now `mesh.remote-panel-observation/v2`. It adds bounded
+public result rows and validates the returned cursor (the cursor after those rows, not the request
+cursor). Old projection shapes are refused by the paired renderer. This is session IPC only; saved
+connection and fleet persistence formats are unchanged. Pages replace each other rather than growing
+an unbounded list. Discovery never downloads result content or authorizes import.

@@ -1,5 +1,14 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"More saved results exist beyond this page.":"קיימות תוצאות שמורות נוספות מעבר לעמוד זה.",
+"Next results":"תוצאות הבאות",
+"Previous results":"תוצאות קודמות",
+"Result offer":"הצעת תוצאה",
+"Result manifest":"מפרט התוצאה",
+"Review identity":"זהות הסקירה",
+"Result identities":"זהויות התוצאה",
+"These results are listed but have not been downloaded or accepted.":"התוצאות מופיעות ברשימה אך עדיין לא הורדו ולא התקבלו.",
+"Saved remote results":"תוצאות שמורות מהסוכן המרוחק",
 "Resume saved input transfer":"המשך העברת הקלט השמור",
 "Resume only the original interrupted input transfer. The worker must still retain its reservation. This does not create another attempt or extend its lease.":"המשיכו רק את העברת הקלט המקורית שנקטעה. ההקצאה המקורית חייבת עדיין להיות שמורה אצל הסוכן. הפעולה אינה יוצרת ניסיון נוסף ואינה מאריכה את תוקף ההקצאה.",
 "The saved input is materialized on the worker. This does not establish that an agent is running.":"הקלט השמור נוצר במחשב הסוכן. אין בכך הוכחה שסוכן פועל.",

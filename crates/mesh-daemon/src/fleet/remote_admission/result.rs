@@ -136,6 +136,18 @@ impl RemoteSavedResultOffer {
     pub fn encode(&self) -> String {
         envelope(SCHEMA, self.body.clone(), &self.signature)
     }
+    /// Public saved-result identities only. This is a display selector, not proof of received
+    /// content or permission to import. Assignment correlation and signature stay native-only.
+    pub fn public_summary(&self) -> Json {
+        let mut fields = vec![(
+            "offer",
+            Json::text(Blake3::digest_bytes(self.encode().as_bytes()).to_string()),
+        )];
+        for field in ["checkpoint", "review", "version", "manifest"] {
+            fields.push((field, self.body.get(field).cloned().unwrap_or(Json::Null)));
+        }
+        Json::object(fields)
+    }
     /// Verify against the coordinator's exact current assignment and the complete manifest.
     /// Expiry does not erase immutable results. No coordinator state or concurrency slot changes.
     pub fn verify(
