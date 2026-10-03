@@ -770,6 +770,6 @@ imports keep their existing behavior; the fixed user checkpoint is unchanged.
 
 Received initialization can complete only the exact intended initial journal prefix after verifying
 its required payloads. It preserves conflicting history and does not append an already-complete
-initial history again. Byte-cut and refusal tests pass; full validation and delivery are tracked in
-R97 of the migration ledger. This internal path does not yet let a user resume an interrupted remote
+initial history again. Byte-cut/refusal tests and the full local gate pass; the preserved process-leak
+warning, fresh hosted validation and delivery are tracked in R97 of the migration ledger. This internal path does not yet let a user resume an interrupted remote
 worker: input-copy and workspace/receipt reconstruction plus authenticated recovery remain unfinished.

@@ -4649,7 +4649,10 @@ retains its existing behavior. Journal/receipt formats are unchanged.
 
 Five new regressions include every byte cut of a real generated initial journal, repeated completion,
 changed prefixes/later tails, linked/shared files, replaced generations and missing payloads. The
-focused import/received-workspace suite passed 28 tests in 3.379s. Full local and hosted checks remain
-pending. This is private initialization machinery, not an authenticated restart operation: original
+focused import/received-workspace suite passed 28 tests in 3.379s. Full `npm test` passed 3,696 native
+tests in 158.456s (one slow, 17 skipped), 181 rendered checks, 634 desktop tests and all 44 real-daemon
+checks. Nextest reported one LEAK warning in the existing background-capture test
+`stopping_during_signing_prevents_that_capture_from_being_committed`; its log is preserved and the
+reliability investigation remains open. Fresh hosted checks remain required. This is private initialization machinery, not an authenticated restart operation: original
 admission/lease/launch checks, partial working-file completion, native workspace reconstruction,
 receipt reconciliation and graphical recovery controls remain required by the full acceptance map.
