@@ -483,3 +483,8 @@ Downloaded remote reviews remain accessible while live fleet status is missing o
 status card loads, its result list appears under **Saved remote reviews**; it moves into the card
 when status arrives. Existing pinned reviews stay fixed. A failed history read shows an error and
 keeps pinning unavailable until a verified read succeeds. Reviewing does not start or recover agents.
+
+Remote workers retain the original input allocation identity before acknowledging a newly
+materialized input. This helps later recovery distinguish retained work, but it does not yet
+make a lost worker reservation resumable. Preserve uncertain work and its original assignment;
+a saved record or missing acknowledgment is not permission to start another agent.

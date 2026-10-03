@@ -211,6 +211,14 @@ pub struct RemoteInputAllocation {
     protected: Vec<ProtectedWorkspaceRoot>,
 }
 impl RemoteInputAllocation {
+    pub(in crate::fleet) fn retained_identity(&self) -> io::Result<[String; 3]> {
+        self.verify()?;
+        Ok([
+            token(&self.parent)?.directory_token(),
+            token(&self.allocation)?.directory_token(),
+            token(&self.files)?.directory_token(),
+        ])
+    }
     /// Native-owned working folder. A path alone conveys no execution or filesystem authority.
     pub fn path(&self) -> &Path {
         &self.path
