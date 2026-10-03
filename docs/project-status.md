@@ -531,3 +531,9 @@ status/result-discovery reads for the application's retained fleet history. Publ
 bounded observations are displayed without exposing credential paths or adopting a worker. This is
 not an editable persistent connection profile, remote launch/receive/reconnect UI, live process proof
 or packaged second-host acceptance. See the developer guide and latest migration-ledger increment.
+
+The remote observation panel also has session-only in-app setup: native selectors for an existing
+coordinator identity and SSH files, public connection fields, and fleet/lane choices from the retained
+catalogue. Using settings performs no network connection. Changed files and stale drafts refuse;
+setup still requires eligible signing custody and existing worker provisioning. Persistent profiles
+and remote execution/recovery controls remain unfinished.

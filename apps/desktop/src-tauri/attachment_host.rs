@@ -318,6 +318,11 @@ impl AttachmentHost {
         action(held.as_ref())
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn remote_fleet_storage_path(&self) -> &Path {
+        &self.fleet_path
+    }
+
     // A native chooser configuration can select retained history only inside this app's catalogue.
     // Return the existing owner handle instead of opening competing storage from a UI command.
     #[cfg(target_os = "macos")]

@@ -783,3 +783,26 @@ page count and whether more results exist; receipt/import and pagination remain 
 recovery flows. Failed reads preserve the last observation with a stale warning. There is no
 background polling. Rendered tests and unsigned native refusal tests do not establish a real
 signed-app/SSH/second-host graphical journey.
+
+### Set up a remote observation without a configuration file
+
+Inside **Inspect a remote worker → Set up a worker connection**, select the existing coordinator
+identity folder, private SSH identity and trusted-hosts file with native choosers. Enter the worker's
+DNS/IPv4 address, account, port and public identity, then select a fleet and lane with a retained
+attempt. Mesh derives the catalogue path and attempt from native records. The renderer cannot
+provide file paths or a replacement catalogue. The chosen identity and SSH subsystem must already
+exist; setup neither provisions credentials nor enrolls trust.
+
+Each picker reply advances an opaque draft ID. Native code binds the selected path's identity and
+metadata and rechecks it before installing the settings. A stale picker reply, changed key/trust
+file, replaced identity folder or stale draft refuses. **Clear selected setup files** rotates the
+draft and drops those selections; it does not forget the active connection, delete files or change
+history. A late reply from an earlier picker cannot restore the cleared draft. After a renderer
+reload, clear the draft before selecting files again if the renderer lost its draft ID.
+
+**Use these connection settings** validates the native selection without contacting the worker.
+Then explicitly read status or results. Locally recorded attempts need not have a remote assignment;
+those reads still require the existing signed remote assignment and peer proof. A refused setup
+preserves the active selection. Existing private configuration import remains available.
+Settings/drafts are session-only. Persistent editable profiles, remote start/receive/reconnect
+controls and signed-app/second-host acceptance remain unfinished.

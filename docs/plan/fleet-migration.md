@@ -4173,3 +4173,28 @@ no implementation conflict occurred. Full local verification of the combined tre
 native tests (151.067 s, one slow, 17 skipped), 173 rendered tests, 607 desktop tests and 44
 daemon-demo checks. No process-leak warning occurred; #172 remains unresolved. Fresh hosted checks
 are pending. Neither older passing run substitutes for the new integrated revision.
+
+## R78: native in-app remote connection setup
+
+R78 is new canonical work, replacing no legacy commit, stacked on PR #207's published integrated
+head `f94470c3ba4418945626e7b0d674adae6d4510c6`. PR #208 and its combined-main checks passed.
+PR #207's fresh run 37118616368 remains pending. The fixed user checkpoint is unchanged.
+
+The remote observation panel now accepts public worker/account/port/identity fields and exact
+fleet/lane choices without requiring a hand-written configuration file. Native choosers retain
+private file paths; native code supplies the app catalogue. Picker replies rotate opaque draft IDs.
+Original file/parent identities and metadata are rechecked before applying settings. Clearing rotates
+the draft, so late picker replies cannot restore it; the active connection remains unchanged until a
+new complete selection succeeds. No key/trust creation, network connection or agent launch occurs
+when applying settings. Native signed-app eligibility remains mandatory before file/custody access.
+
+The first focused compilation found a duplicate module declaration in the new test scope; corrected
+before rerunning. Twenty-three focused native tests passed (6.104 s), including changed files,
+replaced folders, stale/cleared drafts, closed form fields and unsigned refusal. Ten controller tests
+and 174 rendered/typecheck tests passed before the final copy update. The first full run stopped on
+the extracted helper appearing after the test module; it was moved without relaxing lint. The full
+rerun passed: 3,634 native tests (149.087 s, one slow, 17 skipped), 174 rendered tests, 611 desktop
+tests and 44 daemon-demo checks. No process-leak warning occurred; #172 remains unresolved.
+Hosted validation and a packaged setup journey remain pending.
+This remains session-only setup. Persisted profiles, start/receive/reconnect controls, real remote
+packaged acceptance and all remaining requirements of the full plan remain open.
