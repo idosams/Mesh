@@ -13,6 +13,8 @@ use std::{io, time::Duration};
 pub enum RemoteObservationKind {
     /// Retained current lease and execution facts, without renewal.
     CurrentLease,
+    /// Original persisted execution facts; never process liveness or restart authority.
+    Execution,
     /// Explicit complete verification of the originally retained input. Never routine polling.
     InputInspection,
     /// One bounded saved-result catalog page.
@@ -25,6 +27,8 @@ pub enum RemoteObservationKind {
 pub enum RemoteObservationOutcome {
     /// Verified worker status with the retained effective lease.
     CurrentLease(RemoteWorkerStatusReceipt),
+    /// Authenticated original session revision and historical state.
+    Execution(RemoteWorkerStatusReceipt),
     /// Fresh original-input facts, never permission to restart work.
     InputInspection(RemoteWorkerStatusReceipt),
     /// Verified page, or unknown/unrecorded work; absence grants no retry.
@@ -32,6 +36,7 @@ pub enum RemoteObservationOutcome {
 }
 enum Challenge {
     CurrentLease(RemoteWorkerStatusChallenge),
+    Execution(RemoteWorkerStatusChallenge),
     InputInspection(RemoteWorkerStatusChallenge),
     Results(RemoteResultDiscoveryChallenge),
 }
@@ -71,6 +76,21 @@ impl FleetHistory {
                     .and_then(|q| q.frame())
                     .map_err(runtime_error)?;
                 (Challenge::CurrentLease(c), frame)
+            }
+            RemoteObservationKind::Execution => {
+                let c = RemoteWorkerStatusChallenge::issue_with_execution_observation(
+                    runtime,
+                    lane,
+                    run,
+                    coordinator,
+                    worker,
+                )
+                .map_err(runtime_error)?;
+                let frame = c
+                    .signed_query(runtime, sign)
+                    .and_then(|q| q.frame())
+                    .map_err(runtime_error)?;
+                (Challenge::Execution(c), frame)
             }
             RemoteObservationKind::InputInspection => {
                 let c = RemoteWorkerStatusChallenge::issue_with_input_inspection(
@@ -145,6 +165,9 @@ impl RemoteObservation {
             Challenge::CurrentLease(c) => c
                 .verify_reply(&mut inner.runtime, encoded)
                 .map(RemoteObservationOutcome::CurrentLease),
+            Challenge::Execution(c) => c
+                .verify_reply(&mut inner.runtime, encoded)
+                .map(RemoteObservationOutcome::Execution),
             Challenge::InputInspection(c) => c
                 .verify_reply(&mut inner.runtime, encoded)
                 .map(RemoteObservationOutcome::InputInspection),

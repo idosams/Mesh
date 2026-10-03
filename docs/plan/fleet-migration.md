@@ -5189,3 +5189,23 @@ records and recovery tests. All 61 combined focused tests passed in 8.596 second
 `npm test` gate passed 3,760 native tests in 159.966 seconds (one slow, 17 skipped),
 182 rendered checks, 636 desktop tests and the real-daemon proof. No assertion or product
 behavior changed during reconciliation. Fresh exact-head hosted validation remains required.
+
+
+## R113 — coordinator and desktop recorded execution
+
+Depends on R111/PR #244 and R112/PR #245. This increment exposes signed v4 worker
+execution history through the fleet service, explicit `--coordinator execution` command,
+and selected remote worker panel. Existing status, input inspection and result discovery
+remain separate operations. It introduces no replacement for preserved source commits.
+
+The renderer receives only the native-selected identity, observation time, admission/launch
+facts and the original session revision/state. Revisions remain decimal strings. Unknown
+progress, incomplete setup, stopping and recorded terminal states have distinct English and
+Hebrew presentation. Reads cannot allocate, adopt execution, release capacity, restart an
+agent or approve work. Selection changes clear prior execution observations; failed reads
+retain prior facts with an explicit stale-data message.
+
+Validation passed: 45 focused native tests, 49 focused controller/rendered tests, and the full
+`npm test` gate: 3,764 Rust tests in 160.533s (1 slow, 17 skipped), 183 rendered tests,
+641 desktop tests, and the real daemon demo. Hosted exact-head checks and merge remain pending. Real signed packaged SSH observation, multiple remote workers and terminal
+reconciliation remain required by the full plan. The fixed user checkpoint is unchanged.

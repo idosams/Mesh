@@ -270,3 +270,22 @@ fn direct_native_operation_retains_the_eligible_application_boundary() {
         );
     }
 }
+
+#[test]
+fn execution_command_is_a_separate_bounded_read() {
+    let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        parse(&args(&["--coordinator", "execution", "/private/config"])).unwrap(),
+        Some((Action::Execution, PathBuf::from("/private/config")))
+    );
+    for invalid in [
+        vec!["--coordinator", "execution", "relative"],
+        vec!["--coordinator", "execution", "/private/config", "0"],
+    ] {
+        assert!(parse(&args(&invalid)).is_err());
+    }
+    assert_eq!(
+        output_failure(&Action::Execution),
+        "Verified observation output could not be written"
+    );
+}
