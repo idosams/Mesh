@@ -4373,3 +4373,14 @@ R85 reconciled delivery base: PR #214 is retargeted to main at content-identical
 runs are terminal and fresh hosted checks are required. R82 combined-main passed. Both ledger
 sections were retained when resolving their append-only documentation conflict. Catalogue
 full-gate revalidation on the corrected platform boundary is pending.
+
+Second R85 full gate passed on the corrected dependency: 3,661 native tests (153.103 s, one slow,
+17 skipped), 177 rendered checks, 621 desktop tests and all remaining gates/demo; no leak warning.
+Desktop startup inspection then identified a normal readable application-data parent layout.
+Inbox creation/catalogue admission now allow read/search permissions on the parent while refusing
+group/other writes; receiving folders and records remain private. Added an actual 0755-parent
+create/reopen/private-child regression and 0770/0777 refusal checks. Final full revalidation passed:
+3,662 native tests (149.419 s, one slow, one process-leak warning, 17 skipped), 177 rendered
+checks, 621 desktop tests and all repository/docs/license/storage/demo gates. The warning occurred
+in `a_refused_open_is_published_too_so_a_subscriber_learns_about_it`; #37/#172 remain open.
+Corrected PR #215 hosted Linux tests and lint passed; macOS and full hosted delivery remain pending.

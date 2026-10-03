@@ -36,7 +36,17 @@ impl AttachmentStorage {
         }
         let parent_pin = PinnedWorkspaceRoot::open(parent.to_path_buf())?;
         parent_pin.ensure_protected_identity(expected_parent)?;
-        private(&parent_pin)?;
+        parent_pin.ensure_namespace_identity()?;
+        if parent_pin
+            .try_clone_directory()?
+            .metadata()?
+            .permissions()
+            .mode()
+            & 0o022
+            != 0
+        {
+            return Err(unavailable());
+        }
         private(&self.pinned)?;
         let _guard = crate::workspace_custody::lock_workspace_initialization(&self.pinned)
             .map_err(|_| unavailable())?;
@@ -252,6 +262,11 @@ mod tests {
         drop(inbox);
         let record = f.0.join("catalogue").join(RECORD);
         let bytes = fs::read(&record).unwrap();
+        fs::write(&record, b"partial").unwrap();
+        assert!(f.inbox(&store, false).is_err());
+        assert!(f.inbox(&store, true).is_err());
+        assert_eq!(fs::read(&record).unwrap(), b"partial");
+        fs::write(&record, &bytes).unwrap();
         fs::rename(&record, record.with_extension("saved")).unwrap();
         assert!(f.inbox(&store, false).is_err());
         assert!(f.inbox(&store, true).is_err());
@@ -265,5 +280,51 @@ mod tests {
         assert!(f.inbox(&store, true).is_err());
         assert!(replacement.destination().is_ok());
         assert_eq!(fs::read(&record).unwrap(), bytes);
+    }
+    #[test]
+    fn copied_catalogue_binding_never_adopts_another_catalogues_inbox() {
+        let f = Fixture::new();
+        let original = f.inbox(&f.store(), true).unwrap().unwrap();
+        let other_path = f.0.join("other-catalogue");
+        fs::create_dir(&other_path).unwrap();
+        fs::set_permissions(&other_path, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::copy(f.0.join("catalogue").join(RECORD), other_path.join(RECORD)).unwrap();
+        let other = AttachmentStorage::open(&other_path).unwrap();
+        assert!(f.inbox(&other, false).is_err());
+        assert!(f.inbox(&other, true).is_err());
+        assert!(original.destination().is_ok());
+        assert!(other_path.join(RECORD).is_file());
+    }
+    #[test]
+    fn ordinary_application_parent_keeps_inbox_private_and_writable_parents_refuse() {
+        let f = Fixture::new();
+        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o755)).unwrap();
+        let inbox = f.inbox(&f.store(), true).unwrap().unwrap();
+        let identity = inbox.identity().unwrap();
+        for name in [
+            "remote-results",
+            "remote-results/store",
+            "remote-results/allocations",
+        ] {
+            assert_eq!(
+                fs::metadata(f.0.join(name)).unwrap().permissions().mode() & 0o077,
+                0
+            );
+        }
+        assert_eq!(
+            f.inbox(&f.store(), false)
+                .unwrap()
+                .unwrap()
+                .identity()
+                .unwrap(),
+            identity
+        );
+        for mode in [0o770, 0o777] {
+            let unsafe_parent = Fixture::new();
+            fs::set_permissions(&unsafe_parent.0, fs::Permissions::from_mode(mode)).unwrap();
+            assert!(unsafe_parent.inbox(&unsafe_parent.store(), true).is_err());
+            assert!(!unsafe_parent.0.join("remote-results").exists());
+            assert!(!unsafe_parent.0.join("catalogue").join(RECORD).exists());
+        }
     }
 }

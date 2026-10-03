@@ -599,3 +599,8 @@ registered project identities, including detached/offline projects, are automati
 renaming a source does not remove that protection. The format is additive; unknown prior inboxes
 require reconciliation. This supplies native lifecycle integration, not graphical receipt or proof
 that a remote result has arrived. Desktop download/recovery controls remain unfinished.
+
+Native application-data parents may be readable/searchable by other users, as in the desktop's
+ordinary startup layout. Group/other-writable parents refuse. Receiving folders stay owner-only,
+and the catalogue binding and receipts remain owner-only files; no permissions are changed on
+an existing parent or project.
