@@ -833,3 +833,11 @@ returns; worker recovery rechecks proof expiry and exact lease throughout initia
 connected to native recovery, but broker/supervisor/desktop routing and real second-host acceptance
 remain unfinished. R103 in the delivery ledger tracks tests and publication; this is not included in
 the fixed user checkpoint.
+
+### Recovered ownership and provider startup (in validation)
+
+Authenticated original workspace recovery now has a native handoff through the existing provider
+supervisor and bounded resident mailbox. Startup uses the ordinary single launch-intent check;
+reply loss preserves the owner, delivery backpressure returns the held workspace, and failed starts
+retain uncertain slots. Three fixture-provider regressions passed. R104 records full validation and
+publication status. Recovery wire routing and user-facing controls remain unfinished.

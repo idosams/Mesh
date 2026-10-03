@@ -985,3 +985,5 @@ pub(in crate::fleet) fn saved_result_fixture(
     drop(worker);
     offer.encode()
 }
+
+mod recovery;

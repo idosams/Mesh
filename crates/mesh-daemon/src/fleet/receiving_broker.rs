@@ -22,6 +22,15 @@ pub struct RemoteReceivedHandoff {
     pub registry: RemoteAdmissionRegistry,
 }
 
+/// Native ownership returned by authenticated original-initialization recovery. A reply cannot
+/// construct this value; keep it across reply loss and mailbox backpressure until delivered once.
+pub struct RemoteRecoveredHandoff {
+    /// Exclusively held original workspace, never an adopted process or a new input reservation.
+    pub workspace: super::ReceivedWorkerWorkspace,
+    /// Original guarded ledger; ordinary reserve_launch remains the single-intent boundary.
+    pub registry: RemoteAdmissionRegistry,
+}
+
 /// Connection disposition. No result here establishes provider execution or protected-main approval.
 pub enum RemoteReceivingBrokerOutcome {
     /// Clean EOF before handoff. Supervisor state survives and requires fresh authentication.

@@ -20,6 +20,15 @@ pub enum ReceivedWorkerRequest {
         /// Correlated native result, never another launch permit.
         reply: SyncSender<Result<RemoteAdmissionReceipt, Unavailable>>,
     },
+    /// Transfer an authenticated, exclusively held original recovered workspace exactly once.
+    StartRecovered {
+        /// Original workspace plus guarded ledger; not derivable from wire correlation facts.
+        handoff: Box<RemoteRecoveredHandoff>,
+        /// Independently admitted native execution configuration.
+        launch: Box<ReceivedWorkerLaunch>,
+        /// Reply loss does not undo provider ownership or grant another launch.
+        reply: SyncSender<Result<RemoteAdmissionReceipt, Unavailable>>,
+    },
     /// Read native facts for an exact retained admission.
     Snapshot {
         /// Exact retained admission facts.
@@ -109,6 +118,13 @@ impl ReceivedWorkerSupervisor {
                         }
                         ReceivedWorkerRequest::Snapshot { admission, reply } => {
                             let _ = reply.try_send(self.snapshot(&admission));
+                        }
+                        ReceivedWorkerRequest::StartRecovered {
+                            handoff,
+                            launch,
+                            reply,
+                        } => {
+                            let _ = reply.try_send(self.start_recovered(*handoff, *launch));
                         }
                         ReceivedWorkerRequest::Cancel { admission, reply } => {
                             let _ = reply.try_send(self.request_cancel(&admission));
