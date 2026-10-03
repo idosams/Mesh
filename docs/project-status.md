@@ -22,8 +22,10 @@ accepted result to the original folder is a separate, explicitly confirmed nativ
 
 The native worker registry can read original session setup and recorded run outcomes after a
 restart, correlated to the retained launch receipt. This is read-only historical evidence; it
-cannot release occupied capacity, adopt a process or authorize another launch. Signed remote
-transport, desktop presentation and safe terminal reconciliation remain unfinished. Fixture
+cannot release occupied capacity, adopt a process or authorize another launch. Fresh native v4
+status queries can carry these facts over the configured authenticated transport; old versions
+cannot satisfy the new query. Desktop presentation, actual second-host acceptance and safe
+terminal reconciliation remain unfinished. Fixture
 provider-process outcomes and restart/refusal cases are covered by native regression tests;
 this is not signed packaged or second-host acceptance.
 

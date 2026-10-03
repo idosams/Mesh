@@ -5083,3 +5083,24 @@ and broker-registry configuration runs are retained. The first full attempt also
 generated Tauri files in the damaged temporary cache; validation moved to a fresh durable cache.
 Hosted checks and merged delivery remain pending. This does not claim a real commercial provider,
 signed packaged application, remote SSH acceptance or capacity release.
+
+## R112 — signed historical execution status
+
+This canonical increment depends on published R111/PR244 at
+`474289bc96aa403b2aaa5d76d65997c6c264f2ef`; it replaces no preserved source commit.
+The additive `mesh.worker-status-query/v4` and reply use independent signing domains and the
+existing bounded, fresh exact-attempt exchange. They carry original admission/launch/current-lease
+facts plus the historical session revision and state. The worker compares the facts again after
+signing; changed worker history suppresses the reply. Changed coordinator context, stale responses,
+wrong signers and older response versions refuse. v1/v2/v3 remain unchanged. No allocation,
+workspace inspection, service construction, launch, retry or capacity release occurs.
+
+The native connection routes v4 without creating transfer or recovery ownership. The original
+input-inspection routing test is retained unchanged; execution-status routing is covered by a
+separate new module. No existing assertion was removed. New schema checks reject extra fields,
+execution without a retained launch, invalid revision/state combinations and out-of-range revisions.
+All 50 focused status/compatibility tests passed in 7.976 seconds. The full `npm test` gate passed
+3,758 native tests in 157.971 seconds (one slow, 17 skipped), 182 rendered checks, 636 desktop
+tests and the real-daemon proof. Hosted checks and merged delivery remain pending. This is native
+fixture/protocol evidence; desktop projection, real SSH second-host acceptance, native custody
+and capacity-release reconciliation remain required. The fixed user checkpoint is unchanged.

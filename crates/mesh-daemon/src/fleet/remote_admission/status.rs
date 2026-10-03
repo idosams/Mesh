@@ -17,6 +17,7 @@ enum StatusVersion {
     Initial,
     Effective,
     Inspected,
+    Execution,
 }
 impl StatusVersion {
     fn query(self) -> &'static str {
@@ -24,6 +25,7 @@ impl StatusVersion {
             Self::Initial => QUERY,
             Self::Effective => "mesh.worker-status-query/v2",
             Self::Inspected => "mesh.worker-status-query/v3",
+            Self::Execution => "mesh.worker-status-query/v4",
         }
     }
     fn reply(self) -> &'static str {
@@ -31,6 +33,7 @@ impl StatusVersion {
             Self::Initial => REPLY,
             Self::Effective => "mesh.worker-status-reply/v2",
             Self::Inspected => "mesh.worker-status-reply/v3",
+            Self::Execution => "mesh.worker-status-reply/v4",
         }
     }
     fn query_domain(self) -> DomainSeparator {
@@ -38,6 +41,7 @@ impl StatusVersion {
             Self::Initial => QUERY_DOMAIN,
             Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-query"),
             Self::Inspected => DomainSeparator::new("mesh.v3.fleet-worker-status-query"),
+            Self::Execution => DomainSeparator::new("mesh.v4.fleet-worker-status-query"),
         }
     }
     fn reply_domain(self) -> DomainSeparator {
@@ -45,6 +49,7 @@ impl StatusVersion {
             Self::Initial => REPLY_DOMAIN,
             Self::Effective => DomainSeparator::new("mesh.v2.fleet-worker-status-reply"),
             Self::Inspected => DomainSeparator::new("mesh.v3.fleet-worker-status-reply"),
+            Self::Execution => DomainSeparator::new("mesh.v4.fleet-worker-status-reply"),
         }
     }
 }
@@ -449,6 +454,7 @@ impl RemoteWorkerStatusQuery {
             QUERY => StatusVersion::Initial,
             "mesh.worker-status-query/v2" => StatusVersion::Effective,
             "mesh.worker-status-query/v3" => StatusVersion::Inspected,
+            "mesh.worker-status-query/v4" => StatusVersion::Execution,
             _ => return Err(invalid()),
         };
         let v = parse_envelope(encoded, version.query())?;
@@ -648,6 +654,9 @@ impl VerifiedRemoteWorkerStatusQuery {
     }
 }
 fn canonical_facts(v: &Json, version: StatusVersion) -> Result<Json, Error> {
+    if version == StatusVersion::Execution {
+        return execution::canonical_execution_facts(v);
+    }
     if version == StatusVersion::Initial {
         return canonical_base_facts(v);
     }
@@ -823,3 +832,6 @@ pub(in crate::fleet) mod result;
 
 mod inspection;
 pub use inspection::inspect_remote_worker_input_over_ssh;
+
+mod execution;
+pub use execution::{inspect_remote_worker_execution_over_ssh, RemoteRecordedExecution};
