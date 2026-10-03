@@ -444,3 +444,12 @@ another explicit resume; it does not request a replacement attempt or automatica
 **Previous results** to browse; choose **Find saved remote results** again to refresh from the first
 page. **Result identities** shows the exact saved version and review identifiers. A listed result
 has not been downloaded or accepted. Failed reads keep the previous page and show a warning.
+
+## Native remote creation recovery
+
+For the native coordinator `start` command, Mesh now keeps the original creation configuration
+privately before allocating or sending work. Keep the same configuration and request identity if
+an outcome is uncertain; inspect it with `--coordinator created` before deciding what to do next.
+Changing that request's saved version, worker, goal, limits, provider or deadline is refused.
+A retained request is not evidence that input arrived or that an agent ran. There is no automatic
+retry or cleanup. The desktop flow for starting new remote work is still being completed.
