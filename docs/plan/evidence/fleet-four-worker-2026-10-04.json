@@ -1,0 +1,111 @@
+{
+  "schema": "mesh.fleet-measurement-record/v1",
+  "recorded_date": "2026-10-04",
+  "source_revision": "1c0bcd1788878bcbca8936db1c436e8c772fb841",
+  "source_tree": "dbb431ca4c39943ae5522e590c115676e4342101",
+  "platform": "macOS 26.6.1 arm64",
+  "build_scope": "Cargo built the MCP bridge and integration driver from the exact canonical main checkout, reusing dependency artifacts. This is a native real-provider acceptance run, not a packaged GUI or full-gate run.",
+  "binary_sha256": {
+    "fleet-agent": "0a5ac9e7a5ee6fa84196bb483b11e6e4e670debf3e805579823504fcb2413991",
+    "mesh-mcp": "144edcc27ef88bc66026c4b378545b2cb17290c3f3c05481ef596838e19e854b",
+    "codex": "3e11ccc743e8198a5ef84fb57c89941d845b0ea0302485ed1fbac2f0821aca5a"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "result": "passed",
+      "test_elapsed_seconds": 249.53,
+      "condition": "One current-revision serial/parallel pair; no retry or startup probe for this measurement."
+    }
+  ],
+  "serial": {
+    "schema": "mesh.fleet-native-measurement/v1",
+    "provider_version": "codex-cli 0.158.0-alpha.2.1",
+    "workers": 4,
+    "concurrency_limit": 1,
+    "peak_workers_observed": 1,
+    "four_workers_observed": false,
+    "execution_ms": 184925,
+    "tick_samples": 1709,
+    "tick_p95_us": 1030,
+    "state_read_p95_us": 279,
+    "saved_review_inspection_us": 54165,
+    "first_worker_event_ms": [
+      {
+        "lane": "lane-6a905e338bb64d6ddbd07aea9bedde991ec624972ab5cb7798b84db33ad5b418",
+        "elapsed_ms": 26550
+      },
+      {
+        "lane": "lane-70308c4b34be844de90a39f86d0713d643e7b3af8049af03404180fa14e33d91",
+        "elapsed_ms": 65806
+      },
+      {
+        "lane": "lane-9538d59cb5add76c370efa4a7c204cfaa108cad19a6206241798efb561925f8b",
+        "elapsed_ms": 105304
+      },
+      {
+        "lane": "lane-effcbb15bee9398d0cc74c2ac8d0065da92bac7c7b0a010830faeb8dab54a5ad",
+        "elapsed_ms": 143207
+      }
+    ],
+    "cost": null,
+    "renderer_event_lag_ms": null,
+    "human_coordination_ms": null
+  },
+  "parallel": {
+    "schema": "mesh.fleet-native-measurement/v1",
+    "provider_version": "codex-cli 0.158.0-alpha.2.1",
+    "workers": 4,
+    "concurrency_limit": 5,
+    "peak_workers_observed": 4,
+    "four_workers_observed": true,
+    "execution_ms": 64458,
+    "tick_samples": 593,
+    "tick_p95_us": 1084,
+    "state_read_p95_us": 262,
+    "saved_review_inspection_us": 53978,
+    "first_worker_event_ms": [
+      {
+        "lane": "lane-6a905e338bb64d6ddbd07aea9bedde991ec624972ab5cb7798b84db33ad5b418",
+        "elapsed_ms": 21480
+      },
+      {
+        "lane": "lane-70308c4b34be844de90a39f86d0713d643e7b3af8049af03404180fa14e33d91",
+        "elapsed_ms": 21590
+      },
+      {
+        "lane": "lane-9538d59cb5add76c370efa4a7c204cfaa108cad19a6206241798efb561925f8b",
+        "elapsed_ms": 21377
+      },
+      {
+        "lane": "lane-effcbb15bee9398d0cc74c2ac8d0065da92bac7c7b0a010830faeb8dab54a5ad",
+        "elapsed_ms": 21377
+      }
+    ],
+    "cost": null,
+    "renderer_event_lag_ms": null,
+    "human_coordination_ms": null
+  },
+  "verified_by_driver": [
+    "four distinct child lanes per phase",
+    "one attempt per lane",
+    "exact saved review bytes reconstructed",
+    "original file and source state unchanged",
+    "four acknowledged unfinished workers observed concurrently in parallel phase"
+  ],
+  "not_measured": [
+    "matched external-harness baseline",
+    "renderer event latency",
+    "interactive human review time",
+    "time to accepted main",
+    "CPU and memory",
+    "provider cost",
+    "cold-start reliability",
+    "second provider",
+    "second machine"
+  ],
+  "raw_log_sha256": {
+    "real-provider.log": "d7f6e55b560a520ac78dcf800358cd50430e40a082a899d3dc7ec12f825bcd1d"
+  },
+  "raw_comparison_sha256": "6b36487df7ae1c8c0ed3b84396525ccc72f3d88198f1ca07258ddcb1208ffbfb"
+}

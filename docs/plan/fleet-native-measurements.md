@@ -84,3 +84,35 @@ binary with `actual_four_workers_compare_serial_and_parallel_saved_reviews --ign
 paths. The Cargo command above remains the ordinary reproduction route. The matched
 external-harness baseline, resource/cost measurements, packaged interactive review,
 second-provider run and human acceptance requirements remain open.
+
+
+## Recorded native run: 2026-10-04
+
+The [current-revision measurement record](evidence/fleet-four-worker-2026-10-04.json)
+records one successful real Codex pair on canonical main
+`1c0bcd1788878bcbca8936db1c436e8c772fb841`, including merged
+[PR #246](https://github.com/idosams/Mesh/pull/246), with `codex-cli 0.158.0-alpha.2.1`.
+Cargo built the MCP bridge and integration driver from that exact checkout. The record
+contains their hashes, the provider hash, source tree and retained log/comparison hashes.
+Local evidence preserves both generated fixture histories and the complete output.
+
+| Measurement | Serial | Parallel |
+| --- | ---: | ---: |
+| Native execution | 184.925 s | 64.458 s |
+| Peak acknowledged unfinished workers | 1 | 4 |
+| Host tick p95 | 1.030 ms | 1.084 ms |
+| State read p95 | 0.279 ms | 0.262 ms |
+| All four saved reviews inspected | 54.165 ms | 53.978 ms |
+
+The test passed in 249.53 seconds on its first attempt in this run. Both phases verified
+four distinct child lanes, one attempt per lane, exact reconstructed review bytes and
+unchanged original content/source state. Parallel overlap was established by acknowledged
+provider sessions, not scheduling state alone. The generated test projects are separate
+from the user's fixed checkpoint and ordinary work.
+
+This refreshes native execution evidence on current code; it does not establish a statistical
+speed gain or a comparison with a human-operated external harness. The provider version also
+changed since the September record, so the two dates are not controlled performance trials.
+Renderer latency, cost, resource consumption, human coordination, interactive parallel review
+and time to accepted main remain unmeasured. Signed packaged, second-provider and real
+second-host acceptance remain required. Test signing custody is not eligible packaged approval.

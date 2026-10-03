@@ -5209,3 +5209,21 @@ Validation passed: 45 focused native tests, 49 focused controller/rendered tests
 `npm test` gate: 3,764 Rust tests in 160.533s (1 slow, 17 skipped), 183 rendered tests,
 641 desktop tests, and the real daemon demo. Hosted exact-head checks and merge remain pending. Real signed packaged SSH observation, multiple remote workers and terminal
 reconciliation remain required by the full plan. The fixed user checkpoint is unchanged.
+
+
+## R115 — refresh real four-worker native acceptance
+
+No implementation is transferred or replaced. On merged canonical main
+`1c0bcd1788878bcbca8936db1c436e8c772fb841`, the existing real Codex acceptance driver
+passed a serial/parallel pair with four workers. Exact source tree, bridge/driver/provider
+hashes, measured values and explicit unmeasured fields are recorded in
+[evidence/fleet-four-worker-2026-10-04.json](evidence/fleet-four-worker-2026-10-04.json).
+The first current-run attempt passed in 249.53s: native execution was 184.925s serial and
+64.458s parallel, with observed peaks of one and four workers. Both generated fixture
+histories and raw output are preserved separately; the user's checkpoint is unchanged.
+
+This is native real-provider evidence, not packaged interactive review or protected-main
+acceptance. The full fleet plan, second provider/host, matched harness baseline, cost,
+resource and human coordination measurements remain required. This documentation-only
+increment uses the actual acceptance run plus documentation checks; it does not claim a new
+full repository gate or a statistically repeatable speed improvement.

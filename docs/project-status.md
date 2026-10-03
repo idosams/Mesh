@@ -893,3 +893,15 @@ proof, capacity release, another authorized attempt or accepted work. Focused va
 canonical gate (3,764 Rust, 183 rendered and 641 desktop tests plus the real daemon demo).
 Hosted exact-head checks and merge remain pending; packaged signed remote acceptance and the
 full fleet plan remain open. The fixed user testing checkpoint does not include this work.
+
+
+### Current real Codex four-worker measurement (R115)
+
+On canonical main `1c0bcd1788878bcbca8936db1c436e8c772fb841`, the real native
+four-worker comparison passed with `codex-cli 0.158.0-alpha.2.1`: 184.925s serial,
+64.458s parallel, and four acknowledged overlapping workers in the parallel phase.
+It verified one attempt per lane, exact saved reviews and unchanged original state.
+The [measurement record](plan/evidence/fleet-four-worker-2026-10-04.json) binds these
+results to the source revision, binary hashes and preserved raw evidence. GUI latency,
+provider cost, resource usage, human coordination and accepted-main timing remain
+unmeasured; this does not complete packaged, second-provider or second-host acceptance.
