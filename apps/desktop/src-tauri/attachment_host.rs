@@ -1224,6 +1224,39 @@ impl AttachmentHost {
         Ok(stored.to_json().encode())
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn connection_settings(
+        &self,
+        recover: bool,
+    ) -> Result<mesh_daemon::project_attachment::RemoteConnectionSettingsState, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        match &state.storage {
+            None => Ok(Default::default()),
+            Some(storage) => if recover {
+                storage.recover_remote_connection_settings()
+            } else {
+                storage.load_remote_connection_settings()
+            }
+            .map_err(|_| "Saved connections need reconciliation".into()),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    pub(crate) fn save_connection_settings(
+        &self,
+        expected: u64,
+        entries: Vec<mesh_daemon::project_attachment::RemoteConnectionSettings>,
+    ) -> Result<mesh_daemon::project_attachment::RemoteConnectionSettingsState, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_remote_connection_settings(expected, entries)
+            .map_err(|_| "Saved connections changed or need reconciliation".into())
+    }
+
     pub fn load_fleet_pins(&self) -> Result<String, String> {
         let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
         self.initialize(&mut state, false)?;

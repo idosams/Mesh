@@ -32,6 +32,15 @@ test('connection setup offers native selectors and disables use until complete w
   const html = module.exports.render(projection());
   for (const label of ['Choose coordinator identity folder', 'Choose private SSH identity', 'Choose trusted hosts file', 'Clear selected setup files']) assert.ok(html.includes(label));
   assert.match(html, /<button[^>]*disabled=""[^>]*>Use these connection settings<\/button>/);
-  assert.match(html, /Settings apply to this session only/);
+  assert.match(html, /Use Save current connection to keep these settings for later/);
   assert.doesNotMatch(html, /type="file"|type="password"/);
+});
+
+test('saved connection controls expose metadata operations, escape labels and disable while busy', () => {
+  const p = projection(); p.profiles = { revision: '4', entries: [{ id: 'a', label: '<img onerror=bad>', host: 'worker', worker: 'key', objective: 'fleet', lane: 'lane', run: 'run' }] };
+  let html = module.exports.render(p);
+  for (const label of ['Load saved connections', 'Open saved settings', 'Remove saved settings', 'Save current connection', 'Recover interrupted settings save']) assert.ok(html.includes(label));
+  assert.match(html, /&lt;img onerror=bad&gt;/); assert.doesNotMatch(html, /<img/);
+  p.busy = true; html = module.exports.render(p); for (const button of html.matchAll(/<button([^>]*)>/g)) assert.match(button[1], /disabled=""/);
+  module.exports.setLocale('he'); try { assert.match(module.exports.render(p), /פתיחת הגדרות שמורות/); } finally { module.exports.setLocale('en'); }
 });

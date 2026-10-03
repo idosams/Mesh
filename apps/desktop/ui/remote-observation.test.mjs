@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput } from './remote-observation.js';
+import { startRemoteObservation, selectionReply, observationReply, draftReply, setupInput, profilesReply, profileOpenReply } from './remote-observation.js';
 const id = 'a'.repeat(64);
 const selected = () => ({ schema: 'mesh.remote-panel-selection/v1', id, host: 'worker.example', worker: 'b'.repeat(64), objective: 'fleet-one', lane: 'lane-one', run: 'run-one' });
 const status = () => ({ schema: 'mesh.remote-panel-observation/v1', id, kind: 'status', observed_ms: '1000', admitted: true, launch_recorded: false, lease_until_ms: '2000' });
@@ -92,4 +92,45 @@ test('refused setup preserves the active connection and suppresses duplicate con
   reject(new Error('changed file')); await settle();
   assert.equal(calls.filter(name => name === 'configure_remote_observation').length, 1);
   assert.equal(h.projections.at(-1).selection.id, id); assert.ok(h.projections.at(-1).error); h.dispose();
+});
+
+const profile = () => ({ id: 'e'.repeat(64), label: 'My worker', ...Object.fromEntries(['host', 'worker', 'objective', 'lane', 'run'].map(key => [key, selected()[key]])) });
+const profiles = () => ({ schema: 'mesh.remote-connection-profiles/v1', revision: '4', entries: [profile()] });
+const opened = () => ({ schema: 'mesh.remote-profile-open/v1', profile: profile().id, label: profile().label, selection: selected(), draft: draft(), input: form() });
+test('saved profiles bound labels, count, revision and identities while stripping private fields', () => {
+  assert.equal(profilesReply({ ...profiles(), entries: [{ ...profile(), configuration: '/private/key' }] }).entries[0].configuration, undefined);
+  for (const revision of ['04', '-1', '18446744073709551616']) assert.throws(() => profilesReply({ ...profiles(), revision }));
+  assert.throws(() => profilesReply({ ...profiles(), entries: [profile(), profile()] }));
+  for (const label of ['', 'x'.repeat(129), 'worker\u202e', 'worker\n', 'worker\u061c']) assert.throws(() => profilesReply({ ...profiles(), entries: [{ ...profile(), label }] }));
+  assert.throws(() => profileOpenReply({ ...opened(), profile: 'f'.repeat(64) }, profile()));
+  assert.throws(() => profileOpenReply({ ...opened(), input: { ...form(), run: 'other' } }, profile()));
+  assert.throws(() => profileOpenReply({ ...opened(), draft: draft({ hosts: false }) }, profile()));
+});
+test('profiles open explicitly with retained revision, prefill only public fields and never contact worker', async () => {
+  const calls = [], h = harness(async (name, args) => { calls.push([name, args]); return args.action === 'open' ? { ...opened(), input: { ...form(), identity: '/private' } } : profiles(); });
+  assert.equal(calls.length, 0);
+  h.intent({ type: 'profile-open', profile: profile().id }); await settle(); assert.equal(calls.length, 0);
+  h.intent({ type: 'profiles-list' }); await settle();
+  h.intent({ type: 'profile-open', profile: profile().id, revision: '999', path: '/forged' }); await settle();
+  assert.deepEqual(calls.at(-1), ['remote_connection_profiles', { action: 'open', selection: '', label: '', profile: profile().id, revision: '4' }]);
+  const p = h.projections.at(-1); assert.deepEqual(p.preset.input, form()); assert.equal(p.selection.id, id); assert.equal(p.status, null);
+  assert.equal(calls.length, 2); h.dispose();
+});
+test('save uses native selection and removal preserves active selection; failed reopen preserves state', async () => {
+  const calls = []; let fail = false;
+  const h = harness(async (name, args) => { calls.push([name, args]); if (name === 'pick_remote_observation') return selected(); if (fail) throw Error('stale'); return profiles(); });
+  h.intent({ type: 'choose' }); await settle(); h.intent({ type: 'profiles-list' }); await settle();
+  h.intent({ type: 'profile-save', selection: 'forged', label: 'Named', revision: '0' }); await settle();
+  assert.deepEqual(calls.at(-1)[1], { action: 'save', selection: id, label: 'Named', profile: '', revision: '4' });
+  h.intent({ type: 'profile-remove', profile: profile().id }); await settle(); assert.equal(h.projections.at(-1).selection.id, id);
+  fail = true; h.intent({ type: 'profile-open', profile: profile().id }); await settle();
+  assert.equal(h.projections.at(-1).selection.id, id); assert.equal(h.projections.at(-1).profiles.entries[0].id, profile().id); assert.ok(h.projections.at(-1).error); h.dispose();
+});
+test('profile recovery is explicit and pending actions suppress duplicates', async () => {
+  const calls = []; let release;
+  const h = harness(async (name, args) => { calls.push([name, args]); return new Promise(resolve => { release = resolve; }); });
+  h.intent({ type: 'profiles-recover', revision: '4', profile: 'forged' }); await settle();
+  h.intent({ type: 'profiles-list' }); await settle(); assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0][1], { action: 'recover', selection: '', label: '', profile: '', revision: '' });
+  release(profiles()); await settle(); assert.equal(h.projections.at(-1).profiles.revision, '4'); h.dispose();
 });

@@ -1,11 +1,15 @@
 //! Session-bound native selections for read-only graphical remote observations.
 use super::*;
+mod profiles;
 pub(crate) mod setup;
 use ring::rand::{SecureRandom as _, SystemRandom};
 use std::sync::Mutex;
 const BUSY: &str = "Another remote observation is in progress";
 const ELIGIBILITY: &str = "Remote observation requires an eligible signed Mesh application";
 struct Selection {
+    profile_source: Option<String>,
+    identity_file: setup::BoundPath,
+    hosts_file: setup::BoundPath,
     id: String,
     config: Configuration,
     peer: NativeSshDestination,
@@ -96,6 +100,8 @@ impl RemotePanel {
 }
 impl Selection {
     fn verify(&self) -> Result<(), String> {
+        self.identity_file.verify()?;
+        self.hosts_file.verify()?;
         if ProtectedWorkspaceRoot::inspect(&self.config.connection.installation)
             .map_err(|_| UNAVAILABLE)?
             != self.installation
@@ -195,6 +201,8 @@ fn admit_selection(
     let fleets =
         ProtectedWorkspaceRoot::inspect(&config.connection.fleets).map_err(|_| UNAVAILABLE)?;
     let history = host.configured_remote_history(&config.connection.fleets, &config.objective)?;
+    let identity_file = setup::BoundPath::capture(&config.connection.identity, false)?;
+    let hosts_file = setup::BoundPath::capture(&config.connection.known_hosts, false)?;
     let context = open_connection(&config.connection)?;
     let coordinator = context
         .installation
@@ -206,6 +214,9 @@ fn admit_selection(
         .fill(&mut bytes)
         .map_err(|_| UNAVAILABLE)?;
     let selection = Selection {
+        profile_source: None,
+        identity_file,
+        hosts_file,
         id: bytes.iter().map(|b| format!("{b:02x}")).collect(),
         config,
         peer: context.peer,

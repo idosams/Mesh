@@ -21,14 +21,14 @@ impl Part {
         matches!(self, Self::Installation)
     }
 }
-struct BoundPath {
+pub(super) struct BoundPath {
     path: PathBuf,
     metadata: Metadata,
     parent: ProtectedWorkspaceRoot,
     directory: bool,
 }
 impl BoundPath {
-    fn capture(path: &Path, directory: bool) -> Result<Self, String> {
+    pub(super) fn capture(path: &Path, directory: bool) -> Result<Self, String> {
         if !path.is_absolute() {
             return Err(UNAVAILABLE.into());
         }
@@ -59,7 +59,23 @@ impl BoundPath {
         bound.verify()?;
         Ok(bound)
     }
-    fn verify(&self) -> Result<(), String> {
+    pub(super) fn fingerprint(&self) -> Json {
+        let m = &self.metadata;
+        Json::object([
+            ("device", Json::text(m.dev().to_string())),
+            ("inode", Json::text(m.ino().to_string())),
+            ("uid", Json::Number(m.uid().into())),
+            ("mode", Json::Number(m.mode().into())),
+            ("links", Json::Number(m.nlink())),
+            ("bytes", Json::text(m.len().to_string())),
+            ("mtime", Json::text(m.mtime().to_string())),
+            ("mtime_ns", Json::text(m.mtime_nsec().to_string())),
+            ("ctime", Json::text(m.ctime().to_string())),
+            ("ctime_ns", Json::text(m.ctime_nsec().to_string())),
+            ("parent", Json::text(self.parent.directory_token())),
+        ])
+    }
+    pub(super) fn verify(&self) -> Result<(), String> {
         let current = std::fs::symlink_metadata(&self.path).map_err(|_| UNAVAILABLE)?;
         let old = &self.metadata;
         if current.dev() != old.dev()
@@ -84,12 +100,36 @@ impl BoundPath {
 }
 #[derive(Default)]
 pub(super) struct Draft {
+    pub(super) profile_id: Option<String>,
     id: String,
     installation: Option<BoundPath>,
     identity: Option<BoundPath>,
     hosts: Option<BoundPath>,
 }
 impl Draft {
+    pub(super) fn reopen(config: &Configuration, profile: &str) -> Result<Self, String> {
+        let mut draft = Self::default();
+        draft.clear()?;
+        for (part, path) in [
+            (Part::Installation, &config.connection.installation),
+            (Part::Identity, &config.connection.identity),
+            (Part::Hosts, &config.connection.known_hosts),
+        ] {
+            let id = draft.id.clone();
+            draft.pick(&id, part, path)?;
+        }
+        draft.profile_id = Some(profile.into());
+        Ok(draft)
+    }
+    pub(super) fn projection(&self) -> Json {
+        Json::object([
+            ("schema", Json::text("mesh.remote-setup-draft/v1")),
+            ("id", Json::text(&self.id)),
+            ("installation", Json::Bool(self.installation.is_some())),
+            ("identity", Json::Bool(self.identity.is_some())),
+            ("hosts", Json::Bool(self.hosts.is_some())),
+        ])
+    }
     fn clear(&mut self) -> Result<String, String> {
         let mut bytes = [0; 32];
         SystemRandom::new()
@@ -214,7 +254,8 @@ impl RemotePanel {
         let configuration =
             draft.configuration(expected, input, host.remote_fleet_storage_path())?;
         let mut selected = self.0.try_lock().map_err(|_| BUSY)?;
-        let next = admit_selection(configuration, host)?;
+        let mut next = admit_selection(configuration, host)?;
+        next.profile_source = draft.profile_id.clone();
         // A native open may race a changed picker selection: revalidate original bindings again.
         draft.configuration(expected, input, host.remote_fleet_storage_path())?;
         let reply = next.render().encode();
@@ -268,6 +309,51 @@ mod tests {
             r#"{{"host":"worker.example","account":"mesh","port":22,"worker":"{}","objective":"fleet-one","lane":"lane-one","run":"run-one"}}"#,
             "a".repeat(64)
         )
+    }
+    #[test]
+    fn reopened_profile_keeps_native_paths_and_edit_association_until_clear() {
+        let f = Fixture::new();
+        let original = f.draft();
+        let config = original
+            .configuration(&original.id, &input(), &f.0.join("fleets"))
+            .unwrap();
+        let profile = "a".repeat(64);
+        let mut restored = Draft::reopen(&config, &profile).unwrap();
+        assert_ne!(restored.id, original.id);
+        assert_eq!(restored.profile_id.as_deref(), Some(profile.as_str()));
+        assert_eq!(
+            restored.identity.as_ref().unwrap().fingerprint(),
+            original.identity.as_ref().unwrap().fingerprint()
+        );
+        let config = restored
+            .configuration(&restored.id, &input(), &f.0.join("fleets"))
+            .unwrap();
+        assert_eq!(config.connection.identity, f.0.join("identity"));
+        let id = restored.id.clone();
+        restored.pick(&id, Part::Hosts, &f.0.join("hosts")).unwrap();
+        assert_eq!(restored.profile_id.as_deref(), Some(profile.as_str()));
+        restored.clear().unwrap();
+        assert!(restored.profile_id.is_none());
+    }
+    #[test]
+    fn persisted_file_fingerprint_changes_after_replacement_or_content_edit() {
+        let f = Fixture::new();
+        let path = f.0.join("identity");
+        let first = BoundPath::capture(&path, false).unwrap().fingerprint();
+        assert_eq!(
+            BoundPath::capture(&path, false).unwrap().fingerprint(),
+            first
+        );
+        std::fs::rename(&path, f.0.join("preserved-identity")).unwrap();
+        std::fs::write(&path, b"placeholder, not a credential").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let replaced = BoundPath::capture(&path, false).unwrap().fingerprint();
+        assert_ne!(replaced, first);
+        std::fs::write(&path, b"changed bytes").unwrap();
+        assert_ne!(
+            BoundPath::capture(&path, false).unwrap().fingerprint(),
+            replaced
+        );
     }
     #[test]
     fn clearing_rotates_the_draft_and_refuses_a_late_picker_reply() {

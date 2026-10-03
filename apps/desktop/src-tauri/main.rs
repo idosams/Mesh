@@ -890,6 +890,35 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn remote_connection_profiles(
+        app: tauri::AppHandle,
+        action: String,
+        selection: String,
+        label: String,
+        profile: String,
+        revision: String,
+    ) -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let panel = app
+                .state::<Arc<crate::coordinator_observation::panel::RemotePanel>>()
+                .inner()
+                .clone();
+            let host = app.state::<Arc<AttachmentHost>>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                panel.profiles(&action, &selection, &label, &profile, &revision, &host)
+            })
+            .await
+            .map_err(|_| "Saved connection settings are unavailable".to_owned())?
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (app, action, selection, label, profile, revision);
+            Err("Remote observation is available only on macOS".into())
+        }
+    }
+
+    #[tauri::command]
     async fn read_remote_observation(
         app: tauri::AppHandle,
         id: String,
@@ -8085,6 +8114,7 @@ mod desktop {
                 pick_remote_observation,
                 pick_remote_setup_file,
                 clear_remote_setup,
+                remote_connection_profiles,
                 configure_remote_observation,
                 read_remote_observation,
                 forget_remote_observation,
