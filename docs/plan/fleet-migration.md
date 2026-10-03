@@ -4091,3 +4091,27 @@ full `npm test` rerun passed: 3,621 native tests (158.960 s, one slow, 17 skippe
 tests, 601 desktop tests and 44 daemon-demo checks. One process-leak warning in
 `attachment-background::stopping_during_signing_prevents_that_capture_from_being_committed` remains
 unresolved under #172. A real packaged run remains pending. This does not complete the full fleet/provider/harness/main-approval objective.
+
+## R75: presentation-independent native coordinator results
+
+R74 / PR #205 merged as `6d6770c3c87670ec2a0cf742f15efb8ee2fcd2a1`. All seven exact-head checks
+and combined-main run 37115147546 passed. Its sealed `57206a4e917929832575b2713318c1ab11a42a23`
+app passed `mesh-attached-project-window-proof/v1`: dirty-project attachment, external edits, exact
+saved text in two pinned comparisons, independently verified work-line bytes, stopped restart,
+explicit resume/detach, unchanged Git/folder identity and retained pin records. This is automated
+manual-work graphical evidence, not provider, harness attribution, remote-host or main-approval proof.
+
+R75 is new canonical groundwork for graphical remote controls; it replaces no legacy commit.
+Coordinator operations return verified native JSON before CLI presentation. Output failures cannot
+restart an operation, and all six CLI shapes, response formats and recovery messages remain intact.
+Native execution still checks application eligibility before configuration/custody access. No generic
+renderer invocation, credential-path input or mutable runtime is exposed. Fifteen focused tests passed
+(9.938 s), including short writes, partial/flush failure and direct native eligibility refusal.
+The full `npm test` passed: 3,624 native tests (150.944 s, one slow, 17 skipped), 170 rendered
+tests, 601 desktop tests and 44 daemon-demo checks. No process-leak warning occurred in this run;
+that does not resolve #172. Native connection selection/profiles, graphical commands and complete
+remote/provider/human-approval acceptance remain required. Hosted CI is pending.
+
+Reliability issue #172 remains open: a separate instrumented full native run passed all 3,621 tests
+without reproducing a leak. Earlier focused direct probes used a different dependency build closure
+from the workspace suite and do not establish a cause or fix. No test threshold was changed.

@@ -164,7 +164,7 @@ fn project_input(
         .prepare_remote_input(version)
         .map_err(|_| UNAVAILABLE.into())
 }
-pub(super) fn run(path: &Path) -> Result<(), String> {
+pub(super) fn execute(path: &Path) -> Result<Json, String> {
     let selected = configuration(crate::worker_service::load_private_json(path)?)?;
     let NativeContext {
         installation,
@@ -217,9 +217,11 @@ pub(super) fn run(path: &Path) -> Result<(), String> {
         )
         .map_err(|_| UNAVAILABLE)?;
     installation.identity().map_err(|_| UNAVAILABLE)?;
-    let output = outcome(receipt.digest(), receipt.version(), receipt.review());
-    let mut stdout = io::stdout().lock();
-    writeln!(stdout,"{}",output.encode()).and_then(|()|stdout.flush()).map_err(|_|"Saved result output could not be written; retain the same receive configuration for explicit recovery".into())
+    Ok(outcome(
+        receipt.digest(),
+        receipt.version(),
+        receipt.review(),
+    ))
 }
 fn outcome(correlation: RecordDigest, version: RecordDigest, review: RecordDigest) -> Json {
     Json::object([

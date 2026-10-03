@@ -16,7 +16,7 @@ fn configuration(value: Json) -> Result<ReconnectConfiguration, String> {
         input: input_selection(value.get("input").ok_or(UNAVAILABLE)?)?,
     })
 }
-pub(super) fn run(path: &Path) -> Result<(), String> {
+pub(super) fn execute(path: &Path) -> Result<Json, String> {
     let selected = configuration(crate::worker_service::load_private_json(path)?)?;
     let NativeContext {
         installation,
@@ -41,17 +41,11 @@ pub(super) fn run(path: &Path) -> Result<(), String> {
         RemoteInputTransferOutcome::Materialized(receipt) => ("input-materialized", receipt),
         RemoteInputTransferOutcome::Retained(receipt) => ("input-retained", receipt),
     };
-    let value = Json::object([
+    Ok(Json::object([
         ("schema", Json::text("mesh.coordinator-input-reconnect/v1")),
         ("disposition", Json::text(disposition)),
         ("correlation", receipt.correlation().clone()),
-    ]);
-    let mut stdout = io::stdout().lock();
-    writeln!(stdout, "{}", value.encode())
-        .and_then(|()| stdout.flush())
-        .map_err(|_| {
-            "Input reconnect output unavailable; inspect the original retained assignment".into()
-        })
+    ]))
 }
 #[cfg(test)]
 mod tests;

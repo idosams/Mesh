@@ -98,7 +98,7 @@ fn validate_deadline(until: u64, now: u64) -> Result<(), String> {
     }
     Ok(())
 }
-pub(super) fn run(path: &Path, inspect_only: bool) -> Result<(), String> {
+pub(super) fn execute(path: &Path, inspect_only: bool) -> Result<Json, String> {
     let selected = configuration(crate::worker_service::load_private_json(path)?)?;
     // Recovery does not need the original project, a usable lease, SSH access or a signing key.
     if inspect_only {
@@ -108,11 +108,9 @@ pub(super) fn run(path: &Path, inspect_only: bool) -> Result<(), String> {
             CheckpointRuntimeParameters::selected_defaults(),
         )
         .map_err(|_| UNAVAILABLE)?;
-        return output(
-            directory
-                .attached_request_snapshot(&selected.request.request)
-                .map_err(|_| UNAVAILABLE)?,
-        );
+        return Ok(directory
+            .attached_request_snapshot(&selected.request.request)
+            .map_err(|_| UNAVAILABLE)?);
     }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -175,7 +173,7 @@ pub(super) fn run(path: &Path, inspect_only: bool) -> Result<(), String> {
         RemoteInputTransferOutcome::Materialized(receipt) => ("input-materialized", receipt),
         RemoteInputTransferOutcome::Retained(receipt) => ("input-retained", receipt),
     };
-    output(Json::object([
+    Ok(Json::object([
         ("schema", Json::text("mesh.coordinator-start-result/v1")),
         ("request", Json::text(selected.request.request)),
         ("objective", Json::text(objective)),
@@ -187,10 +185,6 @@ pub(super) fn run(path: &Path, inspect_only: bool) -> Result<(), String> {
 }
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-fn output(value: Json) -> Result<(), String> {
-    let mut stdout = io::stdout().lock();
-    writeln!(stdout,"{}",value.encode()).and_then(|()|stdout.flush()).map_err(|_| "Start output unavailable; retain the same configuration and inspect --coordinator created".into())
 }
 #[cfg(test)]
 mod tests;
