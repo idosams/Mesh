@@ -364,3 +364,5 @@ fn missing_or_wrong_commit_preserves_acknowledged_input() {
         assert!(guarded(&s).launch_receipt("assignment").unwrap().is_none());
     }
 }
+
+mod process_crash;
