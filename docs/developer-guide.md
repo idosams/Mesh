@@ -866,3 +866,15 @@ still rechecks cancellation and the original assignment. The separate receipt lo
 for graphical result receiving; native receiving destination/intent management and download controls
 remain unfinished. Existing explicit CLI receipt and its independent authenticated ingestion checks
 are unchanged. No persisted format changes are introduced.
+
+
+## Native receiving inbox prerequisite
+
+`RemoteResultInbox` creates private `remote-results` storage only beneath an independently admitted
+native application directory. An existing or partial inbox is preserved and refused. The native
+owner must durably retain the returned installation identity outside the inbox before transport;
+reopening requires that identity and validates the exact store/allocation folders against the
+owner-only `mesh.remote-result-inbox/v1` record. Missing, replaced, linked, malformed or newly
+protected storage refuses without repair. This new record has no migration from unknown folders.
+This is receiving storage infrastructure, not an exposed graphical download action: durable
+receipt intents, authenticated result selection and graphical receipt/recovery remain required.

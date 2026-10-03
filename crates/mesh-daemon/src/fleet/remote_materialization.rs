@@ -12,6 +12,8 @@ use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
 mod history_binding;
+mod inbox;
+pub use inbox::RemoteResultInbox;
 mod result;
 pub use result::ReceivedResultWorkspace;
 mod worker;
@@ -326,9 +328,9 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
     const ID: &str = "0123456789abcdef0123456789abcdef";
-    struct Fixture(PathBuf);
+    pub(super) struct Fixture(pub(super) PathBuf);
     impl Fixture {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             let root = std::env::temp_dir().join(format!(
                 "mesh-remote-tree-{}-{}",
                 std::process::id(),
@@ -384,7 +386,7 @@ mod tests {
         )
         .unwrap()
     }
-    fn receiver(cas: &Cas, complete: bool) -> RemoteInputReceiver<'_> {
+    pub(super) fn receiver(cas: &Cas, complete: bool) -> RemoteInputReceiver<'_> {
         let manifest = manifest();
         let assignment = RemoteAssignment {
             id: "assigned".into(),

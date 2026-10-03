@@ -4297,3 +4297,22 @@ storage checks and the real daemon demo. No process-leak warning occurred; #37/#
 Hosted delivery is pending.
 Graphical receipt destination/intent management and download controls remain required, along with
 all remaining fleet acceptance. The fixed user checkpoint is unchanged.
+
+
+## R83: native receiving inbox lifecycle
+
+New canonical work, replacing no legacy commit, based on R82 PR #213 head
+`10d9904ab32d611be61cb13c79d29976fb42b72c`. Its original hosted checks remain active.
+Create-only native inbox provisioning and exact-identity reopening supply the storage prerequisite
+for graphical remote receipt. The caller must retain the new inbox identity outside the inbox
+before transfer. Canonical owner-only `mesh.remote-result-inbox/v1` records bind all three physical
+folders; existing partial state is never adopted or repaired. Current protected roots are reapplied
+when reopening. No transport, execution, original-project write or main approval is granted.
+Four focused native tests passed (0.124 s): receipt/materialization after reopening, duplicate
+creation, replaced store/root, changed receipt, protected parent and unknown partial setup.
+Full local gate passed: 3,655 native tests (149.379 s, one slow, two process-leak warnings,
+17 skipped), 177 rendered checks, 621 desktop tests, repository/docs/license/storage checks and
+the real daemon demo. The warnings occurred in `a_daemon_with_nothing_open_refuses_state_rather_than_answering_zero`
+and `stopping_during_signing_prevents_that_capture_from_being_committed`; #37/#172 remain unresolved.
+Hosted delivery pending. Native receipt intents and graphical controls remain
+unfinished; the entire fleet acceptance plan and fixed user checkpoint remain unchanged.
