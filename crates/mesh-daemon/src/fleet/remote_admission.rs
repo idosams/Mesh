@@ -303,7 +303,10 @@ mod tests;
 #[cfg(unix)]
 pub(in crate::fleet) mod launch;
 #[cfg(unix)]
-pub use launch::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
+pub use launch::{
+    RemoteExecutionObservation, RemoteExecutionState, RemoteLaunchOutcome, RemoteLaunchReceipt,
+    RemoteLaunchReservation,
+};
 
 // Shared exact admission encoding for durable records and coordinator proof comparison.
 fn admission_json(

@@ -128,7 +128,8 @@ fn received_host_keeps_one_attempt_across_connections_and_serves_signed_checkpoi
     )
     .unwrap();
     assert!(worker.receipt() == &receipt);
-    verify_saved_review(worker, &fixture, &root);
+    let observer = local_fixture_observer(&worker, &fixture);
+    verify_saved_review(worker, &fixture, &root, &observer);
 }
 
 #[cfg(target_os = "macos")]
@@ -144,10 +145,36 @@ fn received_saved_result_offer_is_signed_durable_and_replayed_without_resigning(
         Arc::new(Signers),
     )
     .unwrap();
-    verify_saved_review(worker, &fixture, &root);
+    let observer = local_fixture_observer(&worker, &fixture);
+    verify_saved_review(worker, &fixture, &root, &observer);
 }
 
-fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: &Path) {
+fn local_fixture_observer(
+    worker: &ReceivedWorkerHost,
+    fixture: &Fixture,
+) -> crate::fleet::RemoteAdmissionRegistry {
+    let admission = worker.receipt().admission();
+    crate::fleet::RemoteAdmissionRegistry::new(
+        mesh_store::fleet::FleetStore::open(fixture.0.join("worker.sqlite")).unwrap(),
+        admission.coordinator(),
+        &admission.work().assignment.worker_key,
+        admission.objective(),
+        crate::fleet::Limits {
+            lanes: 1,
+            concurrency: 1,
+            depth: 0,
+            retries: 0,
+        },
+    )
+    .unwrap()
+}
+
+fn verify_saved_review(
+    mut worker: ReceivedWorkerHost,
+    fixture: &Fixture,
+    root: &Path,
+    observer: &crate::fleet::RemoteAdmissionRegistry,
+) {
     #[cfg(target_os = "macos")]
     let mut reopening = None;
     wait_started(root);
@@ -225,6 +252,17 @@ fn verify_saved_review(mut worker: ReceivedWorkerHost, fixture: &Fixture, root: 
     let state = worker.service.native_state().unwrap();
     assert_eq!(state.lanes["lane"].runs.len(), 1);
     assert_eq!(state.lanes["lane"].runs[0].state, RunState::Succeeded);
+    let admission = worker.receipt().admission();
+    let observed = observer
+        .execution_observation(&admission.work().assignment.id)
+        .unwrap()
+        .unwrap();
+    assert!(observed.launch() == worker.receipt());
+    assert_eq!(observed.revision(), state.revision);
+    assert_eq!(
+        observed.state(),
+        crate::fleet::RemoteExecutionState::Recorded(RunState::Succeeded)
+    );
     assert_eq!(
         fs::read_to_string(root.join("launches.txt")).unwrap(),
         "one\n"
@@ -592,7 +630,7 @@ fn broker_worker_journey(lose_final_reply: bool) {
     );
     // This reconnects scoped IPC, checkpoints signed history, reviews it, observes completion,
     // and asserts exactly one provider launch and one retained run after every connection is gone.
-    verify_saved_review(worker, &fixture, &root);
+    verify_saved_review(worker, &fixture, &root, &setup.f.registry());
     assert!(
         setup
             .f

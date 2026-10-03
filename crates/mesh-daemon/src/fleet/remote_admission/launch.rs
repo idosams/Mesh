@@ -337,3 +337,13 @@ fn validate(receipt: &RemoteLaunchReceipt) -> Result<(), Error> {
 
 #[cfg(test)]
 pub(in crate::fleet) mod tests;
+
+mod execution;
+pub use execution::{RemoteExecutionObservation, RemoteExecutionState};
+
+pub(in crate::fleet) fn session_scope(launch_stream: &str) -> String {
+    format!(
+        "remote-session-{}",
+        Blake3::digest_bytes(launch_stream.as_bytes())
+    )
+}
