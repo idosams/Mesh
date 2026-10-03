@@ -5330,3 +5330,17 @@ both documentation records were preserved. The full gate passed 3,774 Rust tests
 The original published PR254 head remains fixed until its original CI is terminal. The combined
 package and actual provider-launch acceptance are still pending; no signing or full-plan exit is
 claimed.
+
+
+## R119 — refresh the full acceptance and checkpoint map
+
+Documentation-only reconciliation on published R118/PR #254 head
+`3f66a4115912c52abfe261e47a405fcdd4551172`. No implementation is transferred or replaced.
+The acceptance map now records merged PR252, the current native four-worker measurement,
+the repeated `97e263f` window proof, and fixed `c2641c6` package identity separately.
+It corrects the older launcher's incomplete home isolation without replacing user test state.
+Original R118 CI completed successfully before its source-identical ancestry update; fresh
+checks and merge are pending. The map preserves every full-plan exit, including manual/harness
+acceptance, real packaged fleet execution, native approval, second provider/host, retention,
+terminal reconciliation and legacy deprecation. Documentation and repository checks validate
+this reporting increment; no new runtime or full-gate result is claimed by a documentation edit.
