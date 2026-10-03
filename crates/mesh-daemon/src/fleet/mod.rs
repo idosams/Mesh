@@ -1356,3 +1356,6 @@ pub use remote_admission::status::result::evidence::{
 pub use remote_admission::status::result::ingestion::{
     ingest_remote_result_over_ssh, RemoteResultIngestionRequest,
 };
+
+#[cfg(unix)]
+pub use remote_admission::RemoteMaterializationReceipt;

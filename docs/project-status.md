@@ -684,3 +684,17 @@ Queues whose status card is not loaded render independently and move into the ca
 Unavailable execution ownership does not suppress an explicit retained-history read. Failed reads
 cannot enable pinning and do not replace existing pinned selections. This improves the deterministic
 download-to-review path; actual signed packaged and second-host acceptance still remain required.
+
+## Durable remote materialization identity
+
+The receiving broker now commits an immutable native allocation identity before returning a
+materialized handoff or acknowledging it to the coordinator. The record binds the original
+admission and physical receiving parent, allocation and input directory. Exact replay is
+idempotent; changed inputs, mismatched admission, malformed records and extra events refuse
+without deleting retained work. Reading it grants no allocation, lease renewal or launch.
+
+The additive `mesh.remote-materialization/v1` record lives in the existing guarded worker ledger.
+Old admissions without this record remain readable but have unknown materialization identity;
+absence never proves that no input or process exists. No automatic backfill or adoption occurs.
+This is the first native foundation for #222, not completed worker restart recovery. Signed
+packaged, real second-host and full fleet acceptance remain outstanding.
