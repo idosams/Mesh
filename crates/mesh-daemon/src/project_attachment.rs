@@ -21,6 +21,7 @@ mod detachment;
 mod fleet_pins;
 mod remote_connections;
 mod remote_fleet_pins;
+mod remote_inbox;
 pub use remote_connections::{RemoteConnectionSettings, RemoteConnectionSettingsState};
 pub use remote_fleet_pins::RemoteFleetPinState;
 mod review_outbox;

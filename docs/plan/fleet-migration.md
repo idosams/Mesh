@@ -4333,3 +4333,24 @@ bounded-inventory/cross-inbox-copy regressions: 3,657 native tests (148.724 s, o
 177 rendered checks, 621 desktop tests, repository/docs/license/storage checks and the real daemon
 demo. No process-leak warning occurred; #37/#172 remain open. Hosted delivery is pending. GUI receipt and native application identity/
 intent integration remain required, together with the complete outstanding fleet acceptance plan.
+
+
+## R85: catalogue-owned inbox identity
+
+New canonical work replacing no legacy commit. Based on published R84 PR #215
+`a6f439dcbf7e2b8b15f5c5d9076d05723aaa5f80`; canonical main
+`d58178cf4e3e00bc9ed8e5d39ce440176e5e94f1` was integrated on this separate branch with an
+identical implementation tree, preserving running PR checks. R82 PR #213 is merged; R83 PR #214
+original seven checks passed; R84 original checks and R82 combined-main remain active.
+The native catalogue now creates/reopens an inbox only against its independently retained
+external binding, protects catalogue and every saved original-project identity, and refuses
+orphaned/partial/substituted state. No new transfer, execution, source write or main authority.
+Three focused tests passed (0.101 s): lazy first provision and catalogue restart, renamed detached
+source protection, and preserved unbound/substituted inbox refusal. One unused import observed in
+the focused compile was removed before the pending full gate. New binding format is additive;
+no automatic migration, repair or adoption. Local full gate passed: 3,660 native tests (151.629 s,
+one slow, 17 skipped), 177 rendered checks, 621 desktop tests, repository/docs/license/storage
+checks and the real daemon demo. No process-leak warning occurred. Dependency PR #215 has a
+Linux compilation failure because intent exports did not match the existing macOS signed-result
+API boundary; correction and hosted delivery remain required. Desktop
+receipt and the complete remaining fleet acceptance plan are still required.

@@ -890,3 +890,16 @@ files. Partial, copied or malformed records remain preserved and require reconci
 automatic deletion or migration is provided. A saved intent does not prove any content arrived:
 the caller must re-admit peer/configuration/assignment/trust and query the fleet's completed review
 ledger. These primitives still require desktop integration and explicit graphical recovery.
+
+
+## Catalogue-owned receiving storage
+
+`AttachmentStorage::remote_result_inbox` retains the inbox installation outside the receiving
+folder in an owner-only `mesh.native-result-inbox-binding/v1` catalogue record. Native callers
+supply an independently admitted application parent; saved catalogue and parent identities must
+still match on reopen. Provisioning is explicit and lazy. An inbox without its catalogue binding,
+a partial binding, or substituted storage refuses without adoption, deletion or repair. All
+registered project identities, including detached/offline projects, are automatically protected;
+renaming a source does not remove that protection. The format is additive; unknown prior inboxes
+require reconciliation. This supplies native lifecycle integration, not graphical receipt or proof
+that a remote result has arrived. Desktop download/recovery controls remain unfinished.
