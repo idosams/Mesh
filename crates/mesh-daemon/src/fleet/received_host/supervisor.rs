@@ -67,25 +67,7 @@ impl ReceivedWorkerSupervisor {
             .as_ref()
             .ok_or_else(|| unavailable("remote-supervisor-admission"))?
             .clone();
-        if admission.work().assignment.worker_key != self.worker {
-            return Err(unavailable("remote-supervisor-worker-mismatch"));
-        }
-        if self
-            .entries
-            .iter()
-            .any(|entry| same_assignment(&entry.admission, &admission))
-        {
-            return Err(unavailable("remote-supervisor-assignment-retained"));
-        }
-        if self.entries.len() >= self.maximum {
-            return Err(unavailable("remote-supervisor-capacity"));
-        }
-        // Occupy the slot BEFORE any workspace, IPC or process effect. A failed start is never
-        // removed, because absence of an owner cannot prove absence of an external effect.
-        self.entries.push(Entry {
-            admission: admission.clone(),
-            owner: None,
-        });
+        self.admit_start(&admission)?;
         let owner = ReceivedWorkerHost::start_received(
             handoff,
             launch.adapter,
@@ -99,6 +81,50 @@ impl ReceivedWorkerSupervisor {
             .expect("slot inserted before start")
             .owner = Some(owner);
         Ok(admission)
+    }
+    /// Start only the original recovered attempt. Duplicate or uncertain resident slots refuse;
+    /// authentication and a free allocation lock are not evidence that an earlier provider ended.
+    pub fn start_recovered(
+        &mut self,
+        handoff: RemoteRecoveredHandoff,
+        launch: ReceivedWorkerLaunch,
+    ) -> Result<RemoteAdmissionReceipt, Unavailable> {
+        let admission = handoff.workspace.admission().clone();
+        self.admit_start(&admission)?;
+        let owner = ReceivedWorkerHost::start_recovered(
+            handoff,
+            launch.adapter,
+            &launch.endpoint,
+            launch.signers,
+        )?;
+        self.entries
+            .last_mut()
+            .expect("slot inserted before start")
+            .owner = Some(owner);
+        Ok(admission)
+    }
+
+    fn admit_start(&mut self, admission: &RemoteAdmissionReceipt) -> Result<(), Unavailable> {
+        if admission.work().assignment.worker_key != self.worker {
+            return Err(unavailable("remote-supervisor-worker-mismatch"));
+        }
+        if self
+            .entries
+            .iter()
+            .any(|entry| same_assignment(&entry.admission, admission))
+        {
+            return Err(unavailable("remote-supervisor-assignment-retained"));
+        }
+        if self.entries.len() >= self.maximum {
+            return Err(unavailable("remote-supervisor-capacity"));
+        }
+        // Occupy the slot BEFORE any workspace, IPC or process effect. A failed start is never
+        // removed, because absence of an owner cannot prove absence of an external effect.
+        self.entries.push(Entry {
+            admission: admission.clone(),
+            owner: None,
+        });
+        Ok(())
     }
     /// Observe every retained owner without dispatching any new work. A failed poll is isolated.
     pub fn poll(&mut self) -> Vec<ReceivedWorkerObservation> {
