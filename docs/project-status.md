@@ -851,3 +851,12 @@ Eight focused native regressions passed, including a real local fixture process 
 and closed-mailbox recovery. The full local gate passed 3,742 native tests plus desktop and real-daemon checks;
 hosted validation and delivery remain pending in R105 of the migration ledger. Coordinator SSH/application routing and graphical recovery controls remain unfinished;
 this is not packaged, real-provider or second-host acceptance.
+
+### Coordinator original recovery command (in validation)
+
+An explicit native coordinator command now connects original initialization recovery to configured
+SSH transport and eligible signing custody. It releases the fleet lock during transport and signing;
+service cancellation during signing prevents the request. Focused native tests and the full
+local gate passed (3,744 native tests plus desktop and daemon checks); hosted validation
+and delivery are pending in R106. Graphical controls, successful signed second-host
+execution and packaged acceptance remain unfinished.
