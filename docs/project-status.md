@@ -841,3 +841,13 @@ supervisor and bounded resident mailbox. Startup uses the ordinary single launch
 reply loss preserves the owner, delivery backpressure returns the held workspace, and failed starts
 retain uncertain slots. Three fixture-provider regressions passed. R104 records full validation and
 publication status. Recovery wire routing and user-facing controls remain unfinished.
+
+### Original recovery wire and worker routing (in validation)
+
+The typed coordinator exchange and opt-in native worker endpoint now connect signed original-input
+recovery to the resident supervisor. Exact original assignment, policy, limits, lease and fresh
+signatures are checked; a lost final receipt retains the recovered workspace and mailbox request.
+Eight focused native regressions passed, including a real local fixture process after lost reply
+and closed-mailbox recovery. The full local gate passed 3,742 native tests plus desktop and real-daemon checks;
+hosted validation and delivery remain pending in R105 of the migration ledger. Coordinator SSH/application routing and graphical recovery controls remain unfinished;
+this is not packaged, real-provider or second-host acceptance.
