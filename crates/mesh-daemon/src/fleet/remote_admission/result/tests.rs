@@ -404,3 +404,107 @@ fn result_summary_exposes_only_exact_public_saved_identities() {
         assert!(fields.iter().all(|(key, _)| key != private));
     }
 }
+
+#[test]
+fn native_receipt_intent_survives_restart_and_refuses_changed_context_or_partial_records() {
+    use crate::fleet::RemoteResultInbox;
+    use crate::ProtectedWorkspaceRoot;
+    use std::os::unix::fs::PermissionsExt as _;
+    let f = Fixture::new();
+    let mut runtime = f.runtime(true);
+    let (body, _) = fixture_body(&f, &mut runtime);
+    let offer = RemoteSavedResultOffer::sign(body, |p| sign(&f.worker, p)).unwrap();
+    let app = f.path.join("app");
+    std::fs::create_dir(&app).unwrap();
+    std::fs::set_permissions(&app, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let inbox =
+        RemoteResultInbox::create(&app, ProtectedWorkspaceRoot::inspect(&app).unwrap(), &[])
+            .unwrap();
+    let identity = inbox.identity().unwrap();
+    let context = Json::object([("native_peer", Json::text("retained-identity"))]);
+    let before = runtime.state().revision;
+    let intent = inbox.retain_receipt_intent(&offer, &context).unwrap();
+    assert_eq!(intent.offer(), offer.encode());
+    assert_eq!(intent.context(), &context);
+    assert_eq!(intent.allocation().len(), 32);
+    assert_eq!(
+        inbox.retain_receipt_intent(&offer, &context).unwrap(),
+        intent
+    );
+    let changed = Json::object([("native_peer", Json::text("substituted"))]);
+    assert!(inbox.retain_receipt_intent(&offer, &changed).is_err());
+    drop(inbox);
+    let reopened = RemoteResultInbox::open(&app.join("remote-results"), identity, &[]).unwrap();
+    assert_eq!(reopened.receipt_intents().unwrap(), vec![intent.clone()]);
+    assert_eq!(
+        reopened.retain_receipt_intent(&offer, &context).unwrap(),
+        intent
+    );
+    assert_eq!(runtime.state().revision, before);
+    assert_eq!(
+        std::fs::read_dir(app.join("remote-results/allocations"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let record = app
+        .join("remote-results")
+        .join(format!("receipt-{}.json", intent.id()));
+    std::fs::write(&record, b"partial").unwrap();
+    assert!(reopened.receipt_intents().is_err());
+    assert!(reopened.retain_receipt_intent(&offer, &context).is_err());
+    assert_eq!(std::fs::read(&record).unwrap(), b"partial");
+}
+
+#[test]
+fn native_receipt_intent_bounds_inventory_and_refuses_cross_inbox_copy() {
+    use crate::fleet::RemoteResultInbox;
+    use crate::ProtectedWorkspaceRoot;
+    use std::os::unix::fs::PermissionsExt as _;
+    let f = Fixture::new();
+    let mut runtime = f.runtime(true);
+    let (body, _) = fixture_body(&f, &mut runtime);
+    let context = Json::object([("native_peer", Json::text("original"))]);
+    let create = |name| {
+        let p = f.path.join(name);
+        std::fs::create_dir(&p).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o700)).unwrap();
+        RemoteResultInbox::create(&p, ProtectedWorkspaceRoot::inspect(&p).unwrap(), &[]).unwrap()
+    };
+    let inbox = create("first");
+    let other = create("second");
+    let mut first = None;
+    for n in 0..65 {
+        let Json::Object(mut fields) = body.clone() else {
+            panic!("body");
+        };
+        fields
+            .iter_mut()
+            .find(|(k, _)| k == "checkpoint")
+            .unwrap()
+            .1 = Json::text(format!("checkpoint-{n}"));
+        let offer =
+            RemoteSavedResultOffer::sign(Json::Object(fields), |p| sign(&f.worker, p)).unwrap();
+        let result = inbox.retain_receipt_intent(&offer, &context);
+        if n < 64 {
+            let saved = result.unwrap();
+            if n == 0 {
+                first = Some((saved, offer));
+            }
+        } else {
+            assert!(result.is_err());
+        }
+    }
+    assert_eq!(inbox.receipt_intents().unwrap().len(), 64);
+    let (intent, offer) = first.unwrap();
+    assert_eq!(
+        inbox.retain_receipt_intent(&offer, &context).unwrap(),
+        intent
+    );
+    let name = format!("receipt-{}.json", intent.id());
+    let copied = f.path.join("second/remote-results").join(&name);
+    std::fs::copy(f.path.join("first/remote-results").join(&name), &copied).unwrap();
+    assert!(other.receipt_intents().is_err());
+    assert!(other.retain_receipt_intent(&offer, &context).is_err());
+    assert!(copied.is_file());
+}

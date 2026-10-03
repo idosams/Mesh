@@ -13,6 +13,8 @@ use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
 mod history_binding;
 mod inbox;
+#[cfg(target_os = "macos")]
+pub use inbox::RemoteReceiptIntent;
 pub use inbox::RemoteResultInbox;
 mod result;
 pub use result::ReceivedResultWorkspace;

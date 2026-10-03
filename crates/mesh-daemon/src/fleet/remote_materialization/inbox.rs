@@ -2,6 +2,11 @@
 use super::*;
 use crate::ipc::Json;
 
+#[cfg(target_os = "macos")]
+mod intents;
+#[cfg(target_os = "macos")]
+pub use intents::RemoteReceiptIntent;
+
 const NAME: &str = "remote-results";
 const RECEIPT: &str = "inbox.json";
 

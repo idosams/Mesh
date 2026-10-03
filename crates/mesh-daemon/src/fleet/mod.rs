@@ -95,6 +95,8 @@ pub use crate::workspace::RemoteInputSource;
 pub use remote_input::{
     RemoteInputChunk, RemoteInputEntry, RemoteInputManifest, RemoteInputReceiver,
 };
+#[cfg(target_os = "macos")]
+pub use remote_materialization::RemoteReceiptIntent;
 #[cfg(unix)]
 pub use remote_materialization::{
     ReceivedResultWorkspace, ReceivedWorkerWorkspace, RemoteInputAllocation,

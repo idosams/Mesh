@@ -878,3 +878,16 @@ owner-only `mesh.remote-result-inbox/v1` record. Missing, replaced, linked, malf
 protected storage refuses without repair. This new record has no migration from unknown folders.
 This is receiving storage infrastructure, not an exposed graphical download action: durable
 receipt intents, authenticated result selection and graphical receipt/recovery remain required.
+
+
+## Retained native receipt selections
+
+On macOS, matching the existing signed-result and ingestion API, an admitted receiving inbox can
+retain up to 64 immutable `mesh.remote-receipt-intent/v1` records.
+Each record binds the exact signed offer, stable allocation, inbox installation and private native
+configuration. Identical retention is idempotent; changed context for the same offer refuses.
+Listing revalidates signatures, canonical records, physical inbox identity and bounded private
+files. Partial, copied or malformed records remain preserved and require reconciliation. No
+automatic deletion or migration is provided. A saved intent does not prove any content arrived:
+the caller must re-admit peer/configuration/assignment/trust and query the fleet's completed review
+ledger. These primitives still require desktop integration and explicit graphical recovery.

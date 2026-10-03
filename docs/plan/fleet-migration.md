@@ -4316,3 +4316,31 @@ the real daemon demo. The warnings occurred in `a_daemon_with_nothing_open_refus
 and `stopping_during_signing_prevents_that_capture_from_being_committed`; #37/#172 remain unresolved.
 Hosted delivery pending. Native receipt intents and graphical controls remain
 unfinished; the entire fleet acceptance plan and fixed user checkpoint remain unchanged.
+
+
+## R84: immutable native result receipt intents
+
+New canonical work, replacing no legacy commit, based on published R83 PR #214 head
+`7959fa253456e8a7d2a64cd8cbbb62a77eaa47b3`. R82 PR #213 checks and R81 combined-main have passed;
+R83 original checks remain active. Native inbox records preserve the exact signed offer and native
+configuration before I/O with a stable allocation. Physical-root locking serializes create-only
+records; repeated exact selection returns the original intent. Changed context, partial records,
+foreign inbox copies and overflow refuse without repair or transfer. Records never claim completion
+or authorize a peer, worker launch or protected main. New format `mesh.remote-receipt-intent/v1`
+is additive; existing inbox records remain compatible and no unknown state is migrated.
+Focused restart/idempotency/refusal coverage passed (0.080 s). The full gate passed, including
+bounded-inventory/cross-inbox-copy regressions: 3,657 native tests (148.724 s, one slow, 17 skipped),
+177 rendered checks, 621 desktop tests, repository/docs/license/storage checks and the real daemon
+demo. No process-leak warning occurred; #37/#172 remain open. Hosted delivery is pending. GUI receipt and native application identity/
+intent integration remain required, together with the complete outstanding fleet acceptance plan.
+
+
+R84 hosted correction: original run `37123118390` found a Linux unresolved signed-result import.
+Intent implementation and exports now use the same macOS boundary as the existing signed-result
+and ingestion APIs; the underlying inbox remains Unix-capable. No gate is weakened. The failed
+job logs are retained. Original run terminated failed; its macOS job passed. Canonical main
+was integrated with an identical implementation tree before this correction. Local revalidation
+passed: 3,657 native tests (153.018 s, one slow, one process-leak warning, 17 skipped),
+177 rendered checks, 621 desktop tests and all repository/docs/license/storage/demo gates.
+The warning occurred in `mesh-approval` text-diff context coverage; #37/#172 remain unresolved.
+Fresh hosted Linux/macOS validation is required.
