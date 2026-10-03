@@ -18,6 +18,7 @@ pub use inbox::RemoteReceiptIntent;
 pub use inbox::RemoteResultInbox;
 mod result;
 pub use result::ReceivedResultWorkspace;
+mod inspection;
 mod worker;
 pub use worker::ReceivedWorkerWorkspace;
 
