@@ -33,7 +33,7 @@ impl FleetStoreAuthority for TestAuthority {
         }
     }
 }
-fn guarded(s: &Setup) -> RemoteAdmissionRegistry {
+pub(in crate::fleet) fn guarded(s: &Setup) -> RemoteAdmissionRegistry {
     drop(s.f.registry());
     let path = s.f.path.canonicalize().unwrap().join("worker.sqlite");
     let authority = TestAuthority {
@@ -58,7 +58,7 @@ fn guarded(s: &Setup) -> RemoteAdmissionRegistry {
 fn session(s: &Setup) -> RemoteReceivingSession<'_> {
     RemoteReceivingSession::new(guarded(s), s.f.work.clone(), ALLOCATION, &s.destination)
 }
-fn materialized(
+pub(in crate::fleet) fn materialized(
     s: &Setup,
     runtime: &mut Runtime,
 ) -> (RemoteInputAllocation, RemoteAdmissionRegistry) {

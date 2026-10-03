@@ -349,3 +349,5 @@ pub use materialization::RemoteMaterializationReceipt;
 
 #[cfg(unix)]
 mod recovery;
+#[cfg(unix)]
+pub use recovery::{RemoteRecoveryChallenge, RemoteRecoveryProof};

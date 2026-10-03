@@ -4850,3 +4850,43 @@ original admission provenance; the existing admission challenge binds the initia
 cannot authenticate a renewed one. Native socket/frame routing, user recovery controls, expiry and
 cancellation fault coverage, every-write/process-kill campaigns, uncertain launched processes and
 real second-host reconnect acceptance remain required. The full acceptance map is unchanged.
+
+## R103 — fresh proof for original recovery under a renewed lease
+
+R102/PR235 merged at `5a40f181c7e5f07e52653bf36f139e7407a9226b` after all seven
+exact-head checks passed on `85ca27d1ce3cf30ef8d3522e378248e92dfc301f`. Hosted Linux
+passed 3,329 tests (293.163 seconds, two slow, seven skipped); macOS passed 3,725 native
+tests (190.359 seconds, one slow, 17 skipped), the complete desktop/daemon gate and four
+native renderer tests. Combined-main run `37146827118` subsequently passed all seven checks.
+R103 is new canonical implementation on that merge and replaces no preserved source commit.
+
+A separate bounded `mesh.original-recovery-challenge/v1` proof and mutation-specific signature
+domain bind the immutable original admission/revision and materialization directories to the exact
+current effective lease, a random worker nonce and an expiry of at most 30 seconds. Original
+admission v1 and its sequence-one validation remain unchanged. A single-use native challenge owns
+the guarded original registry and invokes R102 recovery only after signature verification; proof
+expiry, exact lease equality, original materialization and launch absence are rechecked during
+recovery phases. A renewal during recovery requires a new challenge. No input reservation is
+recreated and no launch intent or capacity release is granted.
+
+The coordinator compares the proof with the exact current claimed prelaunch attempt, input/bundle,
+worker, provider, task, limits and original admission scope. Its signing callback is checked both
+before and after execution against the full selected lane and limits, including cancellation and
+lease changes. The proof is task-bearing and must not be logged. Decoding/cloning facts cannot
+reconstruct worker authority; noncanonical/unknown envelope fields or versions refuse.
+
+Six connected proof tests passed: renewed initialization preserves the original admission/history,
+simulated authentication after the initial deadline uses only the renewed current lease, nonce
+replay/wrong signer/stale lease refuse before initialization, cancellation during signing discards
+the signature, and malformed proof/wrong native scope/unguarded ledger refuse. The signer-time
+lease-change regression passed too. The combined focused set passed all 11 recovery tests
+in 2.682 seconds. The complete local gate passed 3,731 native tests in 157.525 seconds
+(one slow, 17 skipped), 181 rendered checks, 634 desktop tests and 44 real-daemon checks,
+without leak warnings. Hosted checks and merge of this increment remain pending. The simulated clock test is not a real delayed
+network or second-host recovery proof.
+
+Broker/native socket routing, preserving recovered handoff ownership across lost acknowledgments,
+supervisor integration, desktop recovery controls and cancellation delivery during remote work
+remain required. A fresh bounded signature cannot prove instantaneous knowledge of a later remote
+cancellation. Existing launch intents require separate uncertain-execution reconciliation. The fixed
+user checkpoint is unchanged, and the full fleet acceptance map remains open.

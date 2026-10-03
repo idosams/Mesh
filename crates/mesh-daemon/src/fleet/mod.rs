@@ -64,6 +64,8 @@ pub use remote_admission::{
 };
 #[cfg(unix)]
 pub use remote_admission::{RemoteLaunchOutcome, RemoteLaunchReceipt, RemoteLaunchReservation};
+#[cfg(unix)]
+pub use remote_admission::{RemoteRecoveryChallenge, RemoteRecoveryProof};
 #[cfg(target_os = "macos")]
 mod worker_connections;
 #[cfg(target_os = "macos")]

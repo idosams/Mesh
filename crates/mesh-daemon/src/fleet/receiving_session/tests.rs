@@ -407,4 +407,4 @@ fn durable_materialization_precedes_handoff_and_changed_input_cannot_rewrite_it(
     );
 }
 
-mod recovery;
+pub(in crate::fleet) mod recovery;
