@@ -434,3 +434,5 @@ fn explicit_signed_input_inspection_routes_without_reserving_a_transfer() {
         0
     );
 }
+
+mod recovery;

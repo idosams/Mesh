@@ -16,10 +16,23 @@ struct Transfer<'a> {
     pending: Option<ReceivedWorkerRequest>,
 }
 
+struct RecoveredTransfer {
+    admission: RemoteAdmissionReceipt,
+    handoff: Option<Box<RemoteRecoveredHandoff>>,
+    pending: Option<ReceivedWorkerRequest>,
+}
+
 /// Native connection disposition; materialized input is not provider execution or completion.
 pub enum WorkerConnectionOutcome {
     /// Fresh signed retained facts were written; this grants no execution or retry authority.
     StatusReplied,
+    /// Original initialization recovered and retained for one native supervisor delivery.
+    Recovered {
+        /// Original admission; never replacement reservation or execution evidence.
+        admission: Box<RemoteAdmissionReceipt>,
+        /// Local final response result, not durable peer receipt.
+        reply_written: bool,
+    },
     /// Fresh signed saved-result offer observation; this does not transfer or import content.
     ResultReplied,
     /// Fresh signed catalog page; neither an empty page nor an offer proves completion.
@@ -52,6 +65,8 @@ pub struct NativeWorkerConnections<'a> {
     policy: RemoteDispatchPolicy<'a>,
     maximum: usize,
     transfers: Vec<Transfer<'a>>,
+    recoveries: Vec<RecoveredTransfer>,
+    recovery_policy: Option<(crate::TrustedReviewers, crate::CheckpointRuntimeParameters)>,
 }
 #[cfg(target_os = "macos")]
 impl<'a> NativeWorkerConnections<'a> {
@@ -73,7 +88,20 @@ impl<'a> NativeWorkerConnections<'a> {
             policy,
             maximum,
             transfers: Vec::new(),
+            recoveries: Vec::new(),
+            recovery_policy: None,
         })
+    }
+
+    /// Explicit native opt-in for original recovery. Neither trust nor checkpoint policy comes
+    /// from the peer. Existing workspace policy is not replaced by configuring future recovery.
+    pub fn with_recovery_policy(
+        mut self,
+        reviewers: crate::TrustedReviewers,
+        checkpoint: crate::CheckpointRuntimeParameters,
+    ) -> Self {
+        self.recovery_policy = Some((reviewers, checkpoint));
+        self
     }
 
     /// Verify a fresh signed dispatch, bind its exact facts to the retained session, and serve one
@@ -83,7 +111,7 @@ impl<'a> NativeWorkerConnections<'a> {
         &mut self,
         mut input: R,
         mut output: W,
-        sign: impl FnOnce(&SigningPayload) -> Result<Signature, String>,
+        mut sign: impl FnMut(&SigningPayload) -> Result<Signature, String>,
     ) -> io::Result<WorkerConnectionOutcome> {
         self.installation.verify()?;
         let Some(RemoteFrame::Control(bytes)) = RemoteFrameReader::new(&mut input).read_frame()?
@@ -190,10 +218,74 @@ impl<'a> NativeWorkerConnections<'a> {
             self.installation.verify()?;
             return Ok(WorkerConnectionOutcome::ResultEvidenceServed);
         }
+        if envelope.get("schema").and_then(crate::ipc::Json::as_text)
+            == Some("mesh.worker-recovery-request/v1")
+        {
+            let request = RemoteWorkerRecoveryRequest::decode(encoded)?.verify(&self.policy)?;
+            if self.transfers.len() + self.recoveries.len() >= self.maximum
+                || self.transfers.iter().any(|entry| {
+                    entry.coordinator == request.coordinator()
+                        && entry.objective == request.objective()
+                        && entry.work.assignment.id == request.assignment()
+                })
+                || self.recoveries.iter().any(|entry| {
+                    entry.admission.coordinator() == request.coordinator()
+                        && entry.admission.objective() == request.objective()
+                        && entry.admission.work().assignment.id == request.assignment()
+                })
+            {
+                return Err(refused());
+            }
+            let (reviewers, checkpoint) = self.recovery_policy.clone().ok_or_else(refused)?;
+            let registry = self.installation.registry(
+                request.coordinator(),
+                request.objective(),
+                request.limits().clone(),
+            )?;
+            let outcome = serve_remote_recovery(
+                RemoteRecoveryWorkerRequest {
+                    request,
+                    registry,
+                    destination: self.destination,
+                    reviewers,
+                    checkpoint,
+                },
+                input,
+                output,
+                |payload| {
+                    self.installation
+                        .verify()
+                        .map_err(|_| "worker custody changed".to_string())?;
+                    let signature = sign(payload)?;
+                    self.installation
+                        .verify()
+                        .map_err(|_| "worker custody changed".to_string())?;
+                    Ok(signature)
+                },
+            )?;
+            let admission = outcome.handoff.workspace.admission().clone();
+            self.recoveries.push(RecoveredTransfer {
+                admission: admission.clone(),
+                handoff: Some(outcome.handoff),
+                pending: None,
+            });
+            self.installation.verify()?;
+            return Ok(WorkerConnectionOutcome::Recovered {
+                admission: Box::new(admission),
+                reply_written: outcome.reply_written,
+            });
+        }
         self.destination.verify()?;
         let dispatch = RemoteDispatch::decode(encoded)
             .and_then(|dispatch| dispatch.verify(&self.policy))
             .map_err(|_| refused())?;
+        if self.recoveries.iter().any(|entry| {
+            entry.admission.coordinator() == dispatch.coordinator()
+                && entry.admission.objective() == dispatch.objective()
+                && entry.admission.work().assignment.id == dispatch.work().assignment.id
+        }) {
+            return Err(refused());
+        }
         let index = match self.transfers.iter().position(|entry| {
             entry.coordinator == dispatch.coordinator()
                 && entry.objective == dispatch.objective()
@@ -210,7 +302,7 @@ impl<'a> NativeWorkerConnections<'a> {
                 index
             }
             None => {
-                if self.transfers.len() >= self.maximum {
+                if self.transfers.len() + self.recoveries.len() >= self.maximum {
                     return Err(refused());
                 }
                 let registry = self.installation.registry(
@@ -278,6 +370,19 @@ impl<'a> NativeWorkerConnections<'a> {
         sender: &SyncSender<ReceivedWorkerRequest>,
     ) -> io::Result<bool> {
         self.installation.verify()?;
+        if let Some(entry) = self
+            .recoveries
+            .iter_mut()
+            .find(|entry| &entry.admission == admission)
+        {
+            let handoff = entry.handoff.take().ok_or_else(refused)?;
+            entry.pending = Some(ReceivedWorkerRequest::StartRecovered {
+                handoff,
+                launch: Box::new(launch),
+                reply,
+            });
+            return Self::deliver_pending(&mut entry.pending, sender);
+        }
         let entry = self
             .transfers
             .iter_mut()
@@ -305,17 +410,28 @@ impl<'a> NativeWorkerConnections<'a> {
                 count += 1;
             }
         }
+        for entry in &mut self.recoveries {
+            if entry.pending.is_some() && Self::deliver_pending(&mut entry.pending, sender)? {
+                count += 1;
+            }
+        }
         Ok(count)
     }
     fn deliver(
         entry: &mut Transfer<'a>,
         sender: &SyncSender<ReceivedWorkerRequest>,
     ) -> io::Result<bool> {
-        let request = entry.pending.take().ok_or_else(refused)?;
+        Self::deliver_pending(&mut entry.pending, sender)
+    }
+    fn deliver_pending(
+        pending: &mut Option<ReceivedWorkerRequest>,
+        sender: &SyncSender<ReceivedWorkerRequest>,
+    ) -> io::Result<bool> {
+        let request = pending.take().ok_or_else(refused)?;
         match sender.try_send(request) {
             Ok(()) => Ok(true),
             Err(TrySendError::Full(request) | TrySendError::Disconnected(request)) => {
-                entry.pending = Some(request);
+                *pending = Some(request);
                 Ok(false)
             }
         }
