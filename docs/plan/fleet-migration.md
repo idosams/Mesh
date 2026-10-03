@@ -5,12 +5,15 @@ historical evidence. The full [fleet objective](fleet-orchestration.md) is uncha
 
 ## Delivery checkpoint (2026-10-03)
 
-Canonical main is `273307176a82806bfdeebba97b7c78751e62c048`, including
-[PR #223](https://github.com/idosams/Mesh/pull/223). Its exact head passed all seven hosted
-checks before normal merge. [PR #224](https://github.com/idosams/Mesh/pull/224) is published
-against main at `1149a841902d42d5d924b33f3dc9fafd0746ecff`; fresh PR and combined-main
-checks are still running at this observation. The [acceptance map](fleet-acceptance.md)
-records evidence and remaining requirements across the complete plan.
+Canonical main is `b009f2761f3eb1d397b0902ffb2dd3fc43565b0a`, including
+[PR #224](https://github.com/idosams/Mesh/pull/224), merged at 15:28:15 UTC.
+Its head `1149a841902d42d5d924b33f3dc9fafd0746ecff` passed all seven
+[hosted checks](https://github.com/idosams/Mesh/actions/runs/37132831828) before normal merge.
+The preceding PR223 combined-main run passed; the new
+[combined-main run](https://github.com/idosams/Mesh/actions/runs/37133352356) is running.
+The [acceptance map](fleet-acceptance.md) records evidence and remaining requirements
+across the complete plan. This documentation increment adds no product behavior and replaces
+no preserved implementation commit; it preserves the older dated observations below.
 
 The original work, superseded heads and verification logs remain preserved. Ancestry-only
 reconciliations retained identical source trees and received fresh hosted checks. The earlier

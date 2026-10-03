@@ -5,18 +5,19 @@ This is a dated requirement-to-evidence map, not a completion claim. The accepte
 [migration ledger](fleet-migration.md) retains source provenance and delivery receipts.
 Source coverage and hosted tests do not establish packaged or real-provider acceptance.
 
-At this observation canonical main is `273307176a82806bfdeebba97b7c78751e62c048`,
-including [PR #223](https://github.com/idosams/Mesh/pull/223).
-[PR #224](https://github.com/idosams/Mesh/pull/224), head
-`1149a841902d42d5d924b33f3dc9fafd0746ecff`, is published against main; its
-[exact-head CI](https://github.com/idosams/Mesh/actions/runs/37132831828) and
-[combined-main CI](https://github.com/idosams/Mesh/actions/runs/37132811999) are running.
+At this observation canonical main is `b009f2761f3eb1d397b0902ffb2dd3fc43565b0a`,
+including [PR #224](https://github.com/idosams/Mesh/pull/224), merged on 3 October at
+15:28:15 UTC after all seven [exact-head checks](https://github.com/idosams/Mesh/actions/runs/37132831828)
+passed on `1149a841902d42d5d924b33f3dc9fafd0746ecff`.
+The preceding [combined-main CI](https://github.com/idosams/Mesh/actions/runs/37132811999)
+passed; the new [combined-main run](https://github.com/idosams/Mesh/actions/runs/37133352356)
+is running. This does not complete the acceptance journeys below.
 
 | Requirement | Verified evidence / current boundary | What still proves completion |
 |---|---|---|
 | Canonical repository and identity checks | Actual fetch/push remotes are idosams/Mesh; target guards run before edits/delivery; PR221 merge receipt retained | Continue exact identity/base checks through every remaining delivery |
 | Preserve prior repositories and work | Complete verified bundles, original dirty Mesh-internal checkout and per-increment evidence retained under Mesh-delivery-preserved | Final provenance audit against migration ledger; no history deletion or settings changes |
-| Coherent published and merged increments | Canonical delivery through PR223; PR224 published separately with original CI preserved | Merge accepted increments after fresh checks; verify final combined main |
+| Coherent published and merged increments | Canonical delivery through PR224; separate increments and original CI preserved | Merge accepted increments after fresh checks; verify final combined main |
 | Deprecate Mesh-internal through PR | Guidance points forward to Mesh; [legacy #1488](https://github.com/idosams/Mesh-internal/pull/1488) remains OPEN at `99b55d`, with latest baseline Linux/clippy/deny failures | Legitimately resolve its checks and merge deprecation; no bypass/settings change |
 | Attach existing dirty project without moving or changing Git | Packaged existing-project journey recorded in [PR #221](https://github.com/idosams/Mesh/pull/221) passed on `6b82368`; it predates PR223/224 and is not proof on current main | Full manual acceptance including integration/recovery and native approval; exact final revision evidence |
 | Manual capture, independent line and parallel saved review | Same packaged journey: visible 1156×764 window, two fixed comparisons, fork, restart/resume/detach, original Git preserved; no provider launched | Full manual baseline through reviewed main/integration/restore, broader concurrent-edit/failure campaign |
@@ -29,7 +30,7 @@ including [PR #223](https://github.com/idosams/Mesh/pull/223).
 | Requests for changes and exact protected-main approval | Native mechanisms/source exist; packaged proof explicitly reports protected_main_approval=false | Eligible signed build with human presence, stale approval refusal, accepted integration and recovery |
 | Dependency closure and rejection/revocation | Source mechanisms and tests exist; plan keeps acceptance open | Show downstream private consumption before upstream publication, rejection invalidates downstream publication, full closure reviewed |
 | Retention preserves active/reviewed versions | Explicit plan requirement; held native roots alone are not durable retention policy | Retention/GC and storage-exhaustion campaign preserving pinned inputs/reviews |
-| Worker restart preserves acknowledged work | Merged PR223 records allocation identity before acknowledgment; published PR224 adds read-only restart inspection; both passed their full local gates | Complete partial transfer/initialization/uncertain launch reconciliation without duplicate execution; graphical actions |
+| Worker restart preserves acknowledged work | Merged PR223 records allocation identity before acknowledgment; merged PR224 adds read-only restart inspection; both passed their full local gates | Complete partial transfer/initialization/uncertain launch reconciliation without duplicate execution; graphical actions |
 | Signed remote input inspection in normal workflow | Next integration scoped: explicit request, not routine status polling; no implementation yet | Versioned authenticated request/reply, native pre/post checks, closed compatibility/refusal tests, visible truthful results |
 | Real second machine execution and recovery | Protocol/native fixtures and local proofs are insufficient | Real SSH second host, execute, disconnect/reconnect, lost acknowledgment, exact returned review, no duplicate/lost acknowledged work |
 | Second real provider | Claude adapter source is present; successful authenticated acceptance remains outstanding | Successful second-provider conformance and packaged journey with recorded version/cost |
@@ -46,4 +47,4 @@ including [PR #223](https://github.com/idosams/Mesh/pull/223).
 
 ## Next order
 
-Finish PR224 delivery and combined-main verification. Then connect explicit signed input inspection to native/desktop recovery, proceed through interrupted initialization and uncertain execution reconciliation, and complete the remaining local/harness/provider/signing/second-host acceptance in this map. None of those requirements is waived by completing a smaller native foundation.
+Verify combined-main delivery. Then connect explicit signed input inspection to native/desktop recovery, proceed through interrupted initialization and uncertain execution reconciliation, and complete the remaining local/harness/provider/signing/second-host acceptance in this map. None of those requirements is waived by completing a smaller native foundation.

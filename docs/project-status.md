@@ -23,7 +23,7 @@ accepted result to the original folder is a separate, explicitly confirmed nativ
 Canonical delivery now includes [PR #223](https://github.com/idosams/Mesh/pull/223):
 remote input materialization records survive restart without granting replacement execution.
 [PR #224](https://github.com/idosams/Mesh/pull/224) adds read-only verification of those
-original files and physical identities; it is published and awaiting fresh hosted checks.
+original files and physical identities; it is merged after all seven exact-head checks passed. Combined-main checks are running.
 The [dated acceptance map](plan/fleet-acceptance.md) distinguishes merged implementation,
 local tests, packaged evidence and the remaining full-plan journeys.
 
