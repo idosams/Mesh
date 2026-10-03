@@ -241,7 +241,11 @@ pub(crate) fn serve(path: &Path) -> Result<(), String> {
     };
     let mut connections =
         NativeWorkerConnections::new(&installation, &destination, policy, config.capacity)
-            .map_err(|_| UNAVAILABLE)?;
+            .map_err(|_| UNAVAILABLE)?
+            .with_recovery_policy(
+                mesh_daemon::TrustedReviewers::default(),
+                mesh_daemon::CheckpointRuntimeParameters::selected_defaults(),
+            );
     let mut endpoint_protected = config.protected.clone();
     endpoint_protected.extend([installation_id, store_id, allocation_id]);
     let endpoint = NativeWorkerEndpoint::bind(&config.endpoint, endpoint_id, &endpoint_protected)
@@ -288,7 +292,11 @@ pub(crate) fn serve(path: &Path) -> Result<(), String> {
                 let outcome = connections.serve(input, stream, |payload| {
                     custody.sign(payload).map_err(|_| UNAVAILABLE.into())
                 });
-                if let Ok(WorkerConnectionOutcome::Materialized { admission, .. }) = outcome {
+                if let Ok(
+                    WorkerConnectionOutcome::Materialized { admission, .. }
+                    | WorkerConnectionOutcome::Recovered { admission, .. },
+                ) = outcome
+                {
                     let (reply, _response) = mpsc::sync_channel(1);
                     let launch = ReceivedWorkerLaunch {
                         adapter: adapter.clone(),

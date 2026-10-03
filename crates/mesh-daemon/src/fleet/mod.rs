@@ -18,6 +18,14 @@ mod received_host;
 mod receiving_broker;
 #[cfg(unix)]
 mod receiving_session;
+#[cfg(unix)]
+mod recovery_wire;
+#[cfg(unix)]
+pub use recovery_wire::{
+    recover_remote_worker, serve_remote_recovery, RemoteRecoveryBrokerOutcome,
+    RemoteRecoveryClientRequest, RemoteRecoveryReceipt, RemoteRecoveryWorkerRequest,
+    RemoteWorkerRecoveryRequest, VerifiedWorkerRecoveryRequest,
+};
 mod remote_parent;
 #[cfg(unix)]
 pub use input_transfer::{
