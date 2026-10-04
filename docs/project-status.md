@@ -984,3 +984,12 @@ Nine focused native regressions and the full gate pass: 3,788 native, 185 render
 tests plus all 44 daemon checks. Hosted delivery is pending. Reads remain
 available during a test-paused deletion while a second daemon's agent acquisition waits. Automatic
 scheduling, pressure policy, full cross-process faults and packaged fleet acceptance remain open.
+
+
+## Cleanup preparation and review responsiveness
+
+Cleanup prepares fresh retention facts using an independent pinned journal descriptor after
+releasing the live view and checkpoint locks. Native custody still excludes coordinated writers.
+A paused-preparation test keeps workspace reads available; restoring the old view lock makes that
+test fail. Identical-byte journal replacement also refuses. Full local validation passed 3,790 native,
+185 rendered and 646 desktop tests plus all 44 daemon checks; hosted delivery is pending. Nonblocking background admission and automatic scheduling remain unfinished.

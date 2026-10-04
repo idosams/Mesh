@@ -128,8 +128,12 @@ every recorded payload/manifest/chunk digest, independent of the collection plan
 identities are checked again before deletion. Stale absent candidates are forgotten under the
 same writer guard, so interrupted deletion cannot permanently occupy the next batch.
 
-The workspace-view and checkpoint locks are released before deletion. A deterministic native test
-pauses at that boundary, reads the workspace view, and verifies that a second daemon's agent
+The workspace-view and checkpoint locks are released before live recovery inspection, history
+folding, payload verification, candidate selection and deletion. Independent pinned journal
+descriptors keep those reads separate from the live view; an identical-byte replacement of the
+opened journal is refused. A deterministic native test
+pauses preparation and deletion at their respective boundaries, reads the workspace view, and
+verifies that a second daemon's agent
 acquisition waits until collection releases custody. This is not a timed GUI or cross-process
 acceptance campaign. Journal folding and candidate selection still scan history; only the number
 of deletion candidates is bounded. Dry run removes no chunks but may initialize the normal isolated
