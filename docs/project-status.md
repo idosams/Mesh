@@ -18,6 +18,16 @@ Creating independent lanes and starting a managed fleet are optional. Agents may
 child lanes and submit immutable results; they cannot approve protected Mesh main. Applying an
 accepted result to the original folder is a separate, explicitly confirmed native operation.
 
+## Automatic local worker saving
+
+The current source saves private progress for locally owned fleet workers between explicit handoffs,
+with one background capture per worker and a final attempt before execution completion. Save status
+is separate from provider status; incomplete final saves remain visible and do not imply review or
+approval. Native fixture tests cover live and final edits, empty polls, missed acknowledgment,
+revocation and newer-version races. This is not yet hosted or packaged acceptance. Received remote
+sessions and the fixed user checkpoint do not include this behavior. See the delivery ledger for
+R130 evidence and limits.
+
 ## Retained worker execution observations
 
 The native worker registry can read original session setup and recorded run outcomes after a

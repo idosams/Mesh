@@ -251,6 +251,20 @@ fn observation(value: &WorkerObservation) -> Json {
         ("failed", Json::Bool(activity.failed)),
         ("streams_closed", Json::Bool(activity.streams_closed)),
         ("outcome", value.outcome.map_or(Json::Null, Json::Bool)),
+        (
+            "progress_save",
+            value.progress.as_ref().map_or(Json::Null, |save| {
+                Json::object([
+                    ("state", Json::text(save.state)),
+                    ("observed_at", timestamp(save.observed_at)),
+                    (
+                        "version",
+                        save.version.as_ref().map_or(Json::Null, Json::text),
+                    ),
+                    ("issue", save.issue.map_or(Json::Null, Json::text)),
+                ])
+            }),
+        ),
     ])
 }
 
