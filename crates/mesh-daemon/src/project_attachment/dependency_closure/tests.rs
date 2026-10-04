@@ -175,6 +175,84 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         .unwrap();
     assert_eq!(first_graph.operation_count(), 1);
     assert_ne!(graph.digest(), first_graph.digest());
+    let first_receipt_name = format!("dependency-capture-{}.json", d(1).to_hex());
+    let first_receipt_bytes = fs::read(owner.metadata_path().join(&first_receipt_name)).unwrap();
+    let receipt = Json::parse(std::str::from_utf8(&first_receipt_bytes).unwrap()).unwrap();
+    let first_frames =
+        RecordDigest::parse_hex(receipt.get("frames").unwrap().as_text().unwrap()).unwrap();
+    let facts = graph.retained.values().next().unwrap();
+    assert_eq!(facts.sidecars.len(), 2);
+    assert_eq!(
+        facts.sidecars[&first_receipt_name],
+        hash(&first_receipt_bytes)
+    );
+    assert!(facts.payloads.contains(&first_frames));
+    assert_eq!(
+        first_graph.retained.values().next().unwrap().sidecars.len(),
+        1
+    );
+    let receipt_cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+        owner.metadata_path(),
+        owner.store.filesystem(),
+    )
+    .unwrap();
+    let frame_path = owner.metadata_path().join(
+        receipt_cas
+            .layout()
+            .chunk_path(&mesh_cas::Digest32::from_bytes(*first_frames.as_bytes())),
+    );
+    let frame_bytes = fs::read(&frame_path).unwrap();
+    fs::write(&frame_path, b"changed historical recovery frames").unwrap();
+    assert!(storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .is_err());
+    assert_eq!(
+        fs::read(&frame_path).unwrap(),
+        b"changed historical recovery frames"
+    );
+    fs::write(&frame_path, frame_bytes).unwrap();
+    let receipt_path = owner.metadata_path().join(&first_receipt_name);
+    fs::write(&receipt_path, b"unknown receipt state").unwrap();
+    assert!(storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .is_err());
+    assert_eq!(fs::read(&receipt_path).unwrap(), b"unknown receipt state");
+    fs::write(&receipt_path, &first_receipt_bytes).unwrap();
+    // A second request may not claim the same completed capture operation.
+    let mut duplicate = receipt.clone();
+    let Json::Object(fields) = &mut duplicate else {
+        panic!("receipt object missing")
+    };
+    fields
+        .iter_mut()
+        .find(|(name, _)| name == "request")
+        .unwrap()
+        .1 = Json::text(d(90).to_hex());
+    let duplicate_path = owner
+        .metadata_path()
+        .join(format!("dependency-capture-{}.json", d(90).to_hex()));
+    fs::write(&duplicate_path, duplicate.encode()).unwrap();
+    use std::os::unix::fs::PermissionsExt as _;
+    fs::set_permissions(&duplicate_path, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .is_err(),
+        "two requests cannot claim one completed native capture"
+    );
+    assert_eq!(
+        fs::read_to_string(&duplicate_path).unwrap(),
+        duplicate.encode()
+    );
+    fs::remove_file(duplicate_path).unwrap();
+
+    assert_eq!(
+        graph,
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .unwrap()
+    );
+
     fs::write(root.join("source/note"), b"unsaved later editor bytes").unwrap();
     assert_eq!(
         graph,
@@ -226,6 +304,7 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         .inspect_dependency_graph(&owner, &owner, second, &[])
         .is_err());
     fs::write(&path, &original).unwrap();
+    let before_rejection = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
     let rejection = owner
         .decide_saved_input(
             first,
@@ -243,6 +322,51 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         "eligibility cannot rewrite immutable graph identity"
     );
     assert_eq!(after.nodes, graph.nodes);
+    // Simulate a committed control frame whose final acknowledgement/sidecar removal was lost.
+    use std::os::unix::fs::MetadataExt as _;
+    let journal_metadata =
+        fs::metadata(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let pending_control = crate::project_attachment::dependency_decision::transaction_intent(
+        mesh_store::DependencyKind::Eligibility,
+        d(80),
+        (journal_metadata.dev(), journal_metadata.ino()),
+        &before_rejection,
+        rejection.record(),
+    );
+    let pending_control_path = owner
+        .metadata_path()
+        .join(crate::project_attachment::dependency_decision::PENDING);
+    fs::write(&pending_control_path, &pending_control).unwrap();
+    fs::set_permissions(&pending_control_path, fs::Permissions::from_mode(0o600)).unwrap();
+    let awaiting_ack = storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .unwrap();
+    assert_eq!(awaiting_ack.digest(), after.digest());
+    assert_eq!(
+        awaiting_ack.retained.values().next().unwrap().sidecars
+            [crate::project_attachment::dependency_decision::PENDING],
+        hash(pending_control.as_bytes())
+    );
+    assert_eq!(
+        fs::read_to_string(&pending_control_path).unwrap(),
+        pending_control
+    );
+    fs::write(&pending_control_path, b"unknown control recovery state").unwrap();
+    assert!(storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .is_err());
+    assert_eq!(
+        fs::read(&pending_control_path).unwrap(),
+        b"unknown control recovery state"
+    );
+    fs::remove_file(pending_control_path).unwrap();
+    assert_eq!(
+        after,
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .unwrap()
+    );
+
     assert_eq!(after.retained.len(), 1);
     for (work, before) in &graph.retained {
         let retained = &after.retained[work];
@@ -468,6 +592,53 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .unwrap(),
         "in-memory replay without cached indexes preserves retained closure"
     );
+    let original_store = root.join("original-child-store");
+    let child_store_path = child.metadata_path().to_path_buf();
+    let journal_before = fs::read(child_store_path.join(crate::RECORD_FILE_NAME)).unwrap();
+    fs::rename(&child_store_path, &original_store).unwrap();
+    copy_fixture_store(&original_store, &child_store_path, &mut 1024);
+    assert_eq!(
+        fs::read(child_store_path.join(crate::RECORD_FILE_NAME)).unwrap(),
+        journal_before
+    );
+    let substituted = storage.reopen(child.id()).unwrap();
+    assert_ne!(
+        substituted.store.identity().unwrap(),
+        child.store.identity().unwrap()
+    );
+    assert!(
+        storage
+            .inspect_dependency_graph(&owner, &grandchild, grandchild_save, &[&substituted])
+            .is_err(),
+        "byte-identical replacement store cannot inherit the old installation"
+    );
+    assert!(
+        storage
+            .inspect_dependency_graph(
+                &owner,
+                &grandchild,
+                grandchild_save,
+                &[&child, &substituted]
+            )
+            .is_err(),
+        "same registration with conflicting physical bindings must refuse"
+    );
+    assert_eq!(
+        fs::read(child_store_path.join(crate::RECORD_FILE_NAME)).unwrap(),
+        journal_before
+    );
+    assert_eq!(
+        fs::read(original_store.join(crate::RECORD_FILE_NAME)).unwrap(),
+        journal_before
+    );
+    fs::rename(&child_store_path, root.join("substituted-child-store")).unwrap();
+    fs::rename(&original_store, &child_store_path).unwrap();
+    assert_eq!(
+        transitive,
+        storage
+            .inspect_dependency_graph(&owner, &grandchild, grandchild_save, &[&child])
+            .unwrap()
+    );
     assert_eq!(
         fs::read(root.join("source/note")).unwrap(),
         b"unsaved later editor bytes"
@@ -563,4 +734,76 @@ fn append_consumption_fixture(
     .unwrap();
     file.sync_all().unwrap();
     record.payload
+}
+
+fn copy_fixture_store(from: &std::path::Path, to: &std::path::Path, budget: &mut usize) {
+    use std::fs;
+    *budget = budget.checked_sub(1).expect("fixture copy bound exceeded");
+    fs::create_dir(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let kind = entry.file_type().unwrap();
+        if kind.is_dir() {
+            copy_fixture_store(&entry.path(), &to.join(entry.file_name()), budget);
+        } else {
+            assert!(kind.is_file(), "unexpected fixture file type");
+            *budget = budget.checked_sub(1).expect("fixture copy bound exceeded");
+            fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
+        }
+    }
+    fs::set_permissions(to, fs::metadata(from).unwrap().permissions()).unwrap();
+}
+
+#[test]
+fn pre_enrollment_input_is_not_silently_declared_dependency_free() {
+    use crate::project_attachment::ObservationLimits;
+    use ed25519_dalek::{Signer as _, SigningKey};
+    use std::fs;
+    let root = std::env::temp_dir().join(format!("mesh-legacy-graph-{}", std::process::id()));
+    fs::create_dir(&root).unwrap();
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let _cleanup = Cleanup(root.clone());
+    fs::create_dir(root.join("source")).unwrap();
+    fs::create_dir(root.join("metadata")).unwrap();
+    fs::write(root.join("source/note"), b"legacy private work").unwrap();
+    let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
+    let owner = storage.provision(&root.join("source")).unwrap();
+    let input = owner
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let key = SigningKey::from_bytes(&[82; 32]);
+    let saved = owner
+        .project()
+        .save_capture(
+            owner.metadata_path(),
+            &input,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |body| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(body.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    owner.enroll_dependency_history().unwrap();
+    let journal = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let refused = storage
+        .inspect_dependency_graph(&owner, &owner, saved, &[])
+        .unwrap_err();
+    assert!(refused.to_string().contains("legacy input ancestry"));
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        journal
+    );
+    assert_eq!(
+        fs::read(root.join("source/note")).unwrap(),
+        b"legacy private work"
+    );
+    assert_eq!(owner.saved_versions().unwrap(), vec![saved]);
 }

@@ -35,6 +35,7 @@ pub struct NativeDependencyGraph {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct StoreFacts {
     physical: (u64, u64),
+    sidecars: BTreeMap<String, RecordDigest>,
     correlation: RecordDigest,
     payloads: BTreeSet<RecordDigest>,
     manifests: BTreeSet<RecordDigest>,
@@ -56,8 +57,9 @@ impl NativeDependencyGraph {
         self.nodes.len()
     }
     /// Verified content and policy objects for this selected graph, qualified by native store.
-    /// This excludes pending transaction recovery and unselected saved versions. It is not a
-    /// complete-store collection oracle or a durable pin; callers must retain native custody.
+    /// Includes selected completed capture receipts and complete pending control evidence.
+    /// Torn journals still require the separate exact recovery inspectors. Unselected versions
+    /// are excluded. This is not a complete-store collection oracle or a durable pin.
     pub fn retained_content_json(&self) -> Json {
         Json::object([
             ("schema", Json::text("mesh.native-dependency-content/v1")),
@@ -74,6 +76,21 @@ impl NativeDependencyGraph {
                                 ("device", Json::text(format!("{:x}", facts.physical.0))),
                                 ("inode", Json::text(format!("{:x}", facts.physical.1))),
                                 ("correlation", Json::text(facts.correlation.to_hex())),
+                                (
+                                    "sidecars",
+                                    Json::Array(
+                                        facts
+                                            .sidecars
+                                            .iter()
+                                            .map(|(name, digest)| {
+                                                Json::object([
+                                                    ("name", Json::text(name)),
+                                                    ("digest", Json::text(digest.to_hex())),
+                                                ])
+                                            })
+                                            .collect(),
+                                    ),
+                                ),
                                 (
                                     "payloads",
                                     Json::Array(
@@ -434,6 +451,7 @@ impl AttachmentStorage {
             .collect::<BTreeSet<_>>();
         included.insert((owner_binding.work(), owner_binding.installation()));
         let mut retained_count = 0usize;
+        let mut receipt_budget = 1024 * 1024 * 1024usize;
         for key in included {
             let (work, binding) = &bindings[&key];
             let proof = &histories[&key].1;
@@ -447,8 +465,41 @@ impl AttachmentStorage {
                     manifests.extend(node.manifests.iter().copied());
                 }
             }
+            let operations = graph
+                .nodes
+                .keys()
+                .filter(|id| (id.0, id.1) == key)
+                .map(|id| id.2)
+                .collect::<BTreeSet<_>>();
+            let mut receipts =
+                work.completed_capture_receipt_roots(&operations, &mut receipt_budget)?;
+            let pending_name = super::dependency_decision::PENDING;
+            match super::dependency_enrollment::read_private_in_store(&work.store, pending_name) {
+                Ok(raw) => {
+                    let parsed = Json::parse(&raw).map_err(error)?;
+                    let request = super::dependency_transaction::digest(
+                        super::dependency_transaction::text(&parsed, "request")?,
+                    )?;
+                    let pending = work.inspect_pending_dependency_control_retention(request)?;
+                    let expected = hash(raw.as_bytes());
+                    if pending.get("sidecar_digest").and_then(Json::as_text)
+                        != Some(expected.to_hex().as_str())
+                        || super::dependency_enrollment::read_private_in_store(
+                            &work.store,
+                            pending_name,
+                        )? != raw
+                    {
+                        return Err(invalid("pending graph control evidence changed"));
+                    }
+                    receipts.sidecars.insert(pending_name.to_owned(), expected);
+                }
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
+            }
+            payloads.extend(receipts.payloads);
             retained_count = retained_count
-                .checked_add(payloads.len())
+                .checked_add(receipts.sidecars.len())
+                .and_then(|n| n.checked_add(payloads.len()))
                 .and_then(|n| n.checked_add(manifests.len()))
                 .filter(|n| *n <= MAX_BYTES / 64)
                 .ok_or_else(|| invalid("retained content exceeds its bound"))?;
@@ -456,6 +507,7 @@ impl AttachmentStorage {
                 key,
                 StoreFacts {
                     physical: work.store.identity()?,
+                    sidecars: receipts.sidecars,
                     correlation: binding.correlation,
                     payloads,
                     manifests,

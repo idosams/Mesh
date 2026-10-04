@@ -1414,3 +1414,21 @@ R160's current implementation `9a6f4b7a240775b81757d41ced49f641caacca6f` passed 
 stopped at a Clippy map-entry finding; it was fixed without suppressing the check. This validates
 the current groundwork, not completion of issue #321 or packaged/provider acceptance. A draft PR
 is being published against canonical main; remaining composition/fault coverage still blocks merge.
+
+[Draft PR #322](https://github.com/idosams/Mesh/pull/322) publishes the validated R160 groundwork at
+`1cbbab33934e7d6491b0518431b850e7fedcb72a`; its initial hosted run is `37211764661`. Five checks
+have passed; Linux/macOS tests were still running at this observation. The PR remains draft.
+
+Local refinement now composes selected completed capture receipts and their exact staged frame
+objects into graph retention under the graph's complete native custody set. Receipt names, physical
+journal prefix, request identity and current sidecar bytes must agree; directory enumeration and
+aggregate receipt/prefix/frame verification are bounded. Complete pending control frames awaiting
+acknowledgement also retain their verified sidecar. Unknown recovery state refuses without repair.
+Torn journals still use the separate exact recovery inspectors; these facts do not permit collection.
+
+Five focused graph tests pass (2.31s), covering receipt/frame corruption preservation, three-work
+replay, byte-identical store substitution, conflicting handles, restored original identity and
+pre-enrollment provenance refusal with saved work still readable. A regression first demonstrated
+that two request receipts could claim one completed operation; explicit duplicate detection now
+refuses and preserves that ambiguity. This refinement has not yet updated the published head or
+passed a new full gate. Remaining recovery composition and #321 proof still block merge readiness.

@@ -213,3 +213,117 @@ impl ProvisionedAttachment {
         Ok(facts)
     }
 }
+
+pub(in crate::project_attachment) struct CaptureReceiptRoots {
+    pub(in crate::project_attachment) payloads: BTreeSet<RecordDigest>,
+    pub(in crate::project_attachment) sidecars: BTreeMap<String, RecordDigest>,
+}
+impl ProvisionedAttachment {
+    // Called while the graph holds the complete native custody set. Read all receipt names once,
+    // and validate selected historical receipts against the same physical journal snapshot.
+    pub(in crate::project_attachment) fn completed_capture_receipt_roots(
+        &self,
+        operations: &BTreeSet<RecordDigest>,
+        budget: &mut usize,
+    ) -> io::Result<CaptureReceiptRoots> {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
+        ensure_no_pending_capture(&self.store)?;
+        self.check_dependency_registration()?;
+        let (configuration, proof) = self
+            .attachment
+            .read_configuration(self.metadata_path(), &self.store)?;
+        let proof = proof.ok_or_else(|| invalid("capture receipt enrollment missing"))?;
+        let names = self
+            .store
+            .filesystem()
+            .read_directory_names_bounded(Path::new(""), 16384)?;
+        let cas = Cas::with_filesystem(self.metadata_path(), self.store.filesystem().read_only())
+            .map_err(error)?;
+        let mut file = self
+            .store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(crate::RECORD_FILE_NAME))?;
+        let mut bytes = Vec::new();
+        (&mut file)
+            .take((MAX_JOURNAL + 1) as u64)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_JOURNAL {
+            return Err(invalid("capture receipt journal exceeds bound"));
+        }
+        proof.verify(&self.store, &file, &bytes)?;
+        let journal = (file.metadata()?.dev(), file.metadata()?.ino());
+        let mut result = CaptureReceiptRoots {
+            payloads: BTreeSet::new(),
+            sidecars: BTreeMap::new(),
+        };
+        let mut claimed = BTreeMap::new();
+        for name in &names {
+            if !name.as_encoded_bytes().starts_with(b"dependency-capture-") {
+                continue;
+            }
+            let name = name
+                .to_str()
+                .ok_or_else(|| invalid("invalid capture receipt name"))?;
+            let raw = read_private_in_store(&self.store, name)?;
+            *budget = budget
+                .checked_sub(raw.len())
+                .ok_or_else(|| invalid("capture receipt bytes exceed bound"))?;
+            let intent = CaptureIntent::parse(&raw)?;
+            if name != receipt_name(intent.request) {
+                return Err(invalid("capture receipt request name changed"));
+            }
+            if !operations.contains(&intent.operation) {
+                continue;
+            }
+            if claimed.insert(intent.operation, intent.request).is_some() {
+                return Err(invalid("conflicting completed capture requests"));
+            }
+            *budget = budget
+                .checked_sub(intent.before_bytes)
+                .ok_or_else(|| invalid("capture receipt prefix verification exceeds bound"))?;
+            let frames = validate_frames(&cas, &intent)?;
+            *budget = budget
+                .checked_sub(frames.len().saturating_mul(2))
+                .ok_or_else(|| invalid("capture receipt frame bytes exceed bound"))?;
+            capture_prefix(
+                &cas,
+                &raw,
+                journal,
+                &bytes,
+                proof.binding().authority,
+                &configuration,
+            )?;
+            if bytes.len() < intent.before_bytes.saturating_add(frames.len()) {
+                return Err(invalid("completed capture receipt is not fully journaled"));
+            }
+            result.payloads.insert(intent.frames);
+            result
+                .sidecars
+                .insert(name.to_owned(), hash(raw.as_bytes()));
+        }
+        for (name, expected) in &result.sidecars {
+            if hash(read_private_in_store(&self.store, name)?.as_bytes()) != *expected {
+                return Err(invalid("capture receipt changed during inspection"));
+            }
+        }
+        if self
+            .store
+            .filesystem()
+            .read_directory_names_bounded(Path::new(""), 16384)?
+            != names
+        {
+            return Err(invalid("capture receipt inventory changed"));
+        }
+        file.rewind()?;
+        let mut current = Vec::new();
+        (&mut file)
+            .take((MAX_JOURNAL + 1) as u64)
+            .read_to_end(&mut current)?;
+        proof.verify(&self.store, &file, &current)?;
+        self.check_dependency_registration()?;
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
+    }
+}

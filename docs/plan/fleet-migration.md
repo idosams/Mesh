@@ -6528,3 +6528,17 @@ static gates passing. The initial full run failed Clippy's map-entry rule; `9a6f
 lookup and the complete rerun passed. The draft PR publishes this verified groundwork before further
 R160 refinement. It does not close #321 or authorize merge while composition/fault coverage remains
 unfinished. Subsequent documentation-only evidence changes pass docs and diff checks.
+
+Draft [PR #322](https://github.com/idosams/Mesh/pull/322), head `1cbbab33934e7d6491b0518431b850e7fedcb72a`,
+publishes R160 groundwork with full local gate evidence. Initial hosted run `37211764661` had five
+passing checks and Linux/macOS tests still running; no merge or published-head replacement occurred.
+
+Further local R160 composition ties completed capture sidecars and frame CAS objects to the same
+graph custody snapshot, and retains complete pending control sidecars awaiting acknowledgement.
+Receipt inventory and aggregate verification work are bounded. A new native regression initially
+failed because two receipt requests could claim one operation; duplicate detection now refuses.
+The final focused graph suite passed five tests in 2.31s, including corrupt recovery-object preservation,
+byte-identical installation substitution/conflicting handles, restoring original native identity, and
+legacy provenance refusal without losing saved work. Logs preserve the failing-before case and
+passing refinements. Full validation and publication of this refinement are pending; R160 remains
+draft until remaining recovery composition and executable #321 evidence are complete.
