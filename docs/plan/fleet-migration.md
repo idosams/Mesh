@@ -7314,3 +7314,14 @@ The prerequisite passed all seven hosted checks in run `37239592857`; the child 
 requires its own hosted checks and merge. Full goal and issue #323 remain open: generic callers,
 runtime/publication/review/import/remote controls and packaged acceptance remain required.
 The fixed user checkpoint is unchanged.
+
+R161 native transaction/grant foundation PR #324 merged normally into canonical `main` on
+2026-10-04 at `e92adb547a86a3059182be301c30ed632017892d`, after all seven checks passed on
+`935f8820a26e62d82202a5c44bcda264df08175c` (run `37239592857`). Post-merge CI is separate.
+Chained recovery PR #325 passed all seven checks on `e27f41302850e643040062c8454fd6aa57f76e76`
+(run `37240702369`). Its reconciliation merge `938415c322e9c585ca12238d95ff52c207317569`
+has the identical complete tree; only delivery documentation changes follow. It now targets main
+and requires current-head hosted checks before merge. Empty-input acceptance PR #326 is published
+at `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`, with CI running. The native foundation is merged;
+the full fleet objective and issue #323 remain open for generic callers, runtime/publication/review/
+import/remote controls, remaining fault campaigns and packaged acceptance. The checkpoint is unchanged.
