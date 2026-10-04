@@ -2104,3 +2104,13 @@ for an unnecessary test clone are preserved and corrected; full validation is pe
 child reservation/grant/start execution and its acceptance tests, generic desktop/harness wiring,
 runtime/publication controls and packaged acceptance remain required. PR #324 / issue #323 and the
 full fleet objective stay open; the fixed user checkpoint is unchanged.
+
+R161 automatic-history resolver `abf82e54dbabe910ea614c65d3f30a710c8baea3` passed full
+`npm test`: 3,949 native tests in 282.578s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `2a531da3f849b6fb044c7dd95f9b9a7d5640930b` passed all seven hosted checks
+in run `37236395813`. Complete history and positive, negative, failed lint and full logs are preserved.
+This proves automatic reconstruction for graph inspection, including later saves and fresh processes;
+it does not establish end-to-end multi-level lane creation. Downstream reservation/grant/start/recovery
+integration and tests, generic callers, runtime/publication controls and packaged acceptance remain
+required. Draft PR #324 / issue #323 and the complete fleet goal stay open. The checkpoint is fixed.
