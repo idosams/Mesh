@@ -326,3 +326,19 @@ test('remote assignments retain exact worker and lease identities and reject mal
   lane.run.remote = null; assert.equal(fleetCatalogue(value)[0].lanes[0].run.remote, null);
   delete lane.run.remote; assert.equal(fleetCatalogue(value)[0].lanes[0].run.remote, null);
 });
+
+test('private save observations are optional, dated and never approval claims', () => {
+  const value = activity(); value.fleets.push(live());
+  assert.equal(fleetActivity(value)[0].workers[0].progressSave, null);
+  value.fleets[0].workers[0].progress_save = { state: 'saved', observed_at: '1000', version: 'c'.repeat(64), issue: null };
+  assert.equal(fleetActivity(value)[0].workers[0].progressSave.state, 'saved');
+  for (const mutate of [
+    save => { save.state = 'approved'; },
+    save => { save.observed_at = null; },
+    save => { save.version = '../file'; },
+    save => { save.issue = 'private file content\n'; },
+  ]) {
+    const copy = structuredClone(value); mutate(copy.fleets[0].workers[0].progress_save);
+    assert.throws(() => fleetActivity(copy));
+  }
+});
