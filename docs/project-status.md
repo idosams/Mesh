@@ -1254,7 +1254,8 @@ R155 adds trusted-native-host grant, revoke and regrant requests for exact saved
 destination work. Requests retain native correlation across replay; replaced allocation evidence
 cannot reuse a historical grant. Shared transaction recovery covers every grant-frame prefix and
 failed synchronization/acknowledgement. Focused positive/refusal, schema and previous semantic-reader
-checks pass; full local and hosted verification remain pending. This does not enable a runtime
+checks pass. Full local verification passed: 3,887 native, 194 rendered and 672 desktop tests
+plus all 44 real-daemon checks. Hosted verification remains pending. This does not enable a runtime
 authorization control, content copying, consumption receipts or dependency-bearing publication.
 Historical v1 grants stay historical; current consumers must require verified native bindings.
 The fixed user checkpoint is unchanged.
