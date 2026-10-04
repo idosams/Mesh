@@ -6695,3 +6695,24 @@ published head `8989b942eba30e07af8cc37022a41f778f47f387` also passed all seven 
 run `37217784394`. Compatibility proof does not close issue #323: durable staging/materialization,
 owner consumption, cross-store admission and exact interrupted recovery remain unfinished. Draft
 PR #324 remains unmerged; the full fleet goal and fixed user checkpoint are unchanged.
+
+R161 now extends the existing retained-tree addition helper with explicit bounded staging and
+canonical recovery receipts. Existing callers retain their 64-entry/64-MiB caps; the new internal
+seam accepts admitted limits up to 100,001 entries including the staged root, 1 GiB total and
+64 MiB per file. Entry ordering, duplicate/traversal paths and byte budgets are checked before
+creating a private tree. A receipt binds source/recovery roots, exact target path, parent identity
+and metadata, bounded tree evidence and original entry identities. It is evidence only: a consuming
+native transaction must authenticate and durably retain it before authorizing installation.
+
+Recovery reconstructs either the exact private stage or the exact already-installed tree. Retry
+synchronizes both parents and preserves the same installed inode. Missing/both-present stages,
+substitution, changed content, extra entries, different roots/path or parent policy refuse without
+cleanup. All 46 related retained-replacement tests passed, including a 100-file tree and separate
+processes: one installer exits immediately after rename, then two fresh recovery processes use only
+the saved receipt and retain the same tree identity. Removing installed-tree retry handling makes
+that process test fail; correct source was restored byte-for-byte.
+
+This is a materialization/recovery primitive for the unfinished R161 transaction, not consumption
+commit or runnable-lane admission. It is not yet connected to the required consumption journal
+fence, source closure, signed start or owner receipt. Those cross-store steps and the full fleet
+acceptance scope remain required; draft PR #324 and issue #323 remain open.
