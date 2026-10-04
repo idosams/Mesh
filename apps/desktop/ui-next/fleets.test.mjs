@@ -213,3 +213,21 @@ test('each remote lane shows its own dated observation and retains it beside a r
   value.projection.remoteObservations['fleet-one/lane-one'].run = 'older-attempt';
   assert.doesNotMatch(render(value), /Waiting for input or dependencies/);
 });
+
+
+test('private saving is separate from execution, tolerates an unobserved save and joins only the current run', () => {
+  module.exports.setLocale('en');
+  const value = props();
+  value.projection.fleets[0].lanes[0].run = { id: 'attempt', state: 'running' };
+  const worker = { lane: 'lane-one', run: 'attempt', activity: null, events: '0', observedAt: '1000', progressSave: {state: 'waiting', observedAt: null, version: null, issue: null} };
+  value.projection.activity = [{objective: 'fleet-one', status: 'monitoring', stopRequested: false, observedAt: '1000', workers: [worker]}];
+  let html = render(value);
+  assert.match(html, /Observation time unavailable/);
+  assert.match(html, /Monitoring agents/);
+  worker.progressSave.state = 'needs-attention';
+  html = render(value);
+  assert.match(html, /role="status">Private progress needs attention/);
+  assert.doesNotMatch(html, /new agents will not start/);
+  worker.run = 'old-attempt';
+  assert.doesNotMatch(render(value), /Private progress needs attention/);
+});

@@ -14,6 +14,9 @@ use super::provider::{protocol::ProviderObservation, NativeAdapter, NativeProces
 use super::service::{AgentCredential, CheckpointSigner, FleetService};
 use super::{Command, RunState};
 use crate::ipc::Unavailable;
+mod progress;
+use progress::ProgressOwner;
+pub use progress::WorkerSaveObservation;
 
 /// Native key custody supplies a signer for each lane's session. Never exposed over IPC.
 pub trait WorkerSignerFactory: Send + Sync {
@@ -34,6 +37,8 @@ pub struct WorkerObservation {
     pub activity: ProviderObservation,
     /// Direct process/protocol outcome, not approval or proof of descendant termination.
     pub outcome: Option<bool>,
+    /// Separately dated private-save facts, absent when this host cannot save this session.
+    pub progress: Option<WorkerSaveObservation>,
 }
 
 struct Worker {
@@ -42,6 +47,7 @@ struct Worker {
     process: NativeProcess,
     stop_requested: bool,
     acknowledged: bool,
+    progress: ProgressOwner,
 }
 
 /// Automatically dispatches first attempts for lanes matching its admitted provider, including delegated children.
@@ -53,6 +59,7 @@ pub struct NativeFleetHost {
     signers: Arc<dyn WorkerSignerFactory>,
     identity: String,
     workers: BTreeMap<String, Worker>,
+    progress_enabled: bool,
 }
 
 /// Compatibility name for the original host; native callers may admit either supported provider.
@@ -79,6 +86,7 @@ impl NativeFleetHost {
             .and_then(|mut f| f.read_exact(&mut bytes))
             .map_err(|_| unavailable("fleet-host-identity"))?;
         let identity = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let progress_enabled = service.supports_progress_saving()?;
         Ok(Self {
             service,
             adapter: adapter.into(),
@@ -86,6 +94,7 @@ impl NativeFleetHost {
             signers,
             identity,
             workers: BTreeMap::new(),
+            progress_enabled,
         })
     }
 
@@ -149,6 +158,7 @@ impl NativeFleetHost {
                 process,
                 stop_requested: false,
                 acknowledged: false,
+                progress: ProgressOwner::new(self.progress_enabled),
             },
         );
         Ok(())
@@ -179,7 +189,17 @@ impl NativeFleetHost {
                 .process
                 .poll()
                 .map_err(|_| unavailable("fleet-host-observation"))?;
-            if let Some(success) = outcome.filter(|_| !cancelled && !worker.acknowledged) {
+            if !worker.acknowledged {
+                worker.progress.advance(
+                    &self.service,
+                    &worker.credential,
+                    outcome.is_some(),
+                    cancelled,
+                );
+            }
+            if let Some(success) = outcome
+                .filter(|_| !cancelled && !worker.acknowledged && worker.progress.final_observed())
+            {
                 self.service.revoke(&worker.credential)?;
                 worker.acknowledged =
                     self.service
@@ -191,6 +211,7 @@ impl NativeFleetHost {
                 observed_at: SystemTime::now(),
                 activity,
                 outcome,
+                progress: worker.progress.observation(),
             });
         }
         // Refresh after terminal acknowledgments, so freed slots are usable in the same tick.
@@ -242,4 +263,14 @@ fn unavailable(code: &str) -> Unavailable {
         code,
         "The native fleet host needs reconciliation before this action can continue.",
     )
+}
+
+impl Drop for NativeFleetHost {
+    fn drop(&mut self) {
+        // Revoke every owned session before ProgressOwner joins any in-flight native capture.
+        // Provider termination and capacity reconciliation remain separate native operations.
+        for worker in self.workers.values() {
+            let _ = self.service.revoke(&worker.credential);
+        }
+    }
 }

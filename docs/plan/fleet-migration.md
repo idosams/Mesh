@@ -5608,3 +5608,51 @@ This increment changes local explicit capture. Received remote sessions keep the
 authority path. Contention can produce an incomplete checkpoint; completed authorized appends
 remain durable, including work admitted before cancellation. Automatic ordinary progress capture,
 checkpoint-budget policy, scheduling, live presentation and packaged acceptance remain open.
+
+
+## R130 — automatic private saving for owned local workers
+
+New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267), stacked
+on PR #269 head `92eaef391cb534073725f54e34de4472a2ce0d90`. No preserved source commit is replaced.
+The host captures ordinary progress with one in-flight job per local worker, five seconds between
+completed attempts and one final attempt before recording provider completion. Native journal
+recovery and the existing Saved event retain versions without consuming explicit checkpoint slots.
+Unchanged polls append nothing. Exact grant and native fold checks prevent stale or revoked saving
+and prevent an older completion from replacing a newer saved version. No persisted-format change.
+
+Five native service regressions and a real running-provider fixture cover capture, empty polling,
+missed observation recovery without resigning, explicit handoff separation, missing files,
+cancellation/revocation and concurrent newer checkpoints. Disabling periodic saving fails the
+live-worker assertion; original source was restored byte-for-byte. Controller parsing covers the
+additive nullable observation and malformed values. Rendered tests keep saving separate from
+execution and handle an unavailable timestamp. The first full run passed 3,811 native tests in
+163.739s, then caught a nullable desktop timestamp type error. That failure log is preserved;
+the corrected display passes all 186 rendered tests. The final full `npm test` passed 3,811
+native tests in 167.333s (1 slow, 17 skipped), 186 rendered tests, 647 desktop tests and all
+44 real-daemon checks. Hosted delivery remains pending.
+
+Incomplete saving and pending acknowledgments remain visible; final failures are not retried
+after session revocation. Cancellation can leave already-admitted appends retained. Shutdown joins
+admitted saves and has no storage/signing latency bound. Remote sessions, external harnesses,
+protected main and packaged provider acceptance remain separate unfinished requirements. The
+user's fixed test checkpoint is unchanged.
+
+
+## R131 — bounded final save acknowledgment recovery
+
+New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267), stacked
+on PR #270 head `d15b28081df5c6c49ee673c188bda45cf1ceed16`; no preserved source commit is replaced.
+A complete native final save whose fleet acknowledgment is pending no longer immediately ends the
+session. The same native owner permits three total attempts, one second apart, with one job in
+flight and unchanged credential/capture authority. Success clears the pending observation;
+exhaustion stays visible. Cancellation prevents another attempt. Incomplete captures, signing
+failures and provider execution are not retried by this acknowledgment policy. No protocol,
+dependency or persisted-format change.
+
+All ten focused regressions pass: four owner/backoff tests, five native save tests and the real
+live/final provider-process fixture. Reducing the limit to one fails the recovery assertion;
+source restored byte-for-byte. An initial fixture digest-import compile failure is preserved.
+Full `npm test` passed 3,815 native tests in 164.031s (1 slow, 17 skipped), 186 rendered tests,
+647 desktop tests and all 44 real-daemon checks. Hosted delivery is pending. An attempt may still wait on native filesystem
+or signing work; an attempt count is not a wall-clock shutdown bound. Packaged, remote and
+protected-main acceptance remain open, and the fixed user checkpoint is unchanged.
