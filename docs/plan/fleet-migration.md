@@ -6025,3 +6025,32 @@ dependency or publication authority; project policy, exact closure and race-safe
 require integration. Full gate and hosted delivery pending. Fixed user checkpoint unchanged.
 
 R146 implementation verification: Full `npm test` passed on `cd830a86a98174e0952277f9442020f6329f9b80`: 3,830 native tests in 173.261s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
+
+## R149 — durable preparation fence for older native writers
+
+New canonical work based on main `60441cb0013df707d71f8781b27964514cb32310` (merged #294);
+no preserved source commit is replaced. Tracks #299 and the older-writer prerequisite of #289.
+A thread-bound native preparation guard installs a required custody v2 marker under the existing
+physical-directory lock, binding installation/directory/dependency-authority identity. Existing generic
+custody parsing remains unchanged and refuses the marker. Exact retry syncs the file and directory
+before acknowledgement; errors retain the fence, and dropping the guard never restores write access.
+Assigned, conflicting, malformed and substituted workspaces refuse. No enrollment journal writer,
+agent/renderer/CLI entry point, policy-aware write capability or automatic migration is added.
+
+Eighteen focused custody tests pass, including targeted retry-sync failure, exact retry, interrupted
+staging, assigned/root substitution refusal and existing cross-process custody contention. Bypassing
+retry durability makes the new regression fail; exact source restored. A cached native writer first
+edits successfully, then refuses edit/create/review/agent acquisition after preparation, leaving file
+and journal unchanged and not invoking signing. A separate pre-change source archive from the base
+revision verifies all 1,413 tracked files against Git before adding the test probe; the same cached
+paths refuse its exact marker. Removing that marker fails the refusal assertion; restored probe
+passes. Its executable SHA-256 is
+`efc788aab6865b6bc70c0cc44e08c3f6deb0d17454fb09a5bdea5b1843be061e`.
+
+The initial cached fixture lacked checkpoint configuration, then required unwrapping its fallible
+runtime constructor. Both failures are preserved. An erroneous one-hour fixture idle interval was
+identified in source and a stack sample; only that verified owned test process was stopped, its
+fixture/log retained, and the established one-millisecond native test interval restored. These are
+fixture corrections, not product latency evidence. Full and hosted validation are pending. Valid
+human-approval refusal, every historical writer, complete two-write enrollment crash recovery and
+packaged acceptance remain unproven. The fixed user checkpoint is unchanged.

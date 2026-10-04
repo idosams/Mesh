@@ -162,7 +162,9 @@ pub use crate::workspace::{
     RestoreVersionIdentity, RetiredWorkspaceEntry, WorkspaceCondition, WorkspaceEntry,
     WorkspaceFileHistory, RECORD_FILE_NAME,
 };
-pub use crate::workspace_custody::{WorkspaceAgentCustody, WorkspaceAgentCustodyError};
+pub use crate::workspace_custody::{
+    DependencyEnrollmentFence, WorkspaceAgentCustody, WorkspaceAgentCustodyError,
+};
 pub use mesh_store::{CheckpointRuntimeParameters, RecordDigest as ManagedContentDigest};
 
 /// The crate's name, so a placeholder still carries one verifiable behaviour.

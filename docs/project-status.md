@@ -1150,3 +1150,14 @@ without deadlock. The previous capture path fails the read deadline mutation. Fu
 passed 3,805 native, 185 rendered and 646 desktop tests plus all 44 daemon checks. Hosted
 verification is pending. Received remote sessions retain their original authority path.
 This is a prerequisite for automatic saving, not a scheduler or packaged provider acceptance claim.
+
+## Dependency enrollment preparation
+
+R149 adds a native-only required custody marker that blocks generic older writers before future
+policy enrollment. Exact retry synchronizes the marker again; assigned or substituted workspaces
+refuse and interrupted preparation preserves explicit recovery state. Eighteen focused custody tests
+and a cached native-writer regression pass. An independently built pre-change reader also refuses
+cached edit/create/review/agent-acquisition paths after the marker, with unchanged file/journal bytes.
+This does not prove valid human approval, every writer or complete enrollment recovery. There is no
+agent/renderer/CLI enrollment operation and no automatic migration. Full and hosted checks remain
+pending; see the [authority contract](decisions/private-dependency-authority.md).
