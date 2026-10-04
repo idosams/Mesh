@@ -1,0 +1,45 @@
+{
+  "revision": "5052009ee4fe57a468bca4adec43de6f93c4c6a0",
+  "packaged": true,
+  "graphical": false,
+  "provider_started_by_mesh": false,
+  "protected_main_approval": false,
+  "provider_version": "codex-cli 0.158.0-alpha.2.1",
+  "provider_alive_before_attachment": true,
+  "attach_elapsed_ms": 11191,
+  "same_provider_alive_after_capture_stop": true,
+  "passed": true,
+  "versions": [
+    "ebc848b010f6b8dfc30f571287e415d96a6c7324571671905144f523704cd2f6",
+    "0a8902e8016d4f8ba486ff37fc458e6c97c5a1b2b40535b8cd0d152b79432b06"
+  ],
+  "attribution": "unknown",
+  "git_index_and_head_preserved": true,
+  "root_inode_preserved": true,
+  "post_stop_external_edit_preserved": true,
+  "elapsed_ms": 56561,
+  "executable_sha256": "93f8f470db4aa07fd2a034c02599310be9566db55f7098e7c63c13d6e56f3c09",
+  "registration_meshctl_sha256": "0df1202fd88b5422cfb77e82c62012cfc2be7e1e2053fe5116948047eb0422ff",
+  "schema": "mesh.external-harness-acceptance/v1",
+  "date": "2026-10-04",
+  "registration": "development-meshctl",
+  "provider_options": [
+    "exec",
+    "--ignore-user-config",
+    "--sandbox",
+    "workspace-write",
+    "--json",
+    "--ephemeral",
+    "--color",
+    "never",
+    "-c",
+    "approval_policy=\"never\"",
+    "-"
+  ],
+  "limitations": [
+    "Noninteractive external Codex session, not a pre-existing interactive user session",
+    "Registration uses the development meshctl; capture and version listing use the exact packaged executable",
+    "No graphical review, protected-main approval, integration, restoration or provider session attribution proven",
+    "No matched velocity baseline, cost or renderer responsiveness measurement"
+  ]
+}
