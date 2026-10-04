@@ -24,7 +24,7 @@ checks establishes the unfinished packaged or real-host acceptance journeys belo
 | Deprecate Mesh-internal through PR | [Legacy #1488](https://github.com/idosams/Mesh-internal/pull/1488) merged at `a4eb8619` with the docs quality gate passed and no required checks bypassed; unrelated legacy Rust failures remain recorded | Deprecation notice delivered; preserve history and keep development in Mesh |
 | Attach existing dirty project without moving or changing Git | Repeated visible-window attachment journey passed on merged main `97e263f`; original Git preserved. It predates PR251/252 and is not proof on current main | Full manual acceptance including integration/recovery and native approval; exact final revision evidence |
 | Manual capture, independent line and parallel saved review | Same packaged journey: visible 1156×764 window, two fixed comparisons, fork, restart/resume/detach, original Git preserved; no provider launched | Full manual baseline through reviewed main/integration/restore, broader concurrent-edit/failure campaign |
-| Already-running external harness remains usable | Required by accepted plan; ordinary external edits tested, but that does not prove a live harness session | Run the packaged harness-led journey without Mesh launching the provider, then exact review/main approval |
+| Already-running external harness remains usable | [Packaged native external-Codex proof](evidence/external-harness-2026-10-04.json) at `5052009`: provider edits before attachment, two captures while the same provider runs, then further provider edits after capture stops; original root inode and Git index/HEAD preserved. Registration uses development meshctl; noninteractive provider and no graphical review | Complete the interactive packaged harness-led journey, exact review/main approval, integration and restore; native proof does not establish these exits |
 | Truthful identity and attribution | Native/source model separates project/lane/run/version and retains unknown attribution | Current-revision end-to-end session attribution and mixed manual/agent handoff evidence |
 | Coordinator creates child workers through tools | Current native Codex serial/parallel pair passed on merged main `1c0bcd1`; four distinct lanes, one attempt each and exact saved reviews ([record](evidence/fleet-four-worker-2026-10-04.json)) | Repeat supported provider journey in current packaged app without manual folder handoffs |
 | Durable scheduling, inherited limits, cancellation | Native regression suites and source coverage; reviewed current full suites passed | Full specified fault campaign and no-duplicate recovery across real process/worker failure |
@@ -75,3 +75,28 @@ second-provider login and acceptance, real second-host fault recovery, retention
 terminal capacity reconciliation and measured acceptance time. The legacy deprecation notice is
 merged; final provenance reconciliation remains open. Final completion requires all plan exits and combined-main/package
 proof, not just another green source increment.
+
+## External harness native proof — 4 October 2026
+
+The [retained result](evidence/external-harness-2026-10-04.json) records an external Codex CLI
+0.158.0-alpha.2.1 session in a disposable existing Git project. The harness was launched directly,
+without the Mesh fleet host, bridge or credentials, before attachment. It used workspace-write
+sandboxing and the installed account without copying credentials. User configuration was ignored
+for this controlled run; this is not proof of compatibility with every existing harness setup.
+
+The fixture staged `work.txt`, then changed its working bytes before starting Codex. The provider
+executed one command: write a first value, wait 20 seconds, write a second value, wait 20 seconds,
+and write a third value. After the first write, the test confirmed the provider process was alive,
+registered the unchanged project root with development meshctl and started the checkpoint package's
+attachment watcher. It observed two distinct saved identities with unknown attribution. After a
+joined capture stop, the same provider process was still alive; its third edit completed, while
+Mesh's saved-version list stayed fixed. Git index and HEAD bytes and the source root inode matched
+their pre-attachment values. The fixture remained dirty, with the final external edit intact.
+
+The exact package revision, executable digest and seal were checked before and after execution.
+The run passed in 56.561 seconds; that duration includes provider startup and intentional waits,
+and is not an event-latency or velocity result. The private evidence directory retains the prompt,
+provider protocol output, capture status records, complete fixture, runner script and result; all
+37 recorded files passed a subsequent byte-hash manifest verification. Private paths, process IDs
+and raw provider logs are not published. This proof establishes neither graphical interaction nor
+exact reviewed main approval, and does not close the full harness-led acceptance journey.
