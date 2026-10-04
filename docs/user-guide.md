@@ -547,3 +547,13 @@ recovery are still being validated. No change to your editor or agent harness is
 Inspecting an agent's missing files leaves other fleet reads available while its folder is scanned.
 If the run is cancelled or its session changes during the scan, refresh before trying again.
 Inspection preserves the working files and saved history; it does not itself save a new version.
+
+
+### Local checkpoint activity
+
+Other fleet reads remain available while a local worker checkpoint scans and signs its files.
+Cancellation or a changed session prevents new signing authority. Work already authorized may
+finish saving; completed private history is retained. A busy authority check can leave an incomplete
+checkpoint, so inspect its result before handing it off for review. Repeating the same request
+returns its recorded result and does not save newer edits. Received remote sessions retain their
+existing capture behavior.
