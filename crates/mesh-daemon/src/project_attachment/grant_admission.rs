@@ -174,10 +174,8 @@ impl AttachmentStorage {
             )
             .map_err(error)?;
             verify_history_binding(&history, &configuration)?;
-            let source_binding =
-                self.validate_dependency_work_with_history(source, guard, &proof, &history)?;
-            let destination_binding =
-                self.validate_dependency_work_with_history(destination, guard, &proof, &history)?;
+            let source_binding = context.validate(self, source, guard)?;
+            let destination_binding = context.validate(self, destination, guard)?;
             if !proof.policy().current_bound_grant(
                 (
                     source_binding.work(),
@@ -222,6 +220,16 @@ impl AttachmentStorage {
                 .map_err(error)?;
             read(NativeGrantedInput {
                 history: &owner_history,
+                snapshot: &snapshot,
+            })?
+        } else if context.has_verified_history(request.source) {
+            let (_, _, history) = context.history(request.source)?;
+            SavedAttachmentVersion::from_verified_history(&history, request.version.operation())?;
+            let snapshot = history
+                .historical_workspace_preview(request.version.operation())
+                .map_err(error)?;
+            read(NativeGrantedInput {
+                history: &history,
                 snapshot: &snapshot,
             })?
         } else {

@@ -9,7 +9,7 @@ use crate::{
 use mesh_cas::{Blake3, Cas};
 use mesh_store::{scan_journal, Checkpoint, DependencyKind, StoredRecord};
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum RecoveryPhase {
+pub(super) enum RecoveryPhase {
     Start,
     Installed,
     CompletedRead,
@@ -164,7 +164,6 @@ impl AttachmentStorage {
             &crate::workspace_custody::WorkspaceInitializationGuard,
         ) -> io::Result<T>,
     ) -> io::Result<T> {
-        let installed = phase != RecoveryPhase::Start;
         request.limits.validate()?;
         if request.request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing recovery request"));
@@ -204,12 +203,64 @@ impl AttachmentStorage {
                 owner,
                 request.request,
             )?;
-        let graph = self.inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)?;
+        self.with_recovered_consumed_state_held(owner, request, phase, &guard, context, action)
+    }
+
+    pub(super) fn with_recovered_consumed_state_held<T>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        phase: RecoveryPhase,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        context: crate::project_attachment::dependency_owner_context::OwnerHistoryContext<'_>,
+        action: impl FnOnce(
+            PreparedNativeConsumedStart,
+            StagedNativeConsumedStart,
+            &crate::project_attachment::NativeDependencyGraph,
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let installed = phase != RecoveryPhase::Start;
+        request.limits.validate()?;
+        if request.request == RecordDigest::from_bytes([0; 32]) {
+            return Err(invalid("missing recovery request"));
+        }
+        let selected_graph = self.prepare_dependency_graph(
+            owner,
+            request.input.source,
+            request.input.version.operation(),
+            request.available,
+        )?;
+        let selected_grant = self.prepare_input_grant(
+            owner,
+            NativeGrantInspection {
+                source: request.input.source,
+                version: request.input.version,
+                destination: request.input.destination,
+                grant: request.input.grant,
+            },
+        )?;
+        let selected_source = self.prepare_dependency_work(owner, request.input.source)?;
+        let selected_destination =
+            self.prepare_dependency_work(owner, request.input.destination)?;
+        let roots = selected_graph
+            .roots
+            .iter()
+            .chain(&selected_grant.roots)
+            .chain(&selected_source.roots)
+            .chain(&selected_destination.roots)
+            .map(|root| Ok((root.identity()?, root.clone())))
+            .collect::<io::Result<BTreeMap<_, _>>>()?
+            .into_values()
+            .collect::<Vec<_>>();
+        guard.require_roots(&roots).map_err(error)?;
+        let context = context.for_request(request.request);
+        let graph = self.inspect_dependency_graph_with_owner(&selected_graph, guard, &context)?;
         if graph.operation_count() > 256 {
             return Err(invalid("consumption closure exceeds bound"));
         }
-        let source_binding = context.validate(self, &selected_source, &guard)?;
-        let destination_binding = context.validate(self, &selected_destination, &guard)?;
+        let source_binding = context.validate(self, &selected_source, guard)?;
+        let destination_binding = context.validate(self, &selected_destination, guard)?;
         let destination = request.input.destination;
         let origin = self
             .lane_origin_bound(destination)?
@@ -358,7 +409,7 @@ impl AttachmentStorage {
             return Err(invalid("starting actor changed"));
         }
         let (prospective, operations) =
-            self.with_input_grant_owner(&selected_grant, &guard, &context, |input| {
+            self.with_input_grant_owner(&selected_grant, guard, &context, |input| {
                 let rules = input.starting_exclusion_rules()?;
                 let policy = crate::project_attachment::observation::policy_digest(&rules);
                 let mut proposed = Json::parse(&configuration).map_err(error)?;
@@ -507,7 +558,7 @@ impl AttachmentStorage {
                     &root,
                     original_graph,
                     &origin.allocation,
-                    &guard,
+                    guard,
                     installed,
                 )? != stage_id
             }
@@ -537,7 +588,7 @@ impl AttachmentStorage {
                 return Err(invalid("installed work lacks a complete start"));
             }
         }
-        self.with_input_grant_owner(&selected_grant, &guard, &context, |_| Ok(()))?;
+        self.with_input_grant_owner(&selected_grant, guard, &context, |_| Ok(()))?;
         let (after_configuration, after_facts) = read_start()?;
         if after_configuration != configuration
             || after_facts.as_ref() != Some(&facts)
@@ -554,14 +605,14 @@ impl AttachmentStorage {
                 request: request.request,
             },
             &graph,
-            &guard,
+            guard,
         )?;
         if self
-            .inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)?
+            .inspect_dependency_graph_with_owner(&selected_graph, guard, &context)?
             .digest()
             != graph.digest()
-            || context.validate(self, &selected_source, &guard)? != source_binding
-            || context.validate(self, &selected_destination, &guard)? != destination_binding
+            || context.validate(self, &selected_source, guard)? != source_binding
+            || context.validate(self, &selected_destination, guard)? != destination_binding
         {
             return Err(invalid("consumed source changed during inspection"));
         }
@@ -627,6 +678,12 @@ pub(super) fn run_child_if_requested() -> bool {
             .inspect_consumed_dependency_graph(&owner, request(), *saved.last().unwrap())
             .unwrap();
         assert_eq!(graph.operation_count(), saved.len() + 1);
+        assert_eq!(
+            graph,
+            storage
+                .inspect_dependency_graph(&owner, &destination, *saved.last().unwrap(), &[&source])
+                .unwrap()
+        );
 
         return true;
     }

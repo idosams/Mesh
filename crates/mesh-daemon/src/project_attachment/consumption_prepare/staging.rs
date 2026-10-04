@@ -7,6 +7,7 @@ pub(in crate::project_attachment) use completed_read::VerifiedConsumedHistory;
 mod installation;
 mod owner;
 mod recovery;
+mod resolver;
 mod start_fence;
 use super::*;
 use crate::{

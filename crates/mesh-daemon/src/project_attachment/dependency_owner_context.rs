@@ -24,12 +24,14 @@ pub(super) struct VerifiedHistoryRoots {
     pub(super) payloads: BTreeSet<RecordDigest>,
     pub(super) sidecars: BTreeMap<String, RecordDigest>,
 }
+#[derive(Clone)]
 struct VerifiedHistorySnapshot {
     work: ProvisionedAttachment,
     configuration: String,
     proof: VerifiedDependencyRead,
     roots: VerifiedHistoryRoots,
 }
+#[derive(Clone)]
 pub(super) struct OwnerHistoryContext<'a> {
     owner: &'a ProvisionedAttachment,
     histories: BTreeMap<String, VerifiedHistorySnapshot>,
@@ -175,6 +177,14 @@ impl<'a> OwnerHistoryContext<'a> {
             }
         }
         Ok(Some(snapshot.roots.clone()))
+    }
+    pub(super) fn for_request(mut self, request: RecordDigest) -> Self {
+        self.request = Some(request);
+        self.operation = None;
+        self
+    }
+    pub(super) fn has_verified_history(&self, work: &ProvisionedAttachment) -> bool {
+        self.histories.contains_key(work.id())
     }
     pub(super) fn for_operation(mut self, operation: RecordDigest) -> Self {
         self.operation = Some(operation);

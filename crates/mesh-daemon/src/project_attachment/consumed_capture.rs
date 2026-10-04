@@ -338,6 +338,60 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
             .inspect_consumed_dependency_graph(owner, request(), *final_versions.last().unwrap())
             .unwrap()
     );
+    assert_eq!(
+        storage
+            .inspect_dependency_graph(
+                owner,
+                destination,
+                *final_versions.last().unwrap(),
+                &[start.input.source]
+            )
+            .unwrap(),
+        graph,
+        "native graph must resolve the consumed history without a caller-provided start request"
+    );
+    {
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(
+            std::slice::from_ref(&destination.store),
+        )
+        .unwrap();
+        let context =
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::current(
+                owner,
+            );
+        assert!(
+            storage
+                .resolve_consumed_histories(owner, &[destination], &guard, context)
+                .is_err(),
+            "resolver cannot extend incomplete custody"
+        );
+    }
+    {
+        // Restore even when inspection or an assertion panics.
+        struct RestoreJournal(std::path::PathBuf, Vec<u8>);
+        impl Drop for RestoreJournal {
+            fn drop(&mut self) {
+                fs::write(&self.0, &self.1).unwrap();
+            }
+        }
+        let path = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+        let original = fs::read(&path).unwrap();
+        let restore = RestoreJournal(path.clone(), original);
+        fs::write(&path, &restore.1[..restore.1.len() - 1]).unwrap();
+        let refused = storage
+            .inspect_dependency_graph(
+                owner,
+                destination,
+                *final_versions.last().unwrap(),
+                &[start.input.source],
+            )
+            .is_err();
+        drop(restore);
+        assert!(
+            refused,
+            "automatic resolution cannot use a torn owning receipt"
+        );
+    }
     let retained = graph.retained_content_json();
     let Some(Json::Array(stores)) = retained.get("stores") else {
         panic!("retained stores missing")

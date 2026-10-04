@@ -2086,3 +2086,21 @@ consumed-lane graph inspection is verified; automatic multi-lane resolution, dow
 grant/start, generic desktop/harness integration, runtime/publication controls and packaged acceptance
 remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The fixed user
 checkpoint is unchanged.
+
+R161 graph inspection now resolves completed consumed histories from retained native start records
+without a caller supplying each transaction request. Resolution validates native handles against a
+single complete custody set, derives bounded request/source/limit selectors, reconstructs signed
+starts through already verified histories, and admits a context only after the exact owner/completion
+join. Each successful pass resolves at least one history; unresolved or damaged inputs refuse the
+whole result. Recovery can reuse an already-held guard without acquiring or extending locks. Grant
+inspection can read an explicitly verified source context while preserving exact current or historical
+permission checks. This is history inspection, not new consumption or runtime authority.
+
+Fifteen focused graph/grant/consumption tests passed in 56.459s. Automatic graph inspection equals
+explicit inspection after later saves and in fresh recovery processes; incomplete custody and torn
+owner history refuse. Removing the resolver made the actual fresh-process graph regression fail in
+48.005s, and source was restored byte-for-byte. The initial compile warning and strict lint refusal
+for an unnecessary test clone are preserved and corrected; full validation is pending. Multi-level
+child reservation/grant/start execution and its acceptance tests, generic desktop/harness wiring,
+runtime/publication controls and packaged acceptance remain required. PR #324 / issue #323 and the
+full fleet objective stay open; the fixed user checkpoint is unchanged.

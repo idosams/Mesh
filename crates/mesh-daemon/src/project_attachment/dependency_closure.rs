@@ -369,7 +369,17 @@ impl AttachmentStorage {
         prepared: &PreparedDependencyGraph<'_>,
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
     ) -> io::Result<NativeDependencyGraph> {
-        let context = super::dependency_owner_context::OwnerHistoryContext::current(prepared.owner);
+        let works = prepared
+            .selections
+            .iter()
+            .map(|(work, _)| *work)
+            .collect::<Vec<_>>();
+        let context = self.resolve_consumed_histories(
+            prepared.owner,
+            &works,
+            guard,
+            super::dependency_owner_context::OwnerHistoryContext::current(prepared.owner),
+        )?;
         self.inspect_dependency_graph_with_owner(prepared, guard, &context)
     }
     pub(super) fn inspect_dependency_graph_with_owner(
