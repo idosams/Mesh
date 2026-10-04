@@ -2314,3 +2314,15 @@ implementation with merged empty-input acceptance on main `7ffbd244346b3ce7e534c
 PR #327 is being republished against main; current-head hosted checks and normal merge remain
 required. Automatic discovery remains a separate preserved, unpublished increment awaiting its
 combined full gate. Issue #323 and the complete fleet acceptance remain open. The checkpoint is fixed.
+
+
+R161 discovery reconciliation `15f2a2ec20e9a4343474b2ae7cee1e0fea14147d` passed full
+`npm test`: 3,949 native tests in 345.982s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+The real consumption journey passed in 192.603s, including the added stale-selection refusal
+before its read callback and successful historical reads after revocation. The full source tree was
+held fixed during verification. This increment preserves implementation `67f05c5add78bd981474ec74912f4cf6874e0593`
+and depends on published catalog-read #327 at `62cdcadd9afa70df0d5325114d0eb72628eac2eb`.
+Post-merge CI for #326 passed (run `37244087413`). Discovery still requires publication, hosted
+checks and normal merge; desktop/harness integration and the full issue #323 remain open.
+The fixed checkpoint is unchanged.
