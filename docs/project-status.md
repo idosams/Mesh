@@ -1172,3 +1172,14 @@ and complete count/byte limits. Weakening grant or eligibility checks fails the 
 read-only historical validation, not native control authorization or full dependency-closure proof.
 Consumption and publication remain disabled for dependency-bearing histories; writer fencing and
 runtime integration are still required. Full and hosted checks are pending.
+
+## Dependency enrollment preparation
+
+R149 adds a native-only required custody marker that blocks generic older writers before future
+policy enrollment. Exact retry synchronizes the marker again; assigned or substituted workspaces
+refuse and interrupted preparation preserves explicit recovery state. Eighteen focused custody tests
+and a cached native-writer regression pass. An independently built pre-change reader also refuses
+cached edit/create/review/agent-acquisition paths after the marker, with unchanged file/journal bytes.
+This does not prove valid human approval, every writer or complete enrollment recovery. There is no
+agent/renderer/CLI enrollment operation and no automatic migration. Full and hosted checks remain
+pending; see the [authority contract](decisions/private-dependency-authority.md).

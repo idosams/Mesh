@@ -22,6 +22,9 @@ use crate::root_authority::{PinnedRootFs, PinnedWorkspaceRoot};
 use crate::workspace::OpenWorkspace;
 use crate::workspace::{workspace_installation, workspace_record_file, workspace_storage_root};
 
+mod enrollment;
+pub use enrollment::DependencyEnrollmentFence;
+
 const SCHEMA: &str = "mesh.workspace-agent-custody/v1";
 /// Reserved compatibility name from the first custody prototype.
 ///
@@ -275,6 +278,10 @@ impl Authority {
             ("generation", Json::text(generation)),
         ])
         .encode();
+        self.publish_record(&record)
+    }
+
+    fn publish_record(&self, record: &str) -> Result<(), WorkspaceAgentCustodyError> {
         match self.filesystem.remove_file(Path::new(TEMP_FILE)) {
             Ok(()) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
