@@ -3199,3 +3199,178 @@ fn ordinary_saved_progress_pages_exact_operations_and_isolates_lanes() {
     assert_eq!(before.revision, f.service.native_state().unwrap().revision);
     assert!(before.checkpoints.is_empty());
 }
+
+#[test]
+#[ignore = "requires paid Codex execution, installed login and MESH_TEST_CODEX/MESH_TEST_MCP"]
+fn actual_codex_progress_is_inspectable_before_any_explicit_handoff() {
+    use mesh_daemon::fleet::host::NativeFleetHost;
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    use mesh_daemon::ipc::IpcServer;
+    let executable = PathBuf::from(std::env::var_os("MESH_TEST_CODEX").expect("MESH_TEST_CODEX"));
+    let mcp = PathBuf::from(std::env::var_os("MESH_TEST_MCP").expect("MESH_TEST_MCP"));
+    let provider = std::process::Command::new(&executable)
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(provider.status.success());
+    let f = std::mem::ManuallyDrop::new(Fixture::new("actual-ordinary-save"));
+    eprintln!("ordinary-save fixture retained at {}", f.path.display());
+    let selected = f.desktop.workspace_state().unwrap();
+    let mut request = f.delegate("ordinary-save-child");
+    let Json::Object(fields) = &mut request else {
+        unreachable!()
+    };
+    fields.iter_mut().find(|(key, _)| key == "goal").unwrap().1 = Json::text(
+        "This is an ordinary-saving acceptance task. First call mesh_fleet_context. Then execute exactly one shell command in the assigned lane: printf 'live ordinary progress\\n' > note.txt; sleep 15; printf 'final ordinary progress\\n' > note.txt. Do not change any other file or delegate. Do not call checkpoint or submit_review before that command finishes. After it finishes you may follow the normal handoff instructions, then finish. Do not modify the original project."
+    );
+    let child = f.call("delegate", &request).unwrap();
+    let lane = text(&child, "id").to_owned();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    let socket_dir = PathBuf::from(format!(
+        "/private/tmp/mesh-ordinary-proof-{}",
+        std::process::id()
+    ));
+    fs::create_dir(&socket_dir).unwrap();
+    fs::set_permissions(&socket_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let endpoint = socket_dir.join("daemon.sock");
+    let server = IpcServer::bind(&endpoint)
+        .unwrap()
+        .spawn(f.desktop.clone())
+        .unwrap();
+    let mut host = NativeFleetHost::new(
+        f.service.clone(),
+        CodexAdapter::new(&executable, &mcp).unwrap(),
+        endpoint,
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    let start = std::time::Instant::now();
+    let deadline = start + Duration::from_secs(240);
+    let mut first = None;
+    let mut first_ms = None;
+    let mut pinned = None;
+    let mut object = None;
+    loop {
+        let observations = host.tick().unwrap();
+        let state = f.service.native_state().unwrap();
+        let entry = &state.lanes[&lane];
+        if let Some(saved_version) = entry.saved.filter(|_| {
+            first.is_none()
+                && state.checkpoints.is_empty()
+                && observations
+                    .iter()
+                    .any(|o| o.lane == lane && o.outcome.is_none())
+        }) {
+            let version = saved_version.to_string();
+            let comparison = f
+                .service
+                .saved_progress_comparison(&lane, &version, None, None)
+                .unwrap();
+            let changes = comparison
+                .get("progress")
+                .unwrap()
+                .get("changes")
+                .unwrap()
+                .as_array()
+                .unwrap();
+            if let Some(change) = changes.first() {
+                let id = text(change, "object").to_owned();
+                let content = f
+                    .service
+                    .saved_progress_comparison(&lane, &version, None, Some(&id))
+                    .unwrap();
+                let row = &content
+                    .get("progress")
+                    .unwrap()
+                    .get("changes")
+                    .unwrap()
+                    .as_array()
+                    .unwrap()[0];
+                if row
+                    .get("after")
+                    .and_then(|v| v.get("text"))
+                    .and_then(Json::as_text)
+                    == Some("live ordinary progress\n")
+                {
+                    first_ms = Some(start.elapsed().as_millis() as u64);
+                    first = Some(version);
+                    object = Some(id);
+                    pinned = Some(content.get("progress").unwrap().clone());
+                }
+            }
+        }
+        if entry
+            .runs
+            .last()
+            .is_some_and(|run| run.state == RunState::Succeeded)
+        {
+            break;
+        }
+        if entry
+            .runs
+            .last()
+            .is_some_and(|run| run.state == RunState::Failed)
+        {
+            panic!(
+                "real provider failed; retained fixture {}",
+                f.path.display()
+            );
+        }
+        if std::time::Instant::now() >= deadline {
+            f.service
+                .native_command("ordinary-proof-timeout", Command::Cancel)
+                .unwrap();
+            let _ = host.tick();
+            panic!(
+                "real provider timed out; retained fixture {}",
+                f.path.display()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let first = first.expect("no live immutable save was observed before the first handoff");
+    let state = f.service.native_state().unwrap();
+    assert_eq!(state.lanes[&lane].runs.len(), 1);
+    assert_ne!(state.lanes[&lane].saved.unwrap().to_string(), first);
+    assert_eq!(
+        fs::read_to_string(root.join("note.txt")).unwrap(),
+        "final ordinary progress\n"
+    );
+    let reread = f
+        .service
+        .saved_progress_comparison(&lane, &first, None, object.as_deref())
+        .unwrap();
+    assert_eq!(reread.get("progress"), pinned.as_ref());
+    assert_eq!(f.desktop.workspace_state().unwrap(), selected);
+    assert_eq!(
+        fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
+        "immutable input\n"
+    );
+    let report = Json::object([
+        ("schema", Json::text("mesh.actual-ordinary-progress/v1")),
+        (
+            "provider",
+            Json::text(String::from_utf8(provider.stdout).unwrap().trim()),
+        ),
+        ("lane", Json::text(&lane)),
+        ("first_version", Json::text(first)),
+        ("first_live_save_ms", Json::Number(first_ms.unwrap())),
+        ("total_ms", Json::Number(start.elapsed().as_millis() as u64)),
+        ("explicit_checkpoints_at_live_observation", Json::Number(0)),
+        (
+            "explicit_checkpoints_after_completion",
+            Json::Number(state.checkpoints.len() as u64),
+        ),
+        ("graphical", Json::Bool(false)),
+        ("approval_authority", Json::Bool(false)),
+    ]);
+    fs::write(f.path.join("ordinary-progress-proof.json"), report.encode()).unwrap();
+    server.shutdown();
+    eprintln!("ordinary progress proof: {}", report.encode());
+}
