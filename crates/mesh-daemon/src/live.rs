@@ -1732,6 +1732,8 @@ thread_local! {
     static VERIFIED_MUTATION_CONTEXT: RefCell<Option<MutationContext>> = const { RefCell::new(None) };
     #[cfg(test)]
     static ORPHAN_COLLECTION_READY: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
+    #[cfg(test)]
+    static ORPHAN_COLLECTION_PREPARE: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
 }
 
 // A signing callback receives bytes to sign, never the enclosing capture's mutation authority.
@@ -2551,38 +2553,43 @@ impl LiveDaemon {
                         "checkpoint recovery is pending".into(),
                     ));
                 }
-                let plan = {
-                    let mut held = self.held();
-                    let open = held.as_mut().ok_or(ManagedTextFileError::NoWorkspace)?;
+                let (source, database) = {
+                    let held = self.held();
+                    let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
                     if open.managed_mutation_recovery_needed() {
                         return Err(ManagedTextFileError::Recovery(
                             "workspace recovery needs attention".into(),
                         ));
                     }
-                    let mut recovery_store = SqliteRecoveryState::open_isolated(
-                        recovery_database(open.database_file()),
-                        open.database_file(),
-                        LIVE_WORKSPACE_VIEW,
+                    (
+                        open.orphan_collection_source()
+                            .map_err(ManagedTextFileError::Recovery)?,
+                        open.database_file().to_path_buf(),
                     )
-                    .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
-                    let recovery = mesh_store::RecoveryStatePersistence::load(&mut recovery_store)
-                        .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
-                    if recovery.is_some_and(|s| {
-                        s.open_window().is_some() || s.pending_meaningful().is_some()
-                    }) {
-                        return Err(ManagedTextFileError::Recovery(
-                            "checkpoint recovery is pending".into(),
-                        ));
-                    }
-                    open.refresh_with_trusted_reviewers(&self.trusted_reviewers)
-                        .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
-                    if open.digest().to_string() != expected_digest {
-                        return Err(ManagedTextFileError::StaleWorkspace);
-                    }
-                    open.prepare_orphan_collection()
-                        .map_err(ManagedTextFileError::Recovery)?
                 };
                 drop(checkpoint);
+                #[cfg(test)]
+                ORPHAN_COLLECTION_PREPARE.with(|hook| {
+                    if let Some(hook) = hook.borrow_mut().take() {
+                        hook();
+                    }
+                });
+                let mut recovery_store = SqliteRecoveryState::open_isolated(
+                    recovery_database(&database),
+                    &database,
+                    LIVE_WORKSPACE_VIEW,
+                )
+                .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+                let recovery = mesh_store::RecoveryStatePersistence::load(&mut recovery_store)
+                    .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+                if recovery
+                    .is_some_and(|s| s.open_window().is_some() || s.pending_meaningful().is_some())
+                {
+                    return Err(ManagedTextFileError::Recovery(
+                        "checkpoint recovery is pending".into(),
+                    ));
+                }
+                let plan = source.prepare(expected_digest)?;
                 #[cfg(test)]
                 ORPHAN_COLLECTION_READY.with(|hook| {
                     if let Some(hook) = hook.borrow_mut().take() {
@@ -11059,6 +11066,74 @@ mod tests {
             std::fs::read(physical.join("replacement.txt")).unwrap(),
             b"keep replacement"
         );
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_keeps_reads_available_during_history_preparation() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-prepare-read");
+        let orphan = store
+            .promote(b"orphan beside readable history".to_vec())
+            .unwrap()
+            .digest();
+        let daemon = Arc::new(daemon);
+        let summary = daemon.workspace_state().unwrap();
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let collecting = Arc::clone(&daemon);
+        let expected = summary.clone();
+        let cleanup = std::thread::spawn(move || {
+            ORPHAN_COLLECTION_PREPARE.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    ready_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+                }))
+            });
+            collecting.collect_workspace_orphans(
+                &expected.root,
+                &expected.digest,
+                &expected.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        let (read_tx, read_rx) = std::sync::mpsc::channel();
+        let reading = Arc::clone(&daemon);
+        let reader = std::thread::spawn(move || read_tx.send(reading.workspace_state()).unwrap());
+        let read = read_rx.recv_timeout(Duration::from_secs(2));
+        // Always release and reap both threads before asserting a failed read deadline.
+        resume_tx.send(()).unwrap();
+        let result = cleanup.join().unwrap();
+        reader.join().unwrap();
+        assert_eq!(read.unwrap().unwrap().digest, summary.digest);
+        assert_eq!(result.unwrap().collected(), &[orphan]);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_a_substituted_journal_with_identical_bytes() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-journal-identity");
+        let orphan = store
+            .promote(b"substituted journal retains this".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let journal = daemon.held().as_ref().unwrap().record_file().to_path_buf();
+        let bytes = std::fs::read(&journal).unwrap();
+        std::fs::rename(&journal, journal.with_extension("displaced")).unwrap();
+        std::fs::write(&journal, bytes).unwrap();
+        let refused = daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+            .unwrap_err();
+        assert!(refused.to_string().contains("journal identity changed"));
+        assert!(store.contains(&orphan));
         drop(daemon);
         std::fs::remove_dir_all(root).unwrap();
     }
