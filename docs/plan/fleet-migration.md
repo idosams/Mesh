@@ -5831,3 +5831,31 @@ the test; an edition-incompatible formatting attempt was corrected before a seco
 Both failure records are preserved; production behavior was unchanged.
 
 R138 final implementation `21eab5996d1865dd4b28c99cdaaa9ae1b9178563` passed full `npm test`: 3,823 native tests in 166.174s (1 slow, 18 skipped), 190 rendered tests, 663 desktop tests and 44 real-daemon checks. The new ignored provider test was separately run successfully twice, including once against final source. Hosted delivery remains pending.
+
+
+## R139 — fixed saved-progress test checkpoint
+
+Documentation-only evidence increment based on PR #278 head
+`5052009ee4fe57a468bca4adec43de6f93c4c6a0`; no preserved source commit is replaced.
+A clean canonical checkout built the local macOS app with `npm --prefix apps/desktop run
+ tauri:bundle-local`. Existing target output was copied and verified before replacement; running
+older apps and the fixed c2641c6 checkpoint were left intact. The new separate checkpoint includes
+an isolated-data launcher, sample project and concrete parallel-progress/reopening guide. No
+installed application or account configuration was replaced, and no credentials were copied.
+
+Artifact identity: revision `5052009ee4fe57a468bca4adec43de6f93c4c6a0`, executable SHA-256
+`93f8f470db4aa07fd2a034c02599310be9566db55f7098e7c63c13d6e56f3c09`, 22,742,368 executable bytes.
+The local app verifier confirmed its revision, embedded interface and ad-hoc resource seal before
+and after the packaged test. `packaged_desktop_bridge_delegates_and_reviews_attached_versions`
+passed in 1.35s using that exact checkpoint executable and expected revision. Its scope was the
+native packaged bridge: two child lanes, signed test checkpoints, pinned review, feedback,
+proposed revision, work decision, deletion, empty-result review, exact retry and revoked-session
+refusal. It did not launch a provider or open a graphical interface, and does not prove the newer
+saved-progress commands through the packaged UI. Build/proof logs and identity receipts are retained
+in the private delivery archive. The launcher syntax and old checkpoint executable hash passed.
+
+Graphical inspection was attempted but the Mac was locked. This is a usable development checkpoint,
+not completed graphical acceptance, a notarized release or protected-main authority. Feature PRs
+#274–#278 were still open at checkpoint delivery; their final merge receipts remain separate.
+The full native source gate and two real Codex ordinary-save runs are recorded under R138 and do
+not substitute for this package's remaining visual journey. The complete fleet plan stays open.

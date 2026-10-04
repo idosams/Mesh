@@ -29,7 +29,7 @@ Native fixture tests cover live and final edits, empty polls, missed acknowledgm
 revocation and newer-version races. A real Codex worker also produced an inspectable intermediate save while active and before any
 explicit handoff, with exact saved bytes unchanged after its final edit. This is native-provider
 evidence, not packaged acceptance. Received remote
-sessions and the fixed user checkpoint do not include this behavior. See the delivery ledger for
+sessions and the older c2641c6 checkpoint do not include this behavior. The separate 5052009 checkpoint includes the local implementation. See the delivery ledger for
 R130 evidence and limits.
 
 ## Ordinary saved-progress inspection foundation
@@ -77,6 +77,24 @@ two pinned comparisons and restart/detach with original Git preserved; it launch
 and approved no protected main. Current native real-Codex four-worker evidence is recorded
 separately and does not substitute for that desktop journey. Signed approval, live external-harness
 acceptance, second provider/host, full fault/retention work and final packaged acceptance remain open.
+
+## Saved-progress test checkpoint — 4 October 2026
+
+A separate fixed checkpoint at `5052009ee4fe57a468bca4adec43de6f93c4c6a0` includes ordinary
+local worker saving, up to four exact progress comparisons, durable panel selectors and the
+latest-save shortcut. Its launcher uses separate application data and retains the original Codex
+configuration location without copying credentials. Earlier checkpoints and running apps remain
+preserved. A sample project and six-step guide cover ordinary edits, parallel pins and reopening.
+
+The exact package passed embedded-revision and resource-seal verification before and after the
+packaged native bridge test. That test passed in 1.35s with two delegated lanes, retained review,
+feedback, exact retry and revoked-session refusal. It opened no graphical interface and launched
+no provider. This development checkpoint is ad-hoc signed, not notarized, and provides no protected
+main approval. Its feature stack was published in [PR #274](https://github.com/idosams/Mesh/pull/274)
+through [PR #278](https://github.com/idosams/Mesh/pull/278); package availability does not imply
+merged delivery. The Mac remained locked when graphical acceptance was attempted. Parallel real
+agent activity with packaged panels, restart recovery through that interface and the full acceptance
+plan remain unverified. See R139 in the delivery ledger for exact artifact identity.
 
 ## Test-runner reliability
 
