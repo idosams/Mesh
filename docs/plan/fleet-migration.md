@@ -5916,3 +5916,5 @@ acknowledgment fails the regression; source restored exactly. Full gate and host
 pending. This is the summary read foundation: independent bounded lane refresh and live presentation
 still follow, and the complete packaged/second-provider/second-host acceptance plan remains open.
 The fixed user checkpoint is unchanged and does not include this new command.
+
+R141 implementation `849bbbd21aaa932bf4e4353d0adeeb56833f7012` passed full `npm test`: 3,824 native tests in 170.334s (2 slow, 18 skipped), 191 rendered tests, 665 desktop tests and all 44 real-daemon checks. Restart, substituted-root and cross-lane summary refusals passed in the complete suite. Hosted delivery and overview presentation remain pending.
