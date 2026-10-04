@@ -149,10 +149,15 @@ second closure — a naive fixed point over every record, with no work queue and
    `Cas::sweep_all_chunks` (the full sweep, the backstop) are the two sources, and choosing between
    them is the caller's. Feeding a *larger* candidate set can only find more garbage — a retained
    digest is kept whichever list it arrives on.
-3. **No crash campaign covers collection.** `crates/mesh-cas/tests/crash-promotion.rs` kills a real
-   process at every promotion step; nothing does the equivalent for a collection. The argument that
-   an interrupted collection is a smaller collection is written above and is sound, but it is an
-   argument, not a `SIGKILL` campaign, and this line is where that is recorded.
+3. **Process crashes are tested; power loss is not.**
+   `crates/mesh-cas/tests/crash-collection.rs` kills its acknowledged child with `SIGKILL` at eight
+   points around chunk unlink, chunk-directory sync, partial replacement-journal writing, file
+   sync, rename and journal-directory sync. Reopening verifies the exact retained bytes, removed
+   subset and old/new journal boundary, then completes collection and clears a partial staging
+   file through journal compaction. A deliberate removal of the reference veto makes the campaign
+   fail on the lost retained chunk. The kernel page cache survives these kills: filesystem
+   power-loss durability, native fleet root selection, concurrent cross-process writers and
+   storage exhaustion are not proved by this campaign.
 4. **Nothing schedules a collection.** There is no daemon loop, no trigger and no policy that
    decides *when* to run. This crate supplies the decision and `mesh-cas` supplies the deletion;
    `mesh-daemon` is where scheduling belongs and it does not call either yet.
