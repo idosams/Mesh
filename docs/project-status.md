@@ -24,26 +24,27 @@ The native worker registry can read original session setup and recorded run outc
 restart, correlated to the retained launch receipt. This is read-only historical evidence; it
 cannot release occupied capacity, adopt a process or authorize another launch. Fresh native v4
 status queries can carry these facts over the configured authenticated transport; old versions
-cannot satisfy the new query. Desktop presentation, actual second-host acceptance and safe
-terminal reconciliation remain unfinished. Fixture
+cannot satisfy the new query. Desktop presentation is merged, including independent fleet-wide reads. Actual signed
+second-host acceptance and safe terminal reconciliation remain unfinished. Fixture
 provider-process outcomes and restart/refusal cases are covered by native regression tests;
 this is not signed packaged or second-host acceptance.
 
-## Delivery and acceptance checkpoint — 3 October 2026
+## Delivery and acceptance checkpoint — 4 October 2026
 
-Canonical delivery now includes [PR #223](https://github.com/idosams/Mesh/pull/223):
-remote input materialization records survive restart without granting replacement execution.
-[PR #224](https://github.com/idosams/Mesh/pull/224) adds read-only verification of those
-original files and physical identities; it is merged after all seven exact-head checks passed. Combined-main checks are running.
-The [dated acceptance map](plan/fleet-acceptance.md) distinguishes merged implementation,
-local tests, packaged evidence and the remaining full-plan journeys.
+Canonical delivery includes [PR #252](https://github.com/idosams/Mesh/pull/252), which adds
+independent authenticated observations for remote fleet lanes. All seven exact-head checks passed;
+main `147e469` verification is running. Installed Codex discovery is corrected in
+[PR #254](https://github.com/idosams/Mesh/pull/254): combined source passed its full local gate and
+seven hosted checks, and source-identical reconciliation is receiving fresh CI before merge.
+The [dated acceptance map](plan/fleet-acceptance.md) records exact revisions and unfinished exits.
 
-Recent delivery also includes explicit desktop remote creation and downloaded-review access
-independent of live fleet status. The packaged existing-project journey recorded in
-[PR #221](https://github.com/idosams/Mesh/pull/221) passed at `6b82368`, including two
-fixed reviews and preserved dirty Git state. It did not launch a provider or approve protected
-main. Real second-host recovery, successful second-provider acceptance, signed native approval,
-full dependency/fault acceptance and current end-to-end fleet measurements remain unfinished.
+A fixed `c2641c6` checkpoint is available for user testing with a corrected separate-data launcher;
+older checkpoints remain preserved. Its package identity and seal were verified, but packaged
+provider execution is still unverified. The earlier `97e263f` window journey passed attachment,
+two pinned comparisons and restart/detach with original Git preserved; it launched no provider
+and approved no protected main. Current native real-Codex four-worker evidence is recorded
+separately and does not substitute for that desktop journey. Signed approval, live external-harness
+acceptance, second provider/host, full fault/retention work and final packaged acceptance remain open.
 
 ## Test-runner reliability
 
