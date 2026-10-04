@@ -6084,3 +6084,5 @@ human-approval refusal, every historical writer, complete two-write enrollment c
 packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
 
 R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431dae5d2b7fe190b6` passed full `npm test`: 3,844 native tests in 175.049s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained; no native conflict required resolution. Hosted verification of the reconciled head is pending.
