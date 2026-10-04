@@ -1665,3 +1665,11 @@ the resulting-head check makes the signed refusal test fail; the exact source wa
 repository validation is pending. This connects signed preparation to a verifiable materialization
 plan; durable staging, journal-before-install ordering, owner consumption and cross-store recovery
 remain unfinished in draft PR #324 / issue #323. The fixed user checkpoint remains unchanged.
+
+R161 signed-plan integration `11854f4c7374da54a7c95a3e431680c3e1416d1e` passed full `npm test`:
+3,948 native tests in 274.899s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The exact negative
+head-check mutation and successful focused/full logs are retained. Published predecessor
+`59eeee06b6334372f675e413f4e29cd26fa1d630` passed all seven hosted checks in run `37220272359`.
+This validates signed-plan reconstruction and existing behavior; the durable consumption transaction
+and complete fleet acceptance remain unfinished. Draft PR #324 is unmerged; the checkpoint is fixed.
