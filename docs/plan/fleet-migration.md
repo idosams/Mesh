@@ -5708,3 +5708,25 @@ progress panels, persistence and packaged parallel inspection remain required in
 The fixed user checkpoint is unchanged.
 
 R133 implementation `e029a34ae41831bfa3e945f68e6fb349c458830e` passed full `npm test`: 3,818 native tests in 167.317s (1 slow, 17 skipped), 186 rendered tests, 651 desktop tests and all 44 real-daemon checks. Hosted and packaged delivery remain pending.
+
+
+## R134 — independent ordinary-progress panels
+
+New canonical implementation built on PR #273 head
+`89f59d911e463aedc6cbea979c18d6e4008a3654`, reconciled locally with canonical main
+`e816aa5d161fc13fac6cf15ea81c3361dbf3dbac` without changing the source tree or running published
+CI heads. No preserved source commit is replaced. The fleet view offers retained-progress lists,
+up to four exact immutable comparison pins and at most 32 open lists. Lists refresh independently;
+pins never follow a newer save. Each pin owns its request generation, exact retry and selected
+content. The existing native comparison presentation is reused through a separate event handler,
+without exposing handoff, review, import, execution or approval mutations.
+
+Three controller regressions cover two fixed pins while a third save arrives, stale/closed request
+suppression, failure retention, exact retries, input refusal and bounds. Removing request-generation
+checks fails the stale-response regression; original bytes restored. Two rendered regressions cover
+parallel selectors, authority-free controls, intermediate-save labeling and missing-starting-version
+refusal. Existing fleet and rendered suites passed during iteration. Full validation and hosted
+delivery remain pending. Pins are explicitly session-only in this increment; persistence, live lane
+summaries and actual packaged parallel-agent inspection remain required. Fixed checkpoint unchanged.
+
+R134 implementation `256bdf754b0f834a338aad6f355e83526f510cb0` passed full `npm test`: 3,818 native tests in 166.674s (1 slow, 17 skipped), 188 rendered tests, 654 desktop tests and 44 real-daemon checks. Hosted and packaged validation remain pending.

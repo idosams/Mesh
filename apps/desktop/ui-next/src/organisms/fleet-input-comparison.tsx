@@ -20,7 +20,7 @@ function Side({ label, side }: { label: string; side: InputSide | null }) {
     </>}
   </section>;
 }
-export function FleetInputComparison({ pin, input, layout = "inline", editable = true }: { pin: string; input?: InputComparison; layout?: "inline" | "split"; editable?: boolean }) {
+export function FleetInputComparison({ pin, input, layout = "inline", editable = true, onIntent = send }: { onIntent?: (detail: Record<string, string>) => void; pin: string; input?: InputComparison; layout?: "inline" | "split"; editable?: boolean }) {
   const t = useTranslation();
   const split = layout === "split";
   const file = input?.file;
@@ -28,18 +28,18 @@ export function FleetInputComparison({ pin, input, layout = "inline", editable =
   return <section className="grid min-w-0 gap-3 rounded border border-border p-3" aria-label={t("Changes since lane start")}>
     <h5 className="font-semibold">{t("Changes since this lane started")}</h5>
     <p className="text-xs text-muted-foreground">{t("Compares the verified starting version with this pinned saved result. Current working files do not enter this comparison.")}</p>
-    <Button variant="secondary" disabled={!editable || input?.loading} onClick={() => send({ type: "input-review", pin })}>{t(input?.page ? "First page of changes" : "Compare with starting version")}</Button>
+    <Button variant="secondary" disabled={!editable || input?.loading} onClick={() => onIntent({ type: "input-review", pin })}>{t(input?.page ? "First page of changes" : "Compare with starting version")}</Button>
     {input?.loading && <p role="status">{t("Reading the exact starting-version comparison\u2026 The previous selection remains below.")}</p>}
-    {input?.error && <><p role="alert">{t(input.error)}</p><Button variant="secondary" disabled={!editable || input.loading} onClick={() => send({ type: "retry-input", pin })}>{t("Retry this comparison request")}</Button></>}
+    {input?.error && <><p role="alert">{t(input.error)}</p><Button variant="secondary" disabled={!editable || input.loading} onClick={() => onIntent({ type: "retry-input", pin })}>{t("Retry this comparison request")}</Button></>}
     {input?.page && <>
       <p>{input.page.total} {t("changed objects")} · {input.page.changes.length} {t("on this page")}</p>
       <details className="break-all text-xs"><summary>{t("Exact comparison versions")}</summary><p>{t("Local starting version")}: <bdi dir="ltr">{input.page.base}</bdi></p><p>{t("Pinned result")}: <bdi dir="ltr">{input.page.target}</bdi></p></details>
       {input.page.total === 0 && <p>{t("No path, content or executable-mode changes since this lane started.")}</p>}
-      <ul className="grid max-h-64 gap-2 overflow-auto text-sm">{input.page.changes.map(change => <li key={change.object}><button className="break-all text-left underline" disabled={!editable || input.loading} aria-pressed={file?.object === change.object} onClick={() => send({ type: "input-file", pin, object: change.object })}>{t(change.effect === "added" ? "Added" : change.effect === "removed" ? "Removed" : change.effect === "moved-or-modified" ? "Moved; content may also differ" : "Content or metadata changed")} · <bdi dir="ltr">{path(change)}</bdi></button></li>)}</ul>
-      {input.page.nextAfter && <Button variant="secondary" disabled={!editable || input.loading} onClick={() => send({ type: "input-page", pin, after: input.page!.nextAfter! })}>{t("Next changed objects")}</Button>}
+      <ul className="grid max-h-64 gap-2 overflow-auto text-sm">{input.page.changes.map(change => <li key={change.object}><button className="break-all text-left underline" disabled={!editable || input.loading} aria-pressed={file?.object === change.object} onClick={() => onIntent({ type: "input-file", pin, object: change.object })}>{t(change.effect === "added" ? "Added" : change.effect === "removed" ? "Removed" : change.effect === "moved-or-modified" ? "Moved; content may also differ" : "Content or metadata changed")} · <bdi dir="ltr">{path(change)}</bdi></button></li>)}</ul>
+      {input.page.nextAfter && <Button variant="secondary" disabled={!editable || input.loading} onClick={() => onIntent({ type: "input-page", pin, after: input.page!.nextAfter! })}>{t("Next changed objects")}</Button>}
     </>}
     {file && <div className="grid min-w-0 gap-3"><p className="break-all font-semibold">{t("Selected")}: <bdi dir="ltr">{path(file)}</bdi></p>
-      {textAvailable && <><Button variant="quiet" disabled={!editable} onClick={() => send({ type: "input-layout", pin, layout: split ? "inline" : "split" })}>{t(split ? "Use inline comparison" : "Use side-by-side comparison")}</Button><TextComparison before={file.before?.text ?? ""} after={file.after?.text ?? ""} split={split} context="saved" /></>}
+      {textAvailable && <><Button variant="quiet" disabled={!editable} onClick={() => onIntent({ type: "input-layout", pin, layout: split ? "inline" : "split" })}>{t(split ? "Use inline comparison" : "Use side-by-side comparison")}</Button><TextComparison before={file.before?.text ?? ""} after={file.after?.text ?? ""} split={split} context="saved" /></>}
       <div className="grid gap-3 text-xs"><Side label="Lane starting version" side={file.before} /><Side label="Pinned saved result" side={file.after} /></div>
     </div>}
     <p className="text-xs text-muted-foreground">{t("Read-only comparison. It does not approve or apply changes to main.")}</p>

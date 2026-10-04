@@ -37,8 +37,10 @@ exact saved operation with its original input. They remain readable after sessio
 restart without adopting a worker or creating a handoff. Recorded operations may be intermediate
 captures; listing one makes no completeness or approval claim. The latest fleet-acknowledged
 version is reported separately. Read-only desktop commands and strict response validation expose this history without review
-identities. Independent progress panels are the next increment; this foundation is not yet a
-user-facing packaged capability.
+identities. The desktop now offers separate progress lists and up to four independently pinned comparisons.
+Pins are fixed to exact saved versions and remain available during list refresh; this first panel
+implementation keeps them for the current session only. Persistent pins, live overview summaries
+and packaged parallel-inspection acceptance remain unfinished.
 
 ## Retained worker execution observations
 
