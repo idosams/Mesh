@@ -953,3 +953,12 @@ both layouts in the existing supported application locations, preserving regular
 native adapter admission. Two native regression tests failed with legacy-only discovery; all three focused tests now pass.
 Full validation passed 3,771 native, 183 rendered and 641 desktop tests plus the real daemon demo.
 Hosted delivery and actual corrected packaged provider launch remain pending.
+
+
+### Collector process-crash verification (R120)
+
+A new deterministic campaign kills an acknowledged disposable collector at eight deletion/journal
+boundaries, reopens it and verifies retained bytes before completing collection. It detects removal
+of the reference veto. Production cleanup behavior is unchanged. This improves component-level
+process-crash evidence; fleet root selection, writer coordination, cleanup policy/scheduling and
+storage-exhaustion acceptance remain unfinished in [issue #256](https://github.com/idosams/Mesh/issues/256).
