@@ -23,7 +23,9 @@ accepted result to the original folder is a separate, explicitly confirmed nativ
 The current source saves private progress for locally owned fleet workers between explicit handoffs,
 with one background capture per worker and a final attempt before execution completion. Save status
 is separate from provider status; incomplete final saves remain visible and do not imply review or
-approval. Native fixture tests cover live and final edits, empty polls, missed acknowledgment,
+approval. A complete final native version with a pending fleet acknowledgment gets up to three
+attempts one second apart before terminal recording; cancellation prevents further attempts.
+Native fixture tests cover live and final edits, empty polls, missed acknowledgment,
 revocation and newer-version races. This is not yet hosted or packaged acceptance. Received remote
 sessions and the fixed user checkpoint do not include this behavior. See the delivery ledger for
 R130 evidence and limits.
