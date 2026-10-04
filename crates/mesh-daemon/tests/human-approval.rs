@@ -1145,3 +1145,111 @@ fn byte_identical_same_path_replacement_cannot_receive_the_displayed_approval() 
 
     let _ = std::fs::remove_dir_all(base);
 }
+
+#[test]
+fn a_second_managed_client_cannot_append_an_approval_from_cached_history() {
+    let base = scratch("two-cached-clients");
+    let source = base.join("source");
+    let workspace = base.join("workspace");
+    std::fs::create_dir_all(&source).expect("source");
+    std::fs::write(source.join("notes.txt"), b"reviewed bytes\n").expect("source bytes");
+    let prepared = PreparedFolderImport::prepare(&source, &workspace).expect("preview import");
+    let (confirmed, imported) = prepared.confirm_into_workspace().expect("confirm import");
+    drop(confirmed);
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let first = LiveDaemon::with_trusted_reviewers(startup(), trust.clone());
+    first.open_at_start(&workspace).expect("first client");
+    let shown = first.workspace_state().expect("initial state");
+    let reviewed = first
+        .open_current_review_for_workspace(
+            &shown.root,
+            &shown.digest,
+            &shown.installation,
+            PublicKey::from_bytes([29; 32]),
+        )
+        .expect("review");
+    let bundle = text_field(&reviewed.review_items[0], "bundle").to_owned();
+    let target = imported.operation().to_string();
+    let context = first
+        .human_approval_context_for_workspace(
+            &reviewed.root,
+            &reviewed.digest,
+            &reviewed.installation,
+            &bundle,
+            &target,
+        )
+        .expect("review context");
+    let first_receipt = hex(&signer.sign(ExpectedHumanApproval::new(
+        context.clone(),
+        signer.credential.clone(),
+        [30; 32],
+    )));
+    let second_receipt = hex(&signer.sign(ExpectedHumanApproval::new(
+        context,
+        signer.credential.clone(),
+        [31; 32],
+    )));
+    let second = LiveDaemon::with_trusted_reviewers(startup(), trust.clone());
+    let stale = second
+        .open_at_start(&workspace)
+        .expect("second caches unapproved review");
+    assert_eq!(stale.digest, reviewed.digest);
+    let accepted = first
+        .approve_review_for_workspace(
+            &reviewed.root,
+            &reviewed.digest,
+            &reviewed.installation,
+            &bundle,
+            &target,
+            &first_receipt,
+        )
+        .expect("first approval");
+    assert!(accepted.shared_version.is_some());
+    let journal = workspace.join(".mesh").join(mesh_daemon::RECORD_FILE_NAME);
+    let before = std::fs::read(&journal).expect("accepted journal");
+    let refused = second
+        .approve_review_for_workspace(
+            &stale.root,
+            &stale.digest,
+            &stale.installation,
+            &bundle,
+            &target,
+            &second_receipt,
+        )
+        .expect_err("cached pre-approval history cannot admit another ceremony");
+    assert!(
+        std::fs::read(&journal).expect("journal after refusal") == before,
+        "refusal must occur before any durable append: {refused:?}"
+    );
+    assert_eq!(refused.code, "stale-workspace");
+    let retry = second
+        .approve_review_for_workspace(
+            &stale.root,
+            &stale.digest,
+            &stale.installation,
+            &bundle,
+            &target,
+            &first_receipt,
+        )
+        .expect_err("even the accepted receipt cannot append through a stale displayed context");
+    assert_eq!(retry.code, "stale-workspace");
+    assert!(std::fs::read(&journal).expect("journal after retry") == before);
+    let reopened = LiveDaemon::with_trusted_reviewers(startup(), trust);
+    let recovered = reopened
+        .open_at_start(&workspace)
+        .expect("durable main still readable");
+    assert_eq!(recovered.shared_version, accepted.shared_version);
+    assert_eq!(recovered.records, accepted.records);
+    let durable = reopened
+        .durable_human_approval_for_workspace(
+            &recovered.root,
+            &recovered.digest,
+            &recovered.installation,
+            &bundle,
+            &target,
+        )
+        .expect("the first accepted receipt remains recoverable");
+    assert_eq!(hex(durable.receipt()), first_receipt);
+    std::fs::remove_dir_all(base).expect("remove fixture");
+}
