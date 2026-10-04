@@ -338,6 +338,15 @@ impl ProjectAttachment {
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
             Err(e) => return Err(e),
         };
+        self.history_configuration_with_previous(store, policy, previous)
+    }
+
+    pub(super) fn history_configuration_with_previous(
+        &self,
+        store: &PinnedWorkspaceRoot,
+        policy: Option<Digest32>,
+        previous: Option<String>,
+    ) -> io::Result<(String, bool)> {
         let previous = previous
             .map(|previous| -> io::Result<String> {
                 let value = Json::parse(&previous).map_err(error)?;

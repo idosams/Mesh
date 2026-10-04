@@ -4079,3 +4079,95 @@ fn whole_entry_discovery_reopens_exact_records_without_treating_names_as_authori
         assert!(restored.join("exchange").exists());
     }
 }
+
+#[test]
+fn dependency_preparation_fences_valid_attached_approval_and_capture_without_source_changes() {
+    let f = Fixture::new("dependency-preparation");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let target = f.save("exact attached input");
+    let bundle = f.request(&target, &trust);
+    let receipt = f.receipt(&signer, &trust, &bundle, &target, 1);
+    let binding = f.history.metadata_path().join("attachment-history.json");
+    let original = fs::read_to_string(&binding).unwrap();
+    let journal = f.journal();
+    let authority = mesh_store::RecordDigest::from_bytes([1; 32]);
+    let fence = f.history.prepare_dependency_enrollment(authority).unwrap();
+    fence.ensure_current().unwrap();
+    let required = fs::read(&binding).unwrap();
+    assert_eq!(
+        Json::parse(std::str::from_utf8(&required).unwrap())
+            .unwrap()
+            .get("previous_binding"),
+        Some(&Json::text(original))
+    );
+    drop(fence);
+    assert!(f
+        .history
+        .approve_review(&bundle, &target, &receipt, &trust)
+        .is_err());
+    assert!(f
+        .history
+        .approve_review(&bundle, &target, &receipt, &trust)
+        .is_err());
+    assert_eq!(f.journal(), journal);
+    let input = f
+        .history
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let called = std::cell::Cell::new(false);
+    assert!(f
+        .history
+        .project()
+        .save_capture(
+            f.history.metadata_path(),
+            &input,
+            mesh_types::PublicKey::from_bytes([7; 32]),
+            |_| {
+                called.set(true);
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes([0; 64]))
+            },
+        )
+        .is_err());
+    assert!(!called.get());
+    assert_eq!(f.journal(), journal);
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"exact attached input"
+    );
+    // Ordinary editors remain usable even though unsupported Mesh history writers are fenced.
+    fs::write(f.source.join("work.txt"), b"editor continues").unwrap();
+    drop(f.history.prepare_dependency_enrollment(authority).unwrap());
+    assert_eq!(fs::read(&binding).unwrap(), required);
+    assert!(f
+        .history
+        .prepare_dependency_enrollment(mesh_store::RecordDigest::from_bytes([2; 32]))
+        .is_err());
+    assert_eq!(fs::read(&binding).unwrap(), required);
+    assert_eq!(f.journal(), journal);
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"editor continues"
+    );
+}
+
+#[test]
+fn attachment_dependency_fence_rejects_changed_binding_and_replaced_source() {
+    let f = Fixture::new("dependency-replacement");
+    f.save("retained");
+    let authority = mesh_store::RecordDigest::from_bytes([1; 32]);
+    let fence = f.history.prepare_dependency_enrollment(authority).unwrap();
+    let binding = f.history.metadata_path().join("attachment-history.json");
+    let bytes = fs::read(&binding).unwrap();
+    fs::write(&binding, b"conflicting work").unwrap();
+    assert!(fence.ensure_current().is_err());
+    fs::write(&binding, &bytes).unwrap();
+    fence.ensure_current().unwrap();
+    fs::rename(&f.source, f.root.join("parked")).unwrap();
+    fs::create_dir(&f.source).unwrap();
+    assert!(fence.ensure_current().is_err());
+    drop(fence);
+    assert!(f.history.prepare_dependency_enrollment(authority).is_err());
+    assert_eq!(fs::read(&binding).unwrap(), bytes);
+}

@@ -1183,3 +1183,14 @@ cached edit/create/review/agent-acquisition paths after the marker, with unchang
 This does not prove valid human approval, every writer or complete enrollment recovery. There is no
 agent/renderer/CLI enrollment operation and no automatic migration. Full and hosted checks remain
 pending; see the [authority contract](decisions/private-dependency-authority.md).
+
+
+## Attached-project dependency preparation
+
+R150 adds the separate required attachment-history binding needed to fence older attached approval
+and capture paths. Native tests preserve a previously prepared receipt, source content and journal,
+refuse approval/capture after preparation, recover exact retries and detect changed source/binding.
+Injected acknowledgement-sync failure retains the fence; bypassing sync fails the regression.
+This native primitive is not exposed to users or agents and does not enroll policy. Current Mesh
+history readers refuse its required binding until complete enrollment/recovery support is integrated;
+ordinary editors remain usable. Full local validation passed: 3,840 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted validation is pending. The fixed checkpoint is unchanged.

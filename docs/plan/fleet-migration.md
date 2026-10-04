@@ -6107,6 +6107,37 @@ packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
 
 R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
 
+
+R149 delivery update: [PR #300](https://github.com/idosams/Mesh/pull/300) merged as
+`ba0178935a0fdc9848fe80135169a16ac50c6856` after all seven hosted checks passed in run 37191604924.
+Additional unchanged-source tests prove valid prepared managed approval refusal (with test P-256
+credentials), including exact retry and unchanged journal/main. Removing the custody marker fails
+the regression and the restored probe passes. This is not packaged human presence. Attached approval
+was separately found to ignore that marker before enrollment; it needs R150's distinct preparation.
+
+## R150 — required attached-history preparation
+
+New canonical implementation based on merged R149 `ba0178935a0fdc9848fe80135169a16ac50c6856`;
+no preserved source commit is replaced. Tracks #301 and #289. Preparation retains the original
+attachment-history binding in a required v3 envelope under native store custody. It validates native
+registration and retained history, publishes through a private staged file and atomic rename, and
+requires file/directory durability before acknowledgement and exact recovery. Conflicting authority,
+stage, invalid file mode, changed binding and replaced source/store refuse. Guard drop retains the
+fence. Journal/main bytes and original source are not rewritten. Generic history readers remain
+unchanged and refuse the required binding; no runtime entry point or complete enrollment is enabled.
+
+Three focused regressions passed: prepared valid approval/capture refusal with journal preservation,
+external editor continuity and exact retry; changed binding/source refusal; and injected initial/retry
+sync failure. Removing the sync call makes its regression fail; original implementation restored.
+An unchanged pre-change reader separately accepts attachment approval with only the managed custody
+marker and refuses the required attachment-history binding. Its probe and binary are retained with
+R149 evidence. An initial Rust error-message borrowing compile failure is preserved. Full repository
+and hosted validation remain pending; the fixed user checkpoint is unchanged.
+
+R150 implementation verification: Full `npm test` passed on implementation `cead2c5542f729c32cf458bf4b79c31fccbfe040`: 3,840 native tests in 171.744s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
 R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431dae5d2b7fe190b6` passed full `npm test`: 3,844 native tests in 175.049s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained; no native conflict required resolution. Hosted verification of the reconciled head is pending.
 
 R148 reconciliation with merged R149 and published R147 `6320642214f4bcbc31c6dbc4f266e397b2645f92`: Full `npm test` passed on reconciliation `6c7779b5f022b70047933352ba9a507483903618`: 3,853 native tests in 175.953s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained and native code merged without manual resolution. Fresh hosted validation remains pending.
+
+R150 reconciliation: based on PR #298 `3d3d26672f29a0f99359f148149726f4b0c68ff4`, including merged #296. Full `npm test` passed on combined revision `bdc156363e6ff147ad9936c1553b157c27e5ee8d`: 3,856 native tests in 172.064s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The ledger conflict retained both records; native code required no manual conflict resolution. Fresh hosted validation remains pending.
