@@ -111,18 +111,29 @@ The order is **delete, then forget**, and the asymmetry is deliberate:
 A collection interrupted halfway is a **smaller collection**, never a broken store: every chunk it
 removed was one nothing referenced.
 
-## Collection does not block a local write
+## Coordination with native writers
 
-`Cas::collect` takes `&self`, acquires no lock, and unlinks one file at a time. The proof is
-structural rather than timed: `tests/collection-concurrency.rs` suspends a collection *inside* its
-first `remove_file` and completes a whole promotion beside it, then checks that the promotion
-returned before the collection had finished its deletions. A collector holding any exclusive hold
-on the store would deadlock there.
+The low-level `Cas::collect` takes `&self` and has no writer lock. Its concurrency test shows a
+promotion of a different digest completing while deletion is suspended. It does not make the
+oracle check and unlink atomic with a same-digest promotion or a reference transaction. Callers
+must exclude those writers through deletion and arrival-journal rewriting; asking an oracle once
+cannot close that race on its own.
 
-The one race that remains is a promotion of a digest the collector is deleting at the same instant.
-It is benign by construction: a doomed digest is one nothing references, so if the delete wins, the
-writer re-promotes and the transaction that was going to reference it has not committed. If it had
-committed, the oracle would have said referenced.
+`LiveDaemon::collect_workspace_orphans` now composes that exclusion for an exact unassigned native
+workspace. It holds workspace custody, workspace replacement and managed-edit guards; reads live
+recovery state and folds the durable journal again; refuses changed history, pending recovery,
+fragmented or incomplete history; and selects at most 256 orphan candidates. All recorded actor
+history, reviews, manifests and offline-peer obligations remain retained. A separate veto uses
+every recorded payload/manifest/chunk digest, independent of the collection plan. Directory
+identities are checked again before deletion. Stale absent candidates are forgotten under the
+same writer guard, so interrupted deletion cannot permanently occupy the next batch.
+
+The workspace-view and checkpoint locks are released before deletion. A deterministic native test
+pauses at that boundary, reads the workspace view, and verifies that a second daemon's agent
+acquisition waits until collection releases custody. This is not a timed GUI or cross-process
+acceptance campaign. Journal folding and candidate selection still scan history; only the number
+of deletion candidates is bounded. Dry run removes no chunks but may initialize the normal isolated
+recovery database. The native operation has no IPC, desktop trigger or automatic scheduler yet.
 
 ## The evidence
 
@@ -165,9 +176,10 @@ second closure — a naive fixed point over every record, with no work queue and
    fail on the lost retained chunk. The kernel page cache survives these kills: filesystem
    power-loss durability, native fleet root selection, concurrent cross-process writers and
    storage exhaustion are not proved by this campaign.
-4. **Nothing schedules a collection.** There is no daemon loop, no trigger and no policy that
-   decides *when* to run. This crate supplies the decision and `mesh-cas` supplies the deletion;
-   `mesh-daemon` is where scheduling belongs and it does not call either yet.
+4. **Nothing schedules a collection.** The native explicit operation described above now joins
+   planning and deletion, but there is no daemon loop, desktop trigger or automatic pressure policy.
+   Recorded history is never expired by this operation. End-to-end fleet scheduling and pressure
+   recovery remain unfinished.
 5. **The manifest linkage.** This index holds no operation→manifest edge, so a manifest is reachable
    only when a root names it or when the derived payload-digest edge above applies. Until a real
    edge exists, `RetainedRoots::conservative` names every manifest, which is why the default

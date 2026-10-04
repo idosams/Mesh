@@ -31,12 +31,13 @@ this is not signed packaged or second-host acceptance.
 
 ## Delivery and acceptance checkpoint — 4 October 2026
 
-Canonical delivery includes [PR #252](https://github.com/idosams/Mesh/pull/252), which adds
-independent authenticated observations for remote fleet lanes. All seven exact-head checks passed;
-main `147e469` verification is running. Installed Codex discovery is corrected in
-[PR #254](https://github.com/idosams/Mesh/pull/254): combined source passed its full local gate and
-seven hosted checks, and source-identical reconciliation is receiving fresh CI before merge.
-The [dated acceptance map](plan/fleet-acceptance.md) records exact revisions and unfinished exits.
+Canonical main `ee6fb900d752dff293e2b33bd7a051f98d124db2` includes remote observations,
+installed Codex discovery, the collector crash campaign and conservative retention of buffered
+history ([PR #259](https://github.com/idosams/Mesh/pull/259)). All seven PR checks and
+[merged-main verification](https://github.com/idosams/Mesh/actions/runs/37165263608) passed.
+The [legacy deprecation notice](https://github.com/idosams/Mesh-internal/pull/1488) is merged;
+its history and the original dirty checkout remain preserved. The
+[dated acceptance map](plan/fleet-acceptance.md) records unfinished phase exits.
 
 A fixed `c2641c6` checkpoint is available for user testing with a corrected separate-data launcher;
 older checkpoints remain preserved. Its package identity and seal were verified, but packaged
@@ -972,3 +973,14 @@ Three baseline failures reproduced the omissions; all 13 focused retention and i
 tests pass after the correction. Unknown actor roots still refuse and explicit narrower policies
 remain explicit. This changes retained-set computation, not causal readiness or persisted formats.
 Native fleet cleanup, scheduling, writer coordination and storage-exhaustion acceptance remain open.
+
+
+## Explicit native orphan cleanup
+
+The daemon now has an exact-workspace cleanup operation that keeps all recorded history and removes
+at most 256 unreferenced arrival candidates. It holds native writer custody, refreshes durable
+history and recovery state, and refuses stale, assigned, incomplete or replaced workspaces.
+Nine focused native regressions and the full gate pass: 3,788 native, 185 rendered and 646 desktop
+tests plus all 44 daemon checks. Hosted delivery is pending. Reads remain
+available during a test-paused deletion while a second daemon's agent acquisition waits. Automatic
+scheduling, pressure policy, full cross-process faults and packaged fleet acceptance remain open.

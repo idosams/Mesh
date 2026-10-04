@@ -5,28 +5,23 @@ This is a dated requirement-to-evidence map, not a completion claim. The accepte
 [migration ledger](fleet-migration.md) retains source provenance and delivery receipts.
 Source coverage and hosted tests do not establish packaged or real-provider acceptance.
 
-At this observation canonical main is `147e4695af612aac938a37635ebbcf7f7420fc48`,
-including [PR #252](https://github.com/idosams/Mesh/pull/252), merged at
-23:38:01 UTC on 3 October after all seven
-[exact-head checks](https://github.com/idosams/Mesh/actions/runs/37161611871) passed.
-The [preceding main checks](https://github.com/idosams/Mesh/actions/runs/37161549987)
-passed on `d88e589`; [current main verification](https://github.com/idosams/Mesh/actions/runs/37162398846)
-was still running at this observation.
-
-[PR #254](https://github.com/idosams/Mesh/pull/254) corrects installed Codex discovery.
-Its combined source passed the full local gate and all seven hosted checks at
-`c2641c64f3918e40b906d742295a24e17b490f10`. Reconciled head
-`3f66a4115912c52abfe261e47a405fcdd4551172` has exactly the same source tree and targets
-current main; [fresh CI](https://github.com/idosams/Mesh/actions/runs/37162696782) is running.
-This documentation increment is stacked on that published branch. Neither this PR nor those
-checks establish the unfinished acceptance journeys below.
+At this observation canonical main is `ee6fb900d752dff293e2b33bd7a051f98d124db2`,
+including remote observations (PR252), installed Codex discovery (PR254), collector process-crash
+coverage (PR257) and conservative buffered-history retention
+([PR259](https://github.com/idosams/Mesh/pull/259)). All seven
+[PR259 checks](https://github.com/idosams/Mesh/actions/runs/37164708863) and
+[merged-main verification](https://github.com/idosams/Mesh/actions/runs/37165263608) passed.
+The disk-full campaign [PR260](https://github.com/idosams/Mesh/pull/260) passed its original
+hosted checks and awaits checked reconciliation with main. R123 adds explicit native orphan
+cleanup and passed the full local gate; its hosted delivery remains pending. None of these
+checks establishes the unfinished packaged or real-host acceptance journeys below.
 
 | Requirement | Verified evidence / current boundary | What still proves completion |
 |---|---|---|
 | Canonical repository and identity checks | Actual fetch/push remotes are idosams/Mesh; target guards run before edits/delivery; PR252 merge receipt retained | Continue exact identity/base checks through every remaining delivery |
 | Preserve prior repositories and work | Complete verified bundles, original dirty Mesh-internal checkout and per-increment evidence retained under Mesh-delivery-preserved | Final provenance audit against migration ledger; no history deletion or settings changes |
-| Coherent published and merged increments | Canonical delivery through PR252; PR254 published with fresh reconciliation checks running | Merge accepted increments after fresh checks; verify final combined main |
-| Deprecate Mesh-internal through PR | Guidance points forward to Mesh; [legacy #1488](https://github.com/idosams/Mesh-internal/pull/1488) remains OPEN at `99b55d`, with latest baseline Linux/clippy/deny failures | Legitimately resolve its checks and merge deprecation; no bypass/settings change |
+| Coherent published and merged increments | Canonical delivery through PR259; PR260 and native cleanup remain in delivery | Merge accepted increments after fresh checks; verify final combined main |
+| Deprecate Mesh-internal through PR | [Legacy #1488](https://github.com/idosams/Mesh-internal/pull/1488) merged at `a4eb8619` with the docs quality gate passed and no required checks bypassed; unrelated legacy Rust failures remain recorded | Deprecation notice delivered; preserve history and keep development in Mesh |
 | Attach existing dirty project without moving or changing Git | Repeated visible-window attachment journey passed on merged main `97e263f`; original Git preserved. It predates PR251/252 and is not proof on current main | Full manual acceptance including integration/recovery and native approval; exact final revision evidence |
 | Manual capture, independent line and parallel saved review | Same packaged journey: visible 1156×764 window, two fixed comparisons, fork, restart/resume/detach, original Git preserved; no provider launched | Full manual baseline through reviewed main/integration/restore, broader concurrent-edit/failure campaign |
 | Already-running external harness remains usable | Required by accepted plan; ordinary external edits tested, but that does not prove a live harness session | Run the packaged harness-led journey without Mesh launching the provider, then exact review/main approval |
@@ -37,7 +32,7 @@ checks establish the unfinished acceptance journeys below.
 | Live overview and stable parallel review during execution | Packaged manual pins/restart proven at `97e263f`; merged PR251/252 retain remote assignment identity and independently refresh signed observations across lanes | Interactive packaged review while a third real worker writes, current stale-data/reconnect behavior |
 | Requests for changes and exact protected-main approval | Native mechanisms/source exist; packaged proof explicitly reports protected_main_approval=false | Eligible signed build with human presence, stale approval refusal, accepted integration and recovery |
 | Dependency closure and rejection/revocation | Source mechanisms and tests exist; plan keeps acceptance open | Show downstream private consumption before upstream publication, rejection invalidates downstream publication, full closure reviewed |
-| Retention preserves active/reviewed versions | Explicit plan requirement; held native roots alone are not durable retention policy | Retention/GC and storage-exhaustion campaign preserving pinned inputs/reviews |
+| Retention preserves active/reviewed versions | Conservative roots retain all recorded history; crash and injected disk-full campaigns plus nine native cleanup regressions pass; native delivery is pending | Retention/GC and storage-exhaustion campaign preserving pinned inputs/reviews |
 | Worker restart preserves acknowledged work | Merged native recovery increments retain physical allocation identity, resume original partial initialization and preserve uncertain launch ownership; source tests cover lost receipts and closed mailboxes | Real-provider and second-host partial transfer/initialization recovery, lost acknowledgments and uncertain process reconciliation without duplicate execution |
 | Signed remote input inspection in normal workflow | Merged native, desktop and CLI inspection/recovery routes; signed execution-history presentation and independent fleet observations are also merged | Actual eligible-signed packaged interaction with second-host inspection/recovery and truthful dated results; fixtures do not prove this journey |
 | Real second machine execution and recovery | Protocol/native fixtures and local proofs are insufficient | Real SSH second host, execute, disconnect/reconnect, lost acknowledgment, exact returned review, no duplicate/lost acknowledged work |
@@ -72,11 +67,11 @@ The full requirement map remains open wherever the final column lacks matching e
 
 ## Next order
 
-Finish PR254's normal checked delivery, then test its packaged fleet path through ordinary desktop
-controls after manual unlock: coordinator delegation, independent workers, two saved reviews while
+Finish the published retention/cleanup increments and automatic scheduling, then test the packaged
+fleet path through ordinary desktop controls after manual unlock: coordinator delegation, independent workers, two saved reviews while
 another worker writes, change requests and recovery. Preserve the fixed user checkpoint throughout.
 Continue the already-running external-harness journey, eligible signed main/integration/restore,
 second-provider login and acceptance, real second-host fault recovery, retention/storage exhaustion,
-terminal capacity reconciliation and measured acceptance time. Resolve the legacy deprecation PR's
-checks without bypassing them. Final completion requires all plan exits and combined-main/package
+terminal capacity reconciliation and measured acceptance time. The legacy deprecation notice is
+merged; final provenance reconciliation remains open. Final completion requires all plan exits and combined-main/package
 proof, not just another green source increment.

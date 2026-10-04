@@ -1730,6 +1730,8 @@ enum MutationContext {
 
 thread_local! {
     static VERIFIED_MUTATION_CONTEXT: RefCell<Option<MutationContext>> = const { RefCell::new(None) };
+    #[cfg(test)]
+    static ORPHAN_COLLECTION_READY: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
 }
 
 // A signing callback receives bytes to sign, never the enclosing capture's mutation authority.
@@ -2504,6 +2506,92 @@ impl LiveDaemon {
         }
         let _context = VerifiedMutationContext::enter(self, expected_installation)?;
         operation()
+    }
+
+    /// Collect at most 256 unreferenced arrival candidates for an exact, unassigned workspace.
+    ///
+    /// All recorded versions are retained. Native custody excludes coordinated writers through
+    /// fresh journal folding and deletion. The workspace view lock is released before deletion;
+    /// callers must schedule this native operation away from the presentation thread. This is not
+    /// an IPC method or automatic scheduler and grants no retention-window expiration authority.
+    ///
+    /// # Errors
+    /// Refuses stale identity/history, assigned custody, incomplete history or pending recovery.
+    /// An I/O failure may follow partial orphan deletion; retained history is never rolled back.
+    pub fn collect_workspace_orphans(
+        &self,
+        expected_root: &str,
+        expected_digest: &str,
+        expected_installation: &str,
+        mode: mesh_cas::CollectionMode,
+    ) -> Result<mesh_cas::Collected, ManagedTextFileError> {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested workspace cleanup was refused".into(),
+            ));
+        }
+        self.with_verified_managed_workspace(
+            expected_root,
+            expected_digest,
+            expected_installation,
+            || {
+                let _edit = self
+                    .managed_edit
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
+                let checkpoint = self
+                    .checkpoint
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
+                if checkpoint.active.as_ref().is_some_and(|runtime| {
+                    let snapshot = checkpoint_snapshot(runtime);
+                    snapshot.open_window().is_some() || snapshot.pending_meaningful().is_some()
+                }) {
+                    return Err(ManagedTextFileError::Recovery(
+                        "checkpoint recovery is pending".into(),
+                    ));
+                }
+                let plan = {
+                    let mut held = self.held();
+                    let open = held.as_mut().ok_or(ManagedTextFileError::NoWorkspace)?;
+                    if open.managed_mutation_recovery_needed() {
+                        return Err(ManagedTextFileError::Recovery(
+                            "workspace recovery needs attention".into(),
+                        ));
+                    }
+                    let mut recovery_store = SqliteRecoveryState::open_isolated(
+                        recovery_database(open.database_file()),
+                        open.database_file(),
+                        LIVE_WORKSPACE_VIEW,
+                    )
+                    .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+                    let recovery = mesh_store::RecoveryStatePersistence::load(&mut recovery_store)
+                        .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+                    if recovery.is_some_and(|s| {
+                        s.open_window().is_some() || s.pending_meaningful().is_some()
+                    }) {
+                        return Err(ManagedTextFileError::Recovery(
+                            "checkpoint recovery is pending".into(),
+                        ));
+                    }
+                    open.refresh_with_trusted_reviewers(&self.trusted_reviewers)
+                        .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+                    if open.digest().to_string() != expected_digest {
+                        return Err(ManagedTextFileError::StaleWorkspace);
+                    }
+                    open.prepare_orphan_collection()
+                        .map_err(ManagedTextFileError::Recovery)?
+                };
+                drop(checkpoint);
+                #[cfg(test)]
+                ORPHAN_COLLECTION_READY.with(|hook| {
+                    if let Some(hook) = hook.borrow_mut().take() {
+                        hook();
+                    }
+                });
+                plan.execute(mode).map_err(ManagedTextFileError::Recovery)
+            },
+        )
     }
 
     /// Return the pinned physical directory for the exact managed workspace the desktop showed.
@@ -10552,6 +10640,427 @@ mod tests {
         );
         drop(daemon);
         fs::remove_dir_all(parent).unwrap();
+    }
+
+    fn orphan_fixture(label: &str) -> (std::path::PathBuf, LiveDaemon, mesh_cas::Cas) {
+        let root = scratch(label);
+        let source = root.join("source");
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::write(source.join("note.txt"), b"retained user version").unwrap();
+        let daemon = LiveDaemon::new(started());
+        let preview = daemon
+            .preview_folder_import(source.to_str().unwrap())
+            .unwrap();
+        let digest = preview
+            .get("summary")
+            .and_then(crate::ipc::Json::as_text)
+            .unwrap();
+        daemon
+            .confirm_folder_import(
+                source.to_str().unwrap(),
+                root.join("managed.mesh").to_str().unwrap(),
+                digest,
+            )
+            .unwrap();
+        let store =
+            mesh_cas::Cas::open(daemon.held().as_ref().unwrap().storage_root().as_path()).unwrap();
+        (root, daemon, store)
+    }
+
+    #[test]
+    fn native_orphan_cleanup_preserves_history_dry_run_and_reopen() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-history");
+        let before = store
+            .sweep_all_chunks()
+            .unwrap()
+            .into_iter()
+            .map(|id| (id, store.read(&id).unwrap()))
+            .collect::<Vec<_>>();
+        let orphan = store
+            .promote(b"abandoned staged transaction".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let dry = daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::DryRun,
+            )
+            .unwrap();
+        assert_eq!(dry.collected(), &[orphan]);
+        assert!(store.contains(&orphan));
+        let deleted = daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+            .unwrap();
+        assert_eq!(deleted.collected(), &[orphan]);
+        assert!(!store.contains(&orphan));
+        assert_eq!(daemon.workspace_state().unwrap().digest, summary.digest);
+        drop(daemon);
+        let reopened = LiveDaemon::new(started());
+        reopened.reopen_at_start(Path::new(&summary.root)).unwrap();
+        assert_eq!(reopened.workspace_state().unwrap().digest, summary.digest);
+        for (id, bytes) in before {
+            assert_eq!(store.read(&id).unwrap(), bytes);
+        }
+        assert_eq!(
+            std::fs::read(root.join("source/note.txt")).unwrap(),
+            b"retained user version"
+        );
+        drop(reopened);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_bounds_each_batch_and_forgets_absent_candidates() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-batch");
+        let mut orphans = Vec::new();
+        for index in 0..260 {
+            orphans.push(
+                store
+                    .promote(format!("orphan {index}").into_bytes())
+                    .unwrap()
+                    .digest(),
+            );
+        }
+        // A previous interrupted collection removed one byte object without rewriting arrivals.
+        std::fs::remove_file(store.layout().chunk_path(&orphans[0])).unwrap();
+        let summary = daemon.workspace_state().unwrap();
+        let mut handled = 0;
+        for expected in [256, 4] {
+            let report = daemon
+                .collect_workspace_orphans(
+                    &summary.root,
+                    &summary.digest,
+                    &summary.installation,
+                    mesh_cas::CollectionMode::Delete,
+                )
+                .unwrap();
+            assert_eq!(report.collected().len() + report.absent().len(), expected);
+            handled += report.collected().len() + report.absent().len();
+        }
+        assert_eq!(handled, 260);
+        assert!(orphans.iter().all(|id| !store.contains(id)));
+        assert!(store
+            .journal()
+            .candidates()
+            .unwrap()
+            .iter()
+            .all(|id| !orphans.contains(id)));
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_stale_identity_and_assigned_custody() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-custody");
+        let orphan = store.promote(b"must remain".to_vec()).unwrap().digest();
+        let summary = daemon.workspace_state().unwrap();
+        assert!(daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                "stale",
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete
+            )
+            .is_err());
+        assert!(daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                "replacement",
+                mesh_cas::CollectionMode::Delete
+            )
+            .is_err());
+        daemon
+            .acquire_workspace_agent_custody(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                false,
+                None,
+            )
+            .unwrap();
+        assert!(daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete
+            )
+            .is_err());
+        assert_eq!(store.read(&orphan).unwrap(), b"must remain");
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_reloads_durable_history_before_deletion() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-refresh");
+        let orphan = store
+            .promote(b"must survive stale snapshot".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let second = LiveDaemon::new(started());
+        second.reopen_at_start(Path::new(&summary.root)).unwrap();
+        let target = RecordDigest::parse_hex(
+            summary.workspace_versions[0]
+                .operation()
+                .to_string()
+                .as_str(),
+        )
+        .unwrap();
+        second
+            .held()
+            .as_mut()
+            .unwrap()
+            .append_record(&StoredRecord::Review(ReviewRecord {
+                bundle: RecordDigest::from_bytes([231; 32]),
+                subject_operation: target,
+                opened_by: RecordDigest::from_bytes([232; 32]),
+            }))
+            .unwrap();
+        assert!(matches!(
+            daemon.collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete
+            ),
+            Err(ManagedTextFileError::StaleWorkspace)
+        ));
+        assert_eq!(store.read(&orphan).unwrap(), b"must survive stale snapshot");
+        drop(second);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_recovery_from_another_daemon() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-recovery");
+        let orphan = store
+            .promote(b"pending recovery bytes".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let second =
+            LiveDaemon::with_checkpoint_runtime(started(), checkpoint_parameters()).unwrap();
+        second.reopen_at_start(Path::new(&summary.root)).unwrap();
+        second
+            .observe_checkpoint_activity(RecoverySequence::new(1).unwrap(), 1)
+            .unwrap();
+        let recovery_bytes = b"durable recovery awaiting reconciliation".to_vec();
+        let recovery_digest =
+            RecordDigest::from_bytes(*Blake3::digest_bytes(&recovery_bytes).as_bytes());
+        second
+            .preserve_recovery(
+                RecoveryTrigger::ActorDisconnected,
+                RecoveryPreserved::from_verified_bytes(
+                    RecoveryStamp::new(
+                        1,
+                        RecoveryEventUlid::from_bytes([0x73; 16]),
+                        recovery_digest,
+                    ),
+                    RecoverySequence::new(1).unwrap(),
+                    recovery_bytes,
+                    recovery_digest,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let error = daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("checkpoint recovery is pending"));
+        assert_eq!(store.read(&orphan).unwrap(), b"pending recovery bytes");
+        drop(second);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_keeps_reads_available_and_excludes_custody_acquisition() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-concurrent");
+        let orphan = store.promote(b"held orphan".to_vec()).unwrap().digest();
+        let daemon = Arc::new(daemon);
+        let summary = daemon.workspace_state().unwrap();
+        let second = LiveDaemon::new(started());
+        second.reopen_at_start(Path::new(&summary.root)).unwrap();
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let collecting = Arc::clone(&daemon);
+        let expected = summary.clone();
+        let cleanup = std::thread::spawn(move || {
+            ORPHAN_COLLECTION_READY.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    ready_tx.send(()).unwrap();
+                    resume_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+                }))
+            });
+            collecting.collect_workspace_orphans(
+                &expected.root,
+                &expected.digest,
+                &expected.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+        });
+        ready_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        let (read_tx, read_rx) = std::sync::mpsc::channel();
+        let reading = Arc::clone(&daemon);
+        let reader = std::thread::spawn(move || read_tx.send(reading.workspace_state()).unwrap());
+        assert_eq!(
+            read_rx
+                .recv_timeout(Duration::from_secs(2))
+                .unwrap()
+                .unwrap()
+                .digest,
+            summary.digest
+        );
+        reader.join().unwrap();
+        assert!(store.contains(&orphan));
+        let acquiring = second;
+        let (attempt_tx, attempt_rx) = std::sync::mpsc::channel();
+        let (acquired_tx, acquired_rx) = std::sync::mpsc::channel();
+        let acquire = std::thread::spawn(move || {
+            attempt_tx.send(()).unwrap();
+            acquired_tx
+                .send(acquiring.acquire_workspace_agent_custody(
+                    &summary.root,
+                    &summary.digest,
+                    &summary.installation,
+                    false,
+                    None,
+                ))
+                .unwrap();
+        });
+        attempt_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(matches!(
+            acquired_rx.recv_timeout(Duration::from_millis(100)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        resume_tx.send(()).unwrap();
+        assert_eq!(cleanup.join().unwrap().unwrap().collected(), &[orphan]);
+        acquired_rx
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        acquire.join().unwrap();
+        assert!(!store.contains(&orphan));
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_nested_mutation_before_taking_custody() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-nested");
+        let orphan = store
+            .promote(b"nested calls retain this".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let refusal = daemon
+            .with_verified_managed_workspace(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                || {
+                    daemon.collect_workspace_orphans(
+                        &summary.root,
+                        &summary.digest,
+                        &summary.installation,
+                        mesh_cas::CollectionMode::Delete,
+                    )
+                },
+            )
+            .unwrap_err();
+        assert!(refusal.to_string().contains("nested workspace cleanup"));
+        assert!(store.contains(&orphan));
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_a_torn_record_tail() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-tail");
+        let orphan = store
+            .promote(b"incomplete history retains this".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let journal = daemon.held().as_ref().unwrap().record_file().to_path_buf();
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&journal)
+            .unwrap();
+        std::io::Write::write_all(&mut file, &[1]).unwrap();
+        file.sync_all().unwrap();
+        let before = std::fs::read(&journal).unwrap();
+        assert!(daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete
+            )
+            .is_err());
+        assert!(store.contains(&orphan));
+        assert_eq!(std::fs::read(journal).unwrap(), before);
+        drop(file);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_refuses_directory_replacement_after_planning() {
+        let (root, daemon, store) = orphan_fixture("orphan-cleanup-replacement");
+        let orphan = store
+            .promote(b"replacement must not authorize deletion".to_vec())
+            .unwrap()
+            .digest();
+        let summary = daemon.workspace_state().unwrap();
+        let physical = daemon
+            .held()
+            .as_ref()
+            .unwrap()
+            .physical_root()
+            .as_path()
+            .to_path_buf();
+        let displaced = physical.with_extension("displaced");
+        let replace = physical.clone();
+        ORPHAN_COLLECTION_READY.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move || {
+                std::fs::rename(&replace, displaced).unwrap();
+                std::fs::create_dir(&replace).unwrap();
+                std::fs::write(replace.join("replacement.txt"), b"keep replacement").unwrap();
+            }))
+        });
+        assert!(daemon
+            .collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete
+            )
+            .is_err());
+        assert!(store.contains(&orphan));
+        assert_eq!(
+            std::fs::read(physical.join("replacement.txt")).unwrap(),
+            b"keep replacement"
+        );
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn started() -> StartupSummary {

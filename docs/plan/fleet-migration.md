@@ -5389,3 +5389,24 @@ and combines the crash campaign with the retention correction. The full gate pas
 tests in 168.394s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon
 checks. Original published PR heads remain unchanged while their exact-head CI runs finish;
 publication of this reconciliation and final hosted validation/merge remain pending.
+
+
+## R123 — native guarded orphan cleanup
+
+Tracks [issue #256](https://github.com/idosams/Mesh/issues/256), based on canonical main
+`ee6fb900d752dff293e2b33bd7a051f98d124db2` (merged R121 / PR #259). New native implementation;
+no preserved source commit is replaced. This connects retention planning and CAS deletion under
+exact workspace identity and native custody, retains every recorded version, refuses pending
+recovery/incomplete history, and handles at most 256 candidates per explicit call. A separate
+all-record digest veto protects against a wrong plan. Absent arrival entries are retired under the
+same authority. Native view/checkpoint locks are released before deletion; custody remains held.
+
+Nine focused regressions pass: history/dry-run/reopen, bounded batches with absent entries,
+stale identity and custody refusal, fresh cross-daemon journal validation, durable pending recovery,
+concurrent view reads and second-daemon acquisition exclusion, nested-call refusal, torn history,
+and directory substitution after planning. Initial compile and fixture/recovery-reader failures are
+preserved. The full gate passed 3,788 native tests in 162.475s (1 slow, 17 skipped),
+185 rendered tests, 646 desktop tests and all 44 daemon checks. Hosted delivery is pending.
+No persisted format or IPC changes.
+This is an explicit native operation, not automatic scheduling, history expiration, bounded scan
+latency, real cross-process fault acceptance, packaged UI proof or completion of fleet retention.
