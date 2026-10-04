@@ -5829,3 +5829,5 @@ R138 final test source repeated the real journey successfully in 59.64s: first l
 completion. Both fixtures are retained. The initial full gate caught an unnecessary unwrap in
 the test; an edition-incompatible formatting attempt was corrected before a second provider run.
 Both failure records are preserved; production behavior was unchanged.
+
+R138 final implementation `21eab5996d1865dd4b28c99cdaaa9ae1b9178563` passed full `npm test`: 3,823 native tests in 166.174s (1 slow, 18 skipped), 190 rendered tests, 663 desktop tests and 44 real-daemon checks. The new ignored provider test was separately run successfully twice, including once against final source. Hosted delivery remains pending.
