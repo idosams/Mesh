@@ -3003,3 +3003,196 @@ printf '%s\n' '{{"type":"turn.completed"}}'
         .is_some_and(|save| matches!(save.state, "saved" | "unchanged")));
     assert_eq!(f.desktop.workspace_state().unwrap(), selected);
 }
+
+#[test]
+fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
+    let f = Fixture::new("ordinary-progress-history");
+    let credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "progress-reader",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x76; 32],
+            ))),
+        )
+        .unwrap();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&f.lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    let selected_before = f.desktop.workspace_state().unwrap();
+    fs::write(root.join("note.txt"), "first ordinary save\n").unwrap();
+    let saved = f.service.save_worker_progress(&credential).unwrap();
+    assert!(saved.complete);
+    let version = saved.version.to_string();
+    let page = f.service.saved_progress_versions(&f.lane, None).unwrap();
+    let rows = page
+        .get("progress")
+        .unwrap()
+        .get("versions")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert!(rows.iter().any(|row| text(row, "version") == version));
+    let comparison = f
+        .service
+        .saved_progress_comparison(&f.lane, &version, None, None)
+        .unwrap();
+    let changes = comparison
+        .get("progress")
+        .unwrap()
+        .get("changes")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(changes.len(), 1);
+    let object = text(&changes[0], "object");
+    let pinned = f
+        .service
+        .saved_progress_comparison(&f.lane, &version, None, Some(object))
+        .unwrap();
+    assert!(format!("{pinned:?}").contains("first ordinary save"));
+    fs::write(root.join("note.txt"), "second ordinary save\n").unwrap();
+    let later = f.service.save_worker_progress(&credential).unwrap();
+    assert!(later.complete);
+    assert_ne!(later.version, saved.version);
+    fs::write(root.join("note.txt"), "unsaved working bytes\n").unwrap();
+    f.service.revoke(&credential).unwrap();
+    let before = f.service.native_state().unwrap();
+    let again = f
+        .service
+        .saved_progress_comparison(&f.lane, &version, None, Some(object))
+        .unwrap();
+    assert_eq!(pinned.get("progress"), again.get("progress"));
+    assert!(before.checkpoints.is_empty());
+    let runtime = Runtime::open(
+        FleetStore::open(f.path.join("fleet.sqlite")).unwrap(),
+        "objective",
+    )
+    .unwrap();
+    let allocator = Arc::new(
+        NativeLaneAllocator::open(
+            &f.path.join("allocations"),
+            TrustedReviewers::default(),
+            CheckpointRuntimeParameters {
+                idle_interval: Some(Duration::from_millis(10)),
+                maximum_uncheckpointed_bytes: Some(65_536),
+                maximum_uncheckpointed_interval: Some(Duration::from_secs(60)),
+            },
+            vec![],
+        )
+        .unwrap(),
+    );
+    let reopened = FleetService::new(runtime, allocator, BTreeSet::from(["codex".into()])).unwrap();
+    let restored = reopened
+        .saved_progress_comparison(&f.lane, &version, None, Some(object))
+        .unwrap();
+    assert_eq!(pinned.get("progress"), restored.get("progress"));
+    assert_eq!(before.revision, reopened.native_state().unwrap().revision);
+    assert_eq!(selected_before, f.desktop.workspace_state().unwrap());
+    assert_eq!(
+        fs::read_to_string(root.join("note.txt")).unwrap(),
+        "unsaved working bytes\n"
+    );
+    assert_eq!(
+        fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
+        "immutable input\n"
+    );
+    assert!(reopened
+        .saved_progress_comparison(&f.lane, &"0".repeat(64), None, None)
+        .is_err());
+    assert!(reopened
+        .saved_progress_versions(&f.lane, Some(&"0".repeat(64)))
+        .is_err());
+    assert!(reopened
+        .saved_progress_versions(&f.lane, Some("not-a-version"))
+        .is_err());
+    assert!(reopened
+        .saved_progress_comparison(&f.lane, &version, None, Some("../note.txt"))
+        .is_err());
+    let old_root = root.with_extension("preserved");
+    fs::rename(&root, &old_root).unwrap();
+    fs::create_dir(&root).unwrap();
+    assert!(reopened
+        .saved_progress_comparison(&f.lane, &version, None, None)
+        .is_err());
+}
+
+#[test]
+fn ordinary_saved_progress_pages_exact_operations_and_isolates_lanes() {
+    let f = Fixture::new("ordinary-progress-pages");
+    let other = Fixture::new("ordinary-progress-other");
+    let credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "progress-pages",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x77; 32],
+            ))),
+        )
+        .unwrap();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&f.lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    let mut saved_versions = BTreeSet::new();
+    for n in 0..52 {
+        fs::write(root.join("note.txt"), format!("ordinary save {n}\n")).unwrap();
+        let saved = f.service.save_worker_progress(&credential).unwrap();
+        assert!(saved.complete);
+        saved_versions.insert(saved.version.to_string());
+    }
+    let before = f.service.native_state().unwrap();
+    let first = f.service.saved_progress_versions(&f.lane, None).unwrap();
+    assert_eq!(first.get("handoff_authority"), Some(&Json::Bool(false)));
+    assert_eq!(first.get("approval_authority"), Some(&Json::Bool(false)));
+    let first = first.get("progress").unwrap();
+    let rows = first.get("versions").unwrap().as_array().unwrap();
+    assert_eq!(rows.len(), 50);
+    let cursor = text(first, "next_after");
+    assert_eq!(text(rows.last().unwrap(), "version"), cursor);
+    let next = f
+        .service
+        .saved_progress_versions(&f.lane, Some(cursor))
+        .unwrap();
+    let next = next.get("progress").unwrap();
+    assert_eq!(next.get("next_after"), Some(&Json::Null));
+    let remaining = next.get("versions").unwrap().as_array().unwrap();
+    let all: BTreeSet<_> = rows
+        .iter()
+        .chain(remaining)
+        .map(|row| text(row, "version").to_owned())
+        .collect();
+    assert_eq!(all.len(), rows.len() + remaining.len());
+    assert!(saved_versions.is_subset(&all));
+    for version in &saved_versions {
+        assert!(other
+            .service
+            .saved_progress_comparison(&other.lane, version, None, None)
+            .is_err());
+    }
+    let empty = f
+        .service
+        .saved_progress_versions(&f.lane, Some(text(remaining.last().unwrap(), "version")))
+        .unwrap();
+    assert!(empty
+        .get("progress")
+        .unwrap()
+        .get("versions")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(before.revision, f.service.native_state().unwrap().revision);
+    assert!(before.checkpoints.is_empty());
+}
