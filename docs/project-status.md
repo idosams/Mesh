@@ -2162,3 +2162,13 @@ are preserved. Full validation, including the added stale-proof and ordinary-rea
 is pending. Start/materialization and multi-level consumption recovery, generic desktop/harness
 callers, runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue
 #323 and the full fleet objective stay open. The fixed user checkpoint is unchanged.
+
+R161 consumed-source grants `9b504eac3ab2545684a8420efad2b1a1fd1cf711` passed full `npm test`:
+3,949 native tests in 296.016s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and all
+remaining repository/docs/license/storage/format/lint/real-daemon gates. This includes the additional
+stale-owner-proof and ordinary torn-history refusal assertions. Published predecessor
+`b453de9cd7d52181fa9cdbb7c16407abd0aa3fea` passed all seven hosted checks in run `37238362613`.
+Complete history and failed compatibility, focused, mutation and full logs are preserved. Exact
+consumed-source grants and restart recovery are verified; child materialization/start and multi-level
+consumption recovery, generic callers, runtime/publication controls and packaged acceptance remain
+required. Draft PR #324 / issue #323 and the full fleet goal stay open. The checkpoint is unchanged.
