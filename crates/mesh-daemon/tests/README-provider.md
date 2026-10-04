@@ -232,3 +232,23 @@ run actual credential rotation concurrently with native custody. Mutex admission
 of waiting in the reverse order. The old capture route must fail the two-second parallel-read
 deadline. Received-session behavior remains covered by its existing authority tests. These tests
 do not establish periodic saving, process termination or packaged fleet acceptance.
+
+
+### Automatic local progress capture
+
+The `automatic_progress_` tests exercise native journal capture using exact scoped worker grants.
+They cover unchanged polls without signatures/events, separate explicit handoff accounting,
+missed fleet acknowledgment recovery without another signature, missing-file preservation,
+revocation/cancellation and an older completion racing a newer explicit checkpoint. The real
+provider-process fixture writes while alive, waits for an observed private save, then writes its
+final edit before exiting. The host must capture both phases without a checkpoint tool call.
+Disabling periodic live-worker saves must fail the fixture's live-save assertion.
+
+The host owns one capture job per local worker, waits five seconds after a completed attempt,
+and forces one final attempt before terminal acknowledgment. Incomplete or failed saving remains
+separate from process outcome. Final failures are visible but not automatically retried after
+revocation. Cancellation and host drop revoke credentials; drop joins admitted work. Filesystem
+or signer latency can delay final acknowledgment and shutdown. Received sessions keep their
+existing path. Desktop save observations are additive nullable fields; older payloads still parse.
+No persisted schema changes, new handoff records or automatic process adoption are introduced.
+These regressions are native fixture evidence, not packaged or authenticated provider acceptance.

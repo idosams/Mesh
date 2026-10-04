@@ -20,6 +20,8 @@ use mesh_types::{Blake3, ContentDigest};
 
 pub use crate::CheckpointSigner;
 
+mod auto_save;
+pub use auto_save::WorkerProgressSave;
 mod local_checkpoint;
 mod progress;
 pub use progress::WorkerProgress;

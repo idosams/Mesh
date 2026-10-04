@@ -132,7 +132,7 @@ impl FleetService {
         Ok(checkpoint_summary(&id, &result))
     }
 
-    fn try_checkpoint_authority(
+    pub(super) fn try_checkpoint_authority(
         &self,
         key: &str,
         grant: &Grant,

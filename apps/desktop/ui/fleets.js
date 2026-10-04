@@ -76,8 +76,13 @@ export function fleetActivity(raw) {
         && nullable(worker.thread, value => typeof value === 'string' && /^[a-fA-F0-9-]{36}$/.test(value))
         && nullable(worker.activity, value => text(value, 128)) && decimal(worker.events) && decimal(worker.stderr_lines)
         && ['turn_completed', 'failed', 'streams_closed'].every(key => typeof worker[key] === 'boolean') && nullable(worker.outcome, value => typeof value === 'boolean'));
+      const save = worker.progress_save ?? null;
+      if (save !== null) require(['waiting', 'saving', 'saved', 'unchanged', 'needs-attention'].includes(save.state)
+        && nullable(save.observed_at, decimal) && nullable(save.version, digest)
+        && nullable(save.issue, value => typeof value === 'string' && /^[a-z0-9-]{1,128}$/.test(value))
+        && (!['saved', 'unchanged'].includes(save.state) || (save.observed_at !== null && save.version !== null)));
       lanes.add(worker.lane);
-      return { lane: worker.lane, run: worker.run, observedAt: worker.observed_at, activity: worker.activity,
+      return { progressSave: save === null ? null : { state: save.state, observedAt: save.observed_at, version: save.version, issue: save.issue }, lane: worker.lane, run: worker.run, observedAt: worker.observed_at, activity: worker.activity,
         events: worker.events, outcome: worker.outcome, failed: worker.failed, streamsClosed: worker.streams_closed };
     });
     return { objective: row.objective, status: row.status, stopRequested: row.stop_requested, observedAt: row.observed_at, workers };
