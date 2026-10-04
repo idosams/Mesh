@@ -30,6 +30,15 @@ revocation and newer-version races. This is not yet hosted or packaged acceptanc
 sessions and the fixed user checkpoint do not include this behavior. See the delivery ledger for
 R130 evidence and limits.
 
+## Ordinary saved-progress inspection foundation
+
+Native history reads can enumerate retained local lane operations in pages of 50 and compare an
+exact saved operation with its original input. They remain readable after session revocation and
+restart without adopting a worker or creating a handoff. Recorded operations may be intermediate
+captures; listing one makes no completeness or approval claim. The latest fleet-acknowledged
+version is reported separately. Desktop commands and independent progress panels are the next
+increment; this native foundation is not yet a user-facing packaged capability.
+
 ## Retained worker execution observations
 
 The native worker registry can read original session setup and recorded run outcomes after a

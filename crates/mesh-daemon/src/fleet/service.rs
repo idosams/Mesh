@@ -32,6 +32,7 @@ mod remote_ingestion;
 mod remote_reconnect;
 #[cfg(target_os = "macos")]
 mod remote_recovery;
+mod saved_progress;
 #[cfg(target_os = "macos")]
 pub use remote_recovery::RemoteHistoryRecoveryRequest;
 #[cfg(target_os = "macos")]

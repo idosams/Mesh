@@ -5666,3 +5666,26 @@ head `cfcca75aab183c7a07985868401a568610a89814`. Combined implementation
 All source commits remain ancestors; no production conflicts needed manual resolution. PR #265
 uses PR #271 as its delivery base so cancellation remains a focused review and the full combination
 is validated once. Fresh hosted checks and merged delivery remain pending. User checkpoints remain fixed.
+
+
+## R132 — immutable ordinary saved-progress reads
+
+New canonical implementation for the Phase 3 live-review objective, based on PR #265 head
+`ad2d75f499bcb1f6f8a2b57faef3a474fb06ee3b`. No preserved source commit is replaced. Native
+FleetHistory/FleetService readers enumerate verified causally ready operations in pages of 50
+and compare an exact selection to the bound starting version, using existing 200-change and
+262,144-byte selected-text limits. Exact digest cursors reject unknown or noncanonical IDs.
+History I/O is outside the fleet mutex; pinned allocation/root identity and the lane binding are
+verified before returning. Reads create no checkpoint, review, execution session or approval.
+No persisted-format change or new public IPC command. Page/comparison response schemas are new
+native-only v1 shapes. Intermediate captures are retained progress, not complete handoffs.
+
+Two native regressions pass, covering later saves, unsaved bytes, revocation, restart, read-only
+fleet state, unchanged original/desktop selection, substituted roots, unknown selectors, bounded
+pagination and another lane's version refusal. Mutating exact selection to the latest operation
+fails the immutable-read assertion; source restored byte-for-byte. An initial fixture path-type
+compile failure is preserved. Full repository validation and hosted delivery remain pending.
+Separate progress panels, live changed-file summaries, packaged multi-panel acceptance and the
+remaining full fleet plan are still required. The fixed user checkpoint remains unchanged.
+
+R132 implementation `3a44acc44d1b0486dda51ffaae6f72be10c7ce74` passed full `npm test`: 3,818 native tests in 165.247s (1 slow, 17 skipped), 186 rendered tests, 647 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
