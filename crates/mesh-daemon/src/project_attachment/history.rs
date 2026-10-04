@@ -216,26 +216,20 @@ impl ProjectAttachment {
         metadata: &Path,
         store: PinnedWorkspaceRoot,
     ) -> io::Result<Vec<SavedAttachmentVersion>> {
-        self.ensure_current()?;
-        store.ensure_namespace_identity()?;
-        if read_receipt(&store)? != self.receipt()?.encode() {
-            return Err(invalid("history is not registered to this project"));
-        }
-        let _guard =
-            crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
-        let (configuration, _) = self.history_configuration(&store, None)?;
-        let workspace =
-            OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
-        verify_history_binding(&workspace, &configuration)?;
-        let line = super::capture_line::CaptureLine::load(&store, &workspace, &configuration)?;
-        let versions = workspace
-            .linear_history(line.head)
-            .map_err(error)?
-            .into_iter()
-            .map(|operation| SavedAttachmentVersion { operation })
-            .collect();
-        store.ensure_namespace_identity()?;
-        Ok(versions)
+        self.with_read_history(
+            metadata,
+            store,
+            &crate::TrustedReviewers::default(),
+            |workspace, store, configuration| {
+                let line = super::capture_line::CaptureLine::load(store, workspace, configuration)?;
+                Ok(workspace
+                    .linear_history(line.head)
+                    .map_err(error)?
+                    .into_iter()
+                    .map(|operation| SavedAttachmentVersion { operation })
+                    .collect())
+            },
+        )
     }
 
     /// Read exact saved bytes from external history; this never falls back to a current source file.
@@ -246,17 +240,17 @@ impl ProjectAttachment {
         relative: &str,
     ) -> io::Result<Option<Vec<u8>>> {
         let store = self.history_store(metadata)?;
-        let _guard =
-            crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
-        let (configuration, _) = self.history_configuration(&store, None)?;
-        let workspace =
-            OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
-        verify_history_binding(&workspace, &configuration)?;
-        let file = workspace
-            .historical_workspace_file(version.operation, relative)
-            .map_err(error)?;
-        store.ensure_namespace_identity()?;
-        Ok(file.map(|file| file.bytes))
+        self.with_read_history(
+            metadata,
+            store,
+            &crate::TrustedReviewers::default(),
+            |workspace, _, _| {
+                Ok(workspace
+                    .historical_workspace_file(version.operation, relative)
+                    .map_err(error)?
+                    .map(|file| file.bytes))
+            },
+        )
     }
 
     fn history_store(&self, metadata: &Path) -> io::Result<PinnedWorkspaceRoot> {

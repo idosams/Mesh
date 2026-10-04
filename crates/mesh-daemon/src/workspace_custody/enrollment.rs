@@ -99,6 +99,52 @@ impl DependencyEnrollmentFence {
         )
     }
 
+    /// Read-only verification; never publishes, repairs or syncs a preparation marker.
+    pub(crate) fn verify_while_initialized(
+        root: &Path,
+        expected_installation: &str,
+        dependency_authority: RecordDigest,
+    ) -> Result<(), WorkspaceAgentCustodyError> {
+        let authority = Authority::from_path(root, expected_installation)?;
+        let identity = authority.physical.identity().map_err(|error| {
+            WorkspaceAgentCustodyError::io("inspect dependency read identity", error)
+        })?;
+        authority
+            .physical
+            .ensure_namespace_identity()
+            .and_then(|()| authority.storage.ensure_namespace_identity())
+            .map_err(|error| {
+                WorkspaceAgentCustodyError::io("verify dependency read namespace", error)
+            })?;
+        let marker = Self::marker(&authority, dependency_authority);
+        if dependency_authority == RecordDigest::from_bytes([0; 32])
+            || !custody_contains(identity)
+            || read_marker(&authority)?.as_deref() != Some(marker.as_bytes())
+        {
+            return Err(WorkspaceAgentCustodyError::invalid(
+                "dependency read fence is unavailable",
+            ));
+        }
+        Ok(())
+    }
+
+    fn marker(authority: &Authority, dependency_authority: RecordDigest) -> String {
+        Json::object([
+            ("schema", Json::text(REQUIRED_SCHEMA)),
+            (
+                "workspace_installation",
+                Json::text(&authority.installation),
+            ),
+            ("workspace_directory", Json::text(&authority.directory)),
+            ("generation", Json::Null),
+            (
+                "dependency_authority",
+                Json::text(dependency_authority.to_hex()),
+            ),
+        ])
+        .encode()
+    }
+
     fn prepare_pinned(
         authority: Authority,
         dependency_authority: RecordDigest,
@@ -118,20 +164,7 @@ impl DependencyEnrollmentFence {
             .map_err(|error| {
                 WorkspaceAgentCustodyError::io("verify enrollment namespaces", error)
             })?;
-        let marker = Json::object([
-            ("schema", Json::text(REQUIRED_SCHEMA)),
-            (
-                "workspace_installation",
-                Json::text(&authority.installation),
-            ),
-            ("workspace_directory", Json::text(&authority.directory)),
-            ("generation", Json::Null),
-            (
-                "dependency_authority",
-                Json::text(dependency_authority.to_hex()),
-            ),
-        ])
-        .encode();
+        let marker = Self::marker(&authority, dependency_authority);
         match read_marker(&authority)? {
             Some(bytes) if bytes == marker.as_bytes() => retry_sync(&authority)?,
             _ => {

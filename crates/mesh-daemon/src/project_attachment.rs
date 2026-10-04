@@ -50,7 +50,9 @@ pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
 mod dependency_enrollment;
+mod dependency_read;
 mod dependency_transaction;
+pub(crate) use dependency_read::VerifiedDependencyRead;
 pub use dependency_transaction::NativeDependencyEnrollment;
 mod group_integration;
 mod history;

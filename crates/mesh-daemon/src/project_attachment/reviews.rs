@@ -173,7 +173,7 @@ impl ProjectAttachment {
         store: PinnedWorkspaceRoot,
         trusted: &TrustedReviewers,
     ) -> io::Result<Json> {
-        self.with_review_history(metadata, store, trusted, |workspace, _| {
+        self.with_read_history(metadata, store, trusted, |workspace, _, _| {
             let (items, omitted) = workspace.review_items(None);
             Ok(Json::object([
                 (
@@ -200,7 +200,7 @@ impl ProjectAttachment {
     ) -> io::Result<Json> {
         let bundle = digest(bundle)?;
         let target = digest(target)?;
-        self.with_review_history(metadata, store, trusted, |workspace, _| {
+        self.with_read_history(metadata, store, trusted, |workspace, _, _| {
             let record = workspace
                 .review(&bundle)
                 .ok_or_else(|| invalid("review unavailable"))?;

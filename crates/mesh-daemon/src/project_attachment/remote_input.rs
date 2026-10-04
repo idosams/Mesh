@@ -12,7 +12,7 @@ impl ProvisionedAttachment {
     /// network pacing therefore cannot hold up a subsequent capture. Reads never use current files.
     /// Missing, foreign, changed or unsupported history refuses instead of exporting a partial tree.
     pub fn prepare_remote_input(&self, version: &str) -> io::Result<RemoteInputSource> {
-        self.attachment.inspect_saved(
+        self.attachment.inspect_consumption_input(
             self.metadata_path(),
             self.store.clone(),
             version,

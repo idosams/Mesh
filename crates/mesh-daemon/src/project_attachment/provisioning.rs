@@ -311,21 +311,21 @@ impl ProvisionedAttachment {
         &self,
         trusted: &crate::TrustedReviewers,
     ) -> io::Result<Option<mesh_approval::HeadId>> {
-        self.attachment.with_review_history(
+        self.attachment.with_read_history(
             &self.metadata,
             self.store.clone(),
             trusted,
-            |workspace, _| super::approval::main_head(workspace),
+            |workspace, _, _| super::approval::main_head(workspace),
         )
     }
 
     /// Resolve verified Mesh main to its exact saved version and review, independently of queue bounds.
     pub fn accepted_main(&self, trusted: &crate::TrustedReviewers) -> io::Result<Json> {
-        self.attachment.with_review_history(
+        self.attachment.with_read_history(
             &self.metadata,
             self.store.clone(),
             trusted,
-            |workspace, _| {
+            |workspace, _, _| {
                 let Some(head) = super::approval::main_head(workspace)? else {
                     return Ok(Json::Null);
                 };

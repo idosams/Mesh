@@ -72,7 +72,7 @@ fn native_enrollment_replays_exactly_and_preserves_original_history_and_source()
     let reopened = f.storage.reopen(f.attachment.id()).unwrap();
     assert_eq!(reopened.enroll_dependency_history().unwrap(), enrolled);
     assert_eq!(f.journal(), after);
-    assert!(reopened.saved_versions().is_err());
+    assert!(!reopened.saved_versions().unwrap().is_empty());
     assert_eq!(
         std::fs::read(f.source.join("note")).unwrap(),
         b"original project"

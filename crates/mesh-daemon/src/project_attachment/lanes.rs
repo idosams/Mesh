@@ -154,7 +154,7 @@ impl AttachmentStorage {
         if admitted.store.identity()? != source.store.identity()? {
             return Err(invalid("lane source belongs to another storage root"));
         }
-        source.attachment.inspect_saved(
+        source.attachment.inspect_consumption_input(
             source.metadata_path(),
             source.store.clone(),
             version,
@@ -386,7 +386,7 @@ impl ProvisionedAttachment {
     }
 
     pub(crate) fn validate_lane_version(&self, version: &str) -> io::Result<()> {
-        self.attachment.inspect_saved(
+        self.attachment.inspect_consumption_input(
             self.metadata_path(),
             self.store.clone(),
             version,
@@ -421,7 +421,7 @@ impl ProvisionedAttachment {
             ));
         }
         let limits = ObservationLimits::default();
-        self.attachment.inspect_saved(
+        self.attachment.inspect_consumption_input(
             self.metadata_path(),
             self.store.clone(),
             version,

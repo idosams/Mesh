@@ -1143,10 +1143,11 @@ pub struct OpenWorkspace {
 }
 
 #[derive(Clone, Copy)]
-enum WorkspaceOpenRecovery {
+enum WorkspaceOpenRecovery<'a> {
     WorkingFiles,
     MetadataOnly,
     HistoryOnly,
+    DependencyHistory(&'a crate::project_attachment::VerifiedDependencyRead),
 }
 
 struct PreparedWorkspaceAuthority {
@@ -1432,13 +1433,35 @@ impl OpenWorkspace {
         )
     }
 
+    pub(crate) fn open_attachment_read_history(
+        metadata: &Path,
+        pinned: PinnedWorkspaceRoot,
+        trusted: &crate::TrustedReviewers,
+        proof: Option<&crate::project_attachment::VerifiedDependencyRead>,
+    ) -> Result<Self, OpenFailure> {
+        Self::open_layout_inner(
+            metadata,
+            Some(metadata),
+            trusted,
+            false,
+            Some(PreparedWorkspaceAuthority::transient(
+                pinned.clone(),
+                pinned,
+            )),
+            proof.map_or(
+                WorkspaceOpenRecovery::HistoryOnly,
+                WorkspaceOpenRecovery::DependencyHistory,
+            ),
+        )
+    }
+
     fn open_layout_inner(
         root: &Path,
         explicit_storage_root: Option<&Path>,
         trusted_reviewers: &crate::TrustedReviewers,
         create_missing: bool,
         prepared: Option<PreparedWorkspaceAuthority>,
-        recovery: WorkspaceOpenRecovery,
+        recovery: WorkspaceOpenRecovery<'_>,
     ) -> Result<Self, OpenFailure> {
         let started = Instant::now();
         if create_missing && prepared.is_none() {
@@ -1574,7 +1597,10 @@ impl OpenWorkspace {
         })?;
         let mut file = if create_missing {
             RecordFile::open_pinned(&storage_pinned_root, record_relative, record_file.clone())
-        } else if matches!(recovery, WorkspaceOpenRecovery::HistoryOnly) {
+        } else if matches!(
+            recovery,
+            WorkspaceOpenRecovery::HistoryOnly | WorkspaceOpenRecovery::DependencyHistory(_)
+        ) {
             storage_pinned_root
                 .filesystem()
                 .read_only()
@@ -1595,7 +1621,11 @@ impl OpenWorkspace {
 
         let scan = scan_journal(&bytes).map_err(OpenFailure::Damaged)?;
         let boundary = scan.boundary();
-        if scan
+        if let WorkspaceOpenRecovery::DependencyHistory(proof) = recovery {
+            proof
+                .verify(&storage_pinned_root, &file.file, &bytes)
+                .map_err(OpenFailure::Unreachable)?;
+        } else if scan
             .records()
             .iter()
             .any(|record| matches!(record, StoredRecord::Dependency(_)))
@@ -1639,7 +1669,10 @@ impl OpenWorkspace {
         let record_index = index.clone();
 
         let filesystem = storage_pinned_root.filesystem();
-        let filesystem = if matches!(recovery, WorkspaceOpenRecovery::HistoryOnly) {
+        let filesystem = if matches!(
+            recovery,
+            WorkspaceOpenRecovery::HistoryOnly | WorkspaceOpenRecovery::DependencyHistory(_)
+        ) {
             filesystem.read_only()
         } else {
             filesystem

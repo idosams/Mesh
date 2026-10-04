@@ -1,6 +1,6 @@
 //! Read-only saved-version inspection through retained native attachment authority.
 
-use super::{history::verify_history_binding, invalid, read_receipt, ProjectAttachment};
+use super::{invalid, ProjectAttachment};
 use crate::ipc::Json;
 use crate::root_authority::PinnedWorkspaceRoot;
 use crate::workspace::OpenWorkspace;
@@ -15,6 +15,36 @@ fn error(problem: impl std::fmt::Display) -> io::Error {
     io::Error::other(problem.to_string())
 }
 impl ProjectAttachment {
+    /// Existing native consumption paths keep their legacy fence until exact dependency grants
+    /// and materialization bindings are integrated. Read-only visibility never authorizes a fork.
+    pub(super) fn inspect_consumption_input<T>(
+        &self,
+        metadata: &Path,
+        store: PinnedWorkspaceRoot,
+        operation: &str,
+        consume: impl FnOnce(&OpenWorkspace, RecordDigest) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let digest = RecordDigest::parse_hex(operation).map_err(error)?;
+        if digest.to_string() != operation {
+            return Err(invalid("noncanonical version identity"));
+        }
+        self.with_review_history(
+            metadata,
+            store,
+            &crate::TrustedReviewers::default(),
+            |workspace, _| {
+                if !workspace
+                    .workspace_versions()
+                    .iter()
+                    .any(|version| version.operation() == digest)
+                {
+                    return Err(invalid("version does not belong to attachment history"));
+                }
+                consume(workspace, digest)
+            },
+        )
+    }
+
     pub(super) fn inspect_saved<T>(
         &self,
         metadata: &Path,
@@ -26,28 +56,21 @@ impl ProjectAttachment {
         if digest.to_string() != operation {
             return Err(invalid("noncanonical version identity"));
         }
-        self.ensure_current()?;
-        store.ensure_namespace_identity()?;
-        if read_receipt(&store)? != self.receipt()?.encode() {
-            return Err(invalid("attachment receipt changed"));
-        }
-        let _guard =
-            crate::workspace_custody::lock_workspace_initialization(&store).map_err(error)?;
-        let (configuration, _) = self.history_configuration(&store, None)?;
-        let workspace =
-            OpenWorkspace::open_attachment_store(metadata, store.clone(), false).map_err(error)?;
-        verify_history_binding(&workspace, &configuration)?;
-        if !workspace
-            .workspace_versions()
-            .iter()
-            .any(|version| version.operation() == digest)
-        {
-            return Err(invalid("version does not belong to attachment history"));
-        }
-        let result = read(&workspace, digest)?;
-        store.ensure_namespace_identity()?;
-        self.ensure_current()?;
-        Ok(result)
+        self.with_read_history(
+            metadata,
+            store,
+            &crate::TrustedReviewers::default(),
+            |workspace, _, _| {
+                if !workspace
+                    .workspace_versions()
+                    .iter()
+                    .any(|version| version.operation() == digest)
+                {
+                    return Err(invalid("version does not belong to attachment history"));
+                }
+                read(workspace, digest)
+            },
+        )
     }
 
     pub(super) fn compare_saved(
