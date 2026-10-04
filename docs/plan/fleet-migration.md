@@ -5438,3 +5438,29 @@ and both retention-contract changes are preserved; no production code conflicts 
 Combined source `5655fe5` passed the full gate: 3,789 native tests in 165.911s (1 slow,
 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon checks. R122 hosted delivery
 remains pending on the final combined head.
+
+
+## R124 — keep review reads available during cleanup preparation
+
+Depends on published R123 / PR #261 at `0191b0e9a74594e3849c43954afe5262f42943d4`.
+New canonical refinement replaces no preserved source commit. Cleanup now captures an independent
+pinned journal descriptor and small schema ledger, then releases the live view and checkpoint
+locks before recovery inspection, fresh record folding, payload verification and candidate selection.
+Native writer custody remains held. A replaced journal is refused even when its bytes are identical;
+a stale durable digest still refuses without rewriting the cached view or its indexes.
+
+All eleven cleanup regressions pass in the full gate: 3,790 native tests in 163.208s (1 slow,
+17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon checks.
+A deliberate reintroduction of the view lock across preparation made the new read-availability
+test fail; the implementation was restored byte-for-byte. Hosted delivery is pending. This removes the bulk scan from the review lock but does not bound storage latency or
+provide the still-pending nonblocking admission, background scheduler or complete fleet acceptance.
+
+
+R124 original PR #262 head `ae6a1189ad37268f52c10b7e2c5d8e502c57ba2f` passed all seven
+hosted checks before combination with R122 / PR #260 head
+`054a0f8e12a6d1d273e3b322afef5aacfe402f0d`. Related-history combination
+`e92def7434afc02eaaaeb096d56094c657c8be1c` resolved only this append-only ledger; no production
+conflicts occurred. Its full local gate passed 3,791 native tests in 161.334s (1 slow, 17 skipped),
+185 rendered tests, 646 desktop tests and all 44 daemon checks. PR #262 is stacked on PR #260
+while that parent's original macOS verification remains running; its published head is preserved.
+Fresh hosted checks and merged delivery remain pending for the combined R124 head.
