@@ -362,3 +362,60 @@ fn native_owner_input_uses_the_exact_read_only_owner_snapshot() {
         .unwrap();
     assert_eq!(bytes, b"root source");
 }
+
+#[test]
+fn prepared_grant_requires_complete_held_custody_and_refreshes_permission() {
+    let f = Fixture::new("prepared-custody");
+    let grant = f.grant(true, None, id(1)).unwrap();
+    let prepared = f
+        .storage
+        .prepare_input_grant(
+            &f.owner,
+            NativeGrantInspection {
+                source: &f.source,
+                version: f.version,
+                destination: &f.destination,
+                grant: grant.record(),
+            },
+        )
+        .unwrap();
+    {
+        let incomplete =
+            crate::workspace_custody::lock_workspace_initialization(&f.owner.store).unwrap();
+        assert!(f
+            .storage
+            .with_prepared_input_grant(&prepared, &incomplete, |_| -> io::Result<()> {
+                panic!("incomplete custody entered callback")
+            })
+            .is_err());
+    }
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+        assert!(f
+            .inspect(grant.record(), |_| -> io::Result<()> {
+                panic!("nested public acquisition entered callback")
+            })
+            .is_err());
+        let bytes = f
+            .storage
+            .with_prepared_input_grant(&prepared, &guard, |view| {
+                let mut bytes = Vec::new();
+                view.write_file("note", &mut bytes)?;
+                Ok(bytes)
+            })
+            .unwrap();
+        assert_eq!(bytes, b"private source version");
+        guard.ensure_current().unwrap();
+    }
+    f.grant(false, Some(grant.record()), id(2)).unwrap();
+    let guard =
+        crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+    assert!(f
+        .storage
+        .with_prepared_input_grant(&prepared, &guard, |_| -> io::Result<()> {
+            panic!("revoked prepared grant entered callback")
+        })
+        .is_err());
+    guard.ensure_current().unwrap();
+}

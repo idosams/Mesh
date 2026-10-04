@@ -74,6 +74,14 @@ impl NativeGrantedInput<'_> {
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
+pub(super) struct PreparedNativeGrantInspection<'a> {
+    owner: &'a ProvisionedAttachment,
+    request: NativeGrantInspection<'a>,
+    source: super::dependency_work::PreparedDependencyWork,
+    destination: super::dependency_work::PreparedDependencyWork,
+    pub(super) roots: Vec<crate::root_authority::PinnedWorkspaceRoot>,
+}
+
 impl AttachmentStorage {
     /// Inspect an exact currently granted input while retaining all native custody. The callback
     /// must remain synchronous and bounded; it must not wait for a provider, network or user.
@@ -85,12 +93,42 @@ impl AttachmentStorage {
         request: NativeGrantInspection<'_>,
         read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
     ) -> io::Result<T> {
+        let prepared = self.prepare_input_grant(owner, request)?;
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
+            .map_err(error)?;
+        self.with_prepared_input_grant(&prepared, &guard, read)
+    }
+
+    // Preparation pins identities only. Current authorization is checked under held custody.
+    pub(super) fn prepare_input_grant<'a>(
+        &self,
+        owner: &'a ProvisionedAttachment,
+        request: NativeGrantInspection<'a>,
+    ) -> io::Result<PreparedNativeGrantInspection<'a>> {
         let source = self.prepare_dependency_work(owner, request.source)?;
         let destination = self.prepare_dependency_work(owner, request.destination)?;
         let mut roots = source.roots.clone();
         roots.extend(destination.roots.iter().cloned());
-        let guard =
-            crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
+        Ok(PreparedNativeGrantInspection {
+            owner,
+            request,
+            source,
+            destination,
+            roots,
+        })
+    }
+
+    pub(super) fn with_prepared_input_grant<T>(
+        &self,
+        prepared: &PreparedNativeGrantInspection<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
+        guard.require_roots(&prepared.roots).map_err(error)?;
+        let owner = prepared.owner;
+        let request = &prepared.request;
+        let source = &prepared.source;
+        let destination = &prepared.destination;
         let validate = || -> io::Result<OpenWorkspace> {
             match read_private_in_store(&owner.store, PENDING) {
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {}
@@ -114,9 +152,9 @@ impl AttachmentStorage {
             .map_err(error)?;
             verify_history_binding(&history, &configuration)?;
             let source_binding =
-                self.validate_dependency_work_with_history(&source, &guard, &proof, &history)?;
+                self.validate_dependency_work_with_history(source, guard, &proof, &history)?;
             let destination_binding =
-                self.validate_dependency_work_with_history(&destination, &guard, &proof, &history)?;
+                self.validate_dependency_work_with_history(destination, guard, &proof, &history)?;
             if !proof.policy().current_bound_grant(
                 (
                     source_binding.work(),

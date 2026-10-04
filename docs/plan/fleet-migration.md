@@ -6560,3 +6560,19 @@ validation of the graph/recovery composition and legacy-copy refusal refinement;
 hosted validation of this revision are next. The earlier draft CI is not evidence for this revision.
 Native consumption copying, publication/import/review enforcement and the full fleet acceptance
 scope remain open. The fixed user checkpoint is unchanged.
+
+R160 [PR #322](https://github.com/idosams/Mesh/pull/322) merged normally at
+`5afe7757150eb4f6c079768c9473b5da3cc8b14e` after all seven checks passed on head
+`0a0f2b211d295189cce2670d4cbc03c0907e7a33` (run `37213698088`). Post-merge run `37214307093`
+is still active; this is not yet a post-merge pass.
+
+R161 [issue #323](https://github.com/idosams/Mesh/issues/323) tracks native consumed starting
+versions, required older-writer fencing and exact interrupted-copy recovery. Local groundwork
+separates native graph/grant selection from validation under an already-held complete custody set.
+The ordinary public entry points still acquire their own guards and refuse nested acquisition.
+Preparation conveys no permission: validation rechecks physical bindings and current grants,
+including a grant revoked after preparation. A native composition fixture verifies graph and
+immutable granted-content reads under one guard, and refuses source-only custody when destination
+custody is missing. Five graph tests (2.75s) and seven grant tests (1.43s) pass. Full validation and
+publication are pending. No consumption copying, starting-operation transaction or new persisted
+fence is enabled by this groundwork; the entire #323 scope and fleet goal remain open.

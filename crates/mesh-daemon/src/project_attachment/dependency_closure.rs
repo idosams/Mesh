@@ -262,6 +262,19 @@ fn walk(
     graph.digest = hash(bytes.as_bytes());
     Ok(graph)
 }
+// Native selection and the entire required lock set. Preparation grants no authority; validation
+// must run after acquisition and repeat all physical/history checks under that same guard.
+pub(super) struct PreparedDependencyGraph<'a> {
+    owner: &'a ProvisionedAttachment,
+    source: &'a ProvisionedAttachment,
+    operation: RecordDigest,
+    selections: Vec<(
+        &'a ProvisionedAttachment,
+        super::dependency_work::PreparedDependencyWork,
+    )>,
+    pub(super) roots: Vec<crate::root_authority::PinnedWorkspaceRoot>,
+}
+
 impl AttachmentStorage {
     /// Inspect all signed operation and owner-recorded consumed-input edges. `available` supplies
     /// native handles, never an asserted input list. Omitted referenced work refuses the whole read.
@@ -285,6 +298,19 @@ impl AttachmentStorage {
         operation: RecordDigest,
         available: &[&ProvisionedAttachment],
     ) -> io::Result<NativeDependencyGraph> {
+        let prepared = self.prepare_dependency_graph(owner, source, operation, available)?;
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
+            .map_err(error)?;
+        self.inspect_prepared_dependency_graph(&prepared, &guard)
+    }
+
+    pub(super) fn prepare_dependency_graph<'a>(
+        &self,
+        owner: &'a ProvisionedAttachment,
+        source: &'a ProvisionedAttachment,
+        operation: RecordDigest,
+        available: &[&'a ProvisionedAttachment],
+    ) -> io::Result<PreparedDependencyGraph<'a>> {
         if available.len() > 256 {
             return Err(invalid("too many candidate work handles"));
         }
@@ -314,13 +340,31 @@ impl AttachmentStorage {
             }
             selections.push((*work, selected));
         }
-        let roots = roots.into_values().collect::<Vec<_>>();
-        let guard =
-            crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
+        Ok(PreparedDependencyGraph {
+            owner,
+            source,
+            operation,
+            selections,
+            roots: roots.into_values().collect(),
+        })
+    }
+
+    // A caller may compose this with current-grant validation and a native transaction without
+    // releasing custody. Never acquire additional locks or accept a partial set here.
+    pub(super) fn inspect_prepared_dependency_graph(
+        &self,
+        prepared: &PreparedDependencyGraph<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<NativeDependencyGraph> {
+        guard.require_roots(&prepared.roots).map_err(error)?;
+        let owner = prepared.owner;
+        let source = prepared.source;
+        let operation = prepared.operation;
+        let selections = &prepared.selections;
         let mut bindings = BTreeMap::new();
         let mut legacy_copied_work = BTreeSet::new();
-        for (work, selected) in &selections {
-            let binding = self.validate_dependency_work(selected, &guard)?;
+        for (work, selected) in selections {
+            let binding = self.validate_dependency_work(selected, guard)?;
             if selected.has_legacy_copied_origin() {
                 legacy_copied_work.insert((binding.work(), binding.installation()));
             }
@@ -537,8 +581,8 @@ impl AttachmentStorage {
         if graph.retained_content_json().encode().len() > MAX_BYTES {
             return Err(invalid("retained content encoding exceeds its bound"));
         }
-        for (work, selected) in &selections {
-            let refreshed = self.validate_dependency_work(selected, &guard)?;
+        for (work, selected) in selections {
+            let refreshed = self.validate_dependency_work(selected, guard)?;
             if bindings
                 .get(&(refreshed.work(), refreshed.installation()))
                 .map(|(_, b)| b)

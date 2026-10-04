@@ -171,6 +171,37 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         .inspect_dependency_graph(&owner, &owner, second, &[])
         .unwrap();
     assert_eq!(graph.operation_count(), 2);
+    let prepared = storage
+        .prepare_dependency_graph(&owner, &owner, second.operation(), &[])
+        .unwrap();
+    {
+        let incomplete =
+            crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
+        assert!(
+            storage
+                .inspect_prepared_dependency_graph(&prepared, &incomplete)
+                .is_err(),
+            "a graph cannot be validated with only its history store locked"
+        );
+    }
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+        assert!(
+            storage
+                .inspect_dependency_graph(&owner, &owner, second, &[])
+                .is_err(),
+            "the ordinary entry point must still refuse nested lock acquisition"
+        );
+        assert_eq!(
+            storage
+                .inspect_prepared_dependency_graph(&prepared, &guard)
+                .unwrap(),
+            graph
+        );
+        guard.ensure_current().unwrap();
+    }
+
     // A fully journaled capture awaiting acknowledgement retains its pending evidence atomically.
     let second_receipt = owner
         .metadata_path()
@@ -495,6 +526,65 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             },
         )
         .unwrap();
+    // Native graph and grant admission compose under one complete transaction barrier.
+    let selected_graph = storage
+        .prepare_dependency_graph(&owner, &owner, second.operation(), &[])
+        .unwrap();
+    let selected_grant = storage
+        .prepare_input_grant(
+            &owner,
+            crate::project_attachment::NativeGrantInspection {
+                source: &owner,
+                version: second,
+                destination: &child,
+                grant: grant.record(),
+            },
+        )
+        .unwrap();
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&selected_graph.roots)
+                .unwrap();
+        assert!(storage
+            .inspect_prepared_dependency_graph(&selected_graph, &guard)
+            .is_ok());
+        assert!(storage
+            .with_prepared_input_grant(&selected_grant, &guard, |_| -> io::Result<()> {
+                panic!("source-only custody admitted a destination grant")
+            })
+            .is_err());
+    }
+    let all_roots = selected_graph
+        .roots
+        .iter()
+        .chain(&selected_grant.roots)
+        .map(|root| (root.identity().unwrap(), root.clone()))
+        .collect::<BTreeMap<_, _>>()
+        .into_values()
+        .collect::<Vec<_>>();
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&all_roots).unwrap();
+        let complete = storage
+            .inspect_prepared_dependency_graph(&selected_graph, &guard)
+            .unwrap();
+        assert_eq!(complete.digest(), graph.digest());
+        storage
+            .with_prepared_input_grant(&selected_grant, &guard, |view| {
+                let mut bytes = Vec::new();
+                view.write_file("note", &mut bytes)?;
+                assert_eq!(bytes, b"second private save");
+                assert_eq!(
+                    storage
+                        .inspect_prepared_dependency_graph(&selected_graph, &guard)?
+                        .digest(),
+                    complete.digest()
+                );
+                Ok(())
+            })
+            .unwrap();
+        guard.ensure_current().unwrap();
+    }
     // Replay fixture only: the production consumption transaction is still unimplemented.
     // Stage a valid owner receipt over real bound native work and signed captures.
     let source_binding = storage.dependency_work_binding(&owner, &owner).unwrap();
