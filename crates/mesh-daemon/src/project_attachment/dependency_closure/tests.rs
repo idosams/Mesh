@@ -164,12 +164,73 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .unwrap()
     };
     let first = capture(1);
+    let first_journal = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
     fs::write(root.join("source/note"), b"second private save").unwrap();
     let second = capture(2);
     let graph = storage
         .inspect_dependency_graph(&owner, &owner, second, &[])
         .unwrap();
     assert_eq!(graph.operation_count(), 2);
+    // A fully journaled capture awaiting acknowledgement retains its pending evidence atomically.
+    let second_receipt = owner
+        .metadata_path()
+        .join(format!("dependency-capture-{}.json", d(2).to_hex()));
+    let pending_capture_path = owner.metadata_path().join("dependency-capture.pending");
+    fs::rename(&second_receipt, &pending_capture_path).unwrap();
+    let awaiting_capture = storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .unwrap();
+    assert_eq!(awaiting_capture.digest(), graph.digest());
+    assert!(awaiting_capture
+        .retained
+        .values()
+        .next()
+        .unwrap()
+        .sidecars
+        .contains_key("dependency-capture.pending"));
+    let complete_journal_path = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+    let complete_journal = fs::read(&complete_journal_path).unwrap();
+    let pending_bytes = fs::read(&pending_capture_path).unwrap();
+    fs::write(
+        &complete_journal_path,
+        &complete_journal[..complete_journal.len() - 1],
+    )
+    .unwrap();
+    assert!(
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .is_err(),
+        "a torn journal cannot produce a complete graph"
+    );
+    let recovery = owner.inspect_dependency_capture_retention(d(2)).unwrap();
+    assert!(recovery.pending());
+    assert_eq!(recovery.operation(), second.operation());
+    assert_eq!(
+        fs::read(&complete_journal_path).unwrap(),
+        complete_journal[..complete_journal.len() - 1]
+    );
+    assert_eq!(fs::read(&pending_capture_path).unwrap(), pending_bytes);
+    fs::write(&complete_journal_path, &first_journal).unwrap();
+    assert!(
+        storage
+            .inspect_dependency_graph(&owner, &owner, first, &[])
+            .is_err(),
+        "even a complete older root must refuse an unappended pending capture"
+    );
+    assert!(owner
+        .inspect_dependency_capture_retention(d(2))
+        .unwrap()
+        .pending());
+    assert_eq!(fs::read(&complete_journal_path).unwrap(), first_journal);
+    assert_eq!(fs::read(&pending_capture_path).unwrap(), pending_bytes);
+    fs::write(&complete_journal_path, complete_journal).unwrap();
+    fs::rename(&pending_capture_path, &second_receipt).unwrap();
+    assert_eq!(
+        graph,
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .unwrap()
+    );
     let first_graph = storage
         .inspect_dependency_graph(&owner, &owner, first, &[])
         .unwrap();
@@ -639,6 +700,27 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .inspect_dependency_graph(&owner, &grandchild, grandchild_save, &[&child])
             .unwrap()
     );
+    // Signed native DAG replay, independent of the capture-only linear-history selector.
+    let branch_a = append_signed_operation_fixture(&owner, &[second.operation()], 101);
+    let branch_b = append_signed_operation_fixture(&owner, &[second.operation()], 102);
+    let merged = append_signed_operation_fixture(&owner, &[branch_a, branch_b], 103);
+    let dag = storage
+        .inspect_dependency_operation_graph(&owner, &owner, merged, &[])
+        .unwrap();
+    assert_eq!(dag.operation_count(), 5);
+    let qualified_merge = (source_binding.work(), source_binding.installation(), merged);
+    assert_eq!(dag.nodes[&qualified_merge].parents.len(), 2);
+    assert!(dag.nodes.values().any(|n| n.chunks.contains(&historical)));
+    let missing = append_signed_operation_fixture(&owner, &[d(99)], 104);
+    let journal_before_refusal =
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    assert!(storage
+        .inspect_dependency_operation_graph(&owner, &owner, missing, &[])
+        .is_err());
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        journal_before_refusal
+    );
     assert_eq!(
         fs::read(root.join("source/note")).unwrap(),
         b"unsaved later editor bytes"
@@ -791,7 +873,60 @@ fn pre_enrollment_input_is_not_silently_declared_dependency_free() {
             },
         )
         .unwrap();
+    // The old allocator copies source bytes before the child has any operation history.
+    let copied = storage
+        .open_version_lane(
+            &owner,
+            &saved.operation().to_hex(),
+            "83838383838383838383838383838383",
+            ObservationLimits::default(),
+        )
+        .unwrap();
+    let copied_input = copied
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let (_, created) = copied
+        .project()
+        .history_configuration(&copied.store, Some(copied_input.exclusion_digest()))
+        .unwrap();
+    let empty = crate::workspace::OpenWorkspace::open_attachment_store(
+        copied.metadata_path(),
+        copied.store.clone(),
+        created,
+    )
+    .unwrap();
+    assert_eq!(empty.operations(), 0);
+    drop(empty);
+    copied.enroll_dependency_history().unwrap();
+    let copied_save = copied
+        .prepare_dependency_capture(
+            &copied_input,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            d(83),
+            |body| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(body.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap()
+        .commit()
+        .unwrap();
     owner.enroll_dependency_history().unwrap();
+    let copied_journal = fs::read(copied.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let refused = storage
+        .inspect_dependency_graph(&owner, &copied, copied_save, &[])
+        .unwrap_err();
+    assert!(refused.to_string().contains("legacy copied ancestry"));
+    assert_eq!(
+        fs::read(copied.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        copied_journal
+    );
+    assert_eq!(
+        fs::read(copied.project().root().join("note")).unwrap(),
+        b"legacy private work"
+    );
     let journal = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
     let refused = storage
         .inspect_dependency_graph(&owner, &owner, saved, &[])
@@ -806,4 +941,92 @@ fn pre_enrollment_input_is_not_silently_declared_dependency_free() {
         b"legacy private work"
     );
     assert_eq!(owner.saved_versions().unwrap(), vec![saved]);
+}
+
+fn append_signed_operation_fixture(
+    owner: &ProvisionedAttachment,
+    parents: &[RecordDigest],
+    actor: u8,
+) -> RecordDigest {
+    use crate::checkpoint_storage::{
+        operation_checkpoint_signing_body, prepare_authenticated_checkpoint,
+        AuthenticatedOperationCheckpointRequest,
+    };
+    use ed25519_dalek::{Signer as _, SigningKey};
+    use mesh_operations::*;
+    use mesh_types::{PublicKey, Signature};
+    use std::io::Write as _;
+    struct Head;
+    impl HeadDerivation for Head {
+        fn resulting_head(&self, value: &TransitionCommitment) -> HeadId {
+            HeadId::from_bytes(*hash(&value.canonical_bytes()).as_bytes())
+        }
+    }
+    let _guard = crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
+    let (configuration, proof) = owner
+        .project()
+        .read_configuration(owner.metadata_path(), &owner.store)
+        .unwrap();
+    let proof = proof.unwrap();
+    let history = crate::workspace::OpenWorkspace::open_attachment_read_history(
+        owner.metadata_path(),
+        owner.store.clone(),
+        &crate::TrustedReviewers::default(),
+        Some(&proof),
+    )
+    .unwrap();
+    let key = SigningKey::from_bytes(&[actor; 32]);
+    let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
+    let causal = CausalParents::after(
+        ChangeSetId::from_bytes(*parents[0].as_bytes()),
+        parents[1..]
+            .iter()
+            .map(|p| ChangeSetId::from_bytes(*p.as_bytes()))
+            .collect(),
+    );
+    let request = |signature| {
+        AuthenticatedOperationCheckpointRequest::new(
+            WorkspaceId::from_bytes(crate::project_attachment::history::short_id(
+                configuration.as_bytes(),
+            )),
+            ActorId::from_bytes(*public.as_bytes()),
+            SessionId::from_bytes([actor; 16]),
+            ActorSequence::FIRST,
+            causal.clone(),
+            HeadId::from_bytes([0; 32]),
+            PolicyEpoch::new(1),
+            Hlc::new(u64::from(actor), 0),
+            vec![Operation::CreateDirectory {
+                object_id: ObjectId::from_bytes([actor; 16]),
+            }],
+            public,
+            signature,
+        )
+    };
+    let body = operation_checkpoint_signing_body(&request(Signature::from_bytes([0; 64])), &Head);
+    let payload = mesh_crypto::SigningPayload::new(
+        crate::authenticated_changeset::CHANGESET_SIGNATURE_DOMAIN,
+        &body,
+    );
+    let signature = Signature::from_bytes(key.sign(payload.as_bytes()).to_bytes());
+    let prepared =
+        prepare_authenticated_checkpoint(&history, request(signature), vec![], &Head).unwrap();
+    let operation = prepared.changeset_id;
+    let cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+        owner.metadata_path(),
+        owner.store.filesystem(),
+    )
+    .unwrap();
+    for object in prepared.objects {
+        cas.promote(object).unwrap();
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(owner.metadata_path().join(crate::RECORD_FILE_NAME))
+        .unwrap();
+    for record in prepared.checkpoint.records() {
+        file.write_all(&mesh_store::frame_record(&record)).unwrap();
+    }
+    file.sync_all().unwrap();
+    operation
 }

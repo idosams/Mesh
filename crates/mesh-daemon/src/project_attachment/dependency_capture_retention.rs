@@ -216,6 +216,7 @@ impl ProvisionedAttachment {
 
 pub(in crate::project_attachment) struct CaptureReceiptRoots {
     pub(in crate::project_attachment) payloads: BTreeSet<RecordDigest>,
+    pub(in crate::project_attachment) manifests: BTreeSet<RecordDigest>,
     pub(in crate::project_attachment) sidecars: BTreeMap<String, RecordDigest>,
 }
 impl ProvisionedAttachment {
@@ -228,7 +229,6 @@ impl ProvisionedAttachment {
     ) -> io::Result<CaptureReceiptRoots> {
         let guard =
             crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
-        ensure_no_pending_capture(&self.store)?;
         self.check_dependency_registration()?;
         let (configuration, proof) = self
             .attachment
@@ -256,6 +256,7 @@ impl ProvisionedAttachment {
         let journal = (file.metadata()?.dev(), file.metadata()?.ino());
         let mut result = CaptureReceiptRoots {
             payloads: BTreeSet::new(),
+            manifests: BTreeSet::new(),
             sidecars: BTreeMap::new(),
         };
         let mut claimed = BTreeMap::new();
@@ -302,6 +303,47 @@ impl ProvisionedAttachment {
             result
                 .sidecars
                 .insert(name.to_owned(), hash(raw.as_bytes()));
+        }
+        match read_private_in_store(&self.store, PENDING) {
+            Ok(raw) => {
+                let intent = CaptureIntent::parse(&raw)?;
+                let frames = validate_frames(&cas, &intent)?;
+                *budget = budget
+                    .checked_sub(intent.before_bytes)
+                    .and_then(|n| n.checked_sub(frames.len().saturating_mul(2)))
+                    .ok_or_else(|| invalid("pending capture verification exceeds bound"))?;
+                capture_prefix(
+                    &cas,
+                    &raw,
+                    journal,
+                    &bytes,
+                    proof.binding().authority,
+                    &configuration,
+                )?;
+                if bytes.len() < intent.before_bytes.saturating_add(frames.len()) {
+                    return Err(invalid(
+                        "pending capture needs exact recovery before graph inspection",
+                    ));
+                }
+                if claimed
+                    .get(&intent.operation)
+                    .is_some_and(|request| *request != intent.request)
+                {
+                    return Err(invalid("pending capture conflicts with completed request"));
+                }
+                let pending = self.inspect_dependency_capture_retention(intent.request)?;
+                if pending.journal != hash(&bytes) || pending.sidecar_digest != hash(raw.as_bytes())
+                {
+                    return Err(invalid("pending capture retention snapshot changed"));
+                }
+                result.payloads.extend(pending.payloads);
+                result.manifests.extend(pending.manifests);
+                result
+                    .sidecars
+                    .insert(PENDING.to_owned(), pending.sidecar_digest);
+            }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e),
         }
         for (name, expected) in &result.sidecars {
             if hash(read_private_in_store(&self.store, name)?.as_bytes()) != *expected {

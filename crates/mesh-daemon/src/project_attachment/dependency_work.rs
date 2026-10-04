@@ -54,6 +54,14 @@ pub(super) struct PreparedDependencyWork {
     pub(super) roots: Vec<crate::root_authority::PinnedWorkspaceRoot>,
 }
 impl PreparedDependencyWork {
+    // Only this allocation copied bytes. Parent allocation identity alone is not consumption.
+    pub(super) fn has_legacy_copied_origin(&self) -> bool {
+        self.chain
+            .first()
+            .and_then(|link| link.origin.as_ref())
+            .is_some_and(|origin| !super::dependency_reservation::is_reservation(&origin.value))
+    }
+
     pub(super) fn require_child_capacity(&self) -> io::Result<()> {
         if self.chain.len() > MAX_DEPTH {
             return Err(invalid("reserved child would exceed native ancestry depth"));

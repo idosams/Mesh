@@ -6542,3 +6542,13 @@ byte-identical installation substitution/conflicting handles, restoring original
 legacy provenance refusal without losing saved work. Logs preserve the failing-before case and
 passing refinements. Full validation and publication of this refinement are pending; R160 remains
 draft until remaining recovery composition and executable #321 evidence are complete.
+
+R160 local refinement now composes fully journaled pending capture evidence with graph retention;
+torn or unappended captures require the exact recovery inspector and cannot produce a complete
+graph. Signed multi-parent operation fixtures verify shared-parent deduplication and missing-parent
+refusal. An actual legacy allocation regression reproduced a copied lane incorrectly being reported
+as dependency-free after enrollment. Graph inspection now refuses that copied origin until explicit
+migration evidence exists, preserving its journal and files. Allocation identity for an empty native
+reservation remains distinct from consumption. The five focused graph tests pass (2.67s); full
+validation and publication of these refinements are pending. Draft PR #322 remains unmerged, with
+seven successful checks on its older published head `1cbbab33934e7d6491b0518431b850e7fedcb72a`.

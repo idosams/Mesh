@@ -57,7 +57,7 @@ impl NativeDependencyGraph {
         self.nodes.len()
     }
     /// Verified content and policy objects for this selected graph, qualified by native store.
-    /// Includes selected completed capture receipts and complete pending control evidence.
+    /// Includes selected capture receipts and fully journaled pending capture/control evidence.
     /// Torn journals still require the separate exact recovery inspectors. Unselected versions
     /// are excluded. This is not a complete-store collection oracle or a durable pin.
     pub fn retained_content_json(&self) -> Json {
@@ -274,6 +274,17 @@ impl AttachmentStorage {
         version: SavedAttachmentVersion,
         available: &[&ProvisionedAttachment],
     ) -> io::Result<NativeDependencyGraph> {
+        self.inspect_dependency_operation_graph(owner, source, version.operation(), available)
+    }
+
+    // General native operation roots need not belong to the capture-only linear history API.
+    pub(super) fn inspect_dependency_operation_graph(
+        &self,
+        owner: &ProvisionedAttachment,
+        source: &ProvisionedAttachment,
+        operation: RecordDigest,
+        available: &[&ProvisionedAttachment],
+    ) -> io::Result<NativeDependencyGraph> {
         if available.len() > 256 {
             return Err(invalid("too many candidate work handles"));
         }
@@ -307,8 +318,12 @@ impl AttachmentStorage {
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
         let mut bindings = BTreeMap::new();
+        let mut legacy_copied_work = BTreeSet::new();
         for (work, selected) in &selections {
             let binding = self.validate_dependency_work(selected, &guard)?;
+            if selected.has_legacy_copied_origin() {
+                legacy_copied_work.insert((binding.work(), binding.installation()));
+            }
             if bindings
                 .insert(
                     (binding.work(), binding.installation()),
@@ -334,7 +349,6 @@ impl AttachmentStorage {
         }
         let mut histories = BTreeMap::new();
         for (key, (work, _)) in &bindings {
-            super::history::dependency_capture::ensure_no_pending_capture(&work.store)?;
             let (configuration, proof) = work
                 .project()
                 .read_configuration(work.metadata_path(), &work.store)?;
@@ -366,7 +380,7 @@ impl AttachmentStorage {
         let root = (
             source_binding.work(),
             source_binding.installation(),
-            version.operation(),
+            operation,
         );
         let mut content_budget = 1024 * 1024 * 1024u64;
         let mut verified_manifests = BTreeMap::new();
@@ -376,6 +390,11 @@ impl AttachmentStorage {
                 let (history, proof, workspace) = histories
                     .get(&(id.0, id.1))
                     .ok_or_else(|| invalid("referenced work is unavailable"))?;
+                if legacy_copied_work.contains(&(id.0, id.1)) {
+                    return Err(invalid(
+                        "legacy copied ancestry needs explicit migration evidence",
+                    ));
+                }
                 if proof.is_legacy_operation(id.2) {
                     return Err(invalid(
                         "legacy input ancestry needs explicit migration evidence",
@@ -497,6 +516,7 @@ impl AttachmentStorage {
                 Err(e) => return Err(e),
             }
             payloads.extend(receipts.payloads);
+            manifests.extend(receipts.manifests);
             retained_count = retained_count
                 .checked_add(receipts.sidecars.len())
                 .and_then(|n| n.checked_add(payloads.len()))
