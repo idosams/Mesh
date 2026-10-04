@@ -454,8 +454,10 @@ publication checks must still be integrated before runtime exposure.
 
 Explicitly enrolled native work can prepare a signed capture and commit it through a dedicated
 writer. Preparation uses verified read-only history and preserves the existing exclusion binding.
-The signer runs without a custody guard. Commit reacquires native custody and requires the exact
-registration, enrollment proof and capture line observed before signing. It appends only authenticated
+The signer runs without a custody guard. Commit reacquires native custody and requires the same
+registered enrollment, exact capture line and unchanged authenticated authoring basis. Policy-only
+decisions can advance during signing without invalidating private capture. The writer verifies a
+fresh complete journal proof under custody before appending. It appends only authenticated
 capture manifests and one operation; it never returns a generally writable dependency workspace.
 Legacy writers and post-enrollment legacy publication remain refused. No runtime route auto-enrolls
 projects or invokes this development API.

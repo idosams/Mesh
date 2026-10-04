@@ -1284,14 +1284,17 @@ and full closure enforcement remain outstanding. The fixed user checkpoint is un
 
 ## Native private capture after enrollment
 
-R154 through R157 are now merged into canonical Mesh through passing exact-head checks. Post-merge
-main checks passed through R156; R157 post-merge verification is still pending at this update.
+R154 through R157 are now merged into canonical Mesh through passing exact-head and post-merge
+main checks.
 R158, tracked by [issue #317](https://github.com/idosams/Mesh/issues/317), is in local implementation.
 Its dedicated native capture path signs without custody, preserves the original source folder, and
 records authenticated private progress after explicit enrollment. Exact-request recovery resumes
 staged journal prefixes and preserves unknown work. Historical receipt recovery does not rewind
-newer saves. Eight focused native tests and six checkpoint tests pass; a source-replacement test and
-the full gate remain pending. It is not yet an open or merged PR.
+newer saves. Ten focused native tests and six checkpoint tests pass, including source replacement.
+An initial full gate passed 3,909 native, 194 rendered and 672 desktop tests plus 44 daemon checks.
+A refinement lets policy-only activity during signing coexist with unchanged private authoring;
+stale actor history still refuses before writing. The full gate is running again on that refinement.
+It is not yet an open or merged PR.
 
 This does not enable automatic enrollment, dependency-aware allocation, consumption, publication or
 runtime controls. Full inherited closure, retained roots and packaged/provider acceptance are still

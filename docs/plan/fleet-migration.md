@@ -6378,7 +6378,7 @@ Tracks [issue #317](https://github.com/idosams/Mesh/issues/317). Builds on merge
 [PR #316](https://github.com/idosams/Mesh/pull/316), merge
 `035dc70169d7144fd53e17ff8097c77c8e9e0a39`. Replaces no preserved source commit.
 R154 #310, R155 #312 and R156 #314 also merged through their seven exact-head checks and successful
-post-merge main checks. R157 post-merge main verification remains pending at this entry.
+post-merge main checks. R157 post-merge main verification `37204965382` subsequently passed on that merge.
 
 The new native prepare/commit path keeps inspection read-only, signs outside custody, and refreshes
 exact enrollment, registration and capture position before appending authenticated private progress.
@@ -6399,3 +6399,12 @@ source-replacement recovery regression and the complete repository gate are pend
 The full allocation/consumption, closure/retention, publication, runtime and packaged acceptance
 scope remains open. This increment stays unpublished until its complete checks pass. The fixed
 checkpoint stays unchanged.
+
+R158 initial full verification on `965753f65a30407e5e1a150bf437ef38ba1806f0` passed:
+3,909 native tests in 274.263s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all
+44 real-daemon checks. Review then identified an unnecessary conflict when only dependency policy
+changed during signing. The corrected regression failed before refinement and passes afterward.
+Commit now refreshes current policy while requiring the same native enrollment and exact signed
+authoring basis; an advanced actor cannot be reused even if a mutable capture line is rolled back.
+Ten focused capture/recovery tests pass, including physical source replacement and every frame
+prefix. The complete gate must pass again on this refined implementation before PR delivery.

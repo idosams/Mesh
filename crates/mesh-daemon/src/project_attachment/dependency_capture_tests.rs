@@ -114,7 +114,7 @@ fn enrolled_capture_saves_exact_snapshot_and_keeps_legacy_writers_fenced() {
     assert!(!f.a.metadata_path().join(PENDING).exists());
 }
 #[test]
-fn signer_has_no_custody_and_a_changed_policy_refuses_before_any_capture_write() {
+fn signer_has_no_custody_and_policy_activity_does_not_block_private_capture() {
     let f = Fixture::new("signer-race", true);
     let input = f.input(b"prepared version");
     let prepared =
@@ -131,8 +131,15 @@ fn signer_has_no_custody_and_a_changed_policy_refuses_before_any_capture_write()
         })
         .unwrap();
     let after_policy = f.journal();
-    assert!(prepared.commit().is_err());
-    assert_eq!(f.journal(), after_policy);
+    let saved = prepared.commit().unwrap();
+    assert!(f.journal().starts_with(&after_policy));
+    assert_eq!(
+        f.a.project()
+            .saved_file(f.a.metadata_path(), saved, "note")
+            .unwrap()
+            .unwrap(),
+        b"prepared version"
+    );
     assert!(!f.a.metadata_path().join(PENDING).exists());
 }
 #[test]
@@ -410,4 +417,19 @@ fn replaced_source_refuses_recovery_and_original_identity_can_resume() {
         f.a.recover_dependency_capture(id(1)).unwrap().operation(),
         expected
     );
+}
+
+#[test]
+fn restoring_an_old_capture_line_cannot_reuse_an_advanced_actor_basis() {
+    let f = Fixture::new("actor-basis", true);
+    let line = f.a.metadata_path().join("attachment-capture-line.json");
+    let original = fs::read(&line).unwrap();
+    let first = f.prepare(&f.input(b"first signed candidate"), 1).unwrap();
+    let second = f.prepare(&f.input(b"second signed candidate"), 2).unwrap();
+    first.commit().unwrap();
+    let before = f.journal();
+    fs::write(&line, original).unwrap();
+    assert!(second.commit().is_err());
+    assert_eq!(f.journal(), before);
+    assert!(!f.a.metadata_path().join(PENDING).exists());
 }

@@ -7,7 +7,6 @@ use crate::project_attachment::{
     capture_line::CaptureLine,
     dependency_decision,
     dependency_enrollment::read_private_in_store,
-    dependency_read::VerifiedDependencyRead,
     dependency_transaction::{digest, hash, read_payload, text},
     ProvisionedAttachment,
 };
@@ -21,7 +20,8 @@ const MAX_JOURNAL: usize = 80 * 1024 * 1024;
 pub struct PreparedNativeCapture {
     attachment: ProvisionedAttachment,
     configuration: String,
-    proof: VerifiedDependencyRead,
+    binding: crate::dependency_policy::NativeDependencyBinding,
+    basis: ManagedAuthoringBasis,
     line: CaptureLine,
     request: RecordDigest,
     prepared: PreparedAuthenticatedCheckpoint,
@@ -156,7 +156,8 @@ impl ProvisionedAttachment {
         Ok(PreparedNativeCapture {
             attachment: self.clone(),
             configuration,
-            proof,
+            binding: proof.binding(),
+            basis,
             line,
             request,
             prepared,
@@ -193,19 +194,37 @@ impl PreparedNativeCapture {
         let (configuration, proof) = a
             .attachment
             .read_configuration(a.metadata_path(), &a.store)?;
-        if configuration != self.configuration || proof.as_ref() != Some(&self.proof) {
+        let proof = proof.ok_or_else(|| invalid("native capture enrollment disappeared"))?;
+        if configuration != self.configuration || proof.binding() != self.binding {
             return Err(invalid("native capture basis changed while signing"));
         }
         let history = OpenWorkspace::open_attachment_read_history(
             a.metadata_path(),
             a.store.clone(),
             &crate::TrustedReviewers::default(),
-            Some(&self.proof),
+            Some(&proof),
         )
         .map_err(error)?;
         verify_history_binding(&history, &configuration)?;
         if CaptureLine::load(&a.store, &history, &configuration)? != self.line {
             return Err(invalid("native capture line changed while signing"));
+        }
+        // Policy decisions do not change private authoring. Recheck its actual signed basis,
+        // including actor advancement outside a stale/rolled-back mutable capture position.
+        if let Some(head) = self.line.head {
+            let current = history
+                .historical_authoring_basis(
+                    head,
+                    PublicKey::from_bytes(*self.basis.actor_id.as_bytes()),
+                )
+                .map_err(error)?;
+            if current != self.basis {
+                return Err(invalid(
+                    "native capture authoring basis changed while signing",
+                ));
+            }
+        } else if history.operations() != 0 {
+            return Err(invalid("native capture genesis changed while signing"));
         }
         let mut journal = a
             .store
@@ -215,7 +234,7 @@ impl PreparedNativeCapture {
         (&mut journal)
             .take((MAX_JOURNAL + 1) as u64)
             .read_to_end(&mut before)?;
-        self.proof.verify(&a.store, &journal, &before)?;
+        proof.verify(&a.store, &journal, &before)?;
         let records = self.prepared.checkpoint.records();
         if records.iter().any(|r| {
             !matches!(
@@ -240,7 +259,7 @@ impl PreparedNativeCapture {
         let metadata = journal.metadata()?;
         let intent = CaptureIntent {
             request: self.request,
-            authority: self.proof.binding().authority,
+            authority: self.binding.authority,
             configuration: hash(configuration.as_bytes()),
             journal: (metadata.dev(), metadata.ino()),
             before_bytes: before.len(),
@@ -260,11 +279,11 @@ impl PreparedNativeCapture {
         self.line
             .begin(self.prepared.changeset_id, &a.store, &configuration)?;
         hook(CaptureStep::Staged, &mut journal, &frames)?;
-        let (current, proof) = a
+        let (current, after_staging) = a
             .attachment
             .read_configuration(a.metadata_path(), &a.store)?;
         if current != configuration
-            || proof.as_ref() != Some(&self.proof)
+            || after_staging.as_ref() != Some(&proof)
             || read_private_in_store(&a.store, PENDING)? != intent
             || read_payload(&cas, hash(&frames), MAX_JOURNAL)? != frames
         {
@@ -280,7 +299,7 @@ impl PreparedNativeCapture {
             return Err(invalid("native capture binding changed"));
         }
         let proof = proof.ok_or_else(|| invalid("native capture enrollment disappeared"))?;
-        if proof.binding() != self.proof.binding() {
+        if proof.binding() != self.binding {
             return Err(invalid("native capture authority changed after append"));
         }
         a.check_dependency_registration()?;
