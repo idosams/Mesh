@@ -58,6 +58,7 @@ test('uncertain provisioning retains exact input and request; polling never retr
   const h = harness(async (command, args) => {
     calls.push({ command, args });
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'attached_fleets') return catalogue();
@@ -84,6 +85,7 @@ test('uncertain provisioning retains exact input and request; polling never retr
 });
 test('closed intents cannot supply paths, invalid budgets or unknown project identities', async () => {
   const calls = []; const h = harness(async (command) => { calls.push(command); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] }; return command === 'attached_fleets' ? catalogue() : activity(); });
   await settle(); const before = calls.length;
@@ -95,6 +97,7 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
   const h = harness(async (command, args) => {
     calls.push({ command, args });
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'start_attached_fleet') {
@@ -105,7 +108,7 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
     if (fail) throw new Error('credential-secret');
     return command === 'attached_fleets' ? value : observations;
   });
-  await settle(); h.intent({ type: 'start', objective, path: '/wrong' }); assert.equal(calls.length, 6);
+  await settle(); h.intent({ type: 'start', objective, path: '/wrong' }); assert.equal(calls.length, 7);
   h.intent({ type: 'start', objective }); await settle(); h.intent({ type: 'start', objective }); await settle();
   assert.equal(calls.filter(call => call.command === 'start_attached_fleet').length, 1);
   fail = true; h.intent({ type: 'refresh' }); await settle();
@@ -118,16 +121,18 @@ test('start is explicit, attempted fleets never restart, and stale snapshots can
 test('restored or unavailable fleets cannot request execution and hidden/disposed views stop polling', async () => {
   const value = catalogue(); value.fleets[0].ownership = 'restored-unattached'; const calls = [];
   const h = harness(async command => { calls.push(command); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] }; return command === 'attached_fleets' ? value : activity(); });
-  await settle(); h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); assert.equal(calls.length, 6);
+  await settle(); h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); assert.equal(calls.length, 7);
   assert.equal(h.timers.size, 1); h.emit('mesh:fleets-visible', false); assert.equal(h.timers.size, 0);
-  h.intent(provision); assert.equal(calls.length, 6); h.dispose(); h.emit('mesh:fleets-visible', true); assert.equal(calls.length, 6);
+  h.intent(provision); assert.equal(calls.length, 7); h.dispose(); h.emit('mesh:fleets-visible', true); assert.equal(calls.length, 7);
 });
 test('partial refresh failure retains a coherent prior projection and disposal ignores a late reply', async () => {
   let release; let hold = false;
   const h = harness(async command => {
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (hold && command === 'attached_fleets') return new Promise(resolve => { release = resolve; });
@@ -140,6 +145,7 @@ test('partial refresh failure retains a coherent prior projection and disposal i
 test('failed start remains visible after a later successful poll and is never replayed automatically', async () => {
   const calls = []; const h = harness(async command => {
     calls.push(command); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'start_attached_fleet') throw new Error('private native error');
@@ -158,6 +164,7 @@ test('an explicitly retained saved input does not drift when source capture adva
   const calls = []; const h = harness(async (command, args) => {
     calls.push({ command, args });
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'provision_attached_fleet') return { schema: 'mesh.desktop-attached-fleet/v1', project: id, request: args.request, objective, started: false };
@@ -175,6 +182,7 @@ test('saved-result reads and closing panels remain independent of an active flee
   const h = harness(async (command, args) => {
     commands.push(command);
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'save_fleet_pins') { const value = JSON.parse(args.snapshot); return { ...value, revision: String(BigInt(value.revision) + 1n) }; }
@@ -203,6 +211,7 @@ test('restored fleets expose saved result reads while execution stays unavailabl
     if (command === 'attached_fleets') return value;
     if (command === 'fleet_activity') return activity();
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'fleet_saved_reviews') return { schema: 'mesh.fleet-saved-reviews/v1', objective, lane, revision: 1, after: null, total: 0, next_after: null, order: 'checkpoint-id', reviews: [] };
@@ -211,7 +220,7 @@ test('restored fleets expose saved result reads while execution stays unavailabl
   await settle(); h.intent({ type: 'reviews', objective, lane }); await settle();
   assert.equal(h.projections.at(-1).reviewQueues[`${objective}/${lane}`].page.total, 0);
   h.intent({ type: 'start', objective }); h.intent({ type: 'stop', objective }); await settle();
-  assert.deepEqual(calls.sort(), ['attached_fleets', 'fleet_activity', 'fleet_saved_reviews', 'load_fleet_pins', 'load_fleet_review_outbox', 'load_remote_fleet_pins', 'load_remote_project_outbox'].sort());
+  assert.deepEqual(calls.sort(), ['attached_fleets', 'fleet_activity', 'fleet_saved_reviews', 'load_fleet_pins', 'load_fleet_review_outbox', 'load_progress_pins', 'load_remote_fleet_pins', 'load_remote_project_outbox'].sort());
   h.dispose();
 });
 
@@ -244,6 +253,7 @@ test('policy uncertainty preserves a frozen request and exact retry without star
   const h = harness(async (command, args) => {
     calls.push({ command, args });
     if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins();
     if (command === 'load_fleet_review_outbox') return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] };
     if (command === 'attached_fleets') return catalogue();
@@ -271,6 +281,7 @@ test('policy uncertainty preserves a frozen request and exact retry without star
 test('unknown catalogue policy cannot start agents', async () => {
   const calls = [];
   const h = harness(async command => { calls.push(command); if (command === 'attached_fleets') { const value = catalogue(); delete value.fleets[0].policy; return value; } if (command === 'fleet_activity') return activity(); if (command === 'load_remote_project_outbox') return { schema: 'mesh.remote-project-outbox/v1', revision: '0', entries: [] }; if (command === 'load_remote_fleet_pins') return { schema: 'mesh.desktop-remote-fleet-pin-selectors/v1', revision: '0', pins: [] };
+    if (command === 'load_progress_pins') return { schema: 'mesh.desktop-progress-pin-selectors/v1', revision: '0', pins: [] };
     if (command === 'load_fleet_pins') return savedPins(); return { schema: 'mesh.fleet-review-outbox/v1', revision: '0', entries: [] }; });
   await settle(); h.intent({ type: 'start', objective }); await settle();
   assert.equal(calls.includes('start_attached_fleet'), false); h.dispose();
