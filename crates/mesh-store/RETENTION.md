@@ -164,7 +164,13 @@ second closure — a naive fixed point over every record, with no work queue and
    file through journal compaction. A deliberate removal of the reference veto makes the campaign
    fail on the lost retained chunk. The kernel page cache survives these kills: filesystem
    power-loss durability, native fleet root selection, concurrent cross-process writers and
-   storage exhaustion are not proved by this campaign.
+   storage exhaustion are not proved by this process-kill campaign.
+   `crates/mesh-cas/tests/collection-storage-full.rs` separately injects Unix ENOSPC at eight
+   cleanup boundaries, including a partial replacement-journal write. It verifies the exact
+   error, removed subset, retained bytes, old/new journal state, reopen/retry, explicit journal
+   compaction and a subsequent promotion. Swallowing the journal rewrite error makes this test
+   fail. This bounded fault injection does not fill a real volume or prove daemon-level
+   storage-pressure policy, native writer coordination or recovery of every checkpoint phase.
 4. **Nothing schedules a collection.** There is no daemon loop, no trigger and no policy that
    decides *when* to run. This crate supplies the decision and `mesh-cas` supplies the deletion;
    `mesh-daemon` is where scheduling belongs and it does not call either yet.
