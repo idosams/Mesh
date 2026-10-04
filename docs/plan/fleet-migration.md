@@ -6450,3 +6450,28 @@ R159 full gate on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 nativ
 (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, including
 repository/docs/license/storage/fmt/clippy checks. The native interruption fixtures do not establish
 power-loss or packaged acceptance. Hosted checks and merged reservation delivery remain pending.
+
+
+R159 delivery: [PR #320](https://github.com/idosams/Mesh/pull/320) merged at
+`227fc60d7ce4f5730d74055380567daf1ef0d2f2` after all seven hosted checks in run `37208335397`
+passed on head `953b5cd285e386a3dc1b990859545b711f3b59e2`. Post-merge verification
+`37209051599` is running. The earlier pending R159 entries above are historical.
+
+## R160: Complete native input ancestry and retained roots
+
+Tracks [issue #321](https://github.com/idosams/Mesh/issues/321), builds on merged R159, and replaces
+no preserved source commit. Initial local helper commit `0c5ba6e` verifies immutable signed operation
+facts, including exact parent/header agreement and bounded native CAS reads; three focused tests
+passed in 0.136s. An initial test CAS type-inference failure was corrected. Removing the signed-parent
+comparison makes its refusal test fail on an emptied journal parent list; exact source was restored.
+Ancestry-only merge `7b1769d` reconciles that work with canonical R159 without changing its file tree.
+
+This is unfinished groundwork, not complete dependency closure or a passing full-gate increment.
+The reader is not yet connected to production traversal, so its temporary unused-code warnings
+must disappear through actual integration before full validation or PR publication. Do not suppress
+warnings or claim a flat caller-provided input list proves complete ancestry. Native work resolution,
+qualified DAG traversal, typed owner-consumption facts, bounds/conflict/cycle checks, manifest/chunk
+retention, pending roots and rebuild/rejection tests remain to implement in this increment.
+Reservation lineage alone is not a consumed-input edge. The full consumption/starting-operation,
+old-writer pending-copy fence, all-path publication/import/review and runtime/acceptance scope remains
+open; the fixed user checkpoint is unchanged.

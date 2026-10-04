@@ -1307,8 +1307,9 @@ required. The user checkpoint remains fixed at `5052009`.
 
 ## Native destination reservation before consumption
 
-R159 ([issue #319](https://github.com/idosams/Mesh/issues/319)) is implemented locally with a passing
-full gate and awaits PR delivery. Native reservation creates an empty destination with its own enrolled
+R159 ([issue #319](https://github.com/idosams/Mesh/issues/319)) merged through
+[PR #320](https://github.com/idosams/Mesh/pull/320) at `227fc60d7ce4f5730d74055380567daf1ef0d2f2`
+after its full local gate and all seven exact-head hosted checks passed. Native reservation creates an empty destination with its own enrolled
 history in staging, outside the visible catalog. Exclusive native publication makes that exact store
 visible only after its required writer fences are durable. The destination can receive an exact
 owning-project grant without copying any source bytes or claiming consumption or readiness to run.
@@ -1327,4 +1328,21 @@ The user checkpoint remains fixed at `5052009`.
 R159 full verification on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 native tests in
 271.700s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks.
 Its interruption tests use native fault injection; power-loss, packaged and provider acceptance are
-not established by this result. Hosted reservation CI and merge remain pending.
+not established by this result. Reservation post-merge run `37209051599` is running.
+
+
+## Complete input ancestry and retained roots in progress
+
+R160 ([issue #321](https://github.com/idosams/Mesh/issues/321)) is local work in progress.
+The first native operation reader verifies bounded authenticated payloads and requires journal
+parent links, actor/session, sequence, epoch and logical-clock fields to match the signed statement.
+Three focused tests pass, including multiple parents and real journal/CAS reads that preserve
+corrupt or oversized evidence. Removing the parent comparison makes the refusal regression fail;
+the exact source was restored. This helper is not yet connected to native closure traversal or
+retained-root computation and is not ready for a full gate or PR. No runtime admission changed.
+
+The next implementation must resolve every native work, traverse all immutable operation and
+consumed-input edges under complete custody, distinguish reserved identity from actual consumption,
+and derive retained roots from the same verified graph. Legacy missing provenance, cycles, missing
+inputs, conflicting bindings and overflow must refuse. Actual consumption, publication/import,
+runtime controls and the remaining fleet acceptance requirements stay open.
