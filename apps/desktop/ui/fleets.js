@@ -36,6 +36,19 @@ function remoteAssignment(value) {
   return Object.freeze({ assignment: value.assignment, worker: value.worker, leaseSequence: value.lease_sequence, leaseUntil: value.lease_until_ms });
 }
 
+function handoffStatus(value, version) {
+  if (value === undefined) return null; // Older catalogues do not prove zero handoffs or feedback.
+  const keys = 'approval_authority,complete_handoffs,incomplete_handoffs,open_change_requests,pending_captures,submitted_reviews,version';
+  require(value && typeof value === 'object' && Object.keys(value).sort().join(',') === keys
+    && nullable(value.version, digest) && value.version === version && value.approval_authority === false
+    && ['complete_handoffs', 'incomplete_handoffs', 'open_change_requests', 'pending_captures', 'submitted_reviews'].every(key => integer(value[key], Number.MAX_SAFE_INTEGER))
+    && value.submitted_reviews <= value.complete_handoffs
+    && Number.isSafeInteger(value.complete_handoffs + value.incomplete_handoffs + value.pending_captures)
+    && (version !== null || (value.complete_handoffs === 0 && value.incomplete_handoffs === 0 && value.submitted_reviews === 0)));
+  return Object.freeze({ version, pending: value.pending_captures, complete: value.complete_handoffs,
+    incomplete: value.incomplete_handoffs, reviews: value.submitted_reviews, openRequests: value.open_change_requests });
+}
+
 export function fleetCatalogue(raw) {
   const value = parse(raw);
   require(value?.schema === 'mesh.native-fleets/v1' && Array.isArray(value.fleets) && value.fleets.length <= 16);
@@ -58,7 +71,7 @@ export function fleetCatalogue(raw) {
       require(lane.run === null || (identity(lane.run?.id) && !runs.has(lane.run.id) && states.has(lane.run.state)));
       if (lane.run) runs.add(lane.run.id);
       return { id: lane.id, parent: lane.parent, sourceProject: lane.source_project, goal: lane.goal, provider: lane.provider,
-        savedVersion: lane.saved_version ?? null, base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
+        handoffStatus: handoffStatus(lane.handoff_status, lane.saved_version ?? null), savedVersion: lane.saved_version ?? null, base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
     });
     require(result.every(lane => lane.parent === null || (lane.parent !== lane.id && lanes.has(lane.parent))));
     require(!policy || result.every(lane => policy.providers.includes(lane.provider) && (lane.parent !== null || lane.provider === policy.coordinator)));
