@@ -63,6 +63,25 @@ impl AttachmentStorage {
         input_ids: &[&str],
         action: impl FnOnce(&ProvisionedAttachment, &OpenWorkspace, &str) -> io::Result<T>,
     ) -> io::Result<T> {
+        self.with_checked_catalog_dependency_history(
+            owner_id,
+            work_id,
+            input_ids,
+            |_| Ok(()),
+            action,
+        )
+    }
+
+    pub(super) fn with_checked_catalog_dependency_history<T>(
+        &self,
+        owner_id: &str,
+        work_id: &str,
+        input_ids: &[&str],
+        check_selection: impl Fn(
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<()>,
+        action: impl FnOnce(&ProvisionedAttachment, &OpenWorkspace, &str) -> io::Result<T>,
+    ) -> io::Result<T> {
         if input_ids.len() > 256 {
             return Err(invalid("catalog input selection exceeds bound"));
         }
@@ -93,6 +112,7 @@ impl AttachmentStorage {
         }
         let guard = lock_workspace_initialization_set(&roots.into_values().collect::<Vec<_>>())
             .map_err(error)?;
+        check_selection(&guard)?;
         let handles = works.values().collect::<Vec<_>>();
         let context = self.resolve_consumed_histories(
             owner,
@@ -118,6 +138,7 @@ impl AttachmentStorage {
         if context.read(work)? != (configuration, Some(proof)) {
             return Err(invalid("selected catalog history changed during read"));
         }
+        check_selection(&guard)?;
         guard.ensure_current().map_err(error)?;
         Ok(result)
     }

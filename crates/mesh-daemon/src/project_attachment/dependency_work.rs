@@ -83,6 +83,62 @@ fn field<'a>(value: &'a Json, key: &str) -> io::Result<&'a str> {
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
+pub(super) type CatalogSelectionHint = ((RecordDigest, RecordDigest), Vec<String>);
+fn native_installation(native: (u64, u64)) -> io::Result<RecordDigest> {
+    let installation = workspace_installation(native, native);
+    digest(
+        installation
+            .strip_prefix("blake3:")
+            .ok_or_else(|| invalid("invalid native installation"))?,
+    )
+}
+
+fn derived_work(
+    project: RecordDigest,
+    parent: RecordDigest,
+    origin: &Json,
+) -> io::Result<RecordDigest> {
+    Ok(hash(
+        Json::object([
+            ("schema", Json::text("mesh.native-dependency-work/v1")),
+            ("project", Json::text(project.to_hex())),
+            ("parent_work", Json::text(parent.to_hex())),
+            ("request", Json::text(field(origin, "request")?)),
+            (
+                "source_version",
+                Json::text(field(origin, "source_version")?),
+            ),
+        ])
+        .encode()
+        .as_bytes(),
+    ))
+}
+
+impl PreparedDependencyWork {
+    /// Lookup hints only. No source history or correlation has been admitted by this calculation.
+    pub(super) fn catalog_selection_hint(&self) -> io::Result<CatalogSelectionHint> {
+        let project = hash(self.owner.project().receipt()?.encode().as_bytes());
+        let mut work = project;
+        for link in self.chain.iter().rev() {
+            if let Some(origin) = &link.origin {
+                work = derived_work(project, work, &origin.value)?;
+            }
+        }
+        let selected = &self
+            .chain
+            .first()
+            .ok_or_else(|| invalid("missing catalog work"))?
+            .work;
+        let native = selected.store.identity()?;
+        Ok((
+            (work, native_installation(native)?),
+            self.chain
+                .iter()
+                .map(|link| link.work.id().to_owned())
+                .collect(),
+        ))
+    }
+}
 fn identity(value: (u64, u64)) -> Json {
     Json::text(format!("{:016x}:{:016x}", value.0, value.1))
 }
@@ -293,17 +349,7 @@ impl AttachmentStorage {
                 } else {
                     inspect_parent(parent, version)?;
                 }
-                work = hash(
-                    Json::object([
-                        ("schema", Json::text("mesh.native-dependency-work/v1")),
-                        ("project", Json::text(owner_binding.project.to_hex())),
-                        ("parent_work", Json::text(work.to_hex())),
-                        ("request", Json::text(field(origin, "request")?)),
-                        ("source_version", Json::text(version)),
-                    ])
-                    .encode()
-                    .as_bytes(),
-                );
+                work = derived_work(owner_binding.project, work, origin)?;
             }
             correlation.push(Json::object([
                 ("registration", Json::text(registered.id())),
@@ -333,16 +379,11 @@ impl AttachmentStorage {
             .ok_or_else(|| invalid("missing selected work"))?
             .work;
         let native = selected.store.identity()?;
-        let installation = workspace_installation(native, native);
         Ok(NativeDependencyWorkBinding {
             authority: owner_binding.authority,
             project: owner_binding.project,
             work,
-            installation: digest(
-                installation
-                    .strip_prefix("blake3:")
-                    .ok_or_else(|| invalid("invalid native installation"))?,
-            )?,
+            installation: native_installation(native)?,
             correlation: hash(Json::Array(correlation).encode().as_bytes()),
         })
     }

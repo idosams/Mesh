@@ -7353,3 +7353,24 @@ passed post-merge run `37241537647`; empty-input PR #326 passed run `37241441884
 head but still needs base reconciliation and merge. The catalog-read increment requires its own
 hosted checks and normal merge. Automatic input discovery, desktop/harness wiring and the full
 remaining fleet acceptance remain open in #323. The fixed checkpoint is unchanged.
+
+R161 automatic input discovery selects required native stores from owner consumption facts plus
+allocation ancestry, using the same canonical work/installation encoding as guarded validation.
+Candidate correlation hints are collected before the owner-only policy guard. The complete read
+then rechecks discovery under its existing guard without adding custody roots, and refreshes history
+and sidecars afterward. Unavailable unrelated registrations are excluded; missing/ambiguous required
+inputs refuse. Callers still select the native owning root; no capture/runtime/publication permission
+or pending-transaction recovery is granted by these read APIs.
+
+The real discovery journey passed in 129.383s: two-level saved history, immutable old/new bytes, a
+peer consuming work from a different allocation branch, exactly four required stores, unrelated
+offline work, missing required input and recovery after its identity is restored. An added stale-
+selection case changes real grant policy before guarded read, refuses the old selection before its
+callback and preserves completed history after revocation; full validation of that addition is pending.
+Removing consumption-edge discovery failed the peer read in 121.059s; source was restored byte-for-
+byte. Strict daemon lint passed in 9.18s. Initial compiler failures and owner-fence/nested-custody
+failures are preserved alongside their fixes. Full `npm test`, publication and hosted checks remain
+required. This increment depends on published #327 and replaces no preserved fleet source commit.
+Local reconciliation `1a5176420741b3015a31f50567c0efb2e5bb840a` incorporated main #325 without
+changing #327's tested tree. Desktop/harness wiring and all broader fleet acceptance remain open.
+The fixed user checkpoint is unchanged.

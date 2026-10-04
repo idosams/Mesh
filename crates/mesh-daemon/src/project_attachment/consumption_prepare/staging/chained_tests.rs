@@ -150,6 +150,9 @@ impl AttachmentStorage {
         restart("chain-complete-partial", 75);
         assert!(self.saved_consumed_versions(owner, request(grant)).is_err());
         assert!(self
+            .discovered_dependency_versions(owner.id(), destination.id())
+            .is_err());
+        assert!(self
             .saved_dependency_versions(owner.id(), destination.id(), &[source.id(), original.id()])
             .is_err());
         restart("chain-complete-lost", 76);
@@ -304,6 +307,7 @@ impl AttachmentStorage {
             fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
             owner_journal
         );
+        self.assert_native_discovery(owner, destination, next, &[source, original]);
     }
     pub(in crate::project_attachment) fn chained_start_restart_test(
         &self,
