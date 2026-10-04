@@ -294,3 +294,45 @@ The original binding and accepted journal bytes are retained, but ordinary Mesh 
 while this preparation is present. Complete enrollment/recovery must add validated current-reader
 support before enabling the transition. Independent all-path old-writer proof and packaged acceptance
 remain required. Ordinary external tools can continue editing the source folder.
+
+
+## Native registered-project enrollment (R151)
+
+`ProvisionedAttachment::enroll_dependency_history` joins the foundations in one native transaction.
+Project identity comes from the admitted registration and installation from its pinned store; callers
+do not supply a project path or authority digest. Under the store's existing kernel custody, it
+requires clean unenrolled history and retains a canonical `mesh.dependency-enrollment-intent/v1`
+object in pinned CAS. Fields are schema, native project, installation, journal device/inode,
+original byte length and original byte digest. The intent's content digest selects the authority,
+then a canonical R148 enrollment payload names it. Both objects are staged and verified before fences.
+
+The transaction durably installs both generic managed-custody and attachment-history fences before
+appending the required enrollment record. A private helper borrows only the exact already-held root;
+it does not relax generic nested mutation locking or acquire unrelated roots. Native registration,
+source/store namespaces, journal inode, markers and original prefix are checked before append and
+again before acknowledgement. An exact retry syncs existing fences and journal. Only an empty suffix,
+an exact prefix of this transaction's 145-byte frame, or that exact complete frame is admitted; recovery
+appends only missing bytes, syncs, rereads and validates the complete journal and semantic enrollment.
+No truncation or repair from SQLite occurs. Other fragments, later records or changed identities refuse.
+
+Original history is bounded to 64 MiB for this transition; intent/payload reads are bounded to 4 KiB.
+Overflow refuses without enrolling. Concurrent legacy writes during an interrupted preparation can
+invalidate the anchored prefix and require explicit reconciliation; they are never silently adopted.
+The intent is a retained authority root for future dependency-aware collection. Current collection
+continues to refuse dependency-bearing journals, and the generic custody marker excludes ordinary
+mutation/cleanup after preparation. A future collector must retain the authority intent as well as
+policy payloads and the full input closure.
+
+Five transaction regressions use real journal/CAS files, including all 146 frame-prefix boundaries,
+staging and between-fence interruption, lost acknowledgement, sync failure, exact reopen/retry,
+changed prefix, identical-byte journal replacement and corrupt intent refusal. These are deterministic
+fault injections, not physical power-loss or new process-kill evidence. An additional custody regression
+proves exact-root/lifetime borrowing. A real native approval fixture preserves the accepted journal
+prefix and refuses old approval after enrollment. Removing journal synchronization fails its regression.
+
+This entry point is native Rust only, with no renderer/agent/CLI caller or automatic migration.
+It does not issue grants, enroll managed child work independently, enable private consumption or
+authorize publication. Current ordinary Mesh history readers still refuse required bindings/history;
+validated current-reader support is required before exposing the transition. Existing source and Git
+work remain separate. Complete control authorization, closure/retention, all-path publication and
+packaged acceptance requirements remain open in #289.
