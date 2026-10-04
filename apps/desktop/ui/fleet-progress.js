@@ -40,3 +40,20 @@ export function savedProgressComparison(raw, selection, after = null, selected =
     && value.progress?.base === selection.starting);
   return immutableFleetComparison(value.progress, selection.version, after, selected, prior);
 }
+
+// Aggregate reads bind the requested version without retrieving paths or file contents.
+export function savedProgressSummary(raw, selection) {
+  check(typeof raw !== 'string' || raw.length <= 2048);
+  const value = envelope(raw, selection, 'mesh.fleet-saved-progress-summary/v1'), summary = value.progress;
+  check(digest(selection.version) && digest(value.starting_version)
+    && summary && Object.keys(summary).sort().join(',') === 'approval_authority,base,file_total,folder_total,target,total'
+    && summary.base === value.starting_version && summary.target === selection.version
+    && summary.approval_authority === false && count(summary.total) && count(summary.file_total) && count(summary.folder_total)
+    && summary.file_total <= summary.total && summary.folder_total <= summary.total
+    && summary.file_total + summary.folder_total === summary.total);
+  if (selection.source !== undefined) check(value.source_version === selection.source);
+  if (selection.starting !== undefined) check(value.starting_version === selection.starting);
+  return { objective: value.objective, lane: value.lane, source: value.source_version, starting: value.starting_version,
+    version: summary.target, latest: value.latest_acknowledged_version, revision: value.revision,
+    total: summary.total, fileTotal: summary.file_total, folderTotal: summary.folder_total };
+}

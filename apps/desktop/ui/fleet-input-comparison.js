@@ -37,6 +37,12 @@ export function immutableFleetComparison(page, version, after = null, selected =
     && (after === null || hex(after, 32)) && (selected === null || hex(selected, 32)) && !(after && selected)
     && count(page.total) && Array.isArray(page.changes) && page.changes.length <= 200 && page.total >= page.changes.length);
   if (prior) check(page.base === prior.base && page.total === prior.total);
+  const hasCounts = page.file_total !== undefined || page.folder_total !== undefined;
+  if (hasCounts) check(count(page.file_total) && count(page.folder_total)
+    && page.file_total <= page.total && page.folder_total <= page.total
+    && page.file_total + page.folder_total === page.total);
+  const fileTotal = hasCounts ? page.file_total : null, folderTotal = hasCounts ? page.folder_total : null;
+  if (prior?.fileTotal != null) check(fileTotal === prior.fileTotal && folderTotal === prior.folderTotal);
   let previous = after;
   const changes = page.changes.map(change => {
     check(hex(change?.object, 32) && (previous === null || change.object > previous)); previous = change.object;
@@ -46,10 +52,15 @@ export function immutableFleetComparison(page, version, after = null, selected =
     check(change.effect === effect);
     return { object: change.object, effect, before, after: later };
   });
+  if (hasCounts) {
+    const files = changes.filter(row => row.before?.kind === 'file' || row.after?.kind === 'file').length;
+    check(files <= fileTotal && changes.length - files <= folderTotal);
+    if (after === null && selected === null && page.next_after === null) check(files === fileTotal && changes.length - files === folderTotal);
+  }
   if (selected !== null) check(changes.length === 1 && changes[0].object === selected && page.next_after === null);
   else {
     check(page.next_after === null || (changes.length === 200 && page.next_after === changes.at(-1).object && page.total > 200));
     check(after !== null || page.next_after !== null || changes.length === page.total);
   }
-  return { base: page.base, target: page.target, total: page.total, after, selected, changes, nextAfter: page.next_after };
+  return { base: page.base, target: page.target, total: page.total, fileTotal, folderTotal, after, selected, changes, nextAfter: page.next_after };
 }

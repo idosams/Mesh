@@ -21,6 +21,7 @@ use mesh_types::{Blake3, ContentDigest};
 pub use crate::CheckpointSigner;
 
 mod auto_save;
+mod handoffs;
 pub use auto_save::WorkerProgressSave;
 mod local_checkpoint;
 mod progress;
@@ -2563,18 +2564,7 @@ impl FleetService {
             ("objective", Json::text(inner.runtime.objective())),
             ("revision", Json::Number(inner.runtime.state().revision)),
             ("cancelled", Json::Bool(inner.runtime.state().cancelled)),
-            (
-                "lanes",
-                Json::Array(
-                    inner
-                        .runtime
-                        .state()
-                        .lanes
-                        .values()
-                        .map(lane_summary)
-                        .collect(),
-                ),
-            ),
+            ("lanes", Json::Array(handoffs::lanes(inner.runtime.state()))),
         ]))
     }
 }

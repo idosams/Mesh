@@ -1,3 +1,4 @@
+import { createFleetProgressSummaries } from './fleet-progress-summaries.js';
 import { createFleetProgress } from './fleet-progress-panels.js';
 import { createRemoteFleetObservations } from './remote-fleet-observations.js';
 import { createRemoteFleetReviews } from './remote-fleet-reviews.js';
@@ -35,6 +36,19 @@ function remoteAssignment(value) {
   return Object.freeze({ assignment: value.assignment, worker: value.worker, leaseSequence: value.lease_sequence, leaseUntil: value.lease_until_ms });
 }
 
+function handoffStatus(value, version) {
+  if (value === undefined) return null; // Older catalogues do not prove zero handoffs or feedback.
+  const keys = 'approval_authority,complete_handoffs,incomplete_handoffs,open_change_requests,pending_captures,submitted_reviews,version';
+  require(value && typeof value === 'object' && Object.keys(value).sort().join(',') === keys
+    && nullable(value.version, digest) && value.version === version && value.approval_authority === false
+    && ['complete_handoffs', 'incomplete_handoffs', 'open_change_requests', 'pending_captures', 'submitted_reviews'].every(key => integer(value[key], Number.MAX_SAFE_INTEGER))
+    && value.submitted_reviews <= value.complete_handoffs
+    && Number.isSafeInteger(value.complete_handoffs + value.incomplete_handoffs + value.pending_captures)
+    && (version !== null || (value.complete_handoffs === 0 && value.incomplete_handoffs === 0 && value.submitted_reviews === 0)));
+  return Object.freeze({ version, pending: value.pending_captures, complete: value.complete_handoffs,
+    incomplete: value.incomplete_handoffs, reviews: value.submitted_reviews, openRequests: value.open_change_requests });
+}
+
 export function fleetCatalogue(raw) {
   const value = parse(raw);
   require(value?.schema === 'mesh.native-fleets/v1' && Array.isArray(value.fleets) && value.fleets.length <= 16);
@@ -57,7 +71,7 @@ export function fleetCatalogue(raw) {
       require(lane.run === null || (identity(lane.run?.id) && !runs.has(lane.run.id) && states.has(lane.run.state)));
       if (lane.run) runs.add(lane.run.id);
       return { id: lane.id, parent: lane.parent, sourceProject: lane.source_project, goal: lane.goal, provider: lane.provider,
-        savedVersion: lane.saved_version ?? null, base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
+        handoffStatus: handoffStatus(lane.handoff_status, lane.saved_version ?? null), savedVersion: lane.saved_version ?? null, base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
     });
     require(result.every(lane => lane.parent === null || (lane.parent !== lane.id && lanes.has(lane.parent))));
     require(!policy || result.every(lane => policy.providers.includes(lane.provider) && (lane.parent !== null || lane.provider === policy.coordinator)));
@@ -100,7 +114,8 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   let fleets = [], activity = [], pending = null, busy = false, error = '', feedback = '', visible = false, disposed = false, timer = null;
   let sources = { projects: [], histories: {}, error: '' };
   const remoteObservations = createRemoteFleetObservations({ invoke, publish });
-  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { remoteObservations: remoteObservations.snapshot(), fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot(), ...progress.snapshot() } })); }
+  const progressSummaries = createFleetProgressSummaries({ invoke, publish });
+  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { progressSummaries: progressSummaries.snapshot(), remoteObservations: remoteObservations.snapshot(), fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot(), ...progress.snapshot() } })); }
   const reviews = createFleetReviews({ invoke, changed: publish, otherPinCount: () => remoteReviews.snapshot().remoteReviewPins.length, laneFor: (objective, lane) =>
     fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
   const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish, requestId,
@@ -118,8 +133,8 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
       if (action) await action();
       const [catalogue, observations] = await Promise.all([invoke('attached_fleets'), invoke('fleet_activity')]);
       const nextFleets = fleetCatalogue(catalogue), nextActivity = fleetActivity(observations);
-      fleets = nextFleets; activity = nextActivity; error = ''; remoteObservations.sync(fleets, visible);
-    } catch { error = 'Fleet status could not be confirmed. Existing work is retained. Refresh before starting more work.'; }
+      fleets = nextFleets; activity = nextActivity; error = ''; remoteObservations.sync(fleets, visible); progressSummaries.sync(fleets, visible);
+    } catch { progressSummaries.sync(fleets, false); error = 'Fleet status could not be confirmed. Existing work is retained. Refresh before starting more work.'; }
     finally { busy = false; publish(); plan(); }
   }
   async function provision() {
@@ -161,7 +176,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
       });
     }
   }
-  function mount(event) { visible = event.detail === true; remoteObservations.sync(fleets, visible); if (visible) { publish(); void progress.loadSaved(); void refresh(); void Promise.resolve(reviews.loadSaved()).then(() => remoteReviews.loadSaved()); } else if (timer !== null) { cancel(timer); timer = null; } }
+  function mount(event) { visible = event.detail === true; remoteObservations.sync(fleets, visible); progressSummaries.sync(fleets, visible && !error); if (visible) { publish(); void progress.loadSaved(); void refresh(); void Promise.resolve(reviews.loadSaved()).then(() => remoteReviews.loadSaved()); } else if (timer !== null) { cancel(timer); timer = null; } }
   function attachment(event) {
     const value = event.detail;
     sources = value && Array.isArray(value.projects) && value.histories && typeof value.error === 'string'
@@ -170,5 +185,5 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   document.addEventListener('mesh:fleets-visible', mount);
   document.addEventListener('mesh:fleets-intent', intent);
   document.addEventListener('mesh:attachments-projection', attachment);
-  return () => { disposed = true; progress.dispose(); remoteObservations.dispose(); reviews.dispose(); remoteReviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
+  return () => { disposed = true; progressSummaries.dispose(); progress.dispose(); remoteObservations.dispose(); reviews.dispose(); remoteReviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
 }

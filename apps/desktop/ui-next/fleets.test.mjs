@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
-const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { FleetCards, FleetPendingReviewOperations } from "./src/organisms/fleets.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports.setLocale = setLocale; module.exports.pending = props => renderToStaticMarkup(React.createElement(FleetPendingReviewOperations, props)); module.exports.render = props => renderToStaticMarkup(React.createElement(FleetCards, props));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
+const output = await build({ stdin: { contents: `import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import { FleetCards, FleetPendingReviewOperations, LaneSavedSummary, LaneHandoffStatus } from "./src/organisms/fleets.tsx"; import { setLocale } from "./src/lib/localization.ts"; module.exports.handoff = props => renderToStaticMarkup(React.createElement(LaneHandoffStatus, props)); module.exports.summary = props => renderToStaticMarkup(React.createElement(LaneSavedSummary, props)); module.exports.setLocale = setLocale; module.exports.pending = props => renderToStaticMarkup(React.createElement(FleetPendingReviewOperations, props)); module.exports.render = props => renderToStaticMarkup(React.createElement(FleetCards, props));`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'js' }, bundle: true, format: 'cjs', platform: 'node', packages: 'external', write: false });
 const module = { exports: {} };
 Function('require', 'module', 'exports', output.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
 const props = () => ({ disabled: false, projects: [], projection: { error: '', fleets: [{ objective: 'fleet-one', ownership: 'current-host', policy: { coordinator: 'codex', providers: ['codex'] }, cancelled: false, lanes: [{ id: 'lane-one', parent: null, goal: '<script>private goal</script>', provider: 'codex', base: 'base-version', allocated: true, sourceProject: null, run: null }] }], activity: [] } });
@@ -240,4 +240,44 @@ test('lane overview exposes exact saved progress independently of active executi
   assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>Pin this saved progress<\/button>/);
   value.projection.progressLatestBusy = { 'fleet-one/lane-one': true };
   assert.match(render(value), /<button[^>]*disabled=""[^>]*>Pin this saved progress<\/button>/);
+});
+
+test('saved summary presentation distinguishes current, older, unavailable and unknown counts', () => {
+  const value = { source: 'source', version: 'new-version', busy: false, pending: false, error: '', value: { version: 'new-version', fileTotal: 2, folderTotal: 1 } };
+  const renderSummary = value => module.exports.summary({ value }).replace(/<!--.*?-->/g, '');
+  assert.match(renderSummary(value), /2 changed files · 1 changed folders/);
+  assert.match(renderSummary(value), /Counts for the latest acknowledged save/);
+  value.value.version = 'old-version'; value.busy = true;
+  const older = renderSummary(value); assert.match(older, /Counts for an earlier saved version/); assert.match(older, /Reading saved change counts/); assert.match(older, /old-version/);
+  value.busy = false; value.error = 'Saved change summary is unavailable. Earlier verified counts are retained.';
+  assert.match(renderSummary(value), /Earlier verified counts are retained/);
+  const unknown = renderSummary(undefined); assert.match(unknown, /have not been verified/); assert.doesNotMatch(unknown, /0 changed files/);
+});
+
+test('lane summaries must match the current saved selection and source and never join remote execution', () => {
+  const value = props(), lane = value.projection.fleets[0].lanes[0]; lane.savedVersion = 'saved-version';
+  value.projection.progressSummaries = { 'fleet-one/lane-one': { source: lane.base, version: lane.savedVersion, busy: false, pending: false, error: '', value: { version: lane.savedVersion, fileTotal: 23, folderTotal: 4 } } };
+  assert.match(render(value), /23.*changed files/);
+  value.projection.progressSummaries['fleet-one/lane-one'].source = 'different-source'; assert.doesNotMatch(render(value), /23.*changed files/);
+  value.projection.progressSummaries['fleet-one/lane-one'].source = lane.base;
+  lane.run = { id: 'remote-run', state: 'running', remote: { assignment: 'a', worker: 'w', leaseSequence: '1', leaseUntil: '1' } };
+  assert.doesNotMatch(render(value), /Saved change summary/);
+});
+
+test('lane handoffs remain exact recorded facts independent of execution and approval', () => {
+  const version = 'b'.repeat(64), value = { version, pending: 2, complete: 3, incomplete: 1, reviews: 2, openRequests: 4 };
+  const renderHandoff = module.exports.handoff;
+  const html = renderHandoff({ value, version });
+  assert.match(html, /3 complete handoffs/); assert.match(html, /1 incomplete handoffs/);
+  assert.match(html, /2 submitted reviews/); assert.match(html, /4 open change requests/);
+  assert.match(html, /2 captures not yet confirmed/);
+  assert.match(html, /does not establish test results or approval/); assert.match(html, new RegExp(version));
+  for (const props of [{ version }, { value, version: 'c'.repeat(64) }]) {
+    const unknown = renderHandoff(props); assert.match(unknown, /status unavailable/); assert.doesNotMatch(unknown, /complete handoffs|open change requests/);
+  }
+  assert.match(renderHandoff({ version: null, value: { ...value, version: null, complete: 0, incomplete: 0, reviews: 0 } }), /No saved version recorded/);
+  const cards = props(); cards.projection.fleets[0].lanes[0].savedVersion = version;
+  cards.projection.fleets[0].lanes[0].handoffStatus = value;
+  cards.projection.fleets[0].ownership = 'restored-unattached';
+  assert.match(render(cards), /4 open change requests/);
 });

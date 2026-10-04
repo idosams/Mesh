@@ -5859,3 +5859,123 @@ not completed graphical acceptance, a notarized release or protected-main author
 #274–#278 were still open at checkpoint delivery; their final merge receipts remain separate.
 The full native source gate and two real Codex ordinary-save runs are recorded under R138 and do
 not substitute for this package's remaining visual journey. The complete fleet plan stays open.
+
+
+## R140 — exact saved file and folder counts
+
+New canonical implementation based on PR #279 head
+`e09229de263c1d1038f98e72f19caa677174221c`; no preserved source commit is replaced.
+Tracks issue #280 and the changed-file summary requirement in phase 3. Native starting-version
+comparisons add file_total and folder_total over the complete immutable changed-object set, before
+pagination or selected-content reads. Folder totals never masquerade as files. The same projection
+serves handoff and ordinary-progress comparisons. Desktop validation accepts absent legacy pairs as
+unknown, refuses partial/malformed/inconsistent pairs, checks visible entries against global counts,
+and prevents a known count from changing or disappearing on a subsequent exact comparison request.
+Parallel panels present the native split with English/Hebrew labels and retain the legacy object
+count fallback. No new filesystem scan, authority, persisted format or provider control is added.
+
+The native regression creates 202 changed files and one changed folder, checks both pages and a
+selected-object read, saves later edits including another folder, and verifies that the old pinned
+comparison stays exact. Original project content remains unchanged. Parser and rendered tests cover
+legacy unknown, malformed counts, per-page totals, stable navigation and independent panel fallback.
+Substituting zero for the native file count fails the parser regression; source restored exactly.
+The initial fixture wrongly expected ordinary saving to confirm deletion; the existing conservative
+incomplete-save behavior was preserved, the fixture changed to supported later edits, and the
+failure log retained. Full validation and hosted delivery are pending. These are exact saved-entry
+counts, not a live working-tree inventory or a completeness claim. Live lane summaries, packaged
+parallel-agent acceptance and the remainder of the fleet plan remain unfinished. Fixed checkpoint
+5052009 and previous checkpoints are unchanged.
+
+R140 implementation `d32385e54f8b0619b8e24149dff45761affdeb46` passed full `npm test`: 3,824 native tests in 168.747s (2 slow, 18 skipped), with rendered, desktop and all real-daemon checks passing. The mixed multi-page regression passed in 78.130s under the full suite. Hosted delivery and packaged graphical acceptance remain pending.
+
+
+## R141 — bounded exact saved-progress summary boundary
+
+New canonical implementation based on PR #281 head
+`dda9560fc55946765b6357a02939ca4b165bd509`; no preserved source commit is replaced.
+Tracks issue #282 and the phase-3 live-overview requirement. A native summary projection reuses the
+same immutable change-set calculation as the full comparison but returns before constructing any
+named entry or selected content. FleetHistory and FleetService expose saved_progress_summary for
+one exact retained operation through the existing custody-verified, outside-lock history read.
+Unknown versions, unbound starts and substituted roots still refuse. The read does not adopt a
+worker, start capture, create a checkpoint, or grant handoff/approval authority.
+
+The read-only summarize_fleet_saved_progress desktop command delegates to that history boundary on
+the blocking pool. The new mesh.fleet-saved-progress-summary/v1 response carries source/start/target
+identities, separately observed latest acknowledgment and complete saved file/folder totals. Its
+strict parser limits serialized replies to 2 KiB, rejects unexpected summary fields, malformed or
+inconsistent counts and mismatched selections, and never retargets to a newer acknowledgment.
+No persisted schema or existing comparison response is changed by this increment.
+
+The focused native regression passed in 60.13s: 202 files and one folder produce the same aggregate
+as both comparison pages; the summary has exactly the expected fields, fits the response bound and
+remains fixed after a later save. Existing restart/substituted-root and cross-lane regressions also
+exercise the new read. Parser tests cover bounded output, wrong identities, malformed counts,
+unexpected entry fields and false authority. Replacing the selected version with the latest
+acknowledgment fails the regression; source restored exactly. Full gate and hosted delivery remain
+pending. This is the summary read foundation: independent bounded lane refresh and live presentation
+still follow, and the complete packaged/second-provider/second-host acceptance plan remains open.
+The fixed user checkpoint is unchanged and does not include this new command.
+
+R141 implementation `849bbbd21aaa932bf4e4353d0adeeb56833f7012` passed full `npm test`: 3,824 native tests in 170.334s (2 slow, 18 skipped), 191 rendered tests, 665 desktop tests and all 44 real-daemon checks. Restart, substituted-root and cross-lane summary refusals passed in the complete suite. Hosted delivery and overview presentation remain pending.
+
+
+## R142 — independent local lane saved-change overview
+
+New canonical implementation based on PR #283 head
+`7c5d6c2282d860599335ee4053d93f9f3a184258`; no preserved source commit is replaced.
+Tracks issue #284. Local allocated lanes with an acknowledged save now read the exact native
+summary independently of fleet status/commands and review pins. The scheduler admits at most two
+reads, fairly rotates across the entire bounded catalogue (16 fleets times 1,024 lanes), coalesces
+newer saved versions while an older request is active, and caches successful immutable summaries.
+Failures retain previous verified counts and wait at least five seconds after failure before retry.
+No new native dispatch occurs while hidden/disposed or while catalogue status is unavailable.
+Uncancelled in-flight calls retain their slots until completion; stale scope/version/disposed replies
+cannot replace current results. Restored local lanes use history only; remote assignments and lanes
+without a verified local save do not enter this summary queue.
+
+Lane cards join the exact source and acknowledged version. They distinguish current saved counts,
+earlier saved counts, queued/reading states and unavailable/unknown counts, with exact summary-version
+details and English/Hebrew labels. Counts do not describe unsaved working files or approve results.
+The new controller never captures, launches, stops, adopts or mutates pinned comparisons. Existing
+status/command queues remain responsive while native summary reads are slow.
+
+Focused verification passed 47 scheduler, controller and rendered tests, including two-read capacity,
+fairness, coalesced updates, stale replies, error backoff, hidden/disposed dispatch, source changes,
+restored versus remote eligibility, the catalogue-size bound and explicit start during a pending
+summary. Current/older/error/unknown rendered states and source/version correlation are covered.
+Increasing concurrency to three fails the regression; source restored exactly. Native regression
+also binds the catalogue base to the history summary source. Full gate and hosted delivery remain
+pending. Packaged real-agent parallel review, measured responsiveness, richer activity/validation/
+dependency overview and the full fleet acceptance plan remain open. Fixed checkpoint unchanged.
+
+R142 implementation `94af7d6c329ae7b9440a4f44bfea52512f871ef5` passed full `npm test`: 3,824 native tests in 169.965s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery and packaged graphical acceptance remain pending. The fixed 5052009 user checkpoint remains unchanged.
+
+
+## R144 — exact handoff and feedback overview
+
+New canonical implementation based on PR #285 head
+`8ab2f84fd9787b0551e5e766ed4f5522702569d3`; no preserved source commit is replaced.
+Tracks issue #287. The native fleet snapshot now adds per-lane handoff status computed in one pass
+over the already-refreshed checkpoint and review-request records. Complete/incomplete handoffs and
+submitted reviews are bound to the lane's exact latest saved version; older-version records are
+excluded from those counts. Pending capture intents and open explicit change requests span the lane.
+Confirmed decisions and reopen operations update the request count; provider completion and proposed
+revisions do not. No feedback text, credentials or file contents enter this aggregate.
+
+This is an additive snapshot projection with no persisted-format change, filesystem scan, capture,
+worker adoption or new authority. The strict desktop parser enforces closed fields, exact version
+correlation, safe counts, review subsets and false approval authority. Omitted legacy projections
+remain unknown; contradictory/malformed replies refuse. Lane cards explain current-version versus
+lane-wide counts in English and Hebrew and distinguish native capture completeness from tests or
+approval. Independent comparisons and progress pins remain unchanged.
+
+The focused native projection test covers old/current/new/absent saves, complete/incomplete/pending
+captures, cross-lane isolation, explicit feedback decisions and reopening, read-only state and privacy.
+The existing real native feedback lifecycle test checks the snapshot against durable commands. Both
+pass; 44 focused controller/rendered tests passed. The initial native test fixture needed an explicit
+closure parameter type; its compile failure is preserved. Removing the current-version filter fails
+the native regression; exact source was restored. Full gate and hosted delivery remain pending. Private dependency eligibility, validation evidence, packaged graphical
+acceptance and every remaining fleet-plan exit remain required. Fixed checkpoints are unchanged.
+
+R144 implementation `49cc6a84f5b5ccf90b0c5e4f4b0c40924ea60370` passed full `npm test`: 3,825 native tests in 174.256s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The native feedback decision/reopen projection passed within the full suite. Hosted delivery and packaged graphical acceptance remain pending.

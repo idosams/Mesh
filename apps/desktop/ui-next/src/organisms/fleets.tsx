@@ -8,12 +8,14 @@ import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetRe
 import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
-type Lane = { savedVersion?: string | null; id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string; remote?: { assignment: string; worker: string; leaseSequence: string; leaseUntil: string } | null } | null };
+type HandoffStatus = { version: string | null; pending: number; complete: number; incomplete: number; reviews: number; openRequests: number };
+type Lane = { handoffStatus?: HandoffStatus | null; savedVersion?: string | null; id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string; remote?: { assignment: string; worker: string; leaseSequence: string; leaseUntil: string } | null } | null };
 type ProviderPolicy = { coordinator: string; providers: string[] };
 type Fleet = { policy?: ProviderPolicy | null; objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { progressSave?: { state: string; observedAt: string | null; version: string | null; issue: string | null } | null; lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
 type Activity = { objective: string; status: string; stopRequested: boolean; observedAt: string | null; workers: Worker[] };
-type Projection = { progressLatestBusy?: Record<string, boolean>; progressPersistence?: ProgressPersistence; progressPins?: ProgressPin[]; progressQueues?: Record<string, ProgressQueue>; progressNotice?: string; remoteObservations?: Record<string, { run: string; assignment: string; worker: string; value: RecordedExecution | null; busy: boolean; error: string }>; remoteProjectWorkflow?:RemoteProjectWorkflow; remoteReviewPersistence?: FleetReviewPersistence; remoteReviewPins?: RemoteReviewPin[]; remoteReviewQueues?: Record<string, RemoteReviewQueue>; remoteReviewNotice?: string; reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { policy?: ProviderPolicy; id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
+type ProgressSummary = { source: string; version: string; busy: boolean; pending: boolean; error: string; value: null | { version: string; fileTotal: number; folderTotal: number } };
+type Projection = { progressSummaries?: Record<string, ProgressSummary>; progressLatestBusy?: Record<string, boolean>; progressPersistence?: ProgressPersistence; progressPins?: ProgressPin[]; progressQueues?: Record<string, ProgressQueue>; progressNotice?: string; remoteObservations?: Record<string, { run: string; assignment: string; worker: string; value: RecordedExecution | null; busy: boolean; error: string }>; remoteProjectWorkflow?:RemoteProjectWorkflow; remoteReviewPersistence?: FleetReviewPersistence; remoteReviewPins?: RemoteReviewPin[]; remoteReviewQueues?: Record<string, RemoteReviewQueue>; remoteReviewNotice?: string; reviewOutbox?: { entries: { kind: string; objective: string; selection: { lane: string; checkpoint: string; version: string }; input: { request: string; operation?: string; message?: string; expected_revision?: string; checkpoint?: string | null; version?: string | null; bundle?: string | null } }[]; busy: boolean; loaded: boolean; error: string }; reviewPersistence?: FleetReviewPersistence; reviewQueues?: Record<string, FleetReviewQueue>; reviewPins?: FleetReviewPin[]; reviewNotice?: string; fleets: Fleet[]; activity: Activity[]; pending: { policy?: ProviderPolicy; id: string; version: string; goal: string; limits: { lanes: number; concurrency: number; depth: number } } | null; busy: boolean; error: string; feedback: string; available: boolean };
 const empty: Projection = { fleets: [], activity: [], pending: null, busy: false, error: "", feedback: "", available: false };
 const send = (detail: Record<string, unknown>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const saveStates: Record<string, string> = { waiting: "Private progress not yet observed", saving: "Saving private progress", saved: "Private progress saved", unchanged: "No unsaved changes observed", "needs-attention": "Private progress needs attention" };
@@ -113,6 +115,8 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
           const remoteRow = projection.remoteObservations?.[`${fleet.objective}/${lane.id}`];
           const remote = remoteRow && lane.run?.remote && remoteRow.run === lane.run.id
             && remoteRow.assignment === lane.run.remote.assignment && remoteRow.worker === lane.run.remote.worker ? remoteRow : null;
+          const summaryRow = projection.progressSummaries?.[`${fleet.objective}/${lane.id}`];
+          const summary = summaryRow?.source === lane.base && summaryRow.version === lane.savedVersion ? summaryRow : undefined;
           return <li key={lane.id} className="grid gap-1 rounded border border-border p-2 text-sm">
             <p className="font-medium">{t(lane.parent ? "Worker lane" : "Coordinator lane")} · <bdi dir="ltr">{lane.provider}</bdi></p><p dir="auto" className="whitespace-pre-wrap break-words">{lane.goal}</p>
             <p>{lane.run ? <>{!worker && <>{t("Last saved state")}: </>}{t(states[lane.run.state])}</> : t(!current ? "Saved lane · recovery required" : lane.allocated ? "Waiting to start" : "Allocation needs attention")}</p>
@@ -135,6 +139,8 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
               <details className="break-all"><summary>{t("Latest acknowledged save")}</summary><bdi dir="ltr">{lane.savedVersion}</bdi></details>
               <Button variant="secondary" disabled={!projection.available || fleet.ownership === "unavailable" || !(projection.progressPersistence?.editable ?? true) || projection.progressLatestBusy?.[`${fleet.objective}/${lane.id}`]} onClick={() => send({ type: "progress-pin-latest", objective: fleet.objective, lane: lane.id, version: lane.savedVersion })}>{t("Pin this saved progress")}</Button>
             </div>}
+            {lane.savedVersion && lane.allocated && !lane.run?.remote && <LaneSavedSummary value={summary} />}
+            <LaneHandoffStatus value={lane.handoffStatus} version={lane.savedVersion ?? null} />
             <SavedProgress objective={fleet.objective} lane={lane.id} queue={projection.progressQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable" && lane.allocated && (projection.progressPersistence?.editable ?? true)} />
             <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable"} />
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
@@ -166,4 +172,34 @@ export function FleetPendingReviewOperations({ value }: { value: NonNullable<Pro
 function FleetPolicy({ policy }: { policy?: ProviderPolicy | null }) {
   const t = useTranslation();
   return policy ? <div className="text-sm"><p>{t("Coordinator provider")}: <bdi dir="ltr">{policy.coordinator}</bdi></p><p>{t("Allowed providers")}: <bdi dir="ltr">{policy.providers.join(", ")}</bdi></p></div> : <p className="text-sm">{t("Provider choices unavailable. Refresh before starting agents.")}</p>;
+}
+
+export function LaneSavedSummary({ value }: { value?: ProgressSummary }) {
+  const t = useTranslation();
+  return <section aria-label={t("Saved change summary")} className="grid gap-1 text-xs">
+    <p className="font-medium">{t("Saved changes since lane start")}</p>
+    {value?.value ? <>
+      <p>{value.value.fileTotal} {t("changed files")} · {value.value.folderTotal} {t("changed folders")}</p>
+      <p>{t(value.value.version === value.version ? "Counts for the latest acknowledged save" : "Counts for an earlier saved version")}</p>
+      <details className="break-all"><summary>{t("Summary saved version")}</summary><bdi dir="ltr">{value.value.version}</bdi></details>
+    </> : <p>{t("Saved change counts have not been verified")}</p>}
+    {value?.busy ? <p role="status">{t("Reading saved change counts")}</p>
+      : value?.pending ? <p role="status">{t("Waiting for saved change counts")}</p> : null}
+    {value?.error && <p role="status">{t(value.error)}</p>}
+    <p>{t("Saved counts do not describe unsaved working files or approve a result.")}</p>
+  </section>;
+}
+
+export function LaneHandoffStatus({ value, version }: { value?: HandoffStatus | null; version: string | null }) {
+  const t = useTranslation();
+  if (!value || value.version !== version) return <p className="text-xs text-muted-foreground">{t("Handoff and feedback status unavailable")}</p>;
+  return <div className="grid gap-1 text-xs">
+    <p className="font-medium">{t("Recorded handoffs and feedback")}</p>
+    {version === null ? <p>{t("No saved version recorded")}</p> : <>
+      <p>{t("For the latest saved version")}: {value.complete} {t("complete handoffs")} · {value.incomplete} {t("incomplete handoffs")} · {value.reviews} {t("submitted reviews")}</p>
+      <details className="break-all"><summary>{t("Handoff version")}</summary><bdi dir="ltr">{version}</bdi></details>
+    </>}
+    <p>{t("Across this lane")}: {value.pending} {t("captures not yet confirmed")} · {value.openRequests} {t("open change requests")}</p>
+    <p className="text-muted-foreground">{t("Handoff completeness does not establish test results or approval.")}</p>
+  </div>;
 }

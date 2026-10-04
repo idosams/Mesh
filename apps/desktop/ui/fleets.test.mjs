@@ -362,3 +362,40 @@ test('lane saved version is optional for older replies and exact when present', 
     value.fleets[0].state.lanes[0].saved_version = invalid; assert.throws(() => fleetCatalogue(value));
   }
 });
+
+test('pending summary reads do not block fleet status or an explicit start command', async () => {
+  const calls = [], value = catalogue(); value.fleets[0].state.lanes[0].saved_version = version;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_fleets') return value;
+    if (command === 'fleet_activity' || command === 'start_attached_fleet') return activity();
+    if (command === 'summarize_fleet_saved_progress') return new Promise(() => {});
+    throw new Error('unavailable unrelated history');
+  });
+  await settle(); assert.equal(h.projections.at(-1).busy, false);
+  h.intent({ type: 'start', objective }); await settle();
+  assert.equal(calls.filter(call => call.command === 'start_attached_fleet').length, 1);
+  assert.equal(calls.filter(call => call.command === 'summarize_fleet_saved_progress').length, 1);
+  assert.equal(h.projections.at(-1).busy, false); h.dispose();
+});
+
+test('handoff projection is exact, bounded, immutable and unknown for legacy catalogues', () => {
+  const value = catalogue(), row = value.fleets[0].state.lanes[0];
+  assert.equal(fleetCatalogue(value)[0].lanes[0].handoffStatus, null);
+  row.saved_version = version;
+  const good = { version, pending_captures: 1, complete_handoffs: 2, incomplete_handoffs: 1, submitted_reviews: 1, open_change_requests: 3, approval_authority: false };
+  row.handoff_status = good;
+  const parsed = fleetCatalogue(value)[0].lanes[0].handoffStatus;
+  assert.deepEqual(parsed, { version, pending: 1, complete: 2, incomplete: 1, reviews: 1, openRequests: 3 });
+  assert.ok(Object.isFrozen(parsed));
+  for (const invalid of [null, {}, { ...good, version: id }, { ...good, version: null }, { ...good, approval_authority: true },
+    { ...good, pending_captures: -1 }, { ...good, submitted_reviews: 3 }, { ...good, open_change_requests: '1' },
+    { ...good, incomplete_handoffs: 0.5 }, { ...good, complete_handoffs: Number.MAX_SAFE_INTEGER },
+    { ...good, open_change_requests: Number.MAX_SAFE_INTEGER + 1 }, { ...good, message: 'private' }]) {
+    row.handoff_status = invalid; assert.throws(() => fleetCatalogue(value));
+  }
+  row.saved_version = null;
+  row.handoff_status = { ...good, version: null, complete_handoffs: 0, incomplete_handoffs: 0, submitted_reviews: 0 };
+  assert.equal(fleetCatalogue(value)[0].lanes[0].handoffStatus.openRequests, 3);
+  row.handoff_status.complete_handoffs = 1; assert.throws(() => fleetCatalogue(value));
+});

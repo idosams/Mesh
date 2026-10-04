@@ -47,7 +47,25 @@ its selector and shows a read error; failed saves expose retry/reload controls i
 persistence. Each lane now exposes its durable latest acknowledged save in the polled overview, including
 restored lanes. The shortcut pins the version shown when clicked, even if later saves arrive
 during loading. Missing legacy fields mean unknown, not unsaved work. Broader changed-file/live
-activity summaries and packaged parallel-inspection acceptance remain unfinished.
+activity summaries and packaged parallel-inspection acceptance remain unfinished. Exact pinned comparisons now separate native file and folder counts
+across the entire saved comparison, independently of the displayed page or selected object. Older
+replies retain an unknown split instead of inventing zero files. These counts describe retained
+saved entries, not current working files, capture completeness, or the broader live lane overview. A separate
+native summary command now exposes the same exact counts and bound version identities without
+returning file names or content. It reuses verified retained history outside the fleet lock and
+refuses unavailable or replaced custody. A strict desktop parser bounds and validates the response.
+Local lane cards now refresh these summaries independently of status, commands and pinned reviews.
+At most two summary reads run concurrently, with fair scheduling over the bounded catalogue,
+coalescing of newer saves, cached immutable results and retries no sooner than five seconds after a
+failure. Older counts retain their exact version label during newer reads or errors; unavailable
+history never becomes zero files. Hidden/disposed views stop new dispatch. Restored local lanes
+remain readable without worker adoption, while remote assignments retain their separate observation
+path. This covers saved-change counts in the local overview; broader activity summaries and packaged
+parallel-agent acceptance remain unfinished.
+Lane cards also project recorded handoff completeness and submitted-review counts for the exact
+latest saved version, plus unconfirmed capture intents and open native change requests across the
+lane. This aggregate reads the refreshed durable state once, exposes no feedback text, and does not
+claim tests, dependency eligibility or approval. Older replies remain explicitly unknown.
 
 ## Retained worker execution observations
 

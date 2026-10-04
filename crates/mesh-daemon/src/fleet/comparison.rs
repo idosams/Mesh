@@ -125,6 +125,25 @@ pub(crate) fn compare(
     after: Option<&str>,
     selected: Option<&str>,
 ) -> Result<Json, Unavailable> {
+    project(open, base, target, after, selected, false)
+}
+
+pub(crate) fn summarize(
+    open: &OpenWorkspace,
+    base: RecordDigest,
+    target: RecordDigest,
+) -> Result<Json, Unavailable> {
+    project(open, base, target, None, None, true)
+}
+
+fn project(
+    open: &OpenWorkspace,
+    base: RecordDigest,
+    target: RecordDigest,
+    after: Option<&str>,
+    selected: Option<&str>,
+    summary_only: bool,
+) -> Result<Json, Unavailable> {
     if after.is_some() && selected.is_some() {
         return Err(refused());
     }
@@ -153,6 +172,26 @@ pub(crate) fn compare(
             _ => true,
         })
         .collect();
+    // Count the complete immutable comparison, not just this page or selected object.
+    let mut file_total = 0_u64;
+    for id in &changed {
+        if before.get(*id).is_some_and(|entry| entry.file.is_some())
+            || later.get(*id).is_some_and(|entry| entry.file.is_some())
+        {
+            file_total += 1;
+        }
+    }
+    let folder_total = changed.len() as u64 - file_total;
+    if summary_only {
+        return Ok(Json::object([
+            ("base", Json::text(base.to_string())),
+            ("target", Json::text(target.to_string())),
+            ("total", Json::Number(changed.len() as u64)),
+            ("file_total", Json::Number(file_total)),
+            ("folder_total", Json::Number(folder_total)),
+            ("approval_authority", Json::Bool(false)),
+        ]));
+    }
     let start = match after.or(selected) {
         Some(id) => {
             changed
@@ -200,6 +239,8 @@ pub(crate) fn compare(
         ("after", after.map_or(Json::Null, Json::text)),
         ("selected", selected.map_or(Json::Null, Json::text)),
         ("total", Json::Number(changed.len() as u64)),
+        ("file_total", Json::Number(file_total)),
+        ("folder_total", Json::Number(folder_total)),
         ("changes", Json::Array(changes)),
         (
             "next_after",

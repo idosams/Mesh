@@ -2331,6 +2331,22 @@ fn restarted_history_reads_preserve_work_and_never_restore_execution_authority()
     assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
 }
 
+fn snapshot_handoff(f: &Fixture) -> Json {
+    f.service
+        .snapshot()
+        .unwrap()
+        .get("lanes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lane| lane.get("id").and_then(Json::as_text) == Some(f.lane.as_str()))
+        .unwrap()
+        .get("handoff_status")
+        .unwrap()
+        .clone()
+}
+
 #[test]
 fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_originating_lane() {
     use mesh_daemon::fleet::service::SavedReviewSelection;
@@ -2369,12 +2385,29 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
     )
     .unwrap();
     let before = f.service.native_state().unwrap();
+    assert_eq!(
+        snapshot_handoff(&f).get("complete_handoffs"),
+        Some(&Json::Number(1))
+    );
+    assert_eq!(
+        snapshot_handoff(&f).get("submitted_reviews"),
+        Some(&Json::Number(1))
+    );
+    assert_eq!(
+        snapshot_handoff(&f).get("version"),
+        checkpoint.get("version")
+    );
     let message = "Preserve the previous introduction and add an example.";
     let receipt = f
         .service
         .request_review_changes("reviewer-request", &selection, message)
         .unwrap();
     assert_eq!(text(&receipt, "status"), "recorded");
+    assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(1))
+    );
+    assert!(!snapshot_handoff(&f).encode().contains(message));
     assert_eq!(receipt.get("approval_authority"), Some(&Json::Bool(false)));
     assert_eq!(
         f.service
@@ -2602,6 +2635,10 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         .unwrap();
     assert_eq!(text(receipt.get("current").unwrap(), "status"), "addressed");
     assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(0))
+    );
+    assert_eq!(
         receipt.get("current").unwrap().get("approval_authority"),
         Some(&Json::Bool(false))
     );
@@ -2626,6 +2663,10 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         .unwrap();
     assert_eq!(text(late.get("receipt").unwrap(), "status"), "addressed");
     assert_eq!(text(late.get("current").unwrap(), "status"), "open");
+    assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(1))
+    );
     assert_eq!(
         late.get("current")
             .unwrap()
@@ -3034,6 +3075,7 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
     let lanes = summary.get("lanes").unwrap().as_array().unwrap();
     assert_eq!(text(&lanes[0], "saved_version"), version);
     let page = f.service.saved_progress_versions(&f.lane, None).unwrap();
+    assert_eq!(text(&lanes[0], "base"), text(&page, "source_version"));
     let rows = page
         .get("progress")
         .unwrap()
@@ -3096,6 +3138,16 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
         .saved_progress_comparison(&f.lane, &version, None, Some(object))
         .unwrap();
     assert_eq!(pinned.get("progress"), restored.get("progress"));
+    let restored_summary = reopened.saved_progress_summary(&f.lane, &version).unwrap();
+    assert_eq!(
+        restored_summary
+            .get("progress")
+            .unwrap()
+            .get("file_total")
+            .and_then(Json::as_u64),
+        Some(1)
+    );
+
     assert_eq!(before.revision, reopened.native_state().unwrap().revision);
     assert_eq!(selected_before, f.desktop.workspace_state().unwrap());
     assert_eq!(
@@ -3124,6 +3176,7 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
     assert!(reopened
         .saved_progress_comparison(&f.lane, &version, None, None)
         .is_err());
+    assert!(reopened.saved_progress_summary(&f.lane, &version).is_err());
 }
 
 #[test]
@@ -3178,6 +3231,10 @@ fn ordinary_saved_progress_pages_exact_operations_and_isolates_lanes() {
         .collect();
     assert_eq!(all.len(), rows.len() + remaining.len());
     assert!(saved_versions.is_subset(&all));
+    assert!(other
+        .service
+        .saved_progress_summary(&other.lane, saved_versions.first().unwrap())
+        .is_err());
     for version in &saved_versions {
         assert!(other
             .service
@@ -3373,4 +3430,121 @@ fn actual_codex_progress_is_inspectable_before_any_explicit_handoff() {
     fs::write(f.path.join("ordinary-progress-proof.json"), report.encode()).unwrap();
     server.shutdown();
     eprintln!("ordinary progress proof: {}", report.encode());
+}
+
+#[test]
+fn saved_change_counts_cover_all_pages_and_ignore_later_work() {
+    let f = Fixture::new("saved-change-counts");
+    let credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "count-reader",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x77; 32],
+            ))),
+        )
+        .unwrap();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&f.lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    fs::create_dir(root.join("many")).unwrap();
+    for n in 0..201 {
+        fs::write(root.join(format!("many/{n}.bin")), [0_u8, 0xff]).unwrap();
+    }
+    fs::write(root.join("note.txt"), "changed\n").unwrap();
+    let saved = f.service.save_worker_progress(&credential).unwrap();
+    assert!(saved.complete);
+    let version = saved.version.to_string();
+    let read = |after: Option<&str>, selected: Option<&str>| {
+        f.service
+            .saved_progress_comparison(&f.lane, &version, after, selected)
+            .unwrap()
+    };
+    let first = read(None, None);
+    let progress = first.get("progress").unwrap();
+    let counts = |value: &Json| {
+        let p = value.get("progress").unwrap();
+        assert_eq!(p.get("total").and_then(Json::as_u64), Some(203));
+        assert_eq!(p.get("file_total").and_then(Json::as_u64), Some(202));
+        assert_eq!(p.get("folder_total").and_then(Json::as_u64), Some(1));
+    };
+    counts(&first);
+    let summary = f.service.saved_progress_summary(&f.lane, &version).unwrap();
+    counts(&summary);
+    assert_eq!(
+        text(&summary, "schema"),
+        "mesh.fleet-saved-progress-summary/v1"
+    );
+    assert_eq!(
+        summary.get("progress").unwrap(),
+        &Json::object([
+            ("base", Json::text(text(progress, "base"))),
+            ("target", Json::text(&version)),
+            ("total", Json::Number(203)),
+            ("file_total", Json::Number(202)),
+            ("folder_total", Json::Number(1)),
+            ("approval_authority", Json::Bool(false)),
+        ])
+    );
+    assert!(summary.encode().len() < 2048);
+    let rows = progress.get("changes").unwrap().as_array().unwrap();
+    assert_eq!(rows.len(), 200);
+    let next = read(Some(text(progress, "next_after")), None);
+    counts(&next);
+    assert_eq!(
+        next.get("progress")
+            .unwrap()
+            .get("changes")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    let selected = read(None, Some(text(&rows[0], "object")));
+    counts(&selected);
+    fs::write(root.join("note.txt"), "later saved bytes\n").unwrap();
+    fs::create_dir(root.join("later-folder")).unwrap();
+    let later = f.service.save_worker_progress(&credential).unwrap();
+    assert!(later.complete);
+    assert_ne!(saved.version, later.version);
+    let latest = f
+        .service
+        .saved_progress_comparison(&f.lane, &later.version.to_string(), None, None)
+        .unwrap();
+    assert_eq!(
+        latest
+            .get("progress")
+            .unwrap()
+            .get("folder_total")
+            .and_then(Json::as_u64),
+        Some(2)
+    );
+    assert_eq!(read(None, None).get("progress"), first.get("progress"));
+    assert_eq!(
+        f.service
+            .saved_progress_summary(&f.lane, &version)
+            .unwrap()
+            .get("progress"),
+        summary.get("progress")
+    );
+    assert!(f
+        .service
+        .saved_progress_summary(&f.lane, &"0".repeat(64))
+        .is_err());
+    assert!(f
+        .service
+        .saved_progress_summary(&f.lane, "not-a-version")
+        .is_err());
+
+    assert_eq!(
+        fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
+        "immutable input\n"
+    );
 }

@@ -1229,6 +1229,24 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn summarize_fleet_saved_progress(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        version: String,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.fleet_history(&objective)?
+                .saved_progress_summary(&lane, &version)
+                .map(|value| value.encode())
+                .map_err(|_| "The exact saved progress summary is unavailable".into())
+        })
+        .await
+        .map_err(|_| "Saved progress summary could not be loaded".to_owned())?
+    }
+
+    #[tauri::command]
     async fn fleet_saved_progress(
         host: State<'_, Arc<AttachmentHost>>,
         objective: String,
@@ -8312,6 +8330,7 @@ mod desktop {
                 save_remote_project_outbox,
                 inspect_remote_fleet_review,
                 render_remote_fleet_artifact,
+                summarize_fleet_saved_progress,
                 fleet_saved_progress,
                 inspect_fleet_saved_progress,
                 fleet_saved_reviews,

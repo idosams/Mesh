@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { savedProgressPage, savedProgressComparison } from './fleet-progress.js';
+import { savedProgressPage, savedProgressComparison, savedProgressSummary } from './fleet-progress.js';
 const hash = n => n.toString(16).padStart(64, '0');
 const selection = { objective: `fleet-${hash(1)}`, lane: `lane-${hash(2)}`, source: hash(3), starting: hash(4), version: hash(5) };
 const envelope = schema => ({ schema, objective: selection.objective, lane: selection.lane, revision: 7,
@@ -52,4 +52,21 @@ test('selected progress content verifies object identity, paths, bytes and text 
     v => v.progress.changes[0].after.content_state = 'not-requested']) {
     const altered = structuredClone(value); mutate(altered); assert.throws(() => savedProgressComparison(altered, selection, null, object));
   }
+});
+
+test('summary is bound to one saved version, bounded and contains no named entries', () => {
+  const value = { ...envelope('mesh.fleet-saved-progress-summary/v1'), progress: {
+    base: selection.starting, target: selection.version, total: 203, file_total: 202, folder_total: 1, approval_authority: false } };
+  const result = savedProgressSummary(JSON.stringify(value), selection);
+  assert.equal(result.fileTotal, 202); assert.equal(result.folderTotal, 1);
+  assert.equal(result.version, selection.version); assert.notEqual(result.latest, result.version);
+  assert.equal(savedProgressSummary(value, { objective: selection.objective, lane: selection.lane, version: selection.version }).starting, selection.starting);
+  for (const mutate of [v => v.source_version = hash(8), v => v.starting_version = hash(8), v => v.starting_version = null,
+    v => v.progress.target = hash(9), v => v.progress.base = hash(8), v => v.progress.total = 204,
+    v => v.progress.file_total = null, v => v.progress.folder_total = -1, v => v.progress.folder_total = 0.5,
+    v => v.progress.changes = [], v => v.progress.approval_authority = true, v => v.handoff_authority = true,
+    v => v.lane = `lane-${hash(9)}`, v => v.schema = 'mesh.fleet-saved-progress-page/v1']) {
+    const bad = structuredClone(value); mutate(bad); assert.throws(() => savedProgressSummary(bad, selection));
+  }
+  assert.throws(() => savedProgressSummary(' '.repeat(2049), selection));
 });
