@@ -235,6 +235,10 @@ impl AttachmentStorage {
         let lanes = self.pinned.open_child_directory(OsStr::new(ROOT))?;
         let allocation = lanes.open_child_directory(parts[0].as_os_str())?;
         let (recorded, raw) = recovery::read_json(&allocation, INTENT)?;
+        if super::dependency_reservation::is_reservation(&recorded) {
+            return super::dependency_reservation::origin(self, child, allocation, recorded)
+                .map(Some);
+        }
         let project = recovery::text(&recorded, "source_project")?;
         let version = recovery::text(&recorded, "source_version")?;
         let request = recovery::text(&recorded, "request")?;

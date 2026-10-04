@@ -218,6 +218,12 @@ impl AttachmentStorage {
                 }
                 origin.allocation.ensure_namespace_identity()?;
                 let origin = &origin.value;
+                if super::dependency_reservation::is_reservation(origin)
+                    && (field(origin, "owner")? != owner.id()
+                        || field(origin, "authority")? != owner_binding.authority.to_hex())
+                {
+                    return Err(invalid("reserved work belongs to another owning authority"));
+                }
                 let parent = parent.ok_or_else(|| invalid("missing native parent work"))?;
                 if field(origin, "source_project")? != parent.id() {
                     return Err(invalid("native parent work changed"));
