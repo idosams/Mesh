@@ -6724,3 +6724,23 @@ published head `ba88b38049f21318638eccdfbf4b744c7cdb8ef6` passed all seven hoste
 `37218506637`. These results validate the staging primitive and existing behavior; full consumed
 start commit, journal-before-install ordering, owner receipt and cross-store recovery remain open.
 Draft PR #324 is not merged, and the fixed test checkpoint is unchanged.
+
+R161 now provides the corresponding exact retained-file recovery seam. Canonical receipts bind
+source/recovery roots, target path, parent policy, original allocation identity (including its
+creation-time discriminator), file metadata, byte length and content digest. Resume requires
+independently retained saved bytes within the caller's admitted limit. Wrong bytes or receipts,
+same-byte replacement files, missing/both-present entries, changed roots/path or later editor edits
+refuse without overwriting or cleanup. Already-installed retries synchronize both parents and
+recheck identity/content; an edit during synchronization cannot be acknowledged. Empty files work
+with a zero-byte budget. Receipts remain evidence only, not consumption or write authorization.
+
+All 50 retained-replacement tests passed. A file installer exits in a separate process immediately
+after rename; two fresh recovery processes reconstruct from saved receipt/content and preserve the
+same allocation identity and executable state. Disabling installed-file retry handling makes that
+process test fail; the correct source was restored byte-for-byte. Existing creation/restoration
+callers use the same exact recovery validation without widening their admission policy.
+
+Tree and file primitives now cover both top-level entry types. They still need native integration
+with the signed starting snapshot, staged transaction/source closure, required journal-before-install
+ordering and owner consumption receipt. No consumed version or runnable lane is acknowledged by
+these helper changes. Draft PR #324 and issue #323 remain open; the fixed checkpoint is unchanged.

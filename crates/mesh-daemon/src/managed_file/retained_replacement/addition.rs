@@ -1,5 +1,6 @@
 //! A private staged file can populate an absent attached path without replacing concurrent work.
 use super::*;
+mod recovery;
 
 pub(crate) fn parent_policy(
     root: &PinnedWorkspaceRoot,
@@ -229,7 +230,17 @@ impl RetainedAddition {
     }
 
     pub(crate) fn apply(self) -> io::Result<bool> {
-        self.apply_with_hooks(|| {}, || {}, File::sync_all)
+        let receipt = self.recovery_receipt()?;
+        let limit = self.bytes.len() as u64;
+        Self::resume(
+            self.source.clone(),
+            self.relative.clone(),
+            self.recovery.clone(),
+            self.bytes,
+            &receipt,
+            limit,
+        )?
+        .apply_with_hooks(|| {}, || {}, File::sync_all)
     }
 
     fn apply_with_hooks(
@@ -239,6 +250,15 @@ impl RetainedAddition {
         sync: impl Fn(&File) -> io::Result<()>,
     ) -> io::Result<bool> {
         use mesh_types::ContentDigest as _;
+        if self.installed()? {
+            let (parent, _) = self
+                .source
+                .filesystem()
+                .inspect_entry_with_parent(&self.relative)?;
+            let recovery = self.recovery.try_clone_directory()?;
+            let durable = sync(&parent).is_ok() & sync(&recovery).is_ok();
+            return Ok(durable && self.installed()?);
+        }
         let (directory, name) = self.validated_target()?;
         let recovery = self.recovery.try_clone_directory()?;
         before();
@@ -280,7 +300,7 @@ mod tests {
     use super::super::tests::Fixture;
     use super::*;
 
-    fn prepare(f: &Fixture) -> RetainedAddition {
+    pub(super) fn prepare(f: &Fixture) -> RetainedAddition {
         let root = PinnedWorkspaceRoot::open(f.source.clone()).unwrap();
         let relative = PathBuf::from("new.txt");
         let parent = absent_parent(&root, &relative).unwrap().unwrap();
