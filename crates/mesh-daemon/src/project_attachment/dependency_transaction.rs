@@ -300,7 +300,7 @@ impl ProvisionedAttachment {
         })
     }
 
-    fn check_dependency_registration(&self) -> io::Result<()> {
+    pub(super) fn check_dependency_registration(&self) -> io::Result<()> {
         self.attachment.ensure_current()?;
         self.store.ensure_namespace_identity()?;
         if read_receipt(&self.store)? != self.attachment.receipt()?.encode() {
