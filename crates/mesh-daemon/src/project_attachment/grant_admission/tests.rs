@@ -362,3 +362,118 @@ fn native_owner_input_uses_the_exact_read_only_owner_snapshot() {
         .unwrap();
     assert_eq!(bytes, b"root source");
 }
+
+#[test]
+fn prepared_grant_requires_complete_held_custody_and_refreshes_permission() {
+    let f = Fixture::new("prepared-custody");
+    let grant = f.grant(true, None, id(1)).unwrap();
+    let prepared = f
+        .storage
+        .prepare_input_grant(
+            &f.owner,
+            NativeGrantInspection {
+                source: &f.source,
+                version: f.version,
+                destination: &f.destination,
+                grant: grant.record(),
+            },
+        )
+        .unwrap();
+    {
+        let incomplete =
+            crate::workspace_custody::lock_workspace_initialization(&f.owner.store).unwrap();
+        assert!(f
+            .storage
+            .with_prepared_input_grant(&prepared, &incomplete, |_| -> io::Result<()> {
+                panic!("incomplete custody entered callback")
+            })
+            .is_err());
+    }
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+        assert!(f
+            .inspect(grant.record(), |_| -> io::Result<()> {
+                panic!("nested public acquisition entered callback")
+            })
+            .is_err());
+        let bytes = f
+            .storage
+            .with_prepared_input_grant(&prepared, &guard, |view| {
+                let mut bytes = Vec::new();
+                view.write_file("note", &mut bytes)?;
+                Ok(bytes)
+            })
+            .unwrap();
+        assert_eq!(bytes, b"private source version");
+        guard.ensure_current().unwrap();
+    }
+    f.grant(false, Some(grant.record()), id(2)).unwrap();
+    let guard =
+        crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+    assert!(f
+        .storage
+        .with_prepared_input_grant(&prepared, &guard, |_| -> io::Result<()> {
+            panic!("revoked prepared grant entered callback")
+        })
+        .is_err());
+    guard.ensure_current().unwrap();
+}
+
+#[test]
+fn granted_initial_snapshot_preparation_uses_saved_bytes_and_has_explicit_root() {
+    use mesh_operations::{ActorId, ObjectId, Operation, WorkspaceId};
+    let f = Fixture::new("starting-snapshot");
+    let grant = f.grant(true, None, id(1)).unwrap();
+    fs::write(
+        f.source.project().root().join("note"),
+        b"later unsaved bytes",
+    )
+    .unwrap();
+    let prepare = |limits| {
+        f.inspect(grant.record(), |view| {
+            crate::project_attachment::consumption_start::prepare_initial_snapshot(
+                &view,
+                WorkspaceId::from_bytes([7; 16]),
+                ActorId::from_bytes([8; 32]),
+                limits,
+            )
+        })
+    };
+    let before = fs::read(f.journal()).unwrap();
+    let snapshot = prepare(ObservationLimits::default()).unwrap();
+    assert_eq!(
+        snapshot.operations[0],
+        Operation::InitializeWorkspace {
+            root_id: ObjectId::from_bytes([0; 16])
+        }
+    );
+    assert_eq!(snapshot.operations.len(), 4);
+    assert_eq!(snapshot.files.len(), 1);
+    let expected = crate::checkpoint_storage::PreparedCheckpointFile::from_bytes(
+        b"private source version",
+        &mesh_chunking::ChunkingConfig::default(),
+        crate::ManifestPagingPolicy::flat(),
+    )
+    .unwrap();
+    assert_eq!(snapshot.files[0].manifest(), expected.manifest());
+    assert_eq!(
+        prepare(ObservationLimits::default()).unwrap().operations,
+        snapshot.operations
+    );
+    assert!(prepare(ObservationLimits {
+        file_bytes: 1,
+        ..ObservationLimits::default()
+    })
+    .is_err());
+    assert!(prepare(ObservationLimits {
+        bytes: 1,
+        ..ObservationLimits::default()
+    })
+    .is_err());
+    assert_eq!(fs::read(f.journal()).unwrap(), before);
+    assert_eq!(
+        fs::read(f.source.project().root().join("note")).unwrap(),
+        b"later unsaved bytes"
+    );
+}

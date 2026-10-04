@@ -207,6 +207,34 @@ impl AttachmentStorage {
         proof: &super::dependency_read::VerifiedDependencyRead,
         owner_history: &crate::workspace::OpenWorkspace,
     ) -> io::Result<NativeDependencyWorkBinding> {
+        self.validate_dependency_work_with_parents(
+            prepared,
+            guard,
+            proof,
+            owner_history,
+            |parent, version| {
+                parent.attachment.inspect_saved(
+                    parent.metadata_path(),
+                    parent.store.clone(),
+                    version,
+                    |workspace, version| {
+                        workspace
+                            .historical_workspace_preview(version)
+                            .map(|_| ())
+                            .map_err(error)
+                    },
+                )
+            },
+        )
+    }
+    pub(super) fn validate_dependency_work_with_parents(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        proof: &super::dependency_read::VerifiedDependencyRead,
+        owner_history: &crate::workspace::OpenWorkspace,
+        mut inspect_parent: impl FnMut(&ProvisionedAttachment, &str) -> io::Result<()>,
+    ) -> io::Result<NativeDependencyWorkBinding> {
         guard.require_roots(&prepared.roots).map_err(error)?;
         let owner = &prepared.owner;
         let chain = &prepared.chain;
@@ -263,17 +291,7 @@ impl AttachmentStorage {
                         .historical_workspace_preview(version)
                         .map_err(error)?;
                 } else {
-                    parent.attachment.inspect_saved(
-                        parent.metadata_path(),
-                        parent.store.clone(),
-                        version,
-                        |workspace, version| {
-                            workspace
-                                .historical_workspace_preview(version)
-                                .map(|_| ())
-                                .map_err(error)
-                        },
-                    )?;
+                    inspect_parent(parent, version)?;
                 }
                 work = hash(
                     Json::object([

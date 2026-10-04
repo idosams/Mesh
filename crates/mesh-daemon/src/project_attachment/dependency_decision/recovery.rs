@@ -1,4 +1,4 @@
-//! Canonical pending eligibility-frame validation. No journal writes or repair occur here.
+//! Exact pending native-frame validation. No journal writes, admission or repair occur here.
 use super::*;
 use crate::project_attachment::dependency_transaction::{digest, text};
 pub(in crate::project_attachment) fn pending_prefix(
@@ -11,6 +11,8 @@ pub(in crate::project_attachment) fn pending_prefix(
     let kind = match text(&value, "schema")? {
         "mesh.dependency-decision-intent/v1" => DependencyKind::Eligibility,
         "mesh.dependency-grant-intent/v1" => DependencyKind::Grant,
+        "mesh.native-consumption-owner-commit/v1" => DependencyKind::Consumption,
+        "mesh.native-consumption-start-intent/v1" => DependencyKind::ConsumptionStart,
         _ => return Err(invalid("unknown native control intent")),
     };
     let request = digest(text(&value, "request")?)?;

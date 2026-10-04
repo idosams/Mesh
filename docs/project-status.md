@@ -1450,3 +1450,725 @@ validation of the graph/recovery composition and legacy-copy refusal refinement;
 hosted validation of this revision are next. The earlier draft CI is not evidence for this revision.
 Native consumption copying, publication/import/review enforcement and the full fleet acceptance
 scope remain open. The fixed user checkpoint is unchanged.
+
+R160 [PR #322](https://github.com/idosams/Mesh/pull/322) merged normally at
+`5afe7757150eb4f6c079768c9473b5da3cc8b14e` after all seven checks passed on head
+`0a0f2b211d295189cce2670d4cbc03c0907e7a33` (run `37213698088`). Post-merge run `37214307093`
+is still active; this is not yet a post-merge pass.
+
+R161 [issue #323](https://github.com/idosams/Mesh/issues/323) tracks native consumed starting
+versions, required older-writer fencing and exact interrupted-copy recovery. Local groundwork
+separates native graph/grant selection from validation under an already-held complete custody set.
+The ordinary public entry points still acquire their own guards and refuse nested acquisition.
+Preparation conveys no permission: validation rechecks physical bindings and current grants,
+including a grant revoked after preparation. A native composition fixture verifies graph and
+immutable granted-content reads under one guard, and refuses source-only custody when destination
+custody is missing. Five graph tests (2.75s) and seven grant tests (1.43s) pass. Full validation and
+publication are pending. No consumption copying, starting-operation transaction or new persisted
+fence is enabled by this groundwork; the entire #323 scope and fleet goal remain open.
+
+R161 custody groundwork `a3a99f8e35e86d230aa578c53baa0d742f03bf44` passed full `npm test`:
+3,928 native tests in 269.544s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Publication as a
+draft follows so the unfinished consumption increment remains reviewable. This does not complete
+#323 or enable consumption. Main's post-R160 run still has macOS verification active; its other
+six jobs have passed.
+
+Draft [PR #324](https://github.com/idosams/Mesh/pull/324) publishes the R161 custody groundwork at
+`81babaa25ea86064a7e40b831f41f3d5fafa7970`; its hosted run is `37215060435`. R160 post-merge main
+run `37214307093` has now passed all seven checks on `5afe7757150eb4f6c079768c9473b5da3cc8b14e`.
+
+Further local R161 proof uses an authenticated `InitializeWorkspace` operation in a real empty
+native reservation. Its saved snapshot and qualified graph reopen identically twice, with no files
+or directories invented in the destination. All five focused graph tests pass in 3.20s. An initial
+fixture omitted native read custody and correctly failed; it was corrected without relaxing the
+reader. This is signed native journal replay, not a delivered consumption transaction. Copying,
+required persistent fencing, owner consumption commit and exact recovery remain unfinished. The
+published draft head and fixed user checkpoint remain unchanged while hosted checks run.
+
+Local R161 snapshot preparation now builds deterministic initial operations and prepared manifests
+from exact granted immutable content, with an explicit workspace-root declaration, file/entry/total
+budgets, and an output sink that refuses growth beyond the admitted file length. It does not write
+destination files or history. Eight grant tests passed (1.51s); the new stream-bound test passed,
+and the granted-snapshot test passed again through that sink (0.40s). Unsaved source edits are not
+used and the owner journal remains unchanged.
+
+This internal builder is not yet wired into production consumption/signing or recovery. Full
+validation and publication of this local refinement remain pending; the earlier full gate covers
+only the published custody groundwork. A further transaction requirement is explicit binding of
+the copied snapshot's ignore rules: the empty reservation already bound its original capture policy,
+so copied rule files cannot silently change that policy or break later captures. Resolve that in the
+required consumption binding together with the pending-writer fence. The full #323 scope remains
+open and the published draft head remains fixed while hosted checks run.
+
+R161 signed preparation now connects complete graph/current-grant checks, exact empty native
+reservation validation and bounded snapshot construction to authentication outside custody. Its
+result is an immutable candidate, not saved work: no history, policy or destination files are
+written. Revalidation reacquires the complete set and refreshes the graph, current grant, physical
+binding, enrollment and empty destination. Native fixtures prove that signing can independently
+acquire custody, unexpected destination edits remain preserved/refused, revoked candidates cannot
+be reused, and an empty source prepares a signed candidate without creating a saved version or fake
+files. Five graph tests pass in 4.47s; the initial compile check passed without warnings.
+
+The candidate computes a prospective history binding from saved ignore-rule files without changing
+the reservation's current binding. Persisting and verifying that transition belongs to the upcoming
+required transaction fence; dedicated rule-binding fault coverage is still needed. There is no
+commit API yet. Full validation of these local refinements is pending. All seven hosted checks on
+the older published draft head `81babaa25ea86064a7e40b831f41f3d5fafa7970` passed (run `37215060435`);
+that result must not be attributed to the newer local signed-preparation implementation.
+
+Dedicated R161 ignore-rule coverage now verifies that the signed workspace identity uses the saved
+rule file's prospective binding, excludes ignored saved input, rejects invalid signatures, and
+leaves the current reservation marker and both journals byte-identical. Later unsaved rule edits do
+not alter the candidate identity. The test passed in 0.77s. A negative mutation signing with the old
+reservation configuration failed the exact workspace-identity assertion in 0.54s; the unmodified
+source was restored byte-for-byte. Full validation of this refinement follows. This does not yet
+persist the policy transition or enable copying; #323 remains open.
+
+R161 signed-preparation implementation `b27eb7d7175989aee6ddd022f0ae01514994d1b9` passed full
+`npm test`: 3,931 native tests in 271.702s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Draft PR #324
+will be updated with this verified refinement; new hosted validation remains required. It remains
+draft because persistent fencing, materialization, owner/destination commit ordering and recovery
+are unfinished. The fixed checkpoint and full fleet goal are unchanged.
+
+R161 required consumption storage now adds destination start/completion subtypes 5 and 6 to the
+existing required dependency envelope, with migration 4 preserving populated indexed rows. Migration
+3 is unchanged. Commit `9415a315e164fa72057d0e6ce1beedafe4dfd8ee` passed 342 storage tests (one timing
+benchmark skipped) and all-target daemon compilation. Reopening and raw journal reconstruction are
+verified separately; the in-memory index is not implicitly loaded on open.
+
+The local destination policy projection now binds a start to an exact request, owner enrollment,
+destination installation, granted source, correlation bindings, original/prospective configuration
+digests, complete-closure digest, signed starting operation and staged-object digest. Start is
+allowed only as the first policy record after enrollment; completion must name that exact start
+and its owner receipt. Unrelated policy advancement while pending, conflicting completion,
+second start, malformed identities and duplicate request reuse refuse atomically. Exact replay
+retains the same historical result and all direct references. Native admission still refuses both
+pending and completed-looking records until cross-store consumption verification is implemented.
+A native capture/control test confirms this refusal preserves editor bytes and history; removing
+the admission check makes that test fail because capture incorrectly reaches preparation.
+
+These are staged R161 foundations within draft PR #324, not a completed consumed version. Durable
+materialization, independent owner-receipt verification, recovery, actual previous-writer proof,
+full current-tree validation and merged delivery remain required. The fixed user checkpoint and
+all graphical/provider/remote acceptance requirements are unchanged.
+
+R161 required-record/provenance implementation `2a39f854ac14dbc503d5367a6410c50636261d8d`
+passed full `npm test`: 3,937 native tests in 273.860s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+The earlier full-gate lint failure and native-gate negative mutation remain preserved. This gate
+validates the currently refusing foundation; it does not prove consumption commit/recovery or
+actual previous-binary compatibility. Draft PR #324 remains unmerged and issue #323 remains open.
+
+R161 previous-native compatibility is now executable evidence. The version-independent fixture
+`required_consumption_prefixes_fence_native_read_prepare_commit_and_control` passed on current
+source (3.12s) and exact previous implementation `220f2da76d7e1e35c8b2801db0b8dedc63d1aec8`
+(2.89s). The audit verified that the entire tracked previous tree differed only by the appended
+fixture; production code and schema were the previous revision. It recognized neither new subtype
+and refused all 145 nonempty prefixes of each valid-checksum frame. Native read, new preparation,
+commit of an already signed candidate and control mutation all refused while preserving journal
+and editor bytes. A control capture after restoring the fixture's own baseline still committed.
+The current tree recognizes both frame types and passes the same refusal campaign.
+
+All overwritten current source bytes were backed up and restored with SHA-256 checks; the branch,
+HEAD, published PR and fixed user checkpoint were unchanged. The compatibility fixture, overlay
+manifest, exact previous revision and logs are retained with R161 evidence. This proves the required
+journal boundary in the real previous native implementation, including an already prepared writer;
+it is not a packaged desktop upgrade test. The production transaction must still durably append
+that boundary before its first materialized byte and recover interrupted copying/owner receipts.
+
+R161 compatibility implementation `62031d610e854ac72ae04f2e1dd1b3a0f442de46` passed full
+`npm test`: 3,938 native tests in 315.123s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The previous
+published head `8989b942eba30e07af8cc37022a41f778f47f387` also passed all seven hosted checks in
+run `37217784394`. Compatibility proof does not close issue #323: durable staging/materialization,
+owner consumption, cross-store admission and exact interrupted recovery remain unfinished. Draft
+PR #324 remains unmerged; the full fleet goal and fixed user checkpoint are unchanged.
+
+R161 now extends the existing retained-tree addition helper with explicit bounded staging and
+canonical recovery receipts. Existing callers retain their 64-entry/64-MiB caps; the new internal
+seam accepts admitted limits up to 100,001 entries including the staged root, 1 GiB total and
+64 MiB per file. Entry ordering, duplicate/traversal paths and byte budgets are checked before
+creating a private tree. A receipt binds source/recovery roots, exact target path, parent identity
+and metadata, bounded tree evidence and original entry identities. It is evidence only: a consuming
+native transaction must authenticate and durably retain it before authorizing installation.
+
+Recovery reconstructs either the exact private stage or the exact already-installed tree. Retry
+synchronizes both parents and preserves the same installed inode. Missing/both-present stages,
+substitution, changed content, extra entries, different roots/path or parent policy refuse without
+cleanup. All 46 related retained-replacement tests passed, including a 100-file tree and separate
+processes: one installer exits immediately after rename, then two fresh recovery processes use only
+the saved receipt and retain the same tree identity. Removing installed-tree retry handling makes
+that process test fail; correct source was restored byte-for-byte.
+
+This is a materialization/recovery primitive for the unfinished R161 transaction, not consumption
+commit or runnable-lane admission. It is not yet connected to the required consumption journal
+fence, source closure, signed start or owner receipt. Those cross-store steps and the full fleet
+acceptance scope remain required; draft PR #324 and issue #323 remain open.
+
+R161 bounded-tree implementation `d232d2697b251a255cac71047fc35c4217e1ea0d` passed full
+`npm test`: 3,942 native tests in 274.126s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Previous
+published head `ba88b38049f21318638eccdfbf4b744c7cdb8ef6` passed all seven hosted checks in run
+`37218506637`. These results validate the staging primitive and existing behavior; full consumed
+start commit, journal-before-install ordering, owner receipt and cross-store recovery remain open.
+Draft PR #324 is not merged, and the fixed test checkpoint is unchanged.
+
+R161 now provides the corresponding exact retained-file recovery seam. Canonical receipts bind
+source/recovery roots, target path, parent policy, original allocation identity (including its
+creation-time discriminator), file metadata, byte length and content digest. Resume requires
+independently retained saved bytes within the caller's admitted limit. Wrong bytes or receipts,
+same-byte replacement files, missing/both-present entries, changed roots/path or later editor edits
+refuse without overwriting or cleanup. Already-installed retries synchronize both parents and
+recheck identity/content; an edit during synchronization cannot be acknowledged. Empty files work
+with a zero-byte budget. Receipts remain evidence only, not consumption or write authorization.
+
+All 50 retained-replacement tests passed. A file installer exits in a separate process immediately
+after rename; two fresh recovery processes reconstruct from saved receipt/content and preserve the
+same allocation identity and executable state. Disabling installed-file retry handling makes that
+process test fail; the correct source was restored byte-for-byte. Existing creation/restoration
+callers use the same exact recovery validation without widening their admission policy.
+
+Tree and file primitives now cover both top-level entry types. They still need native integration
+with the signed starting snapshot, staged transaction/source closure, required journal-before-install
+ordering and owner consumption receipt. No consumed version or runnable lane is acknowledged by
+these helper changes. Draft PR #324 and issue #323 remain open; the fixed checkpoint is unchanged.
+
+R161 retained-file implementation `c62c293303d1554c9f25ba7e729cb3f934ba37ae` passed full
+`npm test`: 3,946 native tests in 314.880s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The first
+full attempt found a redundant import; its failed log is retained alongside the corrected passing
+run. Published predecessor `1a28f903f3f0015b6c8f9f6086b704b3c30b1330` passed all seven hosted checks
+in run `37219440756`. These results cover the exact retained-file recovery seam and existing behavior,
+not a completed cross-store consumption transaction. Draft PR #324 and issue #323 remain open;
+the fixed user checkpoint remains unchanged.
+
+R161 preparation and revalidation now reconstruct an exact materialization plan from the authenticated
+initial operation and retained checkpoint objects. The verifier binds the prospective workspace,
+genesis sequence/parents/epoch/time/base and independently derived resulting head. It accepts only
+the complete initial-tree operation grammar: explicit empty root, newly created directories and
+files, exact links and matching file versions. Missing parents, aliases, duplicate paths/objects,
+extra operations and unrelated records refuse. The plan contains paths, manifest identities and
+executable flags; it does not contain a second copy of file bodies.
+
+Content verification checks each logical manifest, chunk layout, retained chunk digest, reconstructed
+file digest, per-file and whole-tree byte limits, and exact referenced-object coverage. It streams
+hashing over retained chunks. Reconstructed paths have a 64-MiB aggregate bound checked before each
+path allocation; retained objects have the admitted content budget plus the existing 16-MiB signed
+payload ceiling. Bounds refuse explicitly without truncating the tree or writing destination files.
+
+Eight focused tests passed, including real signed nonempty/empty sources, preserved saved ignore
+rules, tampered/missing staged content, invalid bounds, nested executable plans and conflicting
+paths/versions. Valid signatures over a false genesis base or resulting head are refused. Removing
+the resulting-head check makes the signed refusal test fail; the exact source was restored. Full
+repository validation is pending. This connects signed preparation to a verifiable materialization
+plan; durable staging, journal-before-install ordering, owner consumption and cross-store recovery
+remain unfinished in draft PR #324 / issue #323. The fixed user checkpoint remains unchanged.
+
+R161 signed-plan integration `11854f4c7374da54a7c95a3e431680c3e1416d1e` passed full `npm test`:
+3,948 native tests in 274.899s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The exact negative
+head-check mutation and successful focused/full logs are retained. Published predecessor
+`59eeee06b6334372f675e413f4e29cd26fa1d630` passed all seven hosted checks in run `37220272359`.
+This validates signed-plan reconstruction and existing behavior; the durable consumption transaction
+and complete fleet acceptance remain unfinished. Draft PR #324 is unmerged; the checkpoint is fixed.
+
+R161 now connects prepared signed versions to durable private staging through
+`PreparedNativeConsumedStart::stage`. Staging uses the native reservation allocation on the same
+filesystem as its unchanged destination root. A private attempt records request, operation, physical
+identities, grant and closure before content construction. It retains signed objects, exact operation
+frames, original/prospective configuration, source graph/retention evidence and recovery receipts.
+Only a complete synchronized bundle is published into the stable request slot by exclusive rename.
+Interrupted scratch attempts remain preserved; retries never overwrite or adopt their incomplete
+contents. No destination file or journal is changed, and no lane becomes runnable.
+
+Retry independently checks the bundle, signed objects, frames, exact root/entry identities and
+source basis. Staged directory paths, kinds, content digests, lengths and executable state are also
+compared with the authenticated materialization plan; matching rewritten local receipts cannot
+substitute different content. Lookups are built once per verification pass, and subtree selection
+uses ordered ranges instead of rescanning every entry for every directory. An exact retry returns
+the same staging receipt and allocation. Empty snapshots create no placeholder destination content.
+
+Integrated tests passed for signed nonempty and empty sources, nested executable/empty directories,
+three interrupted construction boundaries, damaged frames, rewritten tree receipts and untouched
+destination/history. A publisher process exits immediately after bundle publication; two fresh
+processes reopen native handles and recover the same receipt and physical bundle. Bypassing the
+signed-tree comparison makes the forged-receipt test fail; original source was restored exactly.
+Focused process tests passed in 6.392s. The full repository gate is pending.
+
+This is the private staging portion of the unfinished consumption transaction. A staging receipt
+is evidence, not continuing permission or a consumption acknowledgement. Required start-record
+synchronization before installation, owner consumption, completion, cross-store admission and the
+complete interruption/revocation campaign remain required. Private-stage retries currently compare
+the exact retained-source snapshot; transaction recovery must additionally handle intervening owner
+history and committed outcomes without rewriting that evidence. Draft PR #324 remains unmerged,
+issue #323 remains open, and the fixed checkpoint remains unchanged.
+
+R161 private-staging implementation `a89419f3bc3bc7b7d5203124c5f25e8cfe40cdb3` passed full
+`npm test`: 3,948 native tests in 277.987s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The existing
+native integration tests now additionally cover private staging and separate-process restart.
+Published predecessor `4d176d29087916f7499849c535d27df024fa13f3` passed all seven hosted checks in
+run `37221161431`. Successful and negative-mutation logs and complete Git bundles are preserved.
+This validates private staging, not destination installation or consumed runtime admission. Required
+start ordering, owner receipt, completion and cross-store recovery remain open in draft PR #324 /
+issue #323; the full fleet objective and fixed checkpoint are unchanged.
+
+R161 private staging now holds explicit native custody for the destination history, destination
+files and reservation allocation during retained-entry preparation, verification and private bundle
+publication. The retained-entry seam requires all three roots in the still-held guard; incomplete
+custody refuses before creating entries. The private barrier is released before full graph/grant
+revalidation, so it cannot extend a held set or accidentally retain permission for later installation.
+The final commit still requires its own complete cross-store barrier.
+
+Three focused integration tests passed in 6.719s. At each of three interrupted construction
+boundaries, another native writer remains blocked until staging releases custody, then proceeds.
+Incomplete root sets refuse without changing allocation entries. A real native grant revocation
+after custody release prevents acknowledgement and preserves the staged bundle; a late editor file
+also prevents acknowledgement and stays untouched. Separate-process publication/recovery and empty
+source coverage continue passing. Taking custody on the wrong workspace makes the concurrency test
+fail, and removing final revalidation makes the revoked-request test fail. Both negative logs are
+retained, and exact production source was restored before the full gate.
+
+Full repository validation is pending. Required start ordering, owner consumption, destination
+completion and cross-store read/capture admission remain unfinished in draft PR #324 / issue #323.
+These staging safeguards do not install files, launch agents or advance protected main. The fixed
+checkpoint remains unchanged.
+
+R161 custody implementation `6cf11cc0e474d07cafd2d498902180c31d89191f` passed full
+`npm test`: 3,949 native tests in 272.512s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `687ab1c9ed970f11635086e2b37409523745d30b` passed all seven hosted
+checks in run `37222451265`. Focused concurrency/revocation and negative-mutation evidence is
+preserved with the full log and Git history. This proves private staging custody and refreshed
+permission checks; required start ordering, installation, owner consumption, completion and
+cross-store recovery/admission remain unfinished. Draft PR #324 is not merged; issue #323 and
+the full fleet objective remain open. The user checkpoint stays fixed.
+
+R161 now retains the complete selected owner/source/destination custody set through a synchronous
+validated transaction callback. Destination ancestry and all of its roots are selected before the
+single lock acquisition. Signing still runs outside custody; public revalidation remains a
+point-in-time read. The private callback is a transaction integration seam, not a committed version.
+
+Both signed-source integration tests passed in 4.996s. They require catalog, owner, source,
+destination and allocation roots inside the callback, block a competing native writer until an
+intentional callback failure releases custody, preserve unexpected editor work without invoking
+the callback, and refuse callback admission after native grant revocation. Removing both destination
+emptiness checks makes the new regression fail (1.116s); exact source was restored. Full repository
+validation is pending. Required journal-before-install ordering, durable owner/completion receipts,
+recovery and cross-store admission remain unfinished; PR #324 stays draft and the checkpoint fixed.
+
+R161 transaction-custody implementation `55fe74f5528355c45bb9f6e0b4797b7bb14fbdfb` passed
+full `npm test`: 3,949 native tests in 316.666s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `a3ff44a5e95f733a7c5bd391ee98fa5a8f781616` passed all seven hosted checks
+in run `37223540971`. Positive and deliberately failing regression logs and complete Git history
+are preserved. The validated callback retains complete custody but does not itself install files,
+append consumption or acknowledge a runnable version. Draft PR #324 remains unmerged; issue #323
+and the full fleet goal remain open. The fixed checkpoint is unchanged.
+
+R161 recovery inspection now separates exact local native journal facts from workspace admission.
+The shared parser still verifies registration, the enrollment fence, canonical policy payloads and
+exact journal identity/bytes. Its non-admitting result can inspect pending or completed-looking
+consumption policy; the private conversion to an ordinary read proof refuses either. No generic
+ignore-tail flag, consumption permission or completed cross-store proof is introduced.
+
+Six native integration tests passed in 1.426s, including exact local-policy inspection while ordinary
+read/capture/control remain refused, changed bytes and torn-suffix refusal without repair, replaced
+journals, missing fences and corrupt policy payloads. Removing the conversion's consumption refusal
+makes the integration regression fail in 0.204s; exact source was restored. Full repository validation
+is pending. Exact consumed-prefix recovery, required journal-before-install ordering, materialization,
+owner/completion receipts and cross-store admission remain unfinished in draft PR #324 / issue #323.
+The user checkpoint and full fleet objective are unchanged.
+
+R161 native-facts implementation `971ed406a085a035d54d4ee259c195c6f58012a5` passed full
+`npm test`: 3,949 native tests in 273.566s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Six focused native tests and the deliberately failing admission-gate mutation are preserved with
+complete Git history. Published predecessor `d521b18626bf4417eb9a4a5d0aeb4a0def8273d5` has
+six successful hosted checks; macOS remains running in run `37224305162` at this evidence update.
+The factual reader does not grant consumed workspace admission or recover a torn consumption
+append yet. Required start ordering, materialization, owner/completion receipts and cross-store
+recovery/admission remain unfinished; draft PR #324 and issue #323 stay open. The checkpoint is fixed.
+
+R161 now inspects exact interrupted required-start frames through a distinct canonical consumption
+intent. Recovery facts bind the original journal identity, prefix length/digest, request, payload and
+destination configuration. The observed suffix must be a byte-for-byte prefix of that exact frame;
+unknown bytes are neither skipped nor repaired. A pending start remains explicitly consumption even
+when replay stops at the pre-start prefix, so it cannot mint an ordinary native read capability.
+
+Six focused integration tests passed in 1.684s. They cover every start-frame prefix from zero bytes
+through the full frame, changed suffixes, an otherwise canonical start for another configuration,
+unchanged editor/journal bytes and continued ordinary read/capture/control refusal. Removing pending
+consumption admission fencing makes the new regression fail in 0.210s; exact source was restored.
+Full repository validation is pending. This is read-only prefix verification, not the durable start
+writer, materialization, owner/completion transaction or cross-store admission. Those remain required
+in draft PR #324 / issue #323, together with complete restart and fault proof. The checkpoint is fixed.
+
+R161 start-prefix implementation `eef22fe60b0e2f05ff76be69b33a2854c21058fe` passed full
+`npm test`: 3,949 native tests in 275.019s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `41923e7ae4f9d135abd262b4981815d48198fcaa` passed all seven hosted checks
+in run `37225144094`; the preceding run `37224305162` also completed all seven successfully.
+Focused prefix/refusal tests, deliberately failing admission mutation and complete Git history are
+preserved. This validates read-only exact-start recovery facts, not a durable start writer or an
+acknowledged consumption transaction. Installation, owner/completion receipts, full restart recovery
+and cross-store admission remain required in draft PR #324 / issue #323. The checkpoint is unchanged.
+
+R161 now has a native durable start-fence writer for an exact prepared candidate and private stage.
+Under complete owner/source/destination custody it rechecks the current grant, immutable graph,
+reservation binding, empty destination and signed staged content. It retains the transaction's
+explicit limits, stage receipt, signed objects and configuration bindings, then writes and synchronizes
+its exact intent before appending the required start record. Exact retries append only missing bytes;
+post-sync verification compares the complete expected journal, configuration and record identity.
+This writes no destination files or owner consumption and grants no ordinary read/run permission.
+
+The real byte-by-byte test first found that reservation-origin verification incorrectly demanded an
+ordinary read after a partial start. Origin now checks exact native enrollment facts for consumed
+reservations as correlation only; independent histories retain the original full read checks. All
+nine focused reservation/start tests then passed in 26.154s. Coverage includes every interrupted
+frame boundary, failed synchronization, lost acknowledgement, repeated exact retry, editor work,
+foreign suffixes and a real grant revocation while consumption is still uncommitted. Removing journal
+synchronization fails the regression in 23.995s. Failed and successful logs are preserved and exact
+source was restored. Full repository validation is pending.
+
+The writer currently retries using the same authenticated candidate and stage handles. Fresh-process
+candidate reconstruction, exact exclusive installation, signed destination history, owner receipt,
+completion and full cross-store admission remain required before this is an acknowledged consumed
+version. Draft PR #324 / issue #323 and the full fleet scope stay open. The user checkpoint is fixed.
+
+R161 durable start-writer implementation `4ec8638ff010ff63840698311453532dcf229e91` passed
+full `npm test`: 3,949 native tests in 278.939s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `56b26e4d7aa9a6f2eb580887581b449786fad6a2` passed all seven hosted checks
+in run `37225845167`. Positive, initial-failure and deliberately failing synchronization logs are
+preserved with complete Git history. This proves durable start fencing and exact retries with the
+same candidate/stage handles. Fresh-process reconstruction, installation, destination/owner/completion
+commit and cross-store admission remain required. Draft PR #324 / issue #323 and the full fleet goal
+remain open; the user checkpoint stays fixed.
+
+R161 now reconstructs a fenced starting candidate in a fresh process without invoking a signer.
+Recovery requires the exact retained request and original limits, native owner/source/destination
+bindings, current uncommitted grant and empty reservation. It authenticates the retained checkpoint,
+independently reconstructs the expected signed statement from the granted saved source and saved
+ignore rules, and verifies the original stage/transaction bindings. Object names must match the
+checkpoint references; total and per-object bounds are enforced before reading. Recovery creates no
+new signature, installation, owner receipt or ordinary history permission.
+
+Two focused integration tests passed in 27.149s. A child exits after appending one start byte; a fresh
+process reloads and synchronizes the complete start, then exits before reply. Two further processes
+recover the same record and physical stage. Larger retry limits, corrupted retained content and a
+revoked grant refuse while preserving journal/editor work. Bypassing the retained descriptor check
+makes the limits regression fail in 5.357s; exact production source was restored. The prior focused
+run also passed (26.558s), and all evidence is preserved. Full repository validation is pending.
+
+This implements fresh-process recovery of the start phase only. Exclusive file installation,
+destination checkpoint history, owner consumption, completion and cross-store read/capture/runtime
+admission remain required in draft PR #324 / issue #323. The full fleet goal and fixed checkpoint
+remain unchanged.
+
+R161 fresh-process start recovery implementation `a75f32855297f85e608438869658228eec9f105b`
+passed full `npm test`: 3,949 native tests in 293.909s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and the remaining repository, documentation, license,
+storage, format, lint and real-daemon gates. Published predecessor
+`1e0e3e06bcd7b7671ff4c0c66d8531716801c757` passed all seven hosted checks in run
+`37226972531`. Focused, negative-regression and full-gate logs are preserved with complete Git
+history. This proves reconstruction of the original authenticated start without a new signature;
+it does not prove installation, destination/owner/completion commit or cross-store admission.
+Draft PR #324 / issue #323 remain open for those requirements. The full fleet objective and fixed
+user checkpoint remain unchanged.
+
+R161 now connects exclusive file/tree installation to the durable start writer under the same
+complete custody guard. Before copying it retains the exact owner-consumption body and source
+closure. Each move uses the original authenticated receipt, verifies native identity/content,
+refuses unexpected destination/recovery entries and synchronizes both sides. Retries recognize
+already installed entries without reallocating or copying them. Fresh-process reconstruction can
+inspect an exact partial installation behind a complete required start. Final checks revalidate
+stage, owner intent, journal, current grant and custody; ordinary history/runtime remain fenced.
+
+Two focused tests passed in 28.057s after the final receipt checks. Separate children exit after
+one entry and after all entries before reply, then two further processes recover the same native
+allocations. Unknown editor work, foreign recovery entries, altered owner intent and changed
+installed content refuse and remain preserved. Removing the destination-name check makes the
+regression fail in 26.225s because entries were installed beside unexpected editor work; production
+source was restored byte-for-byte. An explicit revoked-install retry assertion is included in the
+full-gate candidate. Full repository validation is pending; no installed result is acknowledged as
+a consumed version. Destination history, owner receipt, completion and cross-store admission remain
+required by draft PR #324 / issue #323. The fixed user checkpoint and full fleet scope are unchanged.
+
+R161 installation implementation `e7969bf8d13b3942bda2e79f0404fcdf01fc4301` passed full
+`npm test`: 3,949 native tests in 324.505s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+This includes the explicit revoked-install retry assertion. Published predecessor
+`56c638c9105fb1f7ffb48c951c81a5ef100453d9` passed all seven hosted checks in run
+`37228220453`. Complete Git history and positive/negative/full verification logs are preserved.
+Installation and exact partial-install recovery are verified at native integration scope;
+destination checkpoint, owner receipt, local completion, cross-store admission and packaged
+acceptance remain required. Draft PR #324 / issue #323 remain open and the user checkpoint is fixed.
+
+R161 now commits the original signed destination checkpoint after exact installation while retaining
+the same complete custody guard. A distinct durable history intent binds the native journal identity,
+complete start prefix, request and retained frame digest. Recovery accepts only the exact checkpoint
+suffix authenticated by the original start/stage chain; unrelated records or changed bytes refuse.
+The reader returns pending local facts only, and ordinary history/capture/runtime remain fenced.
+Retries append only missing bytes and revalidate installation, owner intent, journal and current grant.
+No owner receipt or completion is created by this step, and the prospective configuration transition
+is still pending before ordinary admission.
+
+Two focused tests passed in 32.560s. Separate children exit after one checkpoint byte and after
+synchronization before reply; two further processes recover without duplicate history or file
+allocation. Every checkpoint-byte prefix is accepted and every changed last byte refused by the
+exact prefix inspector. Sync failure and a foreign trailing byte also refuse while preserving bytes.
+Removing the suffix equality check makes the regression fail on foreign prefix 1 in 29.829s;
+production source was restored byte-for-byte. Full repository validation is pending. The owner
+receipt, completion, configuration/capture reconciliation, cross-store admission and full acceptance
+campaign remain required in draft PR #324 / issue #323. The user checkpoint stays fixed.
+
+R161 destination-checkpoint implementation `814f1993e90b9d0c391443e17459cf8af25a414a` passed full
+`npm test`: 3,949 native tests in 281.112s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `3aab0858223914f5334a2acb0d7a14d55ce954e5` passed hosted run `37229406625`.
+Complete Git history and focused, deliberately failing mutation and full-gate logs are preserved.
+This proves the exact signed destination checkpoint commit and its native restart recovery;
+owner receipt, completion, prospective configuration/capture reconciliation, cross-store admission
+and packaged acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain
+open. The user checkpoint stays fixed.
+
+R161 now commits the exact owning-authority consumption receipt after the signed destination
+checkpoint under the same complete custody guard. A dedicated owner-prefix context verifies partial
+receipt history for graph, source and grant inspection without changing ordinary read behavior.
+Immutable per-request/per-payload attempt files preserve earlier staged evidence when valid owner
+history advances before append. Restart selects only one exact matching attempt; unrelated or
+ambiguous suffixes refuse. Pending owner payload/sidecar references are included in inspected graph
+retention. A committed request is recognized before current permission checks, with historical input
+recovery bound to the exact source, grant, native associations, destination and starting operation.
+This historical outcome conveys no new consumption or runtime permission.
+
+Two final focused tests passed in 32.451s. Real children recover after one owner-frame byte and a
+synchronized lost reply; repeated retries return one receipt. An intervening owner decision and the
+original staged attempt stay unchanged. A later grant revocation retains the exact historical receipt;
+a different starting operation refuses. An explicit owner-sync failure prevents success. Ignoring that
+failure makes the regression fail in 32.485s; production source was restored byte-for-byte. Earlier
+failed test logs are preserved: fresh-process setup and result assertions initially omitted their
+required read custody, which was corrected without weakening the read fence. Full validation is
+pending. Local completion, prospective configuration/capture reconciliation, complete cross-store
+admission and the full acceptance campaign remain required by draft PR #324 / issue #323. The user
+checkpoint and full fleet objective remain unchanged.
+
+R161 owner-receipt implementation `d22d4815514b4caa892f1d367d3abdc6b24fd6db` passed full
+`npm test`: 3,949 native tests in 305.019s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `c1cc955d7bcac1147c3e6b19c7216c30ac50aac1` passed all seven hosted checks
+in run `37230271789`. Complete history and positive, diagnostic, mutation and full validation logs
+are preserved. Native receipt commit/recovery, intervening-owner-history preservation and exact
+historical retry after revocation are verified. Local completion, prospective configuration/capture
+reconciliation, final cross-store admission and the full acceptance campaign remain required.
+Draft PR #324 / issue #323 stay open and unmerged; the user checkpoint remains fixed.
+
+R161 now appends the local consumption completion record after the exact installed checkpoint and
+verified owner receipt, under the same complete custody guard. Its immutable recovery intent binds
+request, journal identity, exact preceding bytes and canonical completion payload. Recovery accepts
+only the exact completion-frame prefix and appends missing bytes; earlier phase APIs refuse once
+completion is staged. The checkpoint retry preserves only a separately verified completion suffix.
+This local receipt does not admit ordinary history, capture, runtime or publication. Prospective
+configuration/capture reconciliation and cross-store admission remain required.
+
+Two focused tests passed in 36.953s. Coverage includes every partial completion-frame boundary,
+changed suffix bytes, a canonical completion naming the wrong owner receipt, fresh-process one-byte
+interruption, synchronized lost reply, repeated recovery without changed installed identities or
+owner history, and explicit completion-sync failure. Ordinary history remains refused even after
+local completion. Removing the suffix equality check makes the regression fail on foreign prefix 1
+in 34.101s; the production source was restored byte-for-byte. The initial failed run exposed a test
+mode collision with the older start-recovery fixture; distinct completion-mode matching corrected
+that fixture without changing production authority. Both failed logs are retained. Full repository
+validation is pending. Draft PR #324 / issue #323, packaged acceptance and the full fleet objective
+remain open; the fixed user checkpoint is unchanged.
+
+R161 local-completion implementation `1c1bab93464068213ebf99d0dccc7f74380af3b2` passed full
+`npm test`: 3,949 native tests in 276.872s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `6f2802d21df32ae208b01930211e605e4fc62320` passed all seven hosted checks
+in run `37231827134`. Complete history, the initial fixture failure, positive recovery, deliberate
+corruption failure and full validation logs are preserved. This verifies the local completion
+receipt and exact restart behavior; configuration/capture reconciliation, cross-store admission,
+runtime integration and packaged acceptance remain required. Draft PR #324 / issue #323 and the
+full fleet objective stay open. The user checkpoint remains fixed.
+
+R161 now has explicit native-catalog APIs for reading the completed starting version and its saved
+file bytes. Recovery retains the complete custody set while reconstructing the signed initial
+snapshot from exact saved source content and exclusions. A private typed read proof is created only
+after joining the destination start/checkpoint/completion with the independently replayed exact
+owning receipt and full source closure. The effective saved configuration comes from that verified
+starting record; the original enrollment marker is retained unchanged. Historical inspection does
+not reinstall entries, consult live file content or renew a revoked grant.
+
+Two focused tests passed in 38.953s. Two fresh processes read the original saved bytes after an
+existing working file is edited and a new file is added, preserving journal, enrollment marker and
+both editor files. A locally canonical completion naming a different owner receipt refuses. Removing
+the exact receipt join makes that refusal test fail by returning a saved version (36.874s); source
+was restored byte-for-byte. Explicit refusals before completion and after a one-byte completion are
+included in the full validation now pending. This API currently reads the exact completed initial
+history and retains the original staging evidence. Generic history/capture/runtime paths, later
+capture-state reconciliation, transitive consumed-source admission and packaged acceptance remain
+required before readiness. Draft PR #324 / issue #323 and the full fleet objective remain open.
+The fixed user checkpoint is unchanged.
+
+R161 completed-history read implementation `bba69dad1550fa986a4c6da460917e43db17e295` passed full
+`npm test`: 3,949 native tests in 283.428s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `4a8a1dd297d0b16e46dd6506bf2ed1d2276af5d8` passed all seven hosted checks
+in run `37232967331`. Complete history and focused, deliberate mutation and full validation logs
+are preserved. Native initial-history reads now verify across stores and survive editor changes and
+fresh processes. Generic read/capture integration, later captures, transitive consumed-source
+admission, runtime controls and packaged acceptance remain required; this is not a merged release.
+Draft PR #324 / issue #323 and the full fleet objective remain open. The user checkpoint stays fixed.
+
+R161 now prepares, commits and recovers later private captures through an explicit native catalog
+context. Preparation releases all custody before signing; commit and recovery reconstruct the
+completed starting transaction and reacquire its full custody set. The existing capture writer
+uses fresh verified configuration/history at each boundary, including exact partial-capture
+recovery. Immutable completed-start inspection is separate from later capture validation and never
+creates ordinary admission on its own. Native allocation correlation remains inspectable during
+later interrupted captures without treating that inspection as access. Saved configuration comes
+from the authenticated start; enrollment identity and current editor files are not rewritten.
+
+Fifteen focused consumption/capture tests passed in 44.932s. The new scenario saves later edits,
+interrupts after one capture byte, recovers in fresh processes, retries without duplicate history,
+rejects a stale signed candidate, creates newer saves and retries an older request without rewinding
+the capture position. It also refuses a synchronization failure and recovers the exact staged save.
+Ignoring that sync failure makes the regression incorrectly acknowledge a save and fail in 41.328s;
+source was restored byte-for-byte. An additional owner-history change after signing must refuse
+before any destination append; it is included in the full validation now pending. Existing independent
+capture behavior remains covered by the shared writer tests. Generic desktop/harness context wiring,
+transitive consumed-source graph admission, runtime controls and packaged acceptance remain required.
+Draft PR #324 / issue #323 and the full fleet objective remain open; the user checkpoint is unchanged.
+
+R161 later-capture implementation `fba8e013a6e8886d75010456c87add8192b72ff7` passed full
+`npm test`: 3,949 native tests in 280.261s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `2e7d68bcde473ffdeb4325cd1a53c05ac5df289e` passed all seven hosted checks
+in run `37233954493`. Complete history and positive, mutation and full validation logs are preserved.
+The full run also passed the after-signing owner-history damage refusal without a destination append.
+Later native private saves and exact fresh-process recovery are verified; generic context wiring,
+transitive consumed-source graph admission, runtime/publication controls and packaged acceptance
+remain required. Draft PR #324 / issue #323 and the full fleet objective remain open. The fixed user
+checkpoint is unchanged.
+
+R161 now inspects a graph rooted in a completed consumed lane through its already verified native
+history context. Each use refreshes pinned history facts, registration identity and the original
+configuration binding; the effective configuration must match the authenticated start. Parent
+inspection can use that same context without relaxing independent readers. Graph traversal includes
+the lane's later captures and its owner-recorded input edge, and retains exact local start/stage/
+configuration/frame objects and recovery sidecars. Owner-only grant and receipt references remain
+qualified to the owner store. The complete custody set remains held and cannot grow during traversal.
+
+Thirteen focused graph, identity and consumption tests passed in 46.381s, including repeated fresh-
+process inspection after later saves. A changed original marker invalidates a previously verified
+context while restored exact bytes remain readable. Omitting configuration from the native facts
+made that regression reuse the stale proof and fail in 44.140s; production source was restored
+byte-for-byte. Extra retention assertions check the exact local objects and exclusion of owner-only
+grant payloads in the full validation now pending. The initial test build's ownership error is
+preserved; retaining the before-state fixed the post-read comparison. This supplies explicit consumed-
+lane graph inspection and retained references; automatic multi-lane context resolution, downstream
+reservation/grant/start integration, generic callers, runtime/publication controls and packaged
+acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The user
+checkpoint stays fixed.
+
+R161 consumed-graph implementation `35f447e142f2e26dfe9768db359af6f1ea524fe0` passed full
+`npm test`: 3,949 native tests in 279.218s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+This includes effective-configuration validation, original-marker freshness and exact local retention
+objects without misclassifying owner-store grant payloads. Published predecessor
+`0fc65bf9aaf197b74b27d24a079e06bf1cbbd919` passed all seven hosted checks in run `37235110193`.
+Complete history and focused, mutation, failed diagnostic and full logs are preserved. Explicit native
+consumed-lane graph inspection is verified; automatic multi-lane resolution, downstream reservation/
+grant/start, generic desktop/harness integration, runtime/publication controls and packaged acceptance
+remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The fixed user
+checkpoint is unchanged.
+
+R161 graph inspection now resolves completed consumed histories from retained native start records
+without a caller supplying each transaction request. Resolution validates native handles against a
+single complete custody set, derives bounded request/source/limit selectors, reconstructs signed
+starts through already verified histories, and admits a context only after the exact owner/completion
+join. Each successful pass resolves at least one history; unresolved or damaged inputs refuse the
+whole result. Recovery can reuse an already-held guard without acquiring or extending locks. Grant
+inspection can read an explicitly verified source context while preserving exact current or historical
+permission checks. This is history inspection, not new consumption or runtime authority.
+
+Fifteen focused graph/grant/consumption tests passed in 56.459s. Automatic graph inspection equals
+explicit inspection after later saves and in fresh recovery processes; incomplete custody and torn
+owner history refuse. Removing the resolver made the actual fresh-process graph regression fail in
+48.005s, and source was restored byte-for-byte. The initial compile warning and strict lint refusal
+for an unnecessary test clone are preserved and corrected; full validation is pending. Multi-level
+child reservation/grant/start execution and its acceptance tests, generic desktop/harness wiring,
+runtime/publication controls and packaged acceptance remain required. PR #324 / issue #323 and the
+full fleet objective stay open; the fixed user checkpoint is unchanged.
+
+R161 automatic-history resolver `abf82e54dbabe910ea614c65d3f30a710c8baea3` passed full
+`npm test`: 3,949 native tests in 282.578s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `2a531da3f849b6fb044c7dd95f9b9a7d5640930b` passed all seven hosted checks
+in run `37236395813`. Complete history and positive, negative, failed lint and full logs are preserved.
+This proves automatic reconstruction for graph inspection, including later saves and fresh processes;
+it does not establish end-to-end multi-level lane creation. Downstream reservation/grant/start/recovery
+integration and tests, generic callers, runtime/publication controls and packaged acceptance remain
+required. Draft PR #324 / issue #323 and the complete fleet goal stay open. The checkpoint is fixed.
+
+R161 can now reserve an empty child from a completed consumed lane's later saved version. The native
+reservation API accepts transitive native handles, computes the full input custody set before
+allocation, and resolves the parent's verified history afresh under each allocation/recovery guard.
+No read proof survives a released guard. Exact saved-operation membership and native correlation are
+rechecked before acknowledgement; a retry cannot replace the original version selection. Existing
+reservation entry points retain their signatures and use the same verification path.
+
+Nine focused reservation/consumption tests passed in 59.705s. The new scenario interrupts before
+publication, recovers through a fresh process twice, and retries with the same physical destination
+and exactly one additional registration. The child stays empty and fenced; the parent's marker,
+journal and current editor bytes stay unchanged. Existing unexpected-work, replacement, depth and
+recovery regressions also passed. Omitting the native history inputs made the consumed-child test
+fail in 55.391s; source was restored byte-for-byte. An initial test assertion compile failure is
+preserved and corrected. Full validation is pending. Downstream grant/start/materialization and
+multi-level transaction recovery, generic callers, runtime/publication controls and packaged
+acceptance remain required. PR #324 / issue #323 and the full fleet goal remain open; the checkpoint
+is unchanged.
+
+R161 consumed-parent reservation `b4e1e4117abe5d69bd541764aec6bb9452372180` passed full
+`npm test`: 3,949 native tests in 284.709s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `5337e96191813e7cf13a98a71b673b45efb57481` passed all seven hosted checks
+in run `37237396357`. Full history and focused, mutation, failed diagnostic and full logs are
+preserved. Empty child allocation from consumed progress and exact restart recovery are verified;
+downstream grant/start/materialization and multi-level consumption recovery, generic callers,
+runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue #323
+and the complete fleet objective stay open. The user checkpoint is unchanged.
+
+R161 native grants can now select a consumed lane's saved progress for an exact child destination.
+The control callback reconstructs source history from a context independently matched to its current
+owner proof, including an exact interrupted control prefix. Completed-parent admission requires the
+already journaled owner receipt; the pending record itself cannot substitute. Historical input
+reconstruction during pending control requires the exact prior consumption relationship. Current
+access still refuses unfinished control, stale grants and revoked grants. Destinations remain
+correlation-only selections under complete custody, so empty and interrupted destinations do not
+need readable source history. This corrects the initial focused run's premature destination reads.
+
+Sixteen focused grant/admission/consumption tests passed in 83.858s, including the existing full
+interrupted-frame campaign. The consumed-parent scenario covers one-byte grant interruption,
+fresh-process recovery and historical retry, revoke with lost reply, regrant, exact saved bytes and
+unchanged source/destination journals with an empty child. An added stale-owner-proof refusal fails
+in 61.820s when its exact proof check is removed; production source was restored byte-for-byte.
+Strict daemon linting passed in 9.28s. The initial failing compatibility run and all diagnostic logs
+are preserved. Full validation, including the added stale-proof and ordinary-read refusal assertions,
+is pending. Start/materialization and multi-level consumption recovery, generic desktop/harness
+callers, runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue
+#323 and the full fleet objective stay open. The fixed user checkpoint is unchanged.
+
+R161 consumed-source grants `9b504eac3ab2545684a8420efad2b1a1fd1cf711` passed full `npm test`:
+3,949 native tests in 296.016s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and all
+remaining repository/docs/license/storage/format/lint/real-daemon gates. This includes the additional
+stale-owner-proof and ordinary torn-history refusal assertions. Published predecessor
+`b453de9cd7d52181fa9cdbb7c16407abd0aa3fea` passed all seven hosted checks in run `37238362613`.
+Complete history and failed compatibility, focused, mutation and full logs are preserved. Exact
+consumed-source grants and restart recovery are verified; child materialization/start and multi-level
+consumption recovery, generic callers, runtime/publication controls and packaged acceptance remain
+required. Draft PR #324 / issue #323 and the full fleet goal stay open. The checkpoint is unchanged.

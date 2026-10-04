@@ -8,6 +8,9 @@ use mesh_cas::{Blake3, ContentDigest};
 use mesh_store::{DependencyKind, DependencyRecord, RecordDigest};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod consumption;
+use consumption::{ConsumedComplete, ConsumedStart};
+
 const SCHEMA: &str = "mesh.dependency-policy/v1";
 const MAX_BYTES: usize = 65_536;
 const MAX_INPUTS: usize = 256;
@@ -44,6 +47,8 @@ struct Input(Work, RecordDigest);
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Event {
     Enrollment,
+    ConsumptionStart(Box<ConsumedStart>),
+    ConsumptionComplete(ConsumedComplete),
     Grant {
         source: Input,
         destination: Work,
@@ -95,6 +100,8 @@ pub struct DependencyPolicyHistory {
     roots: BTreeSet<RecordDigest>,
     head: Option<(u64, RecordDigest)>,
     payload_bytes: usize,
+    consumption_start: Option<RecordDigest>,
+    consumption_complete: Option<RecordDigest>,
 }
 impl DependencyPolicyHistory {
     /// Start replay against independently pinned native identity, not an identity in the payload.
@@ -111,6 +118,8 @@ impl DependencyPolicyHistory {
             roots: BTreeSet::new(),
             head: None,
             payload_bytes: 0,
+            consumption_start: None,
+            consumption_complete: None,
         })
     }
 
@@ -184,9 +193,31 @@ impl DependencyPolicyHistory {
                     && event != Event::Enrollment => {}
             _ => return Err(InvalidDependencyHistory),
         }
+        // While materialization is pending, only its exact completion may advance local policy.
+        // The owner retains independent grant/revocation history in its own installation.
+        if self.consumption_start.is_some()
+            && self.consumption_complete.is_none()
+            && !matches!(event, Event::ConsumptionComplete(_))
+        {
+            return Err(InvalidDependencyHistory);
+        }
         // Complete every fallible semantic check before mutating any map or retained reference.
         match &event {
             Event::Enrollment => {}
+            Event::ConsumptionStart(_) => {
+                // A consumed initial tree is permitted only immediately after enrollment.
+                // Native replay must additionally prove there are no operation records yet.
+                if self.records.len() != 1 || self.consumption_start.is_some() {
+                    return Err(InvalidDependencyHistory);
+                }
+            }
+            Event::ConsumptionComplete(complete) => {
+                if self.consumption_start != Some(complete.start)
+                    || self.consumption_complete.is_some()
+                {
+                    return Err(InvalidDependencyHistory);
+                }
+            }
             Event::Grant {
                 source,
                 destination,
@@ -252,6 +283,8 @@ impl DependencyPolicyHistory {
             }
         }
         match &event {
+            Event::ConsumptionStart(_) => self.consumption_start = Some(envelope.payload),
+            Event::ConsumptionComplete(_) => self.consumption_complete = Some(envelope.payload),
             Event::Grant {
                 source,
                 destination,
@@ -284,6 +317,25 @@ impl DependencyPolicyHistory {
         self.head = Some((envelope.revision, envelope.payload));
         self.records.insert(envelope.payload, (envelope, event));
         Ok(())
+    }
+
+    /// Required consumed provenance remains present after completion. This is a replay fact,
+    /// never proof that the owner receipt, staged objects or destination bytes were verified.
+    pub(crate) fn has_consumption_transaction(&self) -> bool {
+        self.consumption_start.is_some()
+    }
+
+    /// Local replay records only. Callers must independently join the owning authority's receipt.
+    pub(crate) fn completed_consumption_records(
+        &self,
+    ) -> Option<(DependencyRecord, DependencyRecord, RecordDigest)> {
+        let (start, _) = self.records.get(&self.consumption_start?)?;
+        let (complete, Event::ConsumptionComplete(body)) =
+            self.records.get(&self.consumption_complete?)?
+        else {
+            return None;
+        };
+        Some((*start, *complete, body.owner_receipt))
     }
 
     pub(crate) fn native_head(&self) -> Option<(u64, RecordDigest)> {
@@ -470,6 +522,17 @@ fn decode(
     let mut roots = BTreeSet::new();
     let mut request = None;
     let event = match kind {
+        DependencyKind::ConsumptionStart => {
+            let start = ConsumedStart::decode(body, binding)?;
+            request = Some(start.request);
+            roots.extend(start.references());
+            Event::ConsumptionStart(Box::new(start))
+        }
+        DependencyKind::ConsumptionComplete => {
+            let complete = ConsumedComplete::decode(body)?;
+            roots.extend([complete.start, complete.owner_receipt]);
+            Event::ConsumptionComplete(complete)
+        }
         DependencyKind::Enrollment => {
             fields(body, &["project", "installation"])?;
             if digest(value(body, "project")?, false)? != binding.project

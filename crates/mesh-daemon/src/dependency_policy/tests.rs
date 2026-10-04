@@ -606,3 +606,260 @@ fn legacy_unbound_grant_never_satisfies_current_native_admission() {
         (d(70), d(71))
     ));
 }
+
+fn consumed_start_body() -> Json {
+    Json::object([
+        ("request", j(60)),
+        ("owner", Json::Array(vec![j(70), j(71), j(72)])),
+        ("destination", Json::Array(vec![j(20), j(3)])),
+        ("source", i(10)),
+        ("grant", j(61)),
+        ("bindings", Json::Array(vec![j(62), j(63)])),
+        ("configuration", j(64)),
+        ("prospective", j(65)),
+        ("closure", j(66)),
+        ("operation", j(67)),
+        ("staged", j(68)),
+    ])
+}
+fn consumed_complete(previous: RecordDigest, start: RecordDigest) -> (DependencyRecord, Vec<u8>) {
+    payload(
+        DependencyKind::ConsumptionComplete,
+        3,
+        previous,
+        Json::object([
+            ("start", Json::text(start.to_hex())),
+            ("owner_receipt", j(69)),
+        ]),
+    )
+}
+
+#[test]
+fn consumed_provenance_replays_idempotently_and_retains_exact_start_and_owner_receipt() {
+    let enrollment = enrollment();
+    let start = payload(
+        DependencyKind::ConsumptionStart,
+        2,
+        enrollment.0.payload,
+        consumed_start_body(),
+    );
+    let complete = consumed_complete(start.0.payload, start.0.payload);
+    let mut h = DependencyPolicyHistory::new(binding()).unwrap();
+    apply(&mut h, &enrollment);
+    assert!(!h.has_consumption_transaction());
+    apply(&mut h, &start);
+    assert!(h.has_consumption_transaction());
+    assert_eq!(h.native_request(d(60)), Some(start.0));
+    let pending = h.clone();
+    apply(&mut h, &start);
+    assert_eq!(h, pending);
+    assert_eq!(h.consumption_complete, None);
+    apply(&mut h, &complete);
+    let finished = h.clone();
+    apply(&mut h, &start);
+    apply(&mut h, &complete);
+    assert_eq!(h, finished);
+    assert_eq!(h.consumption_complete, Some(complete.0.payload));
+    assert!(
+        h.has_consumption_transaction(),
+        "completion must not remove required provenance"
+    );
+    for referenced in [
+        d(12),
+        d(61),
+        d(64),
+        d(65),
+        d(66),
+        d(67),
+        d(68),
+        d(69),
+        start.0.payload,
+        complete.0.payload,
+    ] {
+        assert!(h.referenced_content().any(|id| *id == referenced));
+    }
+    assert!(
+        h.consumption_facts().is_empty(),
+        "a destination acknowledgement cannot invent owner-authority consumption"
+    );
+    let mut reopened = DependencyPolicyHistory::new(binding()).unwrap();
+    for record in [&enrollment, &start, &complete] {
+        apply(&mut reopened, record);
+    }
+    assert_eq!(reopened, finished);
+}
+
+#[test]
+fn consumed_start_completion_order_and_pending_exclusion_are_atomic() {
+    let enrollment = enrollment();
+    let start = payload(
+        DependencyKind::ConsumptionStart,
+        2,
+        enrollment.0.payload,
+        consumed_start_body(),
+    );
+    let mut h = DependencyPolicyHistory::new(binding()).unwrap();
+    refuse(&mut h, &start);
+    apply(&mut h, &enrollment);
+    let orphan = payload(
+        DependencyKind::ConsumptionComplete,
+        2,
+        enrollment.0.payload,
+        Json::object([("start", j(80)), ("owner_receipt", j(69))]),
+    );
+    refuse(&mut h, &orphan);
+    let mut nonempty = h.clone();
+    let grant = grant(2, enrollment.0.payload, 40, 1, ZERO, true);
+    apply(&mut nonempty, &grant);
+    refuse(
+        &mut nonempty,
+        &payload(
+            DependencyKind::ConsumptionStart,
+            3,
+            grant.0.payload,
+            consumed_start_body(),
+        ),
+    );
+    apply(&mut h, &start);
+    refuse(&mut h, &self::grant(3, start.0.payload, 41, 1, ZERO, true));
+    refuse(&mut h, &decide(3, start.0.payload, 42, 1, ZERO, "eligible"));
+    refuse(
+        &mut h,
+        &payload(
+            DependencyKind::ConsumptionStart,
+            3,
+            start.0.payload,
+            consumed_start_body(),
+        ),
+    );
+    refuse(&mut h, &consumed_complete(start.0.payload, d(90)));
+    let complete = consumed_complete(start.0.payload, start.0.payload);
+    apply(&mut h, &complete);
+    let conflicting = payload(
+        DependencyKind::ConsumptionComplete,
+        4,
+        complete.0.payload,
+        Json::object([
+            ("start", Json::text(start.0.payload.to_hex())),
+            ("owner_receipt", j(90)),
+        ]),
+    );
+    refuse(&mut h, &conflicting);
+    refuse(
+        &mut h,
+        &payload(
+            DependencyKind::ConsumptionStart,
+            4,
+            complete.0.payload,
+            consumed_start_body(),
+        ),
+    );
+}
+
+#[test]
+fn consumed_start_rejects_malformed_identity_and_noncanonical_fields_without_losing_roots() {
+    let enrollment = enrollment();
+    let mut h = DependencyPolicyHistory::new(binding()).unwrap();
+    apply(&mut h, &enrollment);
+    for (field, bad) in [
+        ("request", j(0)),
+        ("owner", Json::Array(vec![j(70), j(71)])),
+        ("owner", Json::Array(vec![j(1), j(71), j(72)])),
+        ("owner", Json::Array(vec![j(70), j(2), j(72)])),
+        ("owner", Json::Array(vec![j(70), j(71), j(3)])),
+        ("destination", w(20)),
+        ("destination", Json::Array(vec![j(10), j(3)])),
+        (
+            "source",
+            Json::Array(vec![Json::Array(vec![j(10), j(3)]), j(12)]),
+        ),
+        ("bindings", Json::Array(vec![j(62)])),
+        ("bindings", Json::Array(vec![j(0), j(63)])),
+        ("grant", j(0)),
+        ("configuration", j(0)),
+        ("prospective", j(0)),
+        ("closure", j(0)),
+        ("operation", j(0)),
+        ("staged", j(0)),
+    ] {
+        let Json::Object(mut body) = consumed_start_body() else {
+            unreachable!()
+        };
+        body.iter_mut().find(|(key, _)| key == field).unwrap().1 = bad;
+        refuse(
+            &mut h,
+            &payload(
+                DependencyKind::ConsumptionStart,
+                2,
+                enrollment.0.payload,
+                Json::Object(body),
+            ),
+        );
+    }
+    let Json::Object(body) = consumed_start_body() else {
+        unreachable!()
+    };
+    for position in 0..body.len() {
+        let mut missing = body.clone();
+        missing.remove(position);
+        refuse(
+            &mut h,
+            &payload(
+                DependencyKind::ConsumptionStart,
+                2,
+                enrollment.0.payload,
+                Json::Object(missing),
+            ),
+        );
+    }
+    let mut reversed = body.clone();
+    reversed.reverse();
+    refuse(
+        &mut h,
+        &payload(
+            DependencyKind::ConsumptionStart,
+            2,
+            enrollment.0.payload,
+            Json::Object(reversed),
+        ),
+    );
+    let mut duplicate = body.clone();
+    duplicate.push(body[0].clone());
+    refuse(
+        &mut h,
+        &payload(
+            DependencyKind::ConsumptionStart,
+            2,
+            enrollment.0.payload,
+            Json::Object(duplicate),
+        ),
+    );
+    let start = payload(
+        DependencyKind::ConsumptionStart,
+        2,
+        enrollment.0.payload,
+        consumed_start_body(),
+    );
+    for length in 0..start.1.len() {
+        refuse(&mut h, &(start.0, start.1[..length].to_vec()));
+    }
+    apply(&mut h, &start);
+    for body in [
+        Json::object([("start", j(0)), ("owner_receipt", j(69))]),
+        Json::object([
+            ("start", Json::text(start.0.payload.to_hex())),
+            ("owner_receipt", j(0)),
+        ]),
+        Json::object([("start", Json::text(start.0.payload.to_hex()))]),
+    ] {
+        refuse(
+            &mut h,
+            &payload(
+                DependencyKind::ConsumptionComplete,
+                3,
+                start.0.payload,
+                body,
+            ),
+        );
+    }
+}

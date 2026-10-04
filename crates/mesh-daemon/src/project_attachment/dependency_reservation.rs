@@ -74,18 +74,17 @@ fn store_receipt(work: &ProvisionedAttachment) -> io::Result<Json> {
         ("attachment", work.project().receipt()?),
     ]))
 }
-fn verify_input(parent: &ProvisionedAttachment, version: SavedAttachmentVersion) -> io::Result<()> {
-    parent.project().inspect_saved(
-        parent.metadata_path(),
-        parent.store.clone(),
-        &version.operation().to_string(),
-        |history, op| {
-            history
-                .historical_workspace_preview(op)
-                .map(|_| ())
-                .map_err(error)
-        },
-    )
+fn verify_input(
+    context: &super::dependency_owner_context::OwnerHistoryContext<'_>,
+    parent: &ProvisionedAttachment,
+    version: SavedAttachmentVersion,
+) -> io::Result<()> {
+    let (_, _, history) = context.history(parent)?;
+    SavedAttachmentVersion::from_verified_history(&history, version.operation())?;
+    history
+        .historical_workspace_preview(version.operation())
+        .map(|_| ())
+        .map_err(error)
 }
 fn verify_enrolled(work: &ProvisionedAttachment) -> io::Result<()> {
     let _guard =
@@ -98,6 +97,44 @@ fn verify_enrolled(work: &ProvisionedAttachment) -> io::Result<()> {
     }
     work.saved_versions()?;
     Ok(())
+}
+
+// Allocation ancestry establishes correlation only. Pending consumption must remain discoverable
+// without manufacturing the ordinary history permission that its required journal fence refuses.
+fn verify_origin_enrollment(work: &ProvisionedAttachment) -> io::Result<()> {
+    let guard =
+        crate::workspace_custody::lock_workspace_initialization(&work.store).map_err(error)?;
+    let pending =
+        match read_private_in_store(&work.store, super::consumption_prepare::START_PENDING) {
+            Ok(raw) => Some(raw),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e),
+        };
+    let (_, facts) = work
+        .project()
+        .read_native_facts(work.metadata_path(), &work.store, pending.as_deref(), None)
+        .or_else(|original| {
+            // Correlation must survive later captures, including an interrupted append. This inspects
+            // only the exact original completed start and grants no access to the later history.
+            if pending.is_some() {
+                work.project()
+                    .read_completed_start_facts(work.metadata_path(), &work.store)
+            } else {
+                Err(original)
+            }
+        })?;
+    let facts = facts.ok_or_else(|| invalid("reserved history has no native enrollment"))?;
+    if pending.is_some()
+        && !facts
+            .pending()
+            .is_some_and(|(_, record)| record.kind == mesh_store::DependencyKind::ConsumptionStart)
+    {
+        return Err(invalid("reserved consumption intent has the wrong kind"));
+    }
+    if pending.is_none() && !facts.policy().has_consumption_transaction() {
+        verify_enrolled(work)?;
+    }
+    guard.ensure_current().map_err(error)
 }
 
 fn reserved(work: &ProvisionedAttachment, intent: &Json) -> io::Result<Json> {
@@ -123,12 +160,35 @@ impl AttachmentStorage {
     ) -> io::Result<ProvisionedAttachment> {
         self.reserve_with_hook(owner, parent, version, request, |_| Ok(()))
     }
+    /// Reserve from an exact saved native input whose consumed ancestry is supplied as native
+    /// handles. Missing transitive inputs refuse. This allocates only an empty fenced destination.
+    pub fn reserve_dependency_lane_with_inputs(
+        &self,
+        owner: &ProvisionedAttachment,
+        parent: &ProvisionedAttachment,
+        version: SavedAttachmentVersion,
+        request: RecordDigest,
+        available: &[&ProvisionedAttachment],
+    ) -> io::Result<ProvisionedAttachment> {
+        self.reserve_with_inputs_and_hook(owner, parent, version, request, available, |_| Ok(()))
+    }
     fn reserve_with_hook(
         &self,
         owner: &ProvisionedAttachment,
         parent: &ProvisionedAttachment,
         version: SavedAttachmentVersion,
         request: RecordDigest,
+        hook: impl FnMut(&str) -> io::Result<()>,
+    ) -> io::Result<ProvisionedAttachment> {
+        self.reserve_with_inputs_and_hook(owner, parent, version, request, &[], hook)
+    }
+    fn reserve_with_inputs_and_hook(
+        &self,
+        owner: &ProvisionedAttachment,
+        parent: &ProvisionedAttachment,
+        version: SavedAttachmentVersion,
+        request: RecordDigest,
+        available: &[&ProvisionedAttachment],
         mut hook: impl FnMut(&str) -> io::Result<()>,
     ) -> io::Result<ProvisionedAttachment> {
         if request == RecordDigest::from_bytes([0; 32]) {
@@ -136,21 +196,30 @@ impl AttachmentStorage {
         }
         let prepared = self.prepare_dependency_work(owner, parent)?;
         prepared.require_child_capacity()?;
-        if prepared.roots.len() + 5 > 32 {
+        let graph = self.prepare_dependency_graph(owner, parent, version.operation(), available)?;
+        if graph.roots.len() + 5 > 32 {
             return Err(invalid("reservation ancestry exceeds custody bound"));
         }
-        let binding = self.dependency_work_binding(owner, parent)?;
-        parent.project().inspect_saved(
-            parent.metadata_path(),
-            parent.store.clone(),
-            &version.operation().to_string(),
-            |history, op| {
-                history
-                    .historical_workspace_preview(op)
-                    .map(|_| ())
-                    .map_err(error)
-            },
-        )?;
+        let works = std::iter::once(parent)
+            .chain(available.iter().copied())
+            .collect::<Vec<_>>();
+        let resolve = |guard: &crate::workspace_custody::WorkspaceInitializationGuard| {
+            self.resolve_consumed_histories(
+                owner,
+                &works,
+                guard,
+                super::dependency_owner_context::OwnerHistoryContext::current(owner),
+            )
+        };
+        let binding = {
+            let guard = crate::workspace_custody::lock_workspace_initialization_set(&graph.roots)
+                .map_err(error)?;
+            let context = resolve(&guard)?;
+            let binding = context.validate(self, &prepared, &guard)?;
+            verify_input(&context, parent, version)?;
+            guard.ensure_current().map_err(error)?;
+            binding
+        };
         let name = format!(
             "reservation-{}",
             hash(format!("{}:{}", owner.id(), request.to_hex()).as_bytes()).to_hex()
@@ -206,15 +275,16 @@ impl AttachmentStorage {
                 return Err(invalid("reserved destination changed"));
             }
             let selected = self.prepare_dependency_work(owner, &work)?;
-            let mut roots = prepared.roots.clone();
+            let mut roots = graph.roots.clone();
             roots.extend([allocation.clone(), files.clone(), work.store.clone()]);
             let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
                 .map_err(error)?;
-            if self.validate_dependency_work(&prepared, &guard)? != binding {
+            let context = resolve(&guard)?;
+            if context.validate(self, &prepared, &guard)? != binding {
                 return Err(invalid("reservation parent changed during retry"));
             }
-            self.validate_dependency_work(&selected, &guard)?;
-            verify_input(parent, version)?;
+            context.validate(self, &selected, &guard)?;
+            verify_input(&context, parent, version)?;
             verify_enrolled(&work)?;
             allocation.filesystem().sync_file(Path::new(RESERVED))?;
             allocation.sync()?;
@@ -263,7 +333,7 @@ impl AttachmentStorage {
         {
             return Err(invalid("reserved files binding changed"));
         }
-        let mut roots = prepared.roots.clone();
+        let mut roots = graph.roots.clone();
         roots.extend([
             allocation.clone(),
             files.clone(),
@@ -273,10 +343,11 @@ impl AttachmentStorage {
         {
             let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
                 .map_err(error)?;
-            if self.validate_dependency_work(&prepared, &guard)? != binding {
+            let context = resolve(&guard)?;
+            if context.validate(self, &prepared, &guard)? != binding {
                 return Err(invalid("reservation parent changed"));
             }
-            verify_input(parent, version)?;
+            verify_input(&context, parent, version)?;
             exact(&allocation, INTENT, &intent)?;
             exact(&allocation, FILES, &identity(&files)?)?;
             exact(&allocation, STORE, &store_receipt(&work)?)?;
@@ -335,11 +406,12 @@ impl AttachmentStorage {
         hook("published")?;
         let published = self.reopen(work.id())?;
         exact(&allocation, STORE, &store_receipt(&published)?)?;
-        let mut roots = prepared.roots.clone();
+        let mut roots = graph.roots.clone();
         roots.extend([allocation.clone(), files, staging, published.store.clone()]);
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
-        if self.validate_dependency_work(&prepared, &guard)? != binding {
+        let context = resolve(&guard)?;
+        if context.validate(self, &prepared, &guard)? != binding {
             return Err(invalid("reservation parent changed after publication"));
         }
         if !published
@@ -355,7 +427,7 @@ impl AttachmentStorage {
             return Err(invalid("unacknowledged reservation history changed"));
         }
         exact(&allocation, INTENT, &intent)?;
-        verify_input(parent, version)?;
+        verify_input(&context, parent, version)?;
         verify_enrolled(&published)?;
         write(&allocation, RESERVED, &reserved(&published, &intent)?)?;
         hook("recorded")?;
@@ -427,7 +499,7 @@ pub(super) fn origin(
     exact(&allocation, FILES, &identity(&work.attachment.pinned)?)?;
     exact(&allocation, STORE, &store_receipt(work)?)?;
     exact(&allocation, RESERVED, &reserved(work, &intent)?)?;
-    verify_enrolled(work)?; // local history enrollment, not an owning-project grant
+    verify_origin_enrollment(work)?; // correlation only; never ordinary history admission
     Ok(super::lanes::NativeLaneOrigin {
         value: intent,
         allocation,
@@ -437,5 +509,7 @@ pub(super) fn origin(
 pub(super) fn is_reservation(value: &Json) -> bool {
     value.get("schema").and_then(Json::as_text) == Some(SCHEMA)
 }
+#[cfg(test)]
+mod consumed_tests;
 #[cfg(test)]
 mod tests;

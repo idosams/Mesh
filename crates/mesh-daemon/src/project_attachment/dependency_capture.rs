@@ -12,12 +12,17 @@ use crate::project_attachment::{
 };
 use std::io::{Seek as _, Write as _};
 
+#[path = "consumed_capture.rs"]
+mod consumed;
+use consumed::{CaptureRead, ConsumedCaptureContext};
+
 const PENDING: &str = "dependency-capture.pending";
 const MAX_JOURNAL: usize = 80 * 1024 * 1024;
 
 /// Signed private capture prepared without granting publication or holding native custody.
 /// Commit must refresh exact enrollment and history; signing can never reserve the commit order.
 pub struct PreparedNativeCapture {
+    consumption: Option<ConsumedCaptureContext>,
     attachment: ProvisionedAttachment,
     configuration: String,
     binding: crate::dependency_policy::NativeDependencyBinding,
@@ -50,81 +55,92 @@ impl ProvisionedAttachment {
         F: FnOnce(&SigningPayload) -> Result<Signature, E>,
         E: std::fmt::Display,
     {
+        self.prepare_capture_in(input, actor, request, sign, None)
+    }
+    fn prepare_capture_in<F, E>(
+        &self,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+        request: RecordDigest,
+        sign: F,
+        consumption: Option<ConsumedCaptureContext>,
+    ) -> io::Result<PreparedNativeCapture>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
         if request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing native capture request"));
         }
-        let (configuration, proof, workspace, line, basis, operations, files) = {
-            let _guard = crate::workspace_custody::lock_workspace_initialization(&self.store)
+        let (configuration, proof, workspace, line, basis, operations, files) = self
+            .with_capture_custody(consumption.as_ref(), |read| {
+                self.check_dependency_registration()?;
+                self.attachment.ensure_current()?;
+                if input.root() != self.attachment.root()
+                    || input.identity() != self.attachment.pinned.identity()?
+                {
+                    return Err(invalid("capture belongs to a different native attachment"));
+                }
+                absent(&self.store, PENDING)?;
+                absent(&self.store, &receipt_name(request))?;
+                absent(&self.store, dependency_decision::PENDING)?;
+                crate::project_attachment::detachment::ensure_attached(&self.store)?;
+                let (configuration, proof) = read(None)?;
+                self.attachment.history_configuration_with_previous(
+                    &self.store,
+                    Some(input.exclusion_digest()),
+                    Some(configuration.clone()),
+                )?;
+
+                let workspace = OpenWorkspace::open_attachment_read_history(
+                    self.metadata_path(),
+                    self.store.clone(),
+                    &crate::TrustedReviewers::default(),
+                    Some(&proof),
+                )
                 .map_err(error)?;
-            self.check_dependency_registration()?;
-            self.attachment.ensure_current()?;
-            if input.root() != self.attachment.root()
-                || input.identity() != self.attachment.pinned.identity()?
-            {
-                return Err(invalid("capture belongs to a different native attachment"));
-            }
-            absent(&self.store, PENDING)?;
-            absent(&self.store, &receipt_name(request))?;
-            absent(&self.store, dependency_decision::PENDING)?;
-            crate::project_attachment::detachment::ensure_attached(&self.store)?;
-            let (configuration, proof) = self
-                .attachment
-                .read_configuration(self.metadata_path(), &self.store)?;
-            self.attachment.history_configuration_with_previous(
-                &self.store,
-                Some(input.exclusion_digest()),
-                Some(configuration.clone()),
-            )?;
-            let proof = proof.ok_or_else(|| invalid("native dependency enrollment is required"))?;
-            let workspace = OpenWorkspace::open_attachment_read_history(
-                self.metadata_path(),
-                self.store.clone(),
-                &crate::TrustedReviewers::default(),
-                Some(&proof),
-            )
-            .map_err(error)?;
-            verify_history_binding(&workspace, &configuration)?;
-            let line = CaptureLine::load(&self.store, &workspace, &configuration)?;
-            let workspace_id = WorkspaceId::from_bytes(short_id(configuration.as_bytes()));
-            let basis = if let Some(head) = line.head {
-                let basis = workspace
-                    .historical_authoring_basis(head, actor)
-                    .map_err(error)?;
-                if basis.workspace_id != workspace_id {
-                    return Err(invalid("capture history identity changed"));
+                verify_history_binding(&workspace, &configuration)?;
+                let line = CaptureLine::load(&self.store, &workspace, &configuration)?;
+                let workspace_id = WorkspaceId::from_bytes(short_id(configuration.as_bytes()));
+                let basis = if let Some(head) = line.head {
+                    let basis = workspace
+                        .historical_authoring_basis(head, actor)
+                        .map_err(error)?;
+                    if basis.workspace_id != workspace_id {
+                        return Err(invalid("capture history identity changed"));
+                    }
+                    basis
+                } else {
+                    ManagedAuthoringBasis {
+                        workspace_id,
+                        actor_id: ActorId::from_bytes(*actor.as_bytes()),
+                        session_id: SessionId::from_bytes(short_id(actor.as_bytes())),
+                        actor_sequence: ActorSequence::FIRST,
+                        causal_parents: CausalParents::genesis(),
+                        base_head: HeadId::from_bytes([0; 32]),
+                        policy_epoch: PolicyEpoch::new(1),
+                        hybrid_logical_time: Hlc::new(0, 0),
+                    }
+                };
+                let (operations, files) = prepare_snapshot(&workspace, input, &basis, line.head)?;
+                if operations.is_empty() {
+                    return Err(invalid("capture contains no new private progress"));
                 }
-                basis
-            } else {
-                ManagedAuthoringBasis {
-                    workspace_id,
-                    actor_id: ActorId::from_bytes(*actor.as_bytes()),
-                    session_id: SessionId::from_bytes(short_id(actor.as_bytes())),
-                    actor_sequence: ActorSequence::FIRST,
-                    causal_parents: CausalParents::genesis(),
-                    base_head: HeadId::from_bytes([0; 32]),
-                    policy_epoch: PolicyEpoch::new(1),
-                    hybrid_logical_time: Hlc::new(0, 0),
+                if let Some(head) = line.head {
+                    workspace
+                        .prepare_historical_operations(head, actor, &operations)
+                        .map_err(error)?;
                 }
-            };
-            let (operations, files) = prepare_snapshot(&workspace, input, &basis, line.head)?;
-            if operations.is_empty() {
-                return Err(invalid("capture contains no new private progress"));
-            }
-            if let Some(head) = line.head {
-                workspace
-                    .prepare_historical_operations(head, actor, &operations)
-                    .map_err(error)?;
-            }
-            (
-                configuration,
-                proof,
-                workspace,
-                line,
-                basis,
-                operations,
-                files,
-            )
-        };
+                Ok((
+                    configuration,
+                    proof,
+                    workspace,
+                    line,
+                    basis,
+                    operations,
+                    files,
+                ))
+            })?;
         let make_request = |signature| {
             AuthenticatedOperationCheckpointRequest::new(
                 basis.workspace_id,
@@ -154,6 +170,7 @@ impl ProvisionedAttachment {
         )
         .map_err(error)?;
         Ok(PreparedNativeCapture {
+            consumption,
             attachment: self.clone(),
             configuration,
             binding: proof.binding(),
@@ -179,22 +196,29 @@ impl PreparedNativeCapture {
 
     fn commit_with_io(
         self,
+        hook: impl FnMut(CaptureStep, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
+    ) -> io::Result<SavedAttachmentVersion> {
+        let attachment = self.attachment.clone();
+        let consumption = self.consumption.clone();
+        attachment.with_capture_custody(consumption.as_ref(), |read| {
+            self.commit_held(read, hook, sync)
+        })
+    }
+    fn commit_held(
+        self,
+        read: &CaptureRead<'_>,
         mut hook: impl FnMut(CaptureStep, &mut fs::File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<SavedAttachmentVersion> {
         let a = &self.attachment;
-        let _guard =
-            crate::workspace_custody::lock_workspace_initialization(&a.store).map_err(error)?;
         a.check_dependency_registration()?;
         a.attachment.ensure_current()?;
         crate::project_attachment::detachment::ensure_attached(&a.store)?;
         absent(&a.store, PENDING)?;
         absent(&a.store, &receipt_name(self.request))?;
         absent(&a.store, dependency_decision::PENDING)?;
-        let (configuration, proof) = a
-            .attachment
-            .read_configuration(a.metadata_path(), &a.store)?;
-        let proof = proof.ok_or_else(|| invalid("native capture enrollment disappeared"))?;
+        let (configuration, proof) = read(None)?;
         if configuration != self.configuration || proof.binding() != self.binding {
             return Err(invalid("native capture basis changed while signing"));
         }
@@ -279,11 +303,9 @@ impl PreparedNativeCapture {
         self.line
             .begin(self.prepared.changeset_id, &a.store, &configuration)?;
         hook(CaptureStep::Staged, &mut journal, &frames)?;
-        let (current, after_staging) = a
-            .attachment
-            .read_configuration(a.metadata_path(), &a.store)?;
+        let (current, after_staging) = read(None)?;
         if current != configuration
-            || after_staging.as_ref() != Some(&proof)
+            || after_staging != proof
             || read_private_in_store(&a.store, PENDING)? != intent
             || read_payload(&cas, hash(&frames), MAX_JOURNAL)? != frames
         {
@@ -292,13 +314,11 @@ impl PreparedNativeCapture {
         journal.write_all(&frames)?;
         sync(&journal)?;
         hook(CaptureStep::Appended, &mut journal, &frames)?;
-        let (current, proof) = a
-            .attachment
-            .read_configuration(a.metadata_path(), &a.store)?;
+        let (current, proof) = read(None)?;
         if current != configuration {
             return Err(invalid("native capture binding changed"));
         }
-        let proof = proof.ok_or_else(|| invalid("native capture enrollment disappeared"))?;
+
         if proof.binding() != self.binding {
             return Err(invalid("native capture authority changed after append"));
         }
@@ -533,13 +553,20 @@ impl ProvisionedAttachment {
     fn recover_capture_with_sync(
         &self,
         request: RecordDigest,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
+    ) -> io::Result<SavedAttachmentVersion> {
+        self.with_capture_custody(None, |read| self.recover_capture_held(request, read, sync))
+    }
+    fn recover_capture_held(
+        &self,
+        request: RecordDigest,
+        read: &CaptureRead<'_>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<SavedAttachmentVersion> {
         if request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing capture recovery request"));
         }
-        let _guard =
-            crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
+
         self.check_dependency_registration()?;
         crate::project_attachment::detachment::ensure_attached(&self.store)?;
         absent(&self.store, dependency_decision::PENDING)?;
@@ -555,10 +582,7 @@ impl ProvisionedAttachment {
         if intent.request != request {
             return Err(invalid("another capture request owns this recovery"));
         }
-        let (configuration, proof) =
-            self.attachment
-                .read_capture_configuration(self.metadata_path(), &self.store, &raw)?;
-        let proof = proof.ok_or_else(|| invalid("capture recovery enrollment is missing"))?;
+        let (configuration, proof) = read(Some(&raw))?;
         let cas = Cas::with_filesystem(self.metadata_path(), self.store.filesystem().read_only())
             .map_err(error)?;
         let frames = validate_frames(&cas, &intent)?;
@@ -595,11 +619,7 @@ impl ProvisionedAttachment {
             journal.write_all(&frames[written..])?;
         }
         sync(&journal)?;
-        let (after, after_proof) = self
-            .attachment
-            .read_configuration(self.metadata_path(), &self.store)?;
-        let after_proof =
-            after_proof.ok_or_else(|| invalid("capture recovery enrollment disappeared"))?;
+        let (after, after_proof) = read(None)?;
         if after != configuration || after_proof.binding() != proof.binding() {
             return Err(invalid("capture recovery binding changed"));
         }
@@ -652,3 +672,6 @@ impl ProvisionedAttachment {
 #[path = "dependency_capture_retention.rs"]
 mod retention;
 pub use retention::NativeCaptureRetention;
+
+#[cfg(test)]
+pub(in crate::project_attachment) use consumed::assert_consumed_capture;

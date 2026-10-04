@@ -157,7 +157,7 @@ impl CapturedProjectInput {
         policy_digest(&self.exclusions)
     }
 }
-fn policy_digest(exclusions: &(Option<String>, Option<String>)) -> Digest32 {
+pub(super) fn policy_digest(exclusions: &(Option<String>, Option<String>)) -> Digest32 {
     let policy = Json::object([
         ("schema", Json::text("mesh.attachment-exclusions/v1")),
         (

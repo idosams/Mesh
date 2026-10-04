@@ -52,6 +52,14 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod consumption_complete;
+mod consumption_history;
+mod consumption_plan;
+mod consumption_prepare;
+mod consumption_start;
+pub use consumption_prepare::{
+    NativeConsumedStartRequest, PreparedNativeConsumedStart, StagedNativeConsumedStart,
+};
 mod dependency_decision;
 mod dependency_grant;
 mod grant_admission;
@@ -62,6 +70,7 @@ pub use work_decision::NativeWorkDecisionRequest;
 mod dependency_work;
 pub use dependency_work::NativeDependencyWorkBinding;
 mod dependency_enrollment;
+mod dependency_owner_context;
 mod dependency_read;
 mod dependency_transaction;
 pub use dependency_decision::{NativeInputDecision, SavedInputDecision};

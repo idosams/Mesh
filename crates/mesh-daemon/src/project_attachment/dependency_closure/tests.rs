@@ -171,6 +171,37 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         .inspect_dependency_graph(&owner, &owner, second, &[])
         .unwrap();
     assert_eq!(graph.operation_count(), 2);
+    let prepared = storage
+        .prepare_dependency_graph(&owner, &owner, second.operation(), &[])
+        .unwrap();
+    {
+        let incomplete =
+            crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
+        assert!(
+            storage
+                .inspect_prepared_dependency_graph(&prepared, &incomplete)
+                .is_err(),
+            "a graph cannot be validated with only its history store locked"
+        );
+    }
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots).unwrap();
+        assert!(
+            storage
+                .inspect_dependency_graph(&owner, &owner, second, &[])
+                .is_err(),
+            "the ordinary entry point must still refuse nested lock acquisition"
+        );
+        assert_eq!(
+            storage
+                .inspect_prepared_dependency_graph(&prepared, &guard)
+                .unwrap(),
+            graph
+        );
+        guard.ensure_current().unwrap();
+    }
+
     // A fully journaled capture awaiting acknowledgement retains its pending evidence atomically.
     let second_receipt = owner
         .metadata_path()
@@ -447,6 +478,205 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .inspect_dependency_graph(&handle, &handle, second, &[])
             .unwrap()
     );
+    // A real authenticated root declaration represents an empty initial snapshot. It creates no
+    // sentinel file and does not reset an existing tree or claim a consumption transaction.
+    let empty_child = storage
+        .reserve_dependency_lane(&owner, &owner, second, d(120))
+        .unwrap();
+    let initial_grant = storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &owner,
+                version: second,
+                destination: &empty_child,
+                allowed: true,
+                expected_previous: None,
+                request: d(122),
+            },
+        )
+        .unwrap();
+    let preparation_request = || crate::project_attachment::NativeConsumedStartRequest {
+        input: crate::project_attachment::NativeGrantInspection {
+            source: &owner,
+            version: second,
+            destination: &empty_child,
+            grant: initial_grant.record(),
+        },
+        available: &[],
+        request: d(123),
+        limits: ObservationLimits::default(),
+    };
+    let before_owner = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let before_destination =
+        fs::read(empty_child.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let prepared_start = storage
+        .prepare_consumed_start(
+            &owner,
+            preparation_request(),
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                // This independent acquisition would refuse if the signer inherited native custody.
+                let _guard = crate::workspace_custody::lock_workspace_initialization_set(&[
+                    owner.store.clone(),
+                    empty_child.store.clone(),
+                ])
+                .unwrap();
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert_eq!(prepared_start.request(), d(123));
+    assert_eq!(prepared_start.dependency_digest(), graph.digest());
+    assert_ne!(prepared_start.operation(), d(0));
+    prepared_start.revalidate(&storage).unwrap();
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        before_owner
+    );
+    assert_eq!(
+        fs::read(empty_child.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        before_destination
+    );
+    assert_eq!(
+        fs::read_dir(empty_child.project().root()).unwrap().count(),
+        0
+    );
+    fs::write(
+        empty_child.project().root().join("unexpected"),
+        b"retain this editor work",
+    )
+    .unwrap();
+    assert!(prepared_start.revalidate(&storage).is_err());
+    assert_eq!(
+        fs::read(empty_child.project().root().join("unexpected")).unwrap(),
+        b"retain this editor work"
+    );
+    fs::remove_file(empty_child.project().root().join("unexpected")).unwrap();
+    prepared_start.revalidate(&storage).unwrap();
+    storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &owner,
+                version: second,
+                destination: &empty_child,
+                allowed: false,
+                expected_previous: Some(initial_grant.record()),
+                request: d(124),
+            },
+        )
+        .unwrap();
+    assert!(prepared_start.revalidate(&storage).is_err());
+    assert!(storage
+        .prepare_consumed_start(
+            &owner,
+            preparation_request(),
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |_| -> Result<mesh_types::Signature, &'static str> {
+                panic!("revoked preparation entered signer")
+            }
+        )
+        .is_err());
+    let empty_start = append_signed_operations_fixture(
+        &empty_child,
+        &[],
+        121,
+        vec![mesh_operations::Operation::InitializeWorkspace {
+            root_id: mesh_operations::ObjectId::from_bytes([0; 16]),
+        }],
+    );
+    let empty_graph = storage
+        .inspect_dependency_operation_graph(&owner, &empty_child, empty_start, &[])
+        .unwrap();
+    assert_eq!(empty_graph.operation_count(), 1);
+    for _ in 0..2 {
+        let reopened = storage.reopen(empty_child.id()).unwrap();
+        let read_guard =
+            crate::workspace_custody::lock_workspace_initialization(&reopened.store).unwrap();
+        let (_, proof) = reopened
+            .project()
+            .read_configuration(reopened.metadata_path(), &reopened.store)
+            .unwrap();
+        let history = crate::workspace::OpenWorkspace::open_attachment_read_history(
+            reopened.metadata_path(),
+            reopened.store.clone(),
+            &crate::TrustedReviewers::default(),
+            proof.as_ref(),
+        )
+        .unwrap();
+        let snapshot = history.historical_workspace_preview(empty_start).unwrap();
+        assert!(snapshot.files.is_empty());
+        assert!(snapshot.directories.is_empty());
+        assert_eq!(history.operations(), 1);
+        drop(history);
+        drop(read_guard);
+        assert_eq!(fs::read_dir(reopened.project().root()).unwrap().count(), 0);
+        assert_eq!(
+            storage
+                .inspect_dependency_operation_graph(&owner, &reopened, empty_start, &[])
+                .unwrap(),
+            empty_graph
+        );
+    }
+    let empty_version = empty_child.saved_versions().unwrap()[0];
+    let empty_destination = storage
+        .reserve_dependency_lane(&owner, &empty_child, empty_version, d(125))
+        .unwrap();
+    let empty_grant = storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &empty_child,
+                version: empty_version,
+                destination: &empty_destination,
+                allowed: true,
+                expected_previous: None,
+                request: d(126),
+            },
+        )
+        .unwrap();
+    let signed_empty = storage
+        .prepare_consumed_start(
+            &owner,
+            crate::project_attachment::NativeConsumedStartRequest {
+                input: crate::project_attachment::NativeGrantInspection {
+                    source: &empty_child,
+                    version: empty_version,
+                    destination: &empty_destination,
+                    grant: empty_grant.record(),
+                },
+                available: &[],
+                request: d(127),
+                limits: ObservationLimits::default(),
+            },
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    signed_empty.revalidate(&storage).unwrap();
+    let empty_staged = signed_empty.stage(&storage).unwrap();
+    assert_eq!(
+        signed_empty.stage(&storage).unwrap().receipt().unwrap(),
+        empty_staged.receipt().unwrap()
+    );
+    assert_ne!(signed_empty.operation(), empty_start);
+    assert_eq!(
+        fs::read_dir(empty_destination.project().root())
+            .unwrap()
+            .count(),
+        0
+    );
+    assert!(
+        empty_destination.saved_versions().unwrap().is_empty(),
+        "signing is not a saved-version commit"
+    );
     let child = storage
         .reserve_dependency_lane(&owner, &owner, second, d(81))
         .unwrap();
@@ -495,6 +725,65 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             },
         )
         .unwrap();
+    // Native graph and grant admission compose under one complete transaction barrier.
+    let selected_graph = storage
+        .prepare_dependency_graph(&owner, &owner, second.operation(), &[])
+        .unwrap();
+    let selected_grant = storage
+        .prepare_input_grant(
+            &owner,
+            crate::project_attachment::NativeGrantInspection {
+                source: &owner,
+                version: second,
+                destination: &child,
+                grant: grant.record(),
+            },
+        )
+        .unwrap();
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&selected_graph.roots)
+                .unwrap();
+        assert!(storage
+            .inspect_prepared_dependency_graph(&selected_graph, &guard)
+            .is_ok());
+        assert!(storage
+            .with_prepared_input_grant(&selected_grant, &guard, |_| -> io::Result<()> {
+                panic!("source-only custody admitted a destination grant")
+            })
+            .is_err());
+    }
+    let all_roots = selected_graph
+        .roots
+        .iter()
+        .chain(&selected_grant.roots)
+        .map(|root| (root.identity().unwrap(), root.clone()))
+        .collect::<BTreeMap<_, _>>()
+        .into_values()
+        .collect::<Vec<_>>();
+    {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&all_roots).unwrap();
+        let complete = storage
+            .inspect_prepared_dependency_graph(&selected_graph, &guard)
+            .unwrap();
+        assert_eq!(complete.digest(), graph.digest());
+        storage
+            .with_prepared_input_grant(&selected_grant, &guard, |view| {
+                let mut bytes = Vec::new();
+                view.write_file("note", &mut bytes)?;
+                assert_eq!(bytes, b"second private save");
+                assert_eq!(
+                    storage
+                        .inspect_prepared_dependency_graph(&selected_graph, &guard)?
+                        .digest(),
+                    complete.digest()
+                );
+                Ok(())
+            })
+            .unwrap();
+        guard.ensure_current().unwrap();
+    }
     // Replay fixture only: the production consumption transaction is still unimplemented.
     // Stage a valid owner receipt over real bound native work and signed captures.
     let source_binding = storage.dependency_work_binding(&owner, &owner).unwrap();
@@ -948,6 +1237,22 @@ fn append_signed_operation_fixture(
     parents: &[RecordDigest],
     actor: u8,
 ) -> RecordDigest {
+    append_signed_operations_fixture(
+        owner,
+        parents,
+        actor,
+        vec![mesh_operations::Operation::CreateDirectory {
+            object_id: mesh_operations::ObjectId::from_bytes([actor; 16]),
+        }],
+    )
+}
+
+fn append_signed_operations_fixture(
+    owner: &ProvisionedAttachment,
+    parents: &[RecordDigest],
+    actor: u8,
+    operations: Vec<mesh_operations::Operation>,
+) -> RecordDigest {
     use crate::checkpoint_storage::{
         operation_checkpoint_signing_body, prepare_authenticated_checkpoint,
         AuthenticatedOperationCheckpointRequest,
@@ -977,13 +1282,15 @@ fn append_signed_operation_fixture(
     .unwrap();
     let key = SigningKey::from_bytes(&[actor; 32]);
     let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
-    let causal = CausalParents::after(
-        ChangeSetId::from_bytes(*parents[0].as_bytes()),
-        parents[1..]
-            .iter()
-            .map(|p| ChangeSetId::from_bytes(*p.as_bytes()))
-            .collect(),
-    );
+    let causal = match parents.split_first() {
+        Some((first, rest)) => CausalParents::after(
+            ChangeSetId::from_bytes(*first.as_bytes()),
+            rest.iter()
+                .map(|p| ChangeSetId::from_bytes(*p.as_bytes()))
+                .collect(),
+        ),
+        None => CausalParents::genesis(),
+    };
     let request = |signature| {
         AuthenticatedOperationCheckpointRequest::new(
             WorkspaceId::from_bytes(crate::project_attachment::history::short_id(
@@ -996,9 +1303,7 @@ fn append_signed_operation_fixture(
             HeadId::from_bytes([0; 32]),
             PolicyEpoch::new(1),
             Hlc::new(u64::from(actor), 0),
-            vec![Operation::CreateDirectory {
-                object_id: ObjectId::from_bytes([actor; 16]),
-            }],
+            operations.clone(),
             public,
             signature,
         )

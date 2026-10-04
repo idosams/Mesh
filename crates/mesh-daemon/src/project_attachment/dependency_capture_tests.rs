@@ -546,3 +546,391 @@ fn capture_retention_reads_staged_prefixes_without_recovery_and_keeps_completed_
         b"newer editor work"
     );
 }
+
+#[test]
+fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() {
+    use mesh_store::{DependencyKind, DependencyRecord, StoredRecord};
+    let f = Fixture::new("consumption-record-fence", true);
+    let input = f.input(b"unexpected editor work remains untouched");
+    let (binding, mut policy, configuration) = {
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+        let (configuration, proof) =
+            f.a.project()
+                .read_configuration(f.a.metadata_path(), &f.a.store)
+                .unwrap();
+        let proof = proof.unwrap();
+        (proof.binding(), proof.policy().clone(), configuration)
+    };
+    let j = |n| Json::text(id(n).to_hex());
+    let mut start: Option<String> = None;
+    for kind in [
+        DependencyKind::ConsumptionStart,
+        DependencyKind::ConsumptionComplete,
+    ] {
+        let prefix = f.journal();
+        let prior_policy = policy.clone();
+        let (revision, previous) = policy.native_head().unwrap();
+        let body = if kind == DependencyKind::ConsumptionStart {
+            Json::object([
+                ("request", j(60)),
+                ("owner", Json::Array(vec![j(70), j(71), j(72)])),
+                (
+                    "destination",
+                    Json::Array(vec![j(20), Json::text(binding.installation.to_hex())]),
+                ),
+                (
+                    "source",
+                    Json::Array(vec![Json::Array(vec![j(10), j(11)]), j(12)]),
+                ),
+                ("grant", j(61)),
+                ("bindings", Json::Array(vec![j(62), j(63)])),
+                (
+                    "configuration",
+                    Json::text(hash(configuration.as_bytes()).to_hex()),
+                ),
+                ("prospective", j(65)),
+                ("closure", j(66)),
+                ("operation", j(67)),
+                ("staged", j(68)),
+            ])
+        } else {
+            Json::object([
+                ("start", Json::text(start.as_deref().unwrap())),
+                ("owner_receipt", j(69)),
+            ])
+        };
+        let bytes = Json::object([
+            ("schema", Json::text("mesh.dependency-policy/v1")),
+            ("authority", Json::text(binding.authority.to_hex())),
+            ("revision", Json::Number(revision + 1)),
+            ("previous", Json::text(previous.to_hex())),
+            ("kind", Json::Number(u64::from(kind.code()))),
+            ("body", body),
+        ])
+        .encode()
+        .into_bytes();
+        let record = DependencyRecord {
+            authority: binding.authority,
+            revision: revision + 1,
+            previous,
+            payload: hash(&bytes),
+            kind,
+        };
+        // Both records are valid canonical projections. Neither proves staged content,
+        // owner authority, cross-store acknowledgement, or a valid initial operation.
+        policy.apply(record, &bytes).unwrap();
+        if kind == DependencyKind::ConsumptionStart {
+            start = Some(record.payload.to_hex());
+        }
+        {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+                f.a.metadata_path(),
+                f.a.store.filesystem(),
+            )
+            .unwrap();
+            cas.promote(bytes.clone()).unwrap();
+            let mut journal = fs::OpenOptions::new()
+                .append(true)
+                .open(f.a.metadata_path().join(crate::RECORD_FILE_NAME))
+                .unwrap();
+            journal
+                .write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
+                .unwrap();
+            journal.sync_all().unwrap();
+        }
+        {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let (_, facts) =
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, None, None)
+                    .unwrap();
+            let facts = facts.unwrap();
+            assert_eq!(facts.binding(), binding);
+            assert_eq!(facts.policy(), &policy);
+            assert!(facts.policy().has_consumption_transaction());
+            let journal_path = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+            let file = fs::File::open(&journal_path).unwrap();
+            let exact = f.journal();
+            facts.verify(&f.a.store, &file, &exact).unwrap();
+            let mut changed = exact.clone();
+            changed.push(0);
+            assert!(facts.verify(&f.a.store, &file, &changed).is_err());
+            fs::write(&journal_path, &changed).unwrap();
+            assert!(
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, None, None,)
+                    .is_err(),
+                "non-admitting inspection must still refuse a torn suffix"
+            );
+            assert_eq!(
+                f.journal(),
+                changed,
+                "inspection must not repair journal bytes"
+            );
+            fs::write(&journal_path, &exact).unwrap();
+            assert!(f
+                .a
+                .project()
+                .read_configuration(f.a.metadata_path(), &f.a.store)
+                .is_err());
+        }
+        if kind == DependencyKind::ConsumptionStart {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let journal_path = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+            let metadata = fs::metadata(&journal_path).unwrap();
+            let intent = crate::project_attachment::dependency_decision::transaction_intent(
+                kind,
+                id(60),
+                (metadata.dev(), metadata.ino()),
+                &prefix,
+                record.payload,
+            );
+            let frame = mesh_store::frame_record(&StoredRecord::Dependency(record));
+            let complete = f.journal();
+            for length in 0..=frame.len() {
+                let mut interrupted = prefix.clone();
+                interrupted.extend_from_slice(&frame[..length]);
+                fs::write(&journal_path, &interrupted).unwrap();
+                let (_, facts) =
+                    f.a.project()
+                        .read_native_facts(f.a.metadata_path(), &f.a.store, Some(&intent), None)
+                        .unwrap();
+                let facts = facts.unwrap();
+                assert_eq!(facts.pending(), Some((prefix.len(), record)));
+                assert_eq!(facts.policy(), &prior_policy);
+                assert!(f.a.project().read_decision_configuration(
+                    f.a.metadata_path(), &f.a.store, Some(&intent),
+                ).is_err(), "pending consumed prefix must not mint ordinary admission");
+                assert_eq!(f.journal(), interrupted);
+                if length > 0 {
+                    *interrupted.last_mut().unwrap() ^= 1;
+                    fs::write(&journal_path, &interrupted).unwrap();
+                    assert!(f.a.project().read_native_facts(
+                        f.a.metadata_path(), &f.a.store, Some(&intent), None,
+                    ).is_err(), "foreign consumed suffix must remain untouched");
+                    assert_eq!(f.journal(), interrupted);
+                }
+            }
+            let mut wrong = Json::parse(std::str::from_utf8(&bytes).unwrap()).unwrap();
+            let Json::Object(envelope) = &mut wrong else {
+                panic!("object envelope")
+            };
+            let Json::Object(body) = &mut envelope.iter_mut().find(|(k, _)| k == "body").unwrap().1
+            else {
+                panic!("object body")
+            };
+            body.iter_mut()
+                .find(|(k, _)| k == "configuration")
+                .unwrap()
+                .1 = j(64);
+            let wrong = wrong.encode().into_bytes();
+            let wrong_record = DependencyRecord {
+                payload: hash(&wrong),
+                ..record
+            };
+            let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+                f.a.metadata_path(),
+                f.a.store.filesystem(),
+            )
+            .unwrap();
+            cas.promote(wrong).unwrap();
+            let mut different = prefix.clone();
+            different.extend(mesh_store::frame_record(&StoredRecord::Dependency(
+                wrong_record,
+            )));
+            fs::write(&journal_path, &different).unwrap();
+            let wrong_intent = crate::project_attachment::dependency_decision::transaction_intent(
+                kind,
+                id(60),
+                (metadata.dev(), metadata.ino()),
+                &prefix,
+                wrong_record.payload,
+            );
+            assert!(
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, Some(&wrong_intent), None,)
+                    .is_err(),
+                "canonical start for another configuration must refuse"
+            );
+            assert_eq!(f.journal(), different);
+            fs::write(&journal_path, &complete).unwrap();
+        }
+        let before = f.journal();
+        let called = std::cell::Cell::new(false);
+        assert!(f
+            .a
+            .prepare_dependency_capture(&input, public(&f.key), id(80), |p| {
+                called.set(true);
+                sign(&f.key, p)
+            })
+            .is_err());
+        assert!(
+            !called.get(),
+            "unverified consumption must refuse before signing"
+        );
+        assert!(f
+            .a
+            .decide_saved_input(f.initial, SavedInputDecision::Rejected, None, id(81))
+            .is_err());
+        assert_eq!(f.journal(), before);
+        assert_eq!(
+            fs::read(f.a.project().root().join("note")).unwrap(),
+            b"unexpected editor work remains untouched"
+        );
+        let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            f.a.metadata_path(),
+            f.a.store.filesystem().read_only(),
+        )
+        .unwrap();
+        assert_eq!(read_payload(&cas, record.payload, 65_536).unwrap(), bytes);
+    }
+}
+
+// This fixture deliberately uses only APIs available before required subtypes 5/6. It is also
+// compiled against the exact preserved previous source revision by the compatibility audit.
+#[test]
+fn required_consumption_prefixes_fence_native_read_prepare_commit_and_control() {
+    use mesh_store::{DependencyKind, DependencyRecord, Fnv1a128, IndexDigest as _, StoredRecord};
+    let f = Fixture::new("consumption-previous-reader", true);
+    let input = f.input(b"editor bytes must survive every refused writer");
+    let baseline = f.journal();
+    let (binding, revision, previous) = {
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+        let (_, proof) =
+            f.a.project()
+                .read_configuration(f.a.metadata_path(), &f.a.store)
+                .unwrap();
+        let proof = proof.unwrap();
+        let (revision, previous) = proof.policy().native_head().unwrap();
+        (proof.binding(), revision + 1, previous)
+    };
+    let j = |n| Json::text(id(n).to_hex());
+    for code in [5u8, 6u8] {
+        let body = if code == 5 {
+            Json::object([
+                ("request", j(60)),
+                ("owner", Json::Array(vec![j(70), j(71), j(72)])),
+                (
+                    "destination",
+                    Json::Array(vec![j(20), Json::text(binding.installation.to_hex())]),
+                ),
+                (
+                    "source",
+                    Json::Array(vec![Json::Array(vec![j(10), j(11)]), j(12)]),
+                ),
+                ("grant", j(61)),
+                ("bindings", Json::Array(vec![j(62), j(63)])),
+                ("configuration", j(64)),
+                ("prospective", j(65)),
+                ("closure", j(66)),
+                ("operation", j(67)),
+                ("staged", j(68)),
+            ])
+        } else {
+            Json::object([("start", j(68)), ("owner_receipt", j(69))])
+        };
+        let bytes = Json::object([
+            ("schema", Json::text("mesh.dependency-policy/v1")),
+            ("authority", Json::text(binding.authority.to_hex())),
+            ("revision", Json::Number(revision)),
+            ("previous", Json::text(previous.to_hex())),
+            ("kind", Json::Number(u64::from(code))),
+            ("body", body),
+        ])
+        .encode()
+        .into_bytes();
+        let envelope = DependencyRecord {
+            authority: binding.authority,
+            revision,
+            previous,
+            payload: hash(&bytes),
+            // Only the stable envelope layout is borrowed here; replace the actual subtype below.
+            kind: DependencyKind::ReviewSnapshot,
+        };
+        let mut frame = mesh_store::frame_record(&StoredRecord::Dependency(envelope));
+        assert_eq!(frame.len(), 145);
+        assert_eq!(&frame[..8], &[b'M', b'J', 1, 8, 0, 0, 0, 105]);
+        frame[128] = code;
+        let mut checksum = Fnv1a128::start();
+        checksum.absorb(&frame[..129]);
+        frame[129..].copy_from_slice(checksum.finish().as_bytes());
+        match DependencyKind::from_code(code) {
+            Some(kind) => {
+                let expected = StoredRecord::Dependency(DependencyRecord { kind, ..envelope });
+                assert_eq!(frame, mesh_store::frame_record(&expected));
+                assert_eq!(
+                    mesh_store::scan_journal(&frame).unwrap().records(),
+                    &[expected]
+                );
+            }
+            None => assert_eq!(
+                mesh_store::scan_journal(&frame).unwrap_err().kind(),
+                mesh_store::DamageKind::MalformedBody
+            ),
+        }
+        {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+                f.a.metadata_path(),
+                f.a.store.filesystem(),
+            )
+            .unwrap();
+            cas.promote(bytes.clone()).unwrap();
+        }
+        for length in 1..=frame.len() {
+            // Restore only this fixture's own baseline, then prepare a valid candidate before
+            // installing the interrupted/new frame. Commit must independently recheck it.
+            fs::write(f.a.metadata_path().join(crate::RECORD_FILE_NAME), &baseline).unwrap();
+            let prepared_before_fence = f.prepare(&input, 90).unwrap();
+            let mut fenced = baseline.clone();
+            fenced.extend_from_slice(&frame[..length]);
+            fs::write(f.a.metadata_path().join(crate::RECORD_FILE_NAME), &fenced).unwrap();
+            let called = std::cell::Cell::new(false);
+            assert!(
+                f.a.prepare_dependency_capture(&input, public(&f.key), id(91), |p| {
+                    called.set(true);
+                    sign(&f.key, p)
+                })
+                .is_err(),
+                "subtype {code}, prefix {length} admitted prepare"
+            );
+            assert!(!called.get());
+            assert!(
+                prepared_before_fence.commit().is_err(),
+                "subtype {code}, prefix {length} admitted old candidate"
+            );
+            assert!(f
+                .a
+                .decide_saved_input(f.initial, SavedInputDecision::Rejected, None, id(92))
+                .is_err());
+            assert!(f
+                .a
+                .project()
+                .saved_file(f.a.metadata_path(), f.initial, "note")
+                .is_err());
+            assert_eq!(f.journal(), fenced);
+            assert_eq!(
+                fs::read(f.a.project().root().join("note")).unwrap(),
+                b"editor bytes must survive every refused writer"
+            );
+            assert!(!f.a.metadata_path().join(PENDING).exists());
+            assert!(!f
+                .a
+                .metadata_path()
+                .join(dependency_decision::PENDING)
+                .exists());
+        }
+        println!(
+            "required-consumption-subtype={code} recognized={} refused-native-prefixes={}",
+            DependencyKind::from_code(code).is_some(),
+            frame.len()
+        );
+    }
+    fs::write(f.a.metadata_path().join(crate::RECORD_FILE_NAME), baseline).unwrap();
+    f.prepare(&input, 93).unwrap().commit().unwrap();
+}

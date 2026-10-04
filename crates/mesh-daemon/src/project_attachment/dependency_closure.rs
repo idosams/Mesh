@@ -52,6 +52,19 @@ impl NativeDependencyGraph {
     pub fn digest(&self) -> RecordDigest {
         self.digest
     }
+    pub(super) fn consumption_inputs_json(&self) -> Json {
+        Json::Array(
+            self.nodes
+                .keys()
+                .map(|i| {
+                    Json::Array(vec![
+                        Json::Array(vec![Json::text(i.0.to_hex()), Json::text(i.1.to_hex())]),
+                        Json::text(i.2.to_hex()),
+                    ])
+                })
+                .collect(),
+        )
+    }
     /// Number of exact operation identities, including the selected root.
     pub fn operation_count(&self) -> usize {
         self.nodes.len()
@@ -262,6 +275,19 @@ fn walk(
     graph.digest = hash(bytes.as_bytes());
     Ok(graph)
 }
+// Native selection and the entire required lock set. Preparation grants no authority; validation
+// must run after acquisition and repeat all physical/history checks under that same guard.
+pub(super) struct PreparedDependencyGraph<'a> {
+    owner: &'a ProvisionedAttachment,
+    source: &'a ProvisionedAttachment,
+    operation: RecordDigest,
+    selections: Vec<(
+        &'a ProvisionedAttachment,
+        super::dependency_work::PreparedDependencyWork,
+    )>,
+    pub(super) roots: Vec<crate::root_authority::PinnedWorkspaceRoot>,
+}
+
 impl AttachmentStorage {
     /// Inspect all signed operation and owner-recorded consumed-input edges. `available` supplies
     /// native handles, never an asserted input list. Omitted referenced work refuses the whole read.
@@ -285,6 +311,19 @@ impl AttachmentStorage {
         operation: RecordDigest,
         available: &[&ProvisionedAttachment],
     ) -> io::Result<NativeDependencyGraph> {
+        let prepared = self.prepare_dependency_graph(owner, source, operation, available)?;
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
+            .map_err(error)?;
+        self.inspect_prepared_dependency_graph(&prepared, &guard)
+    }
+
+    pub(super) fn prepare_dependency_graph<'a>(
+        &self,
+        owner: &'a ProvisionedAttachment,
+        source: &'a ProvisionedAttachment,
+        operation: RecordDigest,
+        available: &[&'a ProvisionedAttachment],
+    ) -> io::Result<PreparedDependencyGraph<'a>> {
         if available.len() > 256 {
             return Err(invalid("too many candidate work handles"));
         }
@@ -314,13 +353,50 @@ impl AttachmentStorage {
             }
             selections.push((*work, selected));
         }
-        let roots = roots.into_values().collect::<Vec<_>>();
-        let guard =
-            crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
+        Ok(PreparedDependencyGraph {
+            owner,
+            source,
+            operation,
+            selections,
+            roots: roots.into_values().collect(),
+        })
+    }
+
+    // A caller may compose this with current-grant validation and a native transaction without
+    // releasing custody. Never acquire additional locks or accept a partial set here.
+    pub(super) fn inspect_prepared_dependency_graph(
+        &self,
+        prepared: &PreparedDependencyGraph<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<NativeDependencyGraph> {
+        let works = prepared
+            .selections
+            .iter()
+            .map(|(work, _)| *work)
+            .collect::<Vec<_>>();
+        let context = self.resolve_consumed_histories(
+            prepared.owner,
+            &works,
+            guard,
+            super::dependency_owner_context::OwnerHistoryContext::current(prepared.owner),
+        )?;
+        self.inspect_dependency_graph_with_owner(prepared, guard, &context)
+    }
+    pub(super) fn inspect_dependency_graph_with_owner(
+        &self,
+        prepared: &PreparedDependencyGraph<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        context: &super::dependency_owner_context::OwnerHistoryContext<'_>,
+    ) -> io::Result<NativeDependencyGraph> {
+        guard.require_roots(&prepared.roots).map_err(error)?;
+        let owner = prepared.owner;
+        let source = prepared.source;
+        let operation = prepared.operation;
+        let selections = &prepared.selections;
         let mut bindings = BTreeMap::new();
         let mut legacy_copied_work = BTreeSet::new();
-        for (work, selected) in &selections {
-            let binding = self.validate_dependency_work(selected, &guard)?;
+        for (work, selected) in selections {
+            let binding = context.validate(self, selected, guard)?;
             if selected.has_legacy_copied_origin() {
                 legacy_copied_work.insert((binding.work(), binding.installation()));
             }
@@ -334,9 +410,7 @@ impl AttachmentStorage {
                 return Err(invalid("duplicate native work binding"));
             }
         }
-        let (_, owner_proof) = owner
-            .project()
-            .read_configuration(owner.metadata_path(), &owner.store)?;
+        let (_, owner_proof) = context.read(owner)?;
         let owner_proof =
             owner_proof.ok_or_else(|| invalid("owning dependency authority is unavailable"))?;
         let mut consumptions = BTreeMap::new();
@@ -349,9 +423,7 @@ impl AttachmentStorage {
         }
         let mut histories = BTreeMap::new();
         for (key, (work, _)) in &bindings {
-            let (configuration, proof) = work
-                .project()
-                .read_configuration(work.metadata_path(), &work.store)?;
+            let (configuration, proof) = context.read(work)?;
             let proof = proof.ok_or_else(|| invalid("work has no native dependency enrollment"))?;
             let history = crate::workspace::OpenWorkspace::open_attachment_read_history(
                 work.metadata_path(),
@@ -490,8 +562,11 @@ impl AttachmentStorage {
                 .filter(|id| (id.0, id.1) == key)
                 .map(|id| id.2)
                 .collect::<BTreeSet<_>>();
-            let mut receipts =
-                work.completed_capture_receipt_roots(&operations, &mut receipt_budget)?;
+            let mut receipts = work.completed_capture_receipt_roots_with_owner(
+                &operations,
+                &mut receipt_budget,
+                context,
+            )?;
             let pending_name = super::dependency_decision::PENDING;
             match super::dependency_enrollment::read_private_in_store(&work.store, pending_name) {
                 Ok(raw) => {
@@ -515,6 +590,14 @@ impl AttachmentStorage {
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                 Err(e) => return Err(e),
             }
+            if let Some((name, digest, payload)) = context.pending_roots(work)? {
+                receipts.sidecars.insert(name, digest);
+                payloads.insert(payload);
+            }
+            if let Some(roots) = context.verified_history_roots(work)? {
+                receipts.sidecars.extend(roots.sidecars);
+                payloads.extend(roots.payloads);
+            }
             payloads.extend(receipts.payloads);
             manifests.extend(receipts.manifests);
             retained_count = retained_count
@@ -537,8 +620,8 @@ impl AttachmentStorage {
         if graph.retained_content_json().encode().len() > MAX_BYTES {
             return Err(invalid("retained content encoding exceeds its bound"));
         }
-        for (work, selected) in &selections {
-            let refreshed = self.validate_dependency_work(selected, &guard)?;
+        for (work, selected) in selections {
+            let refreshed = context.validate(self, selected, guard)?;
             if bindings
                 .get(&(refreshed.work(), refreshed.installation()))
                 .map(|(_, b)| b)
@@ -546,9 +629,7 @@ impl AttachmentStorage {
             {
                 return Err(invalid("native graph work changed"));
             }
-            let (_, proof) = work
-                .project()
-                .read_configuration(work.metadata_path(), &work.store)?;
+            let (_, proof) = context.read(work)?;
             if proof.as_ref()
                 != histories
                     .get(&(refreshed.work(), refreshed.installation()))

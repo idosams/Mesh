@@ -222,17 +222,16 @@ pub(in crate::project_attachment) struct CaptureReceiptRoots {
 impl ProvisionedAttachment {
     // Called while the graph holds the complete native custody set. Read all receipt names once,
     // and validate selected historical receipts against the same physical journal snapshot.
-    pub(in crate::project_attachment) fn completed_capture_receipt_roots(
+    pub(in crate::project_attachment) fn completed_capture_receipt_roots_with_owner(
         &self,
         operations: &BTreeSet<RecordDigest>,
         budget: &mut usize,
+        context: &crate::project_attachment::dependency_owner_context::OwnerHistoryContext<'_>,
     ) -> io::Result<CaptureReceiptRoots> {
         let guard =
             crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
         self.check_dependency_registration()?;
-        let (configuration, proof) = self
-            .attachment
-            .read_configuration(self.metadata_path(), &self.store)?;
+        let (configuration, proof) = context.read(self)?;
         let proof = proof.ok_or_else(|| invalid("capture receipt enrollment missing"))?;
         let names = self
             .store

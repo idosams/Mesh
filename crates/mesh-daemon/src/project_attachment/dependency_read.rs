@@ -23,10 +23,11 @@ use std::{
 const MAX_BASE: usize = 64 * 1024 * 1024;
 const MAX_HISTORY: usize = MAX_BASE + 16 * 1024 * 1024;
 
-/// Constructible only after complete native registration, enrollment and payload validation.
-/// The workspace opener checks even an empty/replaced journal against this exact read proof.
-#[derive(PartialEq, Eq)]
-pub(crate) struct VerifiedDependencyRead {
+/// Exact local enrollment and policy facts. These do not authorize opening a workspace,
+/// consumption, mutation or publication, even when local completion records are present.
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct NativeDependencyFacts {
+    configuration: RecordDigest,
     store: (u64, u64),
     journal: (u64, u64),
     bytes: RecordDigest,
@@ -35,7 +36,7 @@ pub(crate) struct VerifiedDependencyRead {
     pending: Option<(usize, mesh_store::DependencyRecord)>,
     legacy_operations: std::collections::BTreeSet<RecordDigest>,
 }
-impl VerifiedDependencyRead {
+impl NativeDependencyFacts {
     pub(super) fn binding(&self) -> NativeDependencyBinding {
         self.binding
     }
@@ -75,10 +76,61 @@ impl VerifiedDependencyRead {
         Ok(())
     }
 }
+/// Native workspace admission capability. Local facts alone cannot admit consumed history.
+/// Construction is private so recovery inspection cannot accidentally create a read proof.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
+impl VerifiedDependencyRead {
+    pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
+        &self.0 == facts
+    }
+    pub(super) fn from_consumption(
+        verified: super::consumption_prepare::VerifiedConsumedHistory,
+    ) -> Self {
+        Self(verified.into_facts())
+    }
+    fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
+        if facts.policy.has_consumption_transaction()
+            || facts.pending.is_some_and(|(_, record)| {
+                record.kind == mesh_store::DependencyKind::ConsumptionStart
+            })
+        {
+            return Err(invalid(
+                "consumed history requires native transaction verification",
+            ));
+        }
+        Ok(Self(facts))
+    }
+    pub(super) fn binding(&self) -> NativeDependencyBinding {
+        self.0.binding()
+    }
+    pub(super) fn policy(&self) -> &DependencyPolicyHistory {
+        self.0.policy()
+    }
+    pub(super) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
+        self.0.is_legacy_operation(operation)
+    }
+    pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
+        self.0.pending()
+    }
+    pub(crate) fn verify(
+        &self,
+        store: &PinnedWorkspaceRoot,
+        file: &File,
+        bytes: &[u8],
+    ) -> io::Result<()> {
+        self.0.verify(store, file, bytes)
+    }
+}
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
 
+enum RecoveryInspection<'a> {
+    Default,
+    CompletedStart,
+    ConsumedCapture(&'a str),
+}
 impl ProjectAttachment {
     pub(super) fn read_configuration(
         &self,
@@ -115,6 +167,72 @@ impl ProjectAttachment {
         pending: Option<&str>,
         capture: Option<&str>,
     ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
+        let (configuration, facts) = self.read_native_facts(metadata, store, pending, capture)?;
+        let proof = facts
+            .map(VerifiedDependencyRead::from_independent_facts)
+            .transpose()?;
+        Ok((configuration, proof))
+    }
+
+    // Recovery inspection only. It never hides an unrecognized suffix, changes journal bytes,
+    // or creates workspace admission. Callers must hold and revalidate their complete custody set.
+    pub(super) fn read_native_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
+        capture: Option<&str>,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        self.read_native_facts_for(
+            metadata,
+            store,
+            pending,
+            capture,
+            RecoveryInspection::Default,
+        )
+    }
+
+    pub(super) fn read_completed_start_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        let pending = read_private_in_store(store, super::consumption_prepare::START_PENDING)?;
+        self.read_native_facts_for(
+            metadata,
+            store,
+            Some(&pending),
+            None,
+            RecoveryInspection::CompletedStart,
+        )
+    }
+
+    pub(super) fn read_consumed_capture_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        capture: &str,
+        configuration: &str,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        // Still local facts only. The caller must independently verify the effective configuration
+        // and owning transaction before constructing a consumed-history read proof.
+        self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            Some(capture),
+            RecoveryInspection::ConsumedCapture(configuration),
+        )
+    }
+
+    fn read_native_facts_for(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
+        capture: Option<&str>,
+        inspection: RecoveryInspection<'_>,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
         self.ensure_current()?;
         store.ensure_namespace_identity()?;
         let receipt = self.receipt()?.encode();
@@ -201,6 +319,43 @@ impl ProjectAttachment {
         }
         let pending = pending
             .map(|intent| {
+                let parsed = Json::parse(intent).map_err(error)?;
+                if parsed.get("schema").and_then(Json::as_text)
+                    == Some("mesh.native-consumption-start-intent/v1")
+                {
+                    let completion =
+                        match read_private_in_store(store, super::consumption_complete::PENDING) {
+                            Ok(raw) => Some(raw),
+                            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                            Err(e) => return Err(e),
+                        };
+                    match read_private_in_store(store, super::consumption_history::PENDING) {
+                        Ok(history) => {
+                            if matches!(inspection, RecoveryInspection::CompletedStart) {
+                                return super::consumption_history::completed_prefix(
+                                    &cas,
+                                    intent,
+                                    &history,
+                                    journal_identity,
+                                    &bytes,
+                                    completion.as_deref().ok_or_else(|| {
+                                        invalid("completed consumption intent missing")
+                                    })?,
+                                );
+                            }
+                            return super::consumption_history::pending_prefix(
+                                &cas,
+                                intent,
+                                &history,
+                                journal_identity,
+                                &bytes,
+                                completion.as_deref(),
+                            );
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::NotFound && completion.is_none() => {}
+                        Err(e) => return Err(e),
+                    }
+                }
                 super::dependency_decision::pending_prefix(&cas, intent, journal_identity, &bytes)
             })
             .transpose()?;
@@ -212,7 +367,10 @@ impl ProjectAttachment {
                     journal_identity,
                     &bytes,
                     authority,
-                    &configuration,
+                    match inspection {
+                        RecoveryInspection::ConsumedCapture(configuration) => configuration,
+                        _ => &configuration,
+                    },
                 )
             })
             .transpose()?;
@@ -254,8 +412,21 @@ impl ProjectAttachment {
         }
         if let Some((_, record, payload)) = &pending {
             policy.clone().apply(*record, payload).map_err(error)?;
+            if record.kind == mesh_store::DependencyKind::ConsumptionStart {
+                let value =
+                    Json::parse(std::str::from_utf8(payload).map_err(error)?).map_err(error)?;
+                if value
+                    .get("body")
+                    .and_then(|v| v.get("configuration"))
+                    .and_then(Json::as_text)
+                    != Some(hash(configuration.as_bytes()).to_hex().as_str())
+                {
+                    return Err(invalid("consumption start configuration changed"));
+                }
+            }
         }
-        let proof = VerifiedDependencyRead {
+        let proof = NativeDependencyFacts {
+            configuration: hash(configuration.as_bytes()),
             store: identity,
             journal: journal_identity,
             bytes: hash(&bytes),

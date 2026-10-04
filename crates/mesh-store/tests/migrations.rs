@@ -433,3 +433,35 @@ fn foreign_keys_are_enforced_on_a_store_opened_connection() {
         "an actor_head row pointing at no operation was accepted"
     );
 }
+
+#[test]
+fn consumption_kind_migration_preserves_populated_dependency_rows() {
+    let directory = TempDir::new("consumption-kind-upgrade");
+    let mut database = database_at_version(&directory, "metadata.sqlite", 3);
+    database.execute_batch(&format!(
+        "INSERT INTO dependency_record VALUES (X'{}',1,X'{}',X'{}',0); INSERT INTO dependency_record VALUES (X'{}',2,X'{}',X'{}',1);",
+        digest(1).to_hex(), digest(0).to_hex(), digest(11).to_hex(), digest(1).to_hex(), digest(11).to_hex(), digest(12).to_hex(),
+    )).unwrap();
+    let table = TABLES
+        .iter()
+        .find(|table| table.name == "dependency_record")
+        .unwrap();
+    let before = database.read_table(table).unwrap();
+    assert_eq!(before.len(), 2);
+    let store = Store::open(Sqlite3::at(directory.join("metadata.sqlite"))).unwrap();
+    assert_eq!(store.schema_version(), CURRENT_VERSION);
+    drop(store);
+    assert_eq!(database.read_table(table).unwrap(), before);
+    assert!(!database
+        .table_exists("dependency_record_before_consumption")
+        .unwrap());
+    assert!(database
+        .execute_batch(&format!(
+            "INSERT INTO dependency_record VALUES (X'{}',3,X'{}',X'{}',7);",
+            digest(1).to_hex(),
+            digest(12).to_hex(),
+            digest(13).to_hex()
+        ))
+        .is_err());
+    assert_eq!(database.read_table(table).unwrap(), before);
+}

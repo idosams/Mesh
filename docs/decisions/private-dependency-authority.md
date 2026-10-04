@@ -514,3 +514,16 @@ provide no grant or current eligibility. Native grants and revocations can now t
 work, while actual copying/consumption remains disabled until full closure, retention and exact
 starting-operation/consumption receipt verification are implemented. No renderer, provider or CLI
 route enables automatic reservation/enrollment through this development API.
+
+### Required consumed-start compatibility proof (R161 draft)
+
+Destination subtypes 5/6 remain required within journal tag 8. A version-independent native
+fixture writes valid-checksum envelopes and exercises every nonempty prefix against capture
+preparation, already signed capture commit, retained reads and control writes. It runs on current
+source and was also compiled against exact prior revision
+`220f2da76d7e1e35c8b2801db0b8dedc63d1aec8`, with production source unchanged from that revision.
+The prior implementation recognized neither subtype and refused all 290 cases without changing
+journal or editor bytes. Current source passed the same campaign. This is actual prior native
+behavior, not a text assertion or a packaged-app migration claim. A zero-byte append leaves no
+fence: the transaction must synchronize the required record before any destination file write.
+The transaction and cross-store recovery remain unfinished in draft PR #324.

@@ -108,6 +108,69 @@ impl OpenWorkspace {
         NativeOperationFact::verify(record, bytes)
     }
 
+    /// Decode only an authenticated genesis candidate for the exact prospective workspace.
+    /// This verifies immutable content; it does not grant consumption or filesystem authority.
+    pub(crate) fn verify_dependency_initial_operations(
+        record: &OperationRecord,
+        bytes: &[u8],
+        workspace: WorkspaceId,
+    ) -> Result<Vec<Operation>, String> {
+        let fact = NativeOperationFact::verify(record, bytes)?;
+        if fact.workspace != workspace
+            || !fact.parents.is_empty()
+            || record.actor_sequence != 1
+            || record.policy_epoch != 1
+            || record.hlc_millis != 0
+            || record.hlc_counter != 0
+        {
+            return Err(refused());
+        }
+        let envelope =
+            AuthenticatedChangeSet::from_canonical_bytes(bytes).map_err(|_| refused())?;
+        let fields = mesh_operations::decode_canonical(
+            &mesh_operations::CHANGESET_SCHEMA,
+            envelope.changeset(),
+        )
+        .map_err(|_| refused())?;
+        let base = mesh_operations::CHANGESET_SCHEMA
+            .fields
+            .iter()
+            .position(|f| f.name == "base_head")
+            .and_then(|n| fields.get(n));
+        if base != Some(&CanonicalValue::Bytes(vec![0; 32])) {
+            return Err(refused());
+        }
+        struct Commitment(Vec<CanonicalValue>);
+        impl mesh_operations::CanonicalEncode for Commitment {
+            fn schema(&self) -> &'static mesh_operations::RecordSchema {
+                &mesh_operations::TRANSITION_SCHEMA
+            }
+            fn canonical_fields(&self) -> Vec<CanonicalValue> {
+                self.0.clone()
+            }
+        }
+        let mut commitment = Vec::new();
+        for field in mesh_operations::TRANSITION_SCHEMA.fields {
+            let index = mesh_operations::CHANGESET_SCHEMA
+                .fields
+                .iter()
+                .position(|f| f.name == field.name)
+                .ok_or_else(refused)?;
+            commitment.push(fields.get(index).ok_or_else(refused)?.clone());
+        }
+        let expected =
+            Blake3::digest_bytes(&mesh_operations::encode_canonical(&Commitment(commitment)));
+        let head = mesh_operations::CHANGESET_SCHEMA
+            .fields
+            .iter()
+            .position(|f| f.name == "resulting_head")
+            .and_then(|n| fields.get(n));
+        if head != Some(&CanonicalValue::Bytes(expected.as_bytes().to_vec())) {
+            return Err(refused());
+        }
+        decode_changeset_operations(bytes).ok_or_else(refused)
+    }
+
     /// Shared immutable verification for journaled and staged recovery manifests.
     pub(crate) fn verify_dependency_manifest_content(
         store: &Cas<crate::root_authority::PinnedRootFs, mesh_cas::Blake3>,
