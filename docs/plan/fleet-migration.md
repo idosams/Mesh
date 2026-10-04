@@ -6947,3 +6947,13 @@ The writer currently retries using the same authenticated candidate and stage ha
 candidate reconstruction, exact exclusive installation, signed destination history, owner receipt,
 completion and full cross-store admission remain required before this is an acknowledged consumed
 version. Draft PR #324 / issue #323 and the full fleet scope stay open. The user checkpoint is fixed.
+
+R161 durable start-writer implementation `4ec8638ff010ff63840698311453532dcf229e91` passed
+full `npm test`: 3,949 native tests in 278.939s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `56b26e4d7aa9a6f2eb580887581b449786fad6a2` passed all seven hosted checks
+in run `37225845167`. Positive, initial-failure and deliberately failing synchronization logs are
+preserved with complete Git history. This proves durable start fencing and exact retries with the
+same candidate/stage handles. Fresh-process reconstruction, installation, destination/owner/completion
+commit and cross-store admission remain required. Draft PR #324 / issue #323 and the full fleet goal
+remain open; the user checkpoint stays fixed.
