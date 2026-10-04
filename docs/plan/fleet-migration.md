@@ -6716,3 +6716,11 @@ This is a materialization/recovery primitive for the unfinished R161 transaction
 commit or runnable-lane admission. It is not yet connected to the required consumption journal
 fence, source closure, signed start or owner receipt. Those cross-store steps and the full fleet
 acceptance scope remain required; draft PR #324 and issue #323 remain open.
+
+R161 bounded-tree implementation `d232d2697b251a255cac71047fc35c4217e1ea0d` passed full
+`npm test`: 3,942 native tests in 274.126s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Previous
+published head `ba88b38049f21318638eccdfbf4b744c7cdb8ef6` passed all seven hosted checks in run
+`37218506637`. These results validate the staging primitive and existing behavior; full consumed
+start commit, journal-before-install ordering, owner receipt and cross-store recovery remain open.
+Draft PR #324 is not merged, and the fixed test checkpoint is unchanged.
