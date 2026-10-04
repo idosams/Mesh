@@ -677,6 +677,142 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         empty_destination.saved_versions().unwrap().is_empty(),
         "signing is not a saved-version commit"
     );
+    // An empty signed input must cross the real durable transaction, not stop at staging.
+    signed_empty
+        .complete_fenced_consumption(&storage, &empty_staged)
+        .unwrap();
+    assert_eq!(
+        fs::read_dir(empty_destination.project().root())
+            .unwrap()
+            .count(),
+        0
+    );
+    let completed_owner = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let completed_destination = fs::read(
+        empty_destination
+            .metadata_path()
+            .join(crate::RECORD_FILE_NAME),
+    )
+    .unwrap();
+    let reopened_empty = AttachmentStorage::open(&root.join("metadata")).unwrap();
+    let reopened_owner = reopened_empty.provision(owner.project().root()).unwrap();
+    let reopened_source = reopened_empty
+        .provision(empty_child.project().root())
+        .unwrap();
+    let reopened_destination = reopened_empty
+        .provision(empty_destination.project().root())
+        .unwrap();
+    let empty_request = || crate::project_attachment::NativeConsumedStartRequest {
+        input: crate::project_attachment::NativeGrantInspection {
+            source: &reopened_source,
+            version: empty_version,
+            destination: &reopened_destination,
+            grant: empty_grant.record(),
+        },
+        available: &[],
+        request: d(127),
+        limits: ObservationLimits::default(),
+    };
+    let (recovered_empty, recovered_stage) = reopened_empty
+        .recover_installing_consumed_start(&reopened_owner, empty_request())
+        .unwrap();
+    recovered_empty
+        .complete_fenced_consumption(&reopened_empty, &recovered_stage)
+        .unwrap();
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        completed_owner
+    );
+    assert_eq!(
+        fs::read(
+            empty_destination
+                .metadata_path()
+                .join(crate::RECORD_FILE_NAME)
+        )
+        .unwrap(),
+        completed_destination
+    );
+    let empty_saved = reopened_empty
+        .saved_consumed_versions(&reopened_owner, empty_request())
+        .unwrap();
+    assert_eq!(empty_saved.len(), 1);
+    assert_eq!(empty_saved[0].operation(), signed_empty.operation());
+    let empty_graph = reopened_empty
+        .inspect_dependency_graph(
+            &reopened_owner,
+            &reopened_destination,
+            empty_saved[0],
+            &[&reopened_source],
+        )
+        .unwrap();
+    assert_eq!(empty_graph.operation_count(), 2);
+    assert!(empty_graph
+        .nodes
+        .values()
+        .all(|node| node.manifests.is_empty() && node.chunks.is_empty()));
+    assert_eq!(empty_graph.retained.len(), 3);
+    fs::write(
+        reopened_destination.project().root().join("first.txt"),
+        b"first work after empty input",
+    )
+    .unwrap();
+    let input = reopened_destination
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let later = reopened_empty
+        .prepare_consumed_capture(
+            &reopened_owner,
+            empty_request(),
+            &input,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            d(128),
+            |payload| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert_eq!(
+        reopened_empty
+            .consumed_saved_file(
+                &reopened_owner,
+                empty_request(),
+                empty_saved[0],
+                "first.txt"
+            )
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        reopened_empty
+            .consumed_saved_file(&reopened_owner, empty_request(), later, "first.txt")
+            .unwrap(),
+        Some(b"first work after empty input".to_vec())
+    );
+    assert_eq!(
+        reopened_empty
+            .inspect_dependency_graph(
+                &reopened_owner,
+                &reopened_destination,
+                later,
+                &[&reopened_source]
+            )
+            .unwrap()
+            .operation_count(),
+        3
+    );
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        completed_owner
+    );
+    assert_eq!(
+        fs::read_dir(empty_child.project().root()).unwrap().count(),
+        0
+    );
     let child = storage
         .reserve_dependency_lane(&owner, &owner, second, d(81))
         .unwrap();
