@@ -568,11 +568,12 @@ create explicit checkpoints when handing work off for review; ordinary saving do
 checkpoint allowance or approve main. Your original project and pinned saved reviews stay unchanged.
 
 After the provider reports completion, Mesh makes a final save attempt before recording execution
-completion. Missing, unsupported or changing files, unavailable signing and pending observations can
+completion. If the native version is complete but its fleet acknowledgment is pending, Mesh permits
+up to three total final attempts, waiting one second between them, under the same session authority. Missing, unsupported or changing files, unavailable signing and pending observations can
 leave **Private progress needs attention**. Execution completion does not mean every edit was saved.
 Completed native history remains retained; an active worker's next poll can recover a missed fleet
-observation without signing unchanged files again. Final attempts are not retried after the session
-is revoked, so unresolved final saving remains explicit. Stopping agents revokes further save
+observation without signing unchanged files again. Incomplete capture and signing failures are not treated as acknowledgment retries. No final attempt
+is retried after session revocation; exhausted acknowledgment retries remain explicitly unresolved. Stopping agents revokes further save
 authority; already admitted changes may finish. Shutdown waits for an admitted save to return.
 
 This applies to local workers launched and owned by Mesh. Restored fleets and received remote
