@@ -1229,6 +1229,44 @@ mod desktop {
     }
 
     #[tauri::command]
+    async fn fleet_saved_progress(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        after: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.fleet_history(&objective)?
+                .saved_progress_versions(&lane, after.as_deref())
+                .map(|value| value.encode())
+                .map_err(|_| "Saved progress is unavailable".into())
+        })
+        .await
+        .map_err(|_| "Saved progress could not be loaded".to_owned())?
+    }
+
+    #[tauri::command]
+    async fn inspect_fleet_saved_progress(
+        host: State<'_, Arc<AttachmentHost>>,
+        objective: String,
+        lane: String,
+        version: String,
+        after: Option<String>,
+        selected: Option<String>,
+    ) -> Result<String, String> {
+        let host = Arc::clone(host.inner());
+        tauri::async_runtime::spawn_blocking(move || {
+            host.fleet_history(&objective)?
+                .saved_progress_comparison(&lane, &version, after.as_deref(), selected.as_deref())
+                .map(|value| value.encode())
+                .map_err(|_| "The exact saved progress is unavailable".into())
+        })
+        .await
+        .map_err(|_| "Saved progress comparison could not be loaded".to_owned())?
+    }
+
+    #[tauri::command]
     async fn fleet_saved_reviews(
         host: State<'_, Arc<AttachmentHost>>,
         objective: String,
@@ -8255,6 +8293,8 @@ mod desktop {
                 save_remote_project_outbox,
                 inspect_remote_fleet_review,
                 render_remote_fleet_artifact,
+                fleet_saved_progress,
+                inspect_fleet_saved_progress,
                 fleet_saved_reviews,
                 inspect_fleet_saved_review,
                 fleet_project_mapping,

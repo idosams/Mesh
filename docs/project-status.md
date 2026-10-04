@@ -36,8 +36,9 @@ Native history reads can enumerate retained local lane operations in pages of 50
 exact saved operation with its original input. They remain readable after session revocation and
 restart without adopting a worker or creating a handoff. Recorded operations may be intermediate
 captures; listing one makes no completeness or approval claim. The latest fleet-acknowledged
-version is reported separately. Desktop commands and independent progress panels are the next
-increment; this native foundation is not yet a user-facing packaged capability.
+version is reported separately. Read-only desktop commands and strict response validation expose this history without review
+identities. Independent progress panels are the next increment; this foundation is not yet a
+user-facing packaged capability.
 
 ## Retained worker execution observations
 

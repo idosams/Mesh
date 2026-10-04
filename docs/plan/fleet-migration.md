@@ -5689,3 +5689,20 @@ Separate progress panels, live changed-file summaries, packaged multi-panel acce
 remaining full fleet plan are still required. The fixed user checkpoint remains unchanged.
 
 R132 implementation `3a44acc44d1b0486dda51ffaae6f72be10c7ce74` passed full `npm test`: 3,818 native tests in 165.247s (1 slow, 17 skipped), 186 rendered tests, 647 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
+
+
+## R133 — desktop saved-progress boundary
+
+New canonical implementation based on PR #272 head
+`23c9663c4c94034f93cde9c81a1c5272977fcd19`; no preserved source commit is replaced.
+Two additive read-only Tauri commands expose retained progress through FleetHistory, without
+execution adoption or arbitrary paths. Distinct progress validators bind fleet/lane/source,
+starting version and exact target, reject invented authority, and enforce causal page identity.
+The existing bounded immutable comparison content validator is shared without fabricating a
+checkpoint or review-bundle selector. Existing review parsing retains its separate envelope.
+No persisted-format changes; older desktop calls remain supported.
+
+Eight focused tests pass, including existing review comparisons and new progress page/correlation,
+bounds and unsafe-content refusal. Full validation and hosted delivery remain pending. Independent
+progress panels, persistence and packaged parallel inspection remain required in following increments.
+The fixed user checkpoint is unchanged.
