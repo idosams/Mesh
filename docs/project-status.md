@@ -1027,3 +1027,15 @@ All 17 focused cleanup tests pass. A dry-run-only mutation fails the actual dele
 source was restored. Full local validation passed 3,797 native, 185 rendered and 646 desktop
 tests plus all 44 daemon checks. Hosted delivery is pending. No packaged scheduled-cleanup
 proof, closed-workspace traversal, pressure policy or bounded admitted scan latency is claimed.
+
+
+## Worker progress inspection
+
+Native progress inspection distinguishes unchanged folders, supported edits/additions and entries
+requiring explicit resolution. The existing missing-file read shares this path and no longer holds
+the fleet mutex during native folder scanning. It suppresses results if the run is cancelled or
+the credential is revoked/rotated during inspection. Four native regressions pass, including a
+paused scan with parallel fleet reads; restoring the old lock fails that test. Full local validation passed 3,801 native, 185 rendered and 646 desktop tests plus all 44 daemon
+checks. Hosted checks are pending. This read never saves content or creates checkpoints. Automatic worker
+saving, cancellation-safe capture, scheduling and packaged acceptance remain unfinished in
+[issue #267](https://github.com/idosams/Mesh/issues/267).

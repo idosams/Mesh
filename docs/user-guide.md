@@ -540,3 +540,10 @@ workspace or native work is busy. It does not scan closed workspaces or expire y
 The desktop and background service wait one minute between cleanup attempts. Once cleanup has
 started, disk work can delay another write or shutdown; large-history latency and storage-pressure
 recovery are still being validated. No change to your editor or agent harness is required.
+
+
+### Missing-file inspection during agent work
+
+Inspecting an agent's missing files leaves other fleet reads available while its folder is scanned.
+If the run is cancelled or its session changes during the scan, refresh before trying again.
+Inspection preserves the working files and saved history; it does not itself save a new version.

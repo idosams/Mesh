@@ -20,6 +20,8 @@ use mesh_types::{Blake3, ContentDigest};
 
 pub use crate::CheckpointSigner;
 
+mod progress;
+pub use progress::WorkerProgress;
 mod received;
 #[cfg(target_os = "macos")]
 mod remote_ingestion;
@@ -1021,6 +1023,10 @@ impl FleetService {
         action: &str,
         arguments: &Json,
     ) -> Result<Json, Unavailable> {
+        if action == "missing_files" {
+            exact_fields(arguments, &[])?;
+            return self.agent_missing_files(credential);
+        }
         if credential.len() != 64 || !credential.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(refusal("fleet-session-refused"));
         }
@@ -1040,42 +1046,6 @@ impl FleetService {
         let state = exact_state(&workspace)?;
         verify_custody(&workspace, &state, &grant.generation)?;
         match action {
-            "missing_files" => {
-                exact_fields(arguments, &[])?;
-                let inventory = workspace
-                    .daemon()
-                    .inspect_agent_finish_preflight(
-                        &state.root,
-                        &state.digest,
-                        &state.installation,
-                        &grant.generation,
-                    )
-                    .map_err(|_| refusal("fleet-deletion-inspection-unavailable"))?;
-                Ok(Json::object([
-                    ("schema", Json::text("mesh.fleet-missing-files/v1")),
-                    (
-                        "files",
-                        Json::Array(
-                            inventory
-                                .missing_files()
-                                .iter()
-                                .take(128)
-                                .map(|file| {
-                                    Json::object([
-                                        ("path", Json::text(file.path())),
-                                        ("version", Json::text(file.current_version())),
-                                    ])
-                                })
-                                .collect(),
-                        ),
-                    ),
-                    (
-                        "not_listed",
-                        Json::Number(inventory.missing_files().len().saturating_sub(128) as u64),
-                    ),
-                    ("approval_authority", Json::Bool(false)),
-                ]))
-            }
             "resolve_file_deletion" => {
                 exact_fields(arguments, &["request", "path", "version"])?;
                 let request = field(arguments, "request")?;

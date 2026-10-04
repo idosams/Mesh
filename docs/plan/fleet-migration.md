@@ -5541,3 +5541,24 @@ tests, 646 desktop tests and all 44 real-daemon checks. The initial full gate id
 desktop fixtures missing the new owner; those fixtures now start the real worker, and the failure
 log is preserved. Hosted delivery remains pending. R125's original head passed all seven hosted
 checks before its source-identical main reconciliation; no active CI head was replaced.
+
+
+## R128 — worker progress inspection without a shared scan lock
+
+New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267); no
+preserved source commit is replaced. Depends on scheduler PR #264 and the merged provenance audit
+PR #266. The existing missing-file read now releases the fleet mutex before native custody and
+filesystem inspection, then refreshes and checks the exact retained grant and active run before
+returning. A native-only progress classification reports unchanged, changed or resolution-needed.
+Neither path saves content, appends checkpoint events, publishes reviews or advances main.
+
+Four native regressions pass, covering real file/directory changes, missing files and unsupported
+links, read-only history/ledger preservation, parallel fleet reads, cancellation, credential
+rotation/revocation and substituted roots. Restoring the shared scan lock fails the concurrency
+regression at its two-second deadline; tested source was restored byte-for-byte. Full `npm test` passed 3,801 native tests in 162.149s (1 slow, 17 skipped), 185 rendered
+tests, 646 desktop tests and all 44 real-daemon checks. Hosted delivery is pending. No IPC schema,
+dependency or persisted-format change.
+
+This is an inspection prerequisite, not automatic worker saving. Per-lane capture, save authority
+during cancellation, scheduling/final-save semantics, recovery, presentation and packaged provider
+acceptance remain open. Source and mutation evidence are retained with the delivery archive.
