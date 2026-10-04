@@ -1171,4 +1171,4 @@ refuse approval/capture after preparation, recover exact retries and detect chan
 Injected acknowledgement-sync failure retains the fence; bypassing sync fails the regression.
 This native primitive is not exposed to users or agents and does not enroll policy. Current Mesh
 history readers refuse its required binding until complete enrollment/recovery support is integrated;
-ordinary editors remain usable. Full and hosted validation are pending. The fixed checkpoint is unchanged.
+ordinary editors remain usable. Full local validation passed: 3,840 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted validation is pending. The fixed checkpoint is unchanged.

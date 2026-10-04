@@ -6083,3 +6083,5 @@ An unchanged pre-change reader separately accepts attachment approval with only 
 marker and refuses the required attachment-history binding. Its probe and binary are retained with
 R149 evidence. An initial Rust error-message borrowing compile failure is preserved. Full repository
 and hosted validation remain pending; the fixed user checkpoint is unchanged.
+
+R150 implementation verification: Full `npm test` passed on implementation `cead2c5542f729c32cf458bf4b79c31fccbfe040`: 3,840 native tests in 171.744s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
