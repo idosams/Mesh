@@ -1202,7 +1202,7 @@ R151 joins registration, retained CAS intent, both required old-reader fences an
 journal append. Recovery finishes only its own anchored frame prefix, re-syncs exact retries and
 refuses substituted or conflicting history. Five real-storage regressions cover all 146 frame-prefix
 boundaries, acknowledgement/sync failure and identity refusal; exact borrowed custody and retained
-accepted-history checks also pass. Removing sync fails the regression. Full and hosted gates remain
-pending. The native method has no renderer/agent/CLI caller: ordinary history readers still refuse
+accepted-history checks also pass. Removing sync fails the regression. Full local validation passed: 3,863 native, 194 rendered and
+672 desktop tests plus all 44 real-daemon checks. Hosted delivery remains pending. The native method has no renderer/agent/CLI caller: ordinary history readers still refuse
 enrolled history until current-reader and complete policy integration are ready. It is not an enabled
 private-consumption or publication feature, and the fixed user checkpoint is unchanged.

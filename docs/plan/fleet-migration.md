@@ -6164,3 +6164,5 @@ regressions passed in 27.07s, and the native accepted-main retention/refusal tes
 A journal-sync bypass mutation fails the intended regression; source restored byte-exact. These are
 deterministic fault injections, not a power-loss or full historical-writer campaign. Full repository
 and hosted validation are pending. The fixed checkpoint remains unchanged.
+
+R151 implementation verification: Full `npm test` passed on implementation `beda134de27be869a94e6aeda19574f9fb98a904`: 3,863 native tests in 199.444s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The accepted-main regression also preserves staged/dirty Git status and exact index/HEAD bytes. Hosted validation and merge remain pending.
