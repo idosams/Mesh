@@ -2205,6 +2205,25 @@ requires its own hosted checks and merge. Full goal and issue #323 remain open: 
 runtime/publication/review/import/remote controls and packaged acceptance remain required.
 The fixed user checkpoint is unchanged.
 
+R161 empty-input acceptance now completes a real empty consumed snapshot, reopens its native
+catalog/owner/source/destination handles, retries completion without journal growth, and verifies a
+two-operation graph with no manifests/chunks and three retained stores. A first later save produces
+readable bytes while the initial version remains empty, with no source files or owner-history change.
+This closes a gap in the prior test, which stopped at signing/staging. The focused graph journey
+passed in 14.663s. A mutation acknowledging completion without its durable transaction failed at
+reopened recovery in 5.373s; production source was restored byte-for-byte. This is in-process native
+reopening, not a new fresh-process or packaged-app claim. Full validation is pending. The increment
+is based on published PR #325 (`e27f41302850e643040062c8454fd6aa57f76e76`) and replaces no preserved
+fleet commit. Both dependency PRs and issue #323 remain open; all runtime, UI, publication and
+packaged acceptance requirements remain. The user's checkpoint is unchanged.
+
+R161 empty-input acceptance `891b7e35e6e1a940b61e28ffbc9f9e51ec244aa2` passed full `npm test`:
+3,949 native tests in 301.441s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all remaining repository/docs/license/storage/format/lint gates.
+Focused and false-acknowledgement mutation evidence, full logs and complete history are preserved.
+This increment will be published separately against PR #325; hosted CI and normal merge remain
+required. The complete fleet objective and issue #323 remain open, with the fixed checkpoint unchanged.
+
 R161 native transaction/grant foundation PR #324 merged normally into canonical `main` on
 2026-10-04 at `e92adb547a86a3059182be301c30ed632017892d`, after all seven checks passed on
 `935f8820a26e62d82202a5c44bcda264df08175c` (run `37239592857`). Post-merge CI is separate.
@@ -2264,3 +2283,34 @@ required. This increment depends on published #327 and replaces no preserved fle
 Local reconciliation `1a5176420741b3015a31f50567c0efb2e5bb840a` incorporated main #325 without
 changing #327's tested tree. Desktop/harness wiring and all broader fleet acceptance remain open.
 The fixed user checkpoint is unchanged.
+R161 chained recovery PR #325 merged normally into canonical `main` on 2026-10-04 at
+`39f75b33ba2586ac2c55b5222ac97ed39196fee6`, after all seven hosted checks passed on
+`26d61d4fb97c99ee7b52f607f15721e07acf63ab` (run `37241603535`). Post-merge CI is separate.
+Empty-input PR #326 passed all seven checks on `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`
+(run `37241441884`). Reconciliation `15c9c75b26d4dc884f92c94c5f8e71cc746ea1cc` preserves its
+production and test source exactly; only documentation differs, with both append-only delivery
+histories retained. It now targets main and needs current-head hosted checks before merge.
+Catalog-read PR #327 is published at `c462e8f1ee573f0647db2cc65c3a317881781f23`, with CI running
+and base reconciliation still required. The full fleet scope and #323 remain open; native input
+selection, desktop/harness integration, runtime/publication and remaining acceptance are unfinished.
+The user checkpoint remains fixed.
+
+R161 empty-input acceptance PR #326 merged normally into canonical main on 2026-10-04 at
+`7ffbd244346b3ce7e534cf509b016dcfe9103386`, after all seven checks passed on
+`428582e967503470591b27db0078fba82e8f1b02` (run `37242735253`). Chained recovery #325 post-merge
+run `37242679496` also passed. Catalog-read #327 passed all seven checks on
+`c462e8f1ee573f0647db2cc65c3a317881781f23` (run `37242611845`). Its local reconciliation
+`ecdb29ae6bd696cf59f209acdc791fc978c36870` adds only the merged empty-input acceptance test and
+delivery notes; all catalog-read production code is unchanged. Both documentation histories were
+retained. Full validation of this combined tree is running before republishing against main.
+Automatic discovery and desktop/harness wiring are not delivered by #327; the full fleet objective
+and issue #323 remain open. The fixed checkpoint is unchanged.
+
+R161 catalog-read reconciliation passed the complete `npm test` gate on
+`7f7c10446fb91650426b89626a073d069c5a40e4`: 3,949 native tests in 322.939s
+(six slow, 18 skipped), 194 rendered tests, 672 desktop tests, 44 real-daemon checks
+and all repository/docs/license/storage/format/lint gates. This combines the catalog-read
+implementation with merged empty-input acceptance on main `7ffbd244346b3ce7e534cf509b016dcfe9103386`.
+PR #327 is being republished against main; current-head hosted checks and normal merge remain
+required. Automatic discovery remains a separate preserved, unpublished increment awaiting its
+combined full gate. Issue #323 and the complete fleet acceptance remain open. The checkpoint is fixed.
