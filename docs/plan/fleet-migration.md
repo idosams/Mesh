@@ -7034,3 +7034,13 @@ Removing the suffix equality check makes the regression fail on foreign prefix 1
 production source was restored byte-for-byte. Full repository validation is pending. The owner
 receipt, completion, configuration/capture reconciliation, cross-store admission and full acceptance
 campaign remain required in draft PR #324 / issue #323. The user checkpoint stays fixed.
+
+R161 destination-checkpoint implementation `814f1993e90b9d0c391443e17459cf8af25a414a` passed full
+`npm test`: 3,949 native tests in 281.112s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `3aab0858223914f5334a2acb0d7a14d55ce954e5` passed hosted run `37229406625`.
+Complete Git history and focused, deliberately failing mutation and full-gate logs are preserved.
+This proves the exact signed destination checkpoint commit and its native restart recovery;
+owner receipt, completion, prospective configuration/capture reconciliation, cross-store admission
+and packaged acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain
+open. The user checkpoint stays fixed.
