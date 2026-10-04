@@ -6056,3 +6056,30 @@ human-approval refusal, every historical writer, complete two-write enrollment c
 packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
 
 R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+
+R149 delivery update: [PR #300](https://github.com/idosams/Mesh/pull/300) merged as
+`ba0178935a0fdc9848fe80135169a16ac50c6856` after all seven hosted checks passed in run 37191604924.
+Additional unchanged-source tests prove valid prepared managed approval refusal (with test P-256
+credentials), including exact retry and unchanged journal/main. Removing the custody marker fails
+the regression and the restored probe passes. This is not packaged human presence. Attached approval
+was separately found to ignore that marker before enrollment; it needs R150's distinct preparation.
+
+## R150 — required attached-history preparation
+
+New canonical implementation based on merged R149 `ba0178935a0fdc9848fe80135169a16ac50c6856`;
+no preserved source commit is replaced. Tracks #301 and #289. Preparation retains the original
+attachment-history binding in a required v3 envelope under native store custody. It validates native
+registration and retained history, publishes through a private staged file and atomic rename, and
+requires file/directory durability before acknowledgement and exact recovery. Conflicting authority,
+stage, invalid file mode, changed binding and replaced source/store refuse. Guard drop retains the
+fence. Journal/main bytes and original source are not rewritten. Generic history readers remain
+unchanged and refuse the required binding; no runtime entry point or complete enrollment is enabled.
+
+Three focused regressions passed: prepared valid approval/capture refusal with journal preservation,
+external editor continuity and exact retry; changed binding/source refusal; and injected initial/retry
+sync failure. Removing the sync call makes its regression fail; original implementation restored.
+An unchanged pre-change reader separately accepts attachment approval with only the managed custody
+marker and refuses the required attachment-history binding. Its probe and binary are retained with
+R149 evidence. An initial Rust error-message borrowing compile failure is preserved. Full repository
+and hosted validation remain pending; the fixed user checkpoint is unchanged.

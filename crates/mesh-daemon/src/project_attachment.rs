@@ -49,8 +49,10 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod dependency_enrollment;
 mod group_integration;
 mod history;
+pub use dependency_enrollment::AttachmentDependencyFence;
 mod inspection;
 mod integration;
 mod remote_input;

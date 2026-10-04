@@ -199,3 +199,28 @@ power-loss campaign. The future transaction must install the fence before its en
 retain recovery evidence across both writes, validate local control authority and cover every
 consumer/publication path before private-input behavior is enabled. Preparation does not rewrite accepted main or journal content;
 this foundation does not automatically migrate any existing workspace.
+
+
+## Attached-history preparation (R150)
+
+Older attached-project approval and capture paths do not consult the managed custody marker.
+An independently compiled reader at `60441cb0013df707d71f8781b27964514cb32310` accepted a
+valid prepared attachment approval with that marker present. The same reader refused approval
+and exact retry with a required attachment-history binding, leaving journal and source bytes
+unchanged. This closes neither all historical paths nor complete enrollment recovery by itself.
+
+Native `ProvisionedAttachment::prepare_dependency_enrollment` now prepares that distinct fence
+under existing store custody. The required `mesh.attachment-history/v3` binding contains the exact
+previous binding and native-selected dependency authority. Existing history readers are unchanged
+and refuse it. Preparation validates registration, retained history identity, bounded private regular
+files and source/store namespaces. Staging is synced before rename; the required binding and directory
+are synced before acknowledgement, including exact retries after a lost acknowledgement. Conflicting
+stages, authorities, changed bindings and substituted namespaces refuse and preserve their evidence.
+Dropping the thread-bound guard never removes the fence or edits the source project.
+
+This is an unexposed native preparation primitive. No renderer, agent or CLI invokes it; there is
+no automatic migration, enrollment append, policy-aware write permission or publication authority.
+The original binding and accepted journal bytes are retained, but ordinary Mesh history reads refuse
+while this preparation is present. Complete enrollment/recovery must add validated current-reader
+support before enabling the transition. Independent all-path old-writer proof and packaged acceptance
+remain required. Ordinary external tools can continue editing the source folder.
