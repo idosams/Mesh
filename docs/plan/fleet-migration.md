@@ -6335,3 +6335,5 @@ No agent/renderer/CLI route or downstream eligibility enforcement is enabled. Th
 decisions that the still-required full closure, consumption and publication paths must consult.
 Private allocation, exact starting-operation/consumption receipts, retention, all publication/import/
 recovery checks and packaged acceptance remain open. The fixed user checkpoint is unchanged.
+
+R156 implementation verification: Full `npm test` passed on implementation `8036b089600600665ba904f28874ddd10e6f90e2`: 3,892 native tests in 268.630s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
