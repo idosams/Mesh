@@ -1161,3 +1161,14 @@ pre-change storage scanner refuses the new kind without changing the fixture. Th
 running-old-desktop compatibility; enrollment must first fence cached old writers. No grants,
 private consumption or publication eligibility are enabled yet. Full repository and hosted checks
 remain pending. See the [dependency contract](decisions/private-dependency-authority.md).
+
+## Dependency enrollment preparation
+
+R149 adds a native-only required custody marker that blocks generic older writers before future
+policy enrollment. Exact retry synchronizes the marker again; assigned or substituted workspaces
+refuse and interrupted preparation preserves explicit recovery state. Eighteen focused custody tests
+and a cached native-writer regression pass. An independently built pre-change reader also refuses
+cached edit/create/review/agent-acquisition paths after the marker, with unchanged file/journal bytes.
+This does not prove valid human approval, every writer or complete enrollment recovery. There is no
+agent/renderer/CLI enrollment operation and no automatic migration. Full and hosted checks remain
+pending; see the [authority contract](decisions/private-dependency-authority.md).

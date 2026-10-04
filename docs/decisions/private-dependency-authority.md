@@ -194,3 +194,38 @@ writers: install the fence before the enrollment record, verify refusal at every
 entry point, and prove recovery across both writes. A crash after fencing must remain refused and
 recoverable. Unknown-kind handling alone does not close this window. These are required follow-up
 acceptance conditions, not guarantees implemented by R147.
+
+## Durable enrollment preparation fence (R149)
+
+`DependencyEnrollmentFence::prepare` pins the expected native installation, takes its existing
+physical-directory custody lock and installs a required `mesh.workspace-agent-custody/v2` marker.
+It binds the exact installation, directory identity and nonzero dependency authority; its generation
+is null because preparation refuses assigned workspaces. Generic v1 custody parsing remains
+unchanged and refuses this record. The API is a native Rust preparation primitive only: no agent,
+renderer or CLI operation invokes it, and it does not append enrollment or grant policy-aware writes.
+
+The marker is staged with owner-only permissions, file-synced, atomically renamed and directory-synced
+through the existing custody publication path. A thread-bound guard retains the directory lock and
+rechecks both namespaces, continued custody and exact marker bytes. Dropping the guard releases the
+lock but never clears the marker. Exact retry reuses the same fence and syncs both the existing file
+and directory before returning; a lost acknowledgement after rename cannot skip that durability step.
+Malformed records, changed authorities, assigned workspaces, wrong installations, changed marker
+bytes and replaced namespaces refuse. Interrupted staging is disposable; a published required marker
+remains explicit recovery evidence. No enrollment journal append is enabled by this increment.
+
+Eighteen focused custody tests and a cached native-daemon regression pass. The latter first performs
+a valid edit, then prepares the fence and verifies that edit, file creation, review creation and
+agent-custody acquisition refuse without changing managed file/journal bytes or invoking signing.
+The regression also passed against independently archived pre-change revision
+`60441cb0013df707d71f8781b27964514cb32310`, with all 1,413 original tracked files verified against
+Git blobs before adding the standalone probe. The old probe publishes only the exact required marker;
+all production reader code is unchanged. Removing its marker lets the cached edit proceed and fails
+the refusal regression; the restored probe passes. This proves those cached native paths, not a valid
+human approval, every historical writer, a packaged desktop journey or complete enrollment recovery.
+
+A controlled retry directory-sync refusal returns no guard and retains the fence. Bypassing retry
+sync makes that regression fail. This is targeted fault-injection/staging evidence, not a complete
+power-loss campaign. The future transaction must install the fence before its enrollment record,
+retain recovery evidence across both writes, validate local control authority and cover every
+consumer/publication path before private-input behavior is enabled. Preparation does not rewrite accepted main or journal content;
+this foundation does not automatically migrate any existing workspace.
