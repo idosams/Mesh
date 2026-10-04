@@ -19,6 +19,9 @@
 //! into a daemon that answers nothing for the rest of its life — the surface that reports damage
 //! is the one thing that has to survive it.
 
+mod orphan_cleanup;
+pub use orphan_cleanup::{OrphanCleanupOutcome, OrphanCleanupStatus, OrphanCleanupWorker};
+
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -1691,6 +1694,7 @@ pub struct LiveDaemon {
     trusted_reviewers: TrustedReviewers,
     checkpoint: Arc<Mutex<LiveCheckpointRuntime>>,
     checkpoint_idle: Arc<IdleCheckpointScheduler>,
+    orphan_cleanup: Mutex<std::sync::Weak<orphan_cleanup::WorkerState>>,
     workspace_open: Mutex<()>,
     managed_edit: Mutex<()>,
     counters: Counters,
@@ -2388,6 +2392,7 @@ impl LiveDaemon {
             trusted_reviewers,
             checkpoint: Arc::new(Mutex::new(checkpoint)),
             checkpoint_idle: Arc::new(IdleCheckpointScheduler::default()),
+            orphan_cleanup: Mutex::new(std::sync::Weak::new()),
             workspace_open: Mutex::new(()),
             managed_edit: Mutex::new(()),
             counters: Counters::new(),
@@ -10771,6 +10776,136 @@ mod tests {
         let store =
             mesh_cas::Cas::open(daemon.held().as_ref().unwrap().storage_root().as_path()).unwrap();
         (root, daemon, store)
+    }
+
+    #[test]
+    fn background_orphan_cleanup_collects_without_an_explicit_call_and_retains_history() {
+        let (root, daemon, store) = orphan_fixture("background-orphan-history");
+        let daemon = Arc::new(daemon);
+        let summary = daemon.workspace_state().unwrap();
+        let retained = store
+            .sweep_all_chunks()
+            .unwrap()
+            .into_iter()
+            .map(|id| (id, store.read(&id).unwrap()))
+            .collect::<Vec<_>>();
+        let orphan = store
+            .promote(b"scheduled orphan".to_vec())
+            .unwrap()
+            .digest();
+        let worker = daemon
+            .start_orphan_cleanup_interval(Duration::from_millis(20))
+            .unwrap();
+        let status = worker.wait_after(0);
+        assert_eq!(status.outcome, OrphanCleanupOutcome::Collected(1));
+        drop(worker);
+        assert!(!store.contains(&orphan));
+        for (id, bytes) in retained {
+            assert_eq!(store.read(&id).unwrap(), bytes);
+        }
+        assert_eq!(daemon.workspace_state().unwrap().digest, summary.digest);
+        assert_eq!(
+            std::fs::read(root.join("source/note.txt")).unwrap(),
+            b"retained user version"
+        );
+        drop(daemon);
+        let reopened = LiveDaemon::new(started());
+        reopened.reopen_at_start(Path::new(&summary.root)).unwrap();
+        assert_eq!(reopened.workspace_state().unwrap().digest, summary.digest);
+        drop(reopened);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn background_orphan_cleanup_skips_busy_workspace_then_retries() {
+        let (root, daemon, store) = orphan_fixture("background-orphan-busy");
+        let daemon = Arc::new(daemon);
+        let orphan = store.promote(b"busy orphan".to_vec()).unwrap().digest();
+        let busy = daemon.workspace_open.lock().unwrap();
+        let worker = daemon
+            .start_orphan_cleanup_interval(Duration::from_millis(20))
+            .unwrap();
+        let status = worker.wait_after(0);
+        assert_eq!(status.outcome, OrphanCleanupOutcome::Deferred);
+        assert!(store.contains(&orphan));
+        drop(busy);
+        // An attempt already in flight at release may still report Deferred; bound the wait.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut attempts = status.attempts;
+        loop {
+            let status = worker.wait_after(attempts);
+            if matches!(status.outcome, OrphanCleanupOutcome::Collected(_)) {
+                break;
+            }
+            assert_eq!(status.outcome, OrphanCleanupOutcome::Deferred);
+            assert!(Instant::now() < deadline);
+            attempts = status.attempts;
+        }
+        drop(worker);
+        assert!(!store.contains(&orphan));
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn background_orphan_cleanup_has_one_owner_and_wakeable_shutdown_without_daemon_cycle() {
+        let daemon = Arc::new(LiveDaemon::new(started()));
+        assert!(daemon
+            .start_orphan_cleanup_interval(Duration::ZERO)
+            .is_err());
+        let worker = daemon.start_orphan_cleanup().unwrap();
+        assert_eq!(worker.status().outcome, OrphanCleanupOutcome::Waiting);
+        assert_eq!(
+            daemon.start_orphan_cleanup().unwrap_err().kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
+        let stopped = Instant::now();
+        drop(worker);
+        assert!(
+            stopped.elapsed() < Duration::from_secs(2),
+            "shutdown must wake the 60-second wait"
+        );
+        let worker = daemon
+            .start_orphan_cleanup_interval(Duration::from_millis(20))
+            .unwrap();
+        assert_eq!(
+            worker.wait_after(0).outcome,
+            OrphanCleanupOutcome::NoWorkspace
+        );
+        drop(worker);
+        let worker = daemon.start_orphan_cleanup().unwrap();
+        let weak = Arc::downgrade(&daemon);
+        drop(daemon);
+        assert!(
+            weak.upgrade().is_none(),
+            "sleeping maintenance must not retain the daemon"
+        );
+        drop(worker);
+    }
+
+    #[test]
+    fn background_orphan_cleanup_refuses_torn_history_without_deleting() {
+        let (root, daemon, store) = orphan_fixture("background-orphan-torn");
+        let daemon = Arc::new(daemon);
+        let orphan = store.promote(b"refused orphan".to_vec()).unwrap().digest();
+        let journal = daemon.held().as_ref().unwrap().record_file().to_path_buf();
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&journal)
+            .unwrap();
+        std::io::Write::write_all(&mut file, &[1]).unwrap();
+        file.sync_all().unwrap();
+        let before = std::fs::read(&journal).unwrap();
+        let worker = daemon
+            .start_orphan_cleanup_interval(Duration::from_millis(20))
+            .unwrap();
+        assert_eq!(worker.wait_after(0).outcome, OrphanCleanupOutcome::Refused);
+        drop(worker);
+        assert!(store.contains(&orphan));
+        assert_eq!(std::fs::read(journal).unwrap(), before);
+        drop(file);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
