@@ -5362,3 +5362,30 @@ tests in 158.640s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests an
 checks. Hosted delivery remains pending. This is process-crash evidence, not power-loss,
 storage-exhaustion, native fleet retention
 policy or daemon scheduling acceptance. All full-plan exits remain intact.
+
+
+## R121 — retain buffered and disconnected recorded history
+
+Tracks [issue #258](https://github.com/idosams/Mesh/issues/258), independently based on canonical
+main `d61421d74de3d51c63668ad010af06783edd91fb`. New canonical correction; no preserved source
+commit is replaced. Three regressions reproduced omitted buffered/disconnected payloads and an
+unresolvable conservative root set for an actor with no causally ready head. The default roots now
+include an existing full-history retention window for each known actor, plus its head when ready.
+Windows resolve against recorded actor existence; explicit head roots still require a ready head,
+and unknown actors remain errors. Persisted formats and causal readiness are unchanged.
+
+All 13 focused retention/independent-GC tests pass, including later parent arrival, genuine orphan
+collection and explicit narrowing. The full gate passed 3,777 native tests in 161.085s (1 slow,
+17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon checks. Hosted delivery remains
+pending. This fixes
+the default retained-set computation; it does not connect daemon cleanup, choose fleet policy,
+resolve writer coordination or complete the storage-exhaustion and full fleet acceptance journeys.
+
+
+R121 combined validation: local related-history reconciliation
+`4de1efcd5fd9634dccaee16fd28ea34ebe019ac1` includes published R120 head
+`b437963c1e6b96c2ac18098035b8a59677174c7a`, preserves the R119/R120/R121 documentation
+and combines the crash campaign with the retention correction. The full gate passed 3,779 native
+tests in 168.394s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon
+checks. Original published PR heads remain unchanged while their exact-head CI runs finish;
+publication of this reconciliation and final hosted validation/merge remain pending.
