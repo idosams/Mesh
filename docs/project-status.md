@@ -1442,3 +1442,11 @@ migration evidence exists, preserving its journal and files. Allocation identity
 reservation remains distinct from consumption. The five focused graph tests pass (2.67s); full
 validation and publication of these refinements are pending. Draft PR #322 remains unmerged, with
 seven successful checks on its older published head `1cbbab33934e7d6491b0518431b850e7fedcb72a`.
+
+R160 composition implementation `30d658add820195b9d0a43ee2c9bc94ecbc4ffe4` passed the full `npm test`
+gate: 3,927 native tests in 274.864s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks, and repository/docs/license/storage/format/lint checks. This completes local
+validation of the graph/recovery composition and legacy-copy refusal refinement; publication and
+hosted validation of this revision are next. The earlier draft CI is not evidence for this revision.
+Native consumption copying, publication/import/review enforcement and the full fleet acceptance
+scope remain open. The fixed user checkpoint is unchanged.
