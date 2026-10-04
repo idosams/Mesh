@@ -6000,3 +6000,28 @@ delivery remain pending. This is native fixture evidence with test credentials, 
 presence or complete dependency-policy enforcement. The fixed user checkpoint is unchanged.
 
 R145 implementation verification: Full `npm test` passed on `19486d421f1c32f8409f6737ef3f19d7be206013`: 3,825 native tests in 170.061s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
+
+## R146 — bounded native custody sets
+
+New canonical implementation based on PR #292 (`3d53c3d8dfda9a3e0f7184b09e90713162930e96`);
+no preserved source commit is replaced. Tracks issue #293 and the first prerequisite of private
+input issue #289. Native initialization can lock up to 32 requested descriptor-pinned roots, with
+identity deduplication and deterministic physical-identity order. It uses the same kernel directory
+locks as existing single-root custody and routes ordinary initialization through the same path.
+Every admitted namespace is verified before and after acquisition. Nested expansion is refused;
+exact already-held roots can be opened without acquiring another lock. Borrowed guards verify
+continued membership. Failed partial acquisition releases every acquired lock. Lock guards cannot
+move between threads because their native custody membership is thread-local.
+
+Twelve focused custody tests pass, including separate-process single/set and set/set contention,
+both acquisition orders, reverse input order, both member roots, duplicates/bounds, unrelated
+nesting, expired borrowed guards and root replacement while a set waits after acquiring its first
+member. Replacing exclusive locks with shared locks makes the process regression fail; tested
+source restored byte-exact. The thread-confinement compile check identified an existing test that
+sent a live guard across threads; the test now performs acquisition on its owning thread and sends
+only the resulting generation. That compile refusal and a separate test-only path accessor compile
+failure are preserved. No persisted format or agent API changes. The primitive grants no mutation,
+dependency or publication authority; project policy, exact closure and race-safe publication still
+require integration. Full gate and hosted delivery pending. Fixed user checkpoint unchanged.
+
+R146 implementation verification: Full `npm test` passed on `cd830a86a98174e0952277f9442020f6329f9b80`: 3,830 native tests in 173.261s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.

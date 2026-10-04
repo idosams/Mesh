@@ -146,3 +146,21 @@ positive/refusal and failing-before evidence, the complete Mesh gate, hosted che
 merge. No sequence item is complete merely because this contract or an isolated helper is merged.
 The phase exit remains: exact private consumption works, and rejected upstream work cannot reach
 shared state indirectly through any supported downstream publication path.
+
+
+## Native barrier foundation
+
+R146 adds the native initialization-set primitive, bounded to 32 requested roots before
+identity deduplication. It acquires the same kernel directory locks as single-root custody in
+physical-identity order, verifies every admitted namespace after acquisition, refuses nested
+extension, and confines lock guards to the owning thread. Single-root initialization uses this
+same implementation. Borrowed history-open guards verify that their exact custody is still held.
+Partial acquisition errors release all acquired locks and thread membership. This is a native
+serialization primitive, not a dependency transaction, access grant or publication capability.
+
+Twelve focused custody tests pass, including separate processes contending in both acquisition
+orders, reverse requested input order, both member roots, duplicate/bounded requests, unrelated
+nesting, borrowed-guard lifetime and replacement during a blocked partial acquisition. Replacing
+exclusive locks with shared locks makes the separate-process regression fail; source restored
+byte-exact. Full repository validation and hosted delivery are recorded in the migration ledger.
+The remaining record, authorization, closure and publication integration steps are still required.

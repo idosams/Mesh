@@ -4,12 +4,15 @@
 //! journal-derived metadata. Its descriptor-pinned lock linearizes agent acquisition/release with
 //! every managed mutation, including daemon IPC and local `meshctl` callers.
 
-use std::cell::Cell;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::{File, Permissions};
 use std::io::{self, Read as _};
+use std::marker::PhantomData;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
+use std::rc::Rc;
 
 use mesh_cas::DurableFs as _;
 
@@ -107,9 +110,11 @@ pub(crate) struct AssignedWorkspaceGuard {
     _lock: CustodyLock,
 }
 
-/// Physical workspace serial held while an initial/restart open selects or creates private state.
+/// Native directory serials held while initial/restart opens select or create private state.
+/// This guard is thread-confined and is not mutation or publication authority.
 pub(crate) struct WorkspaceInitializationGuard {
-    _held: Option<(PinnedWorkspaceRoot, CustodyLock)>,
+    roots: Vec<PinnedWorkspaceRoot>,
+    _locks: Vec<CustodyLock>,
 }
 
 struct Authority {
@@ -507,14 +512,23 @@ fn lock_physical_workspace_mode(
     physical: &PinnedWorkspaceRoot,
     nonblocking: bool,
 ) -> Result<Option<CustodyLock>, WorkspaceAgentCustodyError> {
-    let identity = physical
-        .identity()
-        .map_err(|error| WorkspaceAgentCustodyError::io("inspect workspace custody root", error))?;
-    if HELD_CUSTODY.with(Cell::get).is_some() {
+    if custody_is_held() {
         return Err(WorkspaceAgentCustodyError::invalid(
             "nested workspace custody acquisition was refused",
         ));
     }
+    lock_physical_workspace_in_set(physical, nonblocking)
+}
+
+// Only the bounded, sorted set entry point may acquire another directory while a lock is held.
+// Ordinary mutation entry points must continue through lock_physical_workspace_mode.
+fn lock_physical_workspace_in_set(
+    physical: &PinnedWorkspaceRoot,
+    nonblocking: bool,
+) -> Result<Option<CustodyLock>, WorkspaceAgentCustodyError> {
+    let identity = physical
+        .identity()
+        .map_err(|error| WorkspaceAgentCustodyError::io("inspect workspace custody root", error))?;
     let file = physical.independent_lock_directory().map_err(|error| {
         WorkspaceAgentCustodyError::io("open workspace custody directory", error)
     })?;
@@ -534,20 +548,84 @@ fn lock_physical_workspace_mode(
     Ok(Some(lock))
 }
 
+/// Maximum requested roots, counted before deduplication. Never truncate a requested barrier.
+const MAX_INITIALIZATION_ROOTS: usize = 32;
+
+impl WorkspaceInitializationGuard {
+    /// Verify pinned namespaces and membership in this thread's still-held custody set.
+    pub(crate) fn ensure_current(&self) -> Result<(), WorkspaceAgentCustodyError> {
+        for root in &self.roots {
+            root.ensure_namespace_identity().map_err(|error| {
+                WorkspaceAgentCustodyError::io("verify initialized workspace namespace", error)
+            })?;
+            let identity = root.identity().map_err(|error| {
+                WorkspaceAgentCustodyError::io("verify initialized workspace identity", error)
+            })?;
+            if !custody_contains(identity) {
+                return Err(WorkspaceAgentCustodyError::invalid(
+                    "workspace initialization custody is no longer held",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Acquire a bounded native-only directory barrier in physical-identity order.
+/// This serializes history access; it grants no mutation, agent, grant or approval authority.
+/// Call before daemon view locks, and never extend an already-held set.
+pub(crate) fn lock_workspace_initialization_set(
+    roots: &[PinnedWorkspaceRoot],
+) -> Result<WorkspaceInitializationGuard, WorkspaceAgentCustodyError> {
+    if roots.is_empty() || roots.len() > MAX_INITIALIZATION_ROOTS || custody_is_held() {
+        return Err(WorkspaceAgentCustodyError::invalid(
+            "workspace custody set is empty, oversized or nested",
+        ));
+    }
+    let mut ordered = BTreeMap::new();
+    for root in roots {
+        root.ensure_namespace_identity().map_err(|error| {
+            WorkspaceAgentCustodyError::io("verify workspace custody set root", error)
+        })?;
+        let identity = root.identity().map_err(|error| {
+            WorkspaceAgentCustodyError::io("inspect workspace custody set root", error)
+        })?;
+        ordered.entry(identity).or_insert_with(|| root.clone());
+    }
+    let mut locks = Vec::with_capacity(ordered.len());
+    for root in ordered.values() {
+        locks.push(lock_physical_workspace_in_set(root, false)?.ok_or_else(|| {
+            WorkspaceAgentCustodyError::invalid("blocking custody set lock unexpectedly deferred")
+        })?);
+    }
+    let guard = WorkspaceInitializationGuard {
+        // Retain and revalidate every admitted spelling, including duplicate identities.
+        roots: roots.to_vec(),
+        _locks: locks,
+    };
+    guard.ensure_current()?;
+    Ok(guard)
+}
+
 pub(crate) fn lock_workspace_initialization(
     physical: &PinnedWorkspaceRoot,
 ) -> Result<WorkspaceInitializationGuard, WorkspaceAgentCustodyError> {
     let identity = physical
         .identity()
         .map_err(|error| WorkspaceAgentCustodyError::io("inspect workspace open root", error))?;
-    match HELD_CUSTODY.with(Cell::get) {
-        Some(held) if held == identity => Ok(WorkspaceInitializationGuard { _held: None }),
-        Some(_) => Err(WorkspaceAgentCustodyError::invalid(
+    if custody_contains(identity) {
+        let guard = WorkspaceInitializationGuard {
+            roots: vec![physical.clone()],
+            _locks: Vec::new(),
+        };
+        guard.ensure_current()?;
+        Ok(guard)
+    } else if custody_is_held() {
+        Err(WorkspaceAgentCustodyError::invalid(
             "workspace open attempted under different custody authority",
-        )),
-        None => Ok(WorkspaceInitializationGuard {
-            _held: Some((physical.clone(), lock_physical_workspace(physical)?)),
-        }),
+        ))
+    } else {
+        lock_workspace_initialization_set(std::slice::from_ref(physical))
     }
 }
 
@@ -583,18 +661,10 @@ pub(crate) fn require_unassigned_while_initialized(
         .physical
         .identity()
         .map_err(|error| WorkspaceAgentCustodyError::io("inspect initialized workspace", error))?;
-    match HELD_CUSTODY.with(Cell::get) {
-        Some(held) if held == identity => {}
-        Some(_) => {
-            return Err(WorkspaceAgentCustodyError::invalid(
-                "workspace custody verification used a different initialization guard",
-            ));
-        }
-        None => {
-            return Err(WorkspaceAgentCustodyError::invalid(
-                "workspace custody verification requires its initialization guard",
-            ));
-        }
+    if !custody_contains(identity) {
+        return Err(WorkspaceAgentCustodyError::invalid(
+            "workspace custody verification requires its exact initialization guard",
+        ));
     }
     if authority.read()?.is_assigned() {
         return Err(WorkspaceAgentCustodyError::invalid(
@@ -621,15 +691,28 @@ fn new_generation() -> Result<String, WorkspaceAgentCustodyError> {
 }
 
 thread_local! {
-    static HELD_CUSTODY: Cell<Option<(u64, u64)>> = const { Cell::new(None) };
+    static HELD_CUSTODY: RefCell<BTreeSet<(u64, u64)>> = const { RefCell::new(BTreeSet::new()) };
 }
 
-struct CustodyLock(File);
+fn custody_is_held() -> bool {
+    HELD_CUSTODY.with(|held| !held.borrow().is_empty())
+}
+
+fn custody_contains(identity: (u64, u64)) -> bool {
+    HELD_CUSTODY.with(|held| held.borrow().contains(&identity))
+}
+
+struct CustodyLock {
+    file: File,
+    identity: (u64, u64),
+    // Membership is thread-local; moving a live guard to another thread would split authority.
+    _same_thread: PhantomData<Rc<()>>,
+}
 
 impl Drop for CustodyLock {
     fn drop(&mut self) {
-        HELD_CUSTODY.with(|held| held.set(None));
-        let _ = unlock(&self.0);
+        let _ = unlock(&self.file);
+        HELD_CUSTODY.with(|held| held.borrow_mut().remove(&self.identity));
     }
 }
 
@@ -644,8 +727,12 @@ fn lock_exclusive(file: File, identity: (u64, u64), nonblocking: bool) -> io::Re
     let operation = LOCK_EX | if nonblocking { LOCK_NB } else { 0 };
     // SAFETY: `file` owns a valid descriptor for the lifetime of the returned guard.
     if unsafe { flock(file.as_raw_fd(), operation) } == 0 {
-        HELD_CUSTODY.with(|held| held.set(Some(identity)));
-        Ok(CustodyLock(file))
+        HELD_CUSTODY.with(|held| held.borrow_mut().insert(identity));
+        Ok(CustodyLock {
+            file,
+            identity,
+            _same_thread: PhantomData,
+        })
     } else {
         Err(io::Error::last_os_error())
     }
@@ -681,6 +768,215 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).expect("scratch workspace");
         root
+    }
+
+    fn set_fixture(name: &str) -> (std::path::PathBuf, Vec<PinnedWorkspaceRoot>) {
+        let base = scratch(name);
+        let roots = ["a", "b", "outside"].map(|name| {
+            let path = base.join(name);
+            std::fs::create_dir(&path).unwrap();
+            PinnedWorkspaceRoot::open(path).unwrap()
+        });
+        (base, roots.to_vec())
+    }
+
+    #[test]
+    fn initialization_set_is_bounded_deduplicated_and_cannot_expand() {
+        let (base, roots) = set_fixture("set-scope");
+        assert!(lock_workspace_initialization_set(&[]).is_err());
+        assert!(lock_workspace_initialization_set(&vec![roots[0].clone(); 33]).is_err());
+        let guard = lock_workspace_initialization_set(&[
+            roots[1].clone(),
+            roots[0].clone(),
+            roots[1].clone(),
+        ])
+        .expect("two exact roots, requested in reverse order with a duplicate");
+        assert_eq!(guard._locks.len(), 2);
+        for root in &roots[..2] {
+            lock_workspace_initialization(root)
+                .unwrap()
+                .ensure_current()
+                .unwrap();
+            assert!(
+                lock_physical_workspace_mode(root, true).is_err(),
+                "ordinary mutation may not acquire a nested lock"
+            );
+        }
+        assert!(lock_workspace_initialization(&roots[2]).is_err());
+        assert!(lock_workspace_initialization_set(&roots[..2]).is_err());
+        let borrowed = lock_workspace_initialization(&roots[0]).unwrap();
+        drop(guard);
+        assert!(
+            borrowed.ensure_current().is_err(),
+            "a borrowed guard cannot outlive actual custody"
+        );
+        assert!(!custody_is_held());
+        for root in &roots {
+            drop(lock_physical_workspace_mode(root, true).unwrap().unwrap());
+        }
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn initialization_set_refuses_expansion_from_single_root_custody() {
+        let (base, roots) = set_fixture("set-nested");
+        let guard = lock_workspace_initialization(&roots[0]).unwrap();
+        assert!(lock_workspace_initialization_set(&roots[..2]).is_err());
+        assert!(lock_workspace_initialization(&roots[1]).is_err());
+        guard.ensure_current().unwrap();
+        drop(guard);
+        lock_workspace_initialization_set(&roots[..2])
+            .unwrap()
+            .ensure_current()
+            .unwrap();
+        assert!(!custody_is_held());
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn initialization_set_releases_partial_acquisition_after_substitution() {
+        let (base, mut roots) = set_fixture("set-partial");
+        roots.truncate(2);
+        roots.sort_by_key(|root| root.identity().unwrap());
+        let blocker = lock_workspace_initialization(&roots[1]).unwrap();
+        let waiting_roots = roots.clone();
+        let (done_tx, done_rx) = mpsc::channel();
+        let contender = std::thread::spawn(move || {
+            let refused = lock_workspace_initialization_set(&waiting_roots).is_err();
+            assert!(
+                !custody_is_held(),
+                "failed set must release thread membership"
+            );
+            done_tx.send(refused).unwrap();
+        });
+        let first = roots[0].clone();
+        let probe = std::thread::spawn(move || {
+            let end = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                if lock_physical_workspace_mode(&first, true)
+                    .unwrap()
+                    .is_none()
+                {
+                    return;
+                }
+                assert!(
+                    std::time::Instant::now() < end,
+                    "set never acquired its first root"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        });
+        probe.join().unwrap();
+        let a_identity = PinnedWorkspaceRoot::open(base.join("a"))
+            .unwrap()
+            .identity()
+            .unwrap();
+        let old_path = base.join(if roots[1].identity().unwrap() == a_identity {
+            "a"
+        } else {
+            "b"
+        });
+        std::fs::rename(&old_path, base.join("displaced")).unwrap();
+        std::fs::create_dir(&old_path).unwrap();
+        drop(blocker);
+        assert!(done_rx.recv_timeout(Duration::from_secs(5)).unwrap());
+        contender.join().unwrap();
+        drop(
+            lock_physical_workspace_mode(&roots[0], true)
+                .unwrap()
+                .expect("first root released"),
+        );
+        let replacement = PinnedWorkspaceRoot::open(old_path).unwrap();
+        drop(lock_workspace_initialization(&replacement).unwrap());
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    // Executed only by the separate-process test below. No provider or private account is involved.
+    #[test]
+    fn initialization_set_process_worker() {
+        let Some(base) = std::env::var_os("MESH_TEST_CUSTODY_SET_ROOT") else {
+            return;
+        };
+        let base = std::path::PathBuf::from(base);
+        let mode = std::env::var("MESH_TEST_CUSTODY_SET_MODE").unwrap();
+        let a = PinnedWorkspaceRoot::open(base.join("a")).unwrap();
+        let b = PinnedWorkspaceRoot::open(base.join("b")).unwrap();
+        std::fs::write(base.join("ready"), b"ready").unwrap();
+        let _guard = match mode.as_str() {
+            "a" => lock_workspace_initialization(&a),
+            "b" => lock_workspace_initialization(&b),
+            "set" => lock_workspace_initialization_set(&[b, a]),
+            _ => panic!("unknown test mode"),
+        }
+        .unwrap();
+        std::fs::write(base.join("acquired"), b"acquired").unwrap();
+    }
+
+    #[test]
+    fn initialization_set_contends_with_single_roots_across_processes_in_both_orders() {
+        use std::process::{Command, Stdio};
+        for (case, parent_set, child_mode) in [
+            ("set-first-a", true, "a"),
+            ("set-first-b", true, "b"),
+            ("set-first-set", true, "set"),
+            ("single-first-set", false, "set"),
+        ] {
+            let (base, roots) = set_fixture(case);
+            let guard = if parent_set {
+                lock_workspace_initialization_set(&roots[..2]).unwrap()
+            } else {
+                lock_workspace_initialization(&roots[0]).unwrap()
+            };
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "workspace_custody::tests::initialization_set_process_worker",
+                    "--nocapture",
+                ])
+                .env("MESH_TEST_CUSTODY_SET_ROOT", &base)
+                .env("MESH_TEST_CUSTODY_SET_MODE", child_mode)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(File::create(base.join("worker.stderr")).unwrap())
+                .spawn()
+                .unwrap();
+            let end = std::time::Instant::now() + Duration::from_secs(5);
+            while !base.join("ready").exists() {
+                if std::time::Instant::now() >= end {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("custody child did not become ready: {case}");
+                }
+                assert!(
+                    child.try_wait().unwrap().is_none(),
+                    "custody child exited before ready: {case}"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            std::thread::sleep(Duration::from_millis(100));
+            let acquired_early = base.join("acquired").exists();
+            drop(guard);
+            let end = std::time::Instant::now() + Duration::from_secs(5);
+            let status = loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    break status;
+                }
+                if std::time::Instant::now() >= end {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("custody child did not resume after release: {case}");
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            };
+            assert!(status.success(), "custody child failed: {case}");
+            assert!(
+                !acquired_early,
+                "a held root did not exclude the other process: {case}"
+            );
+            assert!(base.join("acquired").exists());
+            assert!(!custody_is_held());
+            std::fs::remove_dir_all(base).unwrap();
+        }
     }
 
     #[test]
@@ -850,7 +1146,9 @@ mod tests {
                 authority: waiting_authority,
                 _lock: lock,
             });
-            result_tx.send(result).unwrap();
+            result_tx
+                .send(result.and_then(|locked| locked.acquire(false, None)))
+                .unwrap();
         });
         ready.wait();
         std::thread::sleep(Duration::from_millis(20));
@@ -861,12 +1159,10 @@ mod tests {
             "a named file replacement must not release the directory serial"
         );
         drop(held);
-        let locked = result_rx
+        let generation = result_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter wakes after physical serial release")
             .expect("replacing irrelevant named file cannot invalidate workspace");
-        let generation = locked.acquire(false, None).expect("acquire after wait");
-        drop(locked);
         waiting.join().unwrap();
         lock_for_workspace_path(&path, &installation)
             .unwrap()
