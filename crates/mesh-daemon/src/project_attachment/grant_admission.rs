@@ -1,0 +1,181 @@
+//! Current native access inspection, retaining custody through the read callback.
+use super::{
+    dependency_decision::PENDING, dependency_enrollment::read_private_in_store,
+    history::verify_history_binding, invalid, AttachmentStorage, ProvisionedAttachment,
+    SavedAttachmentVersion,
+};
+use crate::{
+    workspace::{HistoricalWorkspacePreview, OpenWorkspace},
+    TrustedReviewers,
+};
+use mesh_store::RecordDigest;
+use std::io::{self, Write};
+
+/// Exact native selection and expected grant. No caller-provided generation or policy path.
+pub struct NativeGrantInspection<'a> {
+    /// Native source registration selected within the owning project.
+    pub source: &'a ProvisionedAttachment,
+    /// Exact immutable source operation.
+    pub version: SavedAttachmentVersion,
+    /// Native destination registration named by the grant.
+    pub destination: &'a ProvisionedAttachment,
+    /// Exact currently allowed grant record; historical or revoked records cannot substitute.
+    pub grant: RecordDigest,
+}
+/// Immutable file metadata from the exact admitted saved snapshot.
+pub struct NativeGrantedFile<'a> {
+    /// Relative saved path, not a path resolved by the renderer or agent.
+    pub path: &'a str,
+    /// Verified saved byte length.
+    pub byte_length: u64,
+    /// Whether the saved file is executable.
+    pub executable: bool,
+}
+/// Read-only source view valid only inside the synchronous custody-bound callback.
+/// Extracted bytes/metadata are facts; they do not retain access or publication authority.
+pub struct NativeGrantedInput<'a> {
+    history: &'a OpenWorkspace,
+    snapshot: &'a HistoricalWorkspacePreview,
+}
+impl NativeGrantedInput<'_> {
+    /// Enumerate exact saved files, never current editor contents.
+    pub fn files(&self) -> impl Iterator<Item = NativeGrantedFile<'_>> {
+        self.snapshot.files.iter().map(|file| NativeGrantedFile {
+            path: &file.path,
+            byte_length: file.byte_length,
+            executable: file.executable,
+        })
+    }
+    /// Enumerate exact saved directory paths, including empty directories.
+    pub fn directories(&self) -> impl Iterator<Item = &str> {
+        self.snapshot
+            .directories
+            .iter()
+            .map(|directory| directory.path.as_str())
+    }
+    /// Read only a file named by this exact verified snapshot. Content verification remains native.
+    pub fn write_file(&self, path: &str, output: &mut impl Write) -> io::Result<()> {
+        let file = self
+            .snapshot
+            .files
+            .iter()
+            .find(|file| file.path == path)
+            .ok_or_else(|| invalid("file is not in the granted snapshot"))?;
+        self.history
+            .write_historical_workspace_file(file, output)
+            .map_err(|failure| match failure {
+                crate::workspace::HistoricalWorkspaceWriteFailure::Output(error) => error,
+                crate::workspace::HistoricalWorkspaceWriteFailure::Retained(_) => {
+                    invalid("granted saved content verification failed")
+                }
+            })
+    }
+}
+fn error(e: impl std::fmt::Display) -> io::Error {
+    io::Error::other(e.to_string())
+}
+impl AttachmentStorage {
+    /// Inspect an exact currently granted input while retaining all native custody. The callback
+    /// must remain synchronous and bounded; it must not wait for a provider, network or user.
+    /// No agent/renderer/CLI route calls this native API. It performs no materialization, records no
+    /// consumption and cannot authorize publication. Errors do not roll back callback side effects.
+    pub fn with_current_input_grant<T>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeGrantInspection<'_>,
+        read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let source = self.prepare_dependency_work(owner, request.source)?;
+        let destination = self.prepare_dependency_work(owner, request.destination)?;
+        let mut roots = source.roots.clone();
+        roots.extend(destination.roots.iter().cloned());
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
+        let validate = || -> io::Result<OpenWorkspace> {
+            match read_private_in_store(&owner.store, PENDING) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+                Ok(_) => {
+                    return Err(invalid(
+                        "native control must finish recovery before grant admission",
+                    ))
+                }
+            }
+            let (configuration, proof) = owner
+                .project()
+                .read_configuration(owner.metadata_path(), &owner.store)?;
+            let proof = proof.ok_or_else(|| invalid("owning dependency enrollment is required"))?;
+            let history = OpenWorkspace::open_attachment_read_history(
+                owner.metadata_path(),
+                owner.store.clone(),
+                &TrustedReviewers::default(),
+                Some(&proof),
+            )
+            .map_err(error)?;
+            verify_history_binding(&history, &configuration)?;
+            let source_binding =
+                self.validate_dependency_work_with_history(&source, &guard, &proof, &history)?;
+            let destination_binding =
+                self.validate_dependency_work_with_history(&destination, &guard, &proof, &history)?;
+            if !proof.policy().current_bound_grant(
+                (
+                    source_binding.work(),
+                    source_binding.installation(),
+                    request.version.operation(),
+                ),
+                (
+                    destination_binding.work(),
+                    destination_binding.installation(),
+                ),
+                request.grant,
+                (source_binding.correlation, destination_binding.correlation),
+            ) {
+                return Err(invalid(
+                    "native input grant is stale, revoked, unbound or mismatched",
+                ));
+            }
+            guard.ensure_current().map_err(error)?;
+            Ok(history)
+        };
+        let owner_history = validate()?;
+        let value = if request.source.id() == owner.id() {
+            if !owner_history
+                .workspace_versions()
+                .iter()
+                .any(|saved| saved.operation() == request.version.operation())
+            {
+                return Err(invalid(
+                    "grant input is not a saved operation of its source",
+                ));
+            }
+            let snapshot = owner_history
+                .historical_workspace_preview(request.version.operation())
+                .map_err(error)?;
+            read(NativeGrantedInput {
+                history: &owner_history,
+                snapshot: &snapshot,
+            })?
+        } else {
+            request.source.attachment.inspect_saved(
+                request.source.metadata_path(),
+                request.source.store.clone(),
+                &request.version.operation().to_string(),
+                |history, operation| {
+                    let snapshot = history
+                        .historical_workspace_preview(operation)
+                        .map_err(error)?;
+                    read(NativeGrantedInput {
+                        history,
+                        snapshot: &snapshot,
+                    })
+                },
+            )?
+        };
+        // A callback result is acknowledged only if native associations and current access still agree.
+        validate()?;
+        Ok(value)
+    }
+}
+
+#[cfg(test)]
+mod tests;

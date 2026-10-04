@@ -20,7 +20,7 @@ use std::{
     path::Path,
 };
 const ZERO: RecordDigest = RecordDigest::from_bytes([0; 32]);
-const PENDING: &str = "dependency-decision.pending";
+pub(super) const PENDING: &str = "dependency-decision.pending";
 const MAX_JOURNAL: usize = 80 * 1024 * 1024;
 
 /// Explicit trusted-native-host decision. This is not exposed through actor credentials.

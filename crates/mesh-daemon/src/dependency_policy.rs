@@ -294,6 +294,21 @@ impl DependencyPolicyHistory {
             .map(|(generation, payload, _)| (*generation, *payload))
     }
 
+    pub(crate) fn current_bound_grant(
+        &self,
+        source: (RecordDigest, RecordDigest, RecordDigest),
+        destination: (RecordDigest, RecordDigest),
+        expected: RecordDigest,
+        bindings: (RecordDigest, RecordDigest),
+    ) -> bool {
+        let key = (
+            Input(Work(source.0, source.1), source.2),
+            Work(destination.0, destination.1),
+        );
+        matches!(self.grants.get(&key), Some((_, current, true)) if *current == expected)
+            && matches!(self.records.get(&expected), Some((_, Event::Grant { bindings: Some(recorded), .. })) if *recorded == bindings)
+    }
+
     pub(crate) fn native_decision(
         &self,
         work: RecordDigest,

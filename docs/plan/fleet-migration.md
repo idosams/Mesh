@@ -6337,3 +6337,34 @@ Private allocation, exact starting-operation/consumption receipts, retention, al
 recovery checks and packaged acceptance remain open. The fixed user checkpoint is unchanged.
 
 R156 implementation verification: Full `npm test` passed on implementation `8036b089600600665ba904f28874ddd10e6f90e2`: 3,892 native tests in 268.630s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+
+
+## R157 — current native grant inspection under retained custody
+
+Tracks [issue #315](https://github.com/idosams/Mesh/issues/315), extending R156
+[PR #314](https://github.com/idosams/Mesh/pull/314) at
+`fc7db8fa52445c654b34ceda08a23e80b6306085`. Replaces no preserved source commit.
+R153 [PR #308](https://github.com/idosams/Mesh/pull/308) merged as
+`5bc0e79ee5b3f24a149ef9bbfc4b7a607034d954`; its seven exact-head checks passed, with
+merged-main verification still pending at this entry. The local branch reconciles that shared history
+without modifying published branches that are under verification.
+
+A native synchronous read callback enters only for the exact current allowed grant and matching
+source/destination physical correlation. The complete native custody set remains held through the
+callback; source history is read-only and its snapshot is fixed. Revoked, superseded, unbound, wrong
+destination and unfinished-control evidence refuse before callback entry. Native associations and
+current access are revalidated before returning its result. Callback errors do not roll back any
+caller side effects; this is neither a consumption transaction nor publication authority.
+
+Six native tests pass, covering root and child snapshots, immutable bytes after editor changes,
+read-only source enforcement, distinct access and eligibility decisions, callback non-entry on
+denial, pending-control preservation, retained/released custody, changed ancestry and replacement
+with unchanged stable work/installation. A policy regression refuses a legacy unbound grant. Removing
+the current allowed-generation predicate causes the revoked-grant callback regression to fail; source
+restored exactly. Initial compile checks exposed the existing file reader's concrete output type and
+an anonymously imported trait; the corrected generic output retains its native chunk verification.
+Failed and passing logs are preserved. Full local and hosted validation remain pending.
+
+No renderer/agent/CLI invokes this API, no destination is materialized or launched, and no consumption
+receipt is recorded. Full inherited closure, exact starting operations, allocation recovery, retention
+and all publication/import/recovery enforcement remain required. The fixed checkpoint is unchanged.

@@ -587,3 +587,22 @@ fn bound_grant_schema_retains_correlation_and_refuses_missing_or_malformed_bindi
         refuse(&mut history, &bad);
     }
 }
+
+#[test]
+fn legacy_unbound_grant_never_satisfies_current_native_admission() {
+    let enrollment = enrollment();
+    let old = grant(2, enrollment.0.payload, 40, 1, ZERO, true);
+    let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+    apply(&mut history, &enrollment);
+    apply(&mut history, &old);
+    assert_eq!(
+        history.native_grant((d(10), d(11), d(12)), (d(20), d(21))),
+        Some((1, old.0.payload))
+    );
+    assert!(!history.current_bound_grant(
+        (d(10), d(11), d(12)),
+        (d(20), d(21)),
+        old.0.payload,
+        (d(70), d(71))
+    ));
+}
