@@ -115,6 +115,10 @@ pub enum DependencyKind {
     Eligibility,
     /// An exact closure and decision vector retained for review.
     ReviewSnapshot,
+    /// Required destination intent, synchronized before materializing any consumed input.
+    ConsumptionStart,
+    /// Required destination acknowledgement of its exact owner-authority consumption record.
+    ConsumptionComplete,
 }
 impl DependencyKind {
     /// Stable journal and SQL code. Unknown values must refuse, never default.
@@ -126,6 +130,8 @@ impl DependencyKind {
             Self::Consumption => 2,
             Self::Eligibility => 3,
             Self::ReviewSnapshot => 4,
+            Self::ConsumptionStart => 5,
+            Self::ConsumptionComplete => 6,
         }
     }
     /// Decode only explicitly supported native envelope kinds.
@@ -137,6 +143,8 @@ impl DependencyKind {
             2 => Some(Self::Consumption),
             3 => Some(Self::Eligibility),
             4 => Some(Self::ReviewSnapshot),
+            5 => Some(Self::ConsumptionStart),
+            6 => Some(Self::ConsumptionComplete),
             _ => None,
         }
     }

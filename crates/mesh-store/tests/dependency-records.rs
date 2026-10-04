@@ -63,11 +63,13 @@ fn dependency_envelope_has_a_fixed_required_tag_and_exact_canonical_body() {
         (DependencyKind::Consumption, 2),
         (DependencyKind::Eligibility, 3),
         (DependencyKind::ReviewSnapshot, 4),
+        (DependencyKind::ConsumptionStart, 5),
+        (DependencyKind::ConsumptionComplete, 6),
     ] {
         assert_eq!(kind.code(), code);
         assert_eq!(DependencyKind::from_code(code), Some(kind));
     }
-    assert_eq!(DependencyKind::from_code(5), None);
+    assert_eq!(DependencyKind::from_code(7), None);
     assert_eq!(DependencyKind::from_code(255), None);
 }
 #[test]
@@ -189,5 +191,86 @@ fn unvalidated_dependency_history_refuses_collection_instead_of_dropping_unknown
     );
     for record in history() {
         assert!(index.named_content().contains(&record.payload));
+    }
+}
+
+#[test]
+fn consumed_start_and_completion_replay_rebuild_and_retain_as_required_records() {
+    let dir = TempDir::new("consumption-required-records");
+    let mut records = history();
+    for (offset, kind) in [
+        DependencyKind::ConsumptionStart,
+        DependencyKind::ConsumptionComplete,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let previous = records.last().unwrap();
+        records.push(DependencyRecord {
+            authority: previous.authority,
+            revision: previous.revision + 1,
+            previous: previous.payload,
+            payload: digest(40 + offset as u8),
+            kind,
+        });
+    }
+    let checkpoint = Checkpoint {
+        dependencies: records.clone(),
+        ..Checkpoint::default()
+    };
+    let path = dir.join("metadata.sqlite");
+    let mut store = Store::open(Sqlite3::at(&path)).unwrap();
+    let expected = store.commit(&checkpoint).unwrap();
+    let bytes = checkpoint
+        .records()
+        .iter()
+        .flat_map(frame_record)
+        .collect::<Vec<_>>();
+    let scan = scan_journal(&bytes).unwrap();
+    assert_eq!(scan.records(), checkpoint.records());
+    assert_eq!(
+        store.rebuild_from(scan.records().iter().cloned()).unwrap(),
+        expected
+    );
+    let expected_rows = store.index().rows("dependency_record").unwrap();
+    assert_eq!(expected_rows.len(), 7);
+    drop(store);
+    let mut reopened = Store::open(Sqlite3::at(&path)).unwrap();
+    let persisted = read_all_tables(&mut Sqlite3::at(&path)).unwrap();
+    let (_, persisted_rows) = persisted
+        .iter()
+        .find(|(name, _)| *name == "dependency_record")
+        .unwrap();
+    assert_eq!(*persisted_rows, expected_rows);
+    assert_eq!(
+        reopened
+            .rebuild_from(scan.records().iter().cloned())
+            .unwrap(),
+        expected
+    );
+    assert_eq!(
+        reopened
+            .index()
+            .dependency_records()
+            .copied()
+            .collect::<Vec<_>>(),
+        records
+    );
+    let retained = RetainedRoots::conservative(reopened.index(), RetentionPolicy::default());
+    assert_eq!(
+        Reachability::compute(reopened.index(), &retained),
+        Err(RetentionError::UnvalidatedDependencies)
+    );
+    for record in &records[5..] {
+        let frame = frame_record(&StoredRecord::Dependency(*record));
+        assert_eq!(
+            frame[3], 8,
+            "required dependency envelope tag must not change"
+        );
+        for length in 0..frame.len() {
+            let partial = scan_journal(&frame[..length]).unwrap();
+            assert!(partial.records().is_empty());
+            assert_eq!(partial.boundary().byte_offset, 0);
+        }
     }
 }

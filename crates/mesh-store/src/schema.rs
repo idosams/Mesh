@@ -479,7 +479,11 @@ mod tests {
     /// `cargo test -p mesh-store --lib` too.
     #[test]
     fn the_reader_finds_every_declared_table_in_the_real_migrations() {
-        let found = table_names_in_ddl(&crate::migration::full_schema_sql());
+        // An upgrade can recreate an existing table to change a constraint. Compare the
+        // declared identities, not the number of CREATE statements across all versions.
+        let found = table_names_in_ddl(&crate::migration::full_schema_sql())
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>();
         for table in TABLES {
             assert!(
                 found.contains(&table.name.to_owned()),

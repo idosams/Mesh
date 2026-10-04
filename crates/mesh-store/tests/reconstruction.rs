@@ -146,7 +146,9 @@ fn every_table_in_the_migrations_is_declared_in_the_schema() {
 
 #[test]
 fn every_table_declared_in_the_schema_is_created_by_a_migration() {
-    let created = table_names_in_ddl(&full_schema_sql());
+    let created = table_names_in_ddl(&full_schema_sql())
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
     for table in TABLES {
         assert!(
             created.contains(&table.name.to_owned()),
@@ -158,9 +160,14 @@ fn every_table_declared_in_the_schema_is_created_by_a_migration() {
 }
 
 #[test]
-fn each_table_is_created_by_the_migration_its_since_version_names() {
+fn each_table_is_first_created_by_the_migration_its_since_version_names() {
+    let mut seen = std::collections::BTreeSet::new();
     for migration in MIGRATIONS {
         for name in table_names_in_ddl(migration.sql) {
+            // Recreating an existing table changes constraints, not its introduction version.
+            if !seen.insert(name.clone()) {
+                continue;
+            }
             let table = mesh_store::table(&name).expect("declared");
             assert_eq!(
                 table.since_version, migration.version,

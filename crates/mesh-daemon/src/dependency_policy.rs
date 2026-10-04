@@ -470,6 +470,11 @@ fn decode(
     let mut roots = BTreeSet::new();
     let mut request = None;
     let event = match kind {
+        // Storage can retain these required envelopes, but ordinary native policy admission must
+        // remain fenced until exact transaction payload validation and recovery are integrated.
+        DependencyKind::ConsumptionStart | DependencyKind::ConsumptionComplete => {
+            return Err(InvalidDependencyHistory);
+        }
         DependencyKind::Enrollment => {
             fields(body, &["project", "installation"])?;
             if digest(value(body, "project")?, false)? != binding.project
