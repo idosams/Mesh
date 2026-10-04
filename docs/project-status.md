@@ -2234,3 +2234,15 @@ and requires current-head hosted checks before merge. Empty-input acceptance PR 
 at `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`, with CI running. The native foundation is merged;
 the full fleet objective and issue #323 remain open for generic callers, runtime/publication/review/
 import/remote controls, remaining fault campaigns and packaged acceptance. The checkpoint is unchanged.
+
+R161 chained recovery PR #325 merged normally into canonical `main` on 2026-10-04 at
+`39f75b33ba2586ac2c55b5222ac97ed39196fee6`, after all seven hosted checks passed on
+`26d61d4fb97c99ee7b52f607f15721e07acf63ab` (run `37241603535`). Post-merge CI is separate.
+Empty-input PR #326 passed all seven checks on `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`
+(run `37241441884`). Reconciliation `15c9c75b26d4dc884f92c94c5f8e71cc746ea1cc` preserves its
+production and test source exactly; only documentation differs, with both append-only delivery
+histories retained. It now targets main and needs current-head hosted checks before merge.
+Catalog-read PR #327 is published at `c462e8f1ee573f0647db2cc65c3a317881781f23`, with CI running
+and base reconciliation still required. The full fleet scope and #323 remain open; native input
+selection, desktop/harness integration, runtime/publication and remaining acceptance are unfinished.
+The user checkpoint remains fixed.
