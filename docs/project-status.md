@@ -26,7 +26,9 @@ is separate from provider status; incomplete final saves remain visible and do n
 approval. A complete final native version with a pending fleet acknowledgment gets up to three
 attempts one second apart before terminal recording; cancellation prevents further attempts.
 Native fixture tests cover live and final edits, empty polls, missed acknowledgment,
-revocation and newer-version races. This is not yet hosted or packaged acceptance. Received remote
+revocation and newer-version races. A real Codex worker also produced an inspectable intermediate save while active and before any
+explicit handoff, with exact saved bytes unchanged after its final edit. This is native-provider
+evidence, not packaged acceptance. Received remote
 sessions and the fixed user checkpoint do not include this behavior. See the delivery ledger for
 R130 evidence and limits.
 

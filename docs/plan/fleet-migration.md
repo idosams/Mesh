@@ -5800,3 +5800,34 @@ remain pending. Changed-file/activity summaries, packaged multi-agent acceptance
 the full fleet plan remain required. User checkpoint unchanged.
 
 R137 implementation `7c7a128f6e9253a14841e41bfc8436ff91890964` passed full `npm test`: 3,823 native tests in 169.654s (1 slow, 17 skipped), 190 rendered tests, 663 desktop tests and 44 real-daemon checks. Hosted and packaged delivery remain pending.
+
+
+## R138 — real-provider ordinary save acceptance
+
+New canonical acceptance test built on PR #277 head
+`36ed79c0d8c7dd10826311e00a1809b86194d8a8`, source-identically reconciled with canonical main
+`d364f552b31c4d9417bf14fd5432099f1b2965c4`. No preserved source commit is replaced.
+An opt-in installed Codex worker writes an intermediate edit, waits 15 seconds, then writes a
+final edit; its normal explicit handoff is allowed only after that command finishes. The native
+host must expose immutable intermediate bytes while the worker is active and before any explicit
+checkpoint. After completion, the same selection must still show those bytes while the working
+file holds the final edit. One worker run, original project and selected desktop state are checked.
+The fixture and structured measurement are retained for later inspection. Account configuration is
+used in place; no credentials are copied. Test signers do not confer human-approval authority.
+
+The real run passed with Codex CLI 0.158.0-alpha.2.1 in 55.10s. First live save observation was
+26,069ms after native-host run start, not a measurement of filesystem-event latency; total host
+journey was 54,550ms. Explicit checkpoint count was zero at the live observation and one after
+completion. Thus this proves ordinary saving before handoff, not absence of all later handoffs.
+The immutable comparison remained exact after the final write; original/desktop selection remained
+unchanged. Preserved fixture copy verified all file bytes and link targets. This is non-graphical,
+local single-provider evidence; full gate, hosted delivery, packaged parallel panels, second-provider/
+second-host and protected-main acceptance remain separate requirements. Fixed checkpoint unchanged.
+
+R138 final test source repeated the real journey successfully in 59.64s: first live save at
+25,971ms, total host journey 59,221ms, zero checkpoints at the live observation and one after
+completion. Both fixtures are retained. The initial full gate caught an unnecessary unwrap in
+the test; an edition-incompatible formatting attempt was corrected before a second provider run.
+Both failure records are preserved; production behavior was unchanged.
+
+R138 final implementation `21eab5996d1865dd4b28c99cdaaa9ae1b9178563` passed full `npm test`: 3,823 native tests in 166.174s (1 slow, 18 skipped), 190 rendered tests, 663 desktop tests and 44 real-daemon checks. The new ignored provider test was separately run successfully twice, including once against final source. Hosted delivery remains pending.
