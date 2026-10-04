@@ -6031,3 +6031,5 @@ made their respective regressions fail; source was restored byte-exact. Two init
 compile failures are preserved. Full repository and hosted checks remain pending. The fixed
 user checkpoint is unchanged; full private-input authorization and publication enforcement remain
 required by the fleet plan.
+
+R147 implementation `af708ababc2f42a8e75a06ebd0d8152d9bfd4d13` passed full `npm test`: 3,837 native tests in 173.217s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
