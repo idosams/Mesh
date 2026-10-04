@@ -1577,3 +1577,11 @@ manifest, exact previous revision and logs are retained with R161 evidence. This
 journal boundary in the real previous native implementation, including an already prepared writer;
 it is not a packaged desktop upgrade test. The production transaction must still durably append
 that boundary before its first materialized byte and recover interrupted copying/owner receipts.
+
+R161 compatibility implementation `62031d610e854ac72ae04f2e1dd1b3a0f442de46` passed full
+`npm test`: 3,938 native tests in 315.123s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The previous
+published head `8989b942eba30e07af8cc37022a41f778f47f387` also passed all seven hosted checks in
+run `37217784394`. Compatibility proof does not close issue #323: durable staging/materialization,
+owner consumption, cross-store admission and exact interrupted recovery remain unfinished. Draft
+PR #324 remains unmerged; the full fleet goal and fixed user checkpoint are unchanged.
