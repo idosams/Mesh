@@ -2285,3 +2285,12 @@ delivery notes; all catalog-read production code is unchanged. Both documentatio
 retained. Full validation of this combined tree is running before republishing against main.
 Automatic discovery and desktop/harness wiring are not delivered by #327; the full fleet objective
 and issue #323 remain open. The fixed checkpoint is unchanged.
+
+R161 catalog-read reconciliation passed the complete `npm test` gate on
+`7f7c10446fb91650426b89626a073d069c5a40e4`: 3,949 native tests in 322.939s
+(six slow, 18 skipped), 194 rendered tests, 672 desktop tests, 44 real-daemon checks
+and all repository/docs/license/storage/format/lint gates. This combines the catalog-read
+implementation with merged empty-input acceptance on main `7ffbd244346b3ce7e534cf509b016dcfe9103386`.
+PR #327 is being republished against main; current-head hosted checks and normal merge remain
+required. Automatic discovery remains a separate preserved, unpublished increment awaiting its
+combined full gate. Issue #323 and the complete fleet acceptance remain open. The checkpoint is fixed.
