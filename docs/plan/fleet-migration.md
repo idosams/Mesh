@@ -6855,3 +6855,16 @@ preserved with the full log and Git history. This proves private staging custody
 permission checks; required start ordering, installation, owner consumption, completion and
 cross-store recovery/admission remain unfinished. Draft PR #324 is not merged; issue #323 and
 the full fleet objective remain open. The user checkpoint stays fixed.
+
+R161 now retains the complete selected owner/source/destination custody set through a synchronous
+validated transaction callback. Destination ancestry and all of its roots are selected before the
+single lock acquisition. Signing still runs outside custody; public revalidation remains a
+point-in-time read. The private callback is a transaction integration seam, not a committed version.
+
+Both signed-source integration tests passed in 4.996s. They require catalog, owner, source,
+destination and allocation roots inside the callback, block a competing native writer until an
+intentional callback failure releases custody, preserve unexpected editor work without invoking
+the callback, and refuse callback admission after native grant revocation. Removing both destination
+emptiness checks makes the new regression fail (1.116s); exact source was restored. Full repository
+validation is pending. Required journal-before-install ordering, durable owner/completion receipts,
+recovery and cross-store admission remain unfinished; PR #324 stays draft and the checkpoint fixed.

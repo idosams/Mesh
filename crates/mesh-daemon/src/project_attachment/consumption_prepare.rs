@@ -76,6 +76,15 @@ impl PreparedNativeConsumedStart {
     }
     /// Point-in-time revalidation only. This method writes nothing and grants no later mutation.
     pub fn revalidate(&self, storage: &AttachmentStorage) -> io::Result<()> {
+        self.with_revalidated_start(storage, |_| Ok(()))
+    }
+    // The transaction must perform its first mutation inside this callback. A successful return
+    // is not continuing authority. Callbacks remain synchronous and may not extend the root set.
+    fn with_revalidated_start<T>(
+        &self,
+        storage: &AttachmentStorage,
+        apply: impl FnOnce(&crate::workspace_custody::WorkspaceInitializationGuard) -> io::Result<T>,
+    ) -> io::Result<T> {
         let available = self.available.iter().collect::<Vec<_>>();
         let request = NativeConsumedStartRequest {
             input: NativeGrantInspection {
@@ -88,18 +97,24 @@ impl PreparedNativeConsumedStart {
             request: self.request,
             limits: self.limits,
         };
-        let (basis, _, _) =
-            storage.inspect_consumed_start_basis(&self.owner, &request, self.actor)?;
-        if basis != self.basis
-            || super::consumption_plan::InitialPlan::verify(
-                &self.checkpoint,
-                WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
-                self.limits,
-            )? != self.plan
-        {
-            return Err(invalid("consumption preparation basis changed"));
-        }
-        Ok(())
+        storage.with_consumed_start_basis(
+            &self.owner,
+            &request,
+            self.actor,
+            |basis, _, _, guard| {
+                if basis != self.basis
+                    || super::consumption_plan::InitialPlan::verify(
+                        &self.checkpoint,
+                        WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
+                        self.limits,
+                    )? != self.plan
+                {
+                    return Err(invalid("consumption preparation basis changed"));
+                }
+                guard.ensure_current().map_err(error)?;
+                apply(guard)
+            },
+        )
     }
 }
 struct StartHead;
@@ -196,6 +211,22 @@ impl AttachmentStorage {
         request: &NativeConsumedStartRequest<'_>,
         actor: PublicKey,
     ) -> io::Result<(Basis, InitialSnapshot, OpenWorkspace)> {
+        self.with_consumed_start_basis(owner, request, actor, |basis, snapshot, history, _| {
+            Ok((basis, snapshot, history))
+        })
+    }
+    fn with_consumed_start_basis<T>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: &NativeConsumedStartRequest<'_>,
+        actor: PublicKey,
+        apply: impl FnOnce(
+            Basis,
+            InitialSnapshot,
+            OpenWorkspace,
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
         if request.request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing consumption request"));
         }
@@ -215,10 +246,12 @@ impl AttachmentStorage {
                 grant: request.input.grant,
             },
         )?;
+        let selected = self.prepare_dependency_work(owner, request.input.destination)?;
         let roots = graph
             .roots
             .iter()
             .chain(&grant.roots)
+            .chain(&selected.roots)
             .map(|root| Ok((root.identity()?, root.clone())))
             .collect::<io::Result<BTreeMap<_, _>>>()?
             .into_values()
@@ -249,7 +282,6 @@ impl AttachmentStorage {
         }
         absent(destination, "dependency-capture.pending")?;
         absent(destination, super::dependency_decision::PENDING)?;
-        let selected = self.prepare_dependency_work(owner, destination)?;
         let destination_binding = self.validate_dependency_work(&selected, &guard)?;
         let (configuration, proof) = destination
             .project()
@@ -307,7 +339,7 @@ impl AttachmentStorage {
             return Err(invalid("consumption basis changed during preparation"));
         }
         guard.ensure_current().map_err(error)?;
-        Ok((
+        apply(
             Basis {
                 configuration,
                 prospective,
@@ -317,7 +349,8 @@ impl AttachmentStorage {
             },
             snapshot,
             history,
-        ))
+            &guard,
+        )
     }
 }
 
@@ -326,6 +359,70 @@ mod tests {
     use super::*;
     use ed25519_dalek::{Signer as _, SigningKey};
     use std::fs;
+    fn assert_transaction_custody(
+        prepared: &PreparedNativeConsumedStart,
+        storage: &AttachmentStorage,
+    ) {
+        let origin = storage
+            .lane_origin_bound(&prepared.destination)
+            .unwrap()
+            .unwrap();
+        let roots = vec![
+            storage.pinned.clone(),
+            prepared.owner.store.clone(),
+            prepared.owner.attachment.pinned.clone(),
+            prepared.source.store.clone(),
+            prepared.source.attachment.pinned.clone(),
+            prepared.destination.store.clone(),
+            prepared.destination.attachment.pinned.clone(),
+            origin.allocation.clone(),
+        ];
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (acquired_tx, acquired_rx) = std::sync::mpsc::channel();
+        let mut worker = None;
+        let result = prepared.with_revalidated_start(storage, |guard| {
+            guard.require_roots(&roots).map_err(error)?;
+            worker = Some(std::thread::spawn(move || {
+                started_tx.send(()).unwrap();
+                let _guard =
+                    crate::workspace_custody::lock_workspace_initialization_set(&roots).unwrap();
+                acquired_tx.send(()).unwrap();
+            }));
+            started_rx
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap();
+            assert!(
+                matches!(
+                    acquired_rx.recv_timeout(std::time::Duration::from_millis(150)),
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+                ),
+                "writer entered while validated transaction callback held custody"
+            );
+            Err::<(), _>(io::Error::other("interrupted transaction callback"))
+        });
+        assert!(result.is_err());
+        acquired_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        worker.unwrap().join().unwrap();
+        let unexpected = prepared
+            .destination
+            .project()
+            .root()
+            .join("unexpected-transaction-work");
+        fs::write(&unexpected, b"keep editor work").unwrap();
+        let mut called = false;
+        assert!(prepared
+            .with_revalidated_start(storage, |_| {
+                called = true;
+                Ok(())
+            })
+            .is_err());
+        assert!(!called, "unexpected work reached transaction callback");
+        assert_eq!(fs::read(&unexpected).unwrap(), b"keep editor work");
+        fs::remove_file(unexpected).unwrap();
+        prepared.revalidate(storage).unwrap();
+    }
     #[test]
     fn saved_ignore_rules_bind_candidate_without_changing_empty_reservation() {
         if staging::run_stage_child_if_requested() {
@@ -472,6 +569,7 @@ mod tests {
         );
         fs::write(root.join("source/.gitignore"), b"kept\n").unwrap();
         prepared.revalidate(&storage).unwrap();
+        assert_transaction_custody(&prepared, &storage);
         let repeated = storage
             .prepare_consumed_start(&owner, request(), actor, sign)
             .unwrap();
@@ -487,6 +585,14 @@ mod tests {
             .is_err());
         if revoke {
             staging::assert_revocation_after_staging(&prepared, &storage);
+            let mut called = false;
+            assert!(prepared
+                .with_revalidated_start(&storage, |_| {
+                    called = true;
+                    Ok(())
+                })
+                .is_err());
+            assert!(!called, "revoked grant reached the transaction callback");
         } else {
             staging::assert_private_stage(&prepared, &storage);
         }
