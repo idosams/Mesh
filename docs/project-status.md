@@ -1379,3 +1379,21 @@ policy payload roots makes the native regression fail on the missing rejection r
 exact passing source was restored. This remains selected-graph retention evidence, not complete-store
 collection authority or durable pins. Pending/completed transaction object retention and remaining
 closure fault cases, full gate and PR delivery remain open.
+
+R160 now has read-only exact native capture recovery-root inspection. Pending and completed request
+sidecars bind the physical store, enrollment, journal and exact staged frame object. Known partial
+frames are reconstructed only in memory; signed local operation facts and all journal/staged manifest
+content are verified with the same immutable readers as graph inspection. Returned local CAS roots
+include the staged journal object, authenticated operations, chunks and policy/authority payloads;
+logical manifests and required sidecar/journal identities remain distinct. This does not recover
+the request, acquire a durable pin, authorize publication, or supply a whole-project collector.
+
+The combined capture/graph/ancestry run passed 18 tests in 15.532s. After connecting an initially
+unwired aggregate signed-payload budget, all 11 capture tests passed without warnings in 15.10s.
+The existing every-frame-byte recovery test now inspects roots before recovery and asserts the
+partial journal is unchanged. Additional cases cover completed historical receipts after later saves,
+wrong requests, corrupt staged frames preserved in place, and unchanged newer editor files. Omitting
+the staged-frame root makes the regression fail (0.24s); the exact passing source was restored.
+The initial missing filesystem-type qualification and unused-budget build logs are preserved.
+Pending control transactions, complete graph/recovery-root composition, remaining fault cases,
+full validation and PR delivery remain unfinished.

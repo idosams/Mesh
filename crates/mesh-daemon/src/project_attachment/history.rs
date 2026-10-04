@@ -590,4 +590,4 @@ mod capture_line_tests;
 
 #[path = "dependency_capture.rs"]
 pub(super) mod dependency_capture;
-pub use dependency_capture::PreparedNativeCapture;
+pub use dependency_capture::{NativeCaptureRetention, PreparedNativeCapture};

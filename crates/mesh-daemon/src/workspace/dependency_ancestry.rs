@@ -96,9 +96,26 @@ impl OpenWorkspace {
         id: RecordDigest,
         remaining_bytes: &mut u64,
     ) -> Result<BTreeSet<RecordDigest>, String> {
-        use mesh_cas::{ContentDigest as _, DigestHasher as _};
         self.ensure_physical_root().map_err(|_| refused())?;
         let manifest = self.record_index.manifest(&id).ok_or_else(refused)?;
+        Self::verify_dependency_manifest_content(&self.payload_store, manifest, remaining_bytes)
+    }
+
+    pub(crate) fn verify_dependency_staged_operation(
+        record: &OperationRecord,
+        bytes: &[u8],
+    ) -> Result<NativeOperationFact, String> {
+        NativeOperationFact::verify(record, bytes)
+    }
+
+    /// Shared immutable verification for journaled and staged recovery manifests.
+    pub(crate) fn verify_dependency_manifest_content(
+        store: &Cas<crate::root_authority::PinnedRootFs, mesh_cas::Blake3>,
+        manifest: &mesh_store::ManifestRecord,
+        remaining_bytes: &mut u64,
+    ) -> Result<BTreeSet<RecordDigest>, String> {
+        use mesh_cas::{ContentDigest as _, DigestHasher as _};
+        let id = manifest.id;
         if manifest.chunks.len() > 65536
             || crate::manifest_paging::logical_manifest_id(
                 manifest.byte_length,
@@ -120,10 +137,9 @@ impl OpenWorkspace {
                 return Err(refused());
             }
             let digest = CasDigest::from_bytes(*chunk.digest.as_bytes());
-            let mut file = self
-                .payload_store
+            let mut file = store
                 .filesystem()
-                .read_file(&self.payload_store.layout().chunk_path(&digest))
+                .read_file(&store.layout().chunk_path(&digest))
                 .map_err(|_| refused())?;
             let metadata = file.metadata().map_err(|_| refused())?;
             if !metadata.is_file() || metadata.len() != chunk.byte_length {

@@ -245,6 +245,16 @@ fn every_capture_frame_prefix_recovers_one_exact_saved_operation() {
         {
             assert!(f.a.project().saved_versions(f.a.metadata_path()).is_err());
         }
+        let retained =
+            f.a.inspect_dependency_capture_retention(id(1))
+                .unwrap_or_else(|e| panic!("retention prefix {length}: {e}"));
+        assert_eq!(retained.operation(), expected);
+        assert!(retained.pending());
+        assert_eq!(
+            f.journal(),
+            partial,
+            "retention inspection altered prefix {length}"
+        );
         let saved =
             f.a.recover_dependency_capture(id(1))
                 .unwrap_or_else(|e| panic!("prefix {length}: {e}"));
@@ -432,4 +442,107 @@ fn restoring_an_old_capture_line_cannot_reuse_an_advanced_actor_basis() {
     assert!(second.commit().is_err());
     assert_eq!(f.journal(), before);
     assert!(!f.a.metadata_path().join(PENDING).exists());
+}
+
+#[test]
+fn capture_retention_reads_staged_prefixes_without_recovery_and_keeps_completed_roots() {
+    let f = Fixture::new("retention-prefixes", true);
+    let before = f.journal();
+    let input = f.input(b"fixed staged capture");
+    let prepared = f.prepare(&input, 91).unwrap();
+    let expected = prepared.operation();
+    let mut frames = Vec::new();
+    assert!(prepared
+        .commit_with_io(
+            |step, _, bytes| {
+                if matches!(step, CaptureStep::Staged) {
+                    frames = bytes.to_vec();
+                    return Err(io::Error::other("stopped after staging"));
+                }
+                Ok(())
+            },
+            |file| file.sync_all()
+        )
+        .is_err());
+    let pending = fs::read(f.a.metadata_path().join(PENDING)).unwrap();
+    let line_path = f.a.metadata_path().join("attachment-capture-line.json");
+    let line = fs::read(&line_path).unwrap();
+    let journal_path = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+    fs::write(f.a.project().root().join("note"), b"newer editor work").unwrap();
+    let required = [
+        hash(&frames),
+        expected,
+        hash(b"fixed staged capture"),
+        hash(b"initial"),
+    ];
+    for length in [0, 1, frames.len() / 2, frames.len() - 1, frames.len()] {
+        let mut partial = before.clone();
+        partial.extend_from_slice(&frames[..length]);
+        fs::write(&journal_path, &partial).unwrap();
+        let facts =
+            f.a.inspect_dependency_capture_retention(id(91))
+                .unwrap_or_else(|e| panic!("prefix {length}: {e}"));
+        assert!(facts.pending());
+        assert_eq!(facts.operation(), expected);
+        let value = facts.to_json();
+        let Json::Array(roots) = value.get("payloads").unwrap() else {
+            panic!("roots absent")
+        };
+        for digest in required {
+            assert!(roots.contains(&Json::text(digest.to_hex())));
+        }
+        assert_eq!(
+            f.journal(),
+            partial,
+            "read-only retention must not finish a journal prefix"
+        );
+        assert_eq!(
+            fs::read(f.a.metadata_path().join(PENDING)).unwrap(),
+            pending
+        );
+        assert_eq!(fs::read(&line_path).unwrap(), line);
+        assert!(f.a.inspect_dependency_capture_retention(id(92)).is_err());
+    }
+    f.a.recover_dependency_capture(id(91)).unwrap();
+    let complete = f.a.inspect_dependency_capture_retention(id(91)).unwrap();
+    assert!(!complete.pending());
+    assert_eq!(complete.operation(), expected);
+    let cas =
+        Cas::<_, mesh_cas::Blake3>::with_filesystem(f.a.metadata_path(), f.a.store.filesystem())
+            .unwrap();
+    let path = f.a.metadata_path().join(
+        cas.layout()
+            .chunk_path(&mesh_cas::Digest32::from_bytes(*hash(&frames).as_bytes())),
+    );
+    let exact = fs::read(&path).unwrap();
+    fs::write(&path, b"corrupt retained frames").unwrap();
+    assert!(f.a.inspect_dependency_capture_retention(id(91)).is_err());
+    assert_eq!(fs::read(&path).unwrap(), b"corrupt retained frames");
+    fs::write(&path, exact).unwrap();
+    assert_eq!(
+        complete,
+        f.a.inspect_dependency_capture_retention(id(91)).unwrap()
+    );
+    let later = f
+        .prepare(&f.input(b"later separately saved work"), 92)
+        .unwrap()
+        .commit()
+        .unwrap();
+    let historical = f.a.inspect_dependency_capture_retention(id(91)).unwrap();
+    assert!(!historical.pending());
+    assert_eq!(historical.operation(), expected);
+    let value = historical.to_json();
+    let Json::Array(roots) = value.get("payloads").unwrap() else {
+        panic!("roots absent")
+    };
+    for digest in required {
+        assert!(roots.contains(&Json::text(digest.to_hex())));
+    }
+    assert!(roots.contains(&Json::text(later.operation().to_hex())));
+    fs::write(f.a.project().root().join("note"), b"newer editor work").unwrap();
+
+    assert_eq!(
+        fs::read(f.a.project().root().join("note")).unwrap(),
+        b"newer editor work"
+    );
 }

@@ -6500,3 +6500,15 @@ proves corrupt on-disk caches are ignored and preserved, and absent caches yield
 Omitting policy roots makes the regression fail on the missing rejection payload in 0.51s; exact
 passing source restored. Full pending/completed transaction retention and full-gate/PR delivery remain
 unfinished. All failing and passing logs are retained.
+
+R160 capture recovery-root groundwork adds an exact native read-only request inspector for pending
+and completed receipts. It reconstructs known torn capture frames in memory and verifies local
+authenticated operation/manifests/chunks through the same helpers as graph reads; the journal,
+sidecars and newer source files remain unchanged. The result includes the staged frame CAS object
+and qualified local recovery evidence, not collection permission or a whole-project closure.
+Combined focused verification passed 18 tests in 15.532s. After wiring the signed-payload byte budget,
+11 capture tests passed without warnings in 15.10s, including root inspection before recovery at
+every frame-byte boundary and historical receipts after later saves. Omitting the frame root makes
+the native regression fail in 0.24s; exact passing source restored. Failed compilation and unused
+budget intermediate logs are retained. Pending control objects and complete graph/recovery-root
+composition still need implementation before full validation and R160 PR delivery.

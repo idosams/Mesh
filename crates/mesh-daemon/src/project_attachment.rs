@@ -70,7 +70,7 @@ pub use dependency_transaction::NativeDependencyEnrollment;
 mod group_integration;
 mod history;
 pub use dependency_enrollment::AttachmentDependencyFence;
-pub use history::PreparedNativeCapture;
+pub use history::{NativeCaptureRetention, PreparedNativeCapture};
 mod inspection;
 mod integration;
 mod remote_input;
