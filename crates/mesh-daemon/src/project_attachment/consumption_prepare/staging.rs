@@ -113,7 +113,20 @@ impl PreparedNativeConsumedStart {
             file_bytes: self.limits.file_bytes,
         }
     }
-    fn entry_receipts(&self, root: &PinnedWorkspaceRoot, prepare: bool) -> io::Result<Vec<Json>> {
+    fn entry_receipts(
+        &self,
+        root: &PinnedWorkspaceRoot,
+        prepare: bool,
+        allocation: &PinnedWorkspaceRoot,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<Vec<Json>> {
+        guard
+            .require_roots(&[
+                self.destination.store.clone(),
+                self.destination.attachment.pinned.clone(),
+                allocation.clone(),
+            ])
+            .map_err(error)?;
         let mut receipts = Vec::new();
         let manifests = self
             .checkpoint
@@ -382,14 +395,20 @@ impl PreparedNativeConsumedStart {
             .flat_map(mesh_store::frame_record)
             .collect()
     }
-    fn verify_stage(&self, root: &PinnedWorkspaceRoot, graph: &Json) -> io::Result<RecordDigest> {
+    fn verify_stage(
+        &self,
+        root: &PinnedWorkspaceRoot,
+        graph: &Json,
+        allocation: &PinnedWorkspaceRoot,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<RecordDigest> {
         if root.try_clone_directory()?.metadata()?.mode() & 0o077 != 0 {
             return Err(invalid("consumption bundle is not private"));
         }
         if read(root, "attempt.json", 65536)? != self.attempt_manifest(root)?.as_bytes() {
             return Err(invalid("consumption attempt identity differs"));
         }
-        let receipts = self.entry_receipts(root, false)?;
+        let receipts = self.entry_receipts(root, false, allocation, guard)?;
         let expected = self.stage_manifest(root, graph, receipts)?;
         if expected.len() > MAX_RECEIPT
             || read(root, RECEIPT, MAX_RECEIPT)? != expected.as_bytes()
@@ -447,6 +466,14 @@ impl PreparedNativeConsumedStart {
             .lane_origin_bound(&self.destination)?
             .ok_or_else(|| invalid("staging reservation missing"))?;
         let target = format!("consumption-{}", self.request.to_hex());
+        // Private immutable staging holds destination and allocation custody. It cannot extend
+        // that set or call complete graph/grant revalidation until this guard has been released.
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&[
+            self.destination.store.clone(),
+            self.destination.attachment.pinned.clone(),
+            origin.allocation.clone(),
+        ])
+        .map_err(error)?;
         let root = match origin.allocation.open_child_directory(OsStr::new(&target)) {
             Ok(root) => root,
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
@@ -471,7 +498,7 @@ impl PreparedNativeConsumedStart {
                 root.sync()?;
                 origin.allocation.sync()?;
                 hook("attempt-created", &root)?;
-                let receipts = self.entry_receipts(&root, true)?;
+                let receipts = self.entry_receipts(&root, true, &origin.allocation, &guard)?;
                 hook("entries-staged", &root)?;
                 for bytes in &self.checkpoint.objects {
                     write(&root, &format!("object-{}", hash(bytes).to_hex()), bytes)?;
@@ -484,8 +511,8 @@ impl PreparedNativeConsumedStart {
                 write(&root, RECEIPT, manifest.as_bytes())?;
                 root.sync()?;
                 hook("bundle-synced", &root)?;
-                self.verify_stage(&root, &graph)?;
-                self.revalidate(storage)?;
+                self.verify_stage(&root, &graph, &origin.allocation, &guard)?;
+                guard.ensure_current().map_err(error)?;
                 origin.allocation.publish_child_directory(
                     OsStr::new(&name),
                     &root,
@@ -496,9 +523,14 @@ impl PreparedNativeConsumedStart {
             Err(e) => return Err(e),
         };
         hook("published", &root)?;
-        let receipt = self.verify_stage(&root, &graph)?;
+        let receipt = self.verify_stage(&root, &graph, &origin.allocation, &guard)?;
         root.sync()?;
         origin.allocation.sync()?;
+        guard.ensure_current().map_err(error)?;
+        drop(guard);
+        hook("custody-released", &root)?;
+        // Recheck permission and the complete source basis after private work; this is not
+        // authority for a later installation. The consuming commit needs its own full barrier.
         self.revalidate(storage)?;
         Ok(StagedNativeConsumedStart {
             root,
@@ -518,17 +550,71 @@ pub(super) fn assert_private_stage(
         .unwrap()
         .unwrap();
     let target = format!("consumption-{}", prepared.request.to_hex());
+    let before = origin
+        .allocation
+        .filesystem()
+        .read_directory_names(Path::new(""))
+        .unwrap();
+    {
+        let incomplete = crate::workspace_custody::lock_workspace_initialization_set(&[
+            prepared.destination.store.clone(),
+            prepared.destination.attachment.pinned.clone(),
+        ])
+        .unwrap();
+        assert!(prepared
+            .entry_receipts(&origin.allocation, true, &origin.allocation, &incomplete)
+            .is_err());
+    }
+    assert_eq!(
+        origin
+            .allocation
+            .filesystem()
+            .read_directory_names(Path::new(""))
+            .unwrap(),
+        before
+    );
     let mut attempts = Vec::new();
     for boundary in ["attempt-created", "entries-staged", "bundle-synced"] {
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (acquired_tx, acquired_rx) = std::sync::mpsc::channel();
+        let mut worker = None;
         assert!(prepared
             .stage_with_hook(storage, |step, root| {
                 if step == boundary {
                     attempts.push(root.clone());
+                    let roots = [
+                        prepared.destination.store.clone(),
+                        prepared.destination.attachment.pinned.clone(),
+                        origin.allocation.clone(),
+                    ];
+                    let started = started_tx.clone();
+                    let acquired = acquired_tx.clone();
+                    worker = Some(std::thread::spawn(move || {
+                        started.send(()).unwrap();
+                        let _guard =
+                            crate::workspace_custody::lock_workspace_initialization_set(&roots)
+                                .unwrap();
+                        acquired.send(()).unwrap();
+                    }));
+                    started_rx
+                        .recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    assert!(
+                        matches!(
+                            acquired_rx.recv_timeout(std::time::Duration::from_millis(150)),
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+                        ),
+                        "concurrent native writer entered private staging"
+                    );
                     return Err(io::Error::other("interrupted private construction"));
                 }
                 Ok(())
             })
             .is_err());
+        acquired_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        worker.unwrap().join().unwrap();
         assert!(origin
             .allocation
             .open_child_directory(OsStr::new(&target))
@@ -601,6 +687,22 @@ pub(super) fn assert_private_stage(
     for attempt in &attempts {
         attempt.ensure_namespace_identity().unwrap();
     }
+    let editor = prepared
+        .destination
+        .project()
+        .root()
+        .join("unexpected-editor-work");
+    assert!(prepared
+        .stage_with_hook(storage, |step, _| {
+            if step == "custody-released" {
+                fs::write(&editor, b"retain this editor work")?;
+            }
+            Ok(())
+        })
+        .is_err());
+    assert_eq!(fs::read(&editor).unwrap(), b"retain this editor work");
+    fs::remove_file(&editor).unwrap(); // Test-owned edit, never production recovery cleanup.
+    assert_eq!(prepared.stage(storage).unwrap().receipt().unwrap(), receipt);
     let (path, _pin) = staged.root.stable_namespace().unwrap();
     let frames = fs::read(path.join("frames.mesh")).unwrap();
     fs::write(path.join("frames.mesh"), b"changed staged frames").unwrap();
@@ -740,4 +842,49 @@ pub(super) fn run_stage_child_if_requested() -> bool {
     assert_eq!(identity(&staged.root).unwrap(), text("physical"));
     println!("exact private stage recovered");
     true
+}
+
+#[cfg(test)]
+pub(super) fn assert_revocation_after_staging(
+    prepared: &PreparedNativeConsumedStart,
+    storage: &AttachmentStorage,
+) {
+    let mut revoked = false;
+    let mut preserved = None;
+    assert!(prepared
+        .stage_with_hook(storage, |step, root| {
+            if step == "custody-released" {
+                // This normal native operation must be able to acquire its complete set after
+                // private staging releases custody, and before the final permission recheck.
+                storage.grant_saved_input(
+                    &prepared.owner,
+                    crate::project_attachment::NativeInputGrantRequest {
+                        source: &prepared.source,
+                        version: prepared.version,
+                        destination: &prepared.destination,
+                        allowed: false,
+                        expected_previous: Some(prepared.grant),
+                        request: RecordDigest::from_bytes([91; 32]),
+                    },
+                )?;
+                revoked = true;
+                preserved = Some((root.clone(), read(root, RECEIPT, MAX_RECEIPT)?));
+            }
+            Ok(())
+        })
+        .is_err());
+    assert!(
+        revoked,
+        "revocation must succeed after private custody is released"
+    );
+    let (root, receipt) = preserved.unwrap();
+    assert_eq!(read(&root, RECEIPT, MAX_RECEIPT).unwrap(), receipt);
+    assert!(prepared.stage(storage).is_err());
+    assert_eq!(read(&root, RECEIPT, MAX_RECEIPT).unwrap(), receipt);
+    assert_eq!(
+        fs::read_dir(prepared.destination.project().root())
+            .unwrap()
+            .count(),
+        0
+    );
 }

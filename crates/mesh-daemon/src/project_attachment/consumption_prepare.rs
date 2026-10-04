@@ -331,8 +331,17 @@ mod tests {
         if staging::run_stage_child_if_requested() {
             return;
         }
-        let root =
-            std::env::temp_dir().join(format!("mesh-consumed-start-rules-{}", std::process::id()));
+        saved_rules_fixture(false);
+    }
+    #[test]
+    fn staging_rechecks_revocation_after_releasing_private_custody() {
+        saved_rules_fixture(true);
+    }
+    fn saved_rules_fixture(revoke: bool) {
+        let root = std::env::temp_dir().join(format!(
+            "mesh-consumed-start-rules-{revoke}-{}",
+            std::process::id()
+        ));
         fs::create_dir(&root).unwrap();
         struct Cleanup(std::path::PathBuf);
         impl Drop for Cleanup {
@@ -476,12 +485,30 @@ mod tests {
                 Signature::from_bytes([0; 64])
             ))
             .is_err());
-        staging::assert_private_stage(&prepared, &storage);
+        if revoke {
+            staging::assert_revocation_after_staging(&prepared, &storage);
+        } else {
+            staging::assert_private_stage(&prepared, &storage);
+        }
         assert_eq!(fs::read(&marker).unwrap(), before_marker);
-        assert_eq!(
-            fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
-            owner_journal
-        );
+        if revoke {
+            assert!(
+                fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME))
+                    .unwrap()
+                    .starts_with(&owner_journal)
+            );
+            assert!(
+                fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME))
+                    .unwrap()
+                    .len()
+                    > owner_journal.len()
+            );
+        } else {
+            assert_eq!(
+                fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+                owner_journal
+            );
+        }
         assert_eq!(
             fs::read(destination.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
             destination_journal

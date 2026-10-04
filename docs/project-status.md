@@ -1714,3 +1714,24 @@ run `37221161431`. Successful and negative-mutation logs and complete Git bundle
 This validates private staging, not destination installation or consumed runtime admission. Required
 start ordering, owner receipt, completion and cross-store recovery remain open in draft PR #324 /
 issue #323; the full fleet objective and fixed checkpoint are unchanged.
+
+R161 private staging now holds explicit native custody for the destination history, destination
+files and reservation allocation during retained-entry preparation, verification and private bundle
+publication. The retained-entry seam requires all three roots in the still-held guard; incomplete
+custody refuses before creating entries. The private barrier is released before full graph/grant
+revalidation, so it cannot extend a held set or accidentally retain permission for later installation.
+The final commit still requires its own complete cross-store barrier.
+
+Three focused integration tests passed in 6.719s. At each of three interrupted construction
+boundaries, another native writer remains blocked until staging releases custody, then proceeds.
+Incomplete root sets refuse without changing allocation entries. A real native grant revocation
+after custody release prevents acknowledgement and preserves the staged bundle; a late editor file
+also prevents acknowledgement and stays untouched. Separate-process publication/recovery and empty
+source coverage continue passing. Taking custody on the wrong workspace makes the concurrency test
+fail, and removing final revalidation makes the revoked-request test fail. Both negative logs are
+retained, and exact production source was restored before the full gate.
+
+Full repository validation is pending. Required start ordering, owner consumption, destination
+completion and cross-store read/capture admission remain unfinished in draft PR #324 / issue #323.
+These staging safeguards do not install files, launch agents or advance protected main. The fixed
+checkpoint remains unchanged.
