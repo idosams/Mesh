@@ -5614,3 +5614,23 @@ after session revocation. Cancellation can leave already-admitted appends retain
 admitted saves and has no storage/signing latency bound. Remote sessions, external harnesses,
 protected main and packaged provider acceptance remain separate unfinished requirements. The
 user's fixed test checkpoint is unchanged.
+
+
+## R131 — bounded final save acknowledgment recovery
+
+New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267), stacked
+on PR #270 head `d15b28081df5c6c49ee673c188bda45cf1ceed16`; no preserved source commit is replaced.
+A complete native final save whose fleet acknowledgment is pending no longer immediately ends the
+session. The same native owner permits three total attempts, one second apart, with one job in
+flight and unchanged credential/capture authority. Success clears the pending observation;
+exhaustion stays visible. Cancellation prevents another attempt. Incomplete captures, signing
+failures and provider execution are not retried by this acknowledgment policy. No protocol,
+dependency or persisted-format change.
+
+All ten focused regressions pass: four owner/backoff tests, five native save tests and the real
+live/final provider-process fixture. Reducing the limit to one fails the recovery assertion;
+source restored byte-for-byte. An initial fixture digest-import compile failure is preserved.
+Full `npm test` passed 3,815 native tests in 164.031s (1 slow, 17 skipped), 186 rendered tests,
+647 desktop tests and all 44 real-daemon checks. Hosted delivery is pending. An attempt may still wait on native filesystem
+or signing work; an attempt count is not a wall-clock shutdown bound. Packaged, remote and
+protected-main acceptance remain open, and the fixed user checkpoint is unchanged.
