@@ -952,3 +952,13 @@ both layouts in the existing supported application locations, preserving regular
 native adapter admission. Two native regression tests failed with legacy-only discovery; all three focused tests now pass.
 Full validation passed 3,771 native, 183 rendered and 641 desktop tests plus the real daemon demo.
 Hosted delivery and actual corrected packaged provider launch remain pending.
+
+
+### Buffered-history retention correction (R121)
+
+Conservative collection roots now preserve every recorded actor operation, including saved work
+whose causal parents have not arrived and disconnected history outside the current actor head.
+Three baseline failures reproduced the omissions; all 13 focused retention and independent GC
+tests pass after the correction. Unknown actor roots still refuse and explicit narrower policies
+remain explicit. This changes retained-set computation, not causal readiness or persisted formats.
+Native fleet cleanup, scheduling, writer coordination and storage-exhaustion acceptance remain open.
