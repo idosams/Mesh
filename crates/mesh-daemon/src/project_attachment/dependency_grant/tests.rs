@@ -228,6 +228,20 @@ fn every_interrupted_grant_frame_prefix_recovers_only_its_exact_request() {
         assert!(failed.is_err());
         let partial = fs::read(f.journal()).unwrap();
         assert_eq!(partial.len(), before.len() + length);
+        let facts = f
+            .owner
+            .inspect_pending_dependency_control_retention(id(1))
+            .unwrap();
+        assert_eq!(
+            facts.get("written_frame_bytes").and_then(Json::as_u64),
+            Some(length as u64)
+        );
+        assert_eq!(fs::read(f.journal()).unwrap(), partial);
+        assert!(f
+            .owner
+            .inspect_pending_dependency_control_retention(id(2))
+            .is_err());
+
         assert!(f.grant(false, None, id(1)).is_err());
         assert!(f.grant(true, None, id(2)).is_err());
         assert_eq!(fs::read(f.journal()).unwrap(), partial);

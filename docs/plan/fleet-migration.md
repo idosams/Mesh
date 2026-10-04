@@ -6512,3 +6512,12 @@ every frame-byte boundary and historical receipts after later saves. Omitting th
 the native regression fail in 0.24s; exact passing source restored. Failed compilation and unused
 budget intermediate logs are retained. Pending control objects and complete graph/recovery-root
 composition still need implementation before full validation and R160 PR delivery.
+
+Pending grant/eligibility control roots are now inspectable under native custody without applying
+the transaction. Exact request, physical prefix, staged payload and policy replay must agree; local
+policy CAS roots remain distinct from references into other works. Both existing every-byte-prefix
+recovery tests now inspect retention before recovery and assert unchanged journal bytes. Changed
+pending intent, source/journal substitution, foreign suffix and corrupt payload also refuse. Focused
+verification passed 12 tests in 80.930s (two slow). Full validation and a draft PR follow; R160 remains
+unmerged and incomplete until atomic graph/recovery-root composition and outstanding #321 proof
+are finished. No runtime copying, publication, generic collection or checkpoint package changed.

@@ -240,6 +240,28 @@ fn every_interrupted_decision_frame_prefix_recovers_only_the_same_native_request
         assert!(result.is_err());
         let interrupted = f.journal();
         assert_eq!(interrupted.len(), before.len() + prefix);
+        let pending_path = f.history.metadata_path().join(PENDING);
+        let pending_bytes = fs::read(&pending_path).unwrap();
+        let facts = f
+            .history
+            .inspect_pending_dependency_control_retention(request(1))
+            .unwrap();
+        assert_eq!(
+            facts.get("written_frame_bytes").and_then(Json::as_u64),
+            Some(prefix as u64)
+        );
+        let pending = Json::parse(std::str::from_utf8(&pending_bytes).unwrap()).unwrap();
+        let Json::Array(roots) = facts.get("payloads").unwrap() else {
+            panic!("missing policy roots")
+        };
+        assert!(roots.contains(pending.get("payload").unwrap()));
+        assert!(f
+            .history
+            .inspect_pending_dependency_control_retention(request(2))
+            .is_err());
+        assert_eq!(f.journal(), interrupted);
+        assert_eq!(fs::read(&pending_path).unwrap(), pending_bytes);
+
         if (1..145).contains(&prefix) {
             assert!(f.history.saved_versions().is_err());
         }
@@ -405,6 +427,12 @@ fn changed_pending_transaction_or_source_is_preserved_without_appending() {
         }
         let observed = fs::read(&path).unwrap();
         let intent = fs::read(&pending).unwrap();
+        assert!(
+            f.history
+                .inspect_pending_dependency_control_retention(request(1))
+                .is_err(),
+            "retention {mode}"
+        );
         assert!(
             f.history
                 .decide_saved_input(version, SavedInputDecision::Rejected, None, request(1))

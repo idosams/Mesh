@@ -1397,3 +1397,13 @@ the staged-frame root makes the regression fail (0.24s); the exact passing sourc
 The initial missing filesystem-type qualification and unused-budget build logs are preserved.
 Pending control transactions, complete graph/recovery-root composition, remaining fault cases,
 full validation and PR delivery remain unfinished.
+
+Pending native control retention now verifies an exact grant/eligibility request, policy prefix,
+physical journal and staged payload without applying the control change or repairing the journal.
+It returns only local authority/policy recovery objects and required sidecar identity; referenced
+inputs in other work are not mislabeled as local CAS objects. Capture/control ambiguity, wrong
+requests, changed journal/source identities, malformed intent, foreign suffix and corrupt payload
+refuse with evidence preserved. Twelve focused grant/decision tests passed in 80.930s (two slow),
+including retention inspection at all 146 frame prefixes for each control type. Full Mesh validation
+is next, followed by a draft R160 PR so the unfinished increment is reviewable. Complete graph and
+recovery-root composition and the remaining issue #321 fault cases still block merge readiness.
