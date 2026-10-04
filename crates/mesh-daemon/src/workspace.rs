@@ -33,6 +33,7 @@
 //! disposable index must be replaced from the immutable journal. No storage meaning is
 //! re-implemented here.
 
+mod dependency_ancestry;
 mod orphan_collection;
 pub(crate) use orphan_collection::OrphanCollectionSource;
 mod remote_input_export;
