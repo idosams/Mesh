@@ -473,4 +473,5 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     assert_eq!(fs::read(&marker_path).unwrap(), marker);
     assert_eq!(fs::read(&journal_path).unwrap(), final_journal);
     assert!(destination.saved_versions().is_err());
+    storage.assert_consumed_child_reservation(owner, &start, *final_versions.last().unwrap());
 }

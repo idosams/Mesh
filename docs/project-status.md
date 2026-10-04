@@ -2114,3 +2114,21 @@ This proves automatic reconstruction for graph inspection, including later saves
 it does not establish end-to-end multi-level lane creation. Downstream reservation/grant/start/recovery
 integration and tests, generic callers, runtime/publication controls and packaged acceptance remain
 required. Draft PR #324 / issue #323 and the complete fleet goal stay open. The checkpoint is fixed.
+
+R161 can now reserve an empty child from a completed consumed lane's later saved version. The native
+reservation API accepts transitive native handles, computes the full input custody set before
+allocation, and resolves the parent's verified history afresh under each allocation/recovery guard.
+No read proof survives a released guard. Exact saved-operation membership and native correlation are
+rechecked before acknowledgement; a retry cannot replace the original version selection. Existing
+reservation entry points retain their signatures and use the same verification path.
+
+Nine focused reservation/consumption tests passed in 59.705s. The new scenario interrupts before
+publication, recovers through a fresh process twice, and retries with the same physical destination
+and exactly one additional registration. The child stays empty and fenced; the parent's marker,
+journal and current editor bytes stay unchanged. Existing unexpected-work, replacement, depth and
+recovery regressions also passed. Omitting the native history inputs made the consumed-child test
+fail in 55.391s; source was restored byte-for-byte. An initial test assertion compile failure is
+preserved and corrected. Full validation is pending. Downstream grant/start/materialization and
+multi-level transaction recovery, generic callers, runtime/publication controls and packaged
+acceptance remain required. PR #324 / issue #323 and the full fleet goal remain open; the checkpoint
+is unchanged.

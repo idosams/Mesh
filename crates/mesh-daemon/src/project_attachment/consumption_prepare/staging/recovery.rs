@@ -656,6 +656,47 @@ pub(super) fn run_child_if_requested() -> bool {
             .find(|v| v.operation().to_hex() == text("version"))
             .unwrap()
     };
+    if text("mode") == "reserve-consumed" {
+        let saved = storage
+            .saved_consumed_versions(
+                &owner,
+                NativeConsumedStartRequest {
+                    input: NativeGrantInspection {
+                        source: &source,
+                        version,
+                        destination: &destination,
+                        grant: digest(text("grant")).unwrap(),
+                    },
+                    available: &[],
+                    request: digest(text("request")).unwrap(),
+                    limits: ObservationLimits::default(),
+                },
+            )
+            .unwrap();
+        let version = saved
+            .into_iter()
+            .find(|v| v.operation().to_hex() == text("child_version"))
+            .unwrap();
+        let child = storage
+            .reserve_dependency_lane_with_inputs(
+                &owner,
+                &destination,
+                version,
+                digest(text("reservation")).unwrap(),
+                &[&source],
+            )
+            .unwrap();
+        assert!(child.saved_versions().unwrap().is_empty());
+        assert!(fs::read_dir(child.project().root())
+            .unwrap()
+            .next()
+            .is_none());
+        assert_eq!(
+            storage.registrations().unwrap().len() as u64,
+            value.get("count").and_then(Json::as_u64).unwrap()
+        );
+        return true;
+    }
     if text("mode") == "capture-recover" {
         let request = || NativeConsumedStartRequest {
             input: NativeGrantInspection {
