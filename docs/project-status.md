@@ -1235,3 +1235,14 @@ stale inputs and changed evidence are covered by focused tests. Removing synchro
 regression. Full local verification passed: 3,874 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification is pending. This is not exposed through agent/renderer/CLI
 operations and is not yet downstream publication enforcement or a consumption grant. The fixed
 checkpoint is unchanged.
+
+
+## Native correlation of root and descendant work
+
+R154 selects enrolled project roots and existing native child work independently of an agent run.
+Exact catalog, source, history and allocation-container identities are retained through bounded
+ancestry verification. Five native regressions cover restart, editor changes, substituted evidence,
+foreign ownership and depth overflow; removing allocation correlation fails its regression. Full local verification passed: 3,879 native, 194 rendered and 672 desktop tests plus all 44
+real-daemon checks. Hosted verification is pending. These immutable facts grant no access and retain no lock.
+Native grant issuance, dependency-aware allocation, full closure and publication enforcement remain
+required before exposing this through the application. The fixed checkpoint is unchanged.
