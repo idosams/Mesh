@@ -30,7 +30,7 @@ pub enum SavedInputDecision {
     Eligible,
     /// Refuse new dependent publication; keep retained content and old accepted main.
     Rejected,
-    /// Replace the input with another exact saved operation of this native project.
+    /// Replace the input with another exact saved operation of the same source work.
     Replaced(SavedAttachmentVersion),
 }
 /// Durable facts about one historical control request, not permission to consume or publish.
@@ -61,7 +61,7 @@ fn input(project: RecordDigest, installation: RecordDigest, version: RecordDiges
         Json::text(version.to_hex()),
     ])
 }
-fn body(
+pub(super) fn body(
     project: RecordDigest,
     installation: RecordDigest,
     version: SavedAttachmentVersion,

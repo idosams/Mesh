@@ -1259,3 +1259,14 @@ plus all 44 real-daemon checks. Hosted verification remains pending. This does n
 authorization control, content copying, consumption receipts or dependency-bearing publication.
 Historical v1 grants stay historical; current consumers must require verified native bindings.
 The fixed user checkpoint is unchanged.
+
+
+## Eligibility decisions for child work
+
+R156 lets the native host reject, replace and revalidate exact saved input in native child work
+under its owning project authority. Five focused tests cover identity separation, foreign and stale
+ancestry refusal, interrupted recovery, child-history preservation and root request compatibility.
+Confusing the child with its project root fails the regression. Full local verification passed:
+3,892 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted checks remain
+pending. No runtime control or downstream publication enforcement is exposed yet; those paths must
+still validate the full dependency closure and current decisions. The checkpoint is unchanged.

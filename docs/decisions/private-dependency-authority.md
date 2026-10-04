@@ -412,3 +412,20 @@ No actor credential, renderer request or CLI method calls this native control. G
 materializes bytes nor establishes a starting-operation or inherited-closure receipt. Child mutation
 fences and full consumption/retention checks remain required before enabling local/manual/delegated
 or remote input admission. Publication still requires current eligibility and the complete closure.
+
+
+## Decisions for native child work (R156)
+
+Native control selects an owning project and exact source work using the same bounded native ancestry
+as grants. Under a complete custody set it verifies the selected saved operation and any replacement
+operation, then writes eligibility in the owner's journal keyed by source work, source installation
+and exact operation. A replacement must be saved in that same source work. It cannot select another
+authority or use the project root as a substitute for a descendant identity. A child cannot declare
+itself a root authority to discard its recorded ancestry.
+
+The existing v1 eligibility encoding and per-input revision rules remain unchanged. Root selections
+retain exact historical request compatibility with the earlier native decision API. The shared
+transaction rechecks ancestry before append and recovers only its own recorded frame. A decision
+changes eligibility of immutable input, not file contents, grant generations or accepted historical
+main. Runtime admission and publication must still resolve full closure under current authority;
+recording this decision alone does not implement that enforcement.
