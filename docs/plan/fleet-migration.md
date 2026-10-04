@@ -6308,3 +6308,30 @@ allocation/consumption, old-writer fencing, exact starting operation, full inher
 publication/recovery and packaged acceptance remain open. The fixed user checkpoint is unchanged.
 
 R155 implementation verification: Full `npm test` passed on implementation `af9a40ddd7cd94c5d1b25d5e16368364db511ba1`: 3,887 native tests in 369.689s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+
+
+## R156 — owning-project decisions for native child work
+
+Tracks [issue #313](https://github.com/idosams/Mesh/issues/313), extending the published grant
+increment [PR #312](https://github.com/idosams/Mesh/pull/312) at
+`9345d52a7c6891a2264c8f5bbc4595a2d0952ec9`. Replaces no preserved source commit.
+
+The native host can reject, replace or explicitly revalidate an exact saved input of a manual or
+delegated child work in the owning project's journal. Native ancestry and exact saved operations
+are checked under one complete custody set, including after staging. Decision keys use stable
+source work, installation and operation; they do not collapse child identity into the project root.
+Replacements must belong to that same source work. Existing root request identity and payload schema
+are retained; historical retries never rewind later decisions. Child history and ordinary editor
+content are not rewritten by an eligibility change. Grants remain separate.
+
+Five native tests pass: child rejection/replacement/revalidation with exact policy-key inspection;
+foreign input/replacement and descendant-root refusal; catalog-reopen recovery at frame-prefix
+positions 0, 1, 72, 144 and 145; changed ancestry between staging and append; and existing root API
+request compatibility. The shared transaction's exhaustive frame tests remain part of the full gate.
+Changing the persisted child work identity to its owning root makes the regression fail; source
+restored exactly. Full local and hosted verification remain pending.
+
+No agent/renderer/CLI route or downstream eligibility enforcement is enabled. This supplies child
+decisions that the still-required full closure, consumption and publication paths must consult.
+Private allocation, exact starting-operation/consumption receipts, retention, all publication/import/
+recovery checks and packaged acceptance remain open. The fixed user checkpoint is unchanged.
