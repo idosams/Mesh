@@ -6891,3 +6891,13 @@ makes the integration regression fail in 0.204s; exact source was restored. Full
 is pending. Exact consumed-prefix recovery, required journal-before-install ordering, materialization,
 owner/completion receipts and cross-store admission remain unfinished in draft PR #324 / issue #323.
 The user checkpoint and full fleet objective are unchanged.
+
+R161 native-facts implementation `971ed406a085a035d54d4ee259c195c6f58012a5` passed full
+`npm test`: 3,949 native tests in 273.566s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Six focused native tests and the deliberately failing admission-gate mutation are preserved with
+complete Git history. Published predecessor `d521b18626bf4417eb9a4a5d0aeb4a0def8273d5` has
+six successful hosted checks; macOS remains running in run `37224305162` at this evidence update.
+The factual reader does not grant consumed workspace admission or recover a torn consumption
+append yet. Required start ordering, materialization, owner/completion receipts and cross-store
+recovery/admission remain unfinished; draft PR #324 and issue #323 stay open. The checkpoint is fixed.
