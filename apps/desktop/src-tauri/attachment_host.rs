@@ -1339,6 +1339,36 @@ impl AttachmentHost {
         Ok(stored.to_json().encode())
     }
 
+    pub fn load_progress_pins(&self) -> Result<String, String> {
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, false)?;
+        let pins = match &state.storage {
+            Some(storage) => storage
+                .load_progress_pins()
+                .map_err(|_| "Saved pin selectors need reconciliation")?,
+            None => mesh_daemon::project_attachment::ProgressPinState {
+                revision: 0,
+                pins: Vec::new(),
+            },
+        };
+        Ok(pins.to_json().encode())
+    }
+
+    pub fn save_progress_pins(&self, snapshot: &str) -> Result<String, String> {
+        let snapshot =
+            mesh_daemon::project_attachment::ProgressPinState::parse_projection(snapshot)
+                .map_err(|_| "Invalid pin selectors")?;
+        let mut state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        self.initialize(&mut state, true)?;
+        let stored = state
+            .storage
+            .as_ref()
+            .ok_or(UNAVAILABLE)?
+            .save_progress_pins(snapshot.revision, snapshot.pins)
+            .map_err(|_| "Pin state changed or could not be saved")?;
+        Ok(stored.to_json().encode())
+    }
+
     pub fn comparison_path(
         &self,
         id: &str,
