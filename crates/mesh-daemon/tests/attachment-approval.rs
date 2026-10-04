@@ -4171,3 +4171,30 @@ fn attachment_dependency_fence_rejects_changed_binding_and_replaced_source() {
     assert!(f.history.prepare_dependency_enrollment(authority).is_err());
     assert_eq!(fs::read(&binding).unwrap(), bytes);
 }
+
+#[test]
+fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_approval() {
+    let f = Fixture::new("dependency-enrolled-main");
+    let signer = TestSigner::generate();
+    let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
+    let target = f.save("accepted original main");
+    let bundle = f.request(&target, &trust);
+    let receipt = f.receipt(&signer, &trust, &bundle, &target, 1);
+    f.history
+        .approve_review(&bundle, &target, &receipt, &trust)
+        .unwrap();
+    let before = f.journal();
+    let enrollment = f.history.enroll_dependency_history().unwrap();
+    let after = f.journal();
+    assert_eq!(&after[..before.len()], before);
+    assert_eq!(f.history.enroll_dependency_history().unwrap(), enrollment);
+    assert!(f
+        .history
+        .approve_review(&bundle, &target, &receipt, &trust)
+        .is_err());
+    assert_eq!(f.journal(), after);
+    assert_eq!(
+        fs::read(f.source.join("work.txt")).unwrap(),
+        b"accepted original main"
+    );
+}

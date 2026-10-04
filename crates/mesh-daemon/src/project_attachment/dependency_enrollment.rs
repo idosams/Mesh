@@ -139,7 +139,7 @@ impl AttachmentDependencyFence {
     }
 }
 
-fn read_private(attachment: &ProvisionedAttachment, name: &str) -> io::Result<String> {
+pub(super) fn read_private(attachment: &ProvisionedAttachment, name: &str) -> io::Result<String> {
     let file = attachment
         .store
         .filesystem()

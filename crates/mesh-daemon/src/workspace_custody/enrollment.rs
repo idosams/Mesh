@@ -12,7 +12,8 @@ const REQUIRED_SCHEMA: &str = "mesh.workspace-agent-custody/v2";
 pub struct DependencyEnrollmentFence {
     authority: Authority,
     marker: String,
-    _lock: CustodyLock,
+    _lock: Option<CustodyLock>,
+    _initialized: Option<WorkspaceInitializationGuard>,
 }
 impl DependencyEnrollmentFence {
     /// Install a required marker before a future enrollment journal append, or recover its exact
@@ -55,6 +56,68 @@ impl DependencyEnrollmentFence {
         }
         let authority = Authority::from_path(root, expected_installation)?;
         let lock = authority.lock()?;
+        Self::prepare_pinned(
+            authority,
+            dependency_authority,
+            Some(lock),
+            None,
+            retry_sync,
+        )
+    }
+
+    /// Reuse only this exact root's already-held native initialization custody. This does not
+    /// relax generic mutation's nested-lock refusal or acquire an unrelated root.
+    pub(crate) fn prepare_while_initialized(
+        root: &Path,
+        expected_installation: &str,
+        dependency_authority: RecordDigest,
+    ) -> Result<Self, WorkspaceAgentCustodyError> {
+        let authority = Authority::from_path(root, expected_installation)?;
+        let identity = authority.physical.identity().map_err(|error| {
+            WorkspaceAgentCustodyError::io("inspect enrollment initialization", error)
+        })?;
+        if !custody_contains(identity) {
+            return Err(WorkspaceAgentCustodyError::invalid(
+                "enrollment initialization is not held",
+            ));
+        }
+        let initialized = lock_workspace_initialization(&authority.physical)?;
+        Self::prepare_pinned(
+            authority,
+            dependency_authority,
+            None,
+            Some(initialized),
+            |authority| {
+                authority
+                    .filesystem
+                    .sync_file(Path::new(RECORD_FILE))
+                    .and_then(|()| authority.filesystem.sync_dir(Path::new("")))
+                    .map_err(|error| {
+                        WorkspaceAgentCustodyError::io("sync recovered dependency fence", error)
+                    })
+            },
+        )
+    }
+
+    fn prepare_pinned(
+        authority: Authority,
+        dependency_authority: RecordDigest,
+        lock: Option<CustodyLock>,
+        initialized: Option<WorkspaceInitializationGuard>,
+        retry_sync: impl FnOnce(&Authority) -> Result<(), WorkspaceAgentCustodyError>,
+    ) -> Result<Self, WorkspaceAgentCustodyError> {
+        if dependency_authority == RecordDigest::from_bytes([0; 32]) {
+            return Err(WorkspaceAgentCustodyError::invalid(
+                "dependency authority is missing",
+            ));
+        }
+        authority
+            .physical
+            .ensure_namespace_identity()
+            .and_then(|()| authority.storage.ensure_namespace_identity())
+            .map_err(|error| {
+                WorkspaceAgentCustodyError::io("verify enrollment namespaces", error)
+            })?;
         let marker = Json::object([
             ("schema", Json::text(REQUIRED_SCHEMA)),
             (
@@ -84,6 +147,7 @@ impl DependencyEnrollmentFence {
             authority,
             marker,
             _lock: lock,
+            _initialized: initialized,
         };
         fence.ensure_current()?;
         Ok(fence)
