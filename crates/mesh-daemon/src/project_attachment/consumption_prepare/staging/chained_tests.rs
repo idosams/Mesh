@@ -149,6 +149,9 @@ impl AttachmentStorage {
         };
         restart("chain-complete-partial", 75);
         assert!(self.saved_consumed_versions(owner, request(grant)).is_err());
+        assert!(self
+            .saved_dependency_versions(owner.id(), destination.id(), &[source.id(), original.id()])
+            .is_err());
         restart("chain-complete-lost", 76);
         let owner_journal = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
         let destination_journal =
@@ -173,6 +176,35 @@ impl AttachmentStorage {
         let saved = self.saved_consumed_versions(owner, request(grant)).unwrap();
         assert_eq!(saved.len(), 1);
         assert_eq!(saved[0].operation(), operation);
+        let catalog_inputs = [source.id(), original.id()];
+        self.assert_catalog_read_freshness(owner.id(), destination.id(), &catalog_inputs);
+        assert_eq!(
+            self.saved_dependency_versions(owner.id(), destination.id(), &catalog_inputs)
+                .unwrap(),
+            saved
+        );
+        assert_eq!(
+            self.saved_dependency_versions(owner.id(), owner.id(), &[])
+                .unwrap(),
+            owner.saved_versions().unwrap()
+        );
+        assert!(self
+            .saved_dependency_versions(owner.id(), destination.id(), &[])
+            .is_err());
+        assert!(self
+            .saved_dependency_versions(destination.id(), destination.id(), &catalog_inputs)
+            .is_err());
+        assert_eq!(
+            self.saved_dependency_file(
+                owner.id(),
+                destination.id(),
+                &catalog_inputs,
+                saved[0],
+                "kept"
+            )
+            .unwrap(),
+            Some(b"sync recovery progress".to_vec())
+        );
         assert_eq!(
             self.consumed_saved_file(owner, request(grant), saved[0], "kept")
                 .unwrap(),
@@ -225,6 +257,27 @@ impl AttachmentStorage {
             .unwrap()
             .commit()
             .unwrap();
+        let catalog_saved = self
+            .saved_dependency_versions(owner.id(), destination.id(), &catalog_inputs)
+            .unwrap();
+        assert_eq!(catalog_saved.len(), 2);
+        assert_eq!(catalog_saved.last(), Some(&next));
+        assert_eq!(
+            self.saved_dependency_file(
+                owner.id(),
+                destination.id(),
+                &catalog_inputs,
+                saved[0],
+                "kept"
+            )
+            .unwrap(),
+            Some(b"sync recovery progress".to_vec())
+        );
+        assert_eq!(
+            self.saved_dependency_file(owner.id(), destination.id(), &catalog_inputs, next, "kept")
+                .unwrap(),
+            Some(b"new child progress".to_vec())
+        );
         let graph = self
             .inspect_dependency_graph(owner, destination, next, &[source, original])
             .unwrap();

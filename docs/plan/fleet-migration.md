@@ -7325,3 +7325,21 @@ and requires current-head hosted checks before merge. Empty-input acceptance PR 
 at `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`, with CI running. The native foundation is merged;
 the full fleet objective and issue #323 remain open for generic callers, runtime/publication/review/
 import/remote controls, remaining fault campaigns and packaged acceptance. The checkpoint is unchanged.
+
+R161 native catalog reads now list saved dependency versions and immutable file bytes from exact
+registered owner/work/input IDs, without requiring a reconstructed consumption transaction request.
+The API reopens registrations, establishes one bounded complete custody set, resolves consumed
+histories, validates correlations and refreshes every selected history and retained sidecar after
+reading. Missing intermediate inputs, interrupted consumption and descendants claiming root authority
+refuse; these read APIs do not grant capture/runtime/publication authority or recover pending work.
+Native input-ID discovery and desktop/harness wiring remain subsequent work, not completed behavior.
+
+The real chained-consumption journey passed in 104.207s, comparing root history, initial and later
+child saves and exact immutable bytes. Added assertions cover interrupted-read refusal and an owner
+journal change during the read, with fixture restoration before assertions. Removing post-read
+validation made the freshness assertion fail in 92.271s; production was restored byte-for-byte.
+Strict daemon lint passed in 9.76s. Full validation, including the new freshness and interrupted-read
+assertions, is pending. This increment is based on published PR #325 at
+`26d61d4fb97c99ee7b52f607f15721e07acf63ab`, replaces no preserved fleet source commit, and will get
+its own PR before the next substantial increment. Issue #323 and the full fleet objective remain open.
+The fixed user checkpoint is unchanged.
