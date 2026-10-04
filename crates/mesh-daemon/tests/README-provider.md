@@ -212,3 +212,13 @@ This backend is ready for selector/controller integration, which is still requir
 Executable discovery uses native installation locations and canonicalizes Claude's
 usual installation symlink. Account login and actual sandbox/bridge operation remain
 part of live acceptance, not facts inferred from an executable's presence.
+
+
+### Worker progress inspection
+
+The native `worker_progress_` regressions use real allocated folders and exact scoped credentials.
+They inspect modified/new/missing/unsupported entries without saving or changing the fleet ledger,
+pause the inspection boundary while another thread reads fleet state, refuse cancellation or
+credential rotation/revocation before returning, and preserve substituted folders. A shared-lock
+mutation must fail the parallel-read deadline. This proves read-path isolation, not scheduled
+background saving or a packaged provider journey.
