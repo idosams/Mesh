@@ -27,11 +27,15 @@ export function fleetInputComparison(raw, pin, after = null, selected = null) {
     && value.selection && Object.keys(value.selection).sort().join(',') === 'bundle,checkpoint,lane,version'
     && ['lane', 'checkpoint', 'version', 'bundle'].every(field => value.selection[field] === selection[field])
     && hex(pin.startingInput, 64) && value.input.source_version === pin.startingInput);
-  check(page && hex(page.base, 64) && page.target === selection.version && page.order === 'object-id'
+  return immutableFleetComparison(page, selection.version, after, selected, pin.input?.page);
+}
+
+// Shared bounded content validator; callers must first verify their distinct native envelope.
+export function immutableFleetComparison(page, version, after = null, selected = null, prior = null) {
+  check(page && hex(page.base, 64) && page.target === version && page.order === 'object-id'
     && page.approval_authority === false && page.after === after && page.selected === selected
     && (after === null || hex(after, 32)) && (selected === null || hex(selected, 32)) && !(after && selected)
     && count(page.total) && Array.isArray(page.changes) && page.changes.length <= 200 && page.total >= page.changes.length);
-  const prior = pin.input?.page;
   if (prior) check(page.base === prior.base && page.total === prior.total);
   let previous = after;
   const changes = page.changes.map(change => {
