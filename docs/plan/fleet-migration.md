@@ -6845,3 +6845,13 @@ Full repository validation is pending. Required start ordering, owner consumptio
 completion and cross-store read/capture admission remain unfinished in draft PR #324 / issue #323.
 These staging safeguards do not install files, launch agents or advance protected main. The fixed
 checkpoint remains unchanged.
+
+R161 custody implementation `6cf11cc0e474d07cafd2d498902180c31d89191f` passed full
+`npm test`: 3,949 native tests in 272.512s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `687ab1c9ed970f11635086e2b37409523745d30b` passed all seven hosted
+checks in run `37222451265`. Focused concurrency/revocation and negative-mutation evidence is
+preserved with the full log and Git history. This proves private staging custody and refreshed
+permission checks; required start ordering, installation, owner consumption, completion and
+cross-store recovery/admission remain unfinished. Draft PR #324 is not merged; issue #323 and
+the full fleet objective remain open. The user checkpoint stays fixed.
