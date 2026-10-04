@@ -190,7 +190,7 @@ impl ReceivedWorkerHost {
     }
 
     /// Native cancellation request. It retains the uncertain slot until independent reconciliation.
-    /// Further polls revoke credentials and stop the directly owned process; descendants may remain.
+    /// Further polls revoke credentials and stop the owned provider group; escaped descendants may remain.
     pub fn request_cancel(&self) -> Result<(), Unavailable> {
         self.service
             .native_command("remote-host-cancel", Command::Cancel)
