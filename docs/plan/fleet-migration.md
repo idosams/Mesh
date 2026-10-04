@@ -6467,9 +6467,13 @@ comparison makes its refusal test fail on an emptied journal parent list; exact 
 Ancestry-only merge `7b1769d` reconciles that work with canonical R159 without changing its file tree.
 
 This is unfinished groundwork, not complete dependency closure or a passing full-gate increment.
-The reader is not yet connected to production traversal, so its temporary unused-code warnings
-must disappear through actual integration before full validation or PR publication. Do not suppress
-warnings or claim a flat caller-provided input list proves complete ancestry. Native work resolution,
+The reader is now connected to bounded native graph inspection. Typed historical consumption facts
+add native-bound source edges; receipt input declarations are checked against independent traversal.
+A real two-save history regression first exposed an incorrect workspace identity derivation; using
+the capture writer's existing domain-separated function fixed it. The focused ancestry/policy/graph
+run passed 17 tests in 2.475s without unused-code warnings, including reopen and unsaved-editor
+isolation. Retain both failing and passing logs. This does not establish retained-root completeness.
+Do not claim a flat caller-provided input list proves complete ancestry. Native work resolution,
 qualified DAG traversal, typed owner-consumption facts, bounds/conflict/cycle checks, manifest/chunk
 retention, pending roots and rebuild/rejection tests remain to implement in this increment.
 Reservation lineage alone is not a consumed-input edge. The full consumption/starting-operation,

@@ -567,7 +567,7 @@ fn path_text(path: &Path) -> io::Result<&str> {
     path.to_str()
         .ok_or_else(|| invalid("invalid captured path"))
 }
-fn short_id(bytes: &[u8]) -> [u8; 16] {
+pub(super) fn short_id(bytes: &[u8]) -> [u8; 16] {
     let mut framed = b"mesh.attachment-history/v1\0".to_vec();
     framed.extend_from_slice(bytes);
     Blake3::digest_bytes(&framed).as_bytes()[..16]

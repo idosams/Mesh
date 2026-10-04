@@ -1328,7 +1328,7 @@ The user checkpoint remains fixed at `5052009`.
 R159 full verification on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 native tests in
 271.700s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks.
 Its interruption tests use native fault injection; power-loss, packaged and provider acceptance are
-not established by this result. Reservation post-merge run `37209051599` is running.
+not established by this result. Reservation post-merge run `37209051599` passed.
 
 
 ## Complete input ancestry and retained roots in progress
@@ -1338,8 +1338,12 @@ The first native operation reader verifies bounded authenticated payloads and re
 parent links, actor/session, sequence, epoch and logical-clock fields to match the signed statement.
 Three focused tests pass, including multiple parents and real journal/CAS reads that preserve
 corrupt or oversized evidence. Removing the parent comparison makes the refusal regression fail;
-the exact source was restored. This helper is not yet connected to native closure traversal or
-retained-root computation and is not ready for a full gate or PR. No runtime admission changed.
+the exact source was restored. The reader is now connected to bounded native graph traversal, with typed owner-consumption facts,
+complete work custody and exact history revalidation. Seventeen focused ancestry/policy/graph tests
+pass (2.475s), including a real two-save history reopened after newer unsaved editor bytes. That
+regression first failed because traversal omitted the workspace identity domain prefix; traversal now
+uses the capture writer's existing identity function. No unused-code warnings remain in this focused
+build. Retained-root computation is unfinished; no full gate or PR is claimed. No runtime admission changed.
 
 The next implementation must resolve every native work, traverse all immutable operation and
 consumed-input edges under complete custody, distinguish reserved identity from actual consumption,

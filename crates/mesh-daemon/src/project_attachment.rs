@@ -17,6 +17,8 @@ const RECEIPT: &str = "attachment.json";
 const SCHEMA: &str = "mesh.project-attachment/v1";
 const MAX_RECEIPT_BYTES: u64 = 65_536;
 
+mod dependency_closure;
+pub use dependency_closure::NativeDependencyGraph;
 mod dependency_reservation;
 mod detachment;
 mod fleet_pins;

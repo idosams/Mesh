@@ -33,6 +33,7 @@ pub(crate) struct VerifiedDependencyRead {
     binding: NativeDependencyBinding,
     policy: DependencyPolicyHistory,
     pending: Option<(usize, mesh_store::DependencyRecord)>,
+    legacy_operations: std::collections::BTreeSet<RecordDigest>,
 }
 impl VerifiedDependencyRead {
     pub(super) fn binding(&self) -> NativeDependencyBinding {
@@ -40,6 +41,10 @@ impl VerifiedDependencyRead {
     }
     pub(super) fn policy(&self) -> &DependencyPolicyHistory {
         &self.policy
+    }
+
+    pub(super) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
+        self.legacy_operations.contains(&operation)
     }
 
     pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
@@ -261,6 +266,14 @@ impl ProjectAttachment {
             },
             policy,
             pending: pending.map(|(length, record, _)| (length, record)),
+            legacy_operations: base
+                .records()
+                .iter()
+                .filter_map(|r| match r {
+                    StoredRecord::Operation(op) => Some(op.id),
+                    _ => None,
+                })
+                .collect(),
         };
         proof.verify(store, &journal, &bytes)?;
         Ok((configuration, Some(proof)))
