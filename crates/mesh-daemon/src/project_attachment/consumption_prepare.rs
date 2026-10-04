@@ -305,3 +305,158 @@ impl AttachmentStorage {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{Signer as _, SigningKey};
+    use std::fs;
+    #[test]
+    fn saved_ignore_rules_bind_candidate_without_changing_empty_reservation() {
+        let root =
+            std::env::temp_dir().join(format!("mesh-consumed-start-rules-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+        let _cleanup = Cleanup(root.clone());
+        fs::create_dir(root.join("source")).unwrap();
+        fs::create_dir(root.join("metadata")).unwrap();
+        fs::write(root.join("source/.gitignore"), b"ignored\n").unwrap();
+        fs::write(root.join("source/ignored"), b"not admitted").unwrap();
+        fs::write(root.join("source/kept"), b"saved bytes").unwrap();
+        let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        let owner = storage.provision(&root.join("source")).unwrap();
+        let input = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let (_, created) = owner
+            .project()
+            .history_configuration(&owner.store, Some(input.exclusion_digest()))
+            .unwrap();
+        drop(
+            OpenWorkspace::open_attachment_store(
+                owner.metadata_path(),
+                owner.store.clone(),
+                created,
+            )
+            .unwrap(),
+        );
+        owner.enroll_dependency_history().unwrap();
+        let key = SigningKey::from_bytes(&[129; 32]);
+        let actor = PublicKey::from_bytes(key.verifying_key().to_bytes());
+        let id = |n| RecordDigest::from_bytes([n; 32]);
+        let sign = |payload: &SigningPayload| {
+            Ok::<_, &'static str>(Signature::from_bytes(
+                key.sign(payload.as_bytes()).to_bytes(),
+            ))
+        };
+        let version = owner
+            .prepare_dependency_capture(&input, actor, id(1), sign)
+            .unwrap()
+            .commit()
+            .unwrap();
+        let destination = storage
+            .reserve_dependency_lane(&owner, &owner, version, id(2))
+            .unwrap();
+        let grant = storage
+            .grant_saved_input(
+                &owner,
+                super::super::NativeInputGrantRequest {
+                    source: &owner,
+                    version,
+                    destination: &destination,
+                    allowed: true,
+                    expected_previous: None,
+                    request: id(3),
+                },
+            )
+            .unwrap();
+        let request = || NativeConsumedStartRequest {
+            input: NativeGrantInspection {
+                source: &owner,
+                version,
+                destination: &destination,
+                grant: grant.record(),
+            },
+            available: &[],
+            request: id(4),
+            limits: ObservationLimits::default(),
+        };
+        let marker = destination
+            .metadata_path()
+            .join(super::super::history::HISTORY);
+        let before_marker = fs::read(&marker).unwrap();
+        let owner_journal = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+        let destination_journal =
+            fs::read(destination.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+        let prepared = storage
+            .prepare_consumed_start(&owner, request(), actor, sign)
+            .unwrap();
+        assert_ne!(prepared.basis.configuration, prepared.basis.prospective);
+        let proposed = Json::parse(&prepared.basis.prospective).unwrap();
+        let expected =
+            super::super::observation::policy_digest(&(Some("ignored\n".to_owned()), None))
+                .to_string();
+        assert_eq!(
+            proposed.get("exclusions").and_then(Json::as_text),
+            Some(expected.as_str())
+        );
+        let records = prepared.checkpoint.checkpoint.records();
+        let record = records
+            .iter()
+            .find_map(|record| match record {
+                mesh_store::StoredRecord::Operation(op) => Some(op),
+                _ => None,
+            })
+            .unwrap();
+        let payload = prepared
+            .checkpoint
+            .objects
+            .iter()
+            .find(|bytes| hash(bytes) == record.payload_digest)
+            .unwrap();
+        let fact = OpenWorkspace::verify_dependency_staged_operation(record, payload).unwrap();
+        assert_eq!(
+            fact.workspace,
+            WorkspaceId::from_bytes(short_id(prepared.basis.prospective.as_bytes()))
+        );
+        assert_eq!(
+            fact.manifests.len(),
+            2,
+            "saved rule file and admitted file only"
+        );
+        fs::write(root.join("source/.gitignore"), b"kept\n").unwrap();
+        prepared.revalidate(&storage).unwrap();
+        let repeated = storage
+            .prepare_consumed_start(&owner, request(), actor, sign)
+            .unwrap();
+        assert_eq!(
+            repeated.operation(),
+            prepared.operation(),
+            "unsaved rules cannot change the signed source snapshot"
+        );
+        assert!(storage
+            .prepare_consumed_start(&owner, request(), actor, |_| Ok::<_, &'static str>(
+                Signature::from_bytes([0; 64])
+            ))
+            .is_err());
+        assert_eq!(fs::read(&marker).unwrap(), before_marker);
+        assert_eq!(
+            fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+            owner_journal
+        );
+        assert_eq!(
+            fs::read(destination.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+            destination_journal
+        );
+        assert_eq!(
+            fs::read_dir(destination.project().root()).unwrap().count(),
+            0
+        );
+    }
+}

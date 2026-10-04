@@ -6626,3 +6626,11 @@ required transaction fence; dedicated rule-binding fault coverage is still neede
 commit API yet. Full validation of these local refinements is pending. All seven hosted checks on
 the older published draft head `81babaa25ea86064a7e40b831f41f3d5fafa7970` passed (run `37215060435`);
 that result must not be attributed to the newer local signed-preparation implementation.
+
+Dedicated R161 ignore-rule coverage now verifies that the signed workspace identity uses the saved
+rule file's prospective binding, excludes ignored saved input, rejects invalid signatures, and
+leaves the current reservation marker and both journals byte-identical. Later unsaved rule edits do
+not alter the candidate identity. The test passed in 0.77s. A negative mutation signing with the old
+reservation configuration failed the exact workspace-identity assertion in 0.54s; the unmodified
+source was restored byte-for-byte. Full validation of this refinement follows. This does not yet
+persist the policy transition or enable copying; #323 remains open.
