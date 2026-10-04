@@ -4233,6 +4233,19 @@ fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_a
     );
     assert_eq!(&after[..before.len()], before);
     assert_eq!(f.history.enroll_dependency_history().unwrap(), enrollment);
+    let rejected = reopened
+        .decide_saved_input(
+            versions[0],
+            mesh_daemon::project_attachment::SavedInputDecision::Rejected,
+            None,
+            mesh_store::RecordDigest::from_bytes([77; 32]),
+        )
+        .unwrap();
+    assert_eq!(rejected.revision(), 1);
+    let after = f.journal();
+    assert_eq!(reopened.main_version(&trust).unwrap(), main);
+    assert_eq!(reopened.accepted_main(&trust).unwrap(), accepted);
+    assert_eq!(reopened.saved_versions().unwrap(), versions);
     assert!(f
         .history
         .approve_review(&bundle, &target, &receipt, &trust)

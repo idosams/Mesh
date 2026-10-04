@@ -49,9 +49,11 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod dependency_decision;
 mod dependency_enrollment;
 mod dependency_read;
 mod dependency_transaction;
+pub use dependency_decision::{NativeInputDecision, SavedInputDecision};
 pub(crate) use dependency_read::VerifiedDependencyRead;
 pub use dependency_transaction::NativeDependencyEnrollment;
 mod group_integration;

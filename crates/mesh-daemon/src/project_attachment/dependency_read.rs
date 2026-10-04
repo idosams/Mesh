@@ -30,8 +30,22 @@ pub(crate) struct VerifiedDependencyRead {
     store: (u64, u64),
     journal: (u64, u64),
     bytes: RecordDigest,
+    binding: NativeDependencyBinding,
+    policy: DependencyPolicyHistory,
+    pending: Option<(usize, mesh_store::DependencyRecord)>,
 }
 impl VerifiedDependencyRead {
+    pub(super) fn binding(&self) -> NativeDependencyBinding {
+        self.binding
+    }
+    pub(super) fn policy(&self) -> &DependencyPolicyHistory {
+        &self.policy
+    }
+
+    pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
+        self.pending
+    }
+
     pub(crate) fn verify(
         &self,
         store: &PinnedWorkspaceRoot,
@@ -61,10 +75,21 @@ fn error(e: impl std::fmt::Display) -> io::Error {
 }
 
 impl ProjectAttachment {
-    fn read_configuration(
+    pub(super) fn read_configuration(
         &self,
         metadata: &Path,
         store: &PinnedWorkspaceRoot,
+    ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
+        self.read_decision_configuration(metadata, store, None)
+    }
+
+    // Native recovery only: validates an exact pending eligibility frame, never a generic
+    // ignore-tail flag. Ordinary readers always pass None and continue refusing torn history.
+    pub(super) fn read_decision_configuration(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
     ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
         self.ensure_current()?;
         store.ensure_namespace_identity()?;
@@ -150,7 +175,18 @@ impl ProjectAttachment {
         {
             return Err(invalid("invalid legacy enrollment prefix"));
         }
-        let suffix = scan_journal(&bytes[base_len..]).map_err(error)?;
+        let pending = pending
+            .map(|intent| {
+                super::dependency_decision::pending_prefix(&cas, intent, journal_identity, &bytes)
+            })
+            .transpose()?;
+        let prefix_end = pending
+            .as_ref()
+            .map_or(bytes.len(), |(length, _, _)| *length);
+        if prefix_end <= base_len {
+            return Err(invalid("decision prefix predates enrollment"));
+        }
+        let suffix = scan_journal(&bytes[base_len..prefix_end]).map_err(error)?;
         if suffix.tail().is_fragment()
             || !matches!(suffix.records().first(), Some(StoredRecord::Dependency(_)))
         {
@@ -178,10 +214,20 @@ impl ProjectAttachment {
                 _ => {}
             }
         }
+        if let Some((_, record, payload)) = &pending {
+            policy.clone().apply(*record, payload).map_err(error)?;
+        }
         let proof = VerifiedDependencyRead {
             store: identity,
             journal: journal_identity,
             bytes: hash(&bytes),
+            binding: NativeDependencyBinding {
+                authority,
+                project,
+                installation,
+            },
+            policy,
+            pending: pending.map(|(length, record, _)| (length, record)),
         };
         proof.verify(store, &journal, &bytes)?;
         Ok((configuration, Some(proof)))

@@ -6203,3 +6203,42 @@ this gap; a fresh full gate is required for the corrected revision. No enrollmen
 and neither the initial reader PR nor this correction has merged at this point.
 
 R152 admission correction verification: Full `npm test` passed on corrected implementation `3902d7abde439f64545cb6d5064c1af82ab1793b`: 3,868 native tests in 200.938s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification of this correction and merge remain pending.
+
+
+## R153 — native saved-input eligibility decisions
+
+Tracks [issue #307](https://github.com/idosams/Mesh/issues/307), extending R152 and replacing no
+preserved source commit. The initial local writer was preserved as `e8491361150eba0472c5117f7a30b80945320b4e`;
+this increment adds its required interrupted-append recovery before delivery. R151 merged in
+[PR #304](https://github.com/idosams/Mesh/pull/304) as `7216af5f89353c3f32d6e6468cdd7cb1be1ab1e4`;
+all seven exact-head checks and merged-main CI passed.
+
+The native host can explicitly reject, replace or revalidate an exact saved version of an enrolled
+registered root work. The root work identity is its native project registration, separate from
+installation and provider/run identity. Native history verifies both selected and replacement
+operations; caller-selected policy paths or foreign operation identities cannot select authority.
+Decision revisions and predecessors are per input; authority ordinals remain separate. Exact
+historical request retry returns its original fact without rewinding later decisions.
+
+Canonical payloads are staged before a private transaction intent and journal append. The intent
+binds request, original journal inode/device, exact prefix length/digest and payload. Native-only
+recovery verifies that prefix, enrollment, both fences, canonical payload and exactly its own
+eligibility-frame suffix before resuming. Unknown/conflicting intent, foreign suffix, changed source,
+replaced journal and corrupt payload refuse without truncation. Normal readers still refuse torn
+history. Rechecks immediately before append and before intent cleanup preserve substituted work.
+Journal synchronization and exact replay precede acknowledgement; complete retries resync. Enrollment
+retry after valid decisions returns the original enrollment without appending or rewinding.
+
+Five focused real-storage tests passed, including all 146 frame-prefix interruption positions,
+restart, sync/lost-ack recovery, stale/foreign/conflicting inputs and damaged recovery evidence.
+Additional last-moment source/fence/intent refusal and accepted-main/dirty-Git preservation tests
+pass. Removing journal synchronization makes the durability regression fail; source restored exactly.
+An initial test-only direct inspection omitted custody and correctly refused; its corrected fixture
+holds custody and passes. Full local and hosted verification remain pending.
+
+This method has no agent, renderer or CLI caller. It does not yet enforce downstream closure at
+publication, authorize consumption, bind other work memberships, or enable enrolled capture. All
+those admission paths remain fenced. No physical power-loss or packaged GUI claim follows from the
+native fault injections. The fixed user checkpoint remains unchanged.
+
+R153 implementation verification: Full `npm test` passed on combined implementation `e57247f7cc2ea18cdfc7426a8d2c92b38d31723e`: 3,874 native tests in 228.506s (3 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
