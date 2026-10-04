@@ -7123,3 +7123,13 @@ history and retains the original staging evidence. Generic history/capture/runti
 capture-state reconciliation, transitive consumed-source admission and packaged acceptance remain
 required before readiness. Draft PR #324 / issue #323 and the full fleet objective remain open.
 The fixed user checkpoint is unchanged.
+
+R161 completed-history read implementation `bba69dad1550fa986a4c6da460917e43db17e295` passed full
+`npm test`: 3,949 native tests in 283.428s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `4a8a1dd297d0b16e46dd6506bf2ed1d2276af5d8` passed all seven hosted checks
+in run `37232967331`. Complete history and focused, deliberate mutation and full validation logs
+are preserved. Native initial-history reads now verify across stores and survive editor changes and
+fresh processes. Generic read/capture integration, later captures, transitive consumed-source
+admission, runtime controls and packaged acceptance remain required; this is not a merged release.
+Draft PR #324 / issue #323 and the full fleet objective remain open. The user checkpoint stays fixed.
