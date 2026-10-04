@@ -2895,3 +2895,111 @@ fn deletion_signer_failure_retains_one_intent_and_retries_without_duplicate_oper
     assert_eq!(f.call("resolve_file_deletion", &args).unwrap(), saved);
     assert_eq!(f.service.native_state().unwrap().file_deletions.len(), 1);
 }
+
+#[test]
+fn automatic_progress_host_saves_a_live_worker_and_final_edits_without_checkpoint_calls() {
+    use mesh_daemon::fleet::host::NativeFleetHost;
+    use mesh_daemon::fleet::provider::CodexAdapter;
+    let f = Fixture::new("automatic-worker-progress");
+    let selected = f.desktop.workspace_state().unwrap();
+    let child = f.call("delegate", &f.delegate("automatic-child")).unwrap();
+    let lane = text(&child, "id").to_owned();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    let ready = f.path.join("worker-ready");
+    let release = f.path.join("worker-release");
+    struct Release(PathBuf);
+    impl Drop for Release {
+        fn drop(&mut self) {
+            let _ = fs::write(&self.0, b"release");
+        }
+    }
+    let _release = Release(release.clone());
+    let executable = f.path.join("automatic-worker");
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/bin/sh
+cat >/dev/null
+printf 'live private progress\n' > note.txt
+touch '{}'
+while [ ! -f '{}' ]; do sleep 0.01; done
+printf 'final private progress\n' > note.txt
+printf '%s\n' '{{"type":"turn.completed"}}'
+"#,
+            ready.display(),
+            release.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut host = NativeFleetHost::new(
+        f.service.clone(),
+        CodexAdapter::new(&executable, &executable).unwrap(),
+        f.path.join("ipc.sock"),
+        Arc::new(TestWorkerSigners),
+    )
+    .unwrap();
+    host.tick().unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while !ready.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    if !ready.exists() {
+        fs::write(&release, b"release").unwrap();
+        panic!("worker did not start");
+    }
+    let mut first = None;
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while std::time::Instant::now() < deadline {
+        host.poll_owned().unwrap();
+        let state = f.service.native_state().unwrap();
+        if let Some(version) = state.lanes[&lane].saved {
+            first = Some(version);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    if first.is_none() {
+        fs::write(&release, b"release").unwrap();
+        panic!("live worker progress was not saved automatically");
+    }
+    assert_eq!(
+        f.service.native_state().unwrap().lanes[&lane].runs[0].state,
+        RunState::Running
+    );
+    assert!(f.service.native_state().unwrap().checkpoints.is_empty());
+    fs::write(&release, b"release").unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let mut completed = false;
+    let mut observations = Vec::new();
+    while std::time::Instant::now() < deadline {
+        observations = host.poll_owned().unwrap();
+        if f.service.native_state().unwrap().lanes[&lane].runs[0].state == RunState::Succeeded {
+            completed = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(completed, "final worker capture did not finish");
+    let state = f.service.native_state().unwrap();
+    assert_ne!(state.lanes[&lane].saved, first);
+    assert!(state.checkpoints.is_empty());
+    assert_eq!(
+        fs::read(root.join("note.txt")).unwrap(),
+        b"final private progress\n"
+    );
+    assert!(observations
+        .iter()
+        .find(|worker| worker.lane == lane)
+        .unwrap()
+        .progress
+        .as_ref()
+        .is_some_and(|save| matches!(save.state, "saved" | "unchanged")));
+    assert_eq!(f.desktop.workspace_state().unwrap(), selected);
+}
