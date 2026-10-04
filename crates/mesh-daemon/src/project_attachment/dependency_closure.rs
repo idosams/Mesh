@@ -394,11 +394,13 @@ impl AttachmentStorage {
                 let mut chunks = BTreeSet::new();
                 for manifest in &fact.manifests {
                     let key = (id.0, id.1, *manifest);
-                    if !verified_manifests.contains_key(&key) {
+                    if let std::collections::btree_map::Entry::Vacant(entry) =
+                        verified_manifests.entry(key)
+                    {
                         let retained = history
                             .dependency_manifest_chunks(*manifest, &mut content_budget)
                             .map_err(error)?;
-                        verified_manifests.insert(key, retained);
+                        entry.insert(retained);
                     }
                     chunks.extend(verified_manifests[&key].iter().copied());
                     if chunks.len() > 65536 {
