@@ -4178,11 +4178,17 @@ fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_a
     let signer = TestSigner::generate();
     let trust = TrustedReviewers::with_human_credentials([signer.credential.clone()]);
     let target = f.save("accepted original main");
+    f.git(&["init", "--quiet"]);
+    f.git(&["add", "work.txt"]);
+    let git_index = fs::read(f.source.join(".git/index")).unwrap();
+    let git_head = fs::read(f.source.join(".git/HEAD")).unwrap();
     let bundle = f.request(&target, &trust);
     let receipt = f.receipt(&signer, &trust, &bundle, &target, 1);
     f.history
         .approve_review(&bundle, &target, &receipt, &trust)
         .unwrap();
+    fs::write(f.source.join("work.txt"), b"ongoing uncommitted source").unwrap();
+    let git_status = f.git(&["status", "--porcelain=v1"]);
     let before = f.journal();
     let enrollment = f.history.enroll_dependency_history().unwrap();
     let after = f.journal();
@@ -4195,6 +4201,9 @@ fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_a
     assert_eq!(f.journal(), after);
     assert_eq!(
         fs::read(f.source.join("work.txt")).unwrap(),
-        b"accepted original main"
+        b"ongoing uncommitted source"
     );
+    assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), git_index);
+    assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), git_head);
+    assert_eq!(f.git(&["status", "--porcelain=v1"]), git_status);
 }

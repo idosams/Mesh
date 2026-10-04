@@ -353,4 +353,37 @@ mod tests {
         std::fs::remove_dir(root).unwrap();
         std::fs::remove_dir_all(parked).unwrap();
     }
+    #[test]
+    fn enrollment_can_borrow_only_exact_live_initialization_custody() {
+        let (root, open) = fixture("borrowed");
+        let (other, other_open) = fixture("borrowed-other");
+        let installation = open.installation();
+        assert!(
+            DependencyEnrollmentFence::prepare_while_initialized(&root, &installation, id(1))
+                .is_err()
+        );
+        let pinned = PinnedWorkspaceRoot::open(root.clone()).unwrap();
+        let initialized = lock_workspace_initialization(&pinned).unwrap();
+        assert!(DependencyEnrollmentFence::prepare_while_initialized(
+            &other,
+            &other_open.installation(),
+            id(1)
+        )
+        .is_err());
+        let fence =
+            DependencyEnrollmentFence::prepare_while_initialized(&root, &installation, id(1))
+                .unwrap();
+        fence.ensure_current().unwrap();
+        drop(initialized);
+        assert!(fence.ensure_current().is_err());
+        drop(fence);
+        assert!(lock_for_workspace_path(&root, &installation)
+            .unwrap()
+            .require_unassigned()
+            .is_err());
+        drop(open);
+        drop(other_open);
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(other).unwrap();
+    }
 }

@@ -139,6 +139,12 @@ fn staging_and_lost_acknowledgement_failures_resume_the_same_enrollment() {
                 Ok(())
             })
             .is_err());
+        if !matches!(stop, Step::Staged) {
+            assert!(crate::workspace_custody::require_unassigned_path(
+                f.attachment.metadata_path()
+            )
+            .is_err());
+        }
         let enrolled = f.attachment.enroll_dependency_history().unwrap();
         let after = f.journal();
         assert_eq!(&after[..before.len()], before);

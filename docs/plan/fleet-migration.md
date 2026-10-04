@@ -6141,3 +6141,26 @@ R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431d
 R148 reconciliation with merged R149 and published R147 `6320642214f4bcbc31c6dbc4f266e397b2645f92`: Full `npm test` passed on reconciliation `6c7779b5f022b70047933352ba9a507483903618`: 3,853 native tests in 175.953s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained and native code merged without manual resolution. Fresh hosted validation remains pending.
 
 R150 reconciliation: based on PR #298 `3d3d26672f29a0f99359f148149726f4b0c68ff4`, including merged #296. Full `npm test` passed on combined revision `bdc156363e6ff147ad9936c1553b157c27e5ee8d`: 3,856 native tests in 172.064s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The ledger conflict retained both records; native code required no manual conflict resolution. Fresh hosted validation remains pending.
+
+
+## R151 — recoverable native project enrollment
+
+New canonical work based on PR #302, published parent
+`044a600a908427d32686ba03e61e38470eeb8de2`; replaces no preserved source commit. Tracks #303 and #289.
+A content-addressed canonical intent binds native registration/installation and exact clean journal
+inode, length and digest. Its digest selects the local authority. Canonical enrollment payloads are
+staged before generic and attachment fences; only then may the required record append. Recovery
+accepts only the original journal prefix and this frame's exact suffix, writes missing bytes, syncs,
+rereads and semantically validates before returning native facts. Source work and accepted history
+are not rewritten. Generic readers/collection still refuse enrolled history; no runtime caller,
+automatic migration, grant, private consumption or publication capability is enabled.
+
+Five focused transaction tests passed, including all 146 frame-prefix cases in real files, staged,
+between-fence and lost-acknowledgement recovery, explicit sync failure, exact reopen/retry, unrelated
+fragments, changed prefix, identical-byte journal replacement and corrupt CAS intent. Generic custody
+refuses pending mutation/cleanup after its marker. The new private borrowed-fence helper requires the
+exact live initialization root; unrelated or expired custody refuses. Twelve combined enrollment
+regressions passed in 27.07s, and the native accepted-main retention/refusal test passed in 0.26s.
+A journal-sync bypass mutation fails the intended regression; source restored byte-exact. These are
+deterministic fault injections, not a power-loss or full historical-writer campaign. Full repository
+and hosted validation are pending. The fixed checkpoint remains unchanged.
