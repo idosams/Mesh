@@ -13,8 +13,9 @@
 //!   A root that resolved to nothing would silently shrink the retained set.
 //! * A parent edge that leaves the index is *recorded* ([`Reachability::dangling_parents`]) and
 //!   never treated as the end of the walk's obligations.
-//! * [`RetainedRoots::conservative`] names every actor head, every review bundle, every peer and
-//!   every manifest the index holds, so the default collector frees only what no record mentions
+//! * [`RetainedRoots::conservative`] names every available actor head and complete actor-history
+//!   window, every review bundle, every peer and every manifest, so the default collector frees
+//!   only what no record mentions
 //!   at all. Narrowing that set is a deliberate act with a name attached.
 //!
 //! # Nothing here reads a clock
@@ -161,8 +162,9 @@ impl RetainedRoots {
         }
     }
 
-    /// Every root the index justifies: each actor's head, each review bundle, each peer, each
-    /// manifest.
+    /// Every available actor head, a complete recorded-history window for every known actor,
+    /// each review bundle, each peer and each manifest. Buffered operations remain retained even
+    /// when their missing causal parents prevent them from advancing an actor head.
     ///
     /// **This is the safe default and it is deliberately unhelpful about disk.** A collector run
     /// against it frees exactly the content no record in the index mentions — crash residue from
@@ -173,7 +175,15 @@ impl RetainedRoots {
     pub fn conservative(index: &Index, policy: RetentionPolicy) -> Self {
         let mut roots = BTreeSet::new();
         for actor in index.actors() {
-            roots.insert(RetainedRoot::ActorHead(actor));
+            if index.actor_head(&actor).is_some() {
+                roots.insert(RetainedRoot::ActorHead(actor));
+            }
+            // A ready head cannot cover buffered or disconnected records. Default retention
+            // promises to preserve every recorded operation, not only materializable history.
+            roots.insert(RetainedRoot::RetentionWindow {
+                actor,
+                from_sequence: 0,
+            });
         }
         for bundle in index.review_bundles() {
             roots.insert(RetainedRoot::ReviewBundle(bundle));
@@ -476,7 +486,7 @@ fn seeds_of(
             actor,
             from_sequence,
         } => {
-            if index.actor_head(actor).is_none() {
+            if index.operations_of(actor).next().is_none() {
                 return Err(RetentionError::UnknownActor {
                     actor: *actor,
                     root: root.clone(),
