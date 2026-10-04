@@ -151,7 +151,7 @@ fn every_table_declared_in_the_schema_is_created_by_a_migration() {
         .collect::<std::collections::BTreeSet<_>>();
     for table in TABLES {
         assert!(
-            created.contains(&table.name.to_owned()),
+            created.contains(table.name),
             "TABLES declares `{}`, which no migration creates",
             table.name
         );

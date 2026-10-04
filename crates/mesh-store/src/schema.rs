@@ -486,7 +486,7 @@ mod tests {
             .collect::<std::collections::BTreeSet<_>>();
         for table in TABLES {
             assert!(
-                found.contains(&table.name.to_owned()),
+                found.contains(table.name),
                 "the reader missed `{}` in the real migrations: {found:?}",
                 table.name
             );
