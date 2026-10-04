@@ -259,6 +259,12 @@ impl ProjectAttachment {
                 if parsed.get("schema").and_then(Json::as_text)
                     == Some("mesh.native-consumption-start-intent/v1")
                 {
+                    let completion =
+                        match read_private_in_store(store, super::consumption_complete::PENDING) {
+                            Ok(raw) => Some(raw),
+                            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                            Err(e) => return Err(e),
+                        };
                     match read_private_in_store(store, super::consumption_history::PENDING) {
                         Ok(history) => {
                             return super::consumption_history::pending_prefix(
@@ -267,9 +273,10 @@ impl ProjectAttachment {
                                 &history,
                                 journal_identity,
                                 &bytes,
+                                completion.as_deref(),
                             )
                         }
-                        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                        Err(e) if e.kind() == io::ErrorKind::NotFound && completion.is_none() => {}
                         Err(e) => return Err(e),
                     }
                 }

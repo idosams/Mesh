@@ -1965,3 +1965,22 @@ are preserved. Native receipt commit/recovery, intervening-owner-history preserv
 historical retry after revocation are verified. Local completion, prospective configuration/capture
 reconciliation, final cross-store admission and the full acceptance campaign remain required.
 Draft PR #324 / issue #323 stay open and unmerged; the user checkpoint remains fixed.
+
+R161 now appends the local consumption completion record after the exact installed checkpoint and
+verified owner receipt, under the same complete custody guard. Its immutable recovery intent binds
+request, journal identity, exact preceding bytes and canonical completion payload. Recovery accepts
+only the exact completion-frame prefix and appends missing bytes; earlier phase APIs refuse once
+completion is staged. The checkpoint retry preserves only a separately verified completion suffix.
+This local receipt does not admit ordinary history, capture, runtime or publication. Prospective
+configuration/capture reconciliation and cross-store admission remain required.
+
+Two focused tests passed in 36.953s. Coverage includes every partial completion-frame boundary,
+changed suffix bytes, a canonical completion naming the wrong owner receipt, fresh-process one-byte
+interruption, synchronized lost reply, repeated recovery without changed installed identities or
+owner history, and explicit completion-sync failure. Ordinary history remains refused even after
+local completion. Removing the suffix equality check makes the regression fail on foreign prefix 1
+in 34.101s; the production source was restored byte-for-byte. The initial failed run exposed a test
+mode collision with the older start-recovery fixture; distinct completion-mode matching corrected
+that fixture without changing production authority. Both failed logs are retained. Full repository
+validation is pending. Draft PR #324 / issue #323, packaged acceptance and the full fleet objective
+remain open; the fixed user checkpoint is unchanged.

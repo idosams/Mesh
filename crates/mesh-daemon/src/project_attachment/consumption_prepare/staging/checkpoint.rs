@@ -45,7 +45,7 @@ impl PreparedNativeConsumedStart {
         let frames = self.frames();
         if prefix > observed.len()
             || prefix.saturating_add(frames.len()) > MAX
-            || !frames.starts_with(&observed[prefix..])
+            || !(frames.starts_with(&observed[prefix..]) || observed[prefix..].starts_with(&frames))
         {
             return Err(invalid("consumption checkpoint bytes differ"));
         }
@@ -97,7 +97,7 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("checkpoint changed before append"));
         }
-        journal.write_all(&frames[observed.len() - prefix..])?;
+        journal.write_all(&frames[(observed.len() - prefix).min(frames.len())..])?;
         sync(journal)?;
         self.destination.store.sync()?;
         hook("checkpoint-synced", journal, &frames)?;
@@ -111,9 +111,12 @@ impl PreparedNativeConsumedStart {
         facts
             .ok_or_else(|| invalid("consumption enrollment missing"))?
             .verify(&self.destination.store, journal, &current)?;
-        if current.len() != prefix + frames.len()
-            || current[..prefix] != observed[..prefix]
-            || current[prefix..] != frames
+        let mut expected = observed[..prefix].to_vec();
+        expected.extend_from_slice(&frames);
+        if observed.len() > expected.len() {
+            expected.extend_from_slice(&observed[expected.len()..]);
+        }
+        if current != expected
             || read_private_in_store(&self.destination.store, super::super::START_PENDING)?
                 != start_intent
             || read_private_in_store(&self.destination.store, consumption_history::PENDING)?
@@ -219,7 +222,8 @@ pub(super) fn assert_checkpoint(
                         &start,
                         &raw,
                         (m.dev(), m.ino()),
-                        &bytes
+                        &bytes,
+                        None
                     )
                     .is_ok(),
                     "prefix {length}"
@@ -232,7 +236,8 @@ pub(super) fn assert_checkpoint(
                             &start,
                             &raw,
                             (m.dev(), m.ino()),
-                            &bytes
+                            &bytes,
+                            None
                         )
                         .is_err(),
                         "foreign prefix {length}"

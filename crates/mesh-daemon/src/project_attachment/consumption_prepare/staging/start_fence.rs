@@ -90,6 +90,12 @@ impl PreparedNativeConsumedStart {
         mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
+        if phase != CommitPhase::Complete {
+            absent(
+                &self.destination,
+                crate::project_attachment::consumption_complete::PENDING,
+            )?;
+        }
         if phase == CommitPhase::Start {
             absent(
                 &self.destination,
@@ -126,7 +132,7 @@ impl PreparedNativeConsumedStart {
             .collect::<Vec<_>>();
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
-        let context = if phase == CommitPhase::Owner {
+        let context = if matches!(phase, CommitPhase::Owner | CommitPhase::Complete) {
             crate::project_attachment::dependency_owner_context::OwnerHistoryContext::recovering(
                 &self.owner,
                 self.request,
@@ -453,7 +459,7 @@ impl PreparedNativeConsumedStart {
             storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
             guard.ensure_current().map_err(error)?;
         }
-        if phase == CommitPhase::Owner {
+        if matches!(phase, CommitPhase::Owner | CommitPhase::Complete) {
             let receipt = self.commit_owner_receipt(
                 &context,
                 owner_intent
@@ -462,8 +468,23 @@ impl PreparedNativeConsumedStart {
                 |step, file, frame| hook(step, file, frame),
                 |file| sync(file),
             )?;
+            let result = if phase == CommitPhase::Complete {
+                self.append_completion(
+                    &mut journal,
+                    &intent,
+                    super::complete::CompletionSelection {
+                        start: record,
+                        owner: receipt,
+                        prefix: before.len() + frame.len() + self.frames().len(),
+                    },
+                    |step, file, frame| hook(step, file, frame),
+                    |file| sync(file),
+                )?
+            } else {
+                receipt
+            };
             guard.ensure_current().map_err(error)?;
-            return Ok(receipt);
+            return Ok(result);
         }
         Ok(record.payload)
     }
@@ -634,4 +655,5 @@ pub(super) fn assert_start_fence(
             .count(),
         prepared.top_entries().len()
     );
+    super::complete::assert_complete(prepared, storage, &staged, receipt);
 }

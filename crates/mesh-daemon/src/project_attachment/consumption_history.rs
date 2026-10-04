@@ -43,6 +43,7 @@ pub(super) fn pending_prefix(
     raw: &str,
     identity: (u64, u64),
     journal: &[u8],
+    completion: Option<&str>,
 ) -> io::Result<(usize, DependencyRecord, Vec<u8>)> {
     let value = Json::parse(raw).map_err(error)?;
     let length = value
@@ -79,9 +80,21 @@ pub(super) fn pending_prefix(
         return Err(invalid("consumption checkpoint intent differs"));
     }
     let frames = read_payload(cas, frames_id, MAX)?;
-    if length.saturating_add(frames.len()) > MAX || !frames.starts_with(&journal[length..]) {
+    let end = length.saturating_add(frames.len());
+    if end > MAX {
+        return Err(invalid("consumption checkpoint exceeds bound"));
+    }
+    if let Some(completion) = completion {
+        if end > journal.len() || journal[length..end] != frames {
+            return Err(invalid("completion lacks exact complete checkpoint"));
+        }
+        super::consumption_complete::verify_prefix(
+            cas, request, identity, journal, end, record, completion,
+        )?;
+    } else if !frames.starts_with(&journal[length..]) {
         return Err(invalid("foreign consumption checkpoint suffix"));
     }
+
     let scan = scan_journal(&frames).map_err(error)?;
     if scan.tail().is_fragment() || scan.records().is_empty() {
         return Err(invalid("incomplete retained consumption checkpoint"));

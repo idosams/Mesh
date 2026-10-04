@@ -1,5 +1,6 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
 mod checkpoint;
+mod complete;
 mod installation;
 mod owner;
 mod recovery;
@@ -26,6 +27,7 @@ enum CommitPhase {
     Start,
     Checkpoint,
     Owner,
+    Complete,
 }
 const RECEIPT: &str = "stage.json";
 const MAX_RECEIPT: usize = 64 * 1024 * 1024;

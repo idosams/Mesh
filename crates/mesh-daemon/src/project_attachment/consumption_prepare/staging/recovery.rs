@@ -460,12 +460,37 @@ pub(super) fn run_child_if_requested() -> bool {
             },
             text("mode").starts_with("install")
                 || text("mode").starts_with("checkpoint")
-                || text("mode").starts_with("owner"),
+                || text("mode").starts_with("owner")
+                || text("mode").starts_with("complete-"),
         )
         .unwrap();
     assert_eq!(candidate.operation().to_hex(), text("operation"));
     assert_eq!(staged.receipt().unwrap().to_hex(), text("stage"));
     assert_eq!(identity(&staged.root).unwrap(), text("physical"));
+    if text("mode").starts_with("complete-") {
+        candidate
+            .commit_phase_with_io(
+                &storage,
+                &staged,
+                true,
+                CommitPhase::Complete,
+                |step, file, frame| {
+                    if text("mode") == "complete-partial" && step == "complete-staged" {
+                        file.write_all(&frame[..1])?;
+                        file.sync_all()?;
+                        std::process::exit(75);
+                    }
+                    if text("mode") == "complete-lost" && step == "complete-synced" {
+                        std::process::exit(75);
+                    }
+                    Ok(())
+                },
+                |file| file.sync_all(),
+            )
+            .unwrap();
+        assert!(destination.saved_versions().is_err());
+        return true;
+    }
     if text("mode").starts_with("owner") {
         let receipt = candidate
             .commit_phase_with_io(
