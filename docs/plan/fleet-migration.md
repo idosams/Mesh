@@ -5752,3 +5752,27 @@ bytes restored. Initial fixture formatting failure was recorded and corrected. F
 hosted delivery and packaged persistence acceptance remain pending. Fixed user checkpoint unchanged.
 
 R135 implementation `c0013200689280be4a23ee0a31730dc1270b7d33` passed full `npm test`: 3,823 native tests in 166.966s (1 slow, 17 skipped), 188 rendered tests, 654 desktop tests and 44 real-daemon checks. Hosted delivery and panel restoration remain pending.
+
+
+## R136 — restore and save progress panels
+
+New canonical implementation based on PR #275 head
+`a4dc6d46c2aabf2ea6e2f48a481d50d87de1d451`; no preserved source commit is replaced.
+Progress panels load their native selector snapshot on opening the fleet view, independently of
+live ownership. Each saved version, source, starting version, layout, page cursor and selected
+object is retained; content is read again through the exact native comparison. No cached content,
+paths, handoff or approval authority is persisted. The new strict renderer parser matches the
+native v1 schema. Restore freezes edits, stale/disposed replies remain ignored, and missing native
+history leaves selectors retained with visible errors. Save failures show explicit retry/reload;
+lost acknowledgment recovery reads current selectors without duplicate writes. Existing review
+pin protocols remain unchanged.
+
+Six progress persistence regressions cover restart without live fleet ownership, missing history,
+lost save acknowledgment, unreadable state/disposal, malformed selectors and independent cursor/
+object restoration. Retargeting a restored version fails the regression; source restored exactly.
+Existing panel/fleet tests and all 189 rendered tests pass. Initial integration fixtures still
+expected six startup reads; updated them for the seventh read-only progress-selector load and
+preserved the failure log. Full validation and hosted/packaged delivery remain pending. Live lane
+summaries and the full fleet acceptance plan are still required. Fixed user checkpoint unchanged.
+
+R136 implementation `df9d0c5053cd16d1412b860117863e06479e9dab` passed full `npm test`: 3,823 native tests in 166.583s (1 slow, 17 skipped), 189 rendered tests, 660 desktop tests and 44 real-daemon checks. Hosted and packaged delivery remain pending.

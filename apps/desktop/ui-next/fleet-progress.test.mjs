@@ -9,7 +9,7 @@ const pin = key => ({ key, selection: { objective: 'fleet', lane: 'lane', versio
 test('independent progress panels identify exact versions and offer no handoff or approval controls', () => {
   const html = module.exports.panels({ pins: [pin('1'), pin('2')], notice: '' });
   assert.match(html, /aria-label="Saved progress 1"/); assert.match(html, /aria-label="Saved progress 2"/);
-  assert.match(html, /kept for this session only/); assert.match(html, /1{64}/); assert.match(html, /2{64}/);
+  assert.match(html, /Reopening verifies its exact saved history again/); assert.match(html, /1{64}/); assert.match(html, /2{64}/);
   assert.match(html, /does not approve or apply changes to main/);
   assert.doesNotMatch(html, /<button[^>]*>(Approve|Import|Record change request|Mark request)/);
 });
@@ -20,4 +20,12 @@ test('progress list labels intermediate saves and refuses pinning without a veri
   assert.match(html, /<button[^>]*disabled=""[^>]*>Pin saved version/);
   props.queue.page.starting = 'base'; props.queue.error = '<script>unavailable</script>';
   const failed = module.exports.queue(props); assert.match(failed, /role="alert"/); assert.doesNotMatch(failed, /<script>/);
+});
+
+test('saving failure is explicit and loading disables destructive panel changes', () => {
+  const pins = [pin('1')];
+  const failed = module.exports.panels({ pins, notice: '', persistence: { phase: 'error', message: 'Not confirmed saved', editable: true, busy: false } });
+  assert.match(failed, /Not confirmed saved/); assert.match(failed, /Retry saving progress panels/); assert.match(failed, /Reload saved progress panels/);
+  const loading = module.exports.panels({ pins, notice: '', persistence: { phase: 'loading', message: '', editable: false, busy: true } });
+  assert.match(loading, /<button[^>]*disabled=""[^>]*>Close progress panel/); assert.doesNotMatch(loading, /Progress panel choices saved/);
 });

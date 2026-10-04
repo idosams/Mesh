@@ -2,21 +2,29 @@ import { useTranslation } from "../lib/localization";
 import { Button } from "../atoms/button";
 import { FleetInputComparison, type InputComparison } from "./fleet-input-comparison";
 export type ProgressQueue = { loading: boolean; error: string; page: null | { total: number; latest: string | null; starting: string | null; versions: { version: string; ordinal: number }[]; nextAfter: string | null } };
+export type ProgressPersistence = { phase: string; message: string; editable: boolean; busy: boolean };
 export type ProgressPin = { key: string; selection: { objective: string; lane: string; version: string }; layout: "inline" | "split"; input: InputComparison };
 const send = (detail: Record<string, unknown>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const actions: Record<string, string> = { "input-review": "progress-first", "retry-input": "progress-retry", "input-file": "progress-file", "input-page": "progress-page", "input-layout": "progress-layout" };
-export function ProgressPanels({ pins, notice }: { pins: ProgressPin[]; notice: string }) {
+export function ProgressPanels({ pins, notice, persistence }: { pins: ProgressPin[]; notice: string; persistence?: ProgressPersistence }) {
   const t = useTranslation();
-  if (!pins.length && !notice) return null;
+  if (!pins.length && !notice && (!persistence || persistence.phase === "session")) return null;
+  const editable = persistence?.editable ?? true;
   return <section aria-label={t("Pinned saved progress")} className="grid gap-3">
     <h3 className="font-semibold">{t("Pinned saved progress")}</h3>
-    <p className="text-sm">{t("Each panel stays on its selected save while agents keep working. These panels are kept for this session only.")}</p>
+    <p className="text-sm">{t("Each panel stays on its selected save while agents keep working. Reopening verifies its exact saved history again.")}</p>
+    {persistence && <div className="grid gap-2 text-sm">
+      <p role="status">{t(persistence.phase === "saved" ? "Progress panel choices saved" : persistence.phase === "saving" ? "Saving progress panel choices…" : persistence.phase === "loading" ? "Restoring saved progress panels…" : persistence.phase === "error" ? "Progress panel choices need attention" : "Progress panels are not yet saved")}</p>
+      {persistence.message && <p role="alert">{t(persistence.message)}</p>}
+      {persistence.phase === "error" && <><Button variant="secondary" disabled={persistence.busy} onClick={() => send({ type: "progress-retry-save" })}>{t("Retry saving progress panels")}</Button>
+        <Button variant="quiet" disabled={persistence.busy} onClick={() => send({ type: "progress-reload-saved" })}>{t("Reload saved progress panels")}</Button></>}
+    </div>}
     {notice && <p role="status">{t(notice)}</p>}
     <div className="grid items-start gap-4 xl:grid-cols-2">{pins.map(pin => <article key={pin.key} className="grid min-w-0 gap-2 rounded border border-border p-3" aria-label={`${t("Saved progress")} ${pin.key}`}>
       <h4 className="font-semibold">{t("Saved progress")} {pin.key}</h4>
       <details className="break-all text-xs"><summary>{t("Exact saved version")}</summary><p>{pin.selection.version}</p><p>{pin.selection.lane}</p><p>{pin.selection.objective}</p></details>
-      <Button variant="quiet" onClick={() => send({ type: "progress-close", pin: pin.key })}>{t("Close progress panel")}</Button>
-      <FleetInputComparison pin={pin.key} input={pin.input} layout={pin.layout} onIntent={detail => { const type = actions[detail.type]; if (type) send({ ...detail, type }); }} />
+      <Button variant="quiet" disabled={!editable} onClick={() => send({ type: "progress-close", pin: pin.key })}>{t("Close progress panel")}</Button>
+      <FleetInputComparison editable={editable} pin={pin.key} input={pin.input} layout={pin.layout} onIntent={detail => { const type = actions[detail.type]; if (type) send({ ...detail, type }); }} />
     </article>)}</div>
   </section>;
 }
