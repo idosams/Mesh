@@ -109,6 +109,10 @@ In the unmerged review-history increment, an already-open pending review stays o
 comparison base when another review advances main, including after restart. This keeps the reviewed
 changes stable; it does not make an old approval valid against the new main version. A stale approval
 must be prepared and reviewed again through the normal current-main flow.
+Managed-workspace approval also rereads durable history while holding native custody. If another
+Mesh client has advanced that history, the old displayed context is refused before an approval
+record is appended. Refresh the view before proceeding; the previously accepted receipt remains
+available through normal recovery.
 
 In the unmerged desktop recovery increment, **Compare main with working files** can offer **Review
 applying this file** for an existing text file that still matches the approved base. The native

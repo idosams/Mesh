@@ -5950,3 +5950,22 @@ pending. Packaged real-agent parallel review, measured responsiveness, richer ac
 dependency overview and the full fleet acceptance plan remain open. Fixed checkpoint unchanged.
 
 R142 implementation `94af7d6c329ae7b9440a4f44bfea52512f871ef5` passed full `npm test`: 3,824 native tests in 169.965s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery and packaged graphical acceptance remain pending. The fixed 5052009 user checkpoint remains unchanged.
+
+
+## R145 — refresh managed approval history inside native custody
+
+New canonical implementation based on merged PR #285 (`9cc808ab4813497d16179a30d20e70af59acb925`);
+no preserved source commit is replaced. Tracks issue #290 and the publication-boundary prerequisite
+of private-dependency issue #289. Managed approval now refreshes record-derived history through the
+already-open descriptor-pinned journal while holding existing native custody, before checking the
+displayed root, digest and installation and before admitting or appending any approval. It does not
+select a replacement pathname, alter receipt formats or weaken native signing/current-folder checks.
+
+The new two-client regression failed before the fix: after the first valid receipt committed, a
+second independently opened daemon appended a different receipt from its cached pre-approval state
+and only then returned `publication-save-failed`. The fix refuses `stale-workspace` before any append.
+The test checks journal byte equality, stale retry refusal, reopened main and exact original receipt
+recovery. The existing native suites passed 44 attachment-approval and 7 human-approval tests. An
+initial test-only receipt accessor compile error is preserved separately. Full gate and hosted
+delivery remain pending. This is native fixture evidence with test credentials, not packaged human
+presence or complete dependency-policy enforcement. The fixed user checkpoint is unchanged.
