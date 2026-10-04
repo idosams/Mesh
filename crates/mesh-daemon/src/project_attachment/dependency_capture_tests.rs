@@ -635,6 +635,43 @@ fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() 
                 .unwrap();
             journal.sync_all().unwrap();
         }
+        {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let (_, facts) =
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, None, None)
+                    .unwrap();
+            let facts = facts.unwrap();
+            assert_eq!(facts.binding(), binding);
+            assert_eq!(facts.policy(), &policy);
+            assert!(facts.policy().has_consumption_transaction());
+            let journal_path = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+            let file = fs::File::open(&journal_path).unwrap();
+            let exact = f.journal();
+            facts.verify(&f.a.store, &file, &exact).unwrap();
+            let mut changed = exact.clone();
+            changed.push(0);
+            assert!(facts.verify(&f.a.store, &file, &changed).is_err());
+            fs::write(&journal_path, &changed).unwrap();
+            assert!(
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, None, None,)
+                    .is_err(),
+                "non-admitting inspection must still refuse a torn suffix"
+            );
+            assert_eq!(
+                f.journal(),
+                changed,
+                "inspection must not repair journal bytes"
+            );
+            fs::write(&journal_path, &exact).unwrap();
+            assert!(f
+                .a
+                .project()
+                .read_configuration(f.a.metadata_path(), &f.a.store)
+                .is_err());
+        }
         let before = f.journal();
         let called = std::cell::Cell::new(false);
         assert!(f

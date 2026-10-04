@@ -23,10 +23,10 @@ use std::{
 const MAX_BASE: usize = 64 * 1024 * 1024;
 const MAX_HISTORY: usize = MAX_BASE + 16 * 1024 * 1024;
 
-/// Constructible only after complete native registration, enrollment and payload validation.
-/// The workspace opener checks even an empty/replaced journal against this exact read proof.
+/// Exact local enrollment and policy facts. These do not authorize opening a workspace,
+/// consumption, mutation or publication, even when local completion records are present.
 #[derive(PartialEq, Eq)]
-pub(crate) struct VerifiedDependencyRead {
+pub(super) struct NativeDependencyFacts {
     store: (u64, u64),
     journal: (u64, u64),
     bytes: RecordDigest,
@@ -35,7 +35,7 @@ pub(crate) struct VerifiedDependencyRead {
     pending: Option<(usize, mesh_store::DependencyRecord)>,
     legacy_operations: std::collections::BTreeSet<RecordDigest>,
 }
-impl VerifiedDependencyRead {
+impl NativeDependencyFacts {
     pub(super) fn binding(&self) -> NativeDependencyBinding {
         self.binding
     }
@@ -73,6 +73,40 @@ impl VerifiedDependencyRead {
             return Err(invalid("validated dependency history changed"));
         }
         Ok(())
+    }
+}
+/// Native workspace admission capability. Local facts alone cannot admit consumed history.
+/// Construction is private so recovery inspection cannot accidentally create a read proof.
+#[derive(PartialEq, Eq)]
+pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
+impl VerifiedDependencyRead {
+    fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
+        if facts.policy.has_consumption_transaction() {
+            return Err(invalid(
+                "consumed history requires native transaction verification",
+            ));
+        }
+        Ok(Self(facts))
+    }
+    pub(super) fn binding(&self) -> NativeDependencyBinding {
+        self.0.binding()
+    }
+    pub(super) fn policy(&self) -> &DependencyPolicyHistory {
+        self.0.policy()
+    }
+    pub(super) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
+        self.0.is_legacy_operation(operation)
+    }
+    pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
+        self.0.pending()
+    }
+    pub(crate) fn verify(
+        &self,
+        store: &PinnedWorkspaceRoot,
+        file: &File,
+        bytes: &[u8],
+    ) -> io::Result<()> {
+        self.0.verify(store, file, bytes)
     }
 }
 fn error(e: impl std::fmt::Display) -> io::Error {
@@ -115,6 +149,22 @@ impl ProjectAttachment {
         pending: Option<&str>,
         capture: Option<&str>,
     ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
+        let (configuration, facts) = self.read_native_facts(metadata, store, pending, capture)?;
+        let proof = facts
+            .map(VerifiedDependencyRead::from_independent_facts)
+            .transpose()?;
+        Ok((configuration, proof))
+    }
+
+    // Recovery inspection only. It never hides an unrecognized suffix, changes journal bytes,
+    // or creates workspace admission. Callers must hold and revalidate their complete custody set.
+    pub(super) fn read_native_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
+        capture: Option<&str>,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
         self.ensure_current()?;
         store.ensure_namespace_identity()?;
         let receipt = self.receipt()?.encode();
@@ -255,15 +305,7 @@ impl ProjectAttachment {
         if let Some((_, record, payload)) = &pending {
             policy.clone().apply(*record, payload).map_err(error)?;
         }
-        // Canonical replay is not cross-store transaction verification. Keep ordinary native
-        // capture/control/read fenced until exact consumption recovery validates the owner
-        // receipt, retained input closure, configuration transition and starting operation.
-        if policy.has_consumption_transaction() {
-            return Err(invalid(
-                "consumed history requires native transaction verification",
-            ));
-        }
-        let proof = VerifiedDependencyRead {
+        let proof = NativeDependencyFacts {
             store: identity,
             journal: journal_identity,
             bytes: hash(&bytes),

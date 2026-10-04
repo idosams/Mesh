@@ -1767,3 +1767,17 @@ in run `37223540971`. Positive and deliberately failing regression logs and comp
 are preserved. The validated callback retains complete custody but does not itself install files,
 append consumption or acknowledge a runnable version. Draft PR #324 remains unmerged; issue #323
 and the full fleet goal remain open. The fixed checkpoint is unchanged.
+
+R161 recovery inspection now separates exact local native journal facts from workspace admission.
+The shared parser still verifies registration, the enrollment fence, canonical policy payloads and
+exact journal identity/bytes. Its non-admitting result can inspect pending or completed-looking
+consumption policy; the private conversion to an ordinary read proof refuses either. No generic
+ignore-tail flag, consumption permission or completed cross-store proof is introduced.
+
+Six native integration tests passed in 1.426s, including exact local-policy inspection while ordinary
+read/capture/control remain refused, changed bytes and torn-suffix refusal without repair, replaced
+journals, missing fences and corrupt policy payloads. Removing the conversion's consumption refusal
+makes the integration regression fail in 0.204s; exact source was restored. Full repository validation
+is pending. Exact consumed-prefix recovery, required journal-before-install ordering, materialization,
+owner/completion receipts and cross-store admission remain unfinished in draft PR #324 / issue #323.
+The user checkpoint and full fleet objective are unchanged.
