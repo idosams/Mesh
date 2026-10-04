@@ -19,6 +19,8 @@ const MAX_RECEIPT_BYTES: u64 = 65_536;
 
 mod detachment;
 mod fleet_pins;
+mod progress_pins;
+pub use progress_pins::ProgressPinState;
 mod remote_connections;
 mod remote_starts;
 pub use remote_starts::RemoteStartRequest;

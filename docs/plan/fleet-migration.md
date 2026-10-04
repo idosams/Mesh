@@ -5730,3 +5730,23 @@ delivery remain pending. Pins are explicitly session-only in this increment; per
 summaries and actual packaged parallel-agent inspection remain required. Fixed checkpoint unchanged.
 
 R134 implementation `256bdf754b0f834a338aad6f355e83526f510cb0` passed full `npm test`: 3,818 native tests in 166.674s (1 slow, 17 skipped), 188 rendered tests, 654 desktop tests and 44 real-daemon checks. Hosted and packaged validation remain pending.
+
+
+## R135 — native progress-selector persistence
+
+New canonical implementation based on PR #274 head
+`ab62121eea5dfd6d40865a749e578c5dc79f78bf`; no preserved source commit is replaced.
+A separate native store retains at most four exact progress selectors and layout/object/cursor
+choices, never file contents, paths, checkpoints or review authority. The new projection is
+`mesh.desktop-progress-pin-selectors/v1`; the private catalog-bound file is
+`desktop-progress-pins.json` with an exclusive pending sibling. Existing attachment/local/remote
+review records are unchanged. Reads reject foreign catalog identity, links, malformed/oversized
+records and incomplete first writes. Writes lock the catalog, require the current revision,
+sync the file and directory, and retain failed staging evidence. Two additive desktop commands
+expose this bounded store. Panel restoration is not yet wired, so visible panels remain session-only.
+
+Five native regressions pass: restart and namespace independence, schema/duplicate/bound refusal,
+corrupt/copied/linked/interrupted evidence preservation, concurrent writers and coexistence with a
+full review pin set. Disabling the revision check fails the concurrent-writer assertion; original
+bytes restored. Initial fixture formatting failure was recorded and corrected. Full validation,
+hosted delivery and packaged persistence acceptance remain pending. Fixed user checkpoint unchanged.

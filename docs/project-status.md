@@ -39,7 +39,8 @@ captures; listing one makes no completeness or approval claim. The latest fleet-
 version is reported separately. Read-only desktop commands and strict response validation expose this history without review
 identities. The desktop now offers separate progress lists and up to four independently pinned comparisons.
 Pins are fixed to exact saved versions and remain available during list refresh; this first panel
-implementation keeps them for the current session only. Persistent pins, live overview summaries
+implementation keeps them for the current session only. A separate native progress-selector store now provides bounded atomic persistence with revision
+checks; connecting panel restoration to it remains the next increment. Live overview summaries
 and packaged parallel-inspection acceptance remain unfinished.
 
 ## Retained worker execution observations
