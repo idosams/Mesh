@@ -114,6 +114,16 @@ merged delivery. The Mac remained locked when graphical acceptance was attempted
 agent activity with packaged panels, restart recovery through that interface and the full acceptance
 plan remain unverified. See R139 in the delivery ledger for exact artifact identity.
 
+## Managed approval history freshness
+
+Managed-workspace approval refreshes durable history under its native custody lock before checking
+the displayed workspace identity or admitting a receipt. Two independently opened clients can no
+longer use an older cached history to append a second conflicting approval after the first client
+commits. A native regression reproduced the previous append-before-refusal failure and now verifies
+that refusal leaves the journal byte-identical and the first receipt recoverable after reopening.
+This uses test credentials; it does not establish eligible signed GUI acceptance or implement
+private-dependency grants, closure, rejection or revalidation.
+
 ## Native dependency barrier foundation
 
 Native history initialization can hold a bounded set of exact directory identities using the same

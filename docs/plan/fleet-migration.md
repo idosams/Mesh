@@ -5981,6 +5981,26 @@ acceptance and every remaining fleet-plan exit remain required. Fixed checkpoint
 R144 implementation `49cc6a84f5b5ccf90b0c5e4f4b0c40924ea60370` passed full `npm test`: 3,825 native tests in 174.256s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The native feedback decision/reopen projection passed within the full suite. Hosted delivery and packaged graphical acceptance remain pending.
 
 
+## R145 — refresh managed approval history inside native custody
+
+New canonical implementation based on merged PR #285 (`9cc808ab4813497d16179a30d20e70af59acb925`);
+no preserved source commit is replaced. Tracks issue #290 and the publication-boundary prerequisite
+of private-dependency issue #289. Managed approval now refreshes record-derived history through the
+already-open descriptor-pinned journal while holding existing native custody, before checking the
+displayed root, digest and installation and before admitting or appending any approval. It does not
+select a replacement pathname, alter receipt formats or weaken native signing/current-folder checks.
+
+The new two-client regression failed before the fix: after the first valid receipt committed, a
+second independently opened daemon appended a different receipt from its cached pre-approval state
+and only then returned `publication-save-failed`. The fix refuses `stale-workspace` before any append.
+The test checks journal byte equality, stale retry refusal, reopened main and exact original receipt
+recovery. The existing native suites passed 44 attachment-approval and 7 human-approval tests. An
+initial test-only receipt accessor compile error is preserved separately. Full gate and hosted
+delivery remain pending. This is native fixture evidence with test credentials, not packaged human
+presence or complete dependency-policy enforcement. The fixed user checkpoint is unchanged.
+
+R145 implementation verification: Full `npm test` passed on `19486d421f1c32f8409f6737ef3f19d7be206013`: 3,825 native tests in 170.061s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
+
 ## R146 — bounded native custody sets
 
 New canonical implementation based on PR #292 (`3d53c3d8dfda9a3e0f7184b09e90713162930e96`);
