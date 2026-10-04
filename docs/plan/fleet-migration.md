@@ -5656,3 +5656,13 @@ Full `npm test` passed 3,815 native tests in 164.031s (1 slow, 17 skipped), 186 
 647 desktop tests and all 44 real-daemon checks. Hosted delivery is pending. An attempt may still wait on native filesystem
 or signing work; an attempt count is not a wall-clock shutdown bound. Packaged, remote and
 protected-main acceptance remain open, and the fixed user checkpoint is unchanged.
+
+
+R127 delivery consolidation: checked cancellation head `2ff2e1a826a9602ebe8c1444d842b289b706a96e`
+(all seven hosted checks passed) is combined with the published saving/retry stack through PR #271
+head `cfcca75aab183c7a07985868401a568610a89814`. Combined implementation
+`9d411a84360f711cb815e9cf4d2cba7d7088514c` passed full `npm test`: 3,816 native tests in 164.518s
+(1 slow, 17 skipped), 186 rendered tests, 647 desktop tests and all 44 real-daemon checks.
+All source commits remain ancestors; no production conflicts needed manual resolution. PR #265
+uses PR #271 as its delivery base so cancellation remains a focused review and the full combination
+is validated once. Fresh hosted checks and merged delivery remain pending. User checkpoints remain fixed.
