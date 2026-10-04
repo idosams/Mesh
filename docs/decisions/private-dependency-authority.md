@@ -526,4 +526,8 @@ The prior implementation recognized neither subtype and refused all 290 cases wi
 journal or editor bytes. Current source passed the same campaign. This is actual prior native
 behavior, not a text assertion or a packaged-app migration claim. A zero-byte append leaves no
 fence: the transaction must synchronize the required record before any destination file write.
-The transaction and cross-store recovery remain unfinished in draft PR #324.
+The native transaction, explicit cross-store recovery and grant foundation merged in PR #324.
+Chained consumed-child recovery is delivered separately in PR #325, with completed empty-input
+acceptance in PR #326. Generic caller integration, runtime and publication controls, whole-store
+retention admission and packaged acceptance remain required; foundation delivery does not complete
+the phase exit above.
