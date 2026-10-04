@@ -3030,6 +3030,9 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
     let saved = f.service.save_worker_progress(&credential).unwrap();
     assert!(saved.complete);
     let version = saved.version.to_string();
+    let summary = f.service.snapshot().unwrap();
+    let lanes = summary.get("lanes").unwrap().as_array().unwrap();
+    assert_eq!(text(&lanes[0], "saved_version"), version);
     let page = f.service.saved_progress_versions(&f.lane, None).unwrap();
     let rows = page
         .get("progress")

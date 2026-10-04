@@ -231,3 +231,13 @@ test('private saving is separate from execution, tolerates an unobserved save an
   worker.run = 'old-attempt';
   assert.doesNotMatch(render(value), /Private progress needs attention/);
 });
+
+test('lane overview exposes exact saved progress independently of active execution', () => {
+  const value = props(); value.projection.available = true;
+  value.projection.fleets[0].ownership = 'restored-unattached';
+  value.projection.fleets[0].lanes[0].savedVersion = 'a'.repeat(64);
+  const html = render(value); assert.match(html, /Latest acknowledged save/); assert.match(html, /a{64}/);
+  assert.match(html, /<button(?![^>]*\sdisabled=)[^>]*>Pin this saved progress<\/button>/);
+  value.projection.progressLatestBusy = { 'fleet-one/lane-one': true };
+  assert.match(render(value), /<button[^>]*disabled=""[^>]*>Pin this saved progress<\/button>/);
+});
