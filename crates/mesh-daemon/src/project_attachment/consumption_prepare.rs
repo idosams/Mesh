@@ -57,6 +57,7 @@ pub struct PreparedNativeConsumedStart {
     actor: PublicKey,
     basis: Basis,
     checkpoint: PreparedAuthenticatedCheckpoint,
+    plan: super::consumption_plan::InitialPlan,
 }
 impl PreparedNativeConsumedStart {
     /// Candidate operation identity. It has not been appended or acknowledged as saved work.
@@ -87,7 +88,13 @@ impl PreparedNativeConsumedStart {
         };
         let (basis, _, _) =
             storage.inspect_consumed_start_basis(&self.owner, &request, self.actor)?;
-        if basis != self.basis {
+        if basis != self.basis
+            || super::consumption_plan::InitialPlan::verify(
+                &self.checkpoint,
+                WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
+                self.limits,
+            )? != self.plan
+        {
             return Err(invalid("consumption preparation basis changed"));
         }
         Ok(())
@@ -157,6 +164,11 @@ impl AttachmentStorage {
             &StartHead,
         )
         .map_err(error)?;
+        let plan = super::consumption_plan::InitialPlan::verify(
+            &checkpoint,
+            WorkspaceId::from_bytes(short_id(basis.prospective.as_bytes())),
+            request.limits,
+        )?;
         Ok(PreparedNativeConsumedStart {
             owner: owner.clone(),
             source: request.input.source.clone(),
@@ -173,6 +185,7 @@ impl AttachmentStorage {
             actor,
             basis,
             checkpoint,
+            plan,
         })
     }
     fn inspect_consumed_start_basis(
@@ -397,6 +410,11 @@ mod tests {
         let prepared = storage
             .prepare_consumed_start(&owner, request(), actor, sign)
             .unwrap();
+        super::super::consumption_plan::assert_staged_refusals(
+            &prepared.checkpoint,
+            WorkspaceId::from_bytes(short_id(prepared.basis.prospective.as_bytes())),
+            &key,
+        );
         assert_ne!(prepared.basis.configuration, prepared.basis.prospective);
         let proposed = Json::parse(&prepared.basis.prospective).unwrap();
         let expected =

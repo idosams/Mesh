@@ -6753,3 +6753,25 @@ run. Published predecessor `1a28f903f3f0015b6c8f9f6086b704b3c30b1330` passed all
 in run `37219440756`. These results cover the exact retained-file recovery seam and existing behavior,
 not a completed cross-store consumption transaction. Draft PR #324 and issue #323 remain open;
 the fixed user checkpoint remains unchanged.
+
+R161 preparation and revalidation now reconstruct an exact materialization plan from the authenticated
+initial operation and retained checkpoint objects. The verifier binds the prospective workspace,
+genesis sequence/parents/epoch/time/base and independently derived resulting head. It accepts only
+the complete initial-tree operation grammar: explicit empty root, newly created directories and
+files, exact links and matching file versions. Missing parents, aliases, duplicate paths/objects,
+extra operations and unrelated records refuse. The plan contains paths, manifest identities and
+executable flags; it does not contain a second copy of file bodies.
+
+Content verification checks each logical manifest, chunk layout, retained chunk digest, reconstructed
+file digest, per-file and whole-tree byte limits, and exact referenced-object coverage. It streams
+hashing over retained chunks. Reconstructed paths have a 64-MiB aggregate bound checked before each
+path allocation; retained objects have the admitted content budget plus the existing 16-MiB signed
+payload ceiling. Bounds refuse explicitly without truncating the tree or writing destination files.
+
+Eight focused tests passed, including real signed nonempty/empty sources, preserved saved ignore
+rules, tampered/missing staged content, invalid bounds, nested executable plans and conflicting
+paths/versions. Valid signatures over a false genesis base or resulting head are refused. Removing
+the resulting-head check makes the signed refusal test fail; the exact source was restored. Full
+repository validation is pending. This connects signed preparation to a verifiable materialization
+plan; durable staging, journal-before-install ordering, owner consumption and cross-store recovery
+remain unfinished in draft PR #324 / issue #323. The fixed user checkpoint remains unchanged.
