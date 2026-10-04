@@ -5885,3 +5885,5 @@ failure log retained. Full validation and hosted delivery are pending. These are
 counts, not a live working-tree inventory or a completeness claim. Live lane summaries, packaged
 parallel-agent acceptance and the remainder of the fleet plan remain unfinished. Fixed checkpoint
 5052009 and previous checkpoints are unchanged.
+
+R140 implementation `d32385e54f8b0619b8e24149dff45761affdeb46` passed full `npm test`: 3,824 native tests in 168.747s (2 slow, 18 skipped), with rendered, desktop and all real-daemon checks passing. The mixed multi-page regression passed in 78.130s under the full suite. Hosted delivery and packaged graphical acceptance remain pending.
