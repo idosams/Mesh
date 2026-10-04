@@ -4,6 +4,7 @@
 //! Restart reconciliation and process-tree cancellation remain host responsibilities.
 
 use std::io::{self, BufRead, BufReader, Write};
+use std::os::unix::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
@@ -191,6 +192,9 @@ fn spawn_configured(
     goal: &str,
     protocol: ProviderProtocol,
 ) -> io::Result<NativeProcess> {
+    // The live, unreaped direct child pins this process-group number against PID reuse.
+    // Descendants may deliberately leave the group, so this is cancellation, not containment.
+    command.process_group(0);
     let mut child = command.spawn()?;
     let output = Arc::new(Mutex::new(Output::default()));
     // Drain both pipes before feeding input, so startup diagnostics cannot block the writer.
@@ -207,7 +211,7 @@ fn spawn_configured(
         .and_then(|()| input.flush())
         .is_err()
     {
-        let _ = child.kill();
+        let _ = stop_owned_group(&mut child);
         let _ = child.wait();
         return Err(io::Error::new(
             io::ErrorKind::BrokenPipe,
@@ -250,14 +254,46 @@ impl NativeProcess {
             .map(|exit| exit.success() && observation.turn_completed && !observation.failed);
         Ok((observation, outcome))
     }
-    /// Stop the directly owned process. This alone proves neither descendant exit nor custody release.
+    /// Stop the owned provider group before reaping its leader. Escaped descendants may remain;
+    /// neither successful signaling nor pipe closure authorizes capacity or custody release.
+    /// After the direct child is reaped, its numeric identity is never used to signal a group.
     pub fn request_stop(&mut self) -> io::Result<()> {
-        self.child.kill()
+        if self.exit.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "provider leader already reaped",
+            ));
+        }
+        stop_owned_group(&mut self.child)
     }
-    pub(super) fn abort_direct(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+    pub(super) fn abort_owned_group(&mut self) {
+        let _ = self.request_stop();
+        if self.exit.is_none() {
+            self.exit = self.child.wait().ok();
+        }
     }
+}
+
+#[allow(unsafe_code)]
+fn stop_owned_group(child: &mut Child) -> io::Result<()> {
+    unsafe extern "C" {
+        fn kill(pid: std::os::raw::c_int, signal: std::os::raw::c_int) -> std::os::raw::c_int;
+    }
+    let leader = i32::try_from(child.id())
+        .ok()
+        .filter(|id| *id > 1)
+        .ok_or_else(|| io::Error::other("invalid owned provider group"))?;
+    // SAFETY: spawn_configured created this group, and callers have not reaped the owned child.
+    // Its PID cannot be reused while it is alive or an unreaped zombie. Never signal after poll
+    // recorded exit, or reconstruct this authority from persisted process numbers.
+    let group = if unsafe { kill(-leader, 9) } == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    };
+    // Also stop the owned child if it moved to another group; this handle is still unreaped.
+    let direct = child.kill();
+    group.and(direct)
 }
 fn executable_path(path: &Path) -> io::Result<PathBuf> {
     use std::os::unix::fs::PermissionsExt as _;
@@ -324,6 +360,75 @@ fn consume_protocol(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancellation_stops_inherited_provider_group_without_signaling_an_independent_process() {
+        use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+        let root = std::env::temp_dir().join(format!(
+            "mesh-provider-group-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let ready = root.join("ready");
+        let mut command = Command::new("/bin/sh");
+        // The background child inherits both output pipes. Killing only the shell cannot close
+        // those pipes promptly. It also has a short natural lifetime, so a failing regression
+        // can drain and reap safely without signaling a numeric group after its leader is reaped.
+        command
+            .args([
+                "-c",
+                "cat >/dev/null; sleep 4 & echo ready > \"$MESH_TEST_READY\"; wait",
+            ])
+            .env("MESH_TEST_READY", &ready)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut process = spawn_configured(command, "fixture", ProviderProtocol::Codex).unwrap();
+        let mut independent = Command::new("/bin/sleep").arg("10").spawn().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !ready.exists() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(5));
+        }
+        let started = ready.exists();
+        let before_stop = Instant::now();
+        let stop = process.request_stop();
+        let deadline = Instant::now() + Duration::from_secs(6);
+        let mut observed = None;
+        while Instant::now() < deadline {
+            match process.poll() {
+                Ok((activity, Some(outcome))) => {
+                    observed = Some((activity.streams_closed, outcome, before_stop.elapsed()));
+                    break;
+                }
+                Ok(_) => thread::sleep(Duration::from_millis(5)),
+                Err(_) => break,
+            }
+        }
+        let independent_live = independent.try_wait().unwrap().is_none();
+        let _ = independent.kill();
+        independent.wait().unwrap();
+        process.abort_owned_group();
+        let after_reap = process.request_stop().unwrap_err().kind();
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(
+            started,
+            "provider descendant must be started before cancellation"
+        );
+        stop.unwrap();
+        let (closed, outcome, elapsed) = observed.expect("owned provider must drain and exit");
+        assert!(closed);
+        assert!(!outcome);
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "inherited provider group must stop before natural child exit"
+        );
+        assert!(independent_live, "an unrelated process must remain alive");
+        assert_eq!(after_reap, io::ErrorKind::InvalidInput);
+    }
 
     fn observe(stdout: &[u8], stderr: &[u8]) -> CodexObservation {
         let output = Arc::new(Mutex::new(Output::default()));

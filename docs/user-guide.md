@@ -540,3 +540,11 @@ workspace or native work is busy. It does not scan closed workspaces or expire y
 The desktop and background service wait one minute between cleanup attempts. Once cleanup has
 started, disk work can delay another write or shutdown; large-history latency and storage-pressure
 recovery are still being validated. No change to your editor or agent harness is required.
+
+
+## Stopping agent work
+
+Mesh requests termination of the agent's native process group when you stop owned work. Programs
+that detach from that group may continue, so a stop request is not proof that every descendant has
+finished. Uncertain remote execution keeps its capacity reservation and requires reconciliation;
+Mesh does not start a duplicate attempt from a completed status alone. Saved versions remain available.
