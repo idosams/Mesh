@@ -2142,3 +2142,23 @@ preserved. Empty child allocation from consumed progress and exact restart recov
 downstream grant/start/materialization and multi-level consumption recovery, generic callers,
 runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue #323
 and the complete fleet objective stay open. The user checkpoint is unchanged.
+
+R161 native grants can now select a consumed lane's saved progress for an exact child destination.
+The control callback reconstructs source history from a context independently matched to its current
+owner proof, including an exact interrupted control prefix. Completed-parent admission requires the
+already journaled owner receipt; the pending record itself cannot substitute. Historical input
+reconstruction during pending control requires the exact prior consumption relationship. Current
+access still refuses unfinished control, stale grants and revoked grants. Destinations remain
+correlation-only selections under complete custody, so empty and interrupted destinations do not
+need readable source history. This corrects the initial focused run's premature destination reads.
+
+Sixteen focused grant/admission/consumption tests passed in 83.858s, including the existing full
+interrupted-frame campaign. The consumed-parent scenario covers one-byte grant interruption,
+fresh-process recovery and historical retry, revoke with lost reply, regrant, exact saved bytes and
+unchanged source/destination journals with an empty child. An added stale-owner-proof refusal fails
+in 61.820s when its exact proof check is removed; production source was restored byte-for-byte.
+Strict daemon linting passed in 9.28s. The initial failing compatibility run and all diagnostic logs
+are preserved. Full validation, including the added stale-proof and ordinary-read refusal assertions,
+is pending. Start/materialization and multi-level consumption recovery, generic desktop/harness
+callers, runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue
+#323 and the full fleet objective stay open. The fixed user checkpoint is unchanged.

@@ -155,15 +155,16 @@ impl AttachmentStorage {
         let source = &prepared.source;
         let destination = &prepared.destination;
         let validate = || -> io::Result<OpenWorkspace> {
-            match read_private_in_store(&owner.store, PENDING) {
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            let pending_control = match read_private_in_store(&owner.store, PENDING) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+                Ok(raw) if context.matches_pending_control(&raw) => true,
                 Err(error) => return Err(error),
                 Ok(_) => {
                     return Err(invalid(
                         "native control must finish recovery before grant admission",
                     ))
                 }
-            }
+            };
             let (configuration, proof) = context.read(owner)?;
             let proof = proof.ok_or_else(|| invalid("owning dependency enrollment is required"))?;
             let history = OpenWorkspace::open_attachment_read_history(
@@ -176,19 +177,7 @@ impl AttachmentStorage {
             verify_history_binding(&history, &configuration)?;
             let source_binding = context.validate(self, source, guard)?;
             let destination_binding = context.validate(self, destination, guard)?;
-            if !proof.policy().current_bound_grant(
-                (
-                    source_binding.work(),
-                    source_binding.installation(),
-                    request.version.operation(),
-                ),
-                (
-                    destination_binding.work(),
-                    destination_binding.installation(),
-                ),
-                request.grant,
-                (source_binding.correlation, destination_binding.correlation),
-            ) && !context.historical_input(
+            let historical = context.historical_input(
                 &proof,
                 (
                     source_binding.work(),
@@ -201,9 +190,23 @@ impl AttachmentStorage {
                 ),
                 request.grant,
                 (source_binding.correlation, destination_binding.correlation),
-            ) {
+            );
+            let current = proof.policy().current_bound_grant(
+                (
+                    source_binding.work(),
+                    source_binding.installation(),
+                    request.version.operation(),
+                ),
+                (
+                    destination_binding.work(),
+                    destination_binding.installation(),
+                ),
+                request.grant,
+                (source_binding.correlation, destination_binding.correlation),
+            );
+            if !historical && (pending_control || !current) {
                 return Err(invalid(
-                    "native input grant is stale, revoked, unbound or mismatched",
+                    "native input grant is stale, revoked, unfinished, unbound or mismatched",
                 ));
             }
             guard.ensure_current().map_err(error)?;

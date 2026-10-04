@@ -633,6 +633,10 @@ pub(super) fn run_child_if_requested() -> bool {
     let owner = storage.reopen(text("owner")).unwrap();
     let source = storage.reopen(text("source")).unwrap();
     let destination = storage.reopen(text("destination")).unwrap();
+    if text("mode") == "grant-consumed" {
+        storage.consumed_grant_restart_test(&owner, &source, &destination, &value);
+        return true;
+    }
     let version = if text("mode").starts_with("owner") {
         let _guard = crate::workspace_custody::lock_workspace_initialization_set(&[
             owner.store.clone(),

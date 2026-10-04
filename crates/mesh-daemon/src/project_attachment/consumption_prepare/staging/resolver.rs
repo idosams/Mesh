@@ -118,9 +118,15 @@ impl AttachmentStorage {
             for selection in pending {
                 let result = (|| {
                     let mut source = None;
+                    let mut available = Vec::new();
                     for work in &admitted {
                         let selected = self.prepare_dependency_work(owner, work)?;
-                        let binding = context.validate(self, &selected, guard)?;
+                        let Ok(binding) = context.validate(self, &selected, guard) else {
+                            // An empty descendant may need this very parent proof for correlation.
+                            // Omit it from this source reconstruction, then validate the full set below.
+                            continue;
+                        };
+                        available.push(*work);
                         if (binding.work(), binding.installation()) == selection.source
                             && source.replace(*work).is_some()
                         {
@@ -140,7 +146,7 @@ impl AttachmentStorage {
                             destination: selection.work,
                             grant: selection.grant,
                         },
-                        available: &admitted,
+                        available: &available,
                         request: selection.request,
                         limits: selection.limits,
                     };
@@ -151,8 +157,10 @@ impl AttachmentStorage {
                         guard,
                         context.clone(),
                         |candidate, staged, graph, guard| {
-                            let (configuration, proof) =
-                                candidate.verify_completed_history(graph, guard, None)?;
+                            let (configuration, proof) = candidate
+                                .verify_completed_history_with_owner(
+                                    graph, guard, None, &context,
+                                )?;
                             let roots = candidate.completed_graph_roots(&staged, graph)?;
                             context.clone().with_verified_history(
                                 selection.work,
@@ -179,6 +187,8 @@ impl AttachmentStorage {
             pending = remaining;
         }
         for work in admitted {
+            let selected = self.prepare_dependency_work(owner, work)?;
+            context.validate(self, &selected, guard)?;
             context.read(work)?;
             context.verified_history_roots(work)?;
         }

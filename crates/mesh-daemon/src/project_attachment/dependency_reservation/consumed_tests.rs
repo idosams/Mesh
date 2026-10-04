@@ -100,5 +100,6 @@ impl AttachmentStorage {
             )
             .is_err());
         assert_eq!(self.registrations().unwrap().len(), count + 1);
+        self.assert_consumed_child_grant(owner, parent, version, &child, start.input.source);
     }
 }

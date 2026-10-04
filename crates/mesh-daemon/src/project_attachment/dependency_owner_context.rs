@@ -178,6 +178,27 @@ impl<'a> OwnerHistoryContext<'a> {
         }
         Ok(Some(snapshot.roots.clone()))
     }
+    pub(super) fn for_control(
+        owner: &'a ProvisionedAttachment,
+        proof: &VerifiedDependencyRead,
+    ) -> io::Result<Self> {
+        let mut context = Self::current(owner);
+        if proof.pending().is_some() {
+            let name = super::dependency_decision::PENDING;
+            context.pending = Some((name.to_owned(), read_private_in_store(&owner.store, name)?));
+        }
+        if context.read(owner)?.1.as_ref() != Some(proof) {
+            return Err(invalid(
+                "native control context differs from exact owner proof",
+            ));
+        }
+        Ok(context)
+    }
+    pub(super) fn matches_pending_control(&self, raw: &str) -> bool {
+        self.pending.as_ref().is_some_and(|(name, value)| {
+            name == super::dependency_decision::PENDING && value == raw
+        })
+    }
     pub(super) fn for_request(mut self, request: RecordDigest) -> Self {
         self.request = Some(request);
         self.operation = None;

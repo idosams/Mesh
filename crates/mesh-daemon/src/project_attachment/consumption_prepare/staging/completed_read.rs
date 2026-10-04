@@ -71,6 +71,19 @@ impl PreparedNativeConsumedStart {
         guard: &WorkspaceInitializationGuard,
         capture: Option<&str>,
     ) -> io::Result<(String, VerifiedDependencyRead)> {
+        let context =
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::current(
+                &self.owner,
+            );
+        self.verify_completed_history_with_owner(graph, guard, capture, &context)
+    }
+    pub(super) fn verify_completed_history_with_owner(
+        &self,
+        graph: &NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+        capture: Option<&str>,
+        context: &crate::project_attachment::dependency_owner_context::OwnerHistoryContext<'_>,
+    ) -> io::Result<(String, VerifiedDependencyRead)> {
         guard.ensure_current().map_err(error)?;
         let destination = &self.destination;
         let pending = read_private_in_store(&destination.store, super::super::START_PENDING)?;
@@ -110,18 +123,17 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("completed starting selection changed"));
         }
-        // Read the full owning authority independently. A local completion or pending owner prefix
-        // cannot substitute for the exact durable owning receipt, even after a later grant revoke.
-        let (owner_configuration, owner) = self
-            .owner
-            .project()
-            .read_configuration(self.owner.metadata_path(), &self.owner.store)?;
+        // The exact receipt must already exist in the independently verified owner prefix.
+        // A pending record may never stand in for this historical completed consumption.
+        let (owner_configuration, owner) = context.read(&self.owner)?;
         let owner = owner.ok_or_else(|| invalid("owning authority missing"))?;
         let owner_record = owner
             .policy()
             .native_request(self.request)
             .ok_or_else(|| invalid("owning consumption receipt missing"))?;
-        if owner.pending().is_some()
+        if owner
+            .pending()
+            .is_some_and(|(_, pending)| pending.payload == owner_record.payload)
             || owner_record.kind != DependencyKind::Consumption
             || owner_record.payload != owner_receipt
         {
@@ -209,10 +221,7 @@ impl PreparedNativeConsumedStart {
         }
         let proof = VerifiedDependencyRead::from_consumption(VerifiedConsumedHistory { facts });
         let (after_configuration, after) = read_facts()?;
-        let (after_owner_configuration, after_owner) = self
-            .owner
-            .project()
-            .read_configuration(self.owner.metadata_path(), &self.owner.store)?;
+        let (after_owner_configuration, after_owner) = context.read(&self.owner)?;
         if after_configuration != configuration
             || !after
                 .as_ref()
