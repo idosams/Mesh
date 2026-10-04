@@ -5887,3 +5887,34 @@ parallel-agent acceptance and the remainder of the fleet plan remain unfinished.
 5052009 and previous checkpoints are unchanged.
 
 R140 implementation `d32385e54f8b0619b8e24149dff45761affdeb46` passed full `npm test`: 3,824 native tests in 168.747s (2 slow, 18 skipped), with rendered, desktop and all real-daemon checks passing. The mixed multi-page regression passed in 78.130s under the full suite. Hosted delivery and packaged graphical acceptance remain pending.
+
+
+## R141 — bounded exact saved-progress summary boundary
+
+New canonical implementation based on PR #281 head
+`dda9560fc55946765b6357a02939ca4b165bd509`; no preserved source commit is replaced.
+Tracks issue #282 and the phase-3 live-overview requirement. A native summary projection reuses the
+same immutable change-set calculation as the full comparison but returns before constructing any
+named entry or selected content. FleetHistory and FleetService expose saved_progress_summary for
+one exact retained operation through the existing custody-verified, outside-lock history read.
+Unknown versions, unbound starts and substituted roots still refuse. The read does not adopt a
+worker, start capture, create a checkpoint, or grant handoff/approval authority.
+
+The read-only summarize_fleet_saved_progress desktop command delegates to that history boundary on
+the blocking pool. The new mesh.fleet-saved-progress-summary/v1 response carries source/start/target
+identities, separately observed latest acknowledgment and complete saved file/folder totals. Its
+strict parser limits serialized replies to 2 KiB, rejects unexpected summary fields, malformed or
+inconsistent counts and mismatched selections, and never retargets to a newer acknowledgment.
+No persisted schema or existing comparison response is changed by this increment.
+
+The focused native regression passed in 60.13s: 202 files and one folder produce the same aggregate
+as both comparison pages; the summary has exactly the expected fields, fits the response bound and
+remains fixed after a later save. Existing restart/substituted-root and cross-lane regressions also
+exercise the new read. Parser tests cover bounded output, wrong identities, malformed counts,
+unexpected entry fields and false authority. Replacing the selected version with the latest
+acknowledgment fails the regression; source restored exactly. Full gate and hosted delivery remain
+pending. This is the summary read foundation: independent bounded lane refresh and live presentation
+still follow, and the complete packaged/second-provider/second-host acceptance plan remains open.
+The fixed user checkpoint is unchanged and does not include this new command.
+
+R141 implementation `849bbbd21aaa932bf4e4353d0adeeb56833f7012` passed full `npm test`: 3,824 native tests in 170.334s (2 slow, 18 skipped), 191 rendered tests, 665 desktop tests and all 44 real-daemon checks. Restart, substituted-root and cross-lane summary refusals passed in the complete suite. Hosted delivery and overview presentation remain pending.

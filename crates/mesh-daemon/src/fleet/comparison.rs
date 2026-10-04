@@ -125,6 +125,25 @@ pub(crate) fn compare(
     after: Option<&str>,
     selected: Option<&str>,
 ) -> Result<Json, Unavailable> {
+    project(open, base, target, after, selected, false)
+}
+
+pub(crate) fn summarize(
+    open: &OpenWorkspace,
+    base: RecordDigest,
+    target: RecordDigest,
+) -> Result<Json, Unavailable> {
+    project(open, base, target, None, None, true)
+}
+
+fn project(
+    open: &OpenWorkspace,
+    base: RecordDigest,
+    target: RecordDigest,
+    after: Option<&str>,
+    selected: Option<&str>,
+    summary_only: bool,
+) -> Result<Json, Unavailable> {
     if after.is_some() && selected.is_some() {
         return Err(refused());
     }
@@ -163,6 +182,16 @@ pub(crate) fn compare(
         }
     }
     let folder_total = changed.len() as u64 - file_total;
+    if summary_only {
+        return Ok(Json::object([
+            ("base", Json::text(base.to_string())),
+            ("target", Json::text(target.to_string())),
+            ("total", Json::Number(changed.len() as u64)),
+            ("file_total", Json::Number(file_total)),
+            ("folder_total", Json::Number(folder_total)),
+            ("approval_authority", Json::Bool(false)),
+        ]));
+    }
     let start = match after.or(selected) {
         Some(id) => {
             changed

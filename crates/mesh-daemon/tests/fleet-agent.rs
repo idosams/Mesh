@@ -3096,6 +3096,16 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
         .saved_progress_comparison(&f.lane, &version, None, Some(object))
         .unwrap();
     assert_eq!(pinned.get("progress"), restored.get("progress"));
+    let restored_summary = reopened.saved_progress_summary(&f.lane, &version).unwrap();
+    assert_eq!(
+        restored_summary
+            .get("progress")
+            .unwrap()
+            .get("file_total")
+            .and_then(Json::as_u64),
+        Some(1)
+    );
+
     assert_eq!(before.revision, reopened.native_state().unwrap().revision);
     assert_eq!(selected_before, f.desktop.workspace_state().unwrap());
     assert_eq!(
@@ -3124,6 +3134,7 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
     assert!(reopened
         .saved_progress_comparison(&f.lane, &version, None, None)
         .is_err());
+    assert!(reopened.saved_progress_summary(&f.lane, &version).is_err());
 }
 
 #[test]
@@ -3178,6 +3189,10 @@ fn ordinary_saved_progress_pages_exact_operations_and_isolates_lanes() {
         .collect();
     assert_eq!(all.len(), rows.len() + remaining.len());
     assert!(saved_versions.is_subset(&all));
+    assert!(other
+        .service
+        .saved_progress_summary(&other.lane, saved_versions.first().unwrap())
+        .is_err());
     for version in &saved_versions {
         assert!(other
             .service
@@ -3418,6 +3433,24 @@ fn saved_change_counts_cover_all_pages_and_ignore_later_work() {
         assert_eq!(p.get("folder_total").and_then(Json::as_u64), Some(1));
     };
     counts(&first);
+    let summary = f.service.saved_progress_summary(&f.lane, &version).unwrap();
+    counts(&summary);
+    assert_eq!(
+        text(&summary, "schema"),
+        "mesh.fleet-saved-progress-summary/v1"
+    );
+    assert_eq!(
+        summary.get("progress").unwrap(),
+        &Json::object([
+            ("base", Json::text(text(progress, "base"))),
+            ("target", Json::text(&version)),
+            ("total", Json::Number(203)),
+            ("file_total", Json::Number(202)),
+            ("folder_total", Json::Number(1)),
+            ("approval_authority", Json::Bool(false)),
+        ])
+    );
+    assert!(summary.encode().len() < 2048);
     let rows = progress.get("changes").unwrap().as_array().unwrap();
     assert_eq!(rows.len(), 200);
     let next = read(Some(text(progress, "next_after")), None);
@@ -3452,6 +3485,22 @@ fn saved_change_counts_cover_all_pages_and_ignore_later_work() {
         Some(2)
     );
     assert_eq!(read(None, None).get("progress"), first.get("progress"));
+    assert_eq!(
+        f.service
+            .saved_progress_summary(&f.lane, &version)
+            .unwrap()
+            .get("progress"),
+        summary.get("progress")
+    );
+    assert!(f
+        .service
+        .saved_progress_summary(&f.lane, &"0".repeat(64))
+        .is_err());
+    assert!(f
+        .service
+        .saved_progress_summary(&f.lane, "not-a-version")
+        .is_err());
+
     assert_eq!(
         fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
         "immutable input\n"

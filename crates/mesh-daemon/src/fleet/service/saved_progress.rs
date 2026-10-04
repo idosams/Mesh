@@ -12,6 +12,11 @@ fn version_id(value: &str) -> Result<RecordDigest, Unavailable> {
 }
 
 impl FleetHistory {
+    /// Counts for one exact retained version, with no entry names, content or execution adoption.
+    pub fn saved_progress_summary(&self, lane: &str, version: &str) -> Result<Json, Unavailable> {
+        self.0.saved_progress_summary(lane, version)
+    }
+
     /// Page retained operations without acquiring a worker or creating a handoff checkpoint.
     pub fn saved_progress_versions(
         &self,
@@ -114,6 +119,31 @@ impl FleetService {
                     version,
                     after,
                     selected,
+                )
+            },
+        )
+    }
+
+    /// Aggregate only; unknown history and substituted custody still refuse through the shared read.
+    pub fn saved_progress_summary(&self, lane: &str, version: &str) -> Result<Json, Unavailable> {
+        let version = version_id(version)?;
+        self.with_progress_history(
+            lane,
+            "mesh.fleet-saved-progress-summary/v1",
+            |open, binding| {
+                if !open
+                    .workspace_versions()
+                    .iter()
+                    .any(|entry| entry.operation() == version)
+                {
+                    return Err(refusal("fleet-progress-version-unavailable"));
+                }
+                super::super::comparison::summarize(
+                    open,
+                    binding
+                        .starting_version()
+                        .ok_or_else(|| refusal("fleet-starting-version-unbound"))?,
+                    version,
                 )
             },
         )
