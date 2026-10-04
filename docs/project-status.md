@@ -1805,3 +1805,13 @@ consumption admission fencing makes the new regression fail in 0.210s; exact sou
 Full repository validation is pending. This is read-only prefix verification, not the durable start
 writer, materialization, owner/completion transaction or cross-store admission. Those remain required
 in draft PR #324 / issue #323, together with complete restart and fault proof. The checkpoint is fixed.
+
+R161 start-prefix implementation `eef22fe60b0e2f05ff76be69b33a2854c21058fe` passed full
+`npm test`: 3,949 native tests in 275.019s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `41923e7ae4f9d135abd262b4981815d48198fcaa` passed all seven hosted checks
+in run `37225144094`; the preceding run `37224305162` also completed all seven successfully.
+Focused prefix/refusal tests, deliberately failing admission mutation and complete Git history are
+preserved. This validates read-only exact-start recovery facts, not a durable start writer or an
+acknowledged consumption transaction. Installation, owner/completion receipts, full restart recovery
+and cross-store admission remain required in draft PR #324 / issue #323. The checkpoint is unchanged.
