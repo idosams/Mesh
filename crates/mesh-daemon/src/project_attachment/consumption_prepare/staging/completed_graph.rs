@@ -18,17 +18,24 @@ impl PreparedNativeConsumedStart {
     ) -> io::Result<NativeDependencyGraph> {
         let (configuration, proof) = self.verify_completed_history(source_graph, guard, None)?;
         let roots = self.completed_graph_roots(staged, source_graph)?;
-        let context = OwnerHistoryContext::current(&self.owner).with_verified_history(
-            &self.destination,
-            configuration.clone(),
-            proof.clone(),
-            roots,
-        )?;
         let available = self
             .available
             .iter()
             .chain(std::iter::once(&self.source))
             .collect::<Vec<_>>();
+        let context = storage
+            .resolve_consumed_histories(
+                &self.owner,
+                &available,
+                guard,
+                OwnerHistoryContext::current(&self.owner),
+            )?
+            .with_verified_history(
+                &self.destination,
+                configuration.clone(),
+                proof.clone(),
+                roots,
+            )?;
         let selected = storage.prepare_dependency_graph(
             &self.owner,
             &self.destination,

@@ -2172,3 +2172,46 @@ Complete history and failed compatibility, focused, mutation and full logs are p
 consumed-source grants and restart recovery are verified; child materialization/start and multi-level
 consumption recovery, generic callers, runtime/publication controls and packaged acceptance remain
 required. Draft PR #324 / issue #323 and the full fleet goal stay open. The checkpoint is unchanged.
+
+R161 now carries resolved native source histories through consumed-child preparation, commit,
+recovery and completed graph inspection. The same held custody context validates the source graph,
+destination correlation and exact input grant; post-read comparisons refresh those facts. Recovery
+reconstructs the intermediate lane before the child and never grows its held root set. The selected
+saved bytes remain distinct from current parent editor contents, and signing remains outside custody.
+
+Seven focused graph/consumption tests passed in 94.838s. A real second consumed lane installs its
+parent's later saved bytes, interrupts its owner receipt after one byte, restarts and interrupts local
+completion, loses the completed reply, and retries twice without duplicate owner/destination records
+or changed installed identities. Explicit and automatic graphs agree across three retained native
+stores. Omitting the intermediate lane refuses inspection. Later child captures preserve the original
+saved bytes and leave the source history/editor and owner history unchanged. An added revoke-after-
+signing case refuses staging without a child file or journal change, then prepares under a new grant.
+Removing parent-context resolution from commit made the scenario fail in 75.080s; exact source was
+restored. Strict daemon linting passed in 9.27s. Full validation is pending. This verifies native
+materialization/recovery, not provider/runtime permission, desktop integration or packaged acceptance.
+Generic desktop/harness callers, runtime/publication/review/import/remote controls and the remaining
+fault/acceptance campaigns stay required. PR #324 / issue #323 and the full fleet goal remain open;
+the user checkpoint stays fixed.
+
+R161 chained consumed starts `68979980c931a390fbcd4f3c7e62177173da2e44` passed full `npm test`:
+3,949 native tests in 299.421s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and
+all remaining repository/docs/license/storage/format/lint/real-daemon gates. This includes the
+revoke-after-signing refusal and multi-process, two-level consumption recovery assertions.
+This increment is delivered separately on `idosams/chained-consumed-start`, based on published
+`idosams/native-consumed-start` at `935f8820a26e62d82202a5c44bcda264df08175c` (prerequisite PR #324).
+It replaces no preserved fleet source commit; it extends the canonical native implementation.
+The prerequisite passed all seven hosted checks in run `37239592857`; the child increment still
+requires its own hosted checks and merge. Full goal and issue #323 remain open: generic callers,
+runtime/publication/review/import/remote controls and packaged acceptance remain required.
+The fixed user checkpoint is unchanged.
+
+R161 native transaction/grant foundation PR #324 merged normally into canonical `main` on
+2026-10-04 at `e92adb547a86a3059182be301c30ed632017892d`, after all seven checks passed on
+`935f8820a26e62d82202a5c44bcda264df08175c` (run `37239592857`). Post-merge CI is separate.
+Chained recovery PR #325 passed all seven checks on `e27f41302850e643040062c8454fd6aa57f76e76`
+(run `37240702369`). Its reconciliation merge `938415c322e9c585ca12238d95ff52c207317569`
+has the identical complete tree; only delivery documentation changes follow. It now targets main
+and requires current-head hosted checks before merge. Empty-input acceptance PR #326 is published
+at `60eeb73e9abbb3f9d35d523768003be4f44ca3cf`, with CI running. The native foundation is merged;
+the full fleet objective and issue #323 remain open for generic callers, runtime/publication/review/
+import/remote controls, remaining fault campaigns and packaged acceptance. The checkpoint is unchanged.

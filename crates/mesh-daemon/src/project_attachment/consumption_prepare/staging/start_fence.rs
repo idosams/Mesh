@@ -143,6 +143,10 @@ impl PreparedNativeConsumedStart {
                 &self.owner,
             )
         };
+        let works = std::iter::once(&self.source)
+            .chain(available.iter().copied())
+            .collect::<Vec<_>>();
+        let context = storage.resolve_consumed_histories(&self.owner, &works, &guard, context)?;
         let current_graph =
             storage.inspect_dependency_graph_with_owner(&graph, &guard, &context)?;
         let source = context.validate(storage, &source, &guard)?;

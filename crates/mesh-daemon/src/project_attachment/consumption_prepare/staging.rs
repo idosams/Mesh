@@ -1,4 +1,6 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
+#[cfg(test)]
+mod chained_tests;
 mod checkpoint;
 mod complete;
 mod completed_graph;
