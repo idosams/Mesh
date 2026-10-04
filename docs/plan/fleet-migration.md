@@ -6595,3 +6595,18 @@ fixture omitted native read custody and correctly failed; it was corrected witho
 reader. This is signed native journal replay, not a delivered consumption transaction. Copying,
 required persistent fencing, owner consumption commit and exact recovery remain unfinished. The
 published draft head and fixed user checkpoint remain unchanged while hosted checks run.
+
+Local R161 snapshot preparation now builds deterministic initial operations and prepared manifests
+from exact granted immutable content, with an explicit workspace-root declaration, file/entry/total
+budgets, and an output sink that refuses growth beyond the admitted file length. It does not write
+destination files or history. Eight grant tests passed (1.51s); the new stream-bound test passed,
+and the granted-snapshot test passed again through that sink (0.40s). Unsaved source edits are not
+used and the owner journal remains unchanged.
+
+This internal builder is not yet wired into production consumption/signing or recovery. Full
+validation and publication of this local refinement remain pending; the earlier full gate covers
+only the published custody groundwork. A further transaction requirement is explicit binding of
+the copied snapshot's ignore rules: the empty reservation already bound its original capture policy,
+so copied rule files cannot silently change that policy or break later captures. Resolve that in the
+required consumption binding together with the pending-writer fence. The full #323 scope remains
+open and the published draft head remains fixed while hosted checks run.

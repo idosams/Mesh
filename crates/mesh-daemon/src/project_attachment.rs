@@ -52,6 +52,7 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod consumption_start;
 mod dependency_decision;
 mod dependency_grant;
 mod grant_admission;

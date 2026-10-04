@@ -419,3 +419,61 @@ fn prepared_grant_requires_complete_held_custody_and_refreshes_permission() {
         .is_err());
     guard.ensure_current().unwrap();
 }
+
+#[test]
+fn granted_initial_snapshot_preparation_uses_saved_bytes_and_has_explicit_root() {
+    use mesh_operations::{ActorId, ObjectId, Operation, WorkspaceId};
+    let f = Fixture::new("starting-snapshot");
+    let grant = f.grant(true, None, id(1)).unwrap();
+    fs::write(
+        f.source.project().root().join("note"),
+        b"later unsaved bytes",
+    )
+    .unwrap();
+    let prepare = |limits| {
+        f.inspect(grant.record(), |view| {
+            crate::project_attachment::consumption_start::prepare_initial_snapshot(
+                &view,
+                WorkspaceId::from_bytes([7; 16]),
+                ActorId::from_bytes([8; 32]),
+                limits,
+            )
+        })
+    };
+    let before = fs::read(f.journal()).unwrap();
+    let snapshot = prepare(ObservationLimits::default()).unwrap();
+    assert_eq!(
+        snapshot.operations[0],
+        Operation::InitializeWorkspace {
+            root_id: ObjectId::from_bytes([0; 16])
+        }
+    );
+    assert_eq!(snapshot.operations.len(), 4);
+    assert_eq!(snapshot.files.len(), 1);
+    let expected = crate::checkpoint_storage::PreparedCheckpointFile::from_bytes(
+        b"private source version",
+        &mesh_chunking::ChunkingConfig::default(),
+        crate::ManifestPagingPolicy::flat(),
+    )
+    .unwrap();
+    assert_eq!(snapshot.files[0].manifest(), expected.manifest());
+    assert_eq!(
+        prepare(ObservationLimits::default()).unwrap().operations,
+        snapshot.operations
+    );
+    assert!(prepare(ObservationLimits {
+        file_bytes: 1,
+        ..ObservationLimits::default()
+    })
+    .is_err());
+    assert!(prepare(ObservationLimits {
+        bytes: 1,
+        ..ObservationLimits::default()
+    })
+    .is_err());
+    assert_eq!(fs::read(f.journal()).unwrap(), before);
+    assert_eq!(
+        fs::read(f.source.project().root().join("note")).unwrap(),
+        b"later unsaved bytes"
+    );
+}
