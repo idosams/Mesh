@@ -259,6 +259,42 @@ impl PinnedWorkspaceRoot {
         Ok(child)
     }
 
+    /// Publish one exact staged directory into an absent catalog slot. The kernel refuses an
+    /// existing destination, including an empty directory; no check-then-replace fallback exists.
+    pub(crate) fn publish_child_directory(
+        &self,
+        name: &OsStr,
+        expected: &PinnedWorkspaceRoot,
+        destination: &PinnedWorkspaceRoot,
+        target: &OsStr,
+    ) -> io::Result<PinnedWorkspaceRoot> {
+        let selected = self.open_child_directory(name)?;
+        expected.ensure_namespace_identity()?;
+        destination.ensure_namespace_identity()?;
+        if selected.identity()? != expected.identity()? {
+            return Err(io::Error::other("staged directory identity changed"));
+        }
+        if target.is_empty()
+            || target == OsStr::new(".")
+            || target == OsStr::new("..")
+            || target.as_bytes().contains(&b'/')
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid catalog slot",
+            ));
+        }
+        renameat_new(&self.directory, name, &destination.directory, target)?;
+        self.directory.sync_all()?;
+        destination.directory.sync_all()?;
+        self.ensure_namespace_identity()?;
+        let published = destination.open_child_directory(target)?;
+        if published.identity()? != expected.identity()? {
+            return Err(io::Error::other("published directory identity changed"));
+        }
+        Ok(published)
+    }
+
     /// Stable device and inode identity of the retained directory descriptor.
     pub(crate) fn identity(&self) -> io::Result<(u64, u64)> {
         let metadata = self.directory.metadata()?;
@@ -858,6 +894,73 @@ fn renameat(
 }
 
 #[allow(unsafe_code)]
+fn renameat_new(
+    from_directory: &File,
+    from: &OsStr,
+    to_directory: &File,
+    to: &OsStr,
+) -> io::Result<()> {
+    let from = CString::new(from.as_bytes())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid source name"))?;
+    let to = CString::new(to.as_bytes())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid target name"))?;
+    #[cfg(target_os = "macos")]
+    unsafe extern "C" {
+        fn renameatx_np(
+            from_fd: i32,
+            from: *const std::ffi::c_char,
+            to_fd: i32,
+            to: *const std::ffi::c_char,
+            flags: u32,
+        ) -> i32;
+    }
+    #[cfg(target_os = "linux")]
+    unsafe extern "C" {
+        fn renameat2(
+            from_fd: i32,
+            from: *const std::ffi::c_char,
+            to_fd: i32,
+            to: *const std::ffi::c_char,
+            flags: u32,
+        ) -> i32;
+    }
+    // SAFETY: owned directory descriptors and live C strings. RENAME_EXCL (macOS) and
+    // RENAME_NOREPLACE (Linux) atomically refuse every existing destination.
+    #[cfg(target_os = "macos")]
+    let result = unsafe {
+        renameatx_np(
+            from_directory.as_raw_fd(),
+            from.as_ptr(),
+            to_directory.as_raw_fd(),
+            to.as_ptr(),
+            0x00000004,
+        )
+    };
+    #[cfg(target_os = "linux")]
+    let result = unsafe {
+        renameat2(
+            from_directory.as_raw_fd(),
+            from.as_ptr(),
+            to_directory.as_raw_fd(),
+            to.as_ptr(),
+            1,
+        )
+    };
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let result = {
+        let _ = (from_directory, to_directory, from, to);
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "exclusive directory publication unsupported",
+        ));
+    };
+    if result != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+#[allow(unsafe_code)]
 fn unlinkat(directory: &File, name: &OsStr) -> io::Result<()> {
     unsafe extern "C" {
         fn unlinkat(directory: i32, path: *const std::ffi::c_char, flags: i32) -> i32;
@@ -888,6 +991,43 @@ mod tests {
         ));
         std::fs::create_dir_all(&path).expect("scratch root");
         path
+    }
+
+    #[test]
+    fn staged_directory_publication_never_replaces_an_existing_catalog_slot() {
+        let root = scratch("exclusive-publication");
+        let parent = PinnedWorkspaceRoot::open(root.clone()).unwrap();
+        let staging = parent
+            .create_child_directory(OsStr::new("staging"))
+            .unwrap();
+        let catalog = parent
+            .create_child_directory(OsStr::new("catalog"))
+            .unwrap();
+        let source = staging
+            .create_child_directory(OsStr::new("source"))
+            .unwrap();
+        let occupied = catalog
+            .create_child_directory(OsStr::new("occupied"))
+            .unwrap();
+        assert!(staging
+            .publish_child_directory(
+                OsStr::new("source"),
+                &source,
+                &catalog,
+                OsStr::new("occupied")
+            )
+            .is_err());
+        source.ensure_namespace_identity().unwrap();
+        occupied.ensure_namespace_identity().unwrap();
+        let published = staging
+            .publish_child_directory(OsStr::new("source"), &source, &catalog, OsStr::new("new"))
+            .unwrap();
+        assert_eq!(published.identity().unwrap(), source.identity().unwrap());
+        assert!(source.ensure_namespace_identity().is_err());
+        assert!(staging
+            .publish_child_directory(OsStr::new(".."), &staging, &catalog, OsStr::new("escape"))
+            .is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn copy_tree(from: &Path, to: &Path) {

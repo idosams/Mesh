@@ -485,3 +485,32 @@ These receipts establish only private capture identity and recovery. They are no
 access grants, consumed-input receipts or publication approvals. Dependency-aware reservation,
 materialized starting-operation binding, full inherited closure and retained roots, all publication
 paths, runtime controls and packaged acceptance remain required. The fixed user checkpoint is unchanged.
+
+
+## Empty native destination reservation (R159)
+
+`reserve_dependency_lane` creates a distinct reserved destination before input grants or copying.
+The source version is verified under native custody, but no source content is materialized. The
+reservation binds owning authority, exact parent correlation, source operation, request and physical
+catalog/allocation/files/store identities. Its required intent schema is
+`mesh.attachment-lane-reservation/v1`; `mesh.native-reserved-destination/v1` acknowledges the
+identity only. It does not produce the legacy `ready.json` record or imply consumed input.
+
+An empty destination history is initialized and enrolled inside private allocation staging outside
+the visible project catalog. Its own installation's enrollment fences legacy writers; this is distinct
+from the owning project's policy authority. Native exclusive rename publishes the exact staged store
+into an absent catalog slot, retaining its physical identity and syncing both directory parents.
+An existing destination is never replaced. Current native work selection validates the reservation
+and complete bounded ancestry, including the stored parent correlation; children cannot discard
+lineage by selecting themselves as root authority. Reservation refuses an over-depth child before
+creating its allocation. The implementation does not require an actor signature to reserve identity.
+
+Exact retry handles initialized, fenced, published and recorded phases without duplicating work.
+Completed reservations preserve later manual captures. Missing early identity receipts, substituted
+objects, unknown partial state and unexpected user files remain available for explicit reconciliation;
+retry does not erase or adopt them. A failed acknowledgement retains evidence, and completed retry
+re-synchronizes its reserved receipt and catalog before returning. Readability and reserved identity
+provide no grant or current eligibility. Native grants and revocations can now target the reserved
+work, while actual copying/consumption remains disabled until full closure, retention and exact
+starting-operation/consumption receipt verification are implemented. No renderer, provider or CLI
+route enables automatic reservation/enrollment through this development API.
