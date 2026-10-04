@@ -524,3 +524,66 @@ fn aggregate_byte_budget_is_enforced_before_record_limit_without_losing_roots() 
     apply(&mut h, &g);
     assert_eq!(h, before);
 }
+
+#[test]
+fn bound_grant_schema_retains_correlation_and_refuses_missing_or_malformed_bindings() {
+    fn bound(schema: &str, bindings: Option<Json>) -> (DependencyRecord, Vec<u8>) {
+        let e = enrollment();
+        let mut value =
+            Json::parse(std::str::from_utf8(&grant(2, e.0.payload, 40, 1, ZERO, true).1).unwrap())
+                .unwrap();
+        let Json::Object(fields) = &mut value else {
+            unreachable!()
+        };
+        fields
+            .iter_mut()
+            .find(|(name, _)| name == "schema")
+            .unwrap()
+            .1 = Json::text(schema);
+        if let Some(bindings) = bindings {
+            let Json::Object(body) = &mut fields
+                .iter_mut()
+                .find(|(name, _)| name == "body")
+                .unwrap()
+                .1
+            else {
+                unreachable!()
+            };
+            body.push(("bindings".into(), bindings));
+        }
+        let bytes = value.encode().into_bytes();
+        let mut record = grant(2, e.0.payload, 40, 1, ZERO, true).0;
+        record.payload = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+        (record, bytes)
+    }
+    let good = bound(
+        "mesh.dependency-policy/v2",
+        Some(Json::Array(vec![j(70), j(71)])),
+    );
+    let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+    apply(&mut history, &enrollment());
+    apply(&mut history, &good);
+    assert!(
+        matches!(history.records.get(&good.0.payload), Some((_, Event::Grant { bindings: Some((a, b)), .. })) if *a == d(70) && *b == d(71))
+    );
+    for bad in [
+        bound(
+            "mesh.dependency-policy/v1",
+            Some(Json::Array(vec![j(70), j(71)])),
+        ),
+        bound("mesh.dependency-policy/v2", None),
+        bound("mesh.dependency-policy/v2", Some(Json::Array(vec![j(70)]))),
+        bound(
+            "mesh.dependency-policy/v2",
+            Some(Json::Array(vec![j(0), j(71)])),
+        ),
+        bound(
+            "mesh.dependency-policy/v3",
+            Some(Json::Array(vec![j(70), j(71)])),
+        ),
+    ] {
+        let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+        apply(&mut history, &enrollment());
+        refuse(&mut history, &bad);
+    }
+}

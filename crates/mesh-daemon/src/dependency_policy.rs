@@ -50,6 +50,7 @@ enum Event {
         generation: u64,
         previous: RecordDigest,
         allowed: bool,
+        bindings: Option<(RecordDigest, RecordDigest)>,
     },
     Consumption {
         grant: RecordDigest,
@@ -130,7 +131,9 @@ impl DependencyPolicyHistory {
                 "body",
             ],
         )?;
-        if value(&json, "schema")?.as_text() != Some(SCHEMA)
+        let bound_grant = value(&json, "schema")?.as_text() == Some("mesh.dependency-policy/v2")
+            && envelope.kind == DependencyKind::Grant;
+        if (!bound_grant && value(&json, "schema")?.as_text() != Some(SCHEMA))
             || digest(value(&json, "authority")?, false)? != envelope.authority
             || number(value(&json, "revision")?)? != envelope.revision
             || digest(value(&json, "previous")?, true)? != envelope.previous
@@ -138,7 +141,12 @@ impl DependencyPolicyHistory {
         {
             return Err(InvalidDependencyHistory);
         }
-        let (request, event, roots) = decode(value(&json, "body")?, envelope.kind, self.binding)?;
+        let (request, event, roots) = decode(
+            value(&json, "body")?,
+            envelope.kind,
+            self.binding,
+            bound_grant,
+        )?;
         if let Some((old, prior)) = self.records.get(&envelope.payload) {
             return if *old == envelope && *prior == event {
                 Ok(())
@@ -273,6 +281,19 @@ impl DependencyPolicyHistory {
             .and_then(|id| self.records.get(id))
             .map(|(record, _)| *record)
     }
+    pub(crate) fn native_grant(
+        &self,
+        source: (RecordDigest, RecordDigest, RecordDigest),
+        destination: (RecordDigest, RecordDigest),
+    ) -> Option<(u64, RecordDigest)> {
+        self.grants
+            .get(&(
+                Input(Work(source.0, source.1), source.2),
+                Work(destination.0, destination.1),
+            ))
+            .map(|(generation, payload, _)| (*generation, *payload))
+    }
+
     pub(crate) fn native_decision(
         &self,
         work: RecordDigest,
@@ -375,6 +396,7 @@ fn decode(
     body: &Json,
     kind: DependencyKind,
     binding: NativeDependencyBinding,
+    bound_grant: bool,
 ) -> Result<(Option<RecordDigest>, Event, BTreeSet<RecordDigest>)> {
     let mut roots = BTreeSet::new();
     let mut request = None;
@@ -389,17 +411,29 @@ fn decode(
             Event::Enrollment
         }
         DependencyKind::Grant => {
-            fields(
-                body,
-                &[
-                    "request",
-                    "source",
-                    "destination",
-                    "generation",
-                    "previous",
-                    "allowed",
-                ],
-            )?;
+            let mut names = vec![
+                "request",
+                "source",
+                "destination",
+                "generation",
+                "previous",
+                "allowed",
+            ];
+            if bound_grant {
+                names.push("bindings");
+            }
+            fields(body, &names)?;
+            let bindings = if bound_grant {
+                let Json::Array(values) = value(body, "bindings")? else {
+                    return Err(InvalidDependencyHistory);
+                };
+                if values.len() != 2 {
+                    return Err(InvalidDependencyHistory);
+                }
+                Some((digest(&values[0], false)?, digest(&values[1], false)?))
+            } else {
+                None
+            };
             request = Some(digest(value(body, "request")?, false)?);
             let source = input(value(body, "source")?)?;
             let destination = work(value(body, "destination")?)?;
@@ -421,6 +455,7 @@ fn decode(
                 generation: number(value(body, "generation")?)?,
                 previous,
                 allowed,
+                bindings,
             }
         }
         DependencyKind::Consumption => {

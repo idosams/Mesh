@@ -378,3 +378,37 @@ The returned native fact owns no custody. Revalidation is a point-in-time check,
 authority; a consuming transaction must acquire its complete custody set and revalidate membership,
 grants, current decisions and full closure before acting. This selector neither issues a grant nor
 retroactively converts legacy lineage into an authorized consumption receipt.
+
+
+## Exact native access grants (R155)
+
+The trusted native host selects an enrolled owner, exact saved source version and existing destination
+work through native registrations. Source and destination ancestry are prepared without authority,
+then validated under one complete custody set. The 32 requested-root bound applies before
+deduplication; a deep combined request may refuse even when each independent selector fits. No
+ancestry is truncated. A prepared selection cannot extend, substitute or outlive its guard.
+
+New Grant records use `mesh.dependency-policy/v2`; other record kinds retain v1. The v2 grant body
+retains all v1 grant fields and a required two-element `bindings` array: source and destination
+native correlation digests. They are identity commitments, not separately addressable CAS objects.
+Missing, zero, extra or malformed bindings refuse. Older semantic readers reject the unknown schema.
+Existing v1 records remain readable, but their grants have no verified native correlation; a future
+consuming admission must explicitly require the native bound form and current generation. Merely
+replaying historical policy never authorizes a transaction.
+
+Grant/revoke generations are per exact input/destination and separate from eligibility revisions
+and authority ordinals. An exact historical request returns its original durable record, including
+after revocation, without restoring permission. A changed request, expected predecessor or native
+correlation refuses. Replaced allocation containers cannot reuse the old grant even if their stable
+work and installation identities match. A new explicit native request can authorize new evidence.
+
+The existing private `dependency-decision.pending` slot serializes unfinished native control writes.
+Eligibility retains `mesh.dependency-decision-intent/v1`; grants use
+`mesh.dependency-grant-intent/v1`. Both bind request, journal identity, exact prefix and staged payload.
+The shared writer revalidates native inputs after staging, resumes only its own exact frame prefix,
+synchronizes and replays before acknowledgement. The slot is recovery evidence, never policy authority.
+
+No actor credential, renderer request or CLI method calls this native control. Grant creation neither
+materializes bytes nor establishes a starting-operation or inherited-closure receipt. Child mutation
+fences and full consumption/retention checks remain required before enabling local/manual/delegated
+or remote input admission. Publication still requires current eligibility and the complete closure.

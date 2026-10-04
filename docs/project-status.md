@@ -1246,3 +1246,16 @@ foreign ownership and depth overflow; removing allocation correlation fails its 
 real-daemon checks. Hosted verification is pending. These immutable facts grant no access and retain no lock.
 Native grant issuance, dependency-aware allocation, full closure and publication enforcement remain
 required before exposing this through the application. The fixed checkpoint is unchanged.
+
+
+## Native grants for exact private inputs
+
+R155 adds trusted-native-host grant, revoke and regrant requests for exact saved source and existing
+destination work. Requests retain native correlation across replay; replaced allocation evidence
+cannot reuse a historical grant. Shared transaction recovery covers every grant-frame prefix and
+failed synchronization/acknowledgement. Focused positive/refusal, schema and previous semantic-reader
+checks pass. Full local verification passed: 3,887 native, 194 rendered and 672 desktop tests
+plus all 44 real-daemon checks. Hosted verification remains pending. This does not enable a runtime
+authorization control, content copying, consumption receipts or dependency-bearing publication.
+Historical v1 grants stay historical; current consumers must require verified native bindings.
+The fixed user checkpoint is unchanged.

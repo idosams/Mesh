@@ -559,6 +559,32 @@ fn lock_physical_workspace_in_set(
 const MAX_INITIALIZATION_ROOTS: usize = 32;
 
 impl WorkspaceInitializationGuard {
+    /// Require every requested physical root to belong to this still-held guard.
+    /// This does not acquire or extend custody, and validates each requested namespace spelling.
+    pub(crate) fn require_roots(
+        &self,
+        roots: &[PinnedWorkspaceRoot],
+    ) -> Result<(), WorkspaceAgentCustodyError> {
+        self.ensure_current()?;
+        for root in roots {
+            root.ensure_namespace_identity().map_err(|error| {
+                WorkspaceAgentCustodyError::io("verify requested custody namespace", error)
+            })?;
+            let identity = root.identity().map_err(|error| {
+                WorkspaceAgentCustodyError::io("inspect requested custody identity", error)
+            })?;
+            if !self
+                .roots
+                .iter()
+                .any(|held| held.identity().ok() == Some(identity))
+            {
+                return Err(WorkspaceAgentCustodyError::invalid(
+                    "requested root is outside this custody set",
+                ));
+            }
+        }
+        Ok(())
+    }
     /// Verify pinned namespaces and membership in this thread's still-held custody set.
     pub(crate) fn ensure_current(&self) -> Result<(), WorkspaceAgentCustodyError> {
         for root in &self.roots {

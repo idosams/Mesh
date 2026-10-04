@@ -8,6 +8,11 @@ pub(in crate::project_attachment) fn pending_prefix(
     journal: &[u8],
 ) -> io::Result<(usize, DependencyRecord, Vec<u8>)> {
     let value = Json::parse(intent).map_err(error)?;
+    let kind = match text(&value, "schema")? {
+        "mesh.dependency-decision-intent/v1" => DependencyKind::Eligibility,
+        "mesh.dependency-grant-intent/v1" => DependencyKind::Grant,
+        _ => return Err(invalid("unknown native control intent")),
+    };
     let request = digest(text(&value, "request")?)?;
     let length = value
         .get("journal_bytes")
@@ -15,16 +20,14 @@ pub(in crate::project_attachment) fn pending_prefix(
         .filter(|n| *n <= journal.len() as u64)
         .ok_or_else(|| invalid("invalid decision prefix"))? as usize;
     let payload = digest(text(&value, "payload")?)?;
-    if transaction_intent(request, identity, &journal[..length], payload) != intent {
+    if transaction_intent(kind, request, identity, &journal[..length], payload) != intent {
         return Err(invalid(
             "decision intent does not match pinned journal prefix",
         ));
     }
     let bytes = read_payload(cas, payload, 65_536)?;
     let decoded = Json::parse(std::str::from_utf8(&bytes).map_err(error)?).map_err(error)?;
-    if decoded.get("kind").and_then(Json::as_u64)
-        != Some(u64::from(DependencyKind::Eligibility.code()))
-    {
+    if decoded.get("kind").and_then(Json::as_u64) != Some(u64::from(kind.code())) {
         return Err(invalid("pending record is not an eligibility decision"));
     }
     let record = DependencyRecord {
@@ -35,7 +38,7 @@ pub(in crate::project_attachment) fn pending_prefix(
             .ok_or_else(|| invalid("missing decision ordinal"))?,
         previous: RecordDigest::parse_hex(text(&decoded, "previous")?).map_err(error)?,
         payload,
-        kind: DependencyKind::Eligibility,
+        kind,
     };
     if decoded
         .get("body")

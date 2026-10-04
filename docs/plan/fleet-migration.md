@@ -6266,3 +6266,45 @@ No grants, new allocation protocol, closure enforcement, runtime entry point or 
 introduced. The user checkpoint remains unchanged.
 
 R154 implementation verification: Full `npm test` passed on implementation `ee53b1b346ee23803f261a31898a06c76f243210`: 3,879 native tests in 281.518s (4 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+
+
+## R155 — native exact-input grants and revocation
+
+Tracks [issue #311](https://github.com/idosams/Mesh/issues/311), extending R153/R154 at
+`f2ec4491ba80a3b5c6e1b9a23f3c6df719382c06`. Replaces no preserved source commit. R152
+[PR #306](https://github.com/idosams/Mesh/pull/306) merged as
+`64d1139db22cc25b0d0d51b2b4fd6b8ad61d1b4a`; its seven exact-head checks and merged-main
+CI passed. The local grant branch reconciles that shared history without rewriting published heads.
+
+The trusted native host can grant, revoke or regrant an exact saved input to an existing native
+destination work. Source and destination ancestry are prepared together, then revalidated under the
+complete bounded custody set before staging and immediately before append. Requests bind native
+project/work/installations and physical correlation; historical retries return the exact recorded
+outcome without rewinding later revocations. Stable work/installation alone cannot reuse a grant
+after an allocation container is replaced. Grants remain separate from decisions and publication.
+
+New grant payloads use `mesh.dependency-policy/v2` with two required nonzero native correlation
+digests. Existing v1 history remains readable without upgrading its unbound grants into native
+authority. The shared decision/control transaction retains the original decision intent schema and
+uses `mesh.dependency-grant-intent/v1` for grants. Both use the existing private pending-file slot;
+only the complete journal record establishes an outcome. Exact prefix recovery, synchronization,
+replay and request verification precede acknowledgement. Unknown pending work is preserved.
+
+Six grant regressions cover progression/restart/editor preservation, self/foreign/stale/conflicting
+requests, all 146 partial-frame boundaries, synchronization/lost acknowledgement, changed destination
+receipts and replacement with unchanged work/installation. Six existing decision regressions passed
+after extracting the shared transaction; the final full gate must cover the later grant extension too.
+Ten policy tests passed, including strict v2 bindings. A shared-custody test rejects incomplete or
+released guards. Removing custody-membership checking and removing grant synchronization each cause
+their regression to fail; source restored exactly. The exact previous policy validator from
+`f2ec4491ba80a3b5c6e1b9a23f3c6df719382c06`, compiled with the current crate types in a temporary
+test module, refuses a bound v2 grant and accepts the legacy positive control. This is semantic-reader
+compatibility evidence, not a previous packaged application run. The initial temporary fixture had
+the wrong module location; the corrected run passes and both logs are retained.
+
+Full local and hosted validation remain pending. No agent/renderer/CLI caller exists. No content is
+materialized, child history enrolled, grant consumed or publication enabled by this increment. Native
+allocation/consumption, old-writer fencing, exact starting operation, full inherited closure, all-path
+publication/recovery and packaged acceptance remain open. The fixed user checkpoint is unchanged.
+
+R155 implementation verification: Full `npm test` passed on implementation `af9a40ddd7cd94c5d1b25d5e16368364db511ba1`: 3,887 native tests in 369.689s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.

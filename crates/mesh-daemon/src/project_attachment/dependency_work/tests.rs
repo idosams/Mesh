@@ -257,3 +257,77 @@ fn replaced_allocation_container_cannot_reuse_a_binding_even_with_same_work_and_
     );
     assert!(original.revalidate(&f.storage, &f.owner, &child).is_err());
 }
+
+#[test]
+fn two_prepared_work_selections_require_their_complete_still_held_custody_set() {
+    use crate::workspace_custody::{
+        lock_workspace_initialization, lock_workspace_initialization_set,
+    };
+    let f = Fixture::new("prepared-pair");
+    let source = f.child(&f.owner, 1);
+    let destination = f.child(&f.owner, 2);
+    f.owner.enroll_dependency_history().unwrap();
+    let source_selection = f
+        .storage
+        .prepare_dependency_work(&f.owner, &source)
+        .unwrap();
+    let destination_selection = f
+        .storage
+        .prepare_dependency_work(&f.owner, &destination)
+        .unwrap();
+    let owner_only = lock_workspace_initialization(&f.owner.store).unwrap();
+    assert!(f
+        .storage
+        .validate_dependency_work(&source_selection, &owner_only)
+        .is_err());
+    assert!(f
+        .storage
+        .validate_dependency_work(&destination_selection, &owner_only)
+        .is_err());
+    drop(owner_only);
+    let mut roots = source_selection.roots.clone();
+    roots.extend(destination_selection.roots.iter().cloned());
+    let complete = lock_workspace_initialization_set(&roots).unwrap();
+    let selected_source = f
+        .storage
+        .validate_dependency_work(&source_selection, &complete)
+        .unwrap();
+    let selected_destination = f
+        .storage
+        .validate_dependency_work(&destination_selection, &complete)
+        .unwrap();
+    assert_ne!(selected_source.work(), selected_destination.work());
+    assert_eq!(
+        selected_source.authority(),
+        selected_destination.authority()
+    );
+    // Preparation does not freeze receipts. They must be revalidated within this same transaction.
+    let ready = destination
+        .project()
+        .root()
+        .parent()
+        .unwrap()
+        .join("ready.json");
+    let original = fs::read(&ready).unwrap();
+    fs::write(&ready, b"changed after discovery").unwrap();
+    assert!(f
+        .storage
+        .validate_dependency_work(&destination_selection, &complete)
+        .is_err());
+    assert!(f
+        .storage
+        .validate_dependency_work(&source_selection, &complete)
+        .is_ok());
+    fs::write(&ready, original).unwrap();
+    let borrowed = lock_workspace_initialization(&f.owner.store).unwrap();
+    drop(complete);
+    assert!(f
+        .storage
+        .validate_dependency_work(&source_selection, &borrowed)
+        .is_err());
+    drop(borrowed);
+    assert!(f
+        .storage
+        .dependency_work_binding(&f.owner, &destination)
+        .is_ok());
+}
