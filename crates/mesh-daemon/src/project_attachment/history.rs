@@ -589,5 +589,5 @@ impl HeadDerivation for CaptureHead {
 mod capture_line_tests;
 
 #[path = "dependency_capture.rs"]
-mod dependency_capture;
+pub(super) mod dependency_capture;
 pub use dependency_capture::PreparedNativeCapture;

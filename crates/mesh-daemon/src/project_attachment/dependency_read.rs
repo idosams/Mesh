@@ -91,6 +91,25 @@ impl ProjectAttachment {
         store: &PinnedWorkspaceRoot,
         pending: Option<&str>,
     ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
+        self.read_native_configuration(metadata, store, pending, None)
+    }
+
+    pub(super) fn read_capture_configuration(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        capture: &str,
+    ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
+        self.read_native_configuration(metadata, store, None, Some(capture))
+    }
+
+    fn read_native_configuration(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
+        capture: Option<&str>,
+    ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
         self.ensure_current()?;
         store.ensure_namespace_identity()?;
         let receipt = self.receipt()?.encode();
@@ -180,9 +199,23 @@ impl ProjectAttachment {
                 super::dependency_decision::pending_prefix(&cas, intent, journal_identity, &bytes)
             })
             .transpose()?;
-        let prefix_end = pending
-            .as_ref()
-            .map_or(bytes.len(), |(length, _, _)| *length);
+        let capture_prefix = capture
+            .map(|intent| {
+                super::history::dependency_capture::capture_prefix(
+                    &cas,
+                    intent,
+                    journal_identity,
+                    &bytes,
+                    authority,
+                    &configuration,
+                )
+            })
+            .transpose()?;
+        let prefix_end = capture_prefix.unwrap_or_else(|| {
+            pending
+                .as_ref()
+                .map_or(bytes.len(), |(length, _, _)| *length)
+        });
         if prefix_end <= base_len {
             return Err(invalid("decision prefix predates enrollment"));
         }

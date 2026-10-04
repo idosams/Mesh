@@ -1281,3 +1281,18 @@ fails the revocation regression. Full local verification passed: 3,899 native, 1
 672 desktop tests plus all 44 real-daemon checks. Hosted validation is pending. This is not a runtime
 agent operation, materialization, consumption receipt or publication gate. Exact allocation/consumption
 and full closure enforcement remain outstanding. The fixed user checkpoint is unchanged.
+
+## Native private capture after enrollment
+
+R154 through R157 are now merged into canonical Mesh through passing exact-head checks. Post-merge
+main checks passed through R156; R157 post-merge verification is still pending at this update.
+R158, tracked by [issue #317](https://github.com/idosams/Mesh/issues/317), is in local implementation.
+Its dedicated native capture path signs without custody, preserves the original source folder, and
+records authenticated private progress after explicit enrollment. Exact-request recovery resumes
+staged journal prefixes and preserves unknown work. Historical receipt recovery does not rewind
+newer saves. Eight focused native tests and six checkpoint tests pass; a source-replacement test and
+the full gate remain pending. It is not yet an open or merged PR.
+
+This does not enable automatic enrollment, dependency-aware allocation, consumption, publication or
+runtime controls. Full inherited closure, retained roots and packaged/provider acceptance are still
+required. The user checkpoint remains fixed at `5052009`.

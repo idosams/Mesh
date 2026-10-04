@@ -449,3 +449,37 @@ back when revalidation refuses, so this helper must not be used as a publication
 commit boundary. Rejection can leave an input inspectable under valid access; eligibility and access
 remain separate. Full dependency-aware allocation, starting-operation receipts and all-path current
 publication checks must still be integrated before runtime exposure.
+
+## Native private capture and exact recovery (R158)
+
+Explicitly enrolled native work can prepare a signed capture and commit it through a dedicated
+writer. Preparation uses verified read-only history and preserves the existing exclusion binding.
+The signer runs without a custody guard. Commit reacquires native custody and requires the exact
+registration, enrollment proof and capture line observed before signing. It appends only authenticated
+capture manifests and one operation; it never returns a generally writable dependency workspace.
+Legacy writers and post-enrollment legacy publication remain refused. No runtime route auto-enrolls
+projects or invokes this development API.
+
+The existing authenticated checkpoint encoding is prepared without persistence. Commit stages its
+content and exact framed append before a bounded private `mesh.dependency-capture-intent/v1` intent.
+The intent binds request, authority, configuration, physical journal, original journal length/hash,
+framed bytes, operation and prior capture head. The journal is synchronized before acknowledgement;
+replay verifies the exact saved snapshot and reads every referenced file through native chunk
+verification. It does not reread or overwrite newer source edits.
+
+Native capture recovery accepts only the recorded request and an exact prefix of those staged
+frames. Its private enrollment-read path validates the original complete policy prefix against the
+physical installation; ordinary readers continue refusing torn journals. Recovery cannot append
+policy, approval or other non-authoring records. Unknown suffixes, changed installations, conflicting
+requests or malformed evidence are preserved and refused. Current native grant/decision writers
+refuse while a capture intent is pending, and captures likewise refuse pending control intents.
+A complete capture receipt is retained under its exact request after journal and capture-line
+verification. Historical recovery verifies the recorded operation without rewinding later progress.
+An older native control writer that does not recognize the new pending file can make recovery
+ambiguous; conflicting bytes remain preserved, never overwritten. This is not a claim that every
+previous control binary coordinates the new transaction.
+
+These receipts establish only private capture identity and recovery. They are not policy decisions,
+access grants, consumed-input receipts or publication approvals. Dependency-aware reservation,
+materialized starting-operation binding, full inherited closure and retained roots, all publication
+paths, runtime controls and packaged acceptance remain required. The fixed user checkpoint is unchanged.

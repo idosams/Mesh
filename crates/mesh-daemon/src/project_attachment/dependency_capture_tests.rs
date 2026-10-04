@@ -188,3 +188,226 @@ fn unenrolled_and_pending_native_state_refuse_without_signing_or_journal_changes
         b"unknown retained evidence"
     );
 }
+
+#[test]
+fn every_capture_frame_prefix_recovers_one_exact_saved_operation() {
+    let f = Fixture::new("every-prefix", true);
+    let before = f.journal();
+    let input = f.input(b"fixed private capture");
+    let prepared = f.prepare(&input, 1).unwrap();
+    let expected = prepared.operation();
+    let mut frames = Vec::new();
+    assert!(prepared
+        .commit_with_io(
+            |step, _, bytes| {
+                if matches!(step, CaptureStep::Staged) {
+                    frames = bytes.to_vec();
+                    return Err(io::Error::other("interrupted"));
+                }
+                Ok(())
+            },
+            |file| file.sync_all()
+        )
+        .is_err());
+    let pending = fs::read(f.a.metadata_path().join(PENDING)).unwrap();
+    let capture_line = f.a.metadata_path().join("attachment-capture-line.json");
+    let line = fs::read(&capture_line).unwrap();
+    let receipt = f.a.metadata_path().join(receipt_name(id(1)));
+    let journal = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+    let mut completed = before.clone();
+    completed.extend_from_slice(&frames);
+    fs::write(f.a.project().root().join("note"), b"later user edits").unwrap();
+    for length in 0..=frames.len() {
+        let mut partial = before.clone();
+        partial.extend_from_slice(&frames[..length]);
+        fs::write(&journal, &partial).unwrap();
+        fs::write(f.a.metadata_path().join(PENDING), &pending).unwrap();
+        fs::set_permissions(
+            f.a.metadata_path().join(PENDING),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        fs::write(&capture_line, &line).unwrap();
+        if receipt.exists() {
+            fs::remove_file(&receipt).unwrap();
+        }
+        if mesh_store::scan_journal(&partial)
+            .unwrap()
+            .tail()
+            .is_fragment()
+        {
+            assert!(f.a.project().saved_versions(f.a.metadata_path()).is_err());
+        }
+        let saved =
+            f.a.recover_dependency_capture(id(1))
+                .unwrap_or_else(|e| panic!("prefix {length}: {e}"));
+        assert_eq!(saved.operation(), expected, "prefix {length}");
+        assert_eq!(f.journal(), completed, "prefix {length}");
+        assert_eq!(
+            f.a.project()
+                .saved_versions(f.a.metadata_path())
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(!f.a.metadata_path().join(PENDING).exists());
+    }
+    assert_eq!(
+        fs::read(f.a.project().root().join("note")).unwrap(),
+        b"later user edits"
+    );
+    assert_eq!(
+        f.a.project()
+            .saved_file(
+                f.a.metadata_path(),
+                SavedAttachmentVersion {
+                    operation: expected
+                },
+                "note"
+            )
+            .unwrap()
+            .unwrap(),
+        b"fixed private capture"
+    );
+}
+
+#[test]
+fn lost_acknowledgement_and_historical_request_recovery_never_rewind_or_duplicate() {
+    let f = Fixture::new("lost-ack", true);
+    let prepared = f.prepare(&f.input(b"first retained capture"), 1).unwrap();
+    let expected = prepared.operation();
+    assert!(prepared
+        .commit_with_io(
+            |step, _, _| {
+                if matches!(step, CaptureStep::Appended) {
+                    Err(io::Error::other("lost acknowledgement"))
+                } else {
+                    Ok(())
+                }
+            },
+            |file| file.sync_all()
+        )
+        .is_err());
+    let before = f.journal();
+    assert!(f
+        .a
+        .decide_saved_input(f.initial, SavedInputDecision::Rejected, None, id(8))
+        .is_err());
+    assert_eq!(f.journal(), before);
+    assert_eq!(
+        f.a.recover_dependency_capture(id(1)).unwrap().operation(),
+        expected
+    );
+    assert_eq!(f.journal(), before);
+    let next = f
+        .prepare(&f.input(b"later progress"), 2)
+        .unwrap()
+        .commit()
+        .unwrap();
+    let later = f.journal();
+    assert_eq!(
+        f.a.recover_dependency_capture(id(1)).unwrap().operation(),
+        expected
+    );
+    assert_eq!(f.journal(), later);
+    assert_eq!(
+        f.a.project()
+            .saved_versions(f.a.metadata_path())
+            .unwrap()
+            .last(),
+        Some(&next)
+    );
+    assert!(f.prepare(&f.input(b"conflicting reuse"), 1).is_err());
+    assert_eq!(f.journal(), later);
+}
+
+#[test]
+fn failed_capture_sync_and_failed_recovery_sync_cannot_acknowledge() {
+    let f = Fixture::new("sync", true);
+    let prepared = f.prepare(&f.input(b"sync-bound capture"), 1).unwrap();
+    let expected = prepared.operation();
+    assert!(prepared
+        .commit_with_io(|_, _, _| Ok(()), |_| Err(io::Error::other("sync failed")))
+        .is_err());
+    assert!(f.a.metadata_path().join(PENDING).exists());
+    assert!(f
+        .a
+        .recover_capture_with_sync(id(1), |_| Err(io::Error::other("recovery sync failed")))
+        .is_err());
+    assert!(f.a.metadata_path().join(PENDING).exists());
+    assert_eq!(
+        f.a.recover_dependency_capture(id(1)).unwrap().operation(),
+        expected
+    );
+    assert!(!f.a.metadata_path().join(PENDING).exists());
+}
+
+#[test]
+fn foreign_suffix_and_wrong_request_recovery_preserve_all_evidence() {
+    let f = Fixture::new("foreign-tail", true);
+    let prepared = f.prepare(&f.input(b"retained capture"), 1).unwrap();
+    assert!(prepared
+        .commit_with_io(
+            |step, journal, frames| {
+                if matches!(step, CaptureStep::Staged) {
+                    journal.write_all(&[frames[0] ^ 0xff])?;
+                    journal.sync_all()?;
+                    return Err(io::Error::other("foreign suffix"));
+                }
+                Ok(())
+            },
+            |file| file.sync_all()
+        )
+        .is_err());
+    let before = f.journal();
+    let pending = fs::read(f.a.metadata_path().join(PENDING)).unwrap();
+    assert!(f.a.recover_dependency_capture(id(2)).is_err());
+    assert!(f.a.recover_dependency_capture(id(1)).is_err());
+    assert_eq!(f.journal(), before);
+    assert_eq!(
+        fs::read(f.a.metadata_path().join(PENDING)).unwrap(),
+        pending
+    );
+}
+
+#[test]
+fn replaced_source_refuses_recovery_and_original_identity_can_resume() {
+    let f = Fixture::new("replacement", true);
+    let prepared = f.prepare(&f.input(b"retained original input"), 1).unwrap();
+    let expected = prepared.operation();
+    assert!(prepared
+        .commit_with_io(
+            |step, _, _| {
+                if matches!(step, CaptureStep::Staged) {
+                    Err(io::Error::other("interrupted before append"))
+                } else {
+                    Ok(())
+                }
+            },
+            |file| file.sync_all()
+        )
+        .is_err());
+    let source = f.a.project().root().to_path_buf();
+    let displaced = f.root.join("displaced-original");
+    fs::rename(&source, &displaced).unwrap();
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("note"), b"replacement folder").unwrap();
+    let before = f.journal();
+    let pending = fs::read(f.a.metadata_path().join(PENDING)).unwrap();
+    assert!(f.a.recover_dependency_capture(id(1)).is_err());
+    assert_eq!(f.journal(), before);
+    assert_eq!(
+        fs::read(f.a.metadata_path().join(PENDING)).unwrap(),
+        pending
+    );
+    assert_eq!(
+        fs::read(source.join("note")).unwrap(),
+        b"replacement folder"
+    );
+    fs::remove_dir_all(&source).unwrap();
+    fs::rename(&displaced, &source).unwrap();
+    assert_eq!(
+        f.a.recover_dependency_capture(id(1)).unwrap().operation(),
+        expected
+    );
+}

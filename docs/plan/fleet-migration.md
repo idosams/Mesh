@@ -6371,3 +6371,31 @@ and all publication/import/recovery enforcement remain required. The fixed check
 
 R157 implementation verification: Full `npm test` passed on implementation `c62f57711174e82fc5c00bac1e558ac43bc9ab0c`: 3,899 native tests in 264.898s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
 R153 merged-main CI `37201308084` subsequently passed on `5bc0e79ee5b3f24a149ef9bbfc4b7a607034d954`.
+
+## R158: Native capture after dependency enrollment
+
+Tracks [issue #317](https://github.com/idosams/Mesh/issues/317). Builds on merged R157
+[PR #316](https://github.com/idosams/Mesh/pull/316), merge
+`035dc70169d7144fd53e17ff8097c77c8e9e0a39`. Replaces no preserved source commit.
+R154 #310, R155 #312 and R156 #314 also merged through their seven exact-head checks and successful
+post-merge main checks. R157 post-merge main verification remains pending at this entry.
+
+The new native prepare/commit path keeps inspection read-only, signs outside custody, and refreshes
+exact enrollment, registration and capture position before appending authenticated private progress.
+Immutable content and framed records are staged before a private exact-request intent. Recovery
+completes only the identical journal suffix; retained request receipts recover historical results
+without duplicating appends or rewinding later saves. Current native control and capture pending
+writes exclude each other. No runtime enrollment, destination allocation, consumption or publication
+is enabled by this increment.
+
+Six checkpoint regressions passed after separating preparation from persistence. Eight native
+capture/recovery tests passed, including every byte prefix of a small capture, exact snapshot bytes
+after editor changes, a signer without custody, stale policy/basis refusal, historical request retry,
+failed synchronization, and preservation of foreign suffixes. Removing the commit sync makes the
+sync-failure regression fail; the implementation was restored exactly. Initial compilation and
+private-fixture permission failures are retained with the corrected passing evidence. A further
+source-replacement recovery regression and the complete repository gate are pending.
+
+The full allocation/consumption, closure/retention, publication, runtime and packaged acceptance
+scope remains open. This increment stays unpublished until its complete checks pass. The fixed
+checkpoint stays unchanged.
