@@ -203,6 +203,10 @@ impl AttachmentStorage {
                 owner,
                 request.request,
             )?;
+        let works = std::iter::once(request.input.source)
+            .chain(request.available.iter().copied())
+            .collect::<Vec<_>>();
+        let context = self.resolve_consumed_histories(owner, &works, &guard, context)?;
         self.with_recovered_consumed_state_held(owner, request, phase, &guard, context, action)
     }
 
@@ -633,6 +637,10 @@ pub(super) fn run_child_if_requested() -> bool {
     let owner = storage.reopen(text("owner")).unwrap();
     let source = storage.reopen(text("source")).unwrap();
     let destination = storage.reopen(text("destination")).unwrap();
+    if text("mode").starts_with("chain-complete") {
+        storage.chained_start_restart_test(&owner, &source, &destination, &value);
+        return true;
+    }
     if text("mode") == "grant-consumed" {
         storage.consumed_grant_restart_test(&owner, &source, &destination, &value);
         return true;

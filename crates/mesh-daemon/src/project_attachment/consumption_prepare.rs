@@ -261,7 +261,16 @@ impl AttachmentStorage {
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
         let selected_graph = graph;
-        let graph = self.inspect_prepared_dependency_graph(&selected_graph, &guard)?;
+        let works = std::iter::once(request.input.source)
+            .chain(request.available.iter().copied())
+            .collect::<Vec<_>>();
+        let context = self.resolve_consumed_histories(
+            owner,
+            &works,
+            &guard,
+            super::dependency_owner_context::OwnerHistoryContext::current(owner),
+        )?;
+        let graph = self.inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)?;
         // The current owner-consumption record format carries at most 256 exact inherited inputs.
         if graph.operation_count() > 256 {
             return Err(invalid("consumption closure exceeds policy format bound"));
@@ -284,7 +293,7 @@ impl AttachmentStorage {
         }
         absent(destination, "dependency-capture.pending")?;
         absent(destination, super::dependency_decision::PENDING)?;
-        let destination_binding = self.validate_dependency_work(&selected, &guard)?;
+        let destination_binding = context.validate(self, &selected, &guard)?;
         let (configuration, proof) = destination
             .project()
             .read_configuration(destination.metadata_path(), &destination.store)?;
@@ -300,31 +309,32 @@ impl AttachmentStorage {
         if history.operations() != 0 {
             return Err(invalid("consumption destination already has saved work"));
         }
-        let (prospective, snapshot) = self.with_prepared_input_grant(&grant, &guard, |input| {
-            let rules = input.starting_exclusion_rules()?;
-            let policy = super::observation::policy_digest(&rules);
-            let mut proposed = Json::parse(&configuration).map_err(error)?;
-            let Json::Object(fields) = &mut proposed else {
-                return Err(invalid("invalid destination configuration"));
-            };
-            let field = fields
-                .iter_mut()
-                .find(|(name, _)| name == "exclusions")
-                .ok_or_else(|| invalid("missing destination exclusions"))?;
-            field.1 = Json::text(policy.to_string());
-            let (prospective, _) = destination.project().history_configuration_with_previous(
-                &destination.store,
-                Some(policy),
-                Some(proposed.encode()),
-            )?;
-            let snapshot = prepare_initial_snapshot(
-                &input,
-                WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
-                ActorId::from_bytes(*actor.as_bytes()),
-                request.limits,
-            )?;
-            Ok((prospective, snapshot))
-        })?;
+        let (prospective, snapshot) =
+            self.with_input_grant_owner(&grant, &guard, &context, |input| {
+                let rules = input.starting_exclusion_rules()?;
+                let policy = super::observation::policy_digest(&rules);
+                let mut proposed = Json::parse(&configuration).map_err(error)?;
+                let Json::Object(fields) = &mut proposed else {
+                    return Err(invalid("invalid destination configuration"));
+                };
+                let field = fields
+                    .iter_mut()
+                    .find(|(name, _)| name == "exclusions")
+                    .ok_or_else(|| invalid("missing destination exclusions"))?;
+                field.1 = Json::text(policy.to_string());
+                let (prospective, _) = destination.project().history_configuration_with_previous(
+                    &destination.store,
+                    Some(policy),
+                    Some(proposed.encode()),
+                )?;
+                let snapshot = prepare_initial_snapshot(
+                    &input,
+                    WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
+                    ActorId::from_bytes(*actor.as_bytes()),
+                    request.limits,
+                )?;
+                Ok((prospective, snapshot))
+            })?;
         let (current_configuration, current_proof) = destination
             .project()
             .read_configuration(destination.metadata_path(), &destination.store)?;
@@ -336,7 +346,7 @@ impl AttachmentStorage {
                 .filesystem()
                 .read_directory_names_bounded(Path::new(""), 1)?
                 .is_empty()
-            || self.inspect_prepared_dependency_graph(&selected_graph, &guard)? != graph
+            || self.inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)? != graph
         {
             return Err(invalid("consumption basis changed during preparation"));
         }

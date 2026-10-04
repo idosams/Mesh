@@ -180,6 +180,14 @@ impl AttachmentStorage {
             .unwrap()
             .next()
             .is_none());
+        self.assert_chained_consumed_start(
+            owner,
+            source,
+            version,
+            destination,
+            original,
+            next.record(),
+        );
     }
     pub(in crate::project_attachment) fn consumed_grant_restart_test(
         &self,

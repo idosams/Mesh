@@ -2172,3 +2172,23 @@ Complete history and failed compatibility, focused, mutation and full logs are p
 consumed-source grants and restart recovery are verified; child materialization/start and multi-level
 consumption recovery, generic callers, runtime/publication controls and packaged acceptance remain
 required. Draft PR #324 / issue #323 and the full fleet goal stay open. The checkpoint is unchanged.
+
+R161 now carries resolved native source histories through consumed-child preparation, commit,
+recovery and completed graph inspection. The same held custody context validates the source graph,
+destination correlation and exact input grant; post-read comparisons refresh those facts. Recovery
+reconstructs the intermediate lane before the child and never grows its held root set. The selected
+saved bytes remain distinct from current parent editor contents, and signing remains outside custody.
+
+Seven focused graph/consumption tests passed in 94.838s. A real second consumed lane installs its
+parent's later saved bytes, interrupts its owner receipt after one byte, restarts and interrupts local
+completion, loses the completed reply, and retries twice without duplicate owner/destination records
+or changed installed identities. Explicit and automatic graphs agree across three retained native
+stores. Omitting the intermediate lane refuses inspection. Later child captures preserve the original
+saved bytes and leave the source history/editor and owner history unchanged. An added revoke-after-
+signing case refuses staging without a child file or journal change, then prepares under a new grant.
+Removing parent-context resolution from commit made the scenario fail in 75.080s; exact source was
+restored. Strict daemon linting passed in 9.27s. Full validation is pending. This verifies native
+materialization/recovery, not provider/runtime permission, desktop integration or packaged acceptance.
+Generic desktop/harness callers, runtime/publication/review/import/remote controls and the remaining
+fault/acceptance campaigns stay required. PR #324 / issue #323 and the full fleet goal remain open;
+the user checkpoint stays fixed.
