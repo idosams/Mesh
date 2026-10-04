@@ -1350,3 +1350,14 @@ consumed-input edges under complete custody, distinguish reserved identity from 
 and derive retained roots from the same verified graph. Legacy missing provenance, cycles, missing
 inputs, conflicting bindings and overflow must refuse. Actual consumption, publication/import,
 runtime controls and the remaining fleet acceptance requirements stay open.
+
+Historical content verification is now connected to graph nodes: manifests come from the immutable
+journal, their logical IDs are recomputed, and every chunk plus the reconstructed content digest is
+checked with streaming reads. Per-manifest chunk references are bounded at 65,536 and the entire
+inspection has a 1 GiB content-read budget; exceeding a bound refuses without a partial success.
+Graph nodes record chunks qualified by their existing work/installation identity. Six focused
+graph/ancestry tests pass in 0.493s, including corrupt and missing content from an earlier save that
+is absent from the latest snapshot; corrupt evidence remains in place. An initial missing digest
+trait import was corrected. This is content verification groundwork, not a complete retained-root
+or collection implementation: policy and pending transaction objects, rebuild and cross-work
+consumption coverage, full validation and PR delivery remain open.

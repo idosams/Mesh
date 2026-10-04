@@ -9,6 +9,7 @@ fn node(parents: &[u8]) -> Node {
     Node {
         parents: parents.iter().map(|n| i(*n)).collect(),
         manifests: BTreeSet::new(),
+        chunks: BTreeSet::new(),
         consumption: None,
     }
 }
@@ -62,6 +63,7 @@ fn missing_parents_cycles_and_incomplete_consumption_lists_refuse() {
             Node {
                 parents: BTreeSet::from([i(4)]),
                 manifests: BTreeSet::new(),
+                chunks: BTreeSet::new(),
                 consumption: Some(NativeConsumptionFact {
                     record: d(8),
                     grant: d(9),
@@ -189,6 +191,41 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .inspect_dependency_graph(&reopened, &reopened, second, &[])
             .unwrap()
     );
+    // The earlier bytes are no longer in the latest snapshot, but remain dependencies.
+    let historical = hash(b"existing editor work");
+    assert!(graph.nodes.values().any(|n| n.chunks.contains(&historical)));
+    let cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+        owner.metadata_path(),
+        owner.store.filesystem(),
+    )
+    .unwrap();
+    let path = owner.metadata_path().join(
+        cas.layout()
+            .chunk_path(&mesh_cas::Digest32::from_bytes(*historical.as_bytes())),
+    );
+    let original = fs::read(&path).unwrap();
+    let corrupt = vec![b'X'; original.len()];
+    fs::write(&path, &corrupt).unwrap();
+    assert!(storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .is_err());
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        corrupt,
+        "inspection preserves corrupt evidence"
+    );
+    fs::write(&path, &original).unwrap();
+    assert_eq!(
+        graph,
+        storage
+            .inspect_dependency_graph(&owner, &owner, second, &[])
+            .unwrap()
+    );
+    fs::remove_file(&path).unwrap();
+    assert!(storage
+        .inspect_dependency_graph(&owner, &owner, second, &[])
+        .is_err());
+    fs::write(&path, &original).unwrap();
     assert_eq!(
         fs::read(root.join("source/note")).unwrap(),
         b"unsaved later editor bytes"

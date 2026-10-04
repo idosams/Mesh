@@ -35,6 +35,7 @@ pub struct NativeDependencyGraph {
 struct Node {
     parents: BTreeSet<Input>,
     manifests: BTreeSet<RecordDigest>,
+    chunks: BTreeSet<RecordDigest>,
     consumption: Option<NativeConsumptionFact>,
 }
 impl NativeDependencyGraph {
@@ -72,6 +73,12 @@ impl NativeDependencyGraph {
                                             .iter()
                                             .map(|m| Json::text(m.to_hex()))
                                             .collect(),
+                                    ),
+                                ),
+                                (
+                                    "chunks",
+                                    Json::Array(
+                                        n.chunks.iter().map(|c| Json::text(c.to_hex())).collect(),
                                     ),
                                 ),
                                 (
@@ -283,6 +290,8 @@ impl AttachmentStorage {
             source_binding.installation(),
             version.operation(),
         );
+        let mut content_budget = 1024 * 1024 * 1024u64;
+        let mut verified_manifests = BTreeMap::new();
         let graph = walk(
             root,
             |id| {
@@ -318,7 +327,22 @@ impl AttachmentStorage {
                     }
                     parents.insert(receipt.source);
                 }
+                let mut chunks = BTreeSet::new();
+                for manifest in &fact.manifests {
+                    let key = (id.0, id.1, *manifest);
+                    if !verified_manifests.contains_key(&key) {
+                        let retained = history
+                            .dependency_manifest_chunks(*manifest, &mut content_budget)
+                            .map_err(error)?;
+                        verified_manifests.insert(key, retained);
+                    }
+                    chunks.extend(verified_manifests[&key].iter().copied());
+                    if chunks.len() > 65536 {
+                        return Err(invalid("dependency chunk roots exceed their bound"));
+                    }
+                }
                 Ok(Node {
+                    chunks,
                     parents,
                     manifests: fact.manifests,
                     consumption,

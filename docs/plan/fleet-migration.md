@@ -6479,3 +6479,11 @@ retention, pending roots and rebuild/rejection tests remain to implement in this
 Reservation lineage alone is not a consumed-input edge. The full consumption/starting-operation,
 old-writer pending-copy fence, all-path publication/import/review and runtime/acceptance scope remains
 open; the fixed user checkpoint is unchanged.
+
+R160 content groundwork verifies journal manifests and streams historical chunks without quarantine,
+including content replaced in later saves. Logical manifest identity, contiguous chunk layout, chunk
+length/hash and whole-file digest must agree. The graph carries qualified chunk facts, with bounded
+per-manifest references and a shared 1 GiB read budget. Six focused tests passed in 0.493s; missing
+or corrupt earlier content refuses and corrupt bytes remain untouched. The initial compile failure
+(missing streaming digest trait import) and passing log are preserved. This still does not establish
+complete policy/pending-object retention, rebuild or cross-work coverage and is not ready for PR.

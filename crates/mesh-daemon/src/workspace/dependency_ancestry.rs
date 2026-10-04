@@ -89,6 +89,72 @@ impl NativeOperationFact {
     }
 }
 impl OpenWorkspace {
+    /// Verify immutable historical content without quarantine or index-derived authority.
+    /// The caller supplies one shared byte budget for the entire dependency traversal.
+    pub(crate) fn dependency_manifest_chunks(
+        &self,
+        id: RecordDigest,
+        remaining_bytes: &mut u64,
+    ) -> Result<BTreeSet<RecordDigest>, String> {
+        use mesh_cas::{ContentDigest as _, DigestHasher as _};
+        self.ensure_physical_root().map_err(|_| refused())?;
+        let manifest = self.record_index.manifest(&id).ok_or_else(refused)?;
+        if manifest.chunks.len() > 65536
+            || crate::manifest_paging::logical_manifest_id(
+                manifest.byte_length,
+                manifest.content_digest,
+                &manifest.chunks,
+            ) != id
+        {
+            return Err(refused());
+        }
+        *remaining_bytes = remaining_bytes
+            .checked_sub(manifest.byte_length)
+            .ok_or_else(refused)?;
+        let mut offset = 0u64;
+        let mut content = mesh_cas::Blake3::hasher();
+        let mut roots = BTreeSet::new();
+        let mut buffer = [0u8; 65536];
+        for chunk in &manifest.chunks {
+            if chunk.byte_offset != offset || chunk.byte_length == 0 {
+                return Err(refused());
+            }
+            let digest = CasDigest::from_bytes(*chunk.digest.as_bytes());
+            let mut file = self
+                .payload_store
+                .filesystem()
+                .read_file(&self.payload_store.layout().chunk_path(&digest))
+                .map_err(|_| refused())?;
+            let metadata = file.metadata().map_err(|_| refused())?;
+            if !metadata.is_file() || metadata.len() != chunk.byte_length {
+                return Err(refused());
+            }
+            let mut chunk_hash = mesh_cas::Blake3::hasher();
+            let mut left = chunk.byte_length;
+            while left > 0 {
+                let take = left.min(buffer.len() as u64) as usize;
+                file.read_exact(&mut buffer[..take])
+                    .map_err(|_| refused())?;
+                chunk_hash.update(&buffer[..take]);
+                content.update(&buffer[..take]);
+                left -= take as u64;
+            }
+            if file.read(&mut buffer[..1]).map_err(|_| refused())? != 0
+                || chunk_hash.finalize() != digest
+            {
+                return Err(refused());
+            }
+            offset = offset.checked_add(chunk.byte_length).ok_or_else(refused)?;
+            roots.insert(chunk.digest);
+        }
+        if offset != manifest.byte_length
+            || content.finalize().as_bytes() != manifest.content_digest.as_bytes()
+        {
+            return Err(refused());
+        }
+        Ok(roots)
+    }
+
     /// Read one bounded authenticated fact from this exact opened journal and verified CAS.
     /// The dependency resolver still must visit every parent, bind workspace identity, verify
     /// referenced content and consumption edges, and retain complete native custody.
