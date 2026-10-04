@@ -230,6 +230,10 @@ review behavior works for manual lines and mixed human/agent work without starti
 
 ## Phase 4: private dependencies
 
+The [native authority contract](../decisions/private-dependency-authority.md) defines exact input
+bindings, project-owned decisions, compatibility, retention and the required publication barrier.
+It is an implementation contract, not evidence that this phase is complete.
+
 Explicitly authorized lanes may consume another lane's pinned saved private version. This is an
 amendment to automatic isolation, not permission to observe a moving writable folder. Record exact
 input closure. Rejection or replacement marks dependent results stale and schedules revalidation.
