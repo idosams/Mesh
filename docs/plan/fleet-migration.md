@@ -5435,4 +5435,6 @@ R122 / PR #260 original head `7beb0bd8b12647042cdbb2a9325d2849376ab4c5` and its
 source-identical reconciliation `60fc9d5e5ca6fadd0a354875ec0510be590cd44f` both passed all seven
 hosted checks before this related-history combination with merged R123. The append-only records
 and both retention-contract changes are preserved; no production code conflicts occurred.
-Fresh combined validation and R122 hosted delivery remain pending.
+Combined source `5655fe5` passed the full gate: 3,789 native tests in 165.911s (1 slow,
+17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon checks. R122 hosted delivery
+remains pending on the final combined head.
