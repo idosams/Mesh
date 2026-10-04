@@ -7372,6 +7372,7 @@ passed post-merge run `37241537647`; empty-input PR #326 passed run `37241441884
 head but still needs base reconciliation and merge. The catalog-read increment requires its own
 hosted checks and normal merge. Automatic input discovery, desktop/harness wiring and the full
 remaining fleet acceptance remain open in #323. The fixed checkpoint is unchanged.
+
 R161 chained recovery PR #325 merged normally into canonical `main` on 2026-10-04 at
 `39f75b33ba2586ac2c55b5222ac97ed39196fee6`, after all seven hosted checks passed on
 `26d61d4fb97c99ee7b52f607f15721e07acf63ab` (run `37241603535`). Post-merge CI is separate.
@@ -7383,3 +7384,14 @@ Catalog-read PR #327 is published at `c462e8f1ee573f0647db2cc65c3a317881781f23`,
 and base reconciliation still required. The full fleet scope and #323 remain open; native input
 selection, desktop/harness integration, runtime/publication and remaining acceptance are unfinished.
 The user checkpoint remains fixed.
+
+R161 empty-input acceptance PR #326 merged normally into canonical main on 2026-10-04 at
+`7ffbd244346b3ce7e534cf509b016dcfe9103386`, after all seven checks passed on
+`428582e967503470591b27db0078fba82e8f1b02` (run `37242735253`). Chained recovery #325 post-merge
+run `37242679496` also passed. Catalog-read #327 passed all seven checks on
+`c462e8f1ee573f0647db2cc65c3a317881781f23` (run `37242611845`). Its local reconciliation
+`ecdb29ae6bd696cf59f209acdc791fc978c36870` adds only the merged empty-input acceptance test and
+delivery notes; all catalog-read production code is unchanged. Both documentation histories were
+retained. Full validation of this combined tree is running before republishing against main.
+Automatic discovery and desktop/harness wiring are not delivered by #327; the full fleet objective
+and issue #323 remain open. The fixed checkpoint is unchanged.
