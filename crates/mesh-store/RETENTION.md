@@ -223,3 +223,12 @@ A pass can delay shutdown while filesystem I/O finishes; no time bound is claime
 in-memory status reports waiting, absent workspace, deferred, collected count or refused, never
 private paths or error contents. All recorded history remains retained; this is orphan cleanup,
 not automatic version expiration or full fleet storage-pressure acceptance.
+
+## Dependency history awaiting native validation
+
+Required dependency envelopes name their canonical payloads, but storage cannot yet validate the
+transitive private-input roots inside those payloads. `Reachability::compute` therefore returns
+`UnvalidatedDependencies` for any dependency-bearing index before producing a collection plan.
+This preserves content by refusing collection; it is not completed dependency retention support.
+`tests/dependency-records.rs` covers the refusal and payload naming. Native payload validation and
+complete retained closure are required before enabling collection for these histories.

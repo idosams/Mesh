@@ -32,8 +32,8 @@
 
 use crate::index::{FoldError, Index};
 use crate::record::{
-    AckRecord, ApprovalRecord, ContextRecord, ManifestRecord, OperationRecord, PeerRecord,
-    ReviewRecord, StoredRecord,
+    AckRecord, ApprovalRecord, ContextRecord, DependencyRecord, ManifestRecord, OperationRecord,
+    PeerRecord, ReviewRecord, StoredRecord,
 };
 use crate::row::{Row, Value};
 use crate::schema::{Provenance, Table, TABLES};
@@ -109,6 +109,8 @@ pub struct Checkpoint {
     pub approvals: Vec<ApprovalRecord>,
     /// Context ledger entries.
     pub context_entries: Vec<ContextRecord>,
+    /// Ordered native dependency envelopes, preserved without granting authority.
+    pub dependencies: Vec<DependencyRecord>,
 }
 
 impl Checkpoint {
@@ -137,6 +139,12 @@ impl Checkpoint {
                 .iter()
                 .copied()
                 .map(StoredRecord::ContextEntry),
+        );
+        records.extend(
+            self.dependencies
+                .iter()
+                .copied()
+                .map(StoredRecord::Dependency),
         );
         records
     }

@@ -83,6 +83,7 @@ mod checkpoint_runtime;
 mod checkpoint_storage;
 pub mod counters;
 mod crash_report;
+pub mod dependency_policy;
 mod exclusions;
 pub mod fallback;
 pub mod fleet;

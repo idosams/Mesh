@@ -6026,6 +6026,56 @@ require integration. Full gate and hosted delivery pending. Fixed user checkpoin
 
 R146 implementation verification: Full `npm test` passed on `cd830a86a98174e0952277f9442020f6329f9b80`: 3,830 native tests in 173.261s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
 
+## R147 — required dependency journal and index foundation
+
+New canonical implementation based on PR #294 at
+`d0b4176d0a7347ba6d2a2e7bfce448e9e5de4d80`; no preserved source commit is replaced.
+Tracks issue #295 and the persistence prerequisite of #289. Required journal kind 8 encodes a
+fixed 105-byte envelope with authority, ledger ordinal, previous/current payload and closed kind.
+Additive index migration 3 reconstructs envelopes. Replay rejects contradictory or noncontiguous
+history before mutation and preserves idempotent exact retries without rewinding ledger heads.
+The payload still requires native semantic validation; no grant or enrollment API is enabled.
+
+Native open and refresh refuse dependency-bearing history, direct dependency appends refuse, and
+cached approval rereads the pinned journal before writing. Unknown transitive roots refuse
+collection. Old disposable-index schema compatibility is not promised. Exact pre-change storage
+source at the base revision was independently built and refused the new record kind with unchanged
+fixture bytes; this is scanner evidence, not an already-running old desktop enrollment proof.
+Future enrollment must install and verify a mandatory old-writer custody fence before its journal
+record, including both crash boundaries. That requirement remains unimplemented.
+
+The complete storage crate suite passed, including real SQLite reconstruction and existing
+crash/recovery campaigns extended with dependency records. The native cached-approval/reopen
+regression passed. Allowing a missing previous payload or disabling cached approval inspection
+made their respective regressions fail; source was restored byte-exact. Two initial test fixture
+compile failures are preserved. Full repository and hosted checks remain pending. The fixed
+user checkpoint is unchanged; full private-input authorization and publication enforcement remain
+required by the fleet plan.
+
+R147 implementation `af708ababc2f42a8e75a06ebd0d8152d9bfd4d13` passed full `npm test`: 3,837 native tests in 173.217s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+## R148 — native dependency payload validation and historical replay
+
+New canonical implementation based on PR #296 at
+`d04729e505007fd04aebcbdad43417e385b9c2e7`; no preserved source commit is replaced.
+Tracks issue #297 and the native policy prerequisite of #289. Canonical bounded payloads must match
+the exact storage digest, authority, kind, ordinal and predecessor. Enrollment matches an independently
+supplied native registration binding. Replay separates ledger order, exact input/destination grant
+generations and per-input decision revisions. It rejects contradictory requests, stale/revoked grants
+and stale/ineligible review vectors before changing state. Exact historical replay remains idempotent
+at capacity. Rejection and replacement preserve direct operation/policy references and earlier reviews.
+
+Nine focused native tests pass, including independent byte vectors, malformed/truncated/oversized
+payloads, external-binding and envelope substitution, atomic refusal, distinct installation versus
+stable-work identity, unrelated decisions, replacement, revocation and full record/aggregate-byte
+limits. Weakening eligibility or current-grant enforcement makes the intended regression fail; exact
+source restored. The initial missing digest-trait import compile failure is retained. Full repository
+and hosted validation pending. This read-only projection does not authenticate control writes, verify
+source ancestry or complete transitive closure, fence older writers or authorize consumption/publication.
+Existing native dependency refusals and the fixed user checkpoint are unchanged.
+
+R148 implementation `f7978bf33cb7ed82dd40ecb70c12191b14863170` passed full `npm test`: 3,847 native tests in 171.254s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
 ## R149 — durable preparation fence for older native writers
 
 New canonical work based on main `60441cb0013df707d71f8781b27964514cb32310` (merged #294);
@@ -6085,3 +6135,7 @@ R149 evidence. An initial Rust error-message borrowing compile failure is preser
 and hosted validation remain pending; the fixed user checkpoint is unchanged.
 
 R150 implementation verification: Full `npm test` passed on implementation `cead2c5542f729c32cf458bf4b79c31fccbfe040`: 3,840 native tests in 171.744s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431dae5d2b7fe190b6` passed full `npm test`: 3,844 native tests in 175.049s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained; no native conflict required resolution. Hosted verification of the reconciled head is pending.
+
+R148 reconciliation with merged R149 and published R147 `6320642214f4bcbc31c6dbc4f266e397b2645f92`: Full `npm test` passed on reconciliation `6c7779b5f022b70047933352ba9a507483903618`: 3,853 native tests in 175.953s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained and native code merged without manual resolution. Fresh hosted validation remains pending.

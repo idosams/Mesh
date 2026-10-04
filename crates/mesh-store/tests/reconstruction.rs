@@ -73,6 +73,13 @@ fn manifest(id: u8, lengths: &[u64]) -> ManifestRecord {
 /// checkpoint that only wrote operations would say nothing about the other nine.
 fn everything() -> Checkpoint {
     Checkpoint {
+        dependencies: vec![mesh_store::DependencyRecord {
+            authority: digest(90),
+            revision: 1,
+            previous: RecordDigest::from_bytes([0; 32]),
+            payload: digest(91),
+            kind: mesh_store::DependencyKind::Enrollment,
+        }],
         manifests: vec![manifest(20, &[10, 20, 30]), manifest(21, &[])],
         operations: vec![
             operation(1, 2, 1, &[]),
@@ -228,8 +235,12 @@ fn a_rebuild_is_insensitive_to_the_order_acknowledgements_arrive_in() {
         .1;
 
     let mut shuffled = checkpoint.records();
-    let tail = shuffled.split_off(shuffled.len() - 1);
-    let mut reordered = tail;
+    let context = shuffled
+        .iter()
+        .position(|record| matches!(record, mesh_store::StoredRecord::ContextEntry(_)))
+        .unwrap();
+    let first = shuffled.remove(context);
+    let mut reordered = vec![first];
     reordered.extend(shuffled);
     // The context entry now arrives before its operation, which the fold must refuse rather than
     // silently drop — a rebuild that quietly skipped it would produce a smaller index.
