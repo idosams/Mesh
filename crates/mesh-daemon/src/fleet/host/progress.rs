@@ -3,6 +3,8 @@ use super::*;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 const INTERVAL: Duration = Duration::from_secs(5);
+const FINAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+const MAX_FINAL_ATTEMPTS: u8 = 3;
 
 /// Redacted private-save observation, independent of provider execution and review status.
 #[derive(Clone, Debug)]
@@ -21,7 +23,7 @@ pub(super) struct ProgressOwner {
     enabled: bool,
     job: Option<(JoinHandle<Result<WorkerProgressSave, Unavailable>>, bool)>,
     next: Instant,
-    final_requested: bool,
+    final_attempts: u8,
     final_completed: bool,
     observation: WorkerSaveObservation,
 }
@@ -31,7 +33,7 @@ impl ProgressOwner {
             enabled,
             job: None,
             next: Instant::now(),
-            final_requested: false,
+            final_attempts: 0,
             final_completed: false,
             observation: WorkerSaveObservation {
                 state: "waiting",
@@ -54,11 +56,26 @@ impl ProgressOwner {
         finished: bool,
         cancelled: bool,
     ) {
+        self.advance_with(Instant::now(), finished, cancelled, || {
+            service.spawn_worker_progress_save(credential)
+        });
+    }
+    fn advance_with(
+        &mut self,
+        now: Instant,
+        finished: bool,
+        cancelled: bool,
+        spawn: impl FnOnce() -> std::io::Result<JoinHandle<Result<WorkerProgressSave, Unavailable>>>,
+    ) {
         if self.job.as_ref().is_some_and(|(job, _)| job.is_finished()) {
             let (job, final_capture) = self.job.take().unwrap();
             self.observation.observed_at = Some(SystemTime::now());
+            let mut retry_observation = false;
             match job.join() {
                 Ok(Ok(result)) => {
+                    // Retry only a complete native save whose fleet acknowledgment is pending.
+                    // No process retry, authority renewal or unsupported-file repair is implied.
+                    retry_observation = result.complete && result.observation_pending;
                     self.observation.version = Some(result.version.to_string());
                     self.observation.issue = result.issue;
                     self.observation.state = if !result.complete || result.observation_pending {
@@ -74,20 +91,31 @@ impl ProgressOwner {
                     self.observation.issue = Some("fleet-progress-unavailable");
                 }
             }
-            self.next = Instant::now() + INTERVAL;
-            self.final_completed |= final_capture;
+            let retry_final =
+                final_capture && retry_observation && self.final_attempts < MAX_FINAL_ATTEMPTS;
+            self.next = now
+                + if retry_final {
+                    FINAL_RETRY_INTERVAL
+                } else {
+                    INTERVAL
+                };
+            self.final_completed |= final_capture && !retry_final;
         }
         if !self.enabled || cancelled || self.job.is_some() || self.final_completed {
             return;
         }
-        let final_capture = finished && !self.final_requested;
-        if !final_capture && (finished || Instant::now() < self.next) {
+        let final_capture = finished;
+        if (!final_capture && self.final_attempts > 0)
+            || ((self.final_attempts > 0 || !final_capture) && now < self.next)
+        {
             return;
         }
-        self.final_requested |= final_capture;
-        self.next = Instant::now() + INTERVAL;
+        if final_capture {
+            self.final_attempts += 1;
+        }
+        self.next = now + INTERVAL;
         self.observation.observed_at = Some(SystemTime::now());
-        match service.spawn_worker_progress_save(credential) {
+        match spawn() {
             Ok(job) => {
                 self.job = Some((job, final_capture));
                 self.observation.state = "saving";
@@ -108,3 +136,6 @@ impl Drop for ProgressOwner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
