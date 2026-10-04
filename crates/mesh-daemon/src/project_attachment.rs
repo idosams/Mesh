@@ -50,6 +50,8 @@ pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
 mod dependency_decision;
+mod dependency_grant;
+pub use dependency_grant::{NativeInputGrant, NativeInputGrantRequest};
 mod dependency_work;
 pub use dependency_work::NativeDependencyWorkBinding;
 mod dependency_enrollment;

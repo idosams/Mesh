@@ -16,7 +16,7 @@ pub struct NativeDependencyWorkBinding {
     project: RecordDigest,
     work: RecordDigest,
     installation: RecordDigest,
-    correlation: RecordDigest,
+    pub(super) correlation: RecordDigest,
 }
 impl NativeDependencyWorkBinding {
     /// Owning dependency authority, selected from native enrollment.
@@ -47,6 +47,11 @@ impl NativeDependencyWorkBinding {
         }
         Ok(())
     }
+}
+pub(super) struct PreparedDependencyWork {
+    owner: ProvisionedAttachment,
+    chain: Vec<Link>,
+    pub(super) roots: Vec<crate::root_authority::PinnedWorkspaceRoot>,
 }
 struct Link {
     work: ProvisionedAttachment,
@@ -91,6 +96,17 @@ impl AttachmentStorage {
         owner: &ProvisionedAttachment,
         candidate: &ProvisionedAttachment,
     ) -> io::Result<NativeDependencyWorkBinding> {
+        let prepared = self.prepare_dependency_work(owner, candidate)?;
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
+            .map_err(error)?;
+        self.validate_dependency_work(&prepared, &guard)
+    }
+
+    pub(super) fn prepare_dependency_work(
+        &self,
+        owner: &ProvisionedAttachment,
+        candidate: &ProvisionedAttachment,
+    ) -> io::Result<PreparedDependencyWork> {
         self.pinned.ensure_namespace_identity()?;
         let owner = self.exact_registered_work(owner)?;
         if self.lane_origin(&owner)?.is_some() {
@@ -134,15 +150,58 @@ impl AttachmentStorage {
                 roots.push(origin.allocation.clone());
             }
         }
-        let guard =
-            crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
+        Ok(PreparedDependencyWork {
+            owner,
+            chain,
+            roots,
+        })
+    }
+
+    pub(super) fn validate_dependency_work(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<NativeDependencyWorkBinding> {
+        guard.require_roots(&prepared.roots).map_err(error)?;
+        let owner = &prepared.owner;
         self.pinned.ensure_namespace_identity()?;
-        let (_, proof) = owner
+        if self.lane_origin(owner)?.is_some() {
+            return Err(invalid("owning root ancestry changed"));
+        }
+        let (configuration, proof) = owner
             .project()
             .read_configuration(owner.metadata_path(), &owner.store)?;
-        let owner_binding = proof
-            .ok_or_else(|| invalid("owning dependency enrollment is required"))?
-            .binding();
+        let proof = proof.ok_or_else(|| invalid("owning dependency enrollment is required"))?;
+        let workspace = crate::workspace::OpenWorkspace::open_attachment_read_history(
+            owner.metadata_path(),
+            owner.store.clone(),
+            &crate::TrustedReviewers::default(),
+            Some(&proof),
+        )
+        .map_err(error)?;
+        super::history::verify_history_binding(&workspace, &configuration)?;
+        self.validate_dependency_work_with_history(prepared, guard, &proof, &workspace)
+    }
+
+    pub(super) fn validate_dependency_work_with_history(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        proof: &super::dependency_read::VerifiedDependencyRead,
+        owner_history: &crate::workspace::OpenWorkspace,
+    ) -> io::Result<NativeDependencyWorkBinding> {
+        guard.require_roots(&prepared.roots).map_err(error)?;
+        let owner = &prepared.owner;
+        let chain = &prepared.chain;
+        self.pinned.ensure_namespace_identity()?;
+        self.exact_registered_work(owner)?;
+        if self.lane_origin(owner)?.is_some() {
+            return Err(invalid("owning root ancestry changed"));
+        }
+        let owner_binding = proof.binding();
+        if owner_binding.project != hash(owner.project().receipt()?.encode().as_bytes()) {
+            return Err(invalid("work owner differs from policy authority"));
+        }
         let mut work = owner_binding.project;
         let mut correlation = vec![identity(self.pinned.identity()?)];
         let mut parent: Option<&ProvisionedAttachment> = None;
@@ -164,17 +223,33 @@ impl AttachmentStorage {
                     return Err(invalid("native parent work changed"));
                 }
                 let version = field(origin, "source_version")?;
-                parent.attachment.inspect_saved(
-                    parent.metadata_path(),
-                    parent.store.clone(),
-                    version,
-                    |workspace, version| {
-                        workspace
-                            .historical_workspace_preview(version)
-                            .map(|_| ())
-                            .map_err(error)
-                    },
-                )?;
+                if parent.id() == owner.id() {
+                    let version = digest(version.strip_prefix("blake3:").unwrap_or(version))?;
+                    if !owner_history
+                        .workspace_versions()
+                        .iter()
+                        .any(|v| v.operation() == version)
+                    {
+                        return Err(invalid(
+                            "ancestry input is not a saved operation of its parent",
+                        ));
+                    }
+                    owner_history
+                        .historical_workspace_preview(version)
+                        .map_err(error)?;
+                } else {
+                    parent.attachment.inspect_saved(
+                        parent.metadata_path(),
+                        parent.store.clone(),
+                        version,
+                        |workspace, version| {
+                            workspace
+                                .historical_workspace_preview(version)
+                                .map(|_| ())
+                                .map_err(error)
+                        },
+                    )?;
+                }
                 work = hash(
                     Json::object([
                         ("schema", Json::text("mesh.native-dependency-work/v1")),

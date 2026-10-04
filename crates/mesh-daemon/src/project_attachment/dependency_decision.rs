@@ -88,19 +88,27 @@ fn body(
     ])
 }
 #[derive(Clone, Copy)]
-enum Step {
+pub(super) enum Step {
     Staged,
     Appended,
 }
 
 pub(super) fn transaction_intent(
+    kind: DependencyKind,
     request: RecordDigest,
     identity: (u64, u64),
     before: &[u8],
     payload: RecordDigest,
 ) -> String {
     Json::object([
-        ("schema", Json::text("mesh.dependency-decision-intent/v1")),
+        (
+            "schema",
+            Json::text(if kind == DependencyKind::Grant {
+                "mesh.dependency-grant-intent/v1"
+            } else {
+                "mesh.dependency-decision-intent/v1"
+            }),
+        ),
         ("request", Json::text(request.to_hex())),
         ("journal_device", Json::text(format!("{:016x}", identity.0))),
         ("journal_inode", Json::text(format!("{:016x}", identity.1))),
@@ -109,6 +117,27 @@ pub(super) fn transaction_intent(
         ("payload", Json::text(payload.to_hex())),
     ])
     .encode()
+}
+/// Native callers construct this only after selecting and validating their exact inputs.
+pub(super) struct NativeControlInput {
+    pub(super) kind: DependencyKind,
+    pub(super) revision_field: &'static str,
+    pub(super) body: Json,
+    pub(super) prior: Option<(u64, RecordDigest)>,
+}
+impl NativeControlInput {
+    fn body_at(&self, revision: u64) -> io::Result<Json> {
+        let mut body = self.body.clone();
+        let Json::Object(fields) = &mut body else {
+            return Err(invalid("invalid native control body"));
+        };
+        let field = fields
+            .iter_mut()
+            .find(|(name, _)| name == self.revision_field)
+            .ok_or_else(|| invalid("missing native control revision"))?;
+        field.1 = Json::Number(revision);
+        Ok(body)
+    }
 }
 mod recovery;
 pub(super) use recovery::pending_prefix;
@@ -140,6 +169,65 @@ impl ProvisionedAttachment {
         decision: SavedInputDecision,
         expected_previous: Option<RecordDigest>,
         request: RecordDigest,
+        mut hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        mut sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<NativeInputDecision> {
+        self.control_with_io(
+            expected_previous,
+            request,
+            |workspace, proof| {
+                let binding = proof.binding();
+                let validate = |version: SavedAttachmentVersion| -> io::Result<()> {
+                    if !workspace
+                        .workspace_versions()
+                        .iter()
+                        .any(|v| v.operation() == version.operation())
+                    {
+                        return Err(invalid(
+                            "input is not a saved version of this native project",
+                        ));
+                    }
+                    workspace
+                        .historical_workspace_preview(version.operation())
+                        .map_err(error)?;
+                    Ok(())
+                };
+                validate(version)?;
+                if let SavedInputDecision::Replaced(replacement) = decision {
+                    validate(replacement)?;
+                }
+                Ok(NativeControlInput {
+                    kind: DependencyKind::Eligibility,
+                    revision_field: "revision",
+                    body: body(
+                        binding.project,
+                        binding.installation,
+                        version,
+                        decision,
+                        request,
+                        0,
+                        expected_previous.unwrap_or(ZERO),
+                    ),
+                    prior: proof.policy().native_decision(
+                        binding.project,
+                        binding.installation,
+                        version.operation(),
+                    ),
+                })
+            },
+            &mut hook,
+            &mut sync,
+        )
+    }
+
+    pub(super) fn control_with_io(
+        &self,
+        expected_previous: Option<RecordDigest>,
+        request: RecordDigest,
+        mut select: impl FnMut(
+            &OpenWorkspace,
+            &super::dependency_read::VerifiedDependencyRead,
+        ) -> io::Result<NativeControlInput>,
         mut hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&File) -> io::Result<()>,
     ) -> io::Result<NativeInputDecision> {
@@ -175,25 +263,7 @@ impl ProvisionedAttachment {
         )
         .map_err(error)?;
         verify_history_binding(&workspace, &configuration)?;
-        let validate = |version: SavedAttachmentVersion| -> io::Result<()> {
-            if !workspace
-                .workspace_versions()
-                .iter()
-                .any(|v| v.operation() == version.operation())
-            {
-                return Err(invalid(
-                    "input is not a saved version of this native project",
-                ));
-            }
-            workspace
-                .historical_workspace_preview(version.operation())
-                .map_err(error)?;
-            Ok(())
-        };
-        validate(version)?;
-        if let SavedInputDecision::Replaced(replacement) = decision {
-            validate(replacement)?;
-        }
+        let selected = select(&workspace, &proof)?;
         let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
             self.metadata_path(),
             self.store.filesystem(),
@@ -219,23 +289,13 @@ impl ProvisionedAttachment {
         if let Some(record) = policy.native_request(request) {
             let bytes = read_payload(&cas, record.payload, 65_536)?;
             let value = Json::parse(std::str::from_utf8(&bytes).map_err(error)?).map_err(error)?;
-            let previous = expected_previous.unwrap_or(ZERO);
             let revision = value
                 .get("body")
-                .and_then(|v| v.get("revision"))
+                .and_then(|v| v.get(selected.revision_field))
                 .and_then(Json::as_u64)
                 .ok_or_else(|| invalid("request is not an input decision"))?;
-            if record.kind != DependencyKind::Eligibility
-                || value.get("body")
-                    != Some(&body(
-                        binding.project,
-                        binding.installation,
-                        version,
-                        decision,
-                        request,
-                        revision,
-                        previous,
-                    ))
+            if record.kind != selected.kind
+                || value.get("body") != Some(&selected.body_at(revision)?)
             {
                 return Err(invalid("decision request was reused with different intent"));
             }
@@ -246,8 +306,7 @@ impl ProvisionedAttachment {
                 revision,
             });
         }
-        let prior =
-            policy.native_decision(binding.project, binding.installation, version.operation());
+        let prior = selected.prior;
         if prior.map(|(_, p)| p) != expected_previous {
             return Err(invalid("saved-input decision is stale"));
         }
@@ -261,26 +320,19 @@ impl ProvisionedAttachment {
             .checked_add(1)
             .ok_or_else(|| invalid("dependency history exhausted"))?;
         let bytes = Json::object([
-            ("schema", Json::text("mesh.dependency-policy/v1")),
+            (
+                "schema",
+                Json::text(if selected.kind == DependencyKind::Grant {
+                    "mesh.dependency-policy/v2"
+                } else {
+                    "mesh.dependency-policy/v1"
+                }),
+            ),
             ("authority", Json::text(binding.authority.to_hex())),
             ("revision", Json::Number(ordinal)),
             ("previous", Json::text(previous.to_hex())),
-            (
-                "kind",
-                Json::Number(u64::from(DependencyKind::Eligibility.code())),
-            ),
-            (
-                "body",
-                body(
-                    binding.project,
-                    binding.installation,
-                    version,
-                    decision,
-                    request,
-                    revision,
-                    expected_previous.unwrap_or(ZERO),
-                ),
-            ),
+            ("kind", Json::Number(u64::from(selected.kind.code()))),
+            ("body", selected.body_at(revision)?),
         ])
         .encode()
         .into_bytes();
@@ -289,11 +341,12 @@ impl ProvisionedAttachment {
             revision: ordinal,
             previous,
             payload: hash(&bytes),
-            kind: DependencyKind::Eligibility,
+            kind: selected.kind,
         };
         policy.apply(record, &bytes).map_err(error)?;
         let identity = journal.metadata()?;
         let pending = transaction_intent(
+            selected.kind,
             request,
             (identity.dev(), identity.ino()),
             &before,
@@ -338,6 +391,13 @@ impl ProvisionedAttachment {
             || current_proof.pending().map(|(_, r)| r) != Some(record)
         {
             return Err(invalid("decision authority changed before append"));
+        }
+        let current_selection = select(&workspace, &current_proof)?;
+        if current_selection.kind != selected.kind
+            || current_selection.body_at(revision)? != selected.body_at(revision)?
+            || current_selection.prior != selected.prior
+        {
+            return Err(invalid("native control inputs changed before append"));
         }
         journal.rewind()?;
         let mut current = Vec::new();
