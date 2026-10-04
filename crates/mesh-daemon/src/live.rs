@@ -3828,6 +3828,10 @@ impl LiveDaemon {
             .lock_current_managed_workspace_mutation()
             .map_err(agent_custody_refusal)?;
         let mut held = self.held();
+        // Custody serializes writers, but another daemon may have committed since this client
+        // loaded its view. Reopen inside that serial before comparing the displayed identity or
+        // deciding approval authority; a cached context must never append a competing receipt.
+        reopen(&mut held, &self.trusted_reviewers)?;
         let open = held.as_ref().ok_or_else(Unavailable::no_workspace_open)?;
         if open.root().as_path() != Path::new(expected_root)
             || open.digest().to_string() != expected_digest
