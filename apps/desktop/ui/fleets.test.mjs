@@ -378,3 +378,24 @@ test('pending summary reads do not block fleet status or an explicit start comma
   assert.equal(calls.filter(call => call.command === 'summarize_fleet_saved_progress').length, 1);
   assert.equal(h.projections.at(-1).busy, false); h.dispose();
 });
+
+test('handoff projection is exact, bounded, immutable and unknown for legacy catalogues', () => {
+  const value = catalogue(), row = value.fleets[0].state.lanes[0];
+  assert.equal(fleetCatalogue(value)[0].lanes[0].handoffStatus, null);
+  row.saved_version = version;
+  const good = { version, pending_captures: 1, complete_handoffs: 2, incomplete_handoffs: 1, submitted_reviews: 1, open_change_requests: 3, approval_authority: false };
+  row.handoff_status = good;
+  const parsed = fleetCatalogue(value)[0].lanes[0].handoffStatus;
+  assert.deepEqual(parsed, { version, pending: 1, complete: 2, incomplete: 1, reviews: 1, openRequests: 3 });
+  assert.ok(Object.isFrozen(parsed));
+  for (const invalid of [null, {}, { ...good, version: id }, { ...good, version: null }, { ...good, approval_authority: true },
+    { ...good, pending_captures: -1 }, { ...good, submitted_reviews: 3 }, { ...good, open_change_requests: '1' },
+    { ...good, incomplete_handoffs: 0.5 }, { ...good, complete_handoffs: Number.MAX_SAFE_INTEGER },
+    { ...good, open_change_requests: Number.MAX_SAFE_INTEGER + 1 }, { ...good, message: 'private' }]) {
+    row.handoff_status = invalid; assert.throws(() => fleetCatalogue(value));
+  }
+  row.saved_version = null;
+  row.handoff_status = { ...good, version: null, complete_handoffs: 0, incomplete_handoffs: 0, submitted_reviews: 0 };
+  assert.equal(fleetCatalogue(value)[0].lanes[0].handoffStatus.openRequests, 3);
+  row.handoff_status.complete_handoffs = 1; assert.throws(() => fleetCatalogue(value));
+});

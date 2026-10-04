@@ -587,3 +587,17 @@ authority; already admitted changes may finish. Shutdown waits for an admitted s
 This applies to local workers launched and owned by Mesh. Restored fleets and received remote
 sessions are not automatically restarted, adopted or saved by this loop. The fixed `c2641c6`
 checkpoint predates this feature. Packaged provider acceptance is still pending.
+
+### Handoffs and feedback across lanes
+
+Each fleet lane shows **Recorded handoffs and feedback**. Complete and incomplete handoff counts
+and submitted reviews apply to the exact latest saved version shown in the details. Saving newer
+work does not transfer an older handoff or review to the newer version. A complete handoff means
+its native capture finished; it does not mean tests passed or the result was approved.
+
+The separate lane-wide counts include capture requests whose result is not yet confirmed and
+open change requests, including feedback on older versions. An unconfirmed capture may still be
+running or need recovery; the count does not classify it as failed. Only an explicit native decision
+closes a change request, and reopening it restores the open count. Proposing a revision or exiting
+an agent does not close feedback automatically. These are retained records, including after restart,
+not evidence that a restored worker is running. Older catalogue replies show status unavailable.

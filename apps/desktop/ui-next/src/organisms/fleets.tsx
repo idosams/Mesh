@@ -8,7 +8,8 @@ import { FleetReviewPanels, FleetSavedResults, type FleetReviewPin, type FleetRe
 import { Button } from "../atoms/button";
 
 type Source = { id: string; root: string; savedVersion: string | null; detached?: boolean };
-type Lane = { savedVersion?: string | null; id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string; remote?: { assignment: string; worker: string; leaseSequence: string; leaseUntil: string } | null } | null };
+type HandoffStatus = { version: string | null; pending: number; complete: number; incomplete: number; reviews: number; openRequests: number };
+type Lane = { handoffStatus?: HandoffStatus | null; savedVersion?: string | null; id: string; parent: string | null; sourceProject: string | null; goal: string; provider: string; base: string; allocated: boolean; run: { id: string; state: string; remote?: { assignment: string; worker: string; leaseSequence: string; leaseUntil: string } | null } | null };
 type ProviderPolicy = { coordinator: string; providers: string[] };
 type Fleet = { policy?: ProviderPolicy | null; objective: string; ownership: string; cancelled: boolean; lanes: Lane[] };
 type Worker = { progressSave?: { state: string; observedAt: string | null; version: string | null; issue: string | null } | null; lane: string; run: string; observedAt: string; activity: string | null; outcome: boolean | null; events: string };
@@ -139,6 +140,7 @@ export function FleetCards({ projection, projects, disabled }: { projection: Pro
               <Button variant="secondary" disabled={!projection.available || fleet.ownership === "unavailable" || !(projection.progressPersistence?.editable ?? true) || projection.progressLatestBusy?.[`${fleet.objective}/${lane.id}`]} onClick={() => send({ type: "progress-pin-latest", objective: fleet.objective, lane: lane.id, version: lane.savedVersion })}>{t("Pin this saved progress")}</Button>
             </div>}
             {lane.savedVersion && lane.allocated && !lane.run?.remote && <LaneSavedSummary value={summary} />}
+            <LaneHandoffStatus value={lane.handoffStatus} version={lane.savedVersion ?? null} />
             <SavedProgress objective={fleet.objective} lane={lane.id} queue={projection.progressQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable" && lane.allocated && (projection.progressPersistence?.editable ?? true)} />
             <FleetSavedResults objective={fleet.objective} lane={lane.id} queue={projection.reviewQueues?.[`${fleet.objective}/${lane.id}`]} available={projection.available && fleet.ownership !== "unavailable"} />
             <details className="break-all text-xs"><summary>{t("Lane and starting version")}</summary><p>{t("Lane")}: <bdi dir="ltr">{lane.id}</bdi></p>{lane.parent && <p>{t("Parent lane")}: <bdi dir="ltr">{lane.parent}</bdi></p>}<p>{t("Starting version")}: <bdi dir="ltr">{lane.base}</bdi></p><p>{t("Project")}: {lane.sourceProject ? <bdi dir="ltr">{projects.find(project => project.id === lane.sourceProject)?.root ?? lane.sourceProject}</bdi> : t("No attached source")}</p></details>
@@ -186,4 +188,18 @@ export function LaneSavedSummary({ value }: { value?: ProgressSummary }) {
     {value?.error && <p role="status">{t(value.error)}</p>}
     <p>{t("Saved counts do not describe unsaved working files or approve a result.")}</p>
   </section>;
+}
+
+export function LaneHandoffStatus({ value, version }: { value?: HandoffStatus | null; version: string | null }) {
+  const t = useTranslation();
+  if (!value || value.version !== version) return <p className="text-xs text-muted-foreground">{t("Handoff and feedback status unavailable")}</p>;
+  return <div className="grid gap-1 text-xs">
+    <p className="font-medium">{t("Recorded handoffs and feedback")}</p>
+    {version === null ? <p>{t("No saved version recorded")}</p> : <>
+      <p>{t("For the latest saved version")}: {value.complete} {t("complete handoffs")} · {value.incomplete} {t("incomplete handoffs")} · {value.reviews} {t("submitted reviews")}</p>
+      <details className="break-all"><summary>{t("Handoff version")}</summary><bdi dir="ltr">{version}</bdi></details>
+    </>}
+    <p>{t("Across this lane")}: {value.pending} {t("captures not yet confirmed")} · {value.openRequests} {t("open change requests")}</p>
+    <p className="text-muted-foreground">{t("Handoff completeness does not establish test results or approval.")}</p>
+  </div>;
 }

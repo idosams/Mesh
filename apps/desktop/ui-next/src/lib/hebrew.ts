@@ -1,5 +1,18 @@
 /** Reviewed UI copy only. Paths, file contents, protocol values and native diagnostics are never translated. */
 export const hebrew: Readonly<Record<string, string>> = Object.freeze({
+"Handoff and feedback status unavailable": "מצב מסירת התוצרים והמשוב אינו זמין",
+"Recorded handoffs and feedback": "מסירת תוצרים ומשוב שנרשמו",
+"No saved version recorded": "לא נרשמה גרסה שמורה",
+"For the latest saved version": "עבור הגרסה השמורה האחרונה",
+"complete handoffs": "מסירות תוצרים שלמות",
+"incomplete handoffs": "מסירות תוצרים לא שלמות",
+"submitted reviews": "סקירות שהוגשו",
+"Handoff version": "גרסת מסירת התוצר",
+"captures not yet confirmed": "שמירות שטרם אושרו כהושלמו",
+"Across this lane": "בכל נתיב העבודה הזה",
+"open change requests": "בקשות שינוי פתוחות",
+"Handoff completeness does not establish test results or approval.": "שלמות מסירת התוצר אינה מעידה על תוצאות בדיקות או על אישור.",
+
 "Refreshing this remote lane": "רענון נתיב העבודה המרוחק",
 "Remote observation unavailable. Last verified history is retained.": "התצפית המרוחקת אינה זמינה. ההיסטוריה המאומתת האחרונה נשמרת.",
 "Check the saved connection for this lane.": "יש לבדוק את החיבור השמור לנתיב עבודה זה.",
