@@ -6744,3 +6744,12 @@ Tree and file primitives now cover both top-level entry types. They still need n
 with the signed starting snapshot, staged transaction/source closure, required journal-before-install
 ordering and owner consumption receipt. No consumed version or runnable lane is acknowledged by
 these helper changes. Draft PR #324 and issue #323 remain open; the fixed checkpoint is unchanged.
+
+R161 retained-file implementation `c62c293303d1554c9f25ba7e729cb3f934ba37ae` passed full
+`npm test`: 3,946 native tests in 314.880s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The first
+full attempt found a redundant import; its failed log is retained alongside the corrected passing
+run. Published predecessor `1a28f903f3f0015b6c8f9f6086b704b3c30b1330` passed all seven hosted checks
+in run `37219440756`. These results cover the exact retained-file recovery seam and existing behavior,
+not a completed cross-store consumption transaction. Draft PR #324 and issue #323 remain open;
+the fixed user checkpoint remains unchanged.
