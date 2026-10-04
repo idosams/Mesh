@@ -5948,3 +5948,5 @@ Increasing concurrency to three fails the regression; source restored exactly. N
 also binds the catalogue base to the history summary source. Full gate and hosted delivery remain
 pending. Packaged real-agent parallel review, measured responsiveness, richer activity/validation/
 dependency overview and the full fleet acceptance plan remain open. Fixed checkpoint unchanged.
+
+R142 implementation `94af7d6c329ae7b9440a4f44bfea52512f871ef5` passed full `npm test`: 3,824 native tests in 169.965s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery and packaged graphical acceptance remain pending. The fixed 5052009 user checkpoint remains unchanged.
