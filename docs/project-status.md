@@ -2216,3 +2216,10 @@ reopening, not a new fresh-process or packaged-app claim. Full validation is pen
 is based on published PR #325 (`e27f41302850e643040062c8454fd6aa57f76e76`) and replaces no preserved
 fleet commit. Both dependency PRs and issue #323 remain open; all runtime, UI, publication and
 packaged acceptance requirements remain. The user's checkpoint is unchanged.
+
+R161 empty-input acceptance `891b7e35e6e1a940b61e28ffbc9f9e51ec244aa2` passed full `npm test`:
+3,949 native tests in 301.441s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all remaining repository/docs/license/storage/format/lint gates.
+Focused and false-acknowledgement mutation evidence, full logs and complete history are preserved.
+This increment will be published separately against PR #325; hosted CI and normal merge remain
+required. The complete fleet objective and issue #323 remain open, with the fixed checkpoint unchanged.
