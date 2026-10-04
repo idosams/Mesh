@@ -1466,3 +1466,10 @@ immutable granted-content reads under one guard, and refuses source-only custody
 custody is missing. Five graph tests (2.75s) and seven grant tests (1.43s) pass. Full validation and
 publication are pending. No consumption copying, starting-operation transaction or new persisted
 fence is enabled by this groundwork; the entire #323 scope and fleet goal remain open.
+
+R161 custody groundwork `a3a99f8e35e86d230aa578c53baa0d742f03bf44` passed full `npm test`:
+3,928 native tests in 269.544s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Publication as a
+draft follows so the unfinished consumption increment remains reviewable. This does not complete
+#323 or enable consumption. Main's post-R160 run still has macOS verification active; its other
+six jobs have passed.
