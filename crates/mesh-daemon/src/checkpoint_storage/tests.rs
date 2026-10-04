@@ -1,5 +1,6 @@
 use super::*;
 use ed25519_dalek::{Signer as _, SigningKey};
+use mesh_cas::ContentDigest as _;
 use mesh_crypto::SigningPayload;
 use mesh_operations::NormalizedName;
 use std::fs;
@@ -305,4 +306,42 @@ fn a_manifest_only_in_the_mutable_index_cannot_be_reused_as_durable_history() {
             .unwrap_err();
     assert!(matches!(err, CheckpointSaveError::ManifestSetMismatch));
     assert_eq!(fs::read(workspace.record_file()).unwrap(), before);
+}
+
+#[test]
+fn authenticated_preparation_is_exact_and_does_not_persist_before_native_intent() {
+    let f = Fixture::new("prepare-only");
+    let mut workspace = OpenWorkspace::open(&f.0).unwrap();
+    let cas = Cas::with_filesystem(
+        workspace.storage_root().as_path().to_path_buf(),
+        workspace.storage_pinned_root().filesystem(),
+    )
+    .unwrap();
+    let before = fs::read(workspace.record_file()).unwrap();
+    let files = vec![prepare(b"private first"), prepare(b"\0private second\xff")];
+    let expected = authenticated_checkpoint_identity(&request(&files), &Head).unwrap();
+    let prepared =
+        prepare_authenticated_checkpoint(&workspace, request(&files), files.clone(), &Head)
+            .unwrap();
+    assert_eq!(prepared.changeset_id, expected);
+    assert_eq!(workspace.operations(), 0);
+    assert_eq!(fs::read(workspace.record_file()).unwrap(), before);
+    for bytes in &prepared.objects {
+        assert!(cas.read(&CasBlake3::digest_bytes(bytes)).is_err());
+    }
+    let frames = prepared
+        .checkpoint
+        .records()
+        .iter()
+        .flat_map(mesh_store::frame_record)
+        .collect::<Vec<_>>();
+    let saved =
+        save_authenticated_checkpoint(&mut workspace, &cas, request(&files), files, &Head).unwrap();
+    assert_eq!(saved.changeset_id(), expected);
+    let after = fs::read(workspace.record_file()).unwrap();
+    assert_eq!(&after[..before.len()], before);
+    assert_eq!(&after[before.len()..], frames);
+    for bytes in prepared.objects {
+        assert_eq!(cas.read(&CasBlake3::digest_bytes(&bytes)).unwrap(), bytes);
+    }
 }
