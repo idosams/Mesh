@@ -2043,3 +2043,14 @@ before any destination append; it is included in the full validation now pending
 capture behavior remains covered by the shared writer tests. Generic desktop/harness context wiring,
 transitive consumed-source graph admission, runtime controls and packaged acceptance remain required.
 Draft PR #324 / issue #323 and the full fleet objective remain open; the user checkpoint is unchanged.
+
+R161 later-capture implementation `fba8e013a6e8886d75010456c87add8192b72ff7` passed full
+`npm test`: 3,949 native tests in 280.261s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `2e7d68bcde473ffdeb4325cd1a53c05ac5df289e` passed all seven hosted checks
+in run `37233954493`. Complete history and positive, mutation and full validation logs are preserved.
+The full run also passed the after-signing owner-history damage refusal without a destination append.
+Later native private saves and exact fresh-process recovery are verified; generic context wiring,
+transitive consumed-source graph admission, runtime/publication controls and packaged acceptance
+remain required. Draft PR #324 / issue #323 and the full fleet objective remain open. The fixed user
+checkpoint is unchanged.
