@@ -2331,6 +2331,22 @@ fn restarted_history_reads_preserve_work_and_never_restore_execution_authority()
     assert_eq!(f.service.saved_review(&selection).unwrap(), frozen);
 }
 
+fn snapshot_handoff(f: &Fixture) -> Json {
+    f.service
+        .snapshot()
+        .unwrap()
+        .get("lanes")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lane| lane.get("id").and_then(Json::as_text) == Some(f.lane.as_str()))
+        .unwrap()
+        .get("handoff_status")
+        .unwrap()
+        .clone()
+}
+
 #[test]
 fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_originating_lane() {
     use mesh_daemon::fleet::service::SavedReviewSelection;
@@ -2369,12 +2385,29 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
     )
     .unwrap();
     let before = f.service.native_state().unwrap();
+    assert_eq!(
+        snapshot_handoff(&f).get("complete_handoffs"),
+        Some(&Json::Number(1))
+    );
+    assert_eq!(
+        snapshot_handoff(&f).get("submitted_reviews"),
+        Some(&Json::Number(1))
+    );
+    assert_eq!(
+        snapshot_handoff(&f).get("version"),
+        checkpoint.get("version")
+    );
     let message = "Preserve the previous introduction and add an example.";
     let receipt = f
         .service
         .request_review_changes("reviewer-request", &selection, message)
         .unwrap();
     assert_eq!(text(&receipt, "status"), "recorded");
+    assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(1))
+    );
+    assert!(!snapshot_handoff(&f).encode().contains(message));
     assert_eq!(receipt.get("approval_authority"), Some(&Json::Bool(false)));
     assert_eq!(
         f.service
@@ -2602,6 +2635,10 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         .unwrap();
     assert_eq!(text(receipt.get("current").unwrap(), "status"), "addressed");
     assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(0))
+    );
+    assert_eq!(
         receipt.get("current").unwrap().get("approval_authority"),
         Some(&Json::Bool(false))
     );
@@ -2626,6 +2663,10 @@ fn native_review_change_requests_are_exact_retryable_and_visible_only_to_the_ori
         .unwrap();
     assert_eq!(text(late.get("receipt").unwrap(), "status"), "addressed");
     assert_eq!(text(late.get("current").unwrap(), "status"), "open");
+    assert_eq!(
+        snapshot_handoff(&f).get("open_change_requests"),
+        Some(&Json::Number(1))
+    );
     assert_eq!(
         late.get("current")
             .unwrap()

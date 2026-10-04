@@ -62,6 +62,10 @@ history never becomes zero files. Hidden/disposed views stop new dispatch. Resto
 remain readable without worker adoption, while remote assignments retain their separate observation
 path. This covers saved-change counts in the local overview; broader activity summaries and packaged
 parallel-agent acceptance remain unfinished.
+Lane cards also project recorded handoff completeness and submitted-review counts for the exact
+latest saved version, plus unconfirmed capture intents and open native change requests across the
+lane. This aggregate reads the refreshed durable state once, exposes no feedback text, and does not
+claim tests, dependency eligibility or approval. Older replies remain explicitly unknown.
 
 ## Retained worker execution observations
 

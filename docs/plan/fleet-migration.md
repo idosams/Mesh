@@ -5952,6 +5952,35 @@ dependency overview and the full fleet acceptance plan remain open. Fixed checkp
 R142 implementation `94af7d6c329ae7b9440a4f44bfea52512f871ef5` passed full `npm test`: 3,824 native tests in 169.965s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery and packaged graphical acceptance remain pending. The fixed 5052009 user checkpoint remains unchanged.
 
 
+## R144 — exact handoff and feedback overview
+
+New canonical implementation based on PR #285 head
+`8ab2f84fd9787b0551e5e766ed4f5522702569d3`; no preserved source commit is replaced.
+Tracks issue #287. The native fleet snapshot now adds per-lane handoff status computed in one pass
+over the already-refreshed checkpoint and review-request records. Complete/incomplete handoffs and
+submitted reviews are bound to the lane's exact latest saved version; older-version records are
+excluded from those counts. Pending capture intents and open explicit change requests span the lane.
+Confirmed decisions and reopen operations update the request count; provider completion and proposed
+revisions do not. No feedback text, credentials or file contents enter this aggregate.
+
+This is an additive snapshot projection with no persisted-format change, filesystem scan, capture,
+worker adoption or new authority. The strict desktop parser enforces closed fields, exact version
+correlation, safe counts, review subsets and false approval authority. Omitted legacy projections
+remain unknown; contradictory/malformed replies refuse. Lane cards explain current-version versus
+lane-wide counts in English and Hebrew and distinguish native capture completeness from tests or
+approval. Independent comparisons and progress pins remain unchanged.
+
+The focused native projection test covers old/current/new/absent saves, complete/incomplete/pending
+captures, cross-lane isolation, explicit feedback decisions and reopening, read-only state and privacy.
+The existing real native feedback lifecycle test checks the snapshot against durable commands. Both
+pass; 44 focused controller/rendered tests passed. The initial native test fixture needed an explicit
+closure parameter type; its compile failure is preserved. Removing the current-version filter fails
+the native regression; exact source was restored. Full gate and hosted delivery remain pending. Private dependency eligibility, validation evidence, packaged graphical
+acceptance and every remaining fleet-plan exit remain required. Fixed checkpoints are unchanged.
+
+R144 implementation `49cc6a84f5b5ccf90b0c5e4f4b0c40924ea60370` passed full `npm test`: 3,825 native tests in 174.256s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The native feedback decision/reopen projection passed within the full suite. Hosted delivery and packaged graphical acceptance remain pending.
+
+
 ## R145 — refresh managed approval history inside native custody
 
 New canonical implementation based on merged PR #285 (`9cc808ab4813497d16179a30d20e70af59acb925`);
