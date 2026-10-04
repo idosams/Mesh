@@ -18,6 +18,23 @@ impl AttachmentStorage {
         owner: &ProvisionedAttachment,
         request: NativeConsumedStartRequest<'_>,
     ) -> io::Result<(PreparedNativeConsumedStart, StagedNativeConsumedStart)> {
+        self.recover_consumed_start_state(owner, request, false)
+    }
+    /// Reconstruct an exact start with zero or more installed entries. This only returns
+    /// authenticated transaction material; ordinary history and runtime remain fenced.
+    pub fn recover_installing_consumed_start(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+    ) -> io::Result<(PreparedNativeConsumedStart, StagedNativeConsumedStart)> {
+        self.recover_consumed_start_state(owner, request, true)
+    }
+    fn recover_consumed_start_state(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        installed: bool,
+    ) -> io::Result<(PreparedNativeConsumedStart, StagedNativeConsumedStart)> {
         request.limits.validate()?;
         if request.request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing recovery request"));
@@ -63,12 +80,13 @@ impl AttachmentStorage {
             .lane_origin_bound(destination)?
             .ok_or_else(|| invalid("reservation missing"))?;
         if !crate::project_attachment::dependency_reservation::is_reservation(&origin.value)
-            || !destination
-                .attachment
-                .pinned
-                .filesystem()
-                .read_directory_names_bounded(Path::new(""), 1)?
-                .is_empty()
+            || (!installed
+                && !destination
+                    .attachment
+                    .pinned
+                    .filesystem()
+                    .read_directory_names_bounded(Path::new(""), 1)?
+                    .is_empty())
         {
             return Err(invalid(
                 "start recovery requires unchanged empty reservation",
@@ -329,10 +347,38 @@ impl AttachmentStorage {
                 &destination_binding,
                 descriptor_id,
             )
-            || candidate.verify_stage(&root, original_graph, &origin.allocation, &guard)?
-                != stage_id
+            || candidate.verify_stage_state(
+                &root,
+                original_graph,
+                &origin.allocation,
+                &guard,
+                installed,
+            )? != stage_id
         {
             return Err(invalid("recovered consumption selection differs"));
+        }
+        if installed {
+            candidate.verify_install_names()?;
+            let occupied = !destination
+                .attachment
+                .pinned
+                .filesystem()
+                .read_directory_names_bounded(Path::new(""), candidate.top_entries().len())?
+                .is_empty();
+            let (before, _) = facts
+                .pending()
+                .ok_or_else(|| invalid("start intent missing"))?;
+            if occupied
+                && read(
+                    &destination.store,
+                    crate::RECORD_FILE_NAME,
+                    80 * 1024 * 1024,
+                )?
+                .len()
+                    != before + mesh_store::frame_record(&StoredRecord::Dependency(record)).len()
+            {
+                return Err(invalid("installed work lacks a complete start"));
+            }
         }
         self.with_prepared_input_grant(&selected_grant, &guard, |_| Ok(()))?;
         let (after_configuration, after_facts) = destination.project().read_native_facts(
@@ -378,7 +424,7 @@ pub(super) fn run_child_if_requested() -> bool {
         .find(|v| v.operation().to_hex() == text("version"))
         .unwrap();
     let (candidate, staged) = storage
-        .recover_fenced_consumed_start(
+        .recover_consumed_start_state(
             &owner,
             NativeConsumedStartRequest {
                 input: NativeGrantInspection {
@@ -391,11 +437,33 @@ pub(super) fn run_child_if_requested() -> bool {
                 request: digest(text("request")).unwrap(),
                 limits: ObservationLimits::default(),
             },
+            text("mode").starts_with("install"),
         )
         .unwrap();
     assert_eq!(candidate.operation().to_hex(), text("operation"));
     assert_eq!(staged.receipt().unwrap().to_hex(), text("stage"));
     assert_eq!(identity(&staged.root).unwrap(), text("physical"));
+    if text("mode").starts_with("install") {
+        let receipt = candidate
+            .fence_and_install_with_io(
+                &storage,
+                &staged,
+                true,
+                |step, _, _| {
+                    if (text("mode") == "install-partial" && step == "installed-entry")
+                        || (text("mode") == "install-lost" && step == "installed")
+                    {
+                        std::process::exit(75);
+                    }
+                    Ok(())
+                },
+                |file| file.sync_all(),
+            )
+            .unwrap();
+        assert_eq!(receipt.to_hex(), text("receipt"));
+        assert!(destination.saved_versions().is_err());
+        return true;
+    }
     if text("mode") == "partial" || text("mode") == "synced" {
         candidate
             .fence_with_io(

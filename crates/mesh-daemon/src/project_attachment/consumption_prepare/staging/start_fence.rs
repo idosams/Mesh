@@ -54,8 +54,7 @@ impl PreparedNativeConsumedStart {
 
     /// Durably fence this exact staged starting version before any destination installation.
     /// The returned record is not consumption acknowledgement, a saved version or run permission.
-    /// Retries require this same authenticated candidate and stage; restart reconstruction and
-    /// the installation/owner/completion transaction are still separate, unfinished integration.
+    /// Fresh-process recovery can reconstruct this candidate; this method installs no files.
     pub fn fence_consumption_start(
         &self,
         storage: &AttachmentStorage,
@@ -67,6 +66,16 @@ impl PreparedNativeConsumedStart {
         &self,
         storage: &AttachmentStorage,
         staged: &StagedNativeConsumedStart,
+        hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
+    ) -> io::Result<RecordDigest> {
+        self.fence_and_install_with_io(storage, staged, false, hook, sync)
+    }
+    pub(super) fn fence_and_install_with_io(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        install: bool,
         mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
@@ -118,13 +127,14 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("consumption fence requires a reservation"));
         }
         let empty = || -> io::Result<()> {
-            if !self
-                .destination
-                .attachment
-                .pinned
-                .filesystem()
-                .read_directory_names_bounded(Path::new(""), 1)?
-                .is_empty()
+            if !install
+                && !self
+                    .destination
+                    .attachment
+                    .pinned
+                    .filesystem()
+                    .read_directory_names_bounded(Path::new(""), 1)?
+                    .is_empty()
             {
                 return Err(invalid("consumption destination contains unexpected work"));
             }
@@ -145,8 +155,13 @@ impl PreparedNativeConsumedStart {
             .get("graph")
             .ok_or_else(|| invalid("staged graph missing"))?;
         if original_graph.get("closure") != Some(&current_graph.to_json())
-            || self.verify_stage(&staged.root, original_graph, &origin.allocation, &guard)?
-                != staged.receipt
+            || self.verify_stage_state(
+                &staged.root,
+                original_graph,
+                &origin.allocation,
+                &guard,
+                install,
+            )? != staged.receipt
             || super::super::super::consumption_plan::InitialPlan::verify(
                 &self.checkpoint,
                 WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
@@ -266,6 +281,22 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("another consumption intent owns recovery"));
         }
+        let owner_intent = if install {
+            self.verify_install_names()?;
+            let occupied = !self
+                .destination
+                .attachment
+                .pinned
+                .filesystem()
+                .read_directory_names_bounded(Path::new(""), self.plan.entries.len())?
+                .is_empty();
+            if occupied && (pending.is_none() || observed.len() != before.len() + frame.len()) {
+                return Err(invalid("installed entries lack a complete durable start"));
+            }
+            Some(self.retain_owner_consumption_intent(&current_graph, record.payload)?)
+        } else {
+            None
+        };
         let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
             self.destination.metadata_path(),
             self.destination.store.filesystem(),
@@ -331,6 +362,40 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("consumption start did not replay exactly"));
         }
         guard.ensure_current().map_err(error)?;
+        if install {
+            self.install_entries(staged, &origin.allocation, &guard, |step| {
+                hook(step, &mut journal, &frame)
+            })?;
+            if self.verify_stage_state(
+                &staged.root,
+                original_graph,
+                &origin.allocation,
+                &guard,
+                true,
+            )? != staged.receipt
+                || read_private_in_store(
+                    &self.destination.store,
+                    super::installation::OWNER_INTENT,
+                )? != *owner_intent
+                    .as_ref()
+                    .ok_or_else(|| invalid("owner intent missing"))?
+                || read_private_in_store(&self.destination.store, PENDING)? != intent
+            {
+                return Err(invalid("consumption installation intent changed"));
+            }
+            let (current_configuration, current_facts) =
+                self.destination.project().read_native_facts(
+                    self.destination.metadata_path(),
+                    &self.destination.store,
+                    None,
+                    None,
+                )?;
+            if current_configuration != configuration || current_facts.as_ref() != Some(&after) {
+                return Err(invalid("consumption journal changed during installation"));
+            }
+            storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+            guard.ensure_current().map_err(error)?;
+        }
         Ok(record.payload)
     }
 }
@@ -447,6 +512,7 @@ pub(super) fn assert_start_fence(
     assert!(prepared.fence_consumption_start(storage, &staged).is_err());
     assert_eq!(fs::read(&journal_path).unwrap(), foreign);
     fs::write(&journal_path, &complete).unwrap();
+    super::installation::assert_installation(prepared, storage, &staged, receipt);
     storage
         .grant_saved_input(
             &prepared.owner,
@@ -460,6 +526,9 @@ pub(super) fn assert_start_fence(
             },
         )
         .unwrap();
+    assert!(prepared
+        .install_fenced_consumed_start(storage, &staged)
+        .is_err());
     assert!(prepared.fence_consumption_start(storage, &staged).is_err());
     let available = prepared.available.iter().collect::<Vec<_>>();
     assert!(storage
@@ -484,6 +553,6 @@ pub(super) fn assert_start_fence(
         fs::read_dir(prepared.destination.project().root())
             .unwrap()
             .count(),
-        0
+        prepared.top_entries().len()
     );
 }

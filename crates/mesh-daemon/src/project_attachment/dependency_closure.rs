@@ -52,6 +52,19 @@ impl NativeDependencyGraph {
     pub fn digest(&self) -> RecordDigest {
         self.digest
     }
+    pub(super) fn consumption_inputs_json(&self) -> Json {
+        Json::Array(
+            self.nodes
+                .keys()
+                .map(|i| {
+                    Json::Array(vec![
+                        Json::Array(vec![Json::text(i.0.to_hex()), Json::text(i.1.to_hex())]),
+                        Json::text(i.2.to_hex()),
+                    ])
+                })
+                .collect(),
+        )
+    }
     /// Number of exact operation identities, including the selected root.
     pub fn operation_count(&self) -> usize {
         self.nodes.len()

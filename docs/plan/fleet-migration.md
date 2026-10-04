@@ -6988,3 +6988,21 @@ history. This proves reconstruction of the original authenticated start without 
 it does not prove installation, destination/owner/completion commit or cross-store admission.
 Draft PR #324 / issue #323 remain open for those requirements. The full fleet objective and fixed
 user checkpoint remain unchanged.
+
+R161 now connects exclusive file/tree installation to the durable start writer under the same
+complete custody guard. Before copying it retains the exact owner-consumption body and source
+closure. Each move uses the original authenticated receipt, verifies native identity/content,
+refuses unexpected destination/recovery entries and synchronizes both sides. Retries recognize
+already installed entries without reallocating or copying them. Fresh-process reconstruction can
+inspect an exact partial installation behind a complete required start. Final checks revalidate
+stage, owner intent, journal, current grant and custody; ordinary history/runtime remain fenced.
+
+Two focused tests passed in 28.057s after the final receipt checks. Separate children exit after
+one entry and after all entries before reply, then two further processes recover the same native
+allocations. Unknown editor work, foreign recovery entries, altered owner intent and changed
+installed content refuse and remain preserved. Removing the destination-name check makes the
+regression fail in 26.225s because entries were installed beside unexpected editor work; production
+source was restored byte-for-byte. An explicit revoked-install retry assertion is included in the
+full-gate candidate. Full repository validation is pending; no installed result is acknowledged as
+a consumed version. Destination history, owner receipt, completion and cross-store admission remain
+required by draft PR #324 / issue #323. The fixed user checkpoint and full fleet scope are unchanged.

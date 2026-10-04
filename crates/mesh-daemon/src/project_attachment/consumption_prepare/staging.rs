@@ -1,4 +1,5 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
+mod installation;
 mod recovery;
 mod start_fence;
 use super::*;
@@ -119,6 +120,7 @@ impl PreparedNativeConsumedStart {
         &self,
         root: &PinnedWorkspaceRoot,
         prepare: bool,
+        installed: bool,
         allocation: &PinnedWorkspaceRoot,
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
     ) -> io::Result<Vec<Json>> {
@@ -250,11 +252,15 @@ impl PreparedNativeConsumedStart {
                 write(&recovery, RECEIPT, receipt.as_bytes())?;
                 recovery.sync()?;
             }
-            if recovery
+            let names = recovery
                 .filesystem()
-                .read_directory_names_bounded(Path::new(""), 2)?
-                .len()
-                != 2
+                .read_directory_names_bounded(Path::new(""), 2)?;
+            let expected = [OsStr::new(RECEIPT), OsStr::new("exchange")];
+            if names
+                .iter()
+                .any(|name| !expected.contains(&name.as_os_str()))
+                || !names.iter().any(|name| name == RECEIPT)
+                || (!installed && names.len() != 2)
             {
                 return Err(invalid("entry recovery contains unexpected work"));
             }
@@ -404,13 +410,23 @@ impl PreparedNativeConsumedStart {
         allocation: &PinnedWorkspaceRoot,
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
     ) -> io::Result<RecordDigest> {
+        self.verify_stage_state(root, graph, allocation, guard, false)
+    }
+    fn verify_stage_state(
+        &self,
+        root: &PinnedWorkspaceRoot,
+        graph: &Json,
+        allocation: &PinnedWorkspaceRoot,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        installed: bool,
+    ) -> io::Result<RecordDigest> {
         if root.try_clone_directory()?.metadata()?.mode() & 0o077 != 0 {
             return Err(invalid("consumption bundle is not private"));
         }
         if read(root, "attempt.json", 65536)? != self.attempt_manifest(root)?.as_bytes() {
             return Err(invalid("consumption attempt identity differs"));
         }
-        let receipts = self.entry_receipts(root, false, allocation, guard)?;
+        let receipts = self.entry_receipts(root, false, installed, allocation, guard)?;
         let expected = self.stage_manifest(root, graph, receipts)?;
         if expected.len() > MAX_RECEIPT
             || read(root, RECEIPT, MAX_RECEIPT)? != expected.as_bytes()
@@ -500,7 +516,8 @@ impl PreparedNativeConsumedStart {
                 root.sync()?;
                 origin.allocation.sync()?;
                 hook("attempt-created", &root)?;
-                let receipts = self.entry_receipts(&root, true, &origin.allocation, &guard)?;
+                let receipts =
+                    self.entry_receipts(&root, true, false, &origin.allocation, &guard)?;
                 hook("entries-staged", &root)?;
                 for bytes in &self.checkpoint.objects {
                     write(&root, &format!("object-{}", hash(bytes).to_hex()), bytes)?;
@@ -564,7 +581,13 @@ pub(super) fn assert_private_stage(
         ])
         .unwrap();
         assert!(prepared
-            .entry_receipts(&origin.allocation, true, &origin.allocation, &incomplete)
+            .entry_receipts(
+                &origin.allocation,
+                true,
+                false,
+                &origin.allocation,
+                &incomplete
+            )
             .is_err());
     }
     assert_eq!(
