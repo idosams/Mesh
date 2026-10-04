@@ -1222,5 +1222,4 @@ enrollment or private consumption to agents/users and does not change the fixed 
 Pre-merge reader audit found and corrected shared-helper admission in manual allocation, agent
 input preparation and remote export. All four now retain the legacy enrollment fence while saved
 inspection remains readable. The new test fails on the previous implementation and passes on the
-correction without creating lanes or destination files. Full revalidation is in progress; earlier
-reader test totals do not certify this correction.
+correction without creating lanes or destination files. Full revalidation passed on `3902d7abde439f64545cb6d5064c1af82ab1793b`: 3,868 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification of this correction is pending.

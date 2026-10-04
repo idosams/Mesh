@@ -6201,3 +6201,5 @@ its immutable reader. The same regression passes after the correction and proves
 allocation, destination files, journal change or source change. The earlier full gate did not cover
 this gap; a fresh full gate is required for the corrected revision. No enrollment control is exposed
 and neither the initial reader PR nor this correction has merged at this point.
+
+R152 admission correction verification: Full `npm test` passed on corrected implementation `3902d7abde439f64545cb6d5064c1af82ab1793b`: 3,868 native tests in 200.938s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification of this correction and merge remain pending.
