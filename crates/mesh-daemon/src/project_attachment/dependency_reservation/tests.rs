@@ -97,6 +97,11 @@ fn empty_reservation_is_grantable_without_copying_input_or_becoming_a_ready_lane
         .unwrap()
         .join(RESERVED)
         .exists());
+    fs::write(
+        work.project().root().join("editor-note"),
+        b"ordinary user work",
+    )
+    .unwrap();
     let input = work
         .project()
         .capture_inputs(ObservationLimits::default())
@@ -264,4 +269,156 @@ fn partial_reservation_never_overwrites_editor_work() {
         b"keep"
     );
     assert_eq!(f.storage.registrations().unwrap().len(), 1);
+}
+
+#[test]
+fn native_capture_in_reserved_work_can_become_an_exact_nested_reservation_input() {
+    let f = Fixture::new("nested");
+    let parent = f.reserve(1).unwrap();
+    fs::write(
+        parent.project().root().join("draft"),
+        b"manual work without a provider",
+    )
+    .unwrap();
+    let input = parent
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let key = SigningKey::from_bytes(&[91; 32]);
+    let saved = parent
+        .prepare_dependency_capture(
+            &input,
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            id(8),
+            |body| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(body.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap()
+        .commit()
+        .unwrap();
+    let child = f
+        .storage
+        .reserve_dependency_lane(&f.owner, &parent, saved, id(2))
+        .unwrap();
+    let binding = f.storage.dependency_work_binding(&f.owner, &child).unwrap();
+    assert_eq!(binding.project().to_hex(), f.owner.id());
+    assert!(fs::read_dir(child.project().root())
+        .unwrap()
+        .next()
+        .is_none());
+    let again = f
+        .storage
+        .reserve_dependency_lane(&f.owner, &parent, saved, id(2))
+        .unwrap();
+    assert_eq!(again.id(), child.id());
+    assert_eq!(f.reserve(1).unwrap().id(), parent.id());
+    assert_eq!(
+        fs::read(parent.project().root().join("draft")).unwrap(),
+        b"manual work without a provider"
+    );
+    let allocation = child.project().root().parent().unwrap();
+    let old = read(
+        &super::super::pin_absolute_directory(allocation).unwrap(),
+        INTENT,
+    )
+    .unwrap()
+    .unwrap();
+    let mut tampered = old.encode();
+    let prior = text(&old, "parent_binding").unwrap();
+    tampered = tampered.replace(prior, &id(99).to_hex());
+    fs::write(allocation.join(INTENT), &tampered).unwrap();
+    let altered = Json::parse(&tampered).unwrap();
+    fs::write(
+        allocation.join(RESERVED),
+        reserved(&child, &altered).unwrap().encode(),
+    )
+    .unwrap();
+    assert!(f.storage.dependency_work_binding(&f.owner, &child).is_err());
+}
+
+#[test]
+fn an_existing_catalog_destination_is_never_replaced_during_reservation_publication() {
+    let f = Fixture::new("collision");
+    let mut conflicting = None;
+    assert!(f
+        .storage
+        .reserve_with_hook(&f.owner, &f.owner, f.version, id(1), |phase| {
+            if phase == "fenced" {
+                let allocation = fs::read_dir(f.root.join("metadata/work-lanes"))?
+                    .next()
+                    .unwrap()?
+                    .path();
+                let entry = fs::read_dir(allocation.join("staging"))?.next().unwrap()?;
+                let target = f.root.join("metadata").join(entry.file_name());
+                fs::create_dir(&target)?;
+                conflicting = Some(target);
+            }
+            Ok(())
+        })
+        .is_err());
+    let target = conflicting.unwrap();
+    assert!(target.is_dir());
+    assert!(fs::read_dir(&target).unwrap().next().is_none());
+    assert!(f.reserve(1).is_err());
+    assert!(fs::read_dir(&target).unwrap().next().is_none());
+    let allocation = fs::read_dir(f.root.join("metadata/work-lanes"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert!(!allocation.join(RESERVED).exists());
+    assert!(fs::read_dir(allocation.join("staging"))
+        .unwrap()
+        .next()
+        .is_some());
+}
+
+#[test]
+fn reservation_refuses_excess_ancestry_before_creating_an_unusable_child() {
+    let f = Fixture::new("depth");
+    let mut parent = f.owner.clone();
+    let mut version = f.version;
+    let key = SigningKey::from_bytes(&[91; 32]);
+    for depth in 1..=8 {
+        let next = f
+            .storage
+            .reserve_dependency_lane(&f.owner, &parent, version, id(depth))
+            .unwrap();
+        fs::write(next.project().root().join("draft"), [depth]).unwrap();
+        let input = next
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        version = next
+            .prepare_dependency_capture(
+                &input,
+                mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+                id(20 + depth),
+                |body| {
+                    Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                        key.sign(body.as_bytes()).to_bytes(),
+                    ))
+                },
+            )
+            .unwrap()
+            .commit()
+            .unwrap();
+        parent = next;
+    }
+    assert!(f.storage.dependency_work_binding(&f.owner, &parent).is_ok());
+    assert!(f
+        .storage
+        .reserve_dependency_lane(&f.owner, &parent, version, id(9))
+        .is_err());
+    assert_eq!(f.storage.registrations().unwrap().len(), 9);
+    assert_eq!(
+        fs::read_dir(f.root.join("metadata/work-lanes"))
+            .unwrap()
+            .count(),
+        8
+    );
 }

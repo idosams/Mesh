@@ -1286,7 +1286,9 @@ and full closure enforcement remain outstanding. The fixed user checkpoint is un
 
 R154 through R157 are now merged into canonical Mesh through passing exact-head and post-merge
 main checks.
-R158, tracked by [issue #317](https://github.com/idosams/Mesh/issues/317), is in local implementation.
+R158, tracked by [issue #317](https://github.com/idosams/Mesh/issues/317), merged through
+[PR #318](https://github.com/idosams/Mesh/pull/318) at `027c8d2debb06cda81fd5e32be2c28c3a10f4473`.
+All seven exact-head hosted checks passed; post-merge main verification is running.
 Its dedicated native capture path signs without custody, preserves the original source folder, and
 records authenticated private progress after explicit enrollment. Exact-request recovery resumes
 staged journal prefixes and preserves unknown work. Historical receipt recovery does not rewind
@@ -1296,8 +1298,28 @@ A refinement lets policy-only activity during signing coexist with unchanged pri
 stale actor history still refuses before writing. The refined full gate on `1d0c000` passed
 3,910 native tests in 275.798s (5 slow, 18 skipped), 194 rendered and 672 desktop tests,
 and all 44 real-daemon checks.
-It is not yet an open or merged PR.
+The fixed checkpoint does not include this native development API.
 
 This does not enable automatic enrollment, dependency-aware allocation, consumption, publication or
 runtime controls. Full inherited closure, retained roots and packaged/provider acceptance are still
 required. The user checkpoint remains fixed at `5052009`.
+
+
+## Native destination reservation before consumption
+
+R159 ([issue #319](https://github.com/idosams/Mesh/issues/319)) is implemented locally and awaits
+its full gate and PR delivery. Native reservation creates an empty destination with its own enrolled
+history in staging, outside the visible catalog. Exclusive native publication makes that exact store
+visible only after its required writer fences are durable. The destination can receive an exact
+owning-project grant without copying any source bytes or claiming consumption or readiness to run.
+
+Fourteen focused reservation/ancestry tests passed. They cover exact retry, interrupted setup,
+occupied destinations, preserved editor work, native grant/revoke binding, manual capture in a
+reserved lane, nested reservation and refusal before exceeding the ancestry limit. Replacing the
+exclusive rename with ordinary rename made the collision regression fail; exact source was restored.
+Initial compilation and nested custody failures are retained with corrected passing evidence.
+
+This is a native development API, not a user-facing fleet launch path. Complete inherited closure,
+retained roots, materialization plus starting-operation/consumption receipts, dependency-aware
+publication/import, runtime controls and packaged/provider/remote acceptance remain required.
+The user checkpoint remains fixed at `5052009`.

@@ -6410,3 +6410,38 @@ Ten focused capture/recovery tests pass, including physical source replacement a
 prefix. The complete gate on final implementation `1d0c000875c33956c2f01423e491d03245ec9347`
 passed 3,910 native tests in 275.798s (5 slow, 18 skipped), 194 rendered tests, 672 desktop
 tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+
+R158 delivery: [PR #318](https://github.com/idosams/Mesh/pull/318) merged at
+`027c8d2debb06cda81fd5e32be2c28c3a10f4473` after all seven hosted checks in run `37206573170`
+passed on published head `9b006c690220211f24e7ffff4f3679f640355867`. Post-merge run
+`37207400781` is running. Earlier pending statements above are historical development entries.
+
+## R159: Reserve a native destination before granting or copying input
+
+Tracks [issue #319](https://github.com/idosams/Mesh/issues/319), builds on merged R158, and replaces
+no preserved source commit. Initial implementation `090fcd5` passed five focused tests; ancestry-only
+reconciliation `693124f` incorporated the canonical R158 merge without dropping local work.
+The refined local implementation passed 14 reservation/ancestry regressions in 5.203s.
+
+The destination starts as empty files plus its own native enrolled history inside private allocation
+staging. The ordinary project catalog sees that history only after required writer fences are durable.
+Descriptor-relative exclusive rename refuses an occupied target, including an empty directory.
+Reservation intent, physical identities and a distinct reserved receipt establish native lineage;
+no legacy ready receipt or consumed-input claim is produced. A completed reservation remains stable
+through manual captures and can parent another exact reservation within the existing ancestry bound.
+Native grant/revoke binds the destination while source content remains uncopied.
+
+Exact retries handle initialized, fenced, published and acknowledgement-lost states. Partial evidence
+without identity receipts or conflicting user work is retained and refused. Child history enrollment
+is separate from the owning project's policy authority; descendants cannot self-adopt as root owners.
+Unknown fields and stale parent correlations refuse. Retry validation reuses the complete held custody
+set instead of trying to acquire a nested set. The earlier failing nested-set regression and initial
+compile failure are preserved. Replacing exclusive publication with ordinary rename made the collision
+regression fail; the implementation was restored byte-for-byte before further validation.
+
+The full Mesh gate, hosted delivery and post-merge proof are pending. Actual input consumption still
+requires complete inherited closure and retention, authenticated starting operations, owning-project
+consumption receipts and exact crash recovery. Empty starting snapshots, runtime integration,
+dependency-aware publication/import and all remaining fleet acceptance stay in scope. The fixed
+user checkpoint is unchanged; no installed application or repository settings were modified.

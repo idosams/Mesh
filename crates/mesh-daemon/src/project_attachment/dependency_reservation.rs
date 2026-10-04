@@ -74,6 +74,32 @@ fn store_receipt(work: &ProvisionedAttachment) -> io::Result<Json> {
         ("attachment", work.project().receipt()?),
     ]))
 }
+fn verify_input(parent: &ProvisionedAttachment, version: SavedAttachmentVersion) -> io::Result<()> {
+    parent.project().inspect_saved(
+        parent.metadata_path(),
+        parent.store.clone(),
+        &version.operation().to_string(),
+        |history, op| {
+            history
+                .historical_workspace_preview(op)
+                .map(|_| ())
+                .map_err(error)
+        },
+    )
+}
+fn verify_enrolled(work: &ProvisionedAttachment) -> io::Result<()> {
+    let _guard =
+        crate::workspace_custody::lock_workspace_initialization(&work.store).map_err(error)?;
+    let (_, proof) = work
+        .project()
+        .read_configuration(work.metadata_path(), &work.store)?;
+    if proof.is_none() {
+        return Err(invalid("reserved history has no native enrollment"));
+    }
+    work.saved_versions()?;
+    Ok(())
+}
+
 fn reserved(work: &ProvisionedAttachment, intent: &Json) -> io::Result<Json> {
     Ok(Json::object([
         ("schema", Json::text("mesh.native-reserved-destination/v1")),
@@ -109,6 +135,7 @@ impl AttachmentStorage {
             return Err(invalid("missing reservation request"));
         }
         let prepared = self.prepare_dependency_work(owner, parent)?;
+        prepared.require_child_capacity()?;
         if prepared.roots.len() + 5 > 32 {
             return Err(invalid("reservation ancestry exceeds custody bound"));
         }
@@ -178,15 +205,32 @@ impl AttachmentStorage {
             if record != reserved(&work, &intent)? {
                 return Err(invalid("reserved destination changed"));
             }
-            self.dependency_work_binding(owner, &work)?;
+            let selected = self.prepare_dependency_work(owner, &work)?;
+            let mut roots = prepared.roots.clone();
+            roots.extend([allocation.clone(), files.clone(), work.store.clone()]);
+            let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
+                .map_err(error)?;
+            if self.validate_dependency_work(&prepared, &guard)? != binding {
+                return Err(invalid("reservation parent changed during retry"));
+            }
+            self.validate_dependency_work(&selected, &guard)?;
+            verify_input(parent, version)?;
+            verify_enrolled(&work)?;
             allocation.filesystem().sync_file(Path::new(RESERVED))?;
             allocation.sync()?;
             self.pinned.sync()?;
+            guard.ensure_current().map_err(error)?;
             return Ok(work);
         }
         let staging = child(&allocation, "staging")?;
         let stage_path = root_path.join("work-lanes").join(&name).join("staging");
         let stage_storage = AttachmentStorage::open(&stage_path)?;
+        let admitted_files = super::ProjectAttachment::admit(&path)?;
+        if stage_storage.pinned.identity()? != staging.identity()?
+            || admitted_files.pinned.identity()? != files.identity()?
+        {
+            return Err(invalid("reservation staging namespace changed"));
+        }
         let recorded = read(&allocation, STORE)?;
         let work = if let Some(recorded) = &recorded {
             let id = text(recorded, "project")?;
@@ -232,6 +276,7 @@ impl AttachmentStorage {
             if self.validate_dependency_work(&prepared, &guard)? != binding {
                 return Err(invalid("reservation parent changed"));
             }
+            verify_input(parent, version)?;
             exact(&allocation, INTENT, &intent)?;
             exact(&allocation, FILES, &identity(&files)?)?;
             exact(&allocation, STORE, &store_receipt(&work)?)?;
@@ -310,6 +355,8 @@ impl AttachmentStorage {
             return Err(invalid("unacknowledged reservation history changed"));
         }
         exact(&allocation, INTENT, &intent)?;
+        verify_input(parent, version)?;
+        verify_enrolled(&published)?;
         write(&allocation, RESERVED, &reserved(&published, &intent)?)?;
         hook("recorded")?;
         guard.ensure_current().map_err(error)?;
@@ -329,7 +376,46 @@ pub(super) fn origin(
     {
         return Err(invalid("reserved native ancestry changed"));
     }
+    for field in [
+        "owner",
+        "source_project",
+        "source_version",
+        "authority",
+        "parent_binding",
+        "request",
+    ] {
+        let value = text(&intent, field)?;
+        if !super::provisioning::valid_id(value) {
+            return Err(invalid("invalid reserved identity"));
+        }
+    }
+    let closed = Json::object([
+        ("schema", Json::text(SCHEMA)),
+        ("owner", Json::text(text(&intent, "owner")?)),
+        ("authority", Json::text(text(&intent, "authority")?)),
+        (
+            "parent_binding",
+            Json::text(text(&intent, "parent_binding")?),
+        ),
+        (
+            "source_project",
+            Json::text(text(&intent, "source_project")?),
+        ),
+        (
+            "source_version",
+            Json::text(text(&intent, "source_version")?),
+        ),
+        ("request", Json::text(text(&intent, "request")?)),
+        ("allocation", identity(&allocation)?),
+        ("catalog", identity(&storage.pinned)?),
+    ]);
+    if intent != closed {
+        return Err(invalid("unknown reservation fields"));
+    }
     let request = RecordDigest::parse_hex(text(&intent, "request")?).map_err(error)?;
+    if request == RecordDigest::from_bytes([0; 32]) {
+        return Err(invalid("missing reserved request"));
+    }
     let expected_name = format!(
         "reservation-{}",
         hash(format!("{}:{}", text(&intent, "owner")?, request.to_hex()).as_bytes()).to_hex()
@@ -341,7 +427,7 @@ pub(super) fn origin(
     exact(&allocation, FILES, &identity(&work.attachment.pinned)?)?;
     exact(&allocation, STORE, &store_receipt(work)?)?;
     exact(&allocation, RESERVED, &reserved(work, &intent)?)?;
-    work.saved_versions()?; // native local enrollment validation, not an owning-project grant
+    verify_enrolled(work)?; // local history enrollment, not an owning-project grant
     Ok(super::lanes::NativeLaneOrigin {
         value: intent,
         allocation,
