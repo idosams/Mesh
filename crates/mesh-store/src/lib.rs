@@ -145,8 +145,9 @@ pub use crate::sqlite_driver::{
 };
 
 pub use crate::record::{
-    AckRecord, ApprovalRecord, ChunkSlice, ContextAccess, ContextRecord, ManifestRecord,
-    OperationRecord, PeerRecord, RecordKind, ReviewRecord, ReviewVerdict, StoredRecord,
+    AckRecord, ApprovalRecord, ChunkSlice, ContextAccess, ContextRecord, DependencyKind,
+    DependencyRecord, ManifestRecord, OperationRecord, PeerRecord, RecordKind, ReviewRecord,
+    ReviewVerdict, StoredRecord,
 };
 
 mod record;

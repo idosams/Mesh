@@ -132,6 +132,13 @@ fn operation_id(index: u64) -> RecordDigest {
 /// nothing about the nine tables that are not the operation table.
 fn checkpoint(weight: u64, chunk: RecordDigest) -> Checkpoint {
     Checkpoint {
+        dependencies: vec![mesh_store::DependencyRecord {
+            authority: digest(90),
+            revision: 1,
+            previous: RecordDigest::from_bytes([0; 32]),
+            payload: digest(91),
+            kind: mesh_store::DependencyKind::Enrollment,
+        }],
         manifests: vec![ManifestRecord {
             id: digest(20),
             byte_length: 64 * 1024,
@@ -184,7 +191,7 @@ fn checkpoint(weight: u64, chunk: RecordDigest) -> Checkpoint {
 
 /// How many records a checkpoint of this weight puts in the journal.
 fn record_count(weight: u64) -> u64 {
-    weight + 6
+    weight + 7
 }
 
 // ---------------------------------------------------------------------------------------------

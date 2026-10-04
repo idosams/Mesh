@@ -42,6 +42,8 @@ pub enum RecordKind {
     Approval,
     /// One context-ledger entry.
     ContextEntry,
+    /// Native dependency-policy envelope; storage alone grants no authority.
+    Dependency,
 }
 
 impl RecordKind {
@@ -55,6 +57,7 @@ impl RecordKind {
         Self::Review,
         Self::Approval,
         Self::ContextEntry,
+        Self::Dependency,
     ];
 }
 
@@ -78,6 +81,8 @@ pub enum StoredRecord {
     Approval(ApprovalRecord),
     /// A context-ledger entry.
     ContextEntry(ContextRecord),
+    /// One ordered native dependency-policy envelope.
+    Dependency(DependencyRecord),
 }
 
 impl StoredRecord {
@@ -92,8 +97,67 @@ impl StoredRecord {
             Self::Review(_) => RecordKind::Review,
             Self::Approval(_) => RecordKind::Approval,
             Self::ContextEntry(_) => RecordKind::ContextEntry,
+            Self::Dependency(_) => RecordKind::Dependency,
         }
     }
+}
+
+/// The native meaning declared by a dependency envelope, not proof of that meaning.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DependencyKind {
+    /// Establish the native authority binding before any subsequent policy facts.
+    Enrollment,
+    /// Explicit access authorization for an exact input and destination.
+    Grant,
+    /// Verified immutable input actually consumed by a destination.
+    Consumption,
+    /// A separately versioned eligibility decision for an exact input.
+    Eligibility,
+    /// An exact closure and decision vector retained for review.
+    ReviewSnapshot,
+}
+impl DependencyKind {
+    /// Stable journal and SQL code. Unknown values must refuse, never default.
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        match self {
+            Self::Enrollment => 0,
+            Self::Grant => 1,
+            Self::Consumption => 2,
+            Self::Eligibility => 3,
+            Self::ReviewSnapshot => 4,
+        }
+    }
+    /// Decode only explicitly supported native envelope kinds.
+    #[must_use]
+    pub const fn from_code(code: u8) -> Option<Self> {
+        match code {
+            0 => Some(Self::Enrollment),
+            1 => Some(Self::Grant),
+            2 => Some(Self::Consumption),
+            3 => Some(Self::Eligibility),
+            4 => Some(Self::ReviewSnapshot),
+            _ => None,
+        }
+    }
+}
+
+/// Immutable dependency storage envelope. The native validator must verify the referenced
+/// canonical payload, authority, exact work/version/grant/closure bindings and its own matching
+/// envelope fields before interpreting it. Checksums, index membership and record order are
+/// durability facts, never access or publication authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DependencyRecord {
+    /// Stable native project authority identity, never an agent-selected path.
+    pub authority: RecordDigest,
+    /// One-based ledger ordinal, not a per-input eligibility revision or workspace policy epoch.
+    pub revision: u64,
+    /// Previous envelope's payload identity; zero only for enrollment at revision one.
+    pub previous: RecordDigest,
+    /// Digest of the complete canonical native payload including this envelope's bindings.
+    pub payload: RecordDigest,
+    /// Native payload class; interpretation requires validation outside this index.
+    pub kind: DependencyKind,
 }
 
 /// An operation as the local index holds it.
@@ -323,6 +387,13 @@ mod tests {
                 operation: digest(1),
                 access: ContextAccess::Read,
                 byte_length: 12,
+            }),
+            StoredRecord::Dependency(DependencyRecord {
+                authority: digest(20),
+                revision: 1,
+                previous: digest(0),
+                payload: digest(21),
+                kind: DependencyKind::Enrollment,
             }),
         ];
         let seen: Vec<RecordKind> = records.iter().map(StoredRecord::kind).collect();

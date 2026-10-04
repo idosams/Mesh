@@ -228,6 +228,8 @@ impl RetainedRoots {
 /// rather than returning a smaller set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RetentionError {
+    /// Dependency payloads have not yet been interpreted into verified retained roots.
+    UnvalidatedDependencies,
     /// A root names an operation the index does not hold.
     UnknownOperation {
         /// The operation named.
@@ -265,6 +267,9 @@ pub enum RetentionError {
 impl core::fmt::Display for RetentionError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::UnvalidatedDependencies => {
+                formatter.write_str("collection refused: native dependency validation is required")
+            }
             Self::UnknownOperation { id, root } => {
                 write!(
                     formatter,
@@ -318,6 +323,9 @@ impl Reachability {
     /// returned: an unresolvable root means the caller's picture of the workspace disagrees with
     /// the index, and collecting on the smaller of two disagreeing pictures is how content is lost.
     pub fn compute(index: &Index, roots: &RetainedRoots) -> Result<Self, RetentionError> {
+        if index.has_dependencies() {
+            return Err(RetentionError::UnvalidatedDependencies);
+        }
         let expired_peers = expired_peers(index, roots.policy());
 
         let mut operations: BTreeMap<RecordDigest, RetainedRoot> = BTreeMap::new();

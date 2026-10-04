@@ -19,8 +19,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::digest::{Digest16, DigestWriter, Fnv1a128, IndexDigest};
 use crate::ids::{EntityUuid, RecordDigest};
 use crate::record::{
-    AckRecord, ApprovalRecord, ContextRecord, ManifestRecord, OperationRecord, PeerRecord,
-    ReviewRecord, StoredRecord,
+    AckRecord, ApprovalRecord, ContextRecord, DependencyKind, DependencyRecord, ManifestRecord,
+    OperationRecord, PeerRecord, ReviewRecord, StoredRecord,
 };
 use crate::row::{absorb_table, Row, Value};
 use crate::schema::TABLES;
@@ -31,6 +31,11 @@ use crate::schema::TABLES;
 /// state that a well-formed stream can put it into a bad place from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FoldError {
+    /// A native policy envelope conflicts, forks, skips a revision or has an invalid shape.
+    InvalidDependency {
+        /// Payload identity of the refused envelope; no private payload is included.
+        payload: RecordDigest,
+    },
     /// Two different operations claim the same identifier. A digest names its content, so this is
     /// either a collision or a forged record, and neither is repaired locally.
     ConflictingOperation {
@@ -86,6 +91,9 @@ pub enum FoldError {
 impl core::fmt::Display for FoldError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::InvalidDependency { payload } => {
+                write!(formatter, "invalid dependency envelope {payload}")
+            }
             Self::ConflictingOperation { id } => {
                 write!(formatter, "two different operations claim {id}")
             }
@@ -155,6 +163,8 @@ pub struct Index {
     reviews: BTreeMap<RecordDigest, ReviewRecord>,
     approvals: BTreeMap<RecordDigest, ApprovalRecord>,
     context: BTreeMap<RecordDigest, ContextRecord>,
+    dependencies: BTreeMap<RecordDigest, DependencyRecord>,
+    dependency_heads: BTreeMap<RecordDigest, (u64, RecordDigest)>,
     ledger: Vec<Row>,
 }
 
@@ -190,6 +200,7 @@ impl Index {
             StoredRecord::Review(review) => self.apply_review(review),
             StoredRecord::Approval(approval) => self.apply_approval(approval),
             StoredRecord::ContextEntry(entry) => self.apply_context(entry),
+            StoredRecord::Dependency(record) => self.apply_dependency(record),
         }
     }
 
@@ -312,6 +323,52 @@ impl Index {
         }
         self.approvals.insert(approval.approval, approval);
         Ok(())
+    }
+
+    fn apply_dependency(&mut self, record: DependencyRecord) -> Result<(), FoldError> {
+        let invalid = || FoldError::InvalidDependency {
+            payload: record.payload,
+        };
+        if let Some(existing) = self.dependencies.get(&record.payload) {
+            return if existing == &record {
+                Ok(())
+            } else {
+                Err(invalid())
+            };
+        }
+        let zero = RecordDigest::from_bytes([0; 32]);
+        if record.authority == zero
+            || record.payload == zero
+            || record.revision == 0
+            || record.revision > i64::MAX as u64
+        {
+            return Err(invalid());
+        }
+        match self.dependency_heads.get(&record.authority) {
+            None if record.revision == 1
+                && record.previous == zero
+                && record.kind == DependencyKind::Enrollment => {}
+            Some((revision, previous))
+                if revision.checked_add(1) == Some(record.revision)
+                    && *previous == record.previous
+                    && record.kind != DependencyKind::Enrollment => {}
+            _ => return Err(invalid()),
+        }
+        self.dependency_heads
+            .insert(record.authority, (record.revision, record.payload));
+        self.dependencies.insert(record.payload, record);
+        Ok(())
+    }
+
+    /// Immutable dependency envelopes. Their presence is not native policy validation.
+    pub fn dependency_records(&self) -> impl Iterator<Item = &DependencyRecord> {
+        self.dependencies.values()
+    }
+
+    /// Whether native policy validation is required before interpreting this history.
+    #[must_use]
+    pub fn has_dependencies(&self) -> bool {
+        !self.dependencies.is_empty()
     }
 
     fn apply_context(&mut self, entry: ContextRecord) -> Result<(), FoldError> {
@@ -581,7 +638,7 @@ impl Index {
     /// are different reports and the difference matters to whoever reads a dry run.
     #[must_use]
     pub fn named_content(&self) -> BTreeSet<RecordDigest> {
-        let mut named = BTreeSet::new();
+        let mut named = self.dependencies.keys().copied().collect::<BTreeSet<_>>();
         for operation in self.operations.values() {
             named.insert(operation.payload_digest);
         }
@@ -613,6 +670,19 @@ impl Index {
             "review_bundle" => self.review_rows(),
             "review_approval" => self.approval_rows(),
             "context_ledger" => self.context_rows(),
+            "dependency_record" => self
+                .dependencies
+                .values()
+                .map(|record| {
+                    Row::new(vec![
+                        Value::blob(record.authority.as_bytes()),
+                        Value::count(record.revision),
+                        Value::blob(record.previous.as_bytes()),
+                        Value::blob(record.payload.as_bytes()),
+                        Value::count(u64::from(record.kind.code())),
+                    ])
+                })
+                .collect(),
             _ => return None,
         };
         rows.sort();

@@ -59,6 +59,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "review_and_context",
         sql: include_str!("../migrations/0002_review_and_context.sql"),
     },
+    Migration {
+        version: 3,
+        name: "dependency_records",
+        sql: include_str!("../migrations/0003_dependency_records.sql"),
+    },
 ];
 
 /// The version a freshly opened database ends up at.

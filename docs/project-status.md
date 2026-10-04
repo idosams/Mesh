@@ -1151,6 +1151,17 @@ passed 3,805 native, 185 rendered and 646 desktop tests plus all 44 daemon check
 verification is pending. Received remote sessions retain their original authority path.
 This is a prerequisite for automatic saving, not a scheduler or packaged provider acceptance claim.
 
+## Dependency journal foundation
+
+R147 adds required dependency envelopes, ordered replay and a reconstructible SQLite table.
+Native open/refresh and cached approval refuse these histories until semantic policy validation
+exists, and collection refuses unknown dependency roots. Fixed-frame, malformed-record, replay,
+SQLite reconstruction, crash-boundary and native refusal tests pass. An independently compiled
+pre-change storage scanner refuses the new kind without changing the fixture. This does not prove
+running-old-desktop compatibility; enrollment must first fence cached old writers. No grants,
+private consumption or publication eligibility are enabled yet. Full repository and hosted checks
+remain pending. See the [dependency contract](decisions/private-dependency-authority.md).
+
 ## Dependency enrollment preparation
 
 R149 adds a native-only required custody marker that blocks generic older writers before future

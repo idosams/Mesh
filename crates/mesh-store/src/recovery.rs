@@ -54,8 +54,9 @@ use crate::ids::{EntityUuid, RecordDigest};
 use crate::index::FoldError;
 use crate::rebuild::{rebuild, RebuildReport};
 use crate::record::{
-    AckRecord, ApprovalRecord, ChunkSlice, ContextAccess, ContextRecord, ManifestRecord,
-    OperationRecord, PeerRecord, RecordKind, ReviewRecord, ReviewVerdict, StoredRecord,
+    AckRecord, ApprovalRecord, ChunkSlice, ContextAccess, ContextRecord, DependencyKind,
+    DependencyRecord, ManifestRecord, OperationRecord, PeerRecord, RecordKind, ReviewRecord,
+    ReviewVerdict, StoredRecord,
 };
 use crate::recovery_state::PendingMeaningfulSave;
 use crate::sequence::PrivateSaved;
@@ -702,6 +703,7 @@ const fn kind_tag(kind: RecordKind) -> u8 {
         RecordKind::Review => 5,
         RecordKind::Approval => 6,
         RecordKind::ContextEntry => 7,
+        RecordKind::Dependency => 8,
     }
 }
 
@@ -714,6 +716,7 @@ const fn kind_from_tag(tag: u8) -> Option<RecordKind> {
         5 => Some(RecordKind::Review),
         6 => Some(RecordKind::Approval),
         7 => Some(RecordKind::ContextEntry),
+        8 => Some(RecordKind::Dependency),
         _ => None,
     }
 }
@@ -764,6 +767,13 @@ fn write_body(record: &StoredRecord, out: &mut Vec<u8>) {
             out.extend_from_slice(approval.bundle.as_bytes());
             out.extend_from_slice(approval.approver.as_bytes());
             out.push(verdict_tag(approval.verdict));
+        }
+        StoredRecord::Dependency(record) => {
+            out.extend_from_slice(record.authority.as_bytes());
+            out.extend_from_slice(&record.revision.to_be_bytes());
+            out.extend_from_slice(record.previous.as_bytes());
+            out.extend_from_slice(record.payload.as_bytes());
+            out.push(record.kind.code());
         }
         StoredRecord::ContextEntry(entry) => {
             out.extend_from_slice(entry.entry.as_bytes());
@@ -932,6 +942,13 @@ fn read_body(kind: RecordKind, body: &[u8]) -> Option<StoredRecord> {
             approver: reader.digest()?,
             verdict: verdict_from_tag(reader.tag()?)?,
         }),
+        RecordKind::Dependency => StoredRecord::Dependency(DependencyRecord {
+            authority: reader.digest()?,
+            revision: reader.integer()?,
+            previous: reader.digest()?,
+            payload: reader.digest()?,
+            kind: DependencyKind::from_code(reader.tag()?)?,
+        }),
         RecordKind::ContextEntry => StoredRecord::ContextEntry(ContextRecord {
             entry: reader.digest()?,
             session: reader.uuid()?,
@@ -1015,11 +1032,45 @@ mod tests {
                 access: ContextAccess::Referenced,
                 byte_length: 60,
             }),
+            StoredRecord::Dependency(DependencyRecord {
+                authority: digest(90),
+                revision: 1,
+                previous: digest(0),
+                payload: digest(91),
+                kind: DependencyKind::Enrollment,
+            }),
         ]
     }
 
     fn journal_bytes(records: &[StoredRecord]) -> Vec<u8> {
         records.iter().flat_map(frame_record).collect()
+    }
+
+    #[test]
+    fn dependency_kind_and_body_shape_are_closed_even_with_valid_checksums() {
+        let record = StoredRecord::Dependency(DependencyRecord {
+            authority: digest(1),
+            revision: 1,
+            previous: digest(0),
+            payload: digest(2),
+            kind: DependencyKind::Enrollment,
+        });
+        let frame = frame_record(&record);
+        let original = &frame[HEADER_BYTES..frame.len() - CHECKSUM_BYTES];
+        for length in [0, 104, 106] {
+            let mut body = original.to_vec();
+            body.resize(length, 0);
+            assert_eq!(
+                scan_journal(&reframe(8, 1, &body)).unwrap_err().kind(),
+                DamageKind::MalformedBody
+            );
+        }
+        let mut body = original.to_vec();
+        body[104] = 255;
+        assert_eq!(
+            scan_journal(&reframe(8, 1, &body)).unwrap_err().kind(),
+            DamageKind::MalformedBody
+        );
     }
 
     #[test]

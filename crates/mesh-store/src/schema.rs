@@ -337,6 +337,23 @@ pub const TABLES: &[Table] = &[
         provenance: Provenance::Records(&[RecordKind::ContextEntry]),
         purpose: "Which session touched which operation's content, and how.",
     },
+    Table {
+        name: "dependency_record",
+        since_version: 3,
+        columns: &[
+            column(
+                "authority_id",
+                DIGEST,
+                ColumnDomain::local("native dependency authority"),
+            ),
+            column("revision", INT, SEQUENCE),
+            column("previous_id", DIGEST, CONTENT_HASH),
+            column("payload_id", DIGEST, CONTENT_HASH),
+            column("kind", INT, ENUM_CODE),
+        ],
+        provenance: Provenance::Records(&[RecordKind::Dependency]),
+        purpose: "Immutable dependency envelopes; native validation remains required.",
+    },
 ];
 
 /// The table with this name, if the schema declares one.

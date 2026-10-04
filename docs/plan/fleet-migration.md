@@ -6026,6 +6026,34 @@ require integration. Full gate and hosted delivery pending. Fixed user checkpoin
 
 R146 implementation verification: Full `npm test` passed on `cd830a86a98174e0952277f9442020f6329f9b80`: 3,830 native tests in 173.261s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
 
+## R147 — required dependency journal and index foundation
+
+New canonical implementation based on PR #294 at
+`d0b4176d0a7347ba6d2a2e7bfce448e9e5de4d80`; no preserved source commit is replaced.
+Tracks issue #295 and the persistence prerequisite of #289. Required journal kind 8 encodes a
+fixed 105-byte envelope with authority, ledger ordinal, previous/current payload and closed kind.
+Additive index migration 3 reconstructs envelopes. Replay rejects contradictory or noncontiguous
+history before mutation and preserves idempotent exact retries without rewinding ledger heads.
+The payload still requires native semantic validation; no grant or enrollment API is enabled.
+
+Native open and refresh refuse dependency-bearing history, direct dependency appends refuse, and
+cached approval rereads the pinned journal before writing. Unknown transitive roots refuse
+collection. Old disposable-index schema compatibility is not promised. Exact pre-change storage
+source at the base revision was independently built and refused the new record kind with unchanged
+fixture bytes; this is scanner evidence, not an already-running old desktop enrollment proof.
+Future enrollment must install and verify a mandatory old-writer custody fence before its journal
+record, including both crash boundaries. That requirement remains unimplemented.
+
+The complete storage crate suite passed, including real SQLite reconstruction and existing
+crash/recovery campaigns extended with dependency records. The native cached-approval/reopen
+regression passed. Allowing a missing previous payload or disabling cached approval inspection
+made their respective regressions fail; source was restored byte-exact. Two initial test fixture
+compile failures are preserved. Full repository and hosted checks remain pending. The fixed
+user checkpoint is unchanged; full private-input authorization and publication enforcement remain
+required by the fleet plan.
+
+R147 implementation `af708ababc2f42a8e75a06ebd0d8152d9bfd4d13` passed full `npm test`: 3,837 native tests in 173.217s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
 ## R149 — durable preparation fence for older native writers
 
 New canonical work based on main `60441cb0013df707d71f8781b27964514cb32310` (merged #294);
@@ -6056,3 +6084,5 @@ human-approval refusal, every historical writer, complete two-write enrollment c
 packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
 
 R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431dae5d2b7fe190b6` passed full `npm test`: 3,844 native tests in 175.049s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained; no native conflict required resolution. Hosted verification of the reconciled head is pending.
