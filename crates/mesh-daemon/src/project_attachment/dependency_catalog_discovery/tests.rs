@@ -37,6 +37,15 @@ impl AttachmentStorage {
         let saved = self
             .discovered_dependency_versions(owner.id(), source.id())
             .unwrap();
+        assert_eq!(self.candidate_owning_root(source.id()).unwrap(), owner.id());
+        assert_eq!(
+            self.registered_dependency_versions(source.id()).unwrap(),
+            saved
+        );
+        assert_eq!(
+            self.registered_dependency_versions(owner.id()).unwrap(),
+            owner.saved_versions().unwrap()
+        );
         assert_eq!(saved.len(), 2);
         assert_eq!(saved.last(), Some(&version));
         assert_eq!(
@@ -120,6 +129,17 @@ impl AttachmentStorage {
             "consumed peer omitted because it was not an allocation parent"
         );
         assert_eq!(selection.works.len(), 4);
+        assert_eq!(self.candidate_owning_root(peer.id()).unwrap(), owner.id());
+        assert_eq!(
+            self.registered_dependency_versions(peer.id()).unwrap(),
+            expected
+        );
+        assert_eq!(
+            self.registered_dependency_file(peer.id(), expected[0], "kept")
+                .unwrap(),
+            Some(b"new child progress".to_vec())
+        );
+
         self.grant_saved_input_with_inputs(
             owner,
             NativeInputGrantRequest {
@@ -169,6 +189,10 @@ impl AttachmentStorage {
             .join("discovery-unrelated");
         fs::create_dir(&unrelated_path).unwrap();
         let unrelated = self.provision(&unrelated_path).unwrap();
+        assert!(
+            self.registered_dependency_versions(unrelated.id()).is_err(),
+            "unenrolled work must not silently enter native dependency reads"
+        );
         let offline = RestoreName::move_aside(&unrelated_path);
         let isolated = self
             .discover_dependency_read(owner.id(), peer.id())
@@ -181,9 +205,28 @@ impl AttachmentStorage {
         );
         drop(offline);
 
+        let missing_owner = RestoreName::move_aside(owner.project().root());
+        let owner_refused = self.registered_dependency_versions(peer.id());
+        drop(missing_owner);
+        assert!(
+            owner_refused.is_err(),
+            "missing owning root became a local-only read"
+        );
+        assert_eq!(
+            self.registered_dependency_versions(peer.id()).unwrap(),
+            expected
+        );
+
         let missing = RestoreName::move_aside(source.project().root());
         let refused = self.discovered_dependency_versions(owner.id(), peer.id());
+        let automatic_refused = self.registered_dependency_versions(peer.id());
+
         drop(missing);
+        assert!(
+            automatic_refused.is_err(),
+            "automatic owner selection omitted a required input"
+        );
+
         assert!(
             refused.is_err(),
             "missing required cross-lane source became a partial success"

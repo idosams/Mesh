@@ -2326,3 +2326,14 @@ and depends on published catalog-read #327 at `62cdcadd9afa70df0d5325114d0eb7262
 Post-merge CI for #326 passed (run `37244087413`). Discovery still requires publication, hosted
 checks and normal merge; desktop/harness integration and the full issue #323 remain open.
 The fixed checkpoint is unchanged.
+
+
+R161 owning-root selection now follows bounded recorded allocation ancestry from a registered lane
+before using the existing complete dependency read guard. Callers can request versions or saved
+bytes using only the lane ID; candidate root selection itself grants no authority. Enrolled root,
+chained lane and cross-branch consumed history passed the focused journey in 136.561s, including
+unenrolled-work and missing-input refusal. An added missing-owner refusal/restoration case awaits
+full validation. Deliberately stopping ancestry traversal after one edge failed the real root identity
+assertion in 104.417s; production source was restored byte-for-byte. Full validation, publication and
+hosted checks are pending. This local increment depends on #328 and replaces no preserved source
+commit. Desktop review/capture wiring and all remaining fleet acceptance stay open in #323.
