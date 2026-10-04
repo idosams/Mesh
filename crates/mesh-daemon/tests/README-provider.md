@@ -222,3 +222,13 @@ pause the inspection boundary while another thread reads fleet state, refuse can
 credential rotation/revocation before returning, and preserve substituted folders. A shared-lock
 mutation must fail the parallel-read deadline. This proves read-path isolation, not scheduled
 background saving or a packaged provider journey.
+
+
+### Local checkpoint concurrency
+
+The `local_checkpoint_` native tests pause a real signing callback while another thread reads
+fleet state, require exact retry without further signatures, revoke/cancel during signing, and
+run actual credential rotation concurrently with native custody. Mutex admission refuses instead
+of waiting in the reverse order. The old capture route must fail the two-second parallel-read
+deadline. Received-session behavior remains covered by its existing authority tests. These tests
+do not establish periodic saving, process termination or packaged fleet acceptance.

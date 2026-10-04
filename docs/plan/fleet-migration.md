@@ -5562,3 +5562,27 @@ dependency or persisted-format change.
 This is an inspection prerequisite, not automatic worker saving. Per-lane capture, save authority
 during cancellation, scheduling/final-save semantics, recovery, presentation and packaged provider
 acceptance remain open. Source and mutation evidence are retained with the delivery archive.
+
+
+## R129 — local signed capture without the shared fleet mutex
+
+New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267), stacked
+on PR #268; no preserved source commit is replaced. Local explicit checkpoint capture retains
+the exact grant/workspace, performs native scanning and signing outside the shared fleet mutex,
+and refreshes authority before and after every signing callback. While native custody is held,
+contended fleet admission refuses rather than waiting in the inverse lock order. Original begin/
+finish records, exact request replay, partial capture and review boundaries remain in use.
+
+Four native regressions pass: paused signing permits parallel fleet reads; exact retry does not
+sign again or rewrite later work; cancellation/revocation during signing suppresses that payload;
+real concurrent credential rotation completes without deadlock and preserves unsaved files; and
+authority checks refuse a held fleet mutex within the test deadline. Routing capture through the
+previous implementation fails the parallel-read deadline. Source was restored byte-for-byte.
+Full `npm test` passed 3,805 native tests in 162.930s (1 slow, 17 skipped), 185 rendered
+tests, 646 desktop tests and all 44 real-daemon checks. Hosted verification is pending. No IPC,
+dependency or persisted-format change.
+
+This increment changes local explicit capture. Received remote sessions keep their original
+authority path. Contention can produce an incomplete checkpoint; completed authorized appends
+remain durable, including work admitted before cancellation. Automatic ordinary progress capture,
+checkpoint-budget policy, scheduling, live presentation and packaged acceptance remain open.

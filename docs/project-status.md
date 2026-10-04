@@ -1039,3 +1039,15 @@ paused scan with parallel fleet reads; restoring the old lock fails that test. F
 checks. Hosted checks are pending. This read never saves content or creates checkpoints. Automatic worker
 saving, cancellation-safe capture, scheduling and packaged acceptance remain unfinished in
 [issue #267](https://github.com/idosams/Mesh/issues/267).
+
+
+## Local checkpoint signing and fleet responsiveness
+
+Local explicit checkpoints now scan and sign outside the fleet mutex, checking the exact current
+grant and run before and after signing. Native custody never waits for a contended fleet mutex;
+that attempt refuses or records an incomplete result. Tests prove parallel reads while signing
+is paused, exact retry, cancellation/revocation refusal and real concurrent credential rotation
+without deadlock. The previous capture path fails the read deadline mutation. Full local validation
+passed 3,805 native, 185 rendered and 646 desktop tests plus all 44 daemon checks. Hosted
+verification is pending. Received remote sessions retain their original authority path.
+This is a prerequisite for automatic saving, not a scheduler or packaged provider acceptance claim.
