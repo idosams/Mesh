@@ -134,9 +134,9 @@ pub use crate::folder_import::{
 pub use crate::live::{
     AgentFileCheckpointRequest, AgentFinishPreflight, AgentLiveFileSnapshot,
     AgentWorkspaceCheckpoint, AgentWorkspaceCheckpointRequest, DurableHumanApproval,
-    HumanApprovalPreview, LiveCheckpointSaveError, LiveDaemon, ReviewArtifact,
-    VerifiedManagedWorkspaceEntry, VerifiedManagedWorkspacePath, WorkspaceAgentSetupGuard,
-    WorkspaceVersionForkRequest,
+    HumanApprovalPreview, LiveCheckpointSaveError, LiveDaemon, OrphanCleanupOutcome,
+    OrphanCleanupStatus, OrphanCleanupWorker, ReviewArtifact, VerifiedManagedWorkspaceEntry,
+    VerifiedManagedWorkspacePath, WorkspaceAgentSetupGuard, WorkspaceVersionForkRequest,
 };
 pub use crate::managed_file::{
     ManagedDirectoryExport, ManagedDirectoryExportBatchPreview, ManagedDirectoryExportPreview,

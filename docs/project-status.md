@@ -1014,3 +1014,16 @@ mutation refuse. Replacing a try-lock with a blocking lock fails the regression.
 queued admission; filesystem and admitted scan latency remain unbounded. Automatic scheduling,
 pressure policy and full fleet acceptance remain open. Full local validation passed 3,793 native, 185 rendered and 646 desktop tests plus all 44
 daemon checks. Hosted delivery is pending.
+
+
+## Periodic cleanup ownership
+
+Desktop and headless daemon now start one periodic cleanup owner. It waits 60 seconds between
+attempts, selects the exact open workspace, defers busy/assigned workspaces, and retains all
+recorded history. Sleeping workers hold only a weak daemon reference; owner drop wakes and joins
+the worker. Four new native regressions prove scheduled deletion with retained history/reopen,
+busy retry, torn-history refusal, unique ownership and wakeable shutdown without a reference cycle.
+All 17 focused cleanup tests pass. A dry-run-only mutation fails the actual deletion assertion;
+source was restored. Full local validation passed 3,797 native, 185 rendered and 646 desktop
+tests plus all 44 daemon checks. Hosted delivery is pending. No packaged scheduled-cleanup
+proof, closed-workspace traversal, pressure policy or bounded admitted scan latency is claimed.
