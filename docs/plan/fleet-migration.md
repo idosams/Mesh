@@ -6054,3 +6054,5 @@ fixture/log retained, and the established one-millisecond native test interval r
 fixture corrections, not product latency evidence. Full and hosted validation are pending. Valid
 human-approval refusal, every historical writer, complete two-write enrollment crash recovery and
 packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
+
+R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.

@@ -197,5 +197,5 @@ A controlled retry directory-sync refusal returns no guard and retains the fence
 sync makes that regression fail. This is targeted fault-injection/staging evidence, not a complete
 power-loss campaign. The future transaction must install the fence before its enrollment record,
 retain recovery evidence across both writes, validate local control authority and cover every
-consumer/publication path before private-input behavior is enabled. Current main remains readable;
+consumer/publication path before private-input behavior is enabled. Preparation does not rewrite accepted main or journal content;
 this foundation does not automatically migrate any existing workspace.
