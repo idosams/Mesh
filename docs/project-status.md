@@ -1524,3 +1524,10 @@ not alter the candidate identity. The test passed in 0.77s. A negative mutation 
 reservation configuration failed the exact workspace-identity assertion in 0.54s; the unmodified
 source was restored byte-for-byte. Full validation of this refinement follows. This does not yet
 persist the policy transition or enable copying; #323 remains open.
+
+R161 signed-preparation implementation `b27eb7d7175989aee6ddd022f0ae01514994d1b9` passed full
+`npm test`: 3,931 native tests in 271.702s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. Draft PR #324
+will be updated with this verified refinement; new hosted validation remains required. It remains
+draft because persistent fencing, materialization, owner/destination commit ordering and recovery
+are unfinished. The fixed checkpoint and full fleet goal are unchanged.
