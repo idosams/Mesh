@@ -362,3 +362,19 @@ test('lane saved version is optional for older replies and exact when present', 
     value.fleets[0].state.lanes[0].saved_version = invalid; assert.throws(() => fleetCatalogue(value));
   }
 });
+
+test('pending summary reads do not block fleet status or an explicit start command', async () => {
+  const calls = [], value = catalogue(); value.fleets[0].state.lanes[0].saved_version = version;
+  const h = harness(async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'attached_fleets') return value;
+    if (command === 'fleet_activity' || command === 'start_attached_fleet') return activity();
+    if (command === 'summarize_fleet_saved_progress') return new Promise(() => {});
+    throw new Error('unavailable unrelated history');
+  });
+  await settle(); assert.equal(h.projections.at(-1).busy, false);
+  h.intent({ type: 'start', objective }); await settle();
+  assert.equal(calls.filter(call => call.command === 'start_attached_fleet').length, 1);
+  assert.equal(calls.filter(call => call.command === 'summarize_fleet_saved_progress').length, 1);
+  assert.equal(h.projections.at(-1).busy, false); h.dispose();
+});

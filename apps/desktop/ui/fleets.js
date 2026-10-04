@@ -1,3 +1,4 @@
+import { createFleetProgressSummaries } from './fleet-progress-summaries.js';
 import { createFleetProgress } from './fleet-progress-panels.js';
 import { createRemoteFleetObservations } from './remote-fleet-observations.js';
 import { createRemoteFleetReviews } from './remote-fleet-reviews.js';
@@ -100,7 +101,8 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   let fleets = [], activity = [], pending = null, busy = false, error = '', feedback = '', visible = false, disposed = false, timer = null;
   let sources = { projects: [], histories: {}, error: '' };
   const remoteObservations = createRemoteFleetObservations({ invoke, publish });
-  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { remoteObservations: remoteObservations.snapshot(), fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot(), ...progress.snapshot() } })); }
+  const progressSummaries = createFleetProgressSummaries({ invoke, publish });
+  function publish() { if (!disposed) document.dispatchEvent(new CustomEvent('mesh:fleets-projection', { detail: { progressSummaries: progressSummaries.snapshot(), remoteObservations: remoteObservations.snapshot(), fleets, activity, pending, busy, error, feedback, available: typeof invoke === 'function', ...reviews.snapshot(), ...remoteReviews.snapshot(), ...progress.snapshot() } })); }
   const reviews = createFleetReviews({ invoke, changed: publish, otherPinCount: () => remoteReviews.snapshot().remoteReviewPins.length, laneFor: (objective, lane) =>
     fleets.find(fleet => fleet.objective === objective && fleet.ownership !== 'unavailable')?.lanes.find(value => value.id === lane) });
   const remoteReviews = createRemoteFleetReviews({ invoke, changed: publish, requestId,
@@ -118,8 +120,8 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
       if (action) await action();
       const [catalogue, observations] = await Promise.all([invoke('attached_fleets'), invoke('fleet_activity')]);
       const nextFleets = fleetCatalogue(catalogue), nextActivity = fleetActivity(observations);
-      fleets = nextFleets; activity = nextActivity; error = ''; remoteObservations.sync(fleets, visible);
-    } catch { error = 'Fleet status could not be confirmed. Existing work is retained. Refresh before starting more work.'; }
+      fleets = nextFleets; activity = nextActivity; error = ''; remoteObservations.sync(fleets, visible); progressSummaries.sync(fleets, visible);
+    } catch { progressSummaries.sync(fleets, false); error = 'Fleet status could not be confirmed. Existing work is retained. Refresh before starting more work.'; }
     finally { busy = false; publish(); plan(); }
   }
   async function provision() {
@@ -161,7 +163,7 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
       });
     }
   }
-  function mount(event) { visible = event.detail === true; remoteObservations.sync(fleets, visible); if (visible) { publish(); void progress.loadSaved(); void refresh(); void Promise.resolve(reviews.loadSaved()).then(() => remoteReviews.loadSaved()); } else if (timer !== null) { cancel(timer); timer = null; } }
+  function mount(event) { visible = event.detail === true; remoteObservations.sync(fleets, visible); progressSummaries.sync(fleets, visible && !error); if (visible) { publish(); void progress.loadSaved(); void refresh(); void Promise.resolve(reviews.loadSaved()).then(() => remoteReviews.loadSaved()); } else if (timer !== null) { cancel(timer); timer = null; } }
   function attachment(event) {
     const value = event.detail;
     sources = value && Array.isArray(value.projects) && value.histories && typeof value.error === 'string'
@@ -170,5 +172,5 @@ export function startFleets({ document, invoke, CustomEvent, schedule = setTimeo
   document.addEventListener('mesh:fleets-visible', mount);
   document.addEventListener('mesh:fleets-intent', intent);
   document.addEventListener('mesh:attachments-projection', attachment);
-  return () => { disposed = true; progress.dispose(); remoteObservations.dispose(); reviews.dispose(); remoteReviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
+  return () => { disposed = true; progressSummaries.dispose(); progress.dispose(); remoteObservations.dispose(); reviews.dispose(); remoteReviews.dispose(); if (timer !== null) cancel(timer); document.removeEventListener('mesh:fleets-visible', mount); document.removeEventListener('mesh:fleets-intent', intent); document.removeEventListener('mesh:attachments-projection', attachment); };
 }

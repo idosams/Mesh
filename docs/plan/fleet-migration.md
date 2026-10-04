@@ -5918,3 +5918,35 @@ still follow, and the complete packaged/second-provider/second-host acceptance p
 The fixed user checkpoint is unchanged and does not include this new command.
 
 R141 implementation `849bbbd21aaa932bf4e4353d0adeeb56833f7012` passed full `npm test`: 3,824 native tests in 170.334s (2 slow, 18 skipped), 191 rendered tests, 665 desktop tests and all 44 real-daemon checks. Restart, substituted-root and cross-lane summary refusals passed in the complete suite. Hosted delivery and overview presentation remain pending.
+
+
+## R142 — independent local lane saved-change overview
+
+New canonical implementation based on PR #283 head
+`7c5d6c2282d860599335ee4053d93f9f3a184258`; no preserved source commit is replaced.
+Tracks issue #284. Local allocated lanes with an acknowledged save now read the exact native
+summary independently of fleet status/commands and review pins. The scheduler admits at most two
+reads, fairly rotates across the entire bounded catalogue (16 fleets times 1,024 lanes), coalesces
+newer saved versions while an older request is active, and caches successful immutable summaries.
+Failures retain previous verified counts and wait at least five seconds after failure before retry.
+No new native dispatch occurs while hidden/disposed or while catalogue status is unavailable.
+Uncancelled in-flight calls retain their slots until completion; stale scope/version/disposed replies
+cannot replace current results. Restored local lanes use history only; remote assignments and lanes
+without a verified local save do not enter this summary queue.
+
+Lane cards join the exact source and acknowledged version. They distinguish current saved counts,
+earlier saved counts, queued/reading states and unavailable/unknown counts, with exact summary-version
+details and English/Hebrew labels. Counts do not describe unsaved working files or approve results.
+The new controller never captures, launches, stops, adopts or mutates pinned comparisons. Existing
+status/command queues remain responsive while native summary reads are slow.
+
+Focused verification passed 47 scheduler, controller and rendered tests, including two-read capacity,
+fairness, coalesced updates, stale replies, error backoff, hidden/disposed dispatch, source changes,
+restored versus remote eligibility, the catalogue-size bound and explicit start during a pending
+summary. Current/older/error/unknown rendered states and source/version correlation are covered.
+Increasing concurrency to three fails the regression; source restored exactly. Native regression
+also binds the catalogue base to the history summary source. Full gate and hosted delivery remain
+pending. Packaged real-agent parallel review, measured responsiveness, richer activity/validation/
+dependency overview and the full fleet acceptance plan remain open. Fixed checkpoint unchanged.
+
+R142 implementation `94af7d6c329ae7b9440a4f44bfea52512f871ef5` passed full `npm test`: 3,824 native tests in 169.965s (2 slow, 18 skipped), 193 rendered tests, 671 desktop tests and all 44 real-daemon checks. Hosted delivery and packaged graphical acceptance remain pending. The fixed 5052009 user checkpoint remains unchanged.

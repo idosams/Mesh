@@ -54,7 +54,14 @@ saved entries, not current working files, capture completeness, or the broader l
 native summary command now exposes the same exact counts and bound version identities without
 returning file names or content. It reuses verified retained history outside the fleet lock and
 refuses unavailable or replaced custody. A strict desktop parser bounds and validates the response.
-Independent overview refresh and presentation are still pending; this is the read boundary.
+Local lane cards now refresh these summaries independently of status, commands and pinned reviews.
+At most two summary reads run concurrently, with fair scheduling over the bounded catalogue,
+coalescing of newer saves, cached immutable results and retries no sooner than five seconds after a
+failure. Older counts retain their exact version label during newer reads or errors; unavailable
+history never becomes zero files. Hidden/disposed views stop new dispatch. Restored local lanes
+remain readable without worker adoption, while remote assignments retain their separate observation
+path. This covers saved-change counts in the local overview; broader activity summaries and packaged
+parallel-agent acceptance remain unfinished.
 
 ## Retained worker execution observations
 
