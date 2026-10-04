@@ -6189,3 +6189,5 @@ caused the replacement regression to fail (exit 101); production bytes were rest
 The shared writer helper is unchanged: capture, review creation, approval and source-integration
 admission remain fenced. No auto-enrollment, new grant/consumption API or complete dependency closure
 claim is introduced. Full local verification and hosted delivery remain pending.
+
+R152 implementation verification: Full `npm test` passed on implementation `6c61818cda5d078723e8a624f92cf80848457840`: 3,867 native tests in 195.008s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.

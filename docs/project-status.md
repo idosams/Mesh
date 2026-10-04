@@ -1215,5 +1215,5 @@ original history anchor and bounded policy replay, then uses immutable journal/C
 refuses incomplete/substituted evidence and later legacy approvals; historical accepted main stays
 bound to its original reviewer evidence. Capture, review creation and approval remain fenced.
 Focused native and accepted-main/Git regressions pass, including a deliberately removed proof check
-that correctly fails its test. Full and hosted verification are pending. This does not expose
+that correctly fails its test. Full local verification passed: 3,867 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification is pending. This does not expose
 enrollment or private consumption to agents/users and does not change the fixed testing checkpoint.
