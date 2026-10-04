@@ -7094,3 +7094,13 @@ mode collision with the older start-recovery fixture; distinct completion-mode m
 that fixture without changing production authority. Both failed logs are retained. Full repository
 validation is pending. Draft PR #324 / issue #323, packaged acceptance and the full fleet objective
 remain open; the fixed user checkpoint is unchanged.
+
+R161 local-completion implementation `1c1bab93464068213ebf99d0dccc7f74380af3b2` passed full
+`npm test`: 3,949 native tests in 276.872s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `6f2802d21df32ae208b01930211e605e4fc62320` passed all seven hosted checks
+in run `37231827134`. Complete history, the initial fixture failure, positive recovery, deliberate
+corruption failure and full validation logs are preserved. This verifies the local completion
+receipt and exact restart behavior; configuration/capture reconciliation, cross-store admission,
+runtime integration and packaged acceptance remain required. Draft PR #324 / issue #323 and the
+full fleet objective stay open. The user checkpoint remains fixed.
