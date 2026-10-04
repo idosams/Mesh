@@ -478,6 +478,52 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             .inspect_dependency_graph(&handle, &handle, second, &[])
             .unwrap()
     );
+    // A real authenticated root declaration represents an empty initial snapshot. It creates no
+    // sentinel file and does not reset an existing tree or claim a consumption transaction.
+    let empty_child = storage
+        .reserve_dependency_lane(&owner, &owner, second, d(120))
+        .unwrap();
+    let empty_start = append_signed_operations_fixture(
+        &empty_child,
+        &[],
+        121,
+        vec![mesh_operations::Operation::InitializeWorkspace {
+            root_id: mesh_operations::ObjectId::from_bytes([0; 16]),
+        }],
+    );
+    let empty_graph = storage
+        .inspect_dependency_operation_graph(&owner, &empty_child, empty_start, &[])
+        .unwrap();
+    assert_eq!(empty_graph.operation_count(), 1);
+    for _ in 0..2 {
+        let reopened = storage.reopen(empty_child.id()).unwrap();
+        let read_guard =
+            crate::workspace_custody::lock_workspace_initialization(&reopened.store).unwrap();
+        let (_, proof) = reopened
+            .project()
+            .read_configuration(reopened.metadata_path(), &reopened.store)
+            .unwrap();
+        let history = crate::workspace::OpenWorkspace::open_attachment_read_history(
+            reopened.metadata_path(),
+            reopened.store.clone(),
+            &crate::TrustedReviewers::default(),
+            proof.as_ref(),
+        )
+        .unwrap();
+        let snapshot = history.historical_workspace_preview(empty_start).unwrap();
+        assert!(snapshot.files.is_empty());
+        assert!(snapshot.directories.is_empty());
+        assert_eq!(history.operations(), 1);
+        drop(history);
+        drop(read_guard);
+        assert_eq!(fs::read_dir(reopened.project().root()).unwrap().count(), 0);
+        assert_eq!(
+            storage
+                .inspect_dependency_operation_graph(&owner, &reopened, empty_start, &[])
+                .unwrap(),
+            empty_graph
+        );
+    }
     let child = storage
         .reserve_dependency_lane(&owner, &owner, second, d(81))
         .unwrap();
@@ -1038,6 +1084,22 @@ fn append_signed_operation_fixture(
     parents: &[RecordDigest],
     actor: u8,
 ) -> RecordDigest {
+    append_signed_operations_fixture(
+        owner,
+        parents,
+        actor,
+        vec![mesh_operations::Operation::CreateDirectory {
+            object_id: mesh_operations::ObjectId::from_bytes([actor; 16]),
+        }],
+    )
+}
+
+fn append_signed_operations_fixture(
+    owner: &ProvisionedAttachment,
+    parents: &[RecordDigest],
+    actor: u8,
+    operations: Vec<mesh_operations::Operation>,
+) -> RecordDigest {
     use crate::checkpoint_storage::{
         operation_checkpoint_signing_body, prepare_authenticated_checkpoint,
         AuthenticatedOperationCheckpointRequest,
@@ -1067,13 +1129,15 @@ fn append_signed_operation_fixture(
     .unwrap();
     let key = SigningKey::from_bytes(&[actor; 32]);
     let public = PublicKey::from_bytes(key.verifying_key().to_bytes());
-    let causal = CausalParents::after(
-        ChangeSetId::from_bytes(*parents[0].as_bytes()),
-        parents[1..]
-            .iter()
-            .map(|p| ChangeSetId::from_bytes(*p.as_bytes()))
-            .collect(),
-    );
+    let causal = match parents.split_first() {
+        Some((first, rest)) => CausalParents::after(
+            ChangeSetId::from_bytes(*first.as_bytes()),
+            rest.iter()
+                .map(|p| ChangeSetId::from_bytes(*p.as_bytes()))
+                .collect(),
+        ),
+        None => CausalParents::genesis(),
+    };
     let request = |signature| {
         AuthenticatedOperationCheckpointRequest::new(
             WorkspaceId::from_bytes(crate::project_attachment::history::short_id(
@@ -1086,9 +1150,7 @@ fn append_signed_operation_fixture(
             HeadId::from_bytes([0; 32]),
             PolicyEpoch::new(1),
             Hlc::new(u64::from(actor), 0),
-            vec![Operation::CreateDirectory {
-                object_id: ObjectId::from_bytes([actor; 16]),
-            }],
+            operations.clone(),
             public,
             signature,
         )

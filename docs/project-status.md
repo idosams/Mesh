@@ -1473,3 +1473,15 @@ R161 custody groundwork `a3a99f8e35e86d230aa578c53baa0d742f03bf44` passed full `
 draft follows so the unfinished consumption increment remains reviewable. This does not complete
 #323 or enable consumption. Main's post-R160 run still has macOS verification active; its other
 six jobs have passed.
+
+Draft [PR #324](https://github.com/idosams/Mesh/pull/324) publishes the R161 custody groundwork at
+`81babaa25ea86064a7e40b831f41f3d5fafa7970`; its hosted run is `37215060435`. R160 post-merge main
+run `37214307093` has now passed all seven checks on `5afe7757150eb4f6c079768c9473b5da3cc8b14e`.
+
+Further local R161 proof uses an authenticated `InitializeWorkspace` operation in a real empty
+native reservation. Its saved snapshot and qualified graph reopen identically twice, with no files
+or directories invented in the destination. All five focused graph tests pass in 3.20s. An initial
+fixture omitted native read custody and correctly failed; it was corrected without relaxing the
+reader. This is signed native journal replay, not a delivered consumption transaction. Copying,
+required persistent fencing, owner consumption commit and exact recovery remain unfinished. The
+published draft head and fixed user checkpoint remain unchanged while hosted checks run.
