@@ -7242,3 +7242,13 @@ preserved and corrected. Full validation is pending. Downstream grant/start/mate
 multi-level transaction recovery, generic callers, runtime/publication controls and packaged
 acceptance remain required. PR #324 / issue #323 and the full fleet goal remain open; the checkpoint
 is unchanged.
+
+R161 consumed-parent reservation `b4e1e4117abe5d69bd541764aec6bb9452372180` passed full
+`npm test`: 3,949 native tests in 284.709s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `5337e96191813e7cf13a98a71b673b45efb57481` passed all seven hosted checks
+in run `37237396357`. Full history and focused, mutation, failed diagnostic and full logs are
+preserved. Empty child allocation from consumed progress and exact restart recovery are verified;
+downstream grant/start/materialization and multi-level consumption recovery, generic callers,
+runtime/publication controls and packaged acceptance remain required. Draft PR #324 / issue #323
+and the complete fleet objective stay open. The user checkpoint is unchanged.
