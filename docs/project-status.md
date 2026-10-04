@@ -1867,3 +1867,14 @@ This implements fresh-process recovery of the start phase only. Exclusive file i
 destination checkpoint history, owner consumption, completion and cross-store read/capture/runtime
 admission remain required in draft PR #324 / issue #323. The full fleet goal and fixed checkpoint
 remain unchanged.
+
+R161 fresh-process start recovery implementation `a75f32855297f85e608438869658228eec9f105b`
+passed full `npm test`: 3,949 native tests in 293.909s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and the remaining repository, documentation, license,
+storage, format, lint and real-daemon gates. Published predecessor
+`1e0e3e06bcd7b7671ff4c0c66d8531716801c757` passed all seven hosted checks in run
+`37226972531`. Focused, negative-regression and full-gate logs are preserved with complete Git
+history. This proves reconstruction of the original authenticated start without a new signature;
+it does not prove installation, destination/owner/completion commit or cross-store admission.
+Draft PR #324 / issue #323 remain open for those requirements. The full fleet objective and fixed
+user checkpoint remain unchanged.
