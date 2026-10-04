@@ -8,6 +8,12 @@ use crate::{
 };
 use mesh_cas::{Blake3, Cas};
 use mesh_store::{scan_journal, Checkpoint, DependencyKind, StoredRecord};
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecoveryPhase {
+    Start,
+    Installed,
+    CompletedRead,
+}
 impl AttachmentStorage {
     /// Reconstruct an interrupted start from its retained signed material. No signer is invoked.
     /// Current grant and the exact original limits are required while consumption is uncommitted.
@@ -35,6 +41,70 @@ impl AttachmentStorage {
         request: NativeConsumedStartRequest<'_>,
         installed: bool,
     ) -> io::Result<(PreparedNativeConsumedStart, StagedNativeConsumedStart)> {
+        self.with_recovered_consumed_state(
+            owner,
+            request,
+            if installed {
+                RecoveryPhase::Installed
+            } else {
+                RecoveryPhase::Start
+            },
+            |candidate, staged, _, _| Ok((candidate, staged)),
+        )
+    }
+
+    /// Read completed consumed versions with an explicit native catalog and complete input set.
+    /// This never installs files, updates capture state, renews a grant or authorizes a run.
+    pub fn saved_consumed_versions(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+    ) -> io::Result<Vec<SavedAttachmentVersion>> {
+        self.with_recovered_consumed_state(
+            owner,
+            request,
+            RecoveryPhase::CompletedRead,
+            |candidate, _, graph, guard| candidate.read_completed_versions(graph, guard),
+        )
+    }
+
+    /// Read immutable bytes after independently verifying the completed source/owner transaction.
+    /// The current working file is never consulted and this grants no writable or runtime authority.
+    pub fn consumed_saved_file(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        version: SavedAttachmentVersion,
+        relative: &str,
+    ) -> io::Result<Option<Vec<u8>>> {
+        self.with_recovered_consumed_state(
+            owner,
+            request,
+            RecoveryPhase::CompletedRead,
+            |candidate, _, graph, guard| {
+                candidate.with_completed_history(graph, guard, |workspace, _| {
+                    Ok(workspace
+                        .historical_workspace_file(version.operation(), relative)
+                        .map_err(error)?
+                        .map(|file| file.bytes))
+                })
+            },
+        )
+    }
+
+    fn with_recovered_consumed_state<T>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        phase: RecoveryPhase,
+        action: impl FnOnce(
+            PreparedNativeConsumedStart,
+            StagedNativeConsumedStart,
+            &crate::project_attachment::NativeDependencyGraph,
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let installed = phase != RecoveryPhase::Start;
         request.limits.validate()?;
         if request.request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing recovery request"));
@@ -351,17 +421,29 @@ impl AttachmentStorage {
                 &destination_binding,
                 descriptor_id,
             )
-            || candidate.verify_stage_state(
-                &root,
-                original_graph,
-                &origin.allocation,
-                &guard,
-                installed,
-            )? != stage_id
+            || if phase == RecoveryPhase::CompletedRead {
+                // Historical reads authenticate retained signed material, not today's working files.
+                // The completion/owner join below is still mandatory before any history is opened.
+                let Some(Json::Array(entries)) = stage.get("entries") else {
+                    return Err(invalid("completed stage entries missing"));
+                };
+                candidate
+                    .stage_manifest(&root, original_graph, entries.clone())?
+                    .as_bytes()
+                    != raw
+            } else {
+                candidate.verify_stage_state(
+                    &root,
+                    original_graph,
+                    &origin.allocation,
+                    &guard,
+                    installed,
+                )? != stage_id
+            }
         {
             return Err(invalid("recovered consumption selection differs"));
         }
-        if installed {
+        if phase == RecoveryPhase::Installed {
             candidate.verify_install_names()?;
             let occupied = !destination
                 .attachment
@@ -398,14 +480,27 @@ impl AttachmentStorage {
             return Err(invalid("recovery history changed during inspection"));
         }
         guard.ensure_current().map_err(error)?;
-        Ok((
+        let result = action(
             candidate,
             StagedNativeConsumedStart {
                 root,
                 receipt: stage_id,
                 request: request.request,
             },
-        ))
+            &graph,
+            &guard,
+        )?;
+        if self
+            .inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)?
+            .digest()
+            != graph.digest()
+            || context.validate(self, &selected_source, &guard)? != source_binding
+            || context.validate(self, &selected_destination, &guard)? != destination_binding
+        {
+            return Err(invalid("consumed source changed during inspection"));
+        }
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
     }
 }
 
@@ -444,6 +539,30 @@ pub(super) fn run_child_if_requested() -> bool {
             .find(|v| v.operation().to_hex() == text("version"))
             .unwrap()
     };
+    if text("mode") == "read-completed" {
+        let request = || NativeConsumedStartRequest {
+            input: NativeGrantInspection {
+                source: &source,
+                version,
+                destination: &destination,
+                grant: digest(text("grant")).unwrap(),
+            },
+            available: &[],
+            request: digest(text("request")).unwrap(),
+            limits: ObservationLimits::default(),
+        };
+        let saved = storage.saved_consumed_versions(&owner, request()).unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].operation().to_hex(), text("operation"));
+        assert_eq!(
+            storage
+                .consumed_saved_file(&owner, request(), saved[0], "kept")
+                .unwrap(),
+            Some(b"saved bytes".to_vec())
+        );
+        assert!(destination.saved_versions().is_err());
+        return true;
+    }
     let (candidate, staged) = storage
         .recover_consumed_start_state(
             &owner,

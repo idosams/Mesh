@@ -25,6 +25,7 @@ use mesh_operations::{
 use mesh_store::RecordDigest;
 use mesh_types::{PublicKey, Signature};
 pub use staging::StagedNativeConsumedStart;
+pub(super) use staging::VerifiedConsumedHistory;
 use std::{collections::BTreeMap, io, path::Path};
 
 /// Exact trusted-native selection. Preparation does not grant access, copy content or start agents.

@@ -7104,3 +7104,22 @@ corruption failure and full validation logs are preserved. This verifies the loc
 receipt and exact restart behavior; configuration/capture reconciliation, cross-store admission,
 runtime integration and packaged acceptance remain required. Draft PR #324 / issue #323 and the
 full fleet objective stay open. The user checkpoint remains fixed.
+
+R161 now has explicit native-catalog APIs for reading the completed starting version and its saved
+file bytes. Recovery retains the complete custody set while reconstructing the signed initial
+snapshot from exact saved source content and exclusions. A private typed read proof is created only
+after joining the destination start/checkpoint/completion with the independently replayed exact
+owning receipt and full source closure. The effective saved configuration comes from that verified
+starting record; the original enrollment marker is retained unchanged. Historical inspection does
+not reinstall entries, consult live file content or renew a revoked grant.
+
+Two focused tests passed in 38.953s. Two fresh processes read the original saved bytes after an
+existing working file is edited and a new file is added, preserving journal, enrollment marker and
+both editor files. A locally canonical completion naming a different owner receipt refuses. Removing
+the exact receipt join makes that refusal test fail by returning a saved version (36.874s); source
+was restored byte-for-byte. Explicit refusals before completion and after a one-byte completion are
+included in the full validation now pending. This API currently reads the exact completed initial
+history and retains the original staging evidence. Generic history/capture/runtime paths, later
+capture-state reconciliation, transitive consumed-source admission and packaged acceptance remain
+required before readiness. Draft PR #324 / issue #323 and the full fleet objective remain open.
+The fixed user checkpoint is unchanged.

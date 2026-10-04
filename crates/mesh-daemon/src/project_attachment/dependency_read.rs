@@ -80,6 +80,14 @@ impl NativeDependencyFacts {
 #[derive(PartialEq, Eq)]
 pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
 impl VerifiedDependencyRead {
+    pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
+        &self.0 == facts
+    }
+    pub(super) fn from_consumption(
+        verified: super::consumption_prepare::VerifiedConsumedHistory,
+    ) -> Self {
+        Self(verified.into_facts())
+    }
     fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
         if facts.policy.has_consumption_transaction()
             || facts.pending.is_some_and(|(_, record)| {

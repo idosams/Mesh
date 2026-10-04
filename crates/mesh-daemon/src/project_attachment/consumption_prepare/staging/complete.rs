@@ -184,6 +184,7 @@ pub(super) fn assert_complete(
         )
         .unwrap_err();
     assert_eq!(failure.to_string(), "completion staged before append");
+    super::completed_read::assert_incomplete_read_refused(prepared, storage);
     assert!(!frame.is_empty());
     assert_eq!(fs::read(&path).unwrap(), before);
     let raw =
@@ -304,6 +305,9 @@ pub(super) fn assert_complete(
                 &frame
             }
         );
+        if mode == "complete-partial" {
+            super::completed_read::assert_incomplete_read_refused(prepared, storage);
+        }
         if mode != "complete-partial" {
             if let Some(ref previous) = completed {
                 assert_eq!(&current, previous);
@@ -352,4 +356,5 @@ pub(super) fn assert_complete(
         .unwrap_err();
     assert_eq!(failure.to_string(), "completion sync refused");
     assert_eq!(fs::read(&path).unwrap(), completed.unwrap());
+    super::completed_read::assert_completed_read(prepared, storage);
 }

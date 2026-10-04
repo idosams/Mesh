@@ -1,6 +1,8 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
 mod checkpoint;
 mod complete;
+mod completed_read;
+pub(in crate::project_attachment) use completed_read::VerifiedConsumedHistory;
 mod installation;
 mod owner;
 mod recovery;

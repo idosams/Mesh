@@ -325,6 +325,19 @@ impl DependencyPolicyHistory {
         self.consumption_start.is_some()
     }
 
+    /// Local replay records only. Callers must independently join the owning authority's receipt.
+    pub(crate) fn completed_consumption_records(
+        &self,
+    ) -> Option<(DependencyRecord, DependencyRecord, RecordDigest)> {
+        let (start, _) = self.records.get(&self.consumption_start?)?;
+        let (complete, Event::ConsumptionComplete(body)) =
+            self.records.get(&self.consumption_complete?)?
+        else {
+            return None;
+        };
+        Some((*start, *complete, body.owner_receipt))
+    }
+
     pub(crate) fn native_head(&self) -> Option<(u64, RecordDigest)> {
         self.head
     }
