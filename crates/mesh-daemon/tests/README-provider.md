@@ -24,7 +24,8 @@ provider and binds the real local IPC service. The model must edit `note.txt`, s
 `mesh_fleet_checkpoint` and submit through `mesh_fleet_submit_review`. Assertions inspect durable
 checkpoint and review records, final bytes and unchanged selected-source state. Raw provider output
 and credentials are not retained. The printed evidence directory is preserved even on failure;
-the 240-second deadline requests direct-child termination but cannot prove all descendants exited.
+the 240-second deadline requests owned provider-group termination but cannot prove escaped
+descendants exited. A reaped leader never authorizes signaling its old numeric process group.
 Do not remove an uncertain run's workspace until process ownership has been reconciled.
 
 On 2026-09-27 this test passed with `codex-cli 0.155.0-alpha.9.2` in 29.81 seconds on the development
@@ -212,6 +213,17 @@ This backend is ready for selector/controller integration, which is still requir
 Executable discovery uses native installation locations and canonicalizes Claude's
 usual installation symlink. Account login and actual sandbox/bridge operation remain
 part of live acceptance, not facts inferred from an executable's presence.
+
+## Owned provider-group cancellation
+
+Native adapters start each provider in a dedicated process group. Explicit cancellation and
+launch-abort paths signal that group while the owned direct child remains unreaped, and also stop
+the direct child if it left the group. After polling reaps the leader, cancellation refuses to use
+its numeric group identity. The native regression starts an inherited-pipe descendant, requires
+prompt pipe closure and exit, and verifies an independent process remains alive. Restoring the old
+direct-child-only stop fails before the fixture child's natural exit. Descendants can escape the
+group; this is not containment, restart adoption, full-tree death proof or capacity-release authority.
+
 
 
 ### Worker progress inspection
