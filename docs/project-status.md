@@ -975,6 +975,16 @@ remain explicit. This changes retained-set computation, not causal readiness or 
 Native fleet cleanup, scheduling, writer coordination and storage-exhaustion acceptance remain open.
 
 
+## Collection under injected storage exhaustion
+
+The native CAS cleanup campaign now checks eight Unix ENOSPC boundaries, including a partially
+written replacement journal. It verifies retained review bytes, honest error reporting, exact
+partial deletion, reopen/retry and a subsequent write. A swallowed-error mutation is rejected.
+The host disk is not filled. Full local validation passed 3,780 native, 185 rendered and 646 desktop
+tests plus all 44 daemon checks; hosted delivery is pending. This does not complete
+native cleanup scheduling, cross-process coordination or the full storage-pressure journey.
+
+
 ## Explicit native orphan cleanup
 
 The daemon now has an exact-workspace cleanup operation that keeps all recorded history and removes

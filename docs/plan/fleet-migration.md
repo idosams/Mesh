@@ -5391,6 +5391,23 @@ checks. Original published PR heads remain unchanged while their exact-head CI r
 publication of this reconciliation and final hosted validation/merge remain pending.
 
 
+## R122 — collection storage-exhaustion recovery campaign
+
+Tracks [issue #256](https://github.com/idosams/Mesh/issues/256), based on published R121 / PR #259
+head `45c5c475c7c33066bdcf741a5def60342b2a3f64`. New canonical verification; no preserved
+implementation commit is replaced. Production collector behavior and persisted formats are unchanged.
+A real-file test injects Unix ENOSPC at eight cleanup boundaries: first/second unlink, chunk-directory
+sync, replacement-journal staging, partial staging, file sync, rename and journal-directory sync.
+It requires the exact error operation/path/code, exact removed subset, retained review bytes,
+old/new journal boundary, successful reopen/retry, explicit compaction and a later promotion.
+The focused eight-case campaign passed in 0.614s. Temporarily swallowing the production journal
+rewrite error made it fail on a false success; production source was restored byte-for-byte.
+The full gate passed 3,780 native tests in 159.314s (1 slow, 17 skipped), 185 rendered tests,
+646 desktop tests and all 44 daemon checks. Hosted delivery is pending. This is bounded injected-failure
+coverage, not a physically full volume, daemon scheduling, cross-process writer coordination,
+checkpoint-wide storage-pressure recovery or full fleet retention-policy acceptance.
+
+
 ## R123 — native guarded orphan cleanup
 
 Tracks [issue #256](https://github.com/idosams/Mesh/issues/256), based on canonical main
@@ -5410,3 +5427,14 @@ preserved. The full gate passed 3,788 native tests in 162.475s (1 slow, 17 skipp
 No persisted format or IPC changes.
 This is an explicit native operation, not automatic scheduling, history expiration, bounded scan
 latency, real cross-process fault acceptance, packaged UI proof or completion of fleet retention.
+
+
+R123 merged through [PR #261](https://github.com/idosams/Mesh/pull/261) at canonical main
+`4be3da5f5e27c41383f9cccd9991b5b8120684af` after all seven exact-head checks passed.
+R122 / PR #260 original head `7beb0bd8b12647042cdbb2a9325d2849376ab4c5` and its
+source-identical reconciliation `60fc9d5e5ca6fadd0a354875ec0510be590cd44f` both passed all seven
+hosted checks before this related-history combination with merged R123. The append-only records
+and both retention-contract changes are preserved; no production code conflicts occurred.
+Combined source `5655fe5` passed the full gate: 3,789 native tests in 165.911s (1 slow,
+17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon checks. R122 hosted delivery
+remains pending on the final combined head.
