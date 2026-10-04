@@ -6663,3 +6663,10 @@ These are staged R161 foundations within draft PR #324, not a completed consumed
 materialization, independent owner-receipt verification, recovery, actual previous-writer proof,
 full current-tree validation and merged delivery remain required. The fixed user checkpoint and
 all graphical/provider/remote acceptance requirements are unchanged.
+
+R161 required-record/provenance implementation `2a39f854ac14dbc503d5367a6410c50636261d8d`
+passed full `npm test`: 3,937 native tests in 273.860s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+The earlier full-gate lint failure and native-gate negative mutation remain preserved. This gate
+validates the currently refusing foundation; it does not prove consumption commit/recovery or
+actual previous-binary compatibility. Draft PR #324 remains unmerged and issue #323 remains open.
