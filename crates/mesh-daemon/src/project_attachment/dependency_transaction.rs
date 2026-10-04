@@ -83,6 +83,36 @@ impl ProvisionedAttachment {
         let previous = read_private(self, HISTORY)?;
         let parsed = Json::parse(&previous).map_err(error)?;
         let recovering = parsed.get("schema").and_then(Json::as_text) == Some(FENCE_SCHEMA);
+        // Completed enrollment remains idempotent after native control advances the ledger.
+        // A torn later decision must recover through its own intent, never through enrollment.
+        if recovering {
+            if let Ok((_, Some(proof))) = self
+                .attachment
+                .read_configuration(self.metadata_path(), &self.store)
+            {
+                if proof.policy().len() > 1 {
+                    proof.verify(&self.store, &journal, &bytes)?;
+                    let scan = scan_journal(&bytes).map_err(error)?;
+                    let enrollment = scan
+                        .records()
+                        .iter()
+                        .find_map(|record| match record {
+                            StoredRecord::Dependency(record)
+                                if record.kind == DependencyKind::Enrollment =>
+                            {
+                                Some(record.payload)
+                            }
+                            _ => None,
+                        })
+                        .ok_or_else(|| invalid("completed history is missing enrollment"))?;
+                    sync(&journal)?;
+                    return Ok(NativeDependencyEnrollment {
+                        binding: proof.binding(),
+                        enrollment,
+                    });
+                }
+            }
+        }
         let project = digest(self.id())?;
         let identity = self.store.identity()?;
         let installation = workspace_installation(identity, identity);

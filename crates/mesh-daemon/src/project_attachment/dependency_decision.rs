@@ -14,6 +14,7 @@ use crate::{
 use mesh_cas::{Blake3, Cas, DurableFs as _};
 use mesh_store::{frame_record, DependencyKind, DependencyRecord, RecordDigest, StoredRecord};
 use std::{
+    fs::File,
     io::{self, Read as _, Seek as _, Write as _},
     os::unix::fs::{MetadataExt as _, PermissionsExt as _},
     path::Path,
@@ -86,10 +87,36 @@ fn body(
         ("replacement", replacement),
     ])
 }
+#[derive(Clone, Copy)]
+enum Step {
+    Staged,
+    Appended,
+}
+
+pub(super) fn transaction_intent(
+    request: RecordDigest,
+    identity: (u64, u64),
+    before: &[u8],
+    payload: RecordDigest,
+) -> String {
+    Json::object([
+        ("schema", Json::text("mesh.dependency-decision-intent/v1")),
+        ("request", Json::text(request.to_hex())),
+        ("journal_device", Json::text(format!("{:016x}", identity.0))),
+        ("journal_inode", Json::text(format!("{:016x}", identity.1))),
+        ("journal_bytes", Json::Number(before.len() as u64)),
+        ("journal_digest", Json::text(hash(before).to_hex())),
+        ("payload", Json::text(payload.to_hex())),
+    ])
+    .encode()
+}
+mod recovery;
+pub(super) use recovery::pending_prefix;
+
 impl ProvisionedAttachment {
     /// Record an explicit native-host input decision. Work identity is the registered root work,
     /// independent of any provider/run. No runtime control interface calls this development API.
-    /// Recovery of pending writes must be completed before this primitive is exposed to users.
+    /// Interrupted appends resume only their exact recorded intent; unknown work is preserved.
     pub fn decide_saved_input(
         &self,
         version: SavedAttachmentVersion,
@@ -97,24 +124,47 @@ impl ProvisionedAttachment {
         expected_previous: Option<RecordDigest>,
         request: RecordDigest,
     ) -> io::Result<NativeInputDecision> {
+        self.decide_with_io(
+            version,
+            decision,
+            expected_previous,
+            request,
+            |_, _, _| Ok(()),
+            |file| file.sync_all(),
+        )
+    }
+
+    fn decide_with_io(
+        &self,
+        version: SavedAttachmentVersion,
+        decision: SavedInputDecision,
+        expected_previous: Option<RecordDigest>,
+        request: RecordDigest,
+        mut hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        mut sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<NativeInputDecision> {
         if request == ZERO || expected_previous == Some(ZERO) {
             return Err(invalid("missing decision request or predecessor"));
         }
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
-        // Unknown pending work is preserved. Exact interrupted-append recovery is integrated next.
-        match read_private_in_store(&self.store, PENDING) {
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        let prior_pending = match read_private_in_store(&self.store, PENDING) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
             Err(e) => return Err(e),
-            Ok(_) => {
-                return Err(invalid(
-                    "native decision requires pending transaction recovery",
-                ))
+            Ok(value) => {
+                let parsed = Json::parse(&value).map_err(error)?;
+                if parsed.get("request").and_then(Json::as_text) != Some(request.to_hex().as_str())
+                {
+                    return Err(invalid("another native decision requires recovery"));
+                }
+                Some(value)
             }
-        }
-        let (configuration, proof) = self
-            .attachment
-            .read_configuration(self.metadata_path(), &self.store)?;
+        };
+        let (configuration, proof) = self.attachment.read_decision_configuration(
+            self.metadata_path(),
+            &self.store,
+            prior_pending.as_deref(),
+        )?;
         let proof = proof.ok_or_else(|| invalid("native dependency enrollment is required"))?;
         let binding = proof.binding();
         let workspace = OpenWorkspace::open_attachment_read_history(
@@ -161,6 +211,10 @@ impl ProvisionedAttachment {
             return Err(invalid("decision history exceeds its bound"));
         }
         proof.verify(&self.store, &journal, &before)?;
+        let observed = before.clone();
+        if let Some((length, _)) = proof.pending() {
+            before.truncate(length);
+        }
         let mut policy = proof.policy().clone();
         if let Some(record) = policy.native_request(request) {
             let bytes = read_payload(&cas, record.payload, 65_536)?;
@@ -185,7 +239,7 @@ impl ProvisionedAttachment {
             {
                 return Err(invalid("decision request was reused with different intent"));
             }
-            journal.sync_all()?;
+            sync(&journal)?;
             self.store.sync()?;
             return Ok(NativeInputDecision {
                 record: record.payload,
@@ -239,41 +293,69 @@ impl ProvisionedAttachment {
         };
         policy.apply(record, &bytes).map_err(error)?;
         let identity = journal.metadata()?;
-        let pending = Json::object([
-            ("schema", Json::text("mesh.dependency-decision-intent/v1")),
-            ("request", Json::text(request.to_hex())),
-            (
-                "journal_device",
-                Json::text(format!("{:016x}", identity.dev())),
-            ),
-            (
-                "journal_inode",
-                Json::text(format!("{:016x}", identity.ino())),
-            ),
-            ("journal_bytes", Json::Number(before.len() as u64)),
-            ("journal_digest", Json::text(hash(&before).to_hex())),
-            ("payload", Json::text(record.payload.to_hex())),
-        ])
-        .encode();
-        cas.promote(bytes.clone()).map_err(error)?;
+        let pending = transaction_intent(
+            request,
+            (identity.dev(), identity.ino()),
+            &before,
+            record.payload,
+        );
+        let frame = frame_record(&StoredRecord::Dependency(record));
+        if before.len().saturating_add(frame.len()) > MAX_JOURNAL {
+            return Err(invalid("decision append exceeds history bound"));
+        }
+        if let Some(original) = &prior_pending {
+            if original != &pending || proof.pending().map(|(_, r)| r) != Some(record) {
+                return Err(invalid(
+                    "pending decision differs from requested native intent",
+                ));
+            }
+            self.store.filesystem().sync_file(Path::new(PENDING))?;
+        } else {
+            cas.promote(bytes.clone()).map_err(error)?;
+            self.store.filesystem().write_new_file(
+                Path::new(PENDING),
+                pending.as_bytes(),
+                std::fs::Permissions::from_mode(0o600),
+            )?;
+        }
         if read_payload(&cas, record.payload, 65_536)? != bytes {
             return Err(invalid("decision payload staging changed"));
         }
-        self.store.filesystem().write_new_file(
-            Path::new(PENDING),
-            pending.as_bytes(),
-            std::fs::Permissions::from_mode(0o600),
-        )?;
         self.store.sync()?;
-        let (_, current) = self
-            .attachment
-            .read_configuration(self.metadata_path(), &self.store)?;
-        if current.as_ref() != Some(&proof) {
+        hook(Step::Staged, &mut journal, &frame)?;
+        if read_private_in_store(&self.store, PENDING)? != pending {
+            return Err(invalid("decision intent changed before append"));
+        }
+        let (current_configuration, current_proof) = self.attachment.read_decision_configuration(
+            self.metadata_path(),
+            &self.store,
+            Some(&pending),
+        )?;
+        let current_proof = current_proof.ok_or_else(|| invalid("decision enrollment changed"))?;
+        if current_configuration != configuration
+            || current_proof.binding() != binding
+            || current_proof.policy() != proof.policy()
+            || current_proof.pending().map(|(_, r)| r) != Some(record)
+        {
+            return Err(invalid("decision authority changed before append"));
+        }
+        journal.rewind()?;
+        let mut current = Vec::new();
+        (&mut journal)
+            .take((MAX_JOURNAL + 1) as u64)
+            .read_to_end(&mut current)?;
+        proof.verify(&self.store, &journal, &current)?;
+        if current != observed {
             return Err(invalid("decision history changed before append"));
         }
-        let frame = frame_record(&StoredRecord::Dependency(record));
-        journal.write_all(&frame)?;
-        journal.sync_all()?;
+        // Recovery has already verified that the only suffix is a prefix of this exact frame.
+        let written = observed.len() - before.len();
+        if written > frame.len() || !frame.starts_with(&observed[before.len()..]) {
+            return Err(invalid("foreign decision suffix"));
+        }
+        journal.write_all(&frame[written..])?;
+        sync(&journal)?;
+        hook(Step::Appended, &mut journal, &frame)?;
         let (_, replay) = self
             .attachment
             .read_configuration(self.metadata_path(), &self.store)?;
@@ -283,6 +365,9 @@ impl ProvisionedAttachment {
             != Some(record)
         {
             return Err(invalid("decision did not replay exactly"));
+        }
+        if read_private_in_store(&self.store, PENDING)? != pending {
+            return Err(invalid("decision intent changed after append"));
         }
         self.store.filesystem().remove_file(Path::new(PENDING))?;
         self.store.sync()?;

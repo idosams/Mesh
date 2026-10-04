@@ -336,3 +336,25 @@ authorize publication. Current ordinary Mesh history readers still refuse requir
 validated current-reader support is required before exposing the transition. Existing source and Git
 work remain separate. Complete control authorization, closure/retention, all-path publication and
 packaged acceptance requirements remain open in #289.
+
+
+## Native root-work decision writer (R153)
+
+The native host may select an exact saved operation of its enrolled registered root work for an
+eligibility decision. Root work uses the native project registration identity; its installation is
+bound separately, and no execution/provider field participates. Replacement selects a distinct
+verified operation of that same work. This increment does not authorize foreign work or substitute
+this root-work binding for the still-required native membership of delegated/manual child lanes.
+
+A bounded private `mesh.dependency-decision-intent/v1` receipt is transaction recovery evidence,
+not a second policy log. It names the request, exact original journal identity and prefix, and the
+canonical payload staged in CAS. Only the journal's complete canonical dependency record establishes
+a decision. Recovery accepts only that frame's exact prefix, revalidates native source/store/fences
+and saved input, syncs and replays before acknowledgement, and preserves unknown work. A historical
+request may be retried after newer decisions without changing the current decision. The caller must
+resolve a different unfinished request first. Generic collection remains refused for enrolled history
+until dependency-aware retention is integrated, preserving staged and recorded policy payloads.
+
+Ordinary readers do not use the native recovery projection; they still refuse torn policy history.
+Historical accepted main is retained. Agent methods, renderer IPC, publication, grants, full closure
+and child-work consumption remain outside this native primitive and require the complete contract.

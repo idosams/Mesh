@@ -1223,3 +1223,15 @@ Pre-merge reader audit found and corrected shared-helper admission in manual all
 input preparation and remote export. All four now retain the legacy enrollment fence while saved
 inspection remains readable. The new test fails on the previous implementation and passes on the
 correction without creating lanes or destination files. Full revalidation passed on `3902d7abde439f64545cb6d5064c1af82ab1793b`: 3,868 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification of this correction is pending.
+
+
+## Native decisions for saved inputs
+
+R153 adds a native-host-only writer for exact saved-input rejection, replacement and explicit
+revalidation in an enrolled registered root work. Decisions retain old accepted main and immutable
+history. Stable requests recover exact outcomes; pending intent and native journal identity bind
+interrupted appends. All 146 frame-prefix fault cases, sync failure, lost acknowledgement, foreign or
+stale inputs and changed evidence are covered by focused tests. Removing synchronization fails its
+regression. Full and hosted verification are pending. This is not exposed through agent/renderer/CLI
+operations and is not yet downstream publication enforcement or a consumption grant. The fixed
+checkpoint is unchanged.
