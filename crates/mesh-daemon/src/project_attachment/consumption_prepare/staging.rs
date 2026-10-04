@@ -1,4 +1,5 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
+mod start_fence;
 use super::*;
 use crate::{
     managed_file::retained_replacement::{
@@ -887,4 +888,12 @@ pub(super) fn assert_revocation_after_staging(
             .count(),
         0
     );
+}
+
+#[cfg(test)]
+pub(super) fn assert_start_fence(
+    prepared: &PreparedNativeConsumedStart,
+    storage: &AttachmentStorage,
+) {
+    start_fence::assert_start_fence(prepared, storage);
 }

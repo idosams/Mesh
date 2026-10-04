@@ -1815,3 +1815,25 @@ Focused prefix/refusal tests, deliberately failing admission mutation and comple
 preserved. This validates read-only exact-start recovery facts, not a durable start writer or an
 acknowledged consumption transaction. Installation, owner/completion receipts, full restart recovery
 and cross-store admission remain required in draft PR #324 / issue #323. The checkpoint is unchanged.
+
+R161 now has a native durable start-fence writer for an exact prepared candidate and private stage.
+Under complete owner/source/destination custody it rechecks the current grant, immutable graph,
+reservation binding, empty destination and signed staged content. It retains the transaction's
+explicit limits, stage receipt, signed objects and configuration bindings, then writes and synchronizes
+its exact intent before appending the required start record. Exact retries append only missing bytes;
+post-sync verification compares the complete expected journal, configuration and record identity.
+This writes no destination files or owner consumption and grants no ordinary read/run permission.
+
+The real byte-by-byte test first found that reservation-origin verification incorrectly demanded an
+ordinary read after a partial start. Origin now checks exact native enrollment facts for consumed
+reservations as correlation only; independent histories retain the original full read checks. All
+nine focused reservation/start tests then passed in 26.154s. Coverage includes every interrupted
+frame boundary, failed synchronization, lost acknowledgement, repeated exact retry, editor work,
+foreign suffixes and a real grant revocation while consumption is still uncommitted. Removing journal
+synchronization fails the regression in 23.995s. Failed and successful logs are preserved and exact
+source was restored. Full repository validation is pending.
+
+The writer currently retries using the same authenticated candidate and stage handles. Fresh-process
+candidate reconstruction, exact exclusive installation, signed destination history, owner receipt,
+completion and full cross-store admission remain required before this is an acknowledged consumed
+version. Draft PR #324 / issue #323 and the full fleet scope stay open. The user checkpoint is fixed.

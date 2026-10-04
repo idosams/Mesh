@@ -100,6 +100,37 @@ fn verify_enrolled(work: &ProvisionedAttachment) -> io::Result<()> {
     Ok(())
 }
 
+// Allocation ancestry establishes correlation only. Pending consumption must remain discoverable
+// without manufacturing the ordinary history permission that its required journal fence refuses.
+fn verify_origin_enrollment(work: &ProvisionedAttachment) -> io::Result<()> {
+    let guard =
+        crate::workspace_custody::lock_workspace_initialization(&work.store).map_err(error)?;
+    let pending =
+        match read_private_in_store(&work.store, super::consumption_prepare::START_PENDING) {
+            Ok(raw) => Some(raw),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+            Err(e) => return Err(e),
+        };
+    let (_, facts) = work.project().read_native_facts(
+        work.metadata_path(),
+        &work.store,
+        pending.as_deref(),
+        None,
+    )?;
+    let facts = facts.ok_or_else(|| invalid("reserved history has no native enrollment"))?;
+    if pending.is_some()
+        && !facts
+            .pending()
+            .is_some_and(|(_, record)| record.kind == mesh_store::DependencyKind::ConsumptionStart)
+    {
+        return Err(invalid("reserved consumption intent has the wrong kind"));
+    }
+    if pending.is_none() && !facts.policy().has_consumption_transaction() {
+        verify_enrolled(work)?;
+    }
+    guard.ensure_current().map_err(error)
+}
+
 fn reserved(work: &ProvisionedAttachment, intent: &Json) -> io::Result<Json> {
     Ok(Json::object([
         ("schema", Json::text("mesh.native-reserved-destination/v1")),
@@ -427,7 +458,7 @@ pub(super) fn origin(
     exact(&allocation, FILES, &identity(&work.attachment.pinned)?)?;
     exact(&allocation, STORE, &store_receipt(work)?)?;
     exact(&allocation, RESERVED, &reserved(work, &intent)?)?;
-    verify_enrolled(work)?; // local history enrollment, not an owning-project grant
+    verify_origin_enrollment(work)?; // correlation only; never ordinary history admission
     Ok(super::lanes::NativeLaneOrigin {
         value: intent,
         allocation,

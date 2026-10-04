@@ -1,5 +1,6 @@
 //! Signed consumption candidates. Preparation writes nothing and does not reserve a commit order.
 mod staging;
+pub(super) const START_PENDING: &str = "consumption-start.pending";
 use super::{
     consumption_start::{prepare_initial_snapshot, InitialSnapshot},
     dependency_enrollment::read_private_in_store,
@@ -623,5 +624,8 @@ mod tests {
             fs::read_dir(destination.project().root()).unwrap().count(),
             0
         );
+        if !revoke {
+            staging::assert_start_fence(&prepared, &storage);
+        }
     }
 }
