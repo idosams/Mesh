@@ -6415,7 +6415,7 @@ tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
 R158 delivery: [PR #318](https://github.com/idosams/Mesh/pull/318) merged at
 `027c8d2debb06cda81fd5e32be2c28c3a10f4473` after all seven hosted checks in run `37206573170`
 passed on published head `9b006c690220211f24e7ffff4f3679f640355867`. Post-merge run
-`37207400781` is running. Earlier pending statements above are historical development entries.
+`37207400781` passed on that merge. Earlier pending statements above are historical development entries.
 
 ## R159: Reserve a native destination before granting or copying input
 
@@ -6445,3 +6445,8 @@ requires complete inherited closure and retention, authenticated starting operat
 consumption receipts and exact crash recovery. Empty starting snapshots, runtime integration,
 dependency-aware publication/import and all remaining fleet acceptance stay in scope. The fixed
 user checkpoint is unchanged; no installed application or repository settings were modified.
+
+R159 full gate on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 native tests in 271.700s
+(5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, including
+repository/docs/license/storage/fmt/clippy checks. The native interruption fixtures do not establish
+power-loss or packaged acceptance. Hosted checks and merged reservation delivery remain pending.

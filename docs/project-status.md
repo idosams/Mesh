@@ -1288,7 +1288,7 @@ R154 through R157 are now merged into canonical Mesh through passing exact-head 
 main checks.
 R158, tracked by [issue #317](https://github.com/idosams/Mesh/issues/317), merged through
 [PR #318](https://github.com/idosams/Mesh/pull/318) at `027c8d2debb06cda81fd5e32be2c28c3a10f4473`.
-All seven exact-head hosted checks passed; post-merge main verification is running.
+All seven exact-head hosted checks and post-merge main verification passed.
 Its dedicated native capture path signs without custody, preserves the original source folder, and
 records authenticated private progress after explicit enrollment. Exact-request recovery resumes
 staged journal prefixes and preserves unknown work. Historical receipt recovery does not rewind
@@ -1307,8 +1307,8 @@ required. The user checkpoint remains fixed at `5052009`.
 
 ## Native destination reservation before consumption
 
-R159 ([issue #319](https://github.com/idosams/Mesh/issues/319)) is implemented locally and awaits
-its full gate and PR delivery. Native reservation creates an empty destination with its own enrolled
+R159 ([issue #319](https://github.com/idosams/Mesh/issues/319)) is implemented locally with a passing
+full gate and awaits PR delivery. Native reservation creates an empty destination with its own enrolled
 history in staging, outside the visible catalog. Exclusive native publication makes that exact store
 visible only after its required writer fences are durable. The destination can receive an exact
 owning-project grant without copying any source bytes or claiming consumption or readiness to run.
@@ -1323,3 +1323,8 @@ This is a native development API, not a user-facing fleet launch path. Complete 
 retained roots, materialization plus starting-operation/consumption receipts, dependency-aware
 publication/import, runtime controls and packaged/provider/remote acceptance remain required.
 The user checkpoint remains fixed at `5052009`.
+
+R159 full verification on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 native tests in
+271.700s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks.
+Its interruption tests use native fault injection; power-loss, packaged and provider acceptance are
+not established by this result. Hosted reservation CI and merge remain pending.
