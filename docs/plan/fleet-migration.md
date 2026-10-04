@@ -5389,3 +5389,20 @@ and combines the crash campaign with the retention correction. The full gate pas
 tests in 168.394s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon
 checks. Original published PR heads remain unchanged while their exact-head CI runs finish;
 publication of this reconciliation and final hosted validation/merge remain pending.
+
+
+## R122 — collection storage-exhaustion recovery campaign
+
+Tracks [issue #256](https://github.com/idosams/Mesh/issues/256), based on published R121 / PR #259
+head `45c5c475c7c33066bdcf741a5def60342b2a3f64`. New canonical verification; no preserved
+implementation commit is replaced. Production collector behavior and persisted formats are unchanged.
+A real-file test injects Unix ENOSPC at eight cleanup boundaries: first/second unlink, chunk-directory
+sync, replacement-journal staging, partial staging, file sync, rename and journal-directory sync.
+It requires the exact error operation/path/code, exact removed subset, retained review bytes,
+old/new journal boundary, successful reopen/retry, explicit compaction and a later promotion.
+The focused eight-case campaign passed in 0.614s. Temporarily swallowing the production journal
+rewrite error made it fail on a false success; production source was restored byte-for-byte.
+The full gate passed 3,780 native tests in 159.314s (1 slow, 17 skipped), 185 rendered tests,
+646 desktop tests and all 44 daemon checks. Hosted delivery is pending. This is bounded injected-failure
+coverage, not a physically full volume, daemon scheduling, cross-process writer coordination,
+checkpoint-wide storage-pressure recovery or full fleet retention-policy acceptance.
