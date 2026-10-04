@@ -1232,6 +1232,6 @@ revalidation in an enrolled registered root work. Decisions retain old accepted 
 history. Stable requests recover exact outcomes; pending intent and native journal identity bind
 interrupted appends. All 146 frame-prefix fault cases, sync failure, lost acknowledgement, foreign or
 stale inputs and changed evidence are covered by focused tests. Removing synchronization fails its
-regression. Full and hosted verification are pending. This is not exposed through agent/renderer/CLI
+regression. Full local verification passed: 3,874 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification is pending. This is not exposed through agent/renderer/CLI
 operations and is not yet downstream publication enforcement or a consumption grant. The fixed
 checkpoint is unchanged.
