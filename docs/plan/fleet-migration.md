@@ -5977,3 +5977,5 @@ pass; 44 focused controller/rendered tests passed. The initial native test fixtu
 closure parameter type; its compile failure is preserved. Removing the current-version filter fails
 the native regression; exact source was restored. Full gate and hosted delivery remain pending. Private dependency eligibility, validation evidence, packaged graphical
 acceptance and every remaining fleet-plan exit remain required. Fixed checkpoints are unchanged.
+
+R144 implementation `49cc6a84f5b5ccf90b0c5e4f4b0c40924ea60370` passed full `npm test`: 3,825 native tests in 174.256s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The native feedback decision/reopen projection passed within the full suite. Hosted delivery and packaged graphical acceptance remain pending.
