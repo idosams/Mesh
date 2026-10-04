@@ -358,3 +358,23 @@ until dependency-aware retention is integrated, preserving staged and recorded p
 Ordinary readers do not use the native recovery projection; they still refuse torn policy history.
 Historical accepted main is retained. Agent methods, renderer IPC, publication, grants, full closure
 and child-work consumption remain outside this native primitive and require the complete contract.
+
+
+## Native work correlation (R154)
+
+An enrolled top-level native registration owns root work whose stable identity is the project ID.
+An existing child derives stable work identity from canonical `mesh.native-dependency-work/v1`
+fields: owning project, parent work, native allocation request and exact saved source version.
+Installation identity remains separate; provider/run identity is absent. A descendant cannot declare
+itself a new root to discard ancestry. Existing allocation receipts establish lineage, not grants.
+
+Selection resolves native catalog registrations and verifies source versions under deterministic
+custody of catalog, every source/store, and every allocation container. At most eight edges (nine
+nodes, 27 requested roots) are accepted; overflow refuses instead of accepting a truncated prefix.
+A private correlation digest retains physical identities and native ancestry. Replacing an allocation
+container invalidates an earlier binding even when stable work and installation remain unchanged.
+
+The returned native fact owns no custody. Revalidation is a point-in-time check, not continuing
+authority; a consuming transaction must acquire its complete custody set and revalidate membership,
+grants, current decisions and full closure before acting. This selector neither issues a grant nor
+retroactively converts legacy lineage into an authorized consumption receipt.

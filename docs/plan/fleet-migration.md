@@ -6242,3 +6242,25 @@ those admission paths remain fenced. No physical power-loss or packaged GUI clai
 native fault injections. The fixed user checkpoint remains unchanged.
 
 R153 implementation verification: Full `npm test` passed on combined implementation `e57247f7cc2ea18cdfc7426a8d2c92b38d31723e`: 3,874 native tests in 228.506s (3 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+
+
+## R154 — native root and descendant work selection
+
+Tracks [issue #309](https://github.com/idosams/Mesh/issues/309), depending on R153
+[PR #308](https://github.com/idosams/Mesh/pull/308) at
+`0c3d17d725b5546eca7b3fbcfeaefb3e456090b6`. This new increment replaces no preserved
+source commit. Native catalog selection binds enrolled root ownership, exact installations and
+manual or delegated allocation ancestry independently of provider/run identity. Historical allocation
+is correlation evidence only; it never retroactively grants consumption or publication.
+
+Selection reopens exact registrations and verifies every saved source version under one ordered
+custody set. Eight ancestry edges require at most 27 roots. Foreign work, descendant root authority,
+cycles, overflow, changed receipts and replaced source/store/allocation containers refuse. Immutable
+bindings hold no lock; consuming transactions still need their own custody and current policy checks.
+
+Five real-storage regressions cover nested manual work, restart/editor writes, foreign and unenrolled
+owners, receipt/source/store substitution, the exact depth boundary and allocation replacement with
+unchanged work/installation. Removing allocation identity from the correlation makes the replacement
+regression fail; the original source was restored exactly. Full local and hosted gates remain pending.
+No grants, new allocation protocol, closure enforcement, runtime entry point or packaged claim is
+introduced. The user checkpoint remains unchanged.

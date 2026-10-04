@@ -125,6 +125,11 @@ fn inventory(root: &PinnedWorkspaceRoot, limit: usize) -> io::Result<BTreeMap<St
     Ok(found)
 }
 
+pub(super) struct NativeLaneOrigin {
+    pub(super) value: Json,
+    pub(super) allocation: PinnedWorkspaceRoot,
+}
+
 impl AttachmentStorage {
     fn canonical_lane_storage(&self) -> io::Result<PathBuf> {
         self.pinned.ensure_namespace_identity()?;
@@ -211,6 +216,14 @@ impl AttachmentStorage {
     /// Recorded allocation ancestry for a registered child. This conveys no authorship or
     /// provider/session association. Missing or changed receipts refuse instead of inventing one.
     pub fn lane_origin(&self, child: &ProvisionedAttachment) -> io::Result<Option<Json>> {
+        self.lane_origin_bound(child)
+            .map(|origin| origin.map(|origin| origin.value))
+    }
+
+    pub(super) fn lane_origin_bound(
+        &self,
+        child: &ProvisionedAttachment,
+    ) -> io::Result<Option<NativeLaneOrigin>> {
         let root = self.canonical_lane_storage()?.join(ROOT);
         let Ok(relative) = child.project().root().strip_prefix(&root) else {
             return Ok(None);
@@ -239,14 +252,17 @@ impl AttachmentStorage {
         }
         child.project().ensure_current()?;
         allocation.ensure_namespace_identity()?;
-        Ok(Some(Json::object([
-            ("schema", Json::text("mesh.attachment-lane-origin/v1")),
-            ("source_project", Json::text(project)),
-            ("source_version", Json::text(version)),
-            ("request", Json::text(request)),
-            ("attribution", Json::text("unknown")),
-            ("provider", Json::Null),
-        ])))
+        Ok(Some(NativeLaneOrigin {
+            value: Json::object([
+                ("schema", Json::text("mesh.attachment-lane-origin/v1")),
+                ("source_project", Json::text(project)),
+                ("source_version", Json::text(version)),
+                ("request", Json::text(request)),
+                ("attribution", Json::text("unknown")),
+                ("provider", Json::Null),
+            ]),
+            allocation,
+        }))
     }
 }
 
