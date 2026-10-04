@@ -427,6 +427,28 @@ pub(crate) fn lock_for_workspace_path(
     })
 }
 
+/// Try the same pinned authority without waiting for another native writer.
+pub(crate) fn try_lock_for_workspace_path(
+    root: &Path,
+    expected_installation: &str,
+) -> Result<Option<LockedAuthority>, WorkspaceAgentCustodyError> {
+    let authority = Authority::from_path(root, expected_installation)?;
+    let Some(lock) = lock_physical_workspace_mode(&authority.physical, true)? else {
+        return Ok(None);
+    };
+    authority
+        .physical
+        .ensure_namespace_identity()
+        .and_then(|()| authority.storage.ensure_namespace_identity())
+        .map_err(|error| {
+            WorkspaceAgentCustodyError::io("revalidate custody after try lock", error)
+        })?;
+    Ok(Some(LockedAuthority {
+        authority,
+        _lock: lock,
+    }))
+}
+
 pub(crate) fn require_unassigned_path(
     root: &Path,
 ) -> Result<UnassignedWorkspaceGuard, WorkspaceAgentCustodyError> {
@@ -476,6 +498,15 @@ pub(crate) fn require_unassigned_path(
 fn lock_physical_workspace(
     physical: &PinnedWorkspaceRoot,
 ) -> Result<CustodyLock, WorkspaceAgentCustodyError> {
+    lock_physical_workspace_mode(physical, false)?.ok_or_else(|| {
+        WorkspaceAgentCustodyError::invalid("blocking custody lock unexpectedly deferred")
+    })
+}
+
+fn lock_physical_workspace_mode(
+    physical: &PinnedWorkspaceRoot,
+    nonblocking: bool,
+) -> Result<Option<CustodyLock>, WorkspaceAgentCustodyError> {
     let identity = physical
         .identity()
         .map_err(|error| WorkspaceAgentCustodyError::io("inspect workspace custody root", error))?;
@@ -487,12 +518,20 @@ fn lock_physical_workspace(
     let file = physical.independent_lock_directory().map_err(|error| {
         WorkspaceAgentCustodyError::io("open workspace custody directory", error)
     })?;
-    let lock = lock_exclusive(file, identity)
-        .map_err(|error| WorkspaceAgentCustodyError::io("lock workspace agent custody", error))?;
+    let lock = match lock_exclusive(file, identity, nonblocking) {
+        Ok(lock) => lock,
+        Err(error) if nonblocking && error.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+        Err(error) => {
+            return Err(WorkspaceAgentCustodyError::io(
+                "lock workspace agent custody",
+                error,
+            ))
+        }
+    };
     physical.ensure_namespace_identity().map_err(|error| {
         WorkspaceAgentCustodyError::io("revalidate workspace after lock wait", error)
     })?;
-    Ok(lock)
+    Ok(Some(lock))
 }
 
 pub(crate) fn lock_workspace_initialization(
@@ -595,14 +634,16 @@ impl Drop for CustodyLock {
 }
 
 #[allow(unsafe_code)]
-fn lock_exclusive(file: File, identity: (u64, u64)) -> io::Result<CustodyLock> {
+fn lock_exclusive(file: File, identity: (u64, u64), nonblocking: bool) -> io::Result<CustodyLock> {
     unsafe extern "C" {
         fn flock(fd: std::os::raw::c_int, operation: std::os::raw::c_int) -> std::os::raw::c_int;
     }
     use std::os::fd::AsRawFd as _;
     const LOCK_EX: std::os::raw::c_int = 2;
+    const LOCK_NB: std::os::raw::c_int = 4;
+    let operation = LOCK_EX | if nonblocking { LOCK_NB } else { 0 };
     // SAFETY: `file` owns a valid descriptor for the lifetime of the returned guard.
-    if unsafe { flock(file.as_raw_fd(), LOCK_EX) } == 0 {
+    if unsafe { flock(file.as_raw_fd(), operation) } == 0 {
         HELD_CUSTODY.with(|held| held.set(Some(identity)));
         Ok(CustodyLock(file))
     } else {

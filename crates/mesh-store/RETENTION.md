@@ -200,3 +200,12 @@ second closure — a naive fixed point over every record, with no work queue and
 That is a P0, and the task contract states the sequence: disable collection, ship the fix, then
 re-enable. Disabling is one line — pass `CollectionMode::DryRun` — and the dry run is the same code
 path, so a workspace under investigation still gets a full report of what *would* have gone.
+
+## Nonblocking native admission
+
+`LiveDaemon::try_collect_workspace_orphans` attempts the physical-directory custody lock and each
+daemon admission lock without waiting. Busy locks or assigned-agent custody return `None` without
+cleanup; callers can retry later. Stale identity, nested mutations, incomplete history and pending
+recovery still refuse. An admitted attempt uses the same pinned preparation and conservative
+reference veto as explicit collection. Filesystem I/O is not time-bounded and admitted scans still
+exclude coordinated writers. There is still no automatic scheduler or pressure policy.

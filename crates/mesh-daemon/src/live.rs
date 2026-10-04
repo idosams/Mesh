@@ -2568,37 +2568,136 @@ impl LiveDaemon {
                     )
                 };
                 drop(checkpoint);
-                #[cfg(test)]
-                ORPHAN_COLLECTION_PREPARE.with(|hook| {
-                    if let Some(hook) = hook.borrow_mut().take() {
-                        hook();
-                    }
-                });
-                let mut recovery_store = SqliteRecoveryState::open_isolated(
-                    recovery_database(&database),
-                    &database,
-                    LIVE_WORKSPACE_VIEW,
-                )
-                .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
-                let recovery = mesh_store::RecoveryStatePersistence::load(&mut recovery_store)
-                    .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
-                if recovery
-                    .is_some_and(|s| s.open_window().is_some() || s.pending_meaningful().is_some())
-                {
-                    return Err(ManagedTextFileError::Recovery(
-                        "checkpoint recovery is pending".into(),
-                    ));
-                }
-                let plan = source.prepare(expected_digest)?;
-                #[cfg(test)]
-                ORPHAN_COLLECTION_READY.with(|hook| {
-                    if let Some(hook) = hook.borrow_mut().take() {
-                        hook();
-                    }
-                });
-                plan.execute(mode).map_err(ManagedTextFileError::Recovery)
+                Self::finish_orphan_collection(source, database, expected_digest, mode)
             },
         )
+    }
+
+    /// Attempt maintenance without waiting for native custody or any daemon admission lock.
+    ///
+    /// `None` means busy or assigned; no cleanup was performed. Once admitted, the same
+    /// conservative retention and recovery checks as explicit cleanup apply. Filesystem I/O and
+    /// the admitted scan can still take time and exclude writers; this is not a latency bound.
+    ///
+    /// # Errors
+    /// Refuses nested mutation, stale identity/history, pending recovery and storage failures.
+    pub fn try_collect_workspace_orphans(
+        &self,
+        expected_root: &str,
+        expected_digest: &str,
+        expected_installation: &str,
+        mode: mesh_cas::CollectionMode,
+    ) -> Result<Option<mesh_cas::Collected>, ManagedTextFileError> {
+        if VERIFIED_MUTATION_CONTEXT.with(|active| active.borrow().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "nested workspace cleanup was refused".into(),
+            ));
+        }
+        let custody = crate::workspace_custody::try_lock_for_workspace_path(
+            Path::new(expected_root),
+            expected_installation,
+        )
+        .map_err(|error| {
+            if error.is_stale_workspace() {
+                ManagedTextFileError::StaleWorkspace
+            } else {
+                ManagedTextFileError::Recovery(error.to_string())
+            }
+        })?;
+        let Some(custody) = custody else {
+            return Ok(None);
+        };
+        if custody
+            .status()
+            .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?
+            .is_assigned()
+        {
+            return Ok(None);
+        }
+        let _custody = custody
+            .require_unassigned()
+            .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+        let Some(_serial) = Self::try_cleanup_lock(&self.workspace_open) else {
+            return Ok(None);
+        };
+        let Some(_edit) = Self::try_cleanup_lock(&self.managed_edit) else {
+            return Ok(None);
+        };
+        let Some(checkpoint) = Self::try_cleanup_lock(&self.checkpoint) else {
+            return Ok(None);
+        };
+        let Some(held) = Self::try_cleanup_lock(&self.open) else {
+            return Ok(None);
+        };
+        let open = held.as_ref().ok_or(ManagedTextFileError::NoWorkspace)?;
+        if open.root().as_path() != Path::new(expected_root)
+            || open.digest().to_string() != expected_digest
+            || open.installation() != expected_installation
+        {
+            return Err(ManagedTextFileError::StaleWorkspace);
+        }
+        open.ensure_physical_root()
+            .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+        if checkpoint.active.as_ref().is_some_and(|runtime| {
+            let snapshot = checkpoint_snapshot(runtime);
+            snapshot.open_window().is_some() || snapshot.pending_meaningful().is_some()
+        }) || open.managed_mutation_recovery_needed()
+        {
+            return Err(ManagedTextFileError::Recovery(
+                "workspace recovery is pending".into(),
+            ));
+        }
+        let source = open
+            .orphan_collection_source()
+            .map_err(ManagedTextFileError::Recovery)?;
+        let database = open.database_file().to_path_buf();
+        drop(held);
+        drop(checkpoint);
+        let _context = VerifiedMutationContext::enter(self, expected_installation)?;
+        Self::finish_orphan_collection(source, database, expected_digest, mode).map(Some)
+    }
+
+    fn try_cleanup_lock<T>(lock: &Mutex<T>) -> Option<MutexGuard<'_, T>> {
+        match lock.try_lock() {
+            Ok(guard) => Some(guard),
+            Err(std::sync::TryLockError::Poisoned(error)) => Some(error.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => None,
+        }
+    }
+
+    fn finish_orphan_collection(
+        source: crate::workspace::OrphanCollectionSource,
+        database: PathBuf,
+        expected_digest: &str,
+        mode: mesh_cas::CollectionMode,
+    ) -> Result<mesh_cas::Collected, ManagedTextFileError> {
+        #[cfg(test)]
+        ORPHAN_COLLECTION_PREPARE.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
+        let mut recovery_store = SqliteRecoveryState::open_isolated(
+            recovery_database(&database),
+            &database,
+            LIVE_WORKSPACE_VIEW,
+        )
+        .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+        let recovery = mesh_store::RecoveryStatePersistence::load(&mut recovery_store)
+            .map_err(|e| ManagedTextFileError::Recovery(e.to_string()))?;
+        if recovery.is_some_and(|s| s.open_window().is_some() || s.pending_meaningful().is_some()) {
+            return Err(ManagedTextFileError::Recovery(
+                "checkpoint recovery is pending".into(),
+            ));
+        }
+        let plan = source.prepare(expected_digest)?;
+        #[cfg(test)]
+        ORPHAN_COLLECTION_READY.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().take() {
+                hook();
+            }
+        });
+        plan.execute(mode).map_err(ManagedTextFileError::Recovery)
     }
 
     /// Return the pinned physical directory for the exact managed workspace the desktop showed.
@@ -10672,6 +10771,122 @@ mod tests {
         let store =
             mesh_cas::Cas::open(daemon.held().as_ref().unwrap().storage_root().as_path()).unwrap();
         (root, daemon, store)
+    }
+
+    #[test]
+    fn native_orphan_cleanup_try_defers_on_every_admission_lock_and_retries() {
+        let (root, daemon, store) = orphan_fixture("orphan-try-locks");
+        let daemon = Arc::new(daemon);
+        let summary = daemon.workspace_state().unwrap();
+        let orphan = store.promote(b"deferred orphan".to_vec()).unwrap().digest();
+        macro_rules! busy {
+            ($guard:expr) => {{
+                let guard = $guard;
+                let collecting = Arc::clone(&daemon);
+                let expected = summary.clone();
+                let (tx, rx) = std::sync::mpsc::channel();
+                let worker = std::thread::spawn(move || {
+                    tx.send(collecting.try_collect_workspace_orphans(
+                        &expected.root,
+                        &expected.digest,
+                        &expected.installation,
+                        mesh_cas::CollectionMode::Delete,
+                    ))
+                    .unwrap();
+                });
+                let response = rx.recv_timeout(Duration::from_secs(2));
+                let preserved = store.contains(&orphan);
+                drop(guard);
+                worker.join().unwrap();
+                assert!(response
+                    .expect("busy admission must return before release")
+                    .unwrap()
+                    .is_none());
+                assert!(preserved, "deferred cleanup must not delete");
+            }};
+        }
+        busy!(crate::workspace_custody::lock_for_workspace_path(
+            Path::new(&summary.root),
+            &summary.installation,
+        )
+        .unwrap());
+        busy!(daemon.workspace_open.lock().unwrap());
+        busy!(daemon.managed_edit.lock().unwrap());
+        busy!(daemon.checkpoint.lock().unwrap());
+        busy!(daemon.open.lock().unwrap());
+        let collected = daemon
+            .try_collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+            .unwrap()
+            .expect("retry admitted after all locks released");
+        assert_eq!(collected.collected(), &[orphan]);
+        assert!(!store.contains(&orphan));
+        assert_eq!(daemon.workspace_state().unwrap().digest, summary.digest);
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_orphan_cleanup_try_refuses_stale_and_defers_assigned() {
+        let (root, daemon, store) = orphan_fixture("orphan-try-authority");
+        let summary = daemon.workspace_state().unwrap();
+        let orphan = store.promote(b"assigned orphan".to_vec()).unwrap().digest();
+        for (digest, installation) in [
+            ("stale", summary.installation.as_str()),
+            (summary.digest.as_str(), "stale"),
+        ] {
+            assert!(daemon
+                .try_collect_workspace_orphans(
+                    &summary.root,
+                    digest,
+                    installation,
+                    mesh_cas::CollectionMode::Delete,
+                )
+                .is_err());
+        }
+        daemon
+            .with_verified_managed_workspace(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                || {
+                    assert!(daemon
+                        .try_collect_workspace_orphans(
+                            &summary.root,
+                            &summary.digest,
+                            &summary.installation,
+                            mesh_cas::CollectionMode::Delete,
+                        )
+                        .is_err());
+                    Ok(())
+                },
+            )
+            .unwrap();
+        daemon
+            .acquire_workspace_agent_custody(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                false,
+                None,
+            )
+            .unwrap();
+        assert!(daemon
+            .try_collect_workspace_orphans(
+                &summary.root,
+                &summary.digest,
+                &summary.installation,
+                mesh_cas::CollectionMode::Delete,
+            )
+            .unwrap()
+            .is_none());
+        assert_eq!(store.read(&orphan).unwrap(), b"assigned orphan");
+        drop(daemon);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
