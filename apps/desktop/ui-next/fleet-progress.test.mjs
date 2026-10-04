@@ -29,3 +29,12 @@ test('saving failure is explicit and loading disables destructive panel changes'
   const loading = module.exports.panels({ pins, notice: '', persistence: { phase: 'loading', message: '', editable: false, busy: true } });
   assert.match(loading, /<button[^>]*disabled=""[^>]*>Close progress panel/); assert.doesNotMatch(loading, /Progress panel choices saved/);
 });
+
+test('parallel saved panels show native file and folder totals with legacy unknown fallback', () => {
+  const first = pin('1'), second = pin('2');
+  Object.assign(first.input.page, { total: 203, fileTotal: 202, folderTotal: 1 });
+  const html = module.exports.panels({ pins: [first, second], notice: '' }).replace(/<!--.*?-->/g, '');
+  assert.match(html, /202 changed files · 1 changed folders/);
+  assert.match(html, /0 changed objects/);
+  assert.doesNotMatch(html, /0 changed files/);
+});

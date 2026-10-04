@@ -39,3 +39,24 @@ test('binary, large and folder metadata cannot masquerade as text', () => {
     value.input.comparison.changes[0].after.text = 'fake'; assert.throws(() => fleetInputComparison(value, pin(), null, object(1)));
   }
 });
+
+test('native file and folder counts are exact, bounded, stable and optional for legacy replies', () => {
+  assert.equal(fleetInputComparison(response(), pin()).fileTotal, null);
+  const value = response(), page = value.input.comparison;
+  Object.assign(page, { file_total: 1, folder_total: 0 });
+  const first = fleetInputComparison(value, pin());
+  assert.equal(first.fileTotal, 1); assert.equal(first.folderTotal, 0);
+  for (const fields of [{ file_total: null }, { folder_total: undefined }, { file_total: 0.5 }, { folder_total: 1 }, { file_total: 0, folder_total: 1 }, { file_total: -1 }, { file_total: Number.MAX_SAFE_INTEGER + 1 }]) {
+    const bad = structuredClone(value); Object.assign(bad.input.comparison, fields);
+    assert.throws(() => fleetInputComparison(bad, pin()));
+  }
+  const bound = pin(); bound.input = { page: first };
+  assert.throws(() => fleetInputComparison(response(), bound), 'known counts cannot disappear during an exact comparison');
+  const folder = { path: 'folder', kind: 'folder', digest: null, bytes: null, executable: null, content_state: 'folder', text: null };
+  Object.assign(page, { total: 201, file_total: 200, folder_total: 1, changes: Array.from({ length: 200 }, (_, n) => change(n + 1)), next_after: object(200) });
+  const paged = pin(); paged.input = { page: fleetInputComparison(value, pin()) };
+  Object.assign(page, { after: object(200), changes: [{ object: object(201), effect: 'added', before: null, after: folder }], next_after: null });
+  assert.equal(fleetInputComparison(value, paged, object(200)).fileTotal, 200);
+  Object.assign(page, { file_total: 199, folder_total: 2 });
+  assert.throws(() => fleetInputComparison(value, paged, object(200)));
+});

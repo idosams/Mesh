@@ -5859,3 +5859,29 @@ not completed graphical acceptance, a notarized release or protected-main author
 #274–#278 were still open at checkpoint delivery; their final merge receipts remain separate.
 The full native source gate and two real Codex ordinary-save runs are recorded under R138 and do
 not substitute for this package's remaining visual journey. The complete fleet plan stays open.
+
+
+## R140 — exact saved file and folder counts
+
+New canonical implementation based on PR #279 head
+`e09229de263c1d1038f98e72f19caa677174221c`; no preserved source commit is replaced.
+Tracks issue #280 and the changed-file summary requirement in phase 3. Native starting-version
+comparisons add file_total and folder_total over the complete immutable changed-object set, before
+pagination or selected-content reads. Folder totals never masquerade as files. The same projection
+serves handoff and ordinary-progress comparisons. Desktop validation accepts absent legacy pairs as
+unknown, refuses partial/malformed/inconsistent pairs, checks visible entries against global counts,
+and prevents a known count from changing or disappearing on a subsequent exact comparison request.
+Parallel panels present the native split with English/Hebrew labels and retain the legacy object
+count fallback. No new filesystem scan, authority, persisted format or provider control is added.
+
+The native regression creates 202 changed files and one changed folder, checks both pages and a
+selected-object read, saves later edits including another folder, and verifies that the old pinned
+comparison stays exact. Original project content remains unchanged. Parser and rendered tests cover
+legacy unknown, malformed counts, per-page totals, stable navigation and independent panel fallback.
+Substituting zero for the native file count fails the parser regression; source restored exactly.
+The initial fixture wrongly expected ordinary saving to confirm deletion; the existing conservative
+incomplete-save behavior was preserved, the fixture changed to supported later edits, and the
+failure log retained. Full validation and hosted delivery are pending. These are exact saved-entry
+counts, not a live working-tree inventory or a completeness claim. Live lane summaries, packaged
+parallel-agent acceptance and the remainder of the fleet plan remain unfinished. Fixed checkpoint
+5052009 and previous checkpoints are unchanged.

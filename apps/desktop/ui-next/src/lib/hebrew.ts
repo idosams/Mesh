@@ -797,6 +797,8 @@ export const hebrew: Readonly<Record<string, string>> = Object.freeze({
 "Reading the exact starting-version comparison… The previous selection remains below.":"קורא את ההשוואה המדויקת לגרסת ההתחלה… הבחירה הקודמת נשארת למטה.",
 "Retry this comparison request":"ניסיון נוסף לאותה בקשת השוואה",
 "changed objects":"פריטים שהשתנו",
+"changed files":"קבצים שהשתנו",
+"changed folders":"תיקיות שהשתנו",
 "on this page":"בדף זה",
 "Exact comparison versions":"גרסאות ההשוואה המדויקות",
 "Local starting version":"גרסת התחלה מקומית",
