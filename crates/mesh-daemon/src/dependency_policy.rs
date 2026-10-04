@@ -264,6 +264,26 @@ impl DependencyPolicyHistory {
         Ok(())
     }
 
+    pub(crate) fn native_head(&self) -> Option<(u64, RecordDigest)> {
+        self.head
+    }
+    pub(crate) fn native_request(&self, request: RecordDigest) -> Option<DependencyRecord> {
+        self.requests
+            .get(&request)
+            .and_then(|id| self.records.get(id))
+            .map(|(record, _)| *record)
+    }
+    pub(crate) fn native_decision(
+        &self,
+        work: RecordDigest,
+        installation: RecordDigest,
+        version: RecordDigest,
+    ) -> Option<(u64, RecordDigest)> {
+        self.decisions
+            .get(&Input(Work(work, installation), version))
+            .map(|(revision, payload, _)| (*revision, *payload))
+    }
+
     /// Direct immutable references only; not a complete retention closure or a collection oracle.
     pub fn referenced_content(&self) -> impl Iterator<Item = &RecordDigest> {
         self.roots.iter()

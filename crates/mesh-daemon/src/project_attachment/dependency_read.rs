@@ -30,8 +30,17 @@ pub(crate) struct VerifiedDependencyRead {
     store: (u64, u64),
     journal: (u64, u64),
     bytes: RecordDigest,
+    binding: NativeDependencyBinding,
+    policy: DependencyPolicyHistory,
 }
 impl VerifiedDependencyRead {
+    pub(super) fn binding(&self) -> NativeDependencyBinding {
+        self.binding
+    }
+    pub(super) fn policy(&self) -> &DependencyPolicyHistory {
+        &self.policy
+    }
+
     pub(crate) fn verify(
         &self,
         store: &PinnedWorkspaceRoot,
@@ -61,7 +70,7 @@ fn error(e: impl std::fmt::Display) -> io::Error {
 }
 
 impl ProjectAttachment {
-    fn read_configuration(
+    pub(super) fn read_configuration(
         &self,
         metadata: &Path,
         store: &PinnedWorkspaceRoot,
@@ -182,6 +191,12 @@ impl ProjectAttachment {
             store: identity,
             journal: journal_identity,
             bytes: hash(&bytes),
+            binding: NativeDependencyBinding {
+                authority,
+                project,
+                installation,
+            },
+            policy,
         };
         proof.verify(store, &journal, &bytes)?;
         Ok((configuration, Some(proof)))
