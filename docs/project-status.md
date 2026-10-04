@@ -1934,3 +1934,24 @@ This proves the exact signed destination checkpoint commit and its native restar
 owner receipt, completion, prospective configuration/capture reconciliation, cross-store admission
 and packaged acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain
 open. The user checkpoint stays fixed.
+
+R161 now commits the exact owning-authority consumption receipt after the signed destination
+checkpoint under the same complete custody guard. A dedicated owner-prefix context verifies partial
+receipt history for graph, source and grant inspection without changing ordinary read behavior.
+Immutable per-request/per-payload attempt files preserve earlier staged evidence when valid owner
+history advances before append. Restart selects only one exact matching attempt; unrelated or
+ambiguous suffixes refuse. Pending owner payload/sidecar references are included in inspected graph
+retention. A committed request is recognized before current permission checks, with historical input
+recovery bound to the exact source, grant, native associations, destination and starting operation.
+This historical outcome conveys no new consumption or runtime permission.
+
+Two final focused tests passed in 32.451s. Real children recover after one owner-frame byte and a
+synchronized lost reply; repeated retries return one receipt. An intervening owner decision and the
+original staged attempt stay unchanged. A later grant revocation retains the exact historical receipt;
+a different starting operation refuses. An explicit owner-sync failure prevents success. Ignoring that
+failure makes the regression fail in 32.485s; production source was restored byte-for-byte. Earlier
+failed test logs are preserved: fresh-process setup and result assertions initially omitted their
+required read custody, which was corrected without weakening the read fence. Full validation is
+pending. Local completion, prospective configuration/capture reconciliation, complete cross-store
+admission and the full acceptance campaign remain required by draft PR #324 / issue #323. The user
+checkpoint and full fleet objective remain unchanged.

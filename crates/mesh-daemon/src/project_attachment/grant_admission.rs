@@ -139,6 +139,16 @@ impl AttachmentStorage {
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
         read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
     ) -> io::Result<T> {
+        let context = super::dependency_owner_context::OwnerHistoryContext::current(prepared.owner);
+        self.with_input_grant_owner(prepared, guard, &context, read)
+    }
+    pub(super) fn with_input_grant_owner<T>(
+        &self,
+        prepared: &PreparedNativeGrantInspection<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        context: &super::dependency_owner_context::OwnerHistoryContext<'_>,
+        read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
         guard.require_roots(&prepared.roots).map_err(error)?;
         let owner = prepared.owner;
         let request = &prepared.request;
@@ -154,9 +164,7 @@ impl AttachmentStorage {
                     ))
                 }
             }
-            let (configuration, proof) = owner
-                .project()
-                .read_configuration(owner.metadata_path(), &owner.store)?;
+            let (configuration, proof) = context.read(owner)?;
             let proof = proof.ok_or_else(|| invalid("owning dependency enrollment is required"))?;
             let history = OpenWorkspace::open_attachment_read_history(
                 owner.metadata_path(),
@@ -182,6 +190,19 @@ impl AttachmentStorage {
                 ),
                 request.grant,
                 (source_binding.correlation, destination_binding.correlation),
+            ) && !context.historical_input(
+                &proof,
+                (
+                    source_binding.work(),
+                    source_binding.installation(),
+                    request.version.operation(),
+                ),
+                (
+                    destination_binding.work(),
+                    destination_binding.installation(),
+                ),
+                request.grant,
+                (source_binding.correlation, destination_binding.correlation),
             ) {
                 return Err(invalid(
                     "native input grant is stale, revoked, unbound or mismatched",
@@ -192,15 +213,10 @@ impl AttachmentStorage {
         };
         let owner_history = validate()?;
         let value = if request.source.id() == owner.id() {
-            if !owner_history
-                .workspace_versions()
-                .iter()
-                .any(|saved| saved.operation() == request.version.operation())
-            {
-                return Err(invalid(
-                    "grant input is not a saved operation of its source",
-                ));
-            }
+            SavedAttachmentVersion::from_verified_history(
+                &owner_history,
+                request.version.operation(),
+            )?;
             let snapshot = owner_history
                 .historical_workspace_preview(request.version.operation())
                 .map_err(error)?;

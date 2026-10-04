@@ -69,12 +69,17 @@ impl AttachmentStorage {
             .collect::<Vec<_>>();
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
-        let graph = self.inspect_prepared_dependency_graph(&selected_graph, &guard)?;
+        let context =
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::recovering(
+                owner,
+                request.request,
+            )?;
+        let graph = self.inspect_dependency_graph_with_owner(&selected_graph, &guard, &context)?;
         if graph.operation_count() > 256 {
             return Err(invalid("consumption closure exceeds bound"));
         }
-        let source_binding = self.validate_dependency_work(&selected_source, &guard)?;
-        let destination_binding = self.validate_dependency_work(&selected_destination, &guard)?;
+        let source_binding = context.validate(self, &selected_source, &guard)?;
+        let destination_binding = context.validate(self, &selected_destination, &guard)?;
         let destination = request.input.destination;
         let origin = self
             .lane_origin_bound(destination)?
@@ -121,6 +126,7 @@ impl AttachmentStorage {
         let body = payload
             .get("body")
             .ok_or_else(|| invalid("missing start body"))?;
+        let context = context.for_operation(digest(text(body, "operation")?)?);
         let descriptor_id = digest(text(body, "staged")?)?;
         let descriptor = read_payload(&cas, descriptor_id, 4096)?;
         let descriptor_json =
@@ -211,7 +217,7 @@ impl AttachmentStorage {
             return Err(invalid("starting actor changed"));
         }
         let (prospective, operations) =
-            self.with_prepared_input_grant(&selected_grant, &guard, |input| {
+            self.with_input_grant_owner(&selected_grant, &guard, &context, |input| {
                 let rules = input.starting_exclusion_rules()?;
                 let policy = crate::project_attachment::observation::policy_digest(&rules);
                 let mut proposed = Json::parse(&configuration).map_err(error)?;
@@ -334,9 +340,7 @@ impl AttachmentStorage {
             checkpoint,
             plan,
         };
-        let (_, owner_proof) = owner
-            .project()
-            .read_configuration(owner.metadata_path(), &owner.store)?;
+        let (_, owner_proof) = context.read(owner)?;
         let owner_binding = owner_proof
             .ok_or_else(|| invalid("owner enrollment missing"))?
             .binding();
@@ -380,7 +384,7 @@ impl AttachmentStorage {
                 return Err(invalid("installed work lacks a complete start"));
             }
         }
-        self.with_prepared_input_grant(&selected_grant, &guard, |_| Ok(()))?;
+        self.with_input_grant_owner(&selected_grant, &guard, &context, |_| Ok(()))?;
         let (after_configuration, after_facts) = destination.project().read_native_facts(
             destination.metadata_path(),
             &destination.store,
@@ -417,12 +421,29 @@ pub(super) fn run_child_if_requested() -> bool {
     let owner = storage.reopen(text("owner")).unwrap();
     let source = storage.reopen(text("source")).unwrap();
     let destination = storage.reopen(text("destination")).unwrap();
-    let version = source
-        .saved_versions()
-        .unwrap()
-        .into_iter()
-        .find(|v| v.operation().to_hex() == text("version"))
+    let version = if text("mode").starts_with("owner") {
+        let _guard = crate::workspace_custody::lock_workspace_initialization_set(&[
+            owner.store.clone(),
+            source.store.clone(),
+        ])
         .unwrap();
+        let context =
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::recovering(
+                &owner,
+                digest(text("request")).unwrap(),
+            )
+            .unwrap();
+        let (_, _, history) = context.history(&source).unwrap();
+        SavedAttachmentVersion::from_verified_history(&history, digest(text("version")).unwrap())
+            .unwrap()
+    } else {
+        source
+            .saved_versions()
+            .unwrap()
+            .into_iter()
+            .find(|v| v.operation().to_hex() == text("version"))
+            .unwrap()
+    };
     let (candidate, staged) = storage
         .recover_consumed_start_state(
             &owner,
@@ -437,19 +458,59 @@ pub(super) fn run_child_if_requested() -> bool {
                 request: digest(text("request")).unwrap(),
                 limits: ObservationLimits::default(),
             },
-            text("mode").starts_with("install") || text("mode").starts_with("checkpoint"),
+            text("mode").starts_with("install")
+                || text("mode").starts_with("checkpoint")
+                || text("mode").starts_with("owner"),
         )
         .unwrap();
     assert_eq!(candidate.operation().to_hex(), text("operation"));
     assert_eq!(staged.receipt().unwrap().to_hex(), text("stage"));
     assert_eq!(identity(&staged.root).unwrap(), text("physical"));
+    if text("mode").starts_with("owner") {
+        let receipt = candidate
+            .commit_phase_with_io(
+                &storage,
+                &staged,
+                true,
+                CommitPhase::Owner,
+                |step, file, frame| {
+                    if text("mode") == "owner-partial" && step == "owner-staged" {
+                        file.write_all(&frame[..1])?;
+                        file.sync_all()?;
+                        std::process::exit(75);
+                    }
+                    if text("mode") == "owner-lost" && step == "owner-synced" {
+                        std::process::exit(75);
+                    }
+                    Ok(())
+                },
+                |f| f.sync_all(),
+            )
+            .unwrap();
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
+        let (_, proof) = owner
+            .project()
+            .read_configuration(owner.metadata_path(), &owner.store)
+            .unwrap();
+        assert_eq!(
+            proof
+                .unwrap()
+                .policy()
+                .native_request(candidate.request)
+                .unwrap()
+                .payload,
+            receipt
+        );
+        assert!(destination.saved_versions().is_err());
+        return true;
+    }
     if text("mode").starts_with("checkpoint") {
         candidate
             .commit_phase_with_io(
                 &storage,
                 &staged,
                 true,
-                true,
+                CommitPhase::Checkpoint,
                 |step, file, frames| {
                     if text("mode") == "checkpoint-partial" && step == "checkpoint-staged" {
                         file.write_all(&frames[..1])?;

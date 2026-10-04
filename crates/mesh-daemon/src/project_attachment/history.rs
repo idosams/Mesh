@@ -37,6 +37,19 @@ pub struct SavedAttachmentVersion {
     operation: RecordDigest,
 }
 impl SavedAttachmentVersion {
+    pub(in crate::project_attachment) fn from_verified_history(
+        history: &OpenWorkspace,
+        operation: RecordDigest,
+    ) -> io::Result<Self> {
+        if !history
+            .workspace_versions()
+            .iter()
+            .any(|v| v.operation() == operation)
+        {
+            return Err(invalid("saved operation is absent from verified history"));
+        }
+        Ok(Self { operation })
+    }
     /// Immutable ChangeSet identity used by saved history and review.
     pub fn operation(&self) -> RecordDigest {
         self.operation

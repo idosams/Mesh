@@ -1,6 +1,7 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
 mod checkpoint;
 mod installation;
+mod owner;
 mod recovery;
 mod start_fence;
 use super::*;
@@ -20,6 +21,12 @@ use std::{
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
 };
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CommitPhase {
+    Start,
+    Checkpoint,
+    Owner,
+}
 const RECEIPT: &str = "stage.json";
 const MAX_RECEIPT: usize = 64 * 1024 * 1024;
 static ATTEMPTS: AtomicU64 = AtomicU64::new(0);

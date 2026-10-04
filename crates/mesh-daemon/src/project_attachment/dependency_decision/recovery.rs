@@ -11,6 +11,7 @@ pub(in crate::project_attachment) fn pending_prefix(
     let kind = match text(&value, "schema")? {
         "mesh.dependency-decision-intent/v1" => DependencyKind::Eligibility,
         "mesh.dependency-grant-intent/v1" => DependencyKind::Grant,
+        "mesh.native-consumption-owner-commit/v1" => DependencyKind::Consumption,
         "mesh.native-consumption-start-intent/v1" => DependencyKind::ConsumptionStart,
         _ => return Err(invalid("unknown native control intent")),
     };

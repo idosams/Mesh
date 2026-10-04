@@ -16,7 +16,7 @@ impl PreparedNativeConsumedStart {
             storage,
             staged,
             true,
-            true,
+            CommitPhase::Checkpoint,
             |_, _, _| Ok(()),
             |f| f.sync_all(),
         )?;
@@ -248,7 +248,7 @@ pub(super) fn assert_checkpoint(
             storage,
             staged,
             true,
-            true,
+            CommitPhase::Checkpoint,
             |_, _, _| Ok(()),
             |file| {
                 syncs += 1;

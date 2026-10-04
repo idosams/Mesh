@@ -369,6 +369,15 @@ impl AttachmentStorage {
         prepared: &PreparedDependencyGraph<'_>,
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
     ) -> io::Result<NativeDependencyGraph> {
+        let context = super::dependency_owner_context::OwnerHistoryContext::current(prepared.owner);
+        self.inspect_dependency_graph_with_owner(prepared, guard, &context)
+    }
+    pub(super) fn inspect_dependency_graph_with_owner(
+        &self,
+        prepared: &PreparedDependencyGraph<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        context: &super::dependency_owner_context::OwnerHistoryContext<'_>,
+    ) -> io::Result<NativeDependencyGraph> {
         guard.require_roots(&prepared.roots).map_err(error)?;
         let owner = prepared.owner;
         let source = prepared.source;
@@ -377,7 +386,7 @@ impl AttachmentStorage {
         let mut bindings = BTreeMap::new();
         let mut legacy_copied_work = BTreeSet::new();
         for (work, selected) in selections {
-            let binding = self.validate_dependency_work(selected, guard)?;
+            let binding = context.validate(self, selected, guard)?;
             if selected.has_legacy_copied_origin() {
                 legacy_copied_work.insert((binding.work(), binding.installation()));
             }
@@ -391,9 +400,7 @@ impl AttachmentStorage {
                 return Err(invalid("duplicate native work binding"));
             }
         }
-        let (_, owner_proof) = owner
-            .project()
-            .read_configuration(owner.metadata_path(), &owner.store)?;
+        let (_, owner_proof) = context.read(owner)?;
         let owner_proof =
             owner_proof.ok_or_else(|| invalid("owning dependency authority is unavailable"))?;
         let mut consumptions = BTreeMap::new();
@@ -406,9 +413,7 @@ impl AttachmentStorage {
         }
         let mut histories = BTreeMap::new();
         for (key, (work, _)) in &bindings {
-            let (configuration, proof) = work
-                .project()
-                .read_configuration(work.metadata_path(), &work.store)?;
+            let (configuration, proof) = context.read(work)?;
             let proof = proof.ok_or_else(|| invalid("work has no native dependency enrollment"))?;
             let history = crate::workspace::OpenWorkspace::open_attachment_read_history(
                 work.metadata_path(),
@@ -547,8 +552,11 @@ impl AttachmentStorage {
                 .filter(|id| (id.0, id.1) == key)
                 .map(|id| id.2)
                 .collect::<BTreeSet<_>>();
-            let mut receipts =
-                work.completed_capture_receipt_roots(&operations, &mut receipt_budget)?;
+            let mut receipts = work.completed_capture_receipt_roots_with_owner(
+                &operations,
+                &mut receipt_budget,
+                context,
+            )?;
             let pending_name = super::dependency_decision::PENDING;
             match super::dependency_enrollment::read_private_in_store(&work.store, pending_name) {
                 Ok(raw) => {
@@ -571,6 +579,10 @@ impl AttachmentStorage {
                 }
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {}
                 Err(e) => return Err(e),
+            }
+            if let Some((name, digest, payload)) = context.pending_roots(work)? {
+                receipts.sidecars.insert(name, digest);
+                payloads.insert(payload);
             }
             payloads.extend(receipts.payloads);
             manifests.extend(receipts.manifests);
@@ -595,7 +607,7 @@ impl AttachmentStorage {
             return Err(invalid("retained content encoding exceeds its bound"));
         }
         for (work, selected) in selections {
-            let refreshed = self.validate_dependency_work(selected, guard)?;
+            let refreshed = context.validate(self, selected, guard)?;
             if bindings
                 .get(&(refreshed.work(), refreshed.installation()))
                 .map(|(_, b)| b)
@@ -603,9 +615,7 @@ impl AttachmentStorage {
             {
                 return Err(invalid("native graph work changed"));
             }
-            let (_, proof) = work
-                .project()
-                .read_configuration(work.metadata_path(), &work.store)?;
+            let (_, proof) = context.read(work)?;
             if proof.as_ref()
                 != histories
                     .get(&(refreshed.work(), refreshed.installation()))

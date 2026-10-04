@@ -79,18 +79,18 @@ impl PreparedNativeConsumedStart {
         hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
         sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
-        self.commit_phase_with_io(storage, staged, install, false, hook, sync)
+        self.commit_phase_with_io(storage, staged, install, CommitPhase::Start, hook, sync)
     }
     pub(super) fn commit_phase_with_io(
         &self,
         storage: &AttachmentStorage,
         staged: &StagedNativeConsumedStart,
         install: bool,
-        checkpoint: bool,
+        phase: CommitPhase,
         mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
-        if !checkpoint {
+        if phase == CommitPhase::Start {
             absent(
                 &self.destination,
                 crate::project_attachment::consumption_history::PENDING,
@@ -126,9 +126,21 @@ impl PreparedNativeConsumedStart {
             .collect::<Vec<_>>();
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
-        let current_graph = storage.inspect_prepared_dependency_graph(&graph, &guard)?;
-        let source = storage.validate_dependency_work(&source, &guard)?;
-        let destination = storage.validate_dependency_work(&destination, &guard)?;
+        let context = if phase == CommitPhase::Owner {
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::recovering(
+                &self.owner,
+                self.request,
+            )?
+            .for_operation(self.operation())
+        } else {
+            crate::project_attachment::dependency_owner_context::OwnerHistoryContext::current(
+                &self.owner,
+            )
+        };
+        let current_graph =
+            storage.inspect_dependency_graph_with_owner(&graph, &guard, &context)?;
+        let source = context.validate(storage, &source, &guard)?;
+        let destination = context.validate(storage, &destination, &guard)?;
         if destination != self.basis.destination
             || current_graph.digest() != self.basis.graph
             || current_graph.operation_count() > 256
@@ -136,7 +148,7 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("consumption fence selection changed"));
         }
-        storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+        storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
         let origin = storage
             .lane_origin_bound(&self.destination)?
             .ok_or_else(|| invalid("reservation missing"))?;
@@ -187,10 +199,7 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("staged consumption material changed"));
         }
-        let (_, owner) = self
-            .owner
-            .project()
-            .read_configuration(self.owner.metadata_path(), &self.owner.store)?;
+        let (_, owner) = context.read(&self.owner)?;
         let owner = owner
             .ok_or_else(|| invalid("owner enrollment missing"))?
             .binding();
@@ -340,7 +349,7 @@ impl PreparedNativeConsumedStart {
         self.destination.store.sync()?;
         hook("staged", &mut journal, &frame)?;
         empty()?;
-        storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+        storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
         guard.ensure_current().map_err(error)?;
         if read_private_in_store(&self.destination.store, PENDING)? != intent {
             return Err(invalid("consumption intent changed"));
@@ -413,10 +422,10 @@ impl PreparedNativeConsumedStart {
             if current_configuration != configuration || current_facts.as_ref() != Some(&after) {
                 return Err(invalid("consumption journal changed during installation"));
             }
-            storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+            storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
             guard.ensure_current().map_err(error)?;
         }
-        if checkpoint {
+        if phase != CommitPhase::Start {
             self.append_consumption_checkpoint(
                 &mut journal,
                 &intent,
@@ -441,8 +450,20 @@ impl PreparedNativeConsumedStart {
             {
                 return Err(invalid("checkpoint installation evidence changed"));
             }
-            storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+            storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
             guard.ensure_current().map_err(error)?;
+        }
+        if phase == CommitPhase::Owner {
+            let receipt = self.commit_owner_receipt(
+                &context,
+                owner_intent
+                    .as_ref()
+                    .ok_or_else(|| invalid("owner intent missing"))?,
+                |step, file, frame| hook(step, file, frame),
+                |file| sync(file),
+            )?;
+            guard.ensure_current().map_err(error)?;
+            return Ok(receipt);
         }
         Ok(record.payload)
     }
@@ -562,6 +583,7 @@ pub(super) fn assert_start_fence(
     fs::write(&journal_path, &complete).unwrap();
     super::installation::assert_installation(prepared, storage, &staged, receipt);
     super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt);
+    let owner_receipt = super::owner::assert_owner(prepared, storage, &staged, receipt);
     let complete = fs::read(&journal_path).unwrap();
     storage
         .grant_saved_input(
@@ -597,6 +619,13 @@ pub(super) fn assert_start_fence(
             }
         )
         .is_err());
+    assert_eq!(
+        prepared
+            .commit_fenced_owner_receipt(storage, &staged)
+            .unwrap(),
+        owner_receipt
+    );
+    super::owner::assert_historical_binding(prepared);
     assert_eq!(fs::read(&journal_path).unwrap(), complete);
     assert!(prepared.destination.saved_versions().is_err());
     assert_eq!(

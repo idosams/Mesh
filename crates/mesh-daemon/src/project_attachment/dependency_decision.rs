@@ -105,6 +105,7 @@ pub(super) fn transaction_intent(
             "schema",
             Json::text(match kind {
                 DependencyKind::Grant => "mesh.dependency-grant-intent/v1",
+                DependencyKind::Consumption => "mesh.native-consumption-owner-commit/v1",
                 DependencyKind::ConsumptionStart => "mesh.native-consumption-start-intent/v1",
                 _ => "mesh.dependency-decision-intent/v1",
             }),
