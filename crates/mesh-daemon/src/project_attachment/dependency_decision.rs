@@ -236,6 +236,7 @@ impl ProvisionedAttachment {
         }
         let _guard =
             crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
+        super::history::dependency_capture::ensure_no_pending_capture(&self.store)?;
         let prior_pending = match read_private_in_store(&self.store, PENDING) {
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
             Err(e) => return Err(e),

@@ -731,6 +731,45 @@ pub(crate) fn save_authenticated_checkpoint<F: DurableFs, D: HeadDerivation + ?S
     files: Vec<PreparedCheckpointFile>,
     derivation: &D,
 ) -> Result<JournaledPrivateMutation, CheckpointSaveError<std::io::Error>> {
+    let PreparedAuthenticatedCheckpoint {
+        checkpoint,
+        objects,
+        changeset_id,
+    } = prepare_authenticated_checkpoint(workspace, request, files, derivation)?;
+    let records = checkpoint.records();
+    let mut promoter = CasChunkPromoter::new(cas);
+    let saved = DurableCommit::new(
+        workspace.checkpoint_store_mut(),
+        &mut promoter,
+        objects,
+        checkpoint,
+    )
+    .finish()
+    .map_err(CheckpointSaveError::DurableSequence)?;
+    let acknowledgement = *saved.acknowledgement();
+    journal_records(workspace.checkpoint_journal_mut(), records.iter())
+        .map_err(CheckpointSaveError::Journal)?;
+    Ok(JournaledPrivateMutation {
+        acknowledgement,
+        changeset_id,
+        linked_bytes: promoter.linked_bytes(),
+    })
+}
+
+/// Verified immutable capture material. Preparing it performs no CAS, index or journal writes.
+/// Native enrolled authoring can stage exact recovery evidence before committing these records.
+pub(crate) struct PreparedAuthenticatedCheckpoint {
+    pub(crate) checkpoint: Checkpoint,
+    pub(crate) objects: Vec<Vec<u8>>,
+    pub(crate) changeset_id: RecordDigest,
+}
+
+pub(crate) fn prepare_authenticated_checkpoint<D: HeadDerivation + ?Sized>(
+    workspace: &OpenWorkspace,
+    request: AuthenticatedOperationCheckpointRequest,
+    files: Vec<PreparedCheckpointFile>,
+    derivation: &D,
+) -> Result<PreparedAuthenticatedCheckpoint, CheckpointSaveError<std::io::Error>> {
     if request.actor_sequence.value() == 0 {
         return Err(CheckpointSaveError::ActorSequenceNotIssued);
     }
@@ -801,23 +840,10 @@ pub(crate) fn save_authenticated_checkpoint<F: DurableFs, D: HeadDerivation + ?S
         operations: vec![operation_record],
         ..Checkpoint::default()
     };
-    let records = checkpoint.records();
-    let mut promoter = CasChunkPromoter::new(cas);
-    let saved = DurableCommit::new(
-        workspace.checkpoint_store_mut(),
-        &mut promoter,
-        objects.into_values().collect(),
+    Ok(PreparedAuthenticatedCheckpoint {
         checkpoint,
-    )
-    .finish()
-    .map_err(CheckpointSaveError::DurableSequence)?;
-    let acknowledgement = *saved.acknowledgement();
-    journal_records(workspace.checkpoint_journal_mut(), records.iter())
-        .map_err(CheckpointSaveError::Journal)?;
-    Ok(JournaledPrivateMutation {
-        acknowledgement,
+        objects: objects.into_values().collect(),
         changeset_id,
-        linked_bytes: promoter.linked_bytes(),
     })
 }
 
