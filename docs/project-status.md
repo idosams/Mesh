@@ -1560,3 +1560,20 @@ passed full `npm test`: 3,937 native tests in 273.860s (five slow, 18 skipped), 
 The earlier full-gate lint failure and native-gate negative mutation remain preserved. This gate
 validates the currently refusing foundation; it does not prove consumption commit/recovery or
 actual previous-binary compatibility. Draft PR #324 remains unmerged and issue #323 remains open.
+
+R161 previous-native compatibility is now executable evidence. The version-independent fixture
+`required_consumption_prefixes_fence_native_read_prepare_commit_and_control` passed on current
+source (3.12s) and exact previous implementation `220f2da76d7e1e35c8b2801db0b8dedc63d1aec8`
+(2.89s). The audit verified that the entire tracked previous tree differed only by the appended
+fixture; production code and schema were the previous revision. It recognized neither new subtype
+and refused all 145 nonempty prefixes of each valid-checksum frame. Native read, new preparation,
+commit of an already signed candidate and control mutation all refused while preserving journal
+and editor bytes. A control capture after restoring the fixture's own baseline still committed.
+The current tree recognizes both frame types and passes the same refusal campaign.
+
+All overwritten current source bytes were backed up and restored with SHA-256 checks; the branch,
+HEAD, published PR and fixed user checkpoint were unchanged. The compatibility fixture, overlay
+manifest, exact previous revision and logs are retained with R161 evidence. This proves the required
+journal boundary in the real previous native implementation, including an already prepared writer;
+it is not a packaged desktop upgrade test. The production transaction must still durably append
+that boundary before its first materialized byte and recover interrupted copying/owner receipts.
