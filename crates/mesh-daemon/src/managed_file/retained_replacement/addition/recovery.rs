@@ -1,7 +1,6 @@
 //! Exact retained-file restart evidence, not permission to access or install a consumed input.
 use super::*;
 use crate::ipc::Json;
-use mesh_types::ContentDigest as _;
 
 impl RetainedAddition {
     /// The native transaction must authenticate and durably retain this receipt before installing.
