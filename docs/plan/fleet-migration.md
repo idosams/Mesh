@@ -6901,3 +6901,17 @@ six successful hosted checks; macOS remains running in run `37224305162` at this
 The factual reader does not grant consumed workspace admission or recover a torn consumption
 append yet. Required start ordering, materialization, owner/completion receipts and cross-store
 recovery/admission remain unfinished; draft PR #324 and issue #323 stay open. The checkpoint is fixed.
+
+R161 now inspects exact interrupted required-start frames through a distinct canonical consumption
+intent. Recovery facts bind the original journal identity, prefix length/digest, request, payload and
+destination configuration. The observed suffix must be a byte-for-byte prefix of that exact frame;
+unknown bytes are neither skipped nor repaired. A pending start remains explicitly consumption even
+when replay stops at the pre-start prefix, so it cannot mint an ordinary native read capability.
+
+Six focused integration tests passed in 1.684s. They cover every start-frame prefix from zero bytes
+through the full frame, changed suffixes, an otherwise canonical start for another configuration,
+unchanged editor/journal bytes and continued ordinary read/capture/control refusal. Removing pending
+consumption admission fencing makes the new regression fail in 0.210s; exact source was restored.
+Full repository validation is pending. This is read-only prefix verification, not the durable start
+writer, materialization, owner/completion transaction or cross-store admission. Those remain required
+in draft PR #324 / issue #323, together with complete restart and fault proof. The checkpoint is fixed.

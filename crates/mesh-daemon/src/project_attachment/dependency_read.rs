@@ -81,7 +81,11 @@ impl NativeDependencyFacts {
 pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
 impl VerifiedDependencyRead {
     fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
-        if facts.policy.has_consumption_transaction() {
+        if facts.policy.has_consumption_transaction()
+            || facts.pending.is_some_and(|(_, record)| {
+                record.kind == mesh_store::DependencyKind::ConsumptionStart
+            })
+        {
             return Err(invalid(
                 "consumed history requires native transaction verification",
             ));
@@ -304,6 +308,18 @@ impl ProjectAttachment {
         }
         if let Some((_, record, payload)) = &pending {
             policy.clone().apply(*record, payload).map_err(error)?;
+            if record.kind == mesh_store::DependencyKind::ConsumptionStart {
+                let value =
+                    Json::parse(std::str::from_utf8(payload).map_err(error)?).map_err(error)?;
+                if value
+                    .get("body")
+                    .and_then(|v| v.get("configuration"))
+                    .and_then(Json::as_text)
+                    != Some(hash(configuration.as_bytes()).to_hex().as_str())
+                {
+                    return Err(invalid("consumption start configuration changed"));
+                }
+            }
         }
         let proof = NativeDependencyFacts {
             store: identity,

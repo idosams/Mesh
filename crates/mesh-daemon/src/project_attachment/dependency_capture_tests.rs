@@ -552,14 +552,14 @@ fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() 
     use mesh_store::{DependencyKind, DependencyRecord, StoredRecord};
     let f = Fixture::new("consumption-record-fence", true);
     let input = f.input(b"unexpected editor work remains untouched");
-    let (binding, mut policy) = {
+    let (binding, mut policy, configuration) = {
         let _guard = crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
-        let (_, proof) =
+        let (configuration, proof) =
             f.a.project()
                 .read_configuration(f.a.metadata_path(), &f.a.store)
                 .unwrap();
         let proof = proof.unwrap();
-        (proof.binding(), proof.policy().clone())
+        (proof.binding(), proof.policy().clone(), configuration)
     };
     let j = |n| Json::text(id(n).to_hex());
     let mut start: Option<String> = None;
@@ -567,6 +567,8 @@ fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() 
         DependencyKind::ConsumptionStart,
         DependencyKind::ConsumptionComplete,
     ] {
+        let prefix = f.journal();
+        let prior_policy = policy.clone();
         let (revision, previous) = policy.native_head().unwrap();
         let body = if kind == DependencyKind::ConsumptionStart {
             Json::object([
@@ -582,7 +584,10 @@ fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() 
                 ),
                 ("grant", j(61)),
                 ("bindings", Json::Array(vec![j(62), j(63)])),
-                ("configuration", j(64)),
+                (
+                    "configuration",
+                    Json::text(hash(configuration.as_bytes()).to_hex()),
+                ),
                 ("prospective", j(65)),
                 ("closure", j(66)),
                 ("operation", j(67)),
@@ -671,6 +676,88 @@ fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() 
                 .project()
                 .read_configuration(f.a.metadata_path(), &f.a.store)
                 .is_err());
+        }
+        if kind == DependencyKind::ConsumptionStart {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let journal_path = f.a.metadata_path().join(crate::RECORD_FILE_NAME);
+            let metadata = fs::metadata(&journal_path).unwrap();
+            let intent = crate::project_attachment::dependency_decision::transaction_intent(
+                kind,
+                id(60),
+                (metadata.dev(), metadata.ino()),
+                &prefix,
+                record.payload,
+            );
+            let frame = mesh_store::frame_record(&StoredRecord::Dependency(record));
+            let complete = f.journal();
+            for length in 0..=frame.len() {
+                let mut interrupted = prefix.clone();
+                interrupted.extend_from_slice(&frame[..length]);
+                fs::write(&journal_path, &interrupted).unwrap();
+                let (_, facts) =
+                    f.a.project()
+                        .read_native_facts(f.a.metadata_path(), &f.a.store, Some(&intent), None)
+                        .unwrap();
+                let facts = facts.unwrap();
+                assert_eq!(facts.pending(), Some((prefix.len(), record)));
+                assert_eq!(facts.policy(), &prior_policy);
+                assert!(f.a.project().read_decision_configuration(
+                    f.a.metadata_path(), &f.a.store, Some(&intent),
+                ).is_err(), "pending consumed prefix must not mint ordinary admission");
+                assert_eq!(f.journal(), interrupted);
+                if length > 0 {
+                    *interrupted.last_mut().unwrap() ^= 1;
+                    fs::write(&journal_path, &interrupted).unwrap();
+                    assert!(f.a.project().read_native_facts(
+                        f.a.metadata_path(), &f.a.store, Some(&intent), None,
+                    ).is_err(), "foreign consumed suffix must remain untouched");
+                    assert_eq!(f.journal(), interrupted);
+                }
+            }
+            let mut wrong = Json::parse(std::str::from_utf8(&bytes).unwrap()).unwrap();
+            let Json::Object(envelope) = &mut wrong else {
+                panic!("object envelope")
+            };
+            let Json::Object(body) = &mut envelope.iter_mut().find(|(k, _)| k == "body").unwrap().1
+            else {
+                panic!("object body")
+            };
+            body.iter_mut()
+                .find(|(k, _)| k == "configuration")
+                .unwrap()
+                .1 = j(64);
+            let wrong = wrong.encode().into_bytes();
+            let wrong_record = DependencyRecord {
+                payload: hash(&wrong),
+                ..record
+            };
+            let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+                f.a.metadata_path(),
+                f.a.store.filesystem(),
+            )
+            .unwrap();
+            cas.promote(wrong).unwrap();
+            let mut different = prefix.clone();
+            different.extend(mesh_store::frame_record(&StoredRecord::Dependency(
+                wrong_record,
+            )));
+            fs::write(&journal_path, &different).unwrap();
+            let wrong_intent = crate::project_attachment::dependency_decision::transaction_intent(
+                kind,
+                id(60),
+                (metadata.dev(), metadata.ino()),
+                &prefix,
+                wrong_record.payload,
+            );
+            assert!(
+                f.a.project()
+                    .read_native_facts(f.a.metadata_path(), &f.a.store, Some(&wrong_intent), None,)
+                    .is_err(),
+                "canonical start for another configuration must refuse"
+            );
+            assert_eq!(f.journal(), different);
+            fs::write(&journal_path, &complete).unwrap();
         }
         let before = f.journal();
         let called = std::cell::Cell::new(false);
