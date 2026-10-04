@@ -530,3 +530,13 @@ your Applications folder. Both the current nested CLI bundle and the older resou
 supported; the current layout is preferred within each app. Mesh does not accept executable paths
 from a fleet card or search arbitrary shell commands. The native provider adapter still checks the
 selected executable before starting an agent. An installed provider account remains required.
+
+
+## Background cleanup
+
+While Mesh is running, it periodically checks the open workspace for unreferenced leftovers from
+interrupted writes. It keeps all recorded versions and skips cleanup when an agent owns the
+workspace or native work is busy. It does not scan closed workspaces or expire your version history.
+The desktop and background service wait one minute between cleanup attempts. Once cleanup has
+started, disk work can delay another write or shutdown; large-history latency and storage-pressure
+recovery are still being validated. No change to your editor or agent harness is required.

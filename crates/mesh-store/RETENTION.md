@@ -137,7 +137,8 @@ verifies that a second daemon's agent
 acquisition waits until collection releases custody. This is not a timed GUI or cross-process
 acceptance campaign. Journal folding and candidate selection still scan history; only the number
 of deletion candidates is bounded. Dry run removes no chunks but may initialize the normal isolated
-recovery database. The native operation has no IPC, desktop trigger or automatic scheduler yet.
+recovery database. There is no cleanup IPC or manual desktop trigger; the periodic owner below
+uses the nonblocking native entry point.
 
 ## The evidence
 
@@ -186,10 +187,10 @@ second closure — a naive fixed point over every record, with no work queue and
    compaction and a subsequent promotion. Swallowing the journal rewrite error makes this test
    fail. This bounded fault injection does not fill a real volume or prove daemon-level
    storage-pressure policy, native writer coordination or recovery of every checkpoint phase.
-4. **Nothing schedules a collection.** The native explicit operation described above now joins
-   planning and deletion, but there is no daemon loop, desktop trigger or automatic pressure policy.
-   Recorded history is never expired by this operation. End-to-end fleet scheduling and pressure
-   recovery remain unfinished.
+4. **Periodic cleanup is limited to the open workspace.** Desktop and headless daemon each own
+   one worker with a 60-second delay between attempts. Busy or assigned workspaces are skipped.
+   Recorded history is never expired. There is no pressure policy, closed-workspace traversal or
+   proof of end-to-end fleet storage-pressure recovery.
 5. **The manifest linkage.** This index holds no operation→manifest edge, so a manifest is reachable
    only when a root names it or when the derived payload-digest edge above applies. Until a real
    edge exists, `RetainedRoots::conservative` names every manifest, which is why the default
@@ -208,4 +209,17 @@ daemon admission lock without waiting. Busy locks or assigned-agent custody retu
 cleanup; callers can retry later. Stale identity, nested mutations, incomplete history and pending
 recovery still refuse. An admitted attempt uses the same pinned preparation and conservative
 reference veto as explicit collection. Filesystem I/O is not time-bounded and admitted scans still
-exclude coordinated writers. There is still no automatic scheduler or pressure policy.
+exclude coordinated writers. A periodic owner now calls this entry point; pressure policy remains
+unimplemented.
+
+## Periodic worker ownership
+
+Desktop and `meshd` retain one `OrphanCleanupWorker` for their serving lifetime. It first waits
+60 seconds, then obtains an exact open-workspace identity without waiting on the view lock and
+attempts at most 256 orphan candidates. The delay restarts after each completed attempt. Duplicate
+owners are refused. Sleeping workers keep only a weak daemon reference. Dropping the owner wakes
+the wait and joins any admitted pass, so custody and journal work are not abandoned on shutdown.
+A pass can delay shutdown while filesystem I/O finishes; no time bound is claimed. Redacted
+in-memory status reports waiting, absent workspace, deferred, collected count or refused, never
+private paths or error contents. All recorded history remains retained; this is orphan cleanup,
+not automatic version expiration or full fleet storage-pressure acceptance.
