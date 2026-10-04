@@ -6407,4 +6407,6 @@ changed during signing. The corrected regression failed before refinement and pa
 Commit now refreshes current policy while requiring the same native enrollment and exact signed
 authoring basis; an advanced actor cannot be reused even if a mutable capture line is rolled back.
 Ten focused capture/recovery tests pass, including physical source replacement and every frame
-prefix. The complete gate must pass again on this refined implementation before PR delivery.
+prefix. The complete gate on final implementation `1d0c000875c33956c2f01423e491d03245ec9347`
+passed 3,910 native tests in 275.798s (5 slow, 18 skipped), 194 rendered tests, 672 desktop
+tests and all 44 real-daemon checks. Hosted validation and merge remain pending.

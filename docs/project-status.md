@@ -1293,7 +1293,9 @@ staged journal prefixes and preserves unknown work. Historical receipt recovery 
 newer saves. Ten focused native tests and six checkpoint tests pass, including source replacement.
 An initial full gate passed 3,909 native, 194 rendered and 672 desktop tests plus 44 daemon checks.
 A refinement lets policy-only activity during signing coexist with unchanged private authoring;
-stale actor history still refuses before writing. The full gate is running again on that refinement.
+stale actor history still refuses before writing. The refined full gate on `1d0c000` passed
+3,910 native tests in 275.798s (5 slow, 18 skipped), 194 rendered and 672 desktop tests,
+and all 44 real-daemon checks.
 It is not yet an open or merged PR.
 
 This does not enable automatic enrollment, dependency-aware allocation, consumption, publication or
