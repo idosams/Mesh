@@ -8,7 +8,10 @@ use super::{
 };
 use crate::{ipc::Json, workspace::OpenWorkspace, workspace_custody::WorkspaceInitializationGuard};
 use mesh_store::{DependencyKind, RecordDigest};
-use std::io;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io,
+};
 pub(super) fn pending_name(request: RecordDigest, payload: RecordDigest) -> String {
     format!(
         "consumption-owner-{}-{}.pending",
@@ -16,8 +19,20 @@ pub(super) fn pending_name(request: RecordDigest, payload: RecordDigest) -> Stri
         payload.to_hex()
     )
 }
+#[derive(Clone, Default)]
+pub(super) struct VerifiedHistoryRoots {
+    pub(super) payloads: BTreeSet<RecordDigest>,
+    pub(super) sidecars: BTreeMap<String, RecordDigest>,
+}
+struct VerifiedHistorySnapshot {
+    work: ProvisionedAttachment,
+    configuration: String,
+    proof: VerifiedDependencyRead,
+    roots: VerifiedHistoryRoots,
+}
 pub(super) struct OwnerHistoryContext<'a> {
     owner: &'a ProvisionedAttachment,
+    histories: BTreeMap<String, VerifiedHistorySnapshot>,
     pending: Option<(String, String)>,
     request: Option<RecordDigest>,
     operation: Option<RecordDigest>,
@@ -29,6 +44,7 @@ impl<'a> OwnerHistoryContext<'a> {
             pending: None,
             request: None,
             operation: None,
+            histories: BTreeMap::new(),
         }
     }
     pub(super) fn recovering(
@@ -74,6 +90,7 @@ impl<'a> OwnerHistoryContext<'a> {
                 pending: Some((name.to_owned(), raw)),
                 request: Some(request),
                 operation: None,
+                histories: BTreeMap::new(),
             };
             if let Ok((_, Some(proof))) = context.read(owner) {
                 if !matches!(proof.pending(),Some((_,r)) if r.kind==DependencyKind::Consumption) {
@@ -90,6 +107,74 @@ impl<'a> OwnerHistoryContext<'a> {
                 "no exact owner receipt attempt matches history: {ordinary_error}"
             ))
         })
+    }
+    // Accept only a proof minted by the complete consumed-history verifier. Every later use
+    // re-reads the pinned native facts, including the original configuration binding.
+    pub(super) fn with_verified_history(
+        mut self,
+        work: &ProvisionedAttachment,
+        configuration: String,
+        proof: VerifiedDependencyRead,
+        roots: VerifiedHistoryRoots,
+    ) -> io::Result<Self> {
+        if work.id() == self.owner.id()
+            || self.histories.len() >= 256
+            || self.histories.contains_key(work.id())
+        {
+            return Err(invalid("conflicting verified graph history"));
+        }
+        let (start, _, _) = proof
+            .policy()
+            .completed_consumption_records()
+            .ok_or_else(|| invalid("verified graph history has no completed consumption"))?;
+        let cas = mesh_cas::Cas::<crate::root_authority::PinnedRootFs, mesh_cas::Blake3>::with_filesystem(
+            work.metadata_path(), work.store.filesystem().read_only()).map_err(|e| io::Error::other(e.to_string()))?;
+        let bytes = super::dependency_transaction::read_payload(&cas, start.payload, 65536)?;
+        let payload =
+            Json::parse(std::str::from_utf8(&bytes).map_err(|e| io::Error::other(e.to_string()))?)
+                .map_err(|e| io::Error::other(e.to_string()))?;
+        let body = payload
+            .get("body")
+            .ok_or_else(|| invalid("verified graph start body missing"))?;
+        if digest(text(body, "prospective")?)?
+            != super::dependency_transaction::hash(configuration.as_bytes())
+        {
+            return Err(invalid("verified graph effective configuration differs"));
+        }
+        work.project().history_configuration_with_previous(
+            &work.store,
+            None,
+            Some(configuration.clone()),
+        )?;
+        self.histories.insert(
+            work.id().to_owned(),
+            VerifiedHistorySnapshot {
+                work: work.clone(),
+                configuration,
+                proof,
+                roots,
+            },
+        );
+        self.read(work)?;
+        Ok(self)
+    }
+    pub(super) fn verified_history_roots(
+        &self,
+        work: &ProvisionedAttachment,
+    ) -> io::Result<Option<VerifiedHistoryRoots>> {
+        let Some(snapshot) = self.histories.get(work.id()) else {
+            return Ok(None);
+        };
+        self.read(work)?;
+        for (name, expected) in &snapshot.roots.sidecars {
+            if super::dependency_transaction::hash(
+                read_private_in_store(&work.store, name)?.as_bytes(),
+            ) != *expected
+            {
+                return Err(invalid("verified consumed recovery sidecar changed"));
+            }
+        }
+        Ok(Some(snapshot.roots.clone()))
     }
     pub(super) fn for_operation(mut self, operation: RecordDigest) -> Self {
         self.operation = Some(operation);
@@ -145,6 +230,26 @@ impl<'a> OwnerHistoryContext<'a> {
         work: &ProvisionedAttachment,
     ) -> io::Result<(String, Option<VerifiedDependencyRead>)> {
         if work.id() != self.owner.id() {
+            if let Some(snapshot) = self.histories.get(work.id()) {
+                if snapshot.work.store.identity()? != work.store.identity()?
+                    || snapshot.work.project().receipt()? != work.project().receipt()?
+                {
+                    return Err(invalid("verified graph history identity changed"));
+                }
+                let (_, facts) = work.project().read_native_facts(
+                    work.metadata_path(),
+                    &work.store,
+                    None,
+                    None,
+                )?;
+                if !facts
+                    .as_ref()
+                    .is_some_and(|facts| snapshot.proof.matches_facts(facts))
+                {
+                    return Err(invalid("verified graph history changed"));
+                }
+                return Ok((snapshot.configuration.clone(), Some(snapshot.proof.clone())));
+            }
             return work
                 .project()
                 .read_configuration(work.metadata_path(), &work.store);
@@ -186,6 +291,33 @@ impl<'a> OwnerHistoryContext<'a> {
         guard: &WorkspaceInitializationGuard,
     ) -> io::Result<NativeDependencyWorkBinding> {
         let (_, proof, history) = self.history(self.owner)?;
-        storage.validate_dependency_work_with_history(selected, guard, &proof, &history)
+        storage.validate_dependency_work_with_parents(
+            selected,
+            guard,
+            &proof,
+            &history,
+            |parent, version| {
+                if self.histories.contains_key(parent.id()) {
+                    let (_, _, history) = self.history(parent)?;
+                    let version = digest(version.strip_prefix("blake3:").unwrap_or(version))?;
+                    history
+                        .historical_workspace_preview(version)
+                        .map(|_| ())
+                        .map_err(|e| io::Error::other(e.to_string()))
+                } else {
+                    parent.attachment.inspect_saved(
+                        parent.metadata_path(),
+                        parent.store.clone(),
+                        version,
+                        |history, version| {
+                            history
+                                .historical_workspace_preview(version)
+                                .map(|_| ())
+                                .map_err(|e| io::Error::other(e.to_string()))
+                        },
+                    )
+                }
+            },
+        )
     }
 }

@@ -584,6 +584,10 @@ impl AttachmentStorage {
                 receipts.sidecars.insert(name, digest);
                 payloads.insert(payload);
             }
+            if let Some(roots) = context.verified_history_roots(work)? {
+                receipts.sidecars.extend(roots.sidecars);
+                payloads.extend(roots.payloads);
+            }
             payloads.extend(receipts.payloads);
             manifests.extend(receipts.manifests);
             retained_count = retained_count

@@ -7164,3 +7164,23 @@ Later native private saves and exact fresh-process recovery are verified; generi
 transitive consumed-source graph admission, runtime/publication controls and packaged acceptance
 remain required. Draft PR #324 / issue #323 and the full fleet objective remain open. The fixed user
 checkpoint is unchanged.
+
+R161 now inspects a graph rooted in a completed consumed lane through its already verified native
+history context. Each use refreshes pinned history facts, registration identity and the original
+configuration binding; the effective configuration must match the authenticated start. Parent
+inspection can use that same context without relaxing independent readers. Graph traversal includes
+the lane's later captures and its owner-recorded input edge, and retains exact local start/stage/
+configuration/frame objects and recovery sidecars. Owner-only grant and receipt references remain
+qualified to the owner store. The complete custody set remains held and cannot grow during traversal.
+
+Thirteen focused graph, identity and consumption tests passed in 46.381s, including repeated fresh-
+process inspection after later saves. A changed original marker invalidates a previously verified
+context while restored exact bytes remain readable. Omitting configuration from the native facts
+made that regression reuse the stale proof and fail in 44.140s; production source was restored
+byte-for-byte. Extra retention assertions check the exact local objects and exclusion of owner-only
+grant payloads in the full validation now pending. The initial test build's ownership error is
+preserved; retaining the before-state fixed the post-read comparison. This supplies explicit consumed-
+lane graph inspection and retained references; automatic multi-lane context resolution, downstream
+reservation/grant/start integration, generic callers, runtime/publication controls and packaged
+acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The user
+checkpoint stays fixed.

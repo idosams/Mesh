@@ -68,6 +68,42 @@ impl AttachmentStorage {
         )
     }
 
+    /// Inspect ancestry and retained content rooted in a completed consumed version. Native start
+    /// reconstruction supplies the graph's read context; local records alone cannot open it.
+    pub fn inspect_consumed_dependency_graph(
+        &self,
+        owner: &ProvisionedAttachment,
+        start: NativeConsumedStartRequest<'_>,
+        version: SavedAttachmentVersion,
+    ) -> io::Result<crate::project_attachment::NativeDependencyGraph> {
+        self.with_recovered_consumed_state(
+            owner,
+            start,
+            RecoveryPhase::CompletedRead,
+            |candidate, staged, graph, guard| {
+                candidate.inspect_completed_graph(self, &staged, graph, guard, version)
+            },
+        )
+    }
+
+    #[cfg(test)]
+    pub(in crate::project_attachment) fn assert_consumed_graph_context(
+        &self,
+        owner: &ProvisionedAttachment,
+        start: NativeConsumedStartRequest<'_>,
+    ) {
+        self.with_recovered_consumed_state(
+            owner,
+            start,
+            RecoveryPhase::CompletedRead,
+            |candidate, _, graph, guard| {
+                candidate.assert_graph_context_revalidation(graph, guard);
+                Ok(())
+            },
+        )
+        .unwrap();
+    }
+
     /// Read immutable bytes after independently verifying the completed source/owner transaction.
     /// The current working file is never consulted and this grants no writable or runtime authority.
     pub fn consumed_saved_file(
@@ -587,6 +623,11 @@ pub(super) fn run_child_if_requested() -> bool {
         assert_eq!(recovered.operation().to_hex(), text("operation"));
         let saved = storage.saved_consumed_versions(&owner, request()).unwrap();
         assert!(saved.iter().any(|v| v.operation() == recovered.operation()));
+        let graph = storage
+            .inspect_consumed_dependency_graph(&owner, request(), *saved.last().unwrap())
+            .unwrap();
+        assert_eq!(graph.operation_count(), saved.len() + 1);
+
         return true;
     }
     if text("mode") == "read-completed" {

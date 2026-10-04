@@ -328,5 +328,95 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
         fs::read(destination.project().root().join("kept")).unwrap(),
         b"next unsaved work"
     );
+    let graph = storage
+        .inspect_consumed_dependency_graph(owner, request(), *final_versions.last().unwrap())
+        .unwrap();
+    assert_eq!(graph.operation_count(), final_versions.len() + 1);
+    assert_eq!(
+        graph,
+        storage
+            .inspect_consumed_dependency_graph(owner, request(), *final_versions.last().unwrap())
+            .unwrap()
+    );
+    let retained = graph.retained_content_json();
+    let Some(Json::Array(stores)) = retained.get("stores") else {
+        panic!("retained stores missing")
+    };
+    assert_eq!(stores.len(), 2);
+    let mut sidecars = BTreeSet::new();
+    for store in stores {
+        let Some(Json::Array(entries)) = store.get("sidecars") else {
+            panic!("retained sidecars missing")
+        };
+        sidecars.extend(
+            entries
+                .iter()
+                .map(|entry| text(entry, "name").unwrap().to_owned()),
+        );
+    }
+    for name in [
+        "consumption-start.pending",
+        "consumption-history.pending",
+        "consumption-complete.pending",
+        "consumption-owner.pending",
+    ] {
+        assert!(
+            sidecars.contains(name),
+            "missing consumed recovery root {name}"
+        );
+    }
+    let graph_json = graph.to_json();
+    let Some(Json::Array(root)) = graph_json.get("root") else {
+        panic!("graph root missing")
+    };
+    let local = stores
+        .iter()
+        .find(|store| store.get("work") == root.first())
+        .unwrap();
+    let Some(Json::Array(local_payloads)) = local.get("payloads") else {
+        panic!("local payloads missing")
+    };
+    let local_payloads = local_payloads
+        .iter()
+        .map(|p| p.as_text().unwrap())
+        .collect::<BTreeSet<_>>();
+    assert!(
+        !local_payloads.contains(start.input.grant.to_hex().as_str()),
+        "owner grant is not lane-local content"
+    );
+    let start_raw = read_private_in_store(&destination.store, "consumption-start.pending").unwrap();
+    let start_json = Json::parse(&start_raw).unwrap();
+    let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+        destination.metadata_path(),
+        destination.store.filesystem().read_only(),
+    )
+    .unwrap();
+    let payload = read_payload(
+        &cas,
+        digest(text(&start_json, "payload").unwrap()).unwrap(),
+        65536,
+    )
+    .unwrap();
+    let envelope = Json::parse(std::str::from_utf8(&payload).unwrap()).unwrap();
+    let body = envelope.get("body").unwrap();
+    for field in [
+        "configuration",
+        "prospective",
+        "closure",
+        "operation",
+        "staged",
+    ] {
+        assert!(
+            local_payloads.contains(text(body, field).unwrap()),
+            "missing local consumed reference {field}"
+        );
+    }
+    let descriptor =
+        read_payload(&cas, digest(text(body, "staged").unwrap()).unwrap(), 4096).unwrap();
+    let descriptor = Json::parse(std::str::from_utf8(&descriptor).unwrap()).unwrap();
+    assert!(local_payloads.contains(text(&descriptor, "stage").unwrap()));
+    storage.assert_consumed_graph_context(owner, request());
+    assert_eq!(fs::read(&marker_path).unwrap(), marker);
+    assert_eq!(fs::read(&journal_path).unwrap(), final_journal);
     assert!(destination.saved_versions().is_err());
 }

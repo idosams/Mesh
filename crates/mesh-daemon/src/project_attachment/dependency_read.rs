@@ -25,8 +25,9 @@ const MAX_HISTORY: usize = MAX_BASE + 16 * 1024 * 1024;
 
 /// Exact local enrollment and policy facts. These do not authorize opening a workspace,
 /// consumption, mutation or publication, even when local completion records are present.
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(super) struct NativeDependencyFacts {
+    configuration: RecordDigest,
     store: (u64, u64),
     journal: (u64, u64),
     bytes: RecordDigest,
@@ -77,7 +78,7 @@ impl NativeDependencyFacts {
 }
 /// Native workspace admission capability. Local facts alone cannot admit consumed history.
 /// Construction is private so recovery inspection cannot accidentally create a read proof.
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
 impl VerifiedDependencyRead {
     pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
@@ -425,6 +426,7 @@ impl ProjectAttachment {
             }
         }
         let proof = NativeDependencyFacts {
+            configuration: hash(configuration.as_bytes()),
             store: identity,
             journal: journal_identity,
             bytes: hash(&bytes),
