@@ -429,3 +429,23 @@ transaction rechecks ancestry before append and recovers only its own recorded f
 changes eligibility of immutable input, not file contents, grant generations or accepted historical
 main. Runtime admission and publication must still resolve full closure under current authority;
 recording this decision alone does not implement that enforcement.
+
+
+## Current grant inspection barrier (R157)
+
+An exact historical grant record is insufficient for new access admission. Native inspection resolves
+owner/source/destination registrations, acquires the complete bounded custody set, verifies saved
+input and requires the latest allowed generation with both v2 native correlation commitments. Legacy
+unbound grants, old allowed records after revocation/regrant, wrong destinations and changed physical
+evidence refuse. Any unfinished native control intent must recover before admission, even if its
+journal frame is complete. The check never repairs or discards that pending evidence.
+
+The synchronous native callback receives only a read-only view of the fixed saved snapshot and
+verified chunk output. It cannot select live editor bytes through this view or mutate its source
+history. Custody remains held through the callback and native access/bindings are revalidated before
+returning the result. Callbacks must be bounded and must not wait on providers, networks or human
+input. Extracted bytes/metadata retain no ongoing authority. Callback side effects are not rolled
+back when revalidation refuses, so this helper must not be used as a publication or consumption
+commit boundary. Rejection can leave an input inspectable under valid access; eligibility and access
+remain separate. Full dependency-aware allocation, starting-operation receipts and all-path current
+publication checks must still be integrated before runtime exposure.

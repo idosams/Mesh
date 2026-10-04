@@ -3548,7 +3548,7 @@ impl OpenWorkspace {
     pub(crate) fn write_historical_workspace_file(
         &self,
         file: &HistoricalWorkspacePreviewFile,
-        output: &mut File,
+        output: &mut impl std::io::Write,
     ) -> Result<(), HistoricalWorkspaceWriteFailure> {
         let manifest = self
             .record_index

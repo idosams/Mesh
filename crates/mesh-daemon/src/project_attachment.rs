@@ -51,6 +51,8 @@ pub(crate) use candidates::CandidateAdmission;
 mod approval;
 mod dependency_decision;
 mod dependency_grant;
+mod grant_admission;
+pub use grant_admission::{NativeGrantInspection, NativeGrantedFile, NativeGrantedInput};
 mod work_decision;
 pub use dependency_grant::{NativeInputGrant, NativeInputGrantRequest};
 pub use work_decision::NativeWorkDecisionRequest;
