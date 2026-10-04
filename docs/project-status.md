@@ -50,7 +50,11 @@ during loading. Missing legacy fields mean unknown, not unsaved work. Broader ch
 activity summaries and packaged parallel-inspection acceptance remain unfinished. Exact pinned comparisons now separate native file and folder counts
 across the entire saved comparison, independently of the displayed page or selected object. Older
 replies retain an unknown split instead of inventing zero files. These counts describe retained
-saved entries, not current working files, capture completeness, or the broader live lane overview.
+saved entries, not current working files, capture completeness, or the broader live lane overview. A separate
+native summary command now exposes the same exact counts and bound version identities without
+returning file names or content. It reuses verified retained history outside the fleet lock and
+refuses unavailable or replaced custody. A strict desktop parser bounds and validates the response.
+Independent overview refresh and presentation are still pending; this is the read boundary.
 
 ## Retained worker execution observations
 
