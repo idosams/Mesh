@@ -5979,3 +5979,27 @@ the native regression; exact source was restored. Full gate and hosted delivery 
 acceptance and every remaining fleet-plan exit remain required. Fixed checkpoints are unchanged.
 
 R144 implementation `49cc6a84f5b5ccf90b0c5e4f4b0c40924ea60370` passed full `npm test`: 3,825 native tests in 174.256s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The native feedback decision/reopen projection passed within the full suite. Hosted delivery and packaged graphical acceptance remain pending.
+
+
+## R146 — bounded native custody sets
+
+New canonical implementation based on PR #292 (`3d53c3d8dfda9a3e0f7184b09e90713162930e96`);
+no preserved source commit is replaced. Tracks issue #293 and the first prerequisite of private
+input issue #289. Native initialization can lock up to 32 requested descriptor-pinned roots, with
+identity deduplication and deterministic physical-identity order. It uses the same kernel directory
+locks as existing single-root custody and routes ordinary initialization through the same path.
+Every admitted namespace is verified before and after acquisition. Nested expansion is refused;
+exact already-held roots can be opened without acquiring another lock. Borrowed guards verify
+continued membership. Failed partial acquisition releases every acquired lock. Lock guards cannot
+move between threads because their native custody membership is thread-local.
+
+Twelve focused custody tests pass, including separate-process single/set and set/set contention,
+both acquisition orders, reverse input order, both member roots, duplicates/bounds, unrelated
+nesting, expired borrowed guards and root replacement while a set waits after acquiring its first
+member. Replacing exclusive locks with shared locks makes the process regression fail; tested
+source restored byte-exact. The thread-confinement compile check identified an existing test that
+sent a live guard across threads; the test now performs acquisition on its owning thread and sends
+only the resulting generation. That compile refusal and a separate test-only path accessor compile
+failure are preserved. No persisted format or agent API changes. The primitive grants no mutation,
+dependency or publication authority; project policy, exact closure and race-safe publication still
+require integration. Full gate and hosted delivery pending. Fixed user checkpoint unchanged.

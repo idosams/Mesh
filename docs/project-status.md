@@ -114,6 +114,16 @@ merged delivery. The Mac remained locked when graphical acceptance was attempted
 agent activity with packaged panels, restart recovery through that interface and the full acceptance
 plan remain unverified. See R139 in the delivery ledger for exact artifact identity.
 
+## Native dependency barrier foundation
+
+Native history initialization can hold a bounded set of exact directory identities using the same
+kernel locks as ordinary single-workspace custody. It orders acquisition deterministically,
+revalidates namespaces, refuses nested expansion and releases partial acquisitions on failure.
+Guards stay on their owning thread. Separate-process tests verify contention in both orders and
+refusal/cleanup when a root is replaced during a wait. This groundwork does not yet enable private
+dependency grants, persist eligibility decisions or enforce transitive rejection at publication;
+those remain in the [native dependency contract](decisions/private-dependency-authority.md).
+
 ## Test-runner reliability
 
 Validation requires nextest 0.9.145 or newer, including the upstream fix for sibling output-pipe
