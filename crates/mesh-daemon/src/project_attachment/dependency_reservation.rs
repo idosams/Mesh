@@ -111,12 +111,19 @@ fn verify_origin_enrollment(work: &ProvisionedAttachment) -> io::Result<()> {
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
             Err(e) => return Err(e),
         };
-    let (_, facts) = work.project().read_native_facts(
-        work.metadata_path(),
-        &work.store,
-        pending.as_deref(),
-        None,
-    )?;
+    let (_, facts) = work
+        .project()
+        .read_native_facts(work.metadata_path(), &work.store, pending.as_deref(), None)
+        .or_else(|original| {
+            // Correlation must survive later captures, including an interrupted append. This inspects
+            // only the exact original completed start and grants no access to the later history.
+            if pending.is_some() {
+                work.project()
+                    .read_completed_start_facts(work.metadata_path(), &work.store)
+            } else {
+                Err(original)
+            }
+        })?;
     let facts = facts.ok_or_else(|| invalid("reserved history has no native enrollment"))?;
     if pending.is_some()
         && !facts

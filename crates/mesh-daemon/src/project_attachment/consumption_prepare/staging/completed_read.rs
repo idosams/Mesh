@@ -48,25 +48,54 @@ impl PreparedNativeConsumedStart {
         guard: &WorkspaceInitializationGuard,
         action: impl FnOnce(&OpenWorkspace, &str) -> io::Result<T>,
     ) -> io::Result<T> {
+        let (configuration, proof) = self.verify_completed_history(graph, guard, None)?;
+        let workspace = OpenWorkspace::open_attachment_read_history(
+            self.destination.metadata_path(),
+            self.destination.store.clone(),
+            &crate::TrustedReviewers::default(),
+            Some(&proof),
+        )
+        .map_err(error)?;
+        verify_history_binding(&workspace, &configuration)?;
+        let result = action(&workspace, &configuration)?;
+        let (after_configuration, after) = self.verify_completed_history(graph, guard, None)?;
+        if after_configuration != configuration || after != proof {
+            return Err(invalid("consumed history changed during inspection"));
+        }
+        Ok(result)
+    }
+
+    pub(super) fn verify_completed_history(
+        &self,
+        graph: &NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+        capture: Option<&str>,
+    ) -> io::Result<(String, VerifiedDependencyRead)> {
         guard.ensure_current().map_err(error)?;
         let destination = &self.destination;
         let pending = read_private_in_store(&destination.store, super::super::START_PENDING)?;
-        let (configuration, pending_facts) = destination.project().read_native_facts(
-            destination.metadata_path(),
-            &destination.store,
-            Some(&pending),
-            None,
-        )?;
+        let (configuration, pending_facts) = destination
+            .project()
+            .read_completed_start_facts(destination.metadata_path(), &destination.store)?;
         let pending_facts = pending_facts.ok_or_else(|| invalid("start enrollment missing"))?;
         let (prefix, pending_start) = pending_facts
             .pending()
             .ok_or_else(|| invalid("original start missing"))?;
-        let (full_configuration, facts) = destination.project().read_native_facts(
-            destination.metadata_path(),
-            &destination.store,
-            None,
-            None,
-        )?;
+        let read_facts = || match capture {
+            Some(raw) => destination.project().read_consumed_capture_facts(
+                destination.metadata_path(),
+                &destination.store,
+                raw,
+                &self.basis.prospective,
+            ),
+            None => destination.project().read_native_facts(
+                destination.metadata_path(),
+                &destination.store,
+                None,
+                None,
+            ),
+        };
+        let (full_configuration, facts) = read_facts()?;
         let facts = facts.ok_or_else(|| invalid("completed enrollment missing"))?;
         let (start, complete, owner_receipt) = facts
             .policy()
@@ -164,27 +193,22 @@ impl PreparedNativeConsumedStart {
         let mut expected = frame_record(&StoredRecord::Dependency(start));
         expected.extend_from_slice(&self.frames());
         expected.extend_from_slice(&frame_record(&StoredRecord::Dependency(complete)));
-        if bytes[prefix..] != expected {
+        if !bytes[prefix..].starts_with(&expected) {
             return Err(invalid("completed checkpoint differs from signed source"));
         }
+        let later = scan_journal(&bytes[prefix + expected.len()..]).map_err(error)?;
+        if (capture.is_none() && later.tail().is_fragment())
+            || later.records().iter().any(|record| {
+                !matches!(
+                    record,
+                    StoredRecord::Manifest(_) | StoredRecord::Operation(_)
+                )
+            })
+        {
+            return Err(invalid("consumed history contains non-capture suffix"));
+        }
         let proof = VerifiedDependencyRead::from_consumption(VerifiedConsumedHistory { facts });
-        let workspace = OpenWorkspace::open_attachment_read_history(
-            destination.metadata_path(),
-            destination.store.clone(),
-            &crate::TrustedReviewers::default(),
-            Some(&proof),
-        )
-        .map_err(error)?;
-        // Keep the enrollment marker's original binding intact. The verified starting record
-        // authenticates the effective saved configuration; no guessed or mutable rule file is used.
-        verify_history_binding(&workspace, &self.basis.prospective)?;
-        let result = action(&workspace, &self.basis.prospective)?;
-        let (after_configuration, after) = destination.project().read_native_facts(
-            destination.metadata_path(),
-            &destination.store,
-            None,
-            None,
-        )?;
+        let (after_configuration, after) = read_facts()?;
         let (after_owner_configuration, after_owner) = self
             .owner
             .project()
@@ -200,7 +224,7 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("consumed history changed during inspection"));
         }
         guard.ensure_current().map_err(error)?;
-        Ok(result)
+        Ok((self.basis.prospective.clone(), proof))
     }
 }
 
@@ -337,6 +361,11 @@ pub(super) fn assert_completed_read(
         versions
     );
     assert!(destination.saved_versions().is_err());
+    crate::project_attachment::history::dependency_capture::assert_consumed_capture(
+        storage,
+        &prepared.owner,
+        request(),
+    );
 }
 
 #[cfg(test)]

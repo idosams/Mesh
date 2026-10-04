@@ -7133,3 +7133,23 @@ are preserved. Native initial-history reads now verify across stores and survive
 fresh processes. Generic read/capture integration, later captures, transitive consumed-source
 admission, runtime controls and packaged acceptance remain required; this is not a merged release.
 Draft PR #324 / issue #323 and the full fleet objective remain open. The user checkpoint stays fixed.
+
+R161 now prepares, commits and recovers later private captures through an explicit native catalog
+context. Preparation releases all custody before signing; commit and recovery reconstruct the
+completed starting transaction and reacquire its full custody set. The existing capture writer
+uses fresh verified configuration/history at each boundary, including exact partial-capture
+recovery. Immutable completed-start inspection is separate from later capture validation and never
+creates ordinary admission on its own. Native allocation correlation remains inspectable during
+later interrupted captures without treating that inspection as access. Saved configuration comes
+from the authenticated start; enrollment identity and current editor files are not rewritten.
+
+Fifteen focused consumption/capture tests passed in 44.932s. The new scenario saves later edits,
+interrupts after one capture byte, recovers in fresh processes, retries without duplicate history,
+rejects a stale signed candidate, creates newer saves and retries an older request without rewinding
+the capture position. It also refuses a synchronization failure and recovers the exact staged save.
+Ignoring that sync failure makes the regression incorrectly acknowledge a save and fail in 41.328s;
+source was restored byte-for-byte. An additional owner-history change after signing must refuse
+before any destination append; it is included in the full validation now pending. Existing independent
+capture behavior remains covered by the shared writer tests. Generic desktop/harness context wiring,
+transitive consumed-source graph admission, runtime controls and packaged acceptance remain required.
+Draft PR #324 / issue #323 and the full fleet objective remain open; the user checkpoint is unchanged.

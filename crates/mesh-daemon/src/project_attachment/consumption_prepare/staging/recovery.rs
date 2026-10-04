@@ -92,6 +92,30 @@ impl AttachmentStorage {
         )
     }
 
+    pub(in crate::project_attachment) fn with_completed_capture_context<T>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        action: impl FnOnce(
+            &dyn Fn(
+                Option<&str>,
+            )
+                -> io::Result<(String, crate::project_attachment::VerifiedDependencyRead)>,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
+        self.with_recovered_consumed_state(
+            owner,
+            request,
+            RecoveryPhase::CompletedRead,
+            |candidate, _, graph, guard| {
+                let read = |capture: Option<&str>| {
+                    candidate.verify_completed_history(graph, guard, capture)
+                };
+                action(&read)
+            },
+        )
+    }
+
     fn with_recovered_consumed_state<T>(
         &self,
         owner: &ProvisionedAttachment,
@@ -167,18 +191,29 @@ impl AttachmentStorage {
                 "start recovery requires unchanged empty reservation",
             ));
         }
-        absent(destination, "dependency-capture.pending")?;
+        if phase != RecoveryPhase::CompletedRead {
+            absent(destination, "dependency-capture.pending")?;
+        }
         absent(
             destination,
             crate::project_attachment::dependency_decision::PENDING,
         )?;
         let pending = read_private_in_store(&destination.store, super::super::START_PENDING)?;
-        let (configuration, facts) = destination.project().read_native_facts(
-            destination.metadata_path(),
-            &destination.store,
-            Some(&pending),
-            None,
-        )?;
+        let read_start = || {
+            if phase == RecoveryPhase::CompletedRead {
+                destination
+                    .project()
+                    .read_completed_start_facts(destination.metadata_path(), &destination.store)
+            } else {
+                destination.project().read_native_facts(
+                    destination.metadata_path(),
+                    &destination.store,
+                    Some(&pending),
+                    None,
+                )
+            }
+        };
+        let (configuration, facts) = read_start()?;
         let facts = facts.ok_or_else(|| invalid("recovery enrollment missing"))?;
         let (_, record) = facts
             .pending()
@@ -467,12 +502,7 @@ impl AttachmentStorage {
             }
         }
         self.with_input_grant_owner(&selected_grant, &guard, &context, |_| Ok(()))?;
-        let (after_configuration, after_facts) = destination.project().read_native_facts(
-            destination.metadata_path(),
-            &destination.store,
-            Some(&pending),
-            None,
-        )?;
+        let (after_configuration, after_facts) = read_start()?;
         if after_configuration != configuration
             || after_facts.as_ref() != Some(&facts)
             || read_private_in_store(&destination.store, super::super::START_PENDING)? != pending
@@ -539,6 +569,26 @@ pub(super) fn run_child_if_requested() -> bool {
             .find(|v| v.operation().to_hex() == text("version"))
             .unwrap()
     };
+    if text("mode") == "capture-recover" {
+        let request = || NativeConsumedStartRequest {
+            input: NativeGrantInspection {
+                source: &source,
+                version,
+                destination: &destination,
+                grant: digest(text("grant")).unwrap(),
+            },
+            available: &[],
+            request: digest(text("request")).unwrap(),
+            limits: ObservationLimits::default(),
+        };
+        let recovered = storage
+            .recover_consumed_capture(&owner, request(), digest(text("capture")).unwrap())
+            .unwrap();
+        assert_eq!(recovered.operation().to_hex(), text("operation"));
+        let saved = storage.saved_consumed_versions(&owner, request()).unwrap();
+        assert!(saved.iter().any(|v| v.operation() == recovered.operation()));
+        return true;
+    }
     if text("mode") == "read-completed" {
         let request = || NativeConsumedStartRequest {
             input: NativeGrantInspection {

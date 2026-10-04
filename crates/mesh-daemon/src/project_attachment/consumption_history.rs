@@ -114,3 +114,40 @@ pub(super) fn pending_prefix(
     // Returning this prefix only inspects pending local facts; it cannot admit consumed history.
     Ok((prefix, record, payload))
 }
+
+/// Inspect the immutable completed transaction before a later history suffix. This returns only
+/// original start facts; it deliberately cannot admit the later records or mint a read capability.
+pub(super) fn completed_prefix(
+    cas: &Cas<PinnedRootFs, Blake3>,
+    start_intent: &str,
+    raw: &str,
+    identity: (u64, u64),
+    journal: &[u8],
+    completion: &str,
+) -> io::Result<(usize, DependencyRecord, Vec<u8>)> {
+    let value = Json::parse(completion).map_err(error)?;
+    let begin = value
+        .get("journal_bytes")
+        .and_then(Json::as_u64)
+        .filter(|n| *n <= journal.len() as u64 && *n <= MAX as u64)
+        .ok_or_else(|| invalid("invalid completed transaction boundary"))? as usize;
+    let scan = scan_journal(&journal[begin..]).map_err(error)?;
+    let Some(StoredRecord::Dependency(record)) = scan.records().first() else {
+        return Err(invalid("complete consumption frame missing"));
+    };
+    if record.kind != DependencyKind::ConsumptionComplete {
+        return Err(invalid("completed transaction record differs"));
+    }
+    let end = begin
+        .checked_add(frame_record(&StoredRecord::Dependency(*record)).len())
+        .filter(|n| *n <= journal.len() && *n <= MAX)
+        .ok_or_else(|| invalid("completed transaction exceeds journal"))?;
+    pending_prefix(
+        cas,
+        start_intent,
+        raw,
+        identity,
+        &journal[..end],
+        Some(completion),
+    )
+}

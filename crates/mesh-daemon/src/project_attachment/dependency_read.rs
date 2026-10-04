@@ -125,6 +125,11 @@ fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
 
+enum RecoveryInspection<'a> {
+    Default,
+    CompletedStart,
+    ConsumedCapture(&'a str),
+}
 impl ProjectAttachment {
     pub(super) fn read_configuration(
         &self,
@@ -176,6 +181,56 @@ impl ProjectAttachment {
         store: &PinnedWorkspaceRoot,
         pending: Option<&str>,
         capture: Option<&str>,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        self.read_native_facts_for(
+            metadata,
+            store,
+            pending,
+            capture,
+            RecoveryInspection::Default,
+        )
+    }
+
+    pub(super) fn read_completed_start_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        let pending = read_private_in_store(store, super::consumption_prepare::START_PENDING)?;
+        self.read_native_facts_for(
+            metadata,
+            store,
+            Some(&pending),
+            None,
+            RecoveryInspection::CompletedStart,
+        )
+    }
+
+    pub(super) fn read_consumed_capture_facts(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        capture: &str,
+        configuration: &str,
+    ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
+        // Still local facts only. The caller must independently verify the effective configuration
+        // and owning transaction before constructing a consumed-history read proof.
+        self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            Some(capture),
+            RecoveryInspection::ConsumedCapture(configuration),
+        )
+    }
+
+    fn read_native_facts_for(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        pending: Option<&str>,
+        capture: Option<&str>,
+        inspection: RecoveryInspection<'_>,
     ) -> io::Result<(String, Option<NativeDependencyFacts>)> {
         self.ensure_current()?;
         store.ensure_namespace_identity()?;
@@ -275,6 +330,18 @@ impl ProjectAttachment {
                         };
                     match read_private_in_store(store, super::consumption_history::PENDING) {
                         Ok(history) => {
+                            if matches!(inspection, RecoveryInspection::CompletedStart) {
+                                return super::consumption_history::completed_prefix(
+                                    &cas,
+                                    intent,
+                                    &history,
+                                    journal_identity,
+                                    &bytes,
+                                    completion.as_deref().ok_or_else(|| {
+                                        invalid("completed consumption intent missing")
+                                    })?,
+                                );
+                            }
                             return super::consumption_history::pending_prefix(
                                 &cas,
                                 intent,
@@ -282,7 +349,7 @@ impl ProjectAttachment {
                                 journal_identity,
                                 &bytes,
                                 completion.as_deref(),
-                            )
+                            );
                         }
                         Err(e) if e.kind() == io::ErrorKind::NotFound && completion.is_none() => {}
                         Err(e) => return Err(e),
@@ -299,7 +366,10 @@ impl ProjectAttachment {
                     journal_identity,
                     &bytes,
                     authority,
-                    &configuration,
+                    match inspection {
+                        RecoveryInspection::ConsumedCapture(configuration) => configuration,
+                        _ => &configuration,
+                    },
                 )
             })
             .transpose()?;
