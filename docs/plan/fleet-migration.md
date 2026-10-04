@@ -5380,3 +5380,12 @@ collection and explicit narrowing. The full gate passed 3,777 native tests in 16
 pending. This fixes
 the default retained-set computation; it does not connect daemon cleanup, choose fleet policy,
 resolve writer coordination or complete the storage-exhaustion and full fleet acceptance journeys.
+
+
+R121 combined validation: local related-history reconciliation
+`4de1efcd5fd9634dccaee16fd28ea34ebe019ac1` includes published R120 head
+`b437963c1e6b96c2ac18098035b8a59677174c7a`, preserves the R119/R120/R121 documentation
+and combines the crash campaign with the retention correction. The full gate passed 3,779 native
+tests in 168.394s (1 slow, 17 skipped), 185 rendered tests, 646 desktop tests and all 44 daemon
+checks. Original published PR heads remain unchanged while their exact-head CI runs finish;
+publication of this reconciliation and final hosted validation/merge remain pending.
