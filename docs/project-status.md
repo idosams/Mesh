@@ -1906,3 +1906,21 @@ This includes the explicit revoked-install retry assertion. Published predecesso
 Installation and exact partial-install recovery are verified at native integration scope;
 destination checkpoint, owner receipt, local completion, cross-store admission and packaged
 acceptance remain required. Draft PR #324 / issue #323 remain open and the user checkpoint is fixed.
+
+R161 now commits the original signed destination checkpoint after exact installation while retaining
+the same complete custody guard. A distinct durable history intent binds the native journal identity,
+complete start prefix, request and retained frame digest. Recovery accepts only the exact checkpoint
+suffix authenticated by the original start/stage chain; unrelated records or changed bytes refuse.
+The reader returns pending local facts only, and ordinary history/capture/runtime remain fenced.
+Retries append only missing bytes and revalidate installation, owner intent, journal and current grant.
+No owner receipt or completion is created by this step, and the prospective configuration transition
+is still pending before ordinary admission.
+
+Two focused tests passed in 32.560s. Separate children exit after one checkpoint byte and after
+synchronization before reply; two further processes recover without duplicate history or file
+allocation. Every checkpoint-byte prefix is accepted and every changed last byte refused by the
+exact prefix inspector. Sync failure and a foreign trailing byte also refuse while preserving bytes.
+Removing the suffix equality check makes the regression fail on foreign prefix 1 in 29.829s;
+production source was restored byte-for-byte. Full repository validation is pending. The owner
+receipt, completion, configuration/capture reconciliation, cross-store admission and full acceptance
+campaign remain required in draft PR #324 / issue #323. The user checkpoint stays fixed.

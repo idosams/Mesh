@@ -52,6 +52,7 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod consumption_history;
 mod consumption_plan;
 mod consumption_prepare;
 mod consumption_start;

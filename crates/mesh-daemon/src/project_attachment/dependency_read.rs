@@ -255,6 +255,24 @@ impl ProjectAttachment {
         }
         let pending = pending
             .map(|intent| {
+                let parsed = Json::parse(intent).map_err(error)?;
+                if parsed.get("schema").and_then(Json::as_text)
+                    == Some("mesh.native-consumption-start-intent/v1")
+                {
+                    match read_private_in_store(store, super::consumption_history::PENDING) {
+                        Ok(history) => {
+                            return super::consumption_history::pending_prefix(
+                                &cas,
+                                intent,
+                                &history,
+                                journal_identity,
+                                &bytes,
+                            )
+                        }
+                        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                        Err(e) => return Err(e),
+                    }
+                }
                 super::dependency_decision::pending_prefix(&cas, intent, journal_identity, &bytes)
             })
             .transpose()?;

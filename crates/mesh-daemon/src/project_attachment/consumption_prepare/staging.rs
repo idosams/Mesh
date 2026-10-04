@@ -1,4 +1,5 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
+mod checkpoint;
 mod installation;
 mod recovery;
 mod start_fence;

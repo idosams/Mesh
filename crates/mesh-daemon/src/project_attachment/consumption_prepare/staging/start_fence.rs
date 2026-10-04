@@ -76,9 +76,26 @@ impl PreparedNativeConsumedStart {
         storage: &AttachmentStorage,
         staged: &StagedNativeConsumedStart,
         install: bool,
+        hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
+    ) -> io::Result<RecordDigest> {
+        self.commit_phase_with_io(storage, staged, install, false, hook, sync)
+    }
+    pub(super) fn commit_phase_with_io(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        install: bool,
+        checkpoint: bool,
         mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
+        if !checkpoint {
+            absent(
+                &self.destination,
+                crate::project_attachment::consumption_history::PENDING,
+            )?;
+        }
         let available = self.available.iter().collect::<Vec<_>>();
         let graph = storage.prepare_dependency_graph(
             &self.owner,
@@ -290,7 +307,7 @@ impl PreparedNativeConsumedStart {
                 .filesystem()
                 .read_directory_names_bounded(Path::new(""), self.plan.entries.len())?
                 .is_empty();
-            if occupied && (pending.is_none() || observed.len() != before.len() + frame.len()) {
+            if occupied && (pending.is_none() || observed.len() < before.len() + frame.len()) {
                 return Err(invalid("installed entries lack a complete durable start"));
             }
             Some(self.retain_owner_consumption_intent(&current_graph, record.payload)?)
@@ -337,8 +354,8 @@ impl PreparedNativeConsumedStart {
         if current != observed {
             return Err(invalid("consumption journal changed"));
         }
-        let written = observed.len() - before.len();
-        if !frame.starts_with(&observed[before.len()..]) {
+        let written = (observed.len() - before.len()).min(frame.len());
+        if !frame.starts_with(&observed[before.len()..before.len() + written]) {
             return Err(invalid("foreign consumption suffix"));
         }
         journal.write_all(&frame[written..])?;
@@ -348,15 +365,18 @@ impl PreparedNativeConsumedStart {
         let (after_configuration, after) = self.destination.project().read_native_facts(
             self.destination.metadata_path(),
             &self.destination.store,
-            None,
+            Some(&intent),
             None,
         )?;
         let after = after.ok_or_else(|| invalid("consumption enrollment disappeared"))?;
         let mut expected = before.to_vec();
         expected.extend_from_slice(&frame);
+        if observed.len() > expected.len() {
+            expected.extend_from_slice(&observed[expected.len()..]);
+        }
         after.verify(&self.destination.store, &journal, &expected)?;
         if after_configuration != configuration
-            || after.policy().native_request(self.request) != Some(record)
+            || after.pending() != Some((before.len(), record))
             || read_private_in_store(&self.destination.store, PENDING)? != intent
         {
             return Err(invalid("consumption start did not replay exactly"));
@@ -387,11 +407,39 @@ impl PreparedNativeConsumedStart {
                 self.destination.project().read_native_facts(
                     self.destination.metadata_path(),
                     &self.destination.store,
-                    None,
+                    Some(&intent),
                     None,
                 )?;
             if current_configuration != configuration || current_facts.as_ref() != Some(&after) {
                 return Err(invalid("consumption journal changed during installation"));
+            }
+            storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
+            guard.ensure_current().map_err(error)?;
+        }
+        if checkpoint {
+            self.append_consumption_checkpoint(
+                &mut journal,
+                &intent,
+                record.payload,
+                before.len() + frame.len(),
+                |step, file, frames| hook(step, file, frames),
+                |file| sync(file),
+            )?;
+            if self.verify_stage_state(
+                &staged.root,
+                original_graph,
+                &origin.allocation,
+                &guard,
+                true,
+            )? != staged.receipt
+                || read_private_in_store(
+                    &self.destination.store,
+                    super::installation::OWNER_INTENT,
+                )? != *owner_intent
+                    .as_ref()
+                    .ok_or_else(|| invalid("owner intent missing"))?
+            {
+                return Err(invalid("checkpoint installation evidence changed"));
             }
             storage.with_prepared_input_grant(&grant, &guard, |_| Ok(()))?;
             guard.ensure_current().map_err(error)?;
@@ -513,6 +561,8 @@ pub(super) fn assert_start_fence(
     assert_eq!(fs::read(&journal_path).unwrap(), foreign);
     fs::write(&journal_path, &complete).unwrap();
     super::installation::assert_installation(prepared, storage, &staged, receipt);
+    super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt);
+    let complete = fs::read(&journal_path).unwrap();
     storage
         .grant_saved_input(
             &prepared.owner,

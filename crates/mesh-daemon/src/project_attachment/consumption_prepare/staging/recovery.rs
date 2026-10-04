@@ -375,7 +375,7 @@ impl AttachmentStorage {
                     80 * 1024 * 1024,
                 )?
                 .len()
-                    != before + mesh_store::frame_record(&StoredRecord::Dependency(record)).len()
+                    < before + mesh_store::frame_record(&StoredRecord::Dependency(record)).len()
             {
                 return Err(invalid("installed work lacks a complete start"));
             }
@@ -437,12 +437,36 @@ pub(super) fn run_child_if_requested() -> bool {
                 request: digest(text("request")).unwrap(),
                 limits: ObservationLimits::default(),
             },
-            text("mode").starts_with("install"),
+            text("mode").starts_with("install") || text("mode").starts_with("checkpoint"),
         )
         .unwrap();
     assert_eq!(candidate.operation().to_hex(), text("operation"));
     assert_eq!(staged.receipt().unwrap().to_hex(), text("stage"));
     assert_eq!(identity(&staged.root).unwrap(), text("physical"));
+    if text("mode").starts_with("checkpoint") {
+        candidate
+            .commit_phase_with_io(
+                &storage,
+                &staged,
+                true,
+                true,
+                |step, file, frames| {
+                    if text("mode") == "checkpoint-partial" && step == "checkpoint-staged" {
+                        file.write_all(&frames[..1])?;
+                        file.sync_all()?;
+                        std::process::exit(75);
+                    }
+                    if text("mode") == "checkpoint-lost" && step == "checkpoint-synced" {
+                        std::process::exit(75);
+                    }
+                    Ok(())
+                },
+                |file| file.sync_all(),
+            )
+            .unwrap();
+        assert!(destination.saved_versions().is_err());
+        return true;
+    }
     if text("mode").starts_with("install") {
         let receipt = candidate
             .fence_and_install_with_io(
