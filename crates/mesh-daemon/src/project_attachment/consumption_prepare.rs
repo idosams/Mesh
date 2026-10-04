@@ -1,4 +1,5 @@
 //! Signed consumption candidates. Preparation writes nothing and does not reserve a commit order.
+mod staging;
 use super::{
     consumption_start::{prepare_initial_snapshot, InitialSnapshot},
     dependency_enrollment::read_private_in_store,
@@ -22,6 +23,7 @@ use mesh_operations::{
 };
 use mesh_store::RecordDigest;
 use mesh_types::{PublicKey, Signature};
+pub use staging::StagedNativeConsumedStart;
 use std::{collections::BTreeMap, io, path::Path};
 
 /// Exact trusted-native selection. Preparation does not grant access, copy content or start agents.
@@ -326,6 +328,9 @@ mod tests {
     use std::fs;
     #[test]
     fn saved_ignore_rules_bind_candidate_without_changing_empty_reservation() {
+        if staging::run_stage_child_if_requested() {
+            return;
+        }
         let root =
             std::env::temp_dir().join(format!("mesh-consumed-start-rules-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
@@ -341,6 +346,14 @@ mod tests {
         fs::write(root.join("source/.gitignore"), b"ignored\n").unwrap();
         fs::write(root.join("source/ignored"), b"not admitted").unwrap();
         fs::write(root.join("source/kept"), b"saved bytes").unwrap();
+        fs::create_dir_all(root.join("source/tree/empty")).unwrap();
+        fs::write(root.join("source/tree/run"), b"executable").unwrap();
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(
+            root.join("source/tree/run"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
         let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
         let owner = storage.provision(&root.join("source")).unwrap();
         let input = owner
@@ -445,8 +458,8 @@ mod tests {
         );
         assert_eq!(
             fact.manifests.len(),
-            2,
-            "saved rule file and admitted file only"
+            3,
+            "saved rule file, admitted file and nested executable only"
         );
         fs::write(root.join("source/.gitignore"), b"kept\n").unwrap();
         prepared.revalidate(&storage).unwrap();
@@ -463,6 +476,7 @@ mod tests {
                 Signature::from_bytes([0; 64])
             ))
             .is_err());
+        staging::assert_private_stage(&prepared, &storage);
         assert_eq!(fs::read(&marker).unwrap(), before_marker);
         assert_eq!(
             fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),

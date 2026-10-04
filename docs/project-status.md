@@ -1673,3 +1673,34 @@ head-check mutation and successful focused/full logs are retained. Published pre
 `59eeee06b6334372f675e413f4e29cd26fa1d630` passed all seven hosted checks in run `37220272359`.
 This validates signed-plan reconstruction and existing behavior; the durable consumption transaction
 and complete fleet acceptance remain unfinished. Draft PR #324 is unmerged; the checkpoint is fixed.
+
+R161 now connects prepared signed versions to durable private staging through
+`PreparedNativeConsumedStart::stage`. Staging uses the native reservation allocation on the same
+filesystem as its unchanged destination root. A private attempt records request, operation, physical
+identities, grant and closure before content construction. It retains signed objects, exact operation
+frames, original/prospective configuration, source graph/retention evidence and recovery receipts.
+Only a complete synchronized bundle is published into the stable request slot by exclusive rename.
+Interrupted scratch attempts remain preserved; retries never overwrite or adopt their incomplete
+contents. No destination file or journal is changed, and no lane becomes runnable.
+
+Retry independently checks the bundle, signed objects, frames, exact root/entry identities and
+source basis. Staged directory paths, kinds, content digests, lengths and executable state are also
+compared with the authenticated materialization plan; matching rewritten local receipts cannot
+substitute different content. Lookups are built once per verification pass, and subtree selection
+uses ordered ranges instead of rescanning every entry for every directory. An exact retry returns
+the same staging receipt and allocation. Empty snapshots create no placeholder destination content.
+
+Integrated tests passed for signed nonempty and empty sources, nested executable/empty directories,
+three interrupted construction boundaries, damaged frames, rewritten tree receipts and untouched
+destination/history. A publisher process exits immediately after bundle publication; two fresh
+processes reopen native handles and recover the same receipt and physical bundle. Bypassing the
+signed-tree comparison makes the forged-receipt test fail; original source was restored exactly.
+Focused process tests passed in 6.392s. The full repository gate is pending.
+
+This is the private staging portion of the unfinished consumption transaction. A staging receipt
+is evidence, not continuing permission or a consumption acknowledgement. Required start-record
+synchronization before installation, owner consumption, completion, cross-store admission and the
+complete interruption/revocation campaign remain required. Private-stage retries currently compare
+the exact retained-source snapshot; transaction recovery must additionally handle intervening owner
+history and committed outcomes without rewriting that evidence. Draft PR #324 remains unmerged,
+issue #323 remains open, and the fixed checkpoint remains unchanged.

@@ -220,7 +220,7 @@ pub(super) fn assert_staged_refusals(
     let plan = InitialPlan::verify(prepared, workspace, limits).unwrap();
     assert_eq!(
         plan.entries.keys().map(String::as_str).collect::<Vec<_>>(),
-        vec![".gitignore", "kept"]
+        vec![".gitignore", "kept", "tree", "tree/empty", "tree/run"]
     );
     let clone = || PreparedAuthenticatedCheckpoint {
         checkpoint: prepared.checkpoint.clone(),

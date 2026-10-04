@@ -661,6 +661,11 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
         )
         .unwrap();
     signed_empty.revalidate(&storage).unwrap();
+    let empty_staged = signed_empty.stage(&storage).unwrap();
+    assert_eq!(
+        signed_empty.stage(&storage).unwrap().receipt().unwrap(),
+        empty_staged.receipt().unwrap()
+    );
     assert_ne!(signed_empty.operation(), empty_start);
     assert_eq!(
         fs::read_dir(empty_destination.project().root())
