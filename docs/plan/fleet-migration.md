@@ -5543,6 +5543,28 @@ log is preserved. Hosted delivery remains pending. R125's original head passed a
 checks before its source-identical main reconciliation; no active CI head was replaced.
 
 
+## R127 — cancel the owned provider process group
+
+Based on published R126 / PR #264 at `cc5608f3eddb04d001cb204e2403f4d76e58a31f`. New canonical
+implementation replaces no preserved source commit. Both adapters use a dedicated process group.
+Cancellation and failed-launch abort signal it only while the original child remains unreaped,
+which pins the group number against PID reuse; the direct child is also stopped if it moved groups.
+An observed exit permanently refuses later numeric group signaling. No persisted schema, protocol,
+credential, capacity-release or main-approval authority changes.
+
+Four focused provider regressions pass. The new real-process test starts a descendant with inherited
+output pipes, requires prompt shutdown before natural child exit, keeps an independent process alive,
+and refuses signaling after reaping. Restoring direct-child-only stop fails the timely-shutdown
+assertion; source restored byte-for-byte. Full validation and hosted delivery are pending. This is
+not containment or proof of escaped descendant termination. Remote terminal capacity remains reserved;
+full cancellation/restart acceptance and issue #172's intermittent lifecycle warning remain open.
+
+R127 full local gate passed 3,798 native tests in 162.715s (1 slow, 17 skipped),
+185 rendered tests, 646 desktop tests and all 44 real-daemon checks. No lifecycle warning was
+reported in this run; this does not resolve issue #172's intermittent earlier observations.
+Hosted delivery remains pending. User checkpoints and their application state remain unchanged.
+
+
 ## R128 — worker progress inspection without a shared scan lock
 
 New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267); no
@@ -5634,3 +5656,13 @@ Full `npm test` passed 3,815 native tests in 164.031s (1 slow, 17 skipped), 186 
 647 desktop tests and all 44 real-daemon checks. Hosted delivery is pending. An attempt may still wait on native filesystem
 or signing work; an attempt count is not a wall-clock shutdown bound. Packaged, remote and
 protected-main acceptance remain open, and the fixed user checkpoint is unchanged.
+
+
+R127 delivery consolidation: checked cancellation head `2ff2e1a826a9602ebe8c1444d842b289b706a96e`
+(all seven hosted checks passed) is combined with the published saving/retry stack through PR #271
+head `cfcca75aab183c7a07985868401a568610a89814`. Combined implementation
+`9d411a84360f711cb815e9cf4d2cba7d7088514c` passed full `npm test`: 3,816 native tests in 164.518s
+(1 slow, 17 skipped), 186 rendered tests, 647 desktop tests and all 44 real-daemon checks.
+All source commits remain ancestors; no production conflicts needed manual resolution. PR #265
+uses PR #271 as its delivery base so cancellation remains a focused review and the full combination
+is validated once. Fresh hosted checks and merged delivery remain pending. User checkpoints remain fixed.

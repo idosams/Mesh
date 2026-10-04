@@ -180,7 +180,7 @@ impl NativeFleetHost {
             if cancelled && !worker.acknowledged {
                 self.service.revoke(&worker.credential)?;
                 if !worker.stop_requested {
-                    // Keep the slot and custody even if the direct process exits. Descendants may live.
+                    // Keep the slot and custody even if group signaling succeeds. Escaped descendants may live.
                     // A failed stop request must remain retryable on the next native tick.
                     worker.stop_requested = worker.process.request_stop().is_ok();
                 }

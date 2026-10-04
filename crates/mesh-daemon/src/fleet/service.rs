@@ -998,7 +998,7 @@ impl FleetService {
             process.retain_authority(self.inner.clone());
         }
         if verified.ensure_current().is_err() {
-            process.abort_direct();
+            process.abort_owned_group();
             return Err(refusal("fleet-lane-identity-changed"));
         }
         if inner
@@ -1013,7 +1013,7 @@ impl FleetService {
             )
             .is_err()
         {
-            process.abort_direct();
+            process.abort_owned_group();
             return Err(refusal("fleet-provider-launch-needs-reconciliation"));
         }
         Ok(process)

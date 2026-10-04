@@ -1041,6 +1041,18 @@ tests plus all 44 daemon checks. Hosted delivery is pending. No packaged schedul
 proof, closed-workspace traversal, pressure policy or bounded admitted scan latency is claimed.
 
 
+## Provider group cancellation
+
+Providers now start in separate native process groups. Stop and launch-abort paths signal the owned
+group before reaping its leader, and refuse numeric group signaling after recorded exit. A real
+process regression proves prompt inherited-pipe descendant shutdown while an unrelated process
+remains alive. Restoring direct-child-only cancellation fails this regression; source was restored.
+Full local validation passed 3,798 native, 185 rendered and 646 desktop tests plus all 44 daemon
+checks. Hosted delivery is pending. This does not prove escaped descendants are gone,
+release remote capacity, resolve the intermittent warnings in issue #172, or establish packaged
+cancellation and restart acceptance. Remote terminal capacity reconciliation remains unfinished.
+
+
 ## Worker progress inspection
 
 Native progress inspection distinguishes unchanged folders, supported edits/additions and entries
