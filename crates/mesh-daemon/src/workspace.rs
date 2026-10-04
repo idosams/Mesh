@@ -33,6 +33,7 @@
 //! disposable index must be replaced from the immutable journal. No storage meaning is
 //! re-implemented here.
 
+mod orphan_collection;
 mod remote_input_export;
 pub use remote_input_export::RemoteInputSource;
 

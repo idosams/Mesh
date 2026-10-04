@@ -13,8 +13,8 @@
 //!    [`ReferenceOracle`](crate::ReferenceOracle) and asks it about every digest again, immediately
 //!    before removing the file. The signature is the point: there is no way to reach the deleter
 //!    without supplying something that can veto it, so a caller who computed the wrong list, or who
-//!    computed the right list and then let the workspace move underneath it, still cannot delete
-//!    something referenced. A veto is [`Collected::refused`] — reported, never an error, because a
+//!    computed the right list and then let references change before the check, can still veto
+//!    referenced content. Writer exclusion must keep that answer valid through unlink. A veto is [`Collected::refused`] — reported, never an error, because a
 //!    reference appearing between the plan and the delete is normal.
 //! 3. **The name.** Only `chunks/<aa>/<bb>/<64 hex>` is ever unlinked. Nothing else in the store is
 //!    reachable from this module: quarantine keeps evidence, `scratch/` is
@@ -28,16 +28,13 @@
 //! nobody runs — and, equally, a dry run that reports nothing is a report that nothing is
 //! collectable, which `tests/collection-footprint.rs` is there to contradict with a number.
 //!
-//! # Why this does not block a local write
+//! # Writer coordination is the caller's responsibility
 //!
-//! [`Cas::collect`] takes `&self`, acquires no lock, and unlinks one file at a time. A promotion
-//! running beside it stages into `scratch/`, syncs, and renames into `chunks/`; the two touch a
-//! common path only when the collector is deleting the very digest the promotion is producing, and
-//! that digest is by definition one nothing references yet. If the delete wins the race the writer
-//! ends up with a chunk it must re-promote, which is a retry, not a loss — the referencing
-//! transaction has not committed, because if it had, the oracle would have said referenced.
-//! `tests/collection-concurrency.rs` holds a collection open across a whole promotion and checks
-//! that the promotion completes anyway.
+//! `collect` takes no writer lock. Its concurrency test demonstrates progress for a promotion of
+//! a different digest; it does not prove an atomic reference-check/unlink for the same digest.
+//! The caller must exclude reference commits and same-digest promotion through deletion and
+//! journal rewriting. An oracle answer can become stale between the check and unlink otherwise.
+//! The native daemon composes workspace custody for its explicit orphan-cleanup operation.
 
 use std::collections::BTreeSet;
 use std::io;
