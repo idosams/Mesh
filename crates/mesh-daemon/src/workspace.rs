@@ -990,6 +990,11 @@ impl RecordJournal for RecordFile {
 /// Why a workspace could not be opened.
 #[derive(Debug)]
 pub enum OpenFailure {
+    /// A required native dependency policy is stored but this reader cannot yet validate it.
+    DependencyPolicyUnavailable {
+        /// Exact complete journal boundary; bytes are preserved rather than ignored.
+        readable: DurableBoundary,
+    },
     /// The directory or the record file could not be reached.
     Unreachable(io::Error),
     /// The workspace content-addressed store could not be opened.
@@ -1026,6 +1031,9 @@ pub enum OpenFailure {
 impl core::fmt::Display for OpenFailure {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::DependencyPolicyUnavailable { .. } => formatter.write_str(
+                "native dependency policy validation is unavailable; history is preserved",
+            ),
             Self::Unreachable(error) => write!(formatter, "{error}"),
             Self::PayloadStore(error) => write!(formatter, "{error}"),
             Self::Index { detail } => write!(formatter, "{detail}"),
@@ -1048,6 +1056,7 @@ impl OpenFailure {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::DependencyPolicyUnavailable { .. } => "workspace-dependency-policy-unavailable",
             Self::Unreachable(_) => "workspace-unreachable",
             Self::PayloadStore(_) => "workspace-payload-store-unreachable",
             Self::Index { .. } => "workspace-index-unavailable",
@@ -1073,7 +1082,8 @@ impl OpenFailure {
                 byte_offset: 0,
             },
             Self::Damaged(damage) => damage.intact_prefix(),
-            Self::Contradictory { readable, .. } => *readable,
+            Self::Contradictory { readable, .. }
+            | Self::DependencyPolicyUnavailable { readable } => *readable,
         }
     }
 }
@@ -1585,6 +1595,13 @@ impl OpenWorkspace {
 
         let scan = scan_journal(&bytes).map_err(OpenFailure::Damaged)?;
         let boundary = scan.boundary();
+        if scan
+            .records()
+            .iter()
+            .any(|record| matches!(record, StoredRecord::Dependency(_)))
+        {
+            return Err(OpenFailure::DependencyPolicyUnavailable { readable: boundary });
+        }
         let tail = scan.tail();
         if boundary.records == 0 && tail.is_fragment() {
             return Err(OpenFailure::NothingReadable {
@@ -1876,6 +1893,13 @@ impl OpenWorkspace {
         let bytes = self.journal.read_all().map_err(OpenFailure::Unreachable)?;
         let scan = scan_journal(&bytes).map_err(OpenFailure::Damaged)?;
         let boundary = scan.boundary();
+        if scan
+            .records()
+            .iter()
+            .any(|record| matches!(record, StoredRecord::Dependency(_)))
+        {
+            return Err(OpenFailure::DependencyPolicyUnavailable { readable: boundary });
+        }
         let tail = scan.tail();
         if boundary.records == 0 && tail.is_fragment() {
             return Err(OpenFailure::NothingReadable {
@@ -3087,7 +3111,31 @@ impl OpenWorkspace {
     ///
     /// Any error advancing the retained index, appending, or syncing the record file.
     pub fn append_record(&mut self, record: &StoredRecord) -> io::Result<()> {
+        // A daemon can retain an older view while another native build enrolls dependency
+        // history. Until policy validation is integrated, even a cached reader must not append
+        // an approval after the required marker has appeared in its pinned durable journal.
+        if matches!(record, StoredRecord::Approval(_)) {
+            let bytes = self.journal.read_all()?;
+            let scan = scan_journal(&bytes)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            if scan
+                .records()
+                .iter()
+                .any(|stored| matches!(stored, StoredRecord::Dependency(_)))
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "native dependency policy validation is unavailable",
+                ));
+            }
+        }
         let checkpoint = match record {
+            StoredRecord::Dependency(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "native dependency policy validation is unavailable",
+                ))
+            }
             StoredRecord::Operation(value) => Checkpoint {
                 operations: vec![value.clone()],
                 ..Checkpoint::default()

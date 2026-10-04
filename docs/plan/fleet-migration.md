@@ -6005,3 +6005,29 @@ dependency or publication authority; project policy, exact closure and race-safe
 require integration. Full gate and hosted delivery pending. Fixed user checkpoint unchanged.
 
 R146 implementation verification: Full `npm test` passed on `cd830a86a98174e0952277f9442020f6329f9b80`: 3,830 native tests in 173.261s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted delivery remains pending.
+
+## R147 — required dependency journal and index foundation
+
+New canonical implementation based on PR #294 at
+`d0b4176d0a7347ba6d2a2e7bfce448e9e5de4d80`; no preserved source commit is replaced.
+Tracks issue #295 and the persistence prerequisite of #289. Required journal kind 8 encodes a
+fixed 105-byte envelope with authority, ledger ordinal, previous/current payload and closed kind.
+Additive index migration 3 reconstructs envelopes. Replay rejects contradictory or noncontiguous
+history before mutation and preserves idempotent exact retries without rewinding ledger heads.
+The payload still requires native semantic validation; no grant or enrollment API is enabled.
+
+Native open and refresh refuse dependency-bearing history, direct dependency appends refuse, and
+cached approval rereads the pinned journal before writing. Unknown transitive roots refuse
+collection. Old disposable-index schema compatibility is not promised. Exact pre-change storage
+source at the base revision was independently built and refused the new record kind with unchanged
+fixture bytes; this is scanner evidence, not an already-running old desktop enrollment proof.
+Future enrollment must install and verify a mandatory old-writer custody fence before its journal
+record, including both crash boundaries. That requirement remains unimplemented.
+
+The complete storage crate suite passed, including real SQLite reconstruction and existing
+crash/recovery campaigns extended with dependency records. The native cached-approval/reopen
+regression passed. Allowing a missing previous payload or disabling cached approval inspection
+made their respective regressions fail; source was restored byte-exact. Two initial test fixture
+compile failures are preserved. Full repository and hosted checks remain pending. The fixed
+user checkpoint is unchanged; full private-input authorization and publication enforcement remain
+required by the fleet plan.

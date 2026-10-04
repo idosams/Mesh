@@ -10657,6 +10657,7 @@ fn refusal_for(failure: &OpenFailure) -> Unavailable {
         OpenFailure::Damaged(_) => user_messages::WORKSPACE_DAMAGED,
         OpenFailure::NothingReadable { .. } => user_messages::WORKSPACE_NOTHING_READABLE,
         OpenFailure::Contradictory { .. } => user_messages::WORKSPACE_CONTRADICTORY,
+        OpenFailure::DependencyPolicyUnavailable { .. } => "This workspace requires native dependency validation that this build does not yet support. Its saved history is preserved.",
     };
     Unavailable::new(failure.code(), sentence)
 }

@@ -164,3 +164,33 @@ nesting, borrowed-guard lifetime and replacement during a blocked partial acquis
 exclusive locks with shared locks makes the separate-process regression fail; source restored
 byte-exact. Full repository validation and hosted delivery are recorded in the migration ledger.
 The remaining record, authorization, closure and publication integration steps are still required.
+
+## Required record foundation (R147)
+
+The storage layer recognizes required journal kind 8 with a fixed 105-byte canonical body:
+authority digest, big-endian 64-bit ledger ordinal, previous payload digest, current payload
+digest and a closed enrollment/grant/consumption/eligibility/review-snapshot discriminator.
+This ordinal orders the whole authority ledger; it is not a per-input eligibility revision or
+workspace policy epoch. Native canonical payloads must include and authenticate these bindings.
+The envelope and its checksum alone grant no authority. Native payload validation is still pending.
+
+An authority starts at enrollment ordinal 1 with no previous payload. Subsequent records must
+advance exactly once and name the previous payload. Conflicting payload reuse, gaps, zero identities
+and repeated enrollment refuse before changing the index. Exact replay is idempotent without
+rewinding the head. Additive disposable-index migration 3 reconstructs all envelopes from journal
+records; previous migrations are unchanged. Older applications may reject this newer index schema
+even for histories without dependencies; transparent downgrade is not promised.
+
+Until semantic validation exists, current native readers refuse dependency-bearing history on
+open and refresh, reject direct dependency appends, and reread the pinned journal before appending
+approval from a cached view. Collection refuses rather than guessing unknown transitive retention
+roots. No runtime enrollment, consumption or grant API is enabled by this foundation.
+
+The pre-change mesh-store scanner built from exact source revision
+`d0b4176d0a7347ba6d2a2e7bfce448e9e5de4d80` rejects the new required kind without changing fixture
+bytes. This proves scanner refusal only, not compatibility of an already-running older desktop.
+Before enrollment can ship, a mandatory native custody-format fence must also exclude cached old
+writers: install the fence before the enrollment record, verify refusal at every historical mutation
+entry point, and prove recovery across both writes. A crash after fencing must remain refused and
+recoverable. Unknown-kind handling alone does not close this window. These are required follow-up
+acceptance conditions, not guarantees implemented by R147.
