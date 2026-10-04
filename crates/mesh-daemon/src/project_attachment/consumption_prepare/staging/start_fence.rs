@@ -14,6 +14,44 @@ fn work(value: &NativeDependencyWorkBinding) -> Json {
     Json::Array(vec![j(value.work()), j(value.installation())])
 }
 impl PreparedNativeConsumedStart {
+    pub(super) fn start_body(
+        &self,
+        owner: crate::dependency_policy::NativeDependencyBinding,
+        source: &NativeDependencyWorkBinding,
+        destination: &NativeDependencyWorkBinding,
+        descriptor: RecordDigest,
+    ) -> Json {
+        Json::object([
+            ("request", j(self.request)),
+            (
+                "owner",
+                Json::Array(vec![
+                    j(owner.authority),
+                    j(owner.project),
+                    j(owner.installation),
+                ]),
+            ),
+            ("destination", work(destination)),
+            (
+                "source",
+                Json::Array(vec![work(source), j(self.version.operation())]),
+            ),
+            ("grant", j(self.grant)),
+            (
+                "bindings",
+                Json::Array(vec![j(source.correlation), j(destination.correlation)]),
+            ),
+            (
+                "configuration",
+                j(hash(self.basis.configuration.as_bytes())),
+            ),
+            ("prospective", j(hash(self.basis.prospective.as_bytes()))),
+            ("closure", j(self.basis.graph)),
+            ("operation", j(self.operation())),
+            ("staged", j(descriptor)),
+        ])
+    }
+
     /// Durably fence this exact staged starting version before any destination installation.
     /// The returned record is not consumption acknowledgement, a saved version or run permission.
     /// Retries require this same authenticated candidate and stage; restart reconstruction and
@@ -25,7 +63,7 @@ impl PreparedNativeConsumedStart {
     ) -> io::Result<RecordDigest> {
         self.fence_with_io(storage, staged, |_, _, _| Ok(()), |file| file.sync_all())
     }
-    fn fence_with_io(
+    pub(super) fn fence_with_io(
         &self,
         storage: &AttachmentStorage,
         staged: &StagedNativeConsumedStart,
@@ -142,35 +180,7 @@ impl PreparedNativeConsumedStart {
         ])
         .encode()
         .into_bytes();
-        let body = Json::object([
-            ("request", j(self.request)),
-            (
-                "owner",
-                Json::Array(vec![
-                    j(owner.authority),
-                    j(owner.project),
-                    j(owner.installation),
-                ]),
-            ),
-            ("destination", work(&destination)),
-            (
-                "source",
-                Json::Array(vec![work(&source), j(self.version.operation())]),
-            ),
-            ("grant", j(self.grant)),
-            (
-                "bindings",
-                Json::Array(vec![j(source.correlation), j(destination.correlation)]),
-            ),
-            (
-                "configuration",
-                j(hash(self.basis.configuration.as_bytes())),
-            ),
-            ("prospective", j(hash(self.basis.prospective.as_bytes()))),
-            ("closure", j(self.basis.graph)),
-            ("operation", j(self.operation())),
-            ("staged", j(hash(&descriptor))),
-        ]);
+        let body = self.start_body(owner, &source, &destination, hash(&descriptor));
         let pending = match read_private_in_store(&self.destination.store, PENDING) {
             Ok(raw) => Some(raw),
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
@@ -354,6 +364,7 @@ pub(super) fn assert_start_fence(
     assert!(length > 0);
     assert_eq!(fs::read(&journal_path).unwrap(), before);
     let intent = read_private_in_store(&prepared.destination.store, PENDING).unwrap();
+    super::recovery::assert_reloaded(prepared, storage, &staged);
     for boundary in 1..=length {
         let failure = prepared
             .fence_with_io(
@@ -450,6 +461,23 @@ pub(super) fn assert_start_fence(
         )
         .unwrap();
     assert!(prepared.fence_consumption_start(storage, &staged).is_err());
+    let available = prepared.available.iter().collect::<Vec<_>>();
+    assert!(storage
+        .recover_fenced_consumed_start(
+            &prepared.owner,
+            NativeConsumedStartRequest {
+                input: NativeGrantInspection {
+                    source: &prepared.source,
+                    version: prepared.version,
+                    destination: &prepared.destination,
+                    grant: prepared.grant
+                },
+                available: &available,
+                request: prepared.request,
+                limits: prepared.limits,
+            }
+        )
+        .is_err());
     assert_eq!(fs::read(&journal_path).unwrap(), complete);
     assert!(prepared.destination.saved_versions().is_err());
     assert_eq!(

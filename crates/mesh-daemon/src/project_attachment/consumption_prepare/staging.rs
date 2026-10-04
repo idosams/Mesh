@@ -1,4 +1,5 @@
 //! Durable private consumption material. Publication here never installs into the reserved root.
+mod recovery;
 mod start_fence;
 use super::*;
 use crate::{
@@ -896,4 +897,9 @@ pub(super) fn assert_start_fence(
     storage: &AttachmentStorage,
 ) {
     start_fence::assert_start_fence(prepared, storage);
+}
+
+#[cfg(test)]
+pub(super) fn run_fence_child_if_requested() -> bool {
+    recovery::run_child_if_requested()
 }

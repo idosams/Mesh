@@ -426,7 +426,7 @@ mod tests {
     }
     #[test]
     fn saved_ignore_rules_bind_candidate_without_changing_empty_reservation() {
-        if staging::run_stage_child_if_requested() {
+        if staging::run_fence_child_if_requested() || staging::run_stage_child_if_requested() {
             return;
         }
         saved_rules_fixture(false);

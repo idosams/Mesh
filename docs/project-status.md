@@ -1847,3 +1847,23 @@ preserved with complete Git history. This proves durable start fencing and exact
 same candidate/stage handles. Fresh-process reconstruction, installation, destination/owner/completion
 commit and cross-store admission remain required. Draft PR #324 / issue #323 and the full fleet goal
 remain open; the user checkpoint stays fixed.
+
+R161 now reconstructs a fenced starting candidate in a fresh process without invoking a signer.
+Recovery requires the exact retained request and original limits, native owner/source/destination
+bindings, current uncommitted grant and empty reservation. It authenticates the retained checkpoint,
+independently reconstructs the expected signed statement from the granted saved source and saved
+ignore rules, and verifies the original stage/transaction bindings. Object names must match the
+checkpoint references; total and per-object bounds are enforced before reading. Recovery creates no
+new signature, installation, owner receipt or ordinary history permission.
+
+Two focused integration tests passed in 27.149s. A child exits after appending one start byte; a fresh
+process reloads and synchronizes the complete start, then exits before reply. Two further processes
+recover the same record and physical stage. Larger retry limits, corrupted retained content and a
+revoked grant refuse while preserving journal/editor work. Bypassing the retained descriptor check
+makes the limits regression fail in 5.357s; exact production source was restored. The prior focused
+run also passed (26.558s), and all evidence is preserved. Full repository validation is pending.
+
+This implements fresh-process recovery of the start phase only. Exclusive file installation,
+destination checkpoint history, owner consumption, completion and cross-store read/capture/runtime
+admission remain required in draft PR #324 / issue #323. The full fleet goal and fixed checkpoint
+remain unchanged.
