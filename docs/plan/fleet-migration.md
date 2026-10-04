@@ -6053,3 +6053,23 @@ user checkpoint is unchanged; full private-input authorization and publication e
 required by the fleet plan.
 
 R147 implementation `af708ababc2f42a8e75a06ebd0d8152d9bfd4d13` passed full `npm test`: 3,837 native tests in 173.217s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
+## R148 — native dependency payload validation and historical replay
+
+New canonical implementation based on PR #296 at
+`d04729e505007fd04aebcbdad43417e385b9c2e7`; no preserved source commit is replaced.
+Tracks issue #297 and the native policy prerequisite of #289. Canonical bounded payloads must match
+the exact storage digest, authority, kind, ordinal and predecessor. Enrollment matches an independently
+supplied native registration binding. Replay separates ledger order, exact input/destination grant
+generations and per-input decision revisions. It rejects contradictory requests, stale/revoked grants
+and stale/ineligible review vectors before changing state. Exact historical replay remains idempotent
+at capacity. Rejection and replacement preserve direct operation/policy references and earlier reviews.
+
+Nine focused native tests pass, including independent byte vectors, malformed/truncated/oversized
+payloads, external-binding and envelope substitution, atomic refusal, distinct installation versus
+stable-work identity, unrelated decisions, replacement, revocation and full record/aggregate-byte
+limits. Weakening eligibility or current-grant enforcement makes the intended regression fail; exact
+source restored. The initial missing digest-trait import compile failure is retained. Full repository
+and hosted validation pending. This read-only projection does not authenticate control writes, verify
+source ancestry or complete transitive closure, fence older writers or authorize consumption/publication.
+Existing native dependency refusals and the fixed user checkpoint are unchanged.

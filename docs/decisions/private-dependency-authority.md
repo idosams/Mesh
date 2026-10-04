@@ -194,3 +194,43 @@ writers: install the fence before the enrollment record, verify refusal at every
 entry point, and prove recovery across both writes. A crash after fencing must remain refused and
 recoverable. Unknown-kind handling alone does not close this window. These are required follow-up
 acceptance conditions, not guarantees implemented by R147.
+
+## Native historical payload validation (R148)
+
+`dependency_policy::DependencyPolicyHistory` is a read-only validator, not a consumption or
+publication capability. Its expected authority/project/installation binding must come from native
+registration independently of the bytes being replayed. It accepts canonical UTF-8 JSON with
+exact ordered fields `schema`, `authority`, `revision`, `previous`, `kind`, `body`; the schema is
+`mesh.dependency-policy/v1`. The BLAKE3 of the complete bytes must match the storage envelope, and
+all four envelope bindings must agree. Digests are 64 lowercase hexadecimal characters; identities
+are nonzero. Unknown fields, duplicate keys, wrong order, noncanonical encoding and unknown kinds
+refuse. Work is `[stable_work_digest, installation_digest]`; saved input is `[work, operation]`.
+Neither contains a provider, process, lane or execution-attempt identity.
+
+| Kind | Ordered body fields | Historical validation |
+| --- | --- | --- |
+| Enrollment | project, installation | Must match the independently supplied native binding and be the first record |
+| Grant | request, source, destination, generation, previous, allowed | Exact input/destination grant generations advance by one and name the previous grant; false records revocation/denial |
+| Consumption | request, grant, start, inputs | Names the current allowed grant, its exact destination and the selected source among sorted unique declared inputs |
+| Eligibility | request, input, revision, previous, state, replacement | Per-input decision revision advances independently; state is eligible/rejected/replaced; only replacement has a distinct replacement input |
+| Review snapshot | request, output, decisions | Sorted unique input/decision pairs name the then-current eligible decisions; later decisions preserve this historical record |
+
+Stable request identities cannot be reused by a different payload. Exact earlier records replay
+without rewinding heads or consuming capacity again. No state changes until every check succeeds.
+Unrelated input decisions do not alter another input's review vector. A changed installation cannot
+disguise a direct self-dependency on the same stable work identity.
+
+Bounds are 65,536 bytes per payload, 256 declared input/decision rows, 8,192 distinct records and
+16 MiB total accepted payload bytes per projection. Exceeding any bound refuses the next record
+without truncation or partial state; it does not expire or delete durable history. Larger histories
+need an explicit supported continuation/compaction design before use. The existing JSON parser's
+16-level nesting bound applies before domain decoding. Direct operation and policy-payload references
+remain enumerable after rejection, replacement and grant revocation.
+
+These direct references are not the complete retention closure. Declared inherited inputs still
+require native ancestry/closure verification; a syntactically consistent snapshot with missing inputs
+must never authorize publication. The validator neither proves control authorization nor validates
+source filesystem custody, actor provenance or a full acyclic closure. There is no native writer,
+agent grant API or enrollment path in this increment. Existing open/approval/collection refusals
+remain in place until the older-writer fence, authenticated native control and complete publication
+barrier are integrated. Tests of this projection do not close those requirements.
