@@ -7184,3 +7184,15 @@ lane graph inspection and retained references; automatic multi-lane context reso
 reservation/grant/start integration, generic callers, runtime/publication controls and packaged
 acceptance remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The user
 checkpoint stays fixed.
+
+R161 consumed-graph implementation `35f447e142f2e26dfe9768db359af6f1ea524fe0` passed full
+`npm test`: 3,949 native tests in 279.218s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+This includes effective-configuration validation, original-marker freshness and exact local retention
+objects without misclassifying owner-store grant payloads. Published predecessor
+`0fc65bf9aaf197b74b27d24a079e06bf1cbbd919` passed all seven hosted checks in run `37235110193`.
+Complete history and focused, mutation, failed diagnostic and full logs are preserved. Explicit native
+consumed-lane graph inspection is verified; automatic multi-lane resolution, downstream reservation/
+grant/start, generic desktop/harness integration, runtime/publication controls and packaged acceptance
+remain required. Draft PR #324 / issue #323 and the full fleet goal remain open. The fixed user
+checkpoint is unchanged.
