@@ -5543,6 +5543,28 @@ log is preserved. Hosted delivery remains pending. R125's original head passed a
 checks before its source-identical main reconciliation; no active CI head was replaced.
 
 
+## R127 — cancel the owned provider process group
+
+Based on published R126 / PR #264 at `cc5608f3eddb04d001cb204e2403f4d76e58a31f`. New canonical
+implementation replaces no preserved source commit. Both adapters use a dedicated process group.
+Cancellation and failed-launch abort signal it only while the original child remains unreaped,
+which pins the group number against PID reuse; the direct child is also stopped if it moved groups.
+An observed exit permanently refuses later numeric group signaling. No persisted schema, protocol,
+credential, capacity-release or main-approval authority changes.
+
+Four focused provider regressions pass. The new real-process test starts a descendant with inherited
+output pipes, requires prompt shutdown before natural child exit, keeps an independent process alive,
+and refuses signaling after reaping. Restoring direct-child-only stop fails the timely-shutdown
+assertion; source restored byte-for-byte. Full validation and hosted delivery are pending. This is
+not containment or proof of escaped descendant termination. Remote terminal capacity remains reserved;
+full cancellation/restart acceptance and issue #172's intermittent lifecycle warning remain open.
+
+R127 full local gate passed 3,798 native tests in 162.715s (1 slow, 17 skipped),
+185 rendered tests, 646 desktop tests and all 44 real-daemon checks. No lifecycle warning was
+reported in this run; this does not resolve issue #172's intermittent earlier observations.
+Hosted delivery remains pending. User checkpoints and their application state remain unchanged.
+
+
 ## R128 — worker progress inspection without a shared scan lock
 
 New canonical implementation for [issue #267](https://github.com/idosams/Mesh/issues/267); no
