@@ -1758,3 +1758,12 @@ the callback, and refuse callback admission after native grant revocation. Remov
 emptiness checks makes the new regression fail (1.116s); exact source was restored. Full repository
 validation is pending. Required journal-before-install ordering, durable owner/completion receipts,
 recovery and cross-store admission remain unfinished; PR #324 stays draft and the checkpoint fixed.
+
+R161 transaction-custody implementation `55fe74f5528355c45bb9f6e0b4797b7bb14fbdfb` passed
+full `npm test`: 3,949 native tests in 316.666s (five slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+Published predecessor `a3ff44a5e95f733a7c5bd391ee98fa5a8f781616` passed all seven hosted checks
+in run `37223540971`. Positive and deliberately failing regression logs and complete Git history
+are preserved. The validated callback retains complete custody but does not itself install files,
+append consumption or acknowledge a runnable version. Draft PR #324 remains unmerged; issue #323
+and the full fleet goal remain open. The fixed checkpoint is unchanged.
