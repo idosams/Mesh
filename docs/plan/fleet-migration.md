@@ -6521,3 +6521,10 @@ pending intent, source/journal substitution, foreign suffix and corrupt payload 
 verification passed 12 tests in 80.930s (two slow). Full validation and a draft PR follow; R160 remains
 unmerged and incomplete until atomic graph/recovery-root composition and outstanding #321 proof
 are finished. No runtime copying, publication, generic collection or checkpoint package changed.
+
+Full Mesh validation passed on implementation `9a6f4b7a240775b81757d41ced49f641caacca6f`: 3,926 native
+tests in 272.003s (five slow, 18 skipped), 194 rendered, 672 desktop and 44 daemon checks, with all
+static gates passing. The initial full run failed Clippy's map-entry rule; `9a6f4b7` corrected the
+lookup and the complete rerun passed. The draft PR publishes this verified groundwork before further
+R160 refinement. It does not close #321 or authorize merge while composition/fault coverage remains
+unfinished. Subsequent documentation-only evidence changes pass docs and diff checks.

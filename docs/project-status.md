@@ -1407,3 +1407,10 @@ refuse with evidence preserved. Twelve focused grant/decision tests passed in 80
 including retention inspection at all 146 frame prefixes for each control type. Full Mesh validation
 is next, followed by a draft R160 PR so the unfinished increment is reviewable. Complete graph and
 recovery-root composition and the remaining issue #321 fault cases still block merge readiness.
+
+R160's current implementation `9a6f4b7a240775b81757d41ced49f641caacca6f` passed the full Mesh gate:
+3,926 native tests (272.003s, five slow, 18 skipped), 194 rendered tests, 672 desktop tests and
+44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy checks. The first full run
+stopped at a Clippy map-entry finding; it was fixed without suppressing the check. This validates
+the current groundwork, not completion of issue #321 or packaged/provider acceptance. A draft PR
+is being published against canonical main; remaining composition/fault coverage still blocks merge.
