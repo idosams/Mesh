@@ -42,7 +42,10 @@ Pins are fixed to exact saved versions and remain available during list refresh.
 layout, page cursor and selected object now persist through the separate native store. Restart
 re-reads exact native history without requiring live fleet ownership. Unavailable content retains
 its selector and shows a read error; failed saves expose retry/reload controls instead of claiming
-persistence. Live overview summaries and packaged parallel-inspection acceptance remain unfinished.
+persistence. Each lane now exposes its durable latest acknowledged save in the polled overview, including
+restored lanes. The shortcut pins the version shown when clicked, even if later saves arrive
+during loading. Missing legacy fields mean unknown, not unsaved work. Broader changed-file/live
+activity summaries and packaged parallel-inspection acceptance remain unfinished.
 
 ## Retained worker execution observations
 

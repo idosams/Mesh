@@ -353,3 +353,12 @@ test('private save observations are optional, dated and never approval claims', 
     assert.throws(() => fleetActivity(copy));
   }
 });
+
+test('lane saved version is optional for older replies and exact when present', () => {
+  const value = catalogue(); assert.equal(fleetCatalogue(value)[0].lanes[0].savedVersion, null);
+  value.fleets[0].state.lanes[0].saved_version = version;
+  assert.equal(fleetCatalogue(value)[0].lanes[0].savedVersion, version);
+  for (const invalid of ['latest', '../file', 'A'.repeat(64), 1, {}]) {
+    value.fleets[0].state.lanes[0].saved_version = invalid; assert.throws(() => fleetCatalogue(value));
+  }
+});

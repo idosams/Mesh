@@ -2908,6 +2908,11 @@ fn lane_summary(lane: &Lane) -> Json {
         ("goal", Json::text(&lane.goal)),
         ("provider", Json::text(&lane.provider)),
         ("base", Json::text(lane.base.to_string())),
+        (
+            "saved_version",
+            lane.saved
+                .map_or(Json::Null, |version| Json::text(version.to_string())),
+        ),
         ("allocated", Json::Bool(lane.workspace.is_some())),
         (
             "workspace",

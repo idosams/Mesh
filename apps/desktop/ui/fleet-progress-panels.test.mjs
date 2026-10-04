@@ -59,3 +59,32 @@ test('failed reads retain verified content, exact retry selection and bounded pa
   assert.equal(f.calls.length, count);
   f.controller.dispose(); f.list(); f.pin(9); assert.equal(f.calls.length, count);
 });
+
+test('pin latest fixes the clicked version beyond the first page while newer work arrives', async () => {
+  let observed = h(70), resolvePage; const calls = [];
+  const controller = createFleetProgress({ changed() {}, laneFor: () => ({ savedVersion: observed }), invoke: async (command, args) => {
+    calls.push({ command, args });
+    const common = { objective, lane, revision: 80, source_version: h(3), starting_version: h(4), latest_acknowledged_version: h(80), handoff_authority: false, approval_authority: false };
+    if (command === 'fleet_saved_progress') return new Promise(resolve => { resolvePage = () => resolve({ ...common, schema: 'mesh.fleet-saved-progress-page/v1', progress: {
+      after: null, order: 'causal-operation', total: 80, versions: Array.from({ length: 50 }, (_, n) => ({ version: h(n + 4), ordinal: n + 1 })), next_after: h(53) } }); });
+    assert.equal(command, 'inspect_fleet_saved_progress');
+    return { ...common, schema: 'mesh.fleet-saved-progress-comparison/v1', progress: { base: h(4), target: args.version,
+      after: null, selected: null, order: 'object-id', approval_authority: false, total: 0, changes: [], next_after: null } };
+  } });
+  controller.handle({ type: 'progress-pin-latest', objective, lane, version: h(69) }); assert.equal(calls.length, 0);
+  controller.handle({ type: 'progress-pin-latest', objective, lane, version: h(70) });
+  controller.handle({ type: 'progress-pin-latest', objective, lane, version: h(70) }); assert.equal(calls.length, 1);
+  observed = h(80); resolvePage(); await settle();
+  assert.equal(controller.snapshot().progressPins[0].selection.version, h(70));
+  assert.equal(controller.snapshot().progressPins[0].input.page.target, h(70));
+  assert.deepEqual(controller.snapshot().progressLatestBusy, {});
+});
+test('late latest-save lookup cannot open a panel after disposal', async () => {
+  let resolve;
+  const page = { schema: 'mesh.fleet-saved-progress-page/v1', objective, lane, revision: 2,
+    source_version: h(3), starting_version: h(4), latest_acknowledged_version: h(5), handoff_authority: false, approval_authority: false,
+    progress: { after: null, order: 'causal-operation', total: 2, versions: [{ version: h(4), ordinal: 1 }, { version: h(5), ordinal: 2 }], next_after: null } };
+  const c = createFleetProgress({ changed() {}, laneFor: () => ({ savedVersion: h(5) }), invoke: () => new Promise(r => resolve = r) });
+  c.handle({ type: 'progress-pin-latest', objective, lane, version: h(5) }); c.dispose(); resolve(page); await settle();
+  assert.deepEqual(c.snapshot().progressPins, []);
+});

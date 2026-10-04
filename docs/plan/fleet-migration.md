@@ -5776,3 +5776,25 @@ preserved the failure log. Full validation and hosted/packaged delivery remain p
 summaries and the full fleet acceptance plan are still required. Fixed user checkpoint unchanged.
 
 R136 implementation `df9d0c5053cd16d1412b860117863e06479e9dab` passed full `npm test`: 3,823 native tests in 166.583s (1 slow, 17 skipped), 189 rendered tests, 660 desktop tests and 44 real-daemon checks. Hosted and packaged delivery remain pending.
+
+
+## R137 — exact latest-save lane overview
+
+New canonical implementation built on PR #276 head
+`c222afe8b289ac00b79e038d758df368b583c8d5` and source-identically reconciled with main
+`2cdc40668c4a944ac5408873c7968cb509a27c30`. No preserved source commit is replaced.
+Native lane summaries add nullable saved_version from the durable ledger. The renderer accepts
+older absent fields as unknown and rejects malformed values. The polled overview displays the
+latest acknowledged version independently of live worker ownership and can pin that exact clicked
+version. History reads obtain the bound source/starting identity; a newer acknowledgment does not
+retarget the request, even when the chosen version lies beyond the first 50-operation page.
+Duplicate in-flight requests are suppressed, concurrent requests are bounded, and disposal or
+selector restoration invalidates pending panel creation. No persisted-schema change or mutation
+of provider execution, working files, checkpoints, reviews or approval state.
+
+Focused native verification covers the projected version after a real save. Controller/parser
+and rendered regressions cover older replies, malformed values, later-save races, duplicate and
+closed reads, restored ownership and loading controls. Substituting the newer acknowledgment for
+the clicked version fails the regression; source restored exactly. Full gate and hosted delivery
+remain pending. Changed-file/activity summaries, packaged multi-agent acceptance and the rest of
+the full fleet plan remain required. User checkpoint unchanged.

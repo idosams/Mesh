@@ -50,13 +50,14 @@ export function fleetCatalogue(raw) {
     const runs = new Set();
     const result = state.lanes.map((lane) => {
       require(identity(lane?.id) && !lanes.has(lane.id) && nullable(lane.parent, identity) && nullable(lane.source_project, digest)
+        && (lane.saved_version === undefined || nullable(lane.saved_version, digest))
         && text(lane.goal, 8192) && identity(lane.provider) && digest(lane.base) && typeof lane.allocated === 'boolean');
       lanes.add(lane.id);
       require(lane.allocated ? text(lane.workspace?.root, 4096) && lane.workspace.root.startsWith('/') && text(lane.workspace.installation, 4096) : lane.workspace === null);
       require(lane.run === null || (identity(lane.run?.id) && !runs.has(lane.run.id) && states.has(lane.run.state)));
       if (lane.run) runs.add(lane.run.id);
       return { id: lane.id, parent: lane.parent, sourceProject: lane.source_project, goal: lane.goal, provider: lane.provider,
-        base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
+        savedVersion: lane.saved_version ?? null, base: lane.base, allocated: lane.allocated, run: lane.run ? { id: lane.run.id, state: lane.run.state, remote: remoteAssignment(lane.run.remote) } : null };
     });
     require(result.every(lane => lane.parent === null || (lane.parent !== lane.id && lanes.has(lane.parent))));
     require(!policy || result.every(lane => policy.providers.includes(lane.provider) && (lane.parent !== null || lane.provider === policy.coordinator)));
