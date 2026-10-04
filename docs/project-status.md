@@ -1277,6 +1277,7 @@ still validate the full dependency closure and current decisions. The checkpoint
 R157 admits a native read callback only under the exact current allowed grant and matching native
 source/destination bindings. Custody remains held; saved source bytes stay read-only and fixed. Six
 focused native tests and a legacy-grant refusal test pass; removing the current-generation check
-fails the revocation regression. Full local and hosted validation are pending. This is not a runtime
+fails the revocation regression. Full local verification passed: 3,899 native, 194 rendered and
+672 desktop tests plus all 44 real-daemon checks. Hosted validation is pending. This is not a runtime
 agent operation, materialization, consumption receipt or publication gate. Exact allocation/consumption
 and full closure enforcement remain outstanding. The fixed user checkpoint is unchanged.

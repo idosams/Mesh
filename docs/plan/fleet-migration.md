@@ -6368,3 +6368,6 @@ Failed and passing logs are preserved. Full local and hosted validation remain p
 No renderer/agent/CLI invokes this API, no destination is materialized or launched, and no consumption
 receipt is recorded. Full inherited closure, exact starting operations, allocation recovery, retention
 and all publication/import/recovery enforcement remain required. The fixed checkpoint is unchanged.
+
+R157 implementation verification: Full `npm test` passed on implementation `c62f57711174e82fc5c00bac1e558ac43bc9ab0c`: 3,899 native tests in 264.898s (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+R153 merged-main CI `37201308084` subsequently passed on `5bc0e79ee5b3f24a149ef9bbfc4b7a607034d954`.
