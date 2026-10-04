@@ -7314,3 +7314,15 @@ The prerequisite passed all seven hosted checks in run `37239592857`; the child 
 requires its own hosted checks and merge. Full goal and issue #323 remain open: generic callers,
 runtime/publication/review/import/remote controls and packaged acceptance remain required.
 The fixed user checkpoint is unchanged.
+
+R161 empty-input acceptance now completes a real empty consumed snapshot, reopens its native
+catalog/owner/source/destination handles, retries completion without journal growth, and verifies a
+two-operation graph with no manifests/chunks and three retained stores. A first later save produces
+readable bytes while the initial version remains empty, with no source files or owner-history change.
+This closes a gap in the prior test, which stopped at signing/staging. The focused graph journey
+passed in 14.663s. A mutation acknowledging completion without its durable transaction failed at
+reopened recovery in 5.373s; production source was restored byte-for-byte. This is in-process native
+reopening, not a new fresh-process or packaged-app claim. Full validation is pending. The increment
+is based on published PR #325 (`e27f41302850e643040062c8454fd6aa57f76e76`) and replaces no preserved
+fleet commit. Both dependency PRs and issue #323 remain open; all runtime, UI, publication and
+packaged acceptance requirements remain. The user's checkpoint is unchanged.
