@@ -2233,3 +2233,13 @@ assertions, is pending. This increment is based on published PR #325 at
 `26d61d4fb97c99ee7b52f607f15721e07acf63ab`, replaces no preserved fleet source commit, and will get
 its own PR before the next substantial increment. Issue #323 and the full fleet objective remain open.
 The fixed user checkpoint is unchanged.
+
+R161 native catalog reads `8d35bd9d9ed25a98d6fccc9f2eddc95738b1e8e8` passed full `npm test`:
+3,949 native tests in 320.087s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all remaining repository/docs/license/storage/format/lint gates.
+The full run includes the added owner-history freshness and interrupted-consumption refusals.
+Focused/mutation/lint/full evidence and complete history are preserved. Foundation PR #324 also
+passed post-merge run `37241537647`; empty-input PR #326 passed run `37241441884` on its published
+head but still needs base reconciliation and merge. The catalog-read increment requires its own
+hosted checks and normal merge. Automatic input discovery, desktop/harness wiring and the full
+remaining fleet acceptance remain open in #323. The fixed checkpoint is unchanged.
