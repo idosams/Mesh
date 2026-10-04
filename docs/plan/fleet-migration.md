@@ -6814,3 +6814,13 @@ complete interruption/revocation campaign remain required. Private-stage retries
 the exact retained-source snapshot; transaction recovery must additionally handle intervening owner
 history and committed outcomes without rewriting that evidence. Draft PR #324 remains unmerged,
 issue #323 remains open, and the fixed checkpoint remains unchanged.
+
+R161 private-staging implementation `a89419f3bc3bc7b7d5203124c5f25e8cfe40cdb3` passed full
+`npm test`: 3,948 native tests in 277.987s (five slow, 18 skipped), 194 rendered tests, 672 desktop
+tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The existing
+native integration tests now additionally cover private staging and separate-process restart.
+Published predecessor `4d176d29087916f7499849c535d27df024fa13f3` passed all seven hosted checks in
+run `37221161431`. Successful and negative-mutation logs and complete Git bundles are preserved.
+This validates private staging, not destination installation or consumed runtime admission. Required
+start ordering, owner receipt, completion and cross-store recovery remain open in draft PR #324 /
+issue #323; the full fleet objective and fixed checkpoint are unchanged.
