@@ -135,4 +135,4 @@ fn inspect(workspace: &LaneWorkspace, grant: &Grant) -> Result<AgentFinishPrefli
 }
 
 #[cfg(all(test, target_os = "macos"))]
-mod tests;
+pub(in crate::fleet::service) mod tests;

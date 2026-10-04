@@ -4,13 +4,13 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::time::Duration;
 
-struct Fixture {
-    service: Arc<FleetService>,
-    credential: AgentCredential,
-    lane: String,
-    root: std::path::PathBuf,
+pub(in crate::fleet::service) struct Fixture {
+    pub(in crate::fleet::service) service: Arc<FleetService>,
+    pub(in crate::fleet::service) credential: AgentCredential,
+    pub(in crate::fleet::service) lane: String,
+    pub(in crate::fleet::service) root: std::path::PathBuf,
 }
-fn fixture() -> Fixture {
+pub(in crate::fleet::service) fn fixture() -> Fixture {
     let path = std::env::temp_dir().join(format!(
         "mesh-worker-progress-{}-{}",
         std::process::id(),

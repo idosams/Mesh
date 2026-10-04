@@ -20,6 +20,7 @@ use mesh_types::{Blake3, ContentDigest};
 
 pub use crate::CheckpointSigner;
 
+mod local_checkpoint;
 mod progress;
 pub use progress::WorkerProgress;
 mod received;
@@ -1023,6 +1024,9 @@ impl FleetService {
         action: &str,
         arguments: &Json,
     ) -> Result<Json, Unavailable> {
+        if action == "checkpoint" && self.lock()?.received.is_none() {
+            return self.local_checkpoint(credential, arguments);
+        }
         if action == "missing_files" {
             exact_fields(arguments, &[])?;
             return self.agent_missing_files(credential);
