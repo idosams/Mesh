@@ -7006,3 +7006,13 @@ source was restored byte-for-byte. An explicit revoked-install retry assertion i
 full-gate candidate. Full repository validation is pending; no installed result is acknowledged as
 a consumed version. Destination history, owner receipt, completion and cross-store admission remain
 required by draft PR #324 / issue #323. The fixed user checkpoint and full fleet scope are unchanged.
+
+R161 installation implementation `e7969bf8d13b3942bda2e79f0404fcdf01fc4301` passed full
+`npm test`: 3,949 native tests in 324.505s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+This includes the explicit revoked-install retry assertion. Published predecessor
+`56c638c9105fb1f7ffb48c951c81a5ef100453d9` passed all seven hosted checks in run
+`37228220453`. Complete Git history and positive/negative/full verification logs are preserved.
+Installation and exact partial-install recovery are verified at native integration scope;
+destination checkpoint, owner receipt, local completion, cross-store admission and packaged
+acceptance remain required. Draft PR #324 / issue #323 remain open and the user checkpoint is fixed.
