@@ -255,6 +255,14 @@ impl ProjectAttachment {
         if let Some((_, record, payload)) = &pending {
             policy.clone().apply(*record, payload).map_err(error)?;
         }
+        // Canonical replay is not cross-store transaction verification. Keep ordinary native
+        // capture/control/read fenced until exact consumption recovery validates the owner
+        // receipt, retained input closure, configuration transition and starting operation.
+        if policy.has_consumption_transaction() {
+            return Err(invalid(
+                "consumed history requires native transaction verification",
+            ));
+        }
         let proof = VerifiedDependencyRead {
             store: identity,
             journal: journal_identity,

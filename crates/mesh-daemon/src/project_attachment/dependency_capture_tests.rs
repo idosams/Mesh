@@ -546,3 +546,122 @@ fn capture_retention_reads_staged_prefixes_without_recovery_and_keeps_completed_
         b"newer editor work"
     );
 }
+
+#[test]
+fn canonical_consumption_records_alone_cannot_admit_native_capture_or_control() {
+    use mesh_store::{DependencyKind, DependencyRecord, StoredRecord};
+    let f = Fixture::new("consumption-record-fence", true);
+    let input = f.input(b"unexpected editor work remains untouched");
+    let (binding, mut policy) = {
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+        let (_, proof) =
+            f.a.project()
+                .read_configuration(f.a.metadata_path(), &f.a.store)
+                .unwrap();
+        let proof = proof.unwrap();
+        (proof.binding(), proof.policy().clone())
+    };
+    let j = |n| Json::text(id(n).to_hex());
+    let mut start: Option<String> = None;
+    for kind in [
+        DependencyKind::ConsumptionStart,
+        DependencyKind::ConsumptionComplete,
+    ] {
+        let (revision, previous) = policy.native_head().unwrap();
+        let body = if kind == DependencyKind::ConsumptionStart {
+            Json::object([
+                ("request", j(60)),
+                ("owner", Json::Array(vec![j(70), j(71), j(72)])),
+                (
+                    "destination",
+                    Json::Array(vec![j(20), Json::text(binding.installation.to_hex())]),
+                ),
+                (
+                    "source",
+                    Json::Array(vec![Json::Array(vec![j(10), j(11)]), j(12)]),
+                ),
+                ("grant", j(61)),
+                ("bindings", Json::Array(vec![j(62), j(63)])),
+                ("configuration", j(64)),
+                ("prospective", j(65)),
+                ("closure", j(66)),
+                ("operation", j(67)),
+                ("staged", j(68)),
+            ])
+        } else {
+            Json::object([
+                ("start", Json::text(start.as_deref().unwrap())),
+                ("owner_receipt", j(69)),
+            ])
+        };
+        let bytes = Json::object([
+            ("schema", Json::text("mesh.dependency-policy/v1")),
+            ("authority", Json::text(binding.authority.to_hex())),
+            ("revision", Json::Number(revision + 1)),
+            ("previous", Json::text(previous.to_hex())),
+            ("kind", Json::Number(u64::from(kind.code()))),
+            ("body", body),
+        ])
+        .encode()
+        .into_bytes();
+        let record = DependencyRecord {
+            authority: binding.authority,
+            revision: revision + 1,
+            previous,
+            payload: hash(&bytes),
+            kind,
+        };
+        // Both records are valid canonical projections. Neither proves staged content,
+        // owner authority, cross-store acknowledgement, or a valid initial operation.
+        policy.apply(record, &bytes).unwrap();
+        if kind == DependencyKind::ConsumptionStart {
+            start = Some(record.payload.to_hex());
+        }
+        {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&f.a.store).unwrap();
+            let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+                f.a.metadata_path(),
+                f.a.store.filesystem(),
+            )
+            .unwrap();
+            cas.promote(bytes.clone()).unwrap();
+            let mut journal = fs::OpenOptions::new()
+                .append(true)
+                .open(f.a.metadata_path().join(crate::RECORD_FILE_NAME))
+                .unwrap();
+            journal
+                .write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
+                .unwrap();
+            journal.sync_all().unwrap();
+        }
+        let before = f.journal();
+        let called = std::cell::Cell::new(false);
+        assert!(f
+            .a
+            .prepare_dependency_capture(&input, public(&f.key), id(80), |p| {
+                called.set(true);
+                sign(&f.key, p)
+            })
+            .is_err());
+        assert!(
+            !called.get(),
+            "unverified consumption must refuse before signing"
+        );
+        assert!(f
+            .a
+            .decide_saved_input(f.initial, SavedInputDecision::Rejected, None, id(81))
+            .is_err());
+        assert_eq!(f.journal(), before);
+        assert_eq!(
+            fs::read(f.a.project().root().join("note")).unwrap(),
+            b"unexpected editor work remains untouched"
+        );
+        let cas = Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            f.a.metadata_path(),
+            f.a.store.filesystem().read_only(),
+        )
+        .unwrap();
+        assert_eq!(read_payload(&cas, record.payload, 65_536).unwrap(), bytes);
+    }
+}

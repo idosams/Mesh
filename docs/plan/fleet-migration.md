@@ -6641,3 +6641,25 @@ tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint
 will be updated with this verified refinement; new hosted validation remains required. It remains
 draft because persistent fencing, materialization, owner/destination commit ordering and recovery
 are unfinished. The fixed checkpoint and full fleet goal are unchanged.
+
+R161 required consumption storage now adds destination start/completion subtypes 5 and 6 to the
+existing required dependency envelope, with migration 4 preserving populated indexed rows. Migration
+3 is unchanged. Commit `9415a315e164fa72057d0e6ce1beedafe4dfd8ee` passed 342 storage tests (one timing
+benchmark skipped) and all-target daemon compilation. Reopening and raw journal reconstruction are
+verified separately; the in-memory index is not implicitly loaded on open.
+
+The local destination policy projection now binds a start to an exact request, owner enrollment,
+destination installation, granted source, correlation bindings, original/prospective configuration
+digests, complete-closure digest, signed starting operation and staged-object digest. Start is
+allowed only as the first policy record after enrollment; completion must name that exact start
+and its owner receipt. Unrelated policy advancement while pending, conflicting completion,
+second start, malformed identities and duplicate request reuse refuse atomically. Exact replay
+retains the same historical result and all direct references. Native admission still refuses both
+pending and completed-looking records until cross-store consumption verification is implemented.
+A native capture/control test confirms this refusal preserves editor bytes and history; removing
+the admission check makes that test fail because capture incorrectly reaches preparation.
+
+These are staged R161 foundations within draft PR #324, not a completed consumed version. Durable
+materialization, independent owner-receipt verification, recovery, actual previous-writer proof,
+full current-tree validation and merged delivery remain required. The fixed user checkpoint and
+all graphical/provider/remote acceptance requirements are unchanged.
