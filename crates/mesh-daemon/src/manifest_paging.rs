@@ -381,7 +381,7 @@ pub fn reconstruct_paged_manifest(
     })
 }
 
-fn logical_manifest_id(
+pub(crate) fn logical_manifest_id(
     byte_length: u64,
     content_digest: RecordDigest,
     chunks: &[ChunkSlice],

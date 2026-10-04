@@ -648,3 +648,7 @@ impl ProvisionedAttachment {
         })
     }
 }
+
+#[path = "dependency_capture_retention.rs"]
+mod retention;
+pub use retention::NativeCaptureRetention;

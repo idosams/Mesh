@@ -6450,3 +6450,113 @@ R159 full gate on `7ef5088b885cf86224353b55d409487a9d604335` passed: 3,918 nativ
 (5 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, including
 repository/docs/license/storage/fmt/clippy checks. The native interruption fixtures do not establish
 power-loss or packaged acceptance. Hosted checks and merged reservation delivery remain pending.
+
+
+R159 delivery: [PR #320](https://github.com/idosams/Mesh/pull/320) merged at
+`227fc60d7ce4f5730d74055380567daf1ef0d2f2` after all seven hosted checks in run `37208335397`
+passed on head `953b5cd285e386a3dc1b990859545b711f3b59e2`. Post-merge verification
+`37209051599` is running. The earlier pending R159 entries above are historical.
+
+## R160: Complete native input ancestry and retained roots
+
+Tracks [issue #321](https://github.com/idosams/Mesh/issues/321), builds on merged R159, and replaces
+no preserved source commit. Initial local helper commit `0c5ba6e` verifies immutable signed operation
+facts, including exact parent/header agreement and bounded native CAS reads; three focused tests
+passed in 0.136s. An initial test CAS type-inference failure was corrected. Removing the signed-parent
+comparison makes its refusal test fail on an emptied journal parent list; exact source was restored.
+Ancestry-only merge `7b1769d` reconciles that work with canonical R159 without changing its file tree.
+
+This is unfinished groundwork, not complete dependency closure or a passing full-gate increment.
+The reader is now connected to bounded native graph inspection. Typed historical consumption facts
+add native-bound source edges; receipt input declarations are checked against independent traversal.
+A real two-save history regression first exposed an incorrect workspace identity derivation; using
+the capture writer's existing domain-separated function fixed it. The focused ancestry/policy/graph
+run passed 17 tests in 2.475s without unused-code warnings, including reopen and unsaved-editor
+isolation. Retain both failing and passing logs. This does not establish retained-root completeness.
+Do not claim a flat caller-provided input list proves complete ancestry. Native work resolution,
+qualified DAG traversal, typed owner-consumption facts, bounds/conflict/cycle checks, manifest/chunk
+retention, pending roots and rebuild/rejection tests remain to implement in this increment.
+Reservation lineage alone is not a consumed-input edge. The full consumption/starting-operation,
+old-writer pending-copy fence, all-path publication/import/review and runtime/acceptance scope remains
+open; the fixed user checkpoint is unchanged.
+
+R160 content groundwork verifies journal manifests and streams historical chunks without quarantine,
+including content replaced in later saves. Logical manifest identity, contiguous chunk layout, chunk
+length/hash and whole-file digest must agree. The graph carries qualified chunk facts, with bounded
+per-manifest references and a shared 1 GiB read budget. Six focused tests passed in 0.493s; missing
+or corrupt earlier content refuses and corrupt bytes remain untouched. The initial compile failure
+(missing streaming digest trait import) and passing log are preserved. This still does not establish
+complete policy/pending-object retention, rebuild or cross-work coverage and is not ready for PR.
+
+R160 selected-graph retention facts now qualify authority/policy payloads, operation payloads,
+logical manifests and chunks by native work, installation, physical store and correlation. Policy
+rejection preserves content and graph identity. Early reference bounds refuse before loading more
+nodes. Focused policy/graph/ancestry tests passed 18/18 in 2.443s. Extended native graph tests passed
+4/4 in 1.95s with three real native works and test-only owner consumption replay fixtures, exercising
+incomplete closure and missing intermediate-work refusal, transitive roots and owner/child store
+separation. This is not production consumption transaction proof. Attachment indexes rebuild in
+memory: an explicit removal-count assertion caught the initial vacuous disk-index test. Its replacement
+proves corrupt on-disk caches are ignored and preserved, and absent caches yield identical facts.
+Omitting policy roots makes the regression fail on the missing rejection payload in 0.51s; exact
+passing source restored. Full pending/completed transaction retention and full-gate/PR delivery remain
+unfinished. All failing and passing logs are retained.
+
+R160 capture recovery-root groundwork adds an exact native read-only request inspector for pending
+and completed receipts. It reconstructs known torn capture frames in memory and verifies local
+authenticated operation/manifests/chunks through the same helpers as graph reads; the journal,
+sidecars and newer source files remain unchanged. The result includes the staged frame CAS object
+and qualified local recovery evidence, not collection permission or a whole-project closure.
+Combined focused verification passed 18 tests in 15.532s. After wiring the signed-payload byte budget,
+11 capture tests passed without warnings in 15.10s, including root inspection before recovery at
+every frame-byte boundary and historical receipts after later saves. Omitting the frame root makes
+the native regression fail in 0.24s; exact passing source restored. Failed compilation and unused
+budget intermediate logs are retained. Pending control objects and complete graph/recovery-root
+composition still need implementation before full validation and R160 PR delivery.
+
+Pending grant/eligibility control roots are now inspectable under native custody without applying
+the transaction. Exact request, physical prefix, staged payload and policy replay must agree; local
+policy CAS roots remain distinct from references into other works. Both existing every-byte-prefix
+recovery tests now inspect retention before recovery and assert unchanged journal bytes. Changed
+pending intent, source/journal substitution, foreign suffix and corrupt payload also refuse. Focused
+verification passed 12 tests in 80.930s (two slow). Full validation and a draft PR follow; R160 remains
+unmerged and incomplete until atomic graph/recovery-root composition and outstanding #321 proof
+are finished. No runtime copying, publication, generic collection or checkpoint package changed.
+
+Full Mesh validation passed on implementation `9a6f4b7a240775b81757d41ced49f641caacca6f`: 3,926 native
+tests in 272.003s (five slow, 18 skipped), 194 rendered, 672 desktop and 44 daemon checks, with all
+static gates passing. The initial full run failed Clippy's map-entry rule; `9a6f4b7` corrected the
+lookup and the complete rerun passed. The draft PR publishes this verified groundwork before further
+R160 refinement. It does not close #321 or authorize merge while composition/fault coverage remains
+unfinished. Subsequent documentation-only evidence changes pass docs and diff checks.
+
+Draft [PR #322](https://github.com/idosams/Mesh/pull/322), head `1cbbab33934e7d6491b0518431b850e7fedcb72a`,
+publishes R160 groundwork with full local gate evidence. Initial hosted run `37211764661` had five
+passing checks and Linux/macOS tests still running; no merge or published-head replacement occurred.
+
+Further local R160 composition ties completed capture sidecars and frame CAS objects to the same
+graph custody snapshot, and retains complete pending control sidecars awaiting acknowledgement.
+Receipt inventory and aggregate verification work are bounded. A new native regression initially
+failed because two receipt requests could claim one operation; duplicate detection now refuses.
+The final focused graph suite passed five tests in 2.31s, including corrupt recovery-object preservation,
+byte-identical installation substitution/conflicting handles, restoring original native identity, and
+legacy provenance refusal without losing saved work. Logs preserve the failing-before case and
+passing refinements. Full validation and publication of this refinement are pending; R160 remains
+draft until remaining recovery composition and executable #321 evidence are complete.
+
+R160 local refinement now composes fully journaled pending capture evidence with graph retention;
+torn or unappended captures require the exact recovery inspector and cannot produce a complete
+graph. Signed multi-parent operation fixtures verify shared-parent deduplication and missing-parent
+refusal. An actual legacy allocation regression reproduced a copied lane incorrectly being reported
+as dependency-free after enrollment. Graph inspection now refuses that copied origin until explicit
+migration evidence exists, preserving its journal and files. Allocation identity for an empty native
+reservation remains distinct from consumption. The five focused graph tests pass (2.67s); full
+validation and publication of these refinements are pending. Draft PR #322 remains unmerged, with
+seven successful checks on its older published head `1cbbab33934e7d6491b0518431b850e7fedcb72a`.
+
+R160 composition implementation `30d658add820195b9d0a43ee2c9bc94ecbc4ffe4` passed the full `npm test`
+gate: 3,927 native tests in 274.864s (five slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks, and repository/docs/license/storage/format/lint checks. This completes local
+validation of the graph/recovery composition and legacy-copy refusal refinement; publication and
+hosted validation of this revision are next. The earlier draft CI is not evidence for this revision.
+Native consumption copying, publication/import/review enforcement and the full fleet acceptance
+scope remain open. The fixed user checkpoint is unchanged.

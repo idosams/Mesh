@@ -70,6 +70,20 @@ enum Event {
     },
 }
 
+pub(crate) type QualifiedDependencyInput = (RecordDigest, RecordDigest, RecordDigest);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct NativeConsumptionFact {
+    pub(crate) record: RecordDigest,
+    pub(crate) grant: RecordDigest,
+    pub(crate) source: QualifiedDependencyInput,
+    pub(crate) start: QualifiedDependencyInput,
+    pub(crate) inputs: Vec<QualifiedDependencyInput>,
+    pub(crate) bindings: Option<(RecordDigest, RecordDigest)>,
+}
+fn qualified(input: Input) -> QualifiedDependencyInput {
+    (input.0 .0, input.0 .1, input.1)
+}
+
 /// Bounded, reconstructible historical projection. It grants no permission to consume or publish.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DependencyPolicyHistory {
@@ -318,6 +332,46 @@ impl DependencyPolicyHistory {
         self.decisions
             .get(&Input(Work(work, installation), version))
             .map(|(revision, payload, _)| (*revision, *payload))
+    }
+
+    /// Historical immutable consumption facts, never a current grant or proof of full closure.
+    /// Unbound legacy grants remain explicitly unknown; they are not silently filtered away.
+    pub(crate) fn consumption_facts(&self) -> Vec<NativeConsumptionFact> {
+        self.records
+            .iter()
+            .filter_map(|(record, (_, event))| {
+                let Event::Consumption {
+                    grant,
+                    start,
+                    inputs,
+                } = event
+                else {
+                    return None;
+                };
+                let (
+                    _,
+                    Event::Grant {
+                        source, bindings, ..
+                    },
+                ) = self.records.get(grant)?
+                else {
+                    return None;
+                };
+                Some(NativeConsumptionFact {
+                    record: *record,
+                    grant: *grant,
+                    source: qualified(*source),
+                    start: qualified(*start),
+                    inputs: inputs.iter().copied().map(qualified).collect(),
+                    bindings: *bindings,
+                })
+            })
+            .collect()
+    }
+
+    /// Payloads physically stored in this authority, excluding references into other work.
+    pub(crate) fn policy_payloads(&self) -> impl Iterator<Item = RecordDigest> + '_ {
+        self.records.keys().copied()
     }
 
     /// Direct immutable references only; not a complete retention closure or a collection oracle.
