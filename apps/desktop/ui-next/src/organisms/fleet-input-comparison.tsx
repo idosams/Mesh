@@ -4,7 +4,7 @@ import { TextComparison } from "./workspace-files-changes";
 
 export type InputSide = { path: string; kind: "file" | "folder"; digest: string | null; bytes: number | null; executable: boolean | null; state: "text" | "folder" | "not-requested" | "too-large" | "binary-or-unsafe-text"; text: string | null };
 export type InputChange = { object: string; effect: string; before: InputSide | null; after: InputSide | null };
-export type InputComparison = { loading: boolean; error: string; file: InputChange | null; page: { base: string; target: string; total: number; after: string | null; nextAfter: string | null; changes: InputChange[] } | null };
+export type InputComparison = { loading: boolean; error: string; file: InputChange | null; page: { base: string; target: string; total: number; fileTotal?: number | null; folderTotal?: number | null; after: string | null; nextAfter: string | null; changes: InputChange[] } | null };
 const send = (detail: Record<string, string>) => document.dispatchEvent(new CustomEvent("mesh:fleets-intent", { detail }));
 const path = (change: InputChange) => change.before && change.after && change.before.path !== change.after.path ? `${change.before.path} → ${change.after.path}` : change.after?.path ?? change.before?.path;
 function Side({ label, side }: { label: string; side: InputSide | null }) {
@@ -32,7 +32,7 @@ export function FleetInputComparison({ pin, input, layout = "inline", editable =
     {input?.loading && <p role="status">{t("Reading the exact starting-version comparison\u2026 The previous selection remains below.")}</p>}
     {input?.error && <><p role="alert">{t(input.error)}</p><Button variant="secondary" disabled={!editable || input.loading} onClick={() => onIntent({ type: "retry-input", pin })}>{t("Retry this comparison request")}</Button></>}
     {input?.page && <>
-      <p>{input.page.total} {t("changed objects")} · {input.page.changes.length} {t("on this page")}</p>
+      <p>{input.page.fileTotal != null && input.page.folderTotal != null ? <>{input.page.fileTotal} {t("changed files")} · {input.page.folderTotal} {t("changed folders")}</> : <>{input.page.total} {t("changed objects")}</>} · {input.page.changes.length} {t("on this page")}</p>
       <details className="break-all text-xs"><summary>{t("Exact comparison versions")}</summary><p>{t("Local starting version")}: <bdi dir="ltr">{input.page.base}</bdi></p><p>{t("Pinned result")}: <bdi dir="ltr">{input.page.target}</bdi></p></details>
       {input.page.total === 0 && <p>{t("No path, content or executable-mode changes since this lane started.")}</p>}
       <ul className="grid max-h-64 gap-2 overflow-auto text-sm">{input.page.changes.map(change => <li key={change.object}><button className="break-all text-left underline" disabled={!editable || input.loading} aria-pressed={file?.object === change.object} onClick={() => onIntent({ type: "input-file", pin, object: change.object })}>{t(change.effect === "added" ? "Added" : change.effect === "removed" ? "Removed" : change.effect === "moved-or-modified" ? "Moved; content may also differ" : "Content or metadata changed")} · <bdi dir="ltr">{path(change)}</bdi></button></li>)}</ul>

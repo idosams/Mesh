@@ -153,6 +153,16 @@ pub(crate) fn compare(
             _ => true,
         })
         .collect();
+    // Count the complete immutable comparison, not just this page or selected object.
+    let mut file_total = 0_u64;
+    for id in &changed {
+        if before.get(*id).is_some_and(|entry| entry.file.is_some())
+            || later.get(*id).is_some_and(|entry| entry.file.is_some())
+        {
+            file_total += 1;
+        }
+    }
+    let folder_total = changed.len() as u64 - file_total;
     let start = match after.or(selected) {
         Some(id) => {
             changed
@@ -200,6 +210,8 @@ pub(crate) fn compare(
         ("after", after.map_or(Json::Null, Json::text)),
         ("selected", selected.map_or(Json::Null, Json::text)),
         ("total", Json::Number(changed.len() as u64)),
+        ("file_total", Json::Number(file_total)),
+        ("folder_total", Json::Number(folder_total)),
         ("changes", Json::Array(changes)),
         (
             "next_after",

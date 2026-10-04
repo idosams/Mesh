@@ -3374,3 +3374,86 @@ fn actual_codex_progress_is_inspectable_before_any_explicit_handoff() {
     server.shutdown();
     eprintln!("ordinary progress proof: {}", report.encode());
 }
+
+#[test]
+fn saved_change_counts_cover_all_pages_and_ignore_later_work() {
+    let f = Fixture::new("saved-change-counts");
+    let credential = f
+        .service
+        .grant_with_signer(
+            &f.lane,
+            "root-run",
+            "count-reader",
+            Arc::new(TestCheckpointSigner(ed25519_dalek::SigningKey::from_bytes(
+                &[0x77; 32],
+            ))),
+        )
+        .unwrap();
+    let root = PathBuf::from(
+        f.service.native_state().unwrap().lanes[&f.lane]
+            .workspace
+            .as_ref()
+            .unwrap()
+            .root(),
+    );
+    fs::create_dir(root.join("many")).unwrap();
+    for n in 0..201 {
+        fs::write(root.join(format!("many/{n}.bin")), [0_u8, 0xff]).unwrap();
+    }
+    fs::write(root.join("note.txt"), "changed\n").unwrap();
+    let saved = f.service.save_worker_progress(&credential).unwrap();
+    assert!(saved.complete);
+    let version = saved.version.to_string();
+    let read = |after: Option<&str>, selected: Option<&str>| {
+        f.service
+            .saved_progress_comparison(&f.lane, &version, after, selected)
+            .unwrap()
+    };
+    let first = read(None, None);
+    let progress = first.get("progress").unwrap();
+    let counts = |value: &Json| {
+        let p = value.get("progress").unwrap();
+        assert_eq!(p.get("total").and_then(Json::as_u64), Some(203));
+        assert_eq!(p.get("file_total").and_then(Json::as_u64), Some(202));
+        assert_eq!(p.get("folder_total").and_then(Json::as_u64), Some(1));
+    };
+    counts(&first);
+    let rows = progress.get("changes").unwrap().as_array().unwrap();
+    assert_eq!(rows.len(), 200);
+    let next = read(Some(text(progress, "next_after")), None);
+    counts(&next);
+    assert_eq!(
+        next.get("progress")
+            .unwrap()
+            .get("changes")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    let selected = read(None, Some(text(&rows[0], "object")));
+    counts(&selected);
+    fs::write(root.join("note.txt"), "later saved bytes\n").unwrap();
+    fs::create_dir(root.join("later-folder")).unwrap();
+    let later = f.service.save_worker_progress(&credential).unwrap();
+    assert!(later.complete);
+    assert_ne!(saved.version, later.version);
+    let latest = f
+        .service
+        .saved_progress_comparison(&f.lane, &later.version.to_string(), None, None)
+        .unwrap();
+    assert_eq!(
+        latest
+            .get("progress")
+            .unwrap()
+            .get("folder_total")
+            .and_then(Json::as_u64),
+        Some(2)
+    );
+    assert_eq!(read(None, None).get("progress"), first.get("progress"));
+    assert_eq!(
+        fs::read_to_string(f.path.join("original/note.txt")).unwrap(),
+        "immutable input\n"
+    );
+}

@@ -47,7 +47,10 @@ its selector and shows a read error; failed saves expose retry/reload controls i
 persistence. Each lane now exposes its durable latest acknowledged save in the polled overview, including
 restored lanes. The shortcut pins the version shown when clicked, even if later saves arrive
 during loading. Missing legacy fields mean unknown, not unsaved work. Broader changed-file/live
-activity summaries and packaged parallel-inspection acceptance remain unfinished.
+activity summaries and packaged parallel-inspection acceptance remain unfinished. Exact pinned comparisons now separate native file and folder counts
+across the entire saved comparison, independently of the displayed page or selected object. Older
+replies retain an unknown split instead of inventing zero files. These counts describe retained
+saved entries, not current working files, capture completeness, or the broader live lane overview.
 
 ## Retained worker execution observations
 
