@@ -2192,3 +2192,15 @@ materialization/recovery, not provider/runtime permission, desktop integration o
 Generic desktop/harness callers, runtime/publication/review/import/remote controls and the remaining
 fault/acceptance campaigns stay required. PR #324 / issue #323 and the full fleet goal remain open;
 the user checkpoint stays fixed.
+
+R161 chained consumed starts `68979980c931a390fbcd4f3c7e62177173da2e44` passed full `npm test`:
+3,949 native tests in 299.421s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and
+all remaining repository/docs/license/storage/format/lint/real-daemon gates. This includes the
+revoke-after-signing refusal and multi-process, two-level consumption recovery assertions.
+This increment is delivered separately on `idosams/chained-consumed-start`, based on published
+`idosams/native-consumed-start` at `935f8820a26e62d82202a5c44bcda264df08175c` (prerequisite PR #324).
+It replaces no preserved fleet source commit; it extends the canonical native implementation.
+The prerequisite passed all seven hosted checks in run `37239592857`; the child increment still
+requires its own hosted checks and merge. Full goal and issue #323 remain open: generic callers,
+runtime/publication/review/import/remote controls and packaged acceptance remain required.
+The fixed user checkpoint is unchanged.
