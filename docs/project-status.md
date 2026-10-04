@@ -1955,3 +1955,13 @@ required read custody, which was corrected without weakening the read fence. Ful
 pending. Local completion, prospective configuration/capture reconciliation, complete cross-store
 admission and the full acceptance campaign remain required by draft PR #324 / issue #323. The user
 checkpoint and full fleet objective remain unchanged.
+
+R161 owner-receipt implementation `d22d4815514b4caa892f1d367d3abdc6b24fd6db` passed full
+`npm test`: 3,949 native tests in 305.019s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all remaining repository/docs/license/storage/format/lint/real-daemon gates.
+Published predecessor `c1cc955d7bcac1147c3e6b19c7216c30ac50aac1` passed all seven hosted checks
+in run `37230271789`. Complete history and positive, diagnostic, mutation and full validation logs
+are preserved. Native receipt commit/recovery, intervening-owner-history preservation and exact
+historical retry after revocation are verified. Local completion, prospective configuration/capture
+reconciliation, final cross-store admission and the full acceptance campaign remain required.
+Draft PR #324 / issue #323 stay open and unmerged; the user checkpoint remains fixed.
