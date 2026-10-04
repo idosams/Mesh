@@ -407,4 +407,38 @@ mod tests {
         )
         .is_err());
     }
+    #[test]
+    fn enrolled_inspection_does_not_authorize_manual_agent_or_remote_consumption() {
+        let f = Fixture::new("consumption-boundary");
+        let h = &f.attachment;
+        let version = h.saved_versions().unwrap()[0].operation().to_string();
+        assert!(h.inspect_text(&version, "note").is_ok());
+        let storage = AttachmentStorage::open(&f.root.join("metadata")).unwrap();
+        let destination = f.root.join("destination");
+        fs::create_dir(&destination).unwrap();
+        let pinned = PinnedWorkspaceRoot::open(destination.clone()).unwrap();
+        let journal = fs::read(f.journal()).unwrap();
+        let refused = [
+            storage
+                .open_version_lane(
+                    h,
+                    &version,
+                    "0123456789abcdef0123456789abcdef",
+                    ObservationLimits::default(),
+                )
+                .is_err(),
+            h.validate_lane_version(&version).is_err(),
+            h.materialize_saved_version(&version, &pinned, &destination)
+                .is_err(),
+            h.prepare_remote_input(&version).is_err(),
+        ];
+        assert_eq!(refused, [true; 4], "manual allocation, agent validation/materialization and remote export require native grants");
+        assert!(!f.root.join("metadata/work-lanes").exists());
+        assert_eq!(fs::read_dir(&destination).unwrap().count(), 0);
+        assert_eq!(fs::read(f.journal()).unwrap(), journal);
+        assert_eq!(
+            fs::read(f.root.join("source/note")).unwrap(),
+            b"saved original"
+        );
+    }
 }

@@ -6191,3 +6191,13 @@ admission remain fenced. No auto-enrollment, new grant/consumption API or comple
 claim is introduced. Full local verification and hosted delivery remain pending.
 
 R152 implementation verification: Full `npm test` passed on implementation `6c61818cda5d078723e8a624f92cf80848457840`: 3,867 native tests in 195.008s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted verification and merge remain pending.
+
+
+R152 pre-merge admission correction: the restored inspection helper was also used by four native
+consumption paths. A new regression demonstrated that manual lane allocation, agent input
+validation/materialization and remote export all incorrectly admitted enrolled history. These
+callers now use a separate helper retaining the original fenced admission; saved inspection keeps
+its immutable reader. The same regression passes after the correction and proves no work-lane
+allocation, destination files, journal change or source change. The earlier full gate did not cover
+this gap; a fresh full gate is required for the corrected revision. No enrollment control is exposed
+and neither the initial reader PR nor this correction has merged at this point.

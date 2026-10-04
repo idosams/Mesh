@@ -15,6 +15,36 @@ fn error(problem: impl std::fmt::Display) -> io::Error {
     io::Error::other(problem.to_string())
 }
 impl ProjectAttachment {
+    /// Existing native consumption paths keep their legacy fence until exact dependency grants
+    /// and materialization bindings are integrated. Read-only visibility never authorizes a fork.
+    pub(super) fn inspect_consumption_input<T>(
+        &self,
+        metadata: &Path,
+        store: PinnedWorkspaceRoot,
+        operation: &str,
+        consume: impl FnOnce(&OpenWorkspace, RecordDigest) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let digest = RecordDigest::parse_hex(operation).map_err(error)?;
+        if digest.to_string() != operation {
+            return Err(invalid("noncanonical version identity"));
+        }
+        self.with_review_history(
+            metadata,
+            store,
+            &crate::TrustedReviewers::default(),
+            |workspace, _| {
+                if !workspace
+                    .workspace_versions()
+                    .iter()
+                    .any(|version| version.operation() == digest)
+                {
+                    return Err(invalid("version does not belong to attachment history"));
+                }
+                consume(workspace, digest)
+            },
+        )
+    }
+
     pub(super) fn inspect_saved<T>(
         &self,
         metadata: &Path,

@@ -1217,3 +1217,10 @@ bound to its original reviewer evidence. Capture, review creation and approval r
 Focused native and accepted-main/Git regressions pass, including a deliberately removed proof check
 that correctly fails its test. Full local verification passed: 3,867 native, 194 rendered and 672 desktop tests plus all 44 real-daemon checks. Hosted verification is pending. This does not expose
 enrollment or private consumption to agents/users and does not change the fixed testing checkpoint.
+
+
+Pre-merge reader audit found and corrected shared-helper admission in manual allocation, agent
+input preparation and remote export. All four now retain the legacy enrollment fence while saved
+inspection remains readable. The new test fails on the previous implementation and passes on the
+correction without creating lanes or destination files. Full revalidation is in progress; earlier
+reader test totals do not certify this correction.
