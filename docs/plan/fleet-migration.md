@@ -6487,3 +6487,16 @@ per-manifest references and a shared 1 GiB read budget. Six focused tests passed
 or corrupt earlier content refuses and corrupt bytes remain untouched. The initial compile failure
 (missing streaming digest trait import) and passing log are preserved. This still does not establish
 complete policy/pending-object retention, rebuild or cross-work coverage and is not ready for PR.
+
+R160 selected-graph retention facts now qualify authority/policy payloads, operation payloads,
+logical manifests and chunks by native work, installation, physical store and correlation. Policy
+rejection preserves content and graph identity. Early reference bounds refuse before loading more
+nodes. Focused policy/graph/ancestry tests passed 18/18 in 2.443s. Extended native graph tests passed
+4/4 in 1.95s with three real native works and test-only owner consumption replay fixtures, exercising
+incomplete closure and missing intermediate-work refusal, transitive roots and owner/child store
+separation. This is not production consumption transaction proof. Attachment indexes rebuild in
+memory: an explicit removal-count assertion caught the initial vacuous disk-index test. Its replacement
+proves corrupt on-disk caches are ignored and preserved, and absent caches yield identical facts.
+Omitting policy roots makes the regression fail on the missing rejection payload in 0.51s; exact
+passing source restored. Full pending/completed transaction retention and full-gate/PR delivery remain
+unfinished. All failing and passing logs are retained.

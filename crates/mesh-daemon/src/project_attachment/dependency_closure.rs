@@ -30,6 +30,14 @@ pub struct NativeDependencyGraph {
     root: Input,
     nodes: BTreeMap<Input, Node>,
     digest: RecordDigest,
+    retained: BTreeMap<(RecordDigest, RecordDigest), StoreFacts>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct StoreFacts {
+    physical: (u64, u64),
+    correlation: RecordDigest,
+    payloads: BTreeSet<RecordDigest>,
+    manifests: BTreeSet<RecordDigest>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Node {
@@ -46,6 +54,52 @@ impl NativeDependencyGraph {
     /// Number of exact operation identities, including the selected root.
     pub fn operation_count(&self) -> usize {
         self.nodes.len()
+    }
+    /// Verified content and policy objects for this selected graph, qualified by native store.
+    /// This excludes pending transaction recovery and unselected saved versions. It is not a
+    /// complete-store collection oracle or a durable pin; callers must retain native custody.
+    pub fn retained_content_json(&self) -> Json {
+        Json::object([
+            ("schema", Json::text("mesh.native-dependency-content/v1")),
+            ("graph", Json::text(self.digest.to_hex())),
+            (
+                "stores",
+                Json::Array(
+                    self.retained
+                        .iter()
+                        .map(|(work, facts)| {
+                            Json::object([
+                                ("work", Json::text(work.0.to_hex())),
+                                ("installation", Json::text(work.1.to_hex())),
+                                ("device", Json::text(format!("{:x}", facts.physical.0))),
+                                ("inode", Json::text(format!("{:x}", facts.physical.1))),
+                                ("correlation", Json::text(facts.correlation.to_hex())),
+                                (
+                                    "payloads",
+                                    Json::Array(
+                                        facts
+                                            .payloads
+                                            .iter()
+                                            .map(|p| Json::text(p.to_hex()))
+                                            .collect(),
+                                    ),
+                                ),
+                                (
+                                    "manifests",
+                                    Json::Array(
+                                        facts
+                                            .manifests
+                                            .iter()
+                                            .map(|p| Json::text(p.to_hex()))
+                                            .collect(),
+                                    ),
+                                ),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
+        ])
     }
     /// Immutable graph facts only. No live working-directory content is included.
     pub fn to_json(&self) -> Json {
@@ -111,6 +165,7 @@ fn walk(
     let mut heights = BTreeMap::<Input, usize>::new();
     let mut stack = vec![(root, false)];
     let mut edges = 0usize;
+    let mut references = 0usize;
     while let Some((id, finish)) = stack.pop() {
         if finish {
             let node = nodes
@@ -140,6 +195,11 @@ fn walk(
             return Err(invalid("dependency node count exceeds its bound"));
         }
         let node = load(id)?;
+        references = references
+            .checked_add(node.manifests.len())
+            .and_then(|n| n.checked_add(node.chunks.len()))
+            .filter(|n| *n <= max_bytes / 64)
+            .ok_or_else(|| invalid("dependency content references exceed their bound"))?;
         edges = edges
             .checked_add(node.parents.len())
             .filter(|n| *n <= max_edges)
@@ -176,6 +236,7 @@ fn walk(
         root,
         nodes,
         digest: RecordDigest::from_bytes([0; 32]),
+        retained: BTreeMap::new(),
     };
     let bytes = graph.to_json().encode();
     if bytes.len() > max_bytes {
@@ -292,7 +353,7 @@ impl AttachmentStorage {
         );
         let mut content_budget = 1024 * 1024 * 1024u64;
         let mut verified_manifests = BTreeMap::new();
-        let graph = walk(
+        let mut graph = walk(
             root,
             |id| {
                 let (history, proof, workspace) = histories
@@ -327,6 +388,9 @@ impl AttachmentStorage {
                     }
                     parents.insert(receipt.source);
                 }
+                if fact.manifests.len() > 4096 {
+                    return Err(invalid("operation manifest count exceeds its bound"));
+                }
                 let mut chunks = BTreeSet::new();
                 for manifest in &fact.manifests {
                     let key = (id.0, id.1, *manifest);
@@ -353,6 +417,52 @@ impl AttachmentStorage {
             MAX_NODES,
             MAX_BYTES,
         )?;
+        // Policy payloads are local objects; cross-work reference IDs must never be
+        // misclassified as local CAS roots. Keep control history separate from graph identity.
+        let owner_binding = bindings
+            .values()
+            .find(|(work, _)| work.id() == owner.id())
+            .ok_or_else(|| invalid("owner work is unavailable"))?
+            .1
+            .clone();
+        let mut included = graph
+            .nodes
+            .keys()
+            .map(|id| (id.0, id.1))
+            .collect::<BTreeSet<_>>();
+        included.insert((owner_binding.work(), owner_binding.installation()));
+        let mut retained_count = 0usize;
+        for key in included {
+            let (work, binding) = &bindings[&key];
+            let proof = &histories[&key].1;
+            let mut payloads = proof.policy().policy_payloads().collect::<BTreeSet<_>>();
+            payloads.insert(proof.binding().authority);
+            let mut manifests = BTreeSet::new();
+            for (id, node) in &graph.nodes {
+                if (id.0, id.1) == key {
+                    payloads.insert(id.2);
+                    payloads.extend(node.chunks.iter().copied());
+                    manifests.extend(node.manifests.iter().copied());
+                }
+            }
+            retained_count = retained_count
+                .checked_add(payloads.len())
+                .and_then(|n| n.checked_add(manifests.len()))
+                .filter(|n| *n <= MAX_BYTES / 64)
+                .ok_or_else(|| invalid("retained content exceeds its bound"))?;
+            graph.retained.insert(
+                key,
+                StoreFacts {
+                    physical: work.store.identity()?,
+                    correlation: binding.correlation,
+                    payloads,
+                    manifests,
+                },
+            );
+        }
+        if graph.retained_content_json().encode().len() > MAX_BYTES {
+            return Err(invalid("retained content encoding exceeds its bound"));
+        }
         for (work, selected) in &selections {
             let refreshed = self.validate_dependency_work(selected, &guard)?;
             if bindings

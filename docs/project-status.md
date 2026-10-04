@@ -1361,3 +1361,21 @@ is absent from the latest snapshot; corrupt evidence remains in place. An initia
 trait import was corrected. This is content verification groundwork, not a complete retained-root
 or collection implementation: policy and pending transaction objects, rebuild and cross-work
 consumption coverage, full validation and PR delivery remain open.
+
+R160 now also records selected-graph content and verified policy payloads by exact work, installation,
+physical store and native correlation. Owner policy stays in the owner's store, and eligibility
+changes do not rewrite immutable graph identity. An early aggregate content-reference budget prevents
+loading further graph nodes after overflow. Eighteen focused tests passed (2.443s); the extended
+native graph suite then passed four tests (1.95s), including real three-level reserved work, signed
+captures, grants and test-only durable consumption replay fixtures. Those fixtures are not a
+production consumption writer. Missing intermediate work and incomplete inherited-input receipts
+refuse; repeated/reordered handles agree; rejection preserves content and adds its policy record.
+
+The initial disk-index deletion check was vacuous because attachment readers reconstruct in-memory
+indexes. A strengthened assertion exposed that mistaken fixture assumption. The corrected regression
+plants invalid cached indexes in all three stores, confirms journal-derived facts ignore and preserve
+those bytes, removes the actual planted files, and confirms identical replay without them. Removing
+policy payload roots makes the native regression fail on the missing rejection record (0.51s); the
+exact passing source was restored. This remains selected-graph retention evidence, not complete-store
+collection authority or durable pins. Pending/completed transaction object retention and remaining
+closure fault cases, full gate and PR delivery remain open.

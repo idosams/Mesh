@@ -369,6 +369,11 @@ impl DependencyPolicyHistory {
             .collect()
     }
 
+    /// Payloads physically stored in this authority, excluding references into other work.
+    pub(crate) fn policy_payloads(&self) -> impl Iterator<Item = RecordDigest> + '_ {
+        self.records.keys().copied()
+    }
+
     /// Direct immutable references only; not a complete retention closure or a collection oracle.
     pub fn referenced_content(&self) -> impl Iterator<Item = &RecordDigest> {
         self.roots.iter()
