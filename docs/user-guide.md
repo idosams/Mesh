@@ -605,3 +605,13 @@ running or need recovery; the count does not classify it as failed. Only an expl
 closes a change request, and reopening it restores the open count. Proposing a revision or exiting
 an agent does not close feedback automatically. These are retained records, including after restart,
 not evidence that a restored worker is running. Older catalogue replies show status unavailable.
+
+
+### Native dependency-enrollment development status
+
+For projects explicitly enrolled through the native development API, Mesh can inspect saved files,
+compare versions, open saved reviews and display previously accepted main after validating the
+complete enrollment evidence. An incomplete or changed enrollment remains unavailable; inspection
+does not repair it or change your project files. New capture and approval stay unavailable until
+policy-aware writing is integrated. There is no automatic enrollment or user-facing enrollment
+control yet. This work is not included in the fixed `5052009` testing checkpoint.

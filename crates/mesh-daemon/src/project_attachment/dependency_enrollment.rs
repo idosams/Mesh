@@ -140,10 +140,14 @@ impl AttachmentDependencyFence {
 }
 
 pub(super) fn read_private(attachment: &ProvisionedAttachment, name: &str) -> io::Result<String> {
-    let file = attachment
-        .store
-        .filesystem()
-        .inspect_entry(Path::new(name))?;
+    read_private_in_store(&attachment.store, name)
+}
+
+pub(super) fn read_private_in_store(
+    store: &crate::root_authority::PinnedWorkspaceRoot,
+    name: &str,
+) -> io::Result<String> {
+    let file = store.filesystem().inspect_entry(Path::new(name))?;
     let metadata = file.metadata()?;
     if !metadata.is_file()
         || metadata.nlink() != 1

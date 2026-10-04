@@ -6166,3 +6166,26 @@ deterministic fault injections, not a power-loss or full historical-writer campa
 and hosted validation are pending. The fixed checkpoint remains unchanged.
 
 R151 implementation verification: Full `npm test` passed on implementation `beda134de27be869a94e6aeda19574f9fb98a904`: 3,863 native tests in 199.444s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. The accepted-main regression also preserves staged/dirty Git status and exact index/HEAD bytes. Hosted validation and merge remain pending.
+
+
+## R152 — validated enrolled-history inspection
+
+Tracks [issue #305](https://github.com/idosams/Mesh/issues/305), following native enrollment in
+[PR #304](https://github.com/idosams/Mesh/pull/304). This increment extends its implementation;
+it does not replace or drop a preserved source commit. R150 [PR #302](https://github.com/idosams/Mesh/pull/302)
+merged as `86de1feca2c4bbf908018ca77b5dbc830488d4fc` after all seven hosted checks passed.
+
+A sealed native proof verifies registration, both required fences, canonical retained intent,
+original journal identity/prefix and bounded policy replay. The workspace opener binds the exact
+whole journal even if it is replaced by a legacy-only prefix. Immutable journal/CAS handles and a
+transient index serve saved versions/files, file inspection/comparison, exact saved reviews and
+historically accepted main. Post-enrollment legacy approval records refuse until dependency-aware
+publication is implemented; old accepted main retains its existing trusted-reviewer validation.
+Prepared-only fences, torn frames, substituted journals and corrupt intent/payloads refuse unchanged.
+
+Four focused native regressions passed, and the existing accepted-main integration test now proves
+these reads across reopen with staged/dirty Git preserved. Removing the exact journal proof check
+caused the replacement regression to fail (exit 101); production bytes were restored exactly.
+The shared writer helper is unchanged: capture, review creation, approval and source-integration
+admission remain fenced. No auto-enrollment, new grant/consumption API or complete dependency closure
+claim is introduced. Full local verification and hosted delivery remain pending.

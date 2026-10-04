@@ -48,9 +48,9 @@ enum Step {
 }
 
 impl ProvisionedAttachment {
-    /// Enroll this native registration with exact crash recovery. Current ordinary Mesh readers
-    /// refuse the required history; complete reader/control/publication integration must precede
-    /// any user-facing exposure. Source files, Git and old journal bytes are never rewritten.
+    /// Enroll this native registration with exact crash recovery. Validated immutable inspection
+    /// is supported; complete control/publication integration must precede user-facing enrollment.
+    /// Source files, Git and old journal bytes are never rewritten.
     pub fn enroll_dependency_history(&self) -> io::Result<NativeDependencyEnrollment> {
         self.enroll_dependency_with_hook(|_, _, _| Ok(()))
     }
@@ -294,7 +294,7 @@ impl ProvisionedAttachment {
         Ok(())
     }
 }
-fn intent_bytes(
+pub(super) fn intent_bytes(
     project: RecordDigest,
     installation: RecordDigest,
     journal: (u64, u64),
@@ -313,20 +313,20 @@ fn intent_bytes(
     .encode()
     .into_bytes()
 }
-fn text<'a>(value: &'a Json, key: &str) -> io::Result<&'a str> {
+pub(super) fn text<'a>(value: &'a Json, key: &str) -> io::Result<&'a str> {
     value
         .get(key)
         .and_then(Json::as_text)
         .ok_or_else(|| invalid("missing enrollment identity"))
 }
-fn digest(value: &str) -> io::Result<RecordDigest> {
+pub(super) fn digest(value: &str) -> io::Result<RecordDigest> {
     let digest = RecordDigest::parse_hex(value).map_err(error)?;
     if digest == ZERO || digest.to_hex() != value {
         return Err(invalid("invalid enrollment identity"));
     }
     Ok(digest)
 }
-fn hash(bytes: &[u8]) -> RecordDigest {
+pub(super) fn hash(bytes: &[u8]) -> RecordDigest {
     RecordDigest::from_bytes(*Blake3::digest_bytes(bytes).as_bytes())
 }
 fn read_journal(file: &mut File) -> io::Result<Vec<u8>> {
@@ -339,7 +339,7 @@ fn read_journal(file: &mut File) -> io::Result<Vec<u8>> {
     }
     Ok(bytes)
 }
-fn read_payload(
+pub(super) fn read_payload(
     cas: &Cas<PinnedRootFs, Blake3>,
     digest: RecordDigest,
     limit: usize,

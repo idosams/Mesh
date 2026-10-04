@@ -4189,9 +4189,48 @@ fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_a
         .unwrap();
     fs::write(f.source.join("work.txt"), b"ongoing uncommitted source").unwrap();
     let git_status = f.git(&["status", "--porcelain=v1"]);
+    let versions = f.history.saved_versions().unwrap();
+    let main = f.history.main_version(&trust).unwrap();
+    let accepted = f.history.accepted_main(&trust).unwrap();
+    let review = f
+        .history
+        .review_with_trusted_reviewers(&bundle, &target, &trust)
+        .unwrap();
+    let reviews = f.history.reviews_with_trusted_reviewers(&trust).unwrap();
+    let entries = f.history.inspect_entries(&target, None).unwrap();
+    let text = f.history.inspect_text(&target, "work.txt").unwrap();
+    let compared = f.history.compare_versions(&target, &target, None).unwrap();
     let before = f.journal();
     let enrollment = f.history.enroll_dependency_history().unwrap();
     let after = f.journal();
+    let reopened = f.storage.reopen(f.history.id()).unwrap();
+    assert_eq!(reopened.inspect_entries(&target, None).unwrap(), entries);
+    assert_eq!(reopened.inspect_text(&target, "work.txt").unwrap(), text);
+    assert_eq!(
+        reopened.compare_versions(&target, &target, None).unwrap(),
+        compared
+    );
+    assert_eq!(reopened.main_version(&trust).unwrap(), main);
+    assert_eq!(reopened.accepted_main(&trust).unwrap(), accepted);
+    assert_eq!(
+        reopened
+            .review_with_trusted_reviewers(&bundle, &target, &trust)
+            .unwrap(),
+        review
+    );
+    assert_eq!(
+        reopened.reviews_with_trusted_reviewers(&trust).unwrap(),
+        reviews
+    );
+    assert_eq!(reopened.saved_versions().unwrap(), versions);
+    assert_eq!(
+        reopened
+            .project()
+            .saved_file(reopened.metadata_path(), versions[0], "work.txt")
+            .unwrap()
+            .unwrap(),
+        b"accepted original main"
+    );
     assert_eq!(&after[..before.len()], before);
     assert_eq!(f.history.enroll_dependency_history().unwrap(), enrollment);
     assert!(f
@@ -4206,4 +4245,18 @@ fn native_dependency_enrollment_retains_existing_accepted_main_and_refuses_old_a
     assert_eq!(fs::read(f.source.join(".git/index")).unwrap(), git_index);
     assert_eq!(fs::read(f.source.join(".git/HEAD")).unwrap(), git_head);
     assert_eq!(f.git(&["status", "--porcelain=v1"]), git_status);
+    // Even a genuinely signed historical receipt appended after enrollment cannot become a
+    // dependency-aware approval. Readers preserve these bytes and refuse rather than admitting it.
+    let scan = mesh_store::scan_journal(&before).unwrap();
+    let approval = scan
+        .records()
+        .iter()
+        .find(|r| matches!(r, mesh_store::StoredRecord::Approval(_)))
+        .unwrap();
+    let mut unsupported = after.clone();
+    unsupported.extend(mesh_store::frame_record(approval));
+    fs::write(f.history.metadata_path().join("records.mesh"), &unsupported).unwrap();
+    assert!(reopened.main_version(&trust).is_err());
+    assert!(reopened.saved_versions().is_err());
+    assert_eq!(f.journal(), unsupported);
 }

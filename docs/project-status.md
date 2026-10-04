@@ -1203,6 +1203,17 @@ journal append. Recovery finishes only its own anchored frame prefix, re-syncs e
 refuses substituted or conflicting history. Five real-storage regressions cover all 146 frame-prefix
 boundaries, acknowledgement/sync failure and identity refusal; exact borrowed custody and retained
 accepted-history checks also pass. Removing sync fails the regression. Full local validation passed: 3,863 native, 194 rendered and
-672 desktop tests plus all 44 real-daemon checks. Hosted delivery remains pending. The native method has no renderer/agent/CLI caller: ordinary history readers still refuse
-enrolled history until current-reader and complete policy integration are ready. It is not an enabled
+672 desktop tests plus all 44 real-daemon checks. Hosted delivery remains pending. The native method has no renderer/agent/CLI caller: R151 alone refuses enrolled history; the R152 reader work below adds validated immutable inspection. It is not an enabled
 private-consumption or publication feature, and the fixed user checkpoint is unchanged.
+
+
+## Validated inspection after native enrollment
+
+R152 restores saved versions/files, entry/text inspection, comparisons, saved reviews and accepted
+main after complete native enrollment. Every read verifies the native registration, both fences,
+original history anchor and bounded policy replay, then uses immutable journal/CAS handles. It
+refuses incomplete/substituted evidence and later legacy approvals; historical accepted main stays
+bound to its original reviewer evidence. Capture, review creation and approval remain fenced.
+Focused native and accepted-main/Git regressions pass, including a deliberately removed proof check
+that correctly fails its test. Full and hosted verification are pending. This does not expose
+enrollment or private consumption to agents/users and does not change the fixed testing checkpoint.
