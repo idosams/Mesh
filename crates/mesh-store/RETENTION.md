@@ -43,10 +43,17 @@ From the reachable **operations** and **manifests**, the reachable **content** i
   that manifest. This edge only ever *adds* reachability, so a workspace in which the relation does
   not hold loses nothing by it.
 
-`RetainedRoots::conservative` builds the set from the index itself — every actor head, every review
-bundle, every peer, every manifest. **A collection against that set frees exactly the content no
-record in the index mentions at all**, which is plan §6.3's crash residue and nothing else. Freeing
-more requires naming which root is genuinely gone, and this crate cannot make that judgement.
+`RetainedRoots::conservative` builds the set from the index itself: every available actor head,
+a `RetentionWindow` from sequence zero for every known actor, every review bundle, every peer and
+every manifest. The complete actor windows preserve buffered and disconnected recorded operations
+that a causally ready head cannot reach. A known actor with no ready head still has a valid window;
+that does not make its operations causally ready. Unknown actors continue to refuse.
+**A collection against this set frees exactly the content no record in the index mentions at all**,
+which is plan §6.3's crash residue and nothing else. Removing an actor-head root alone does not
+remove that actor's complete-history window. Freeing recorded history requires explicitly narrowing
+that window as well as accounting for every other retained root; this crate cannot make that policy
+judgement. `tests/retention-buffered.rs` reproduces the formerly omitted payloads and checks parent
+arrival, buffered-only actors, disconnected history, genuine orphans and explicit narrowing.
 
 ## What an offline peer's watermark keeps, and when it stops
 

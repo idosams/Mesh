@@ -962,3 +962,13 @@ boundaries, reopens it and verifies retained bytes before completing collection.
 of the reference veto. Production cleanup behavior is unchanged. This improves component-level
 process-crash evidence; fleet root selection, writer coordination, cleanup policy/scheduling and
 storage-exhaustion acceptance remain unfinished in [issue #256](https://github.com/idosams/Mesh/issues/256).
+
+
+### Buffered-history retention correction (R121)
+
+Conservative collection roots now preserve every recorded actor operation, including saved work
+whose causal parents have not arrived and disconnected history outside the current actor head.
+Three baseline failures reproduced the omissions; all 13 focused retention and independent GC
+tests pass after the correction. Unknown actor roots still refuse and explicit narrower policies
+remain explicit. This changes retained-set computation, not causal readiness or persisted formats.
+Native fleet cleanup, scheduling, writer coordination and storage-exhaustion acceptance remain open.
