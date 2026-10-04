@@ -158,6 +158,7 @@ mod desktop {
     }
 
     struct DesktopRuntime {
+        _cleanup: mesh_daemon::OrphanCleanupWorker,
         endpoint: PathBuf,
         daemon: Arc<LiveDaemon>,
         author: Mutex<SoftwareActorCustody>,
@@ -8441,7 +8442,9 @@ mod desktop {
                 let operations: Arc<dyn Operations> = daemon.clone();
                 let server = pending_server.spawn(operations)?;
                 app.manage(attention);
+                let cleanup = daemon.start_orphan_cleanup()?;
                 app.manage(DesktopRuntime {
+                    _cleanup: cleanup,
                     endpoint,
                     daemon,
                     author: Mutex::new(author),
@@ -9146,6 +9149,9 @@ mod desktop {
                 )
                 .expect("remember a second managed workspace and project");
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint: application.join("runtime/daemon.sock"),
                 daemon,
                 author: Mutex::new(SoftwareActorCustody::generate().expect("runtime author")),
@@ -9607,6 +9613,9 @@ mod desktop {
                 .expect("preview summary")
                 .to_owned();
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint: application.join("runtime/daemon.sock"),
                 daemon,
                 author: Mutex::new(SoftwareActorCustody::generate().expect("local author")),
@@ -9714,6 +9723,9 @@ mod desktop {
                 .spawn(operations)
                 .expect("serve app daemon");
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint,
                 daemon,
                 author: Mutex::new(SoftwareActorCustody::generate().expect("local author")),
@@ -9990,6 +10002,9 @@ mod desktop {
                 .spawn(operations)
                 .expect("serve app daemon");
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint,
                 daemon,
                 author: Mutex::new(SoftwareActorCustody::generate().expect("local author")),
@@ -10191,6 +10206,9 @@ mod desktop {
             );
 
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint: application.join("runtime/daemon.sock"),
                 daemon,
                 author: Mutex::new(SoftwareActorCustody::generate().expect("local author")),
@@ -12314,6 +12332,9 @@ mod desktop {
             )
             .expect("replace the sole private Codex configuration through the agent boundary");
             let runtime = DesktopRuntime {
+                _cleanup: daemon
+                    .start_orphan_cleanup()
+                    .expect("runtime cleanup owner"),
                 endpoint: endpoint.clone(),
                 daemon: Arc::clone(&daemon),
                 author: Mutex::new(SoftwareActorCustody::generate().expect("runtime author")),
