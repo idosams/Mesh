@@ -1003,3 +1003,14 @@ releasing the live view and checkpoint locks. Native custody still excludes coor
 A paused-preparation test keeps workspace reads available; restoring the old view lock makes that
 test fail. Identical-byte journal replacement also refuses. Full local validation passed 3,790 native,
 185 rendered and 646 desktop tests plus all 44 daemon checks; hosted delivery is pending. Nonblocking background admission and automatic scheduling remain unfinished.
+
+
+## Cleanup admission during active work
+
+The native maintenance entry point now defers if writer custody or any daemon admission lock is
+busy, and defers assigned-agent workspaces. Tests hold each of the five admission locks, require
+a response before release, preserve the orphan, then successfully retry. Stale identity and nested
+mutation refuse. Replacing a try-lock with a blocking lock fails the regression. This prevents
+queued admission; filesystem and admitted scan latency remain unbounded. Automatic scheduling,
+pressure policy and full fleet acceptance remain open. Full local validation passed 3,793 native, 185 rendered and 646 desktop tests plus all 44
+daemon checks. Hosted delivery is pending.

@@ -5464,3 +5464,21 @@ conflicts occurred. Its full local gate passed 3,791 native tests in 161.334s (1
 185 rendered tests, 646 desktop tests and all 44 daemon checks. PR #262 is stacked on PR #260
 while that parent's original macOS verification remains running; its published head is preserved.
 Fresh hosted checks and merged delivery remain pending for the combined R124 head.
+
+
+## R125 — defer cleanup when native admission is busy
+
+Tracks [issue #256](https://github.com/idosams/Mesh/issues/256), based on published R124 / PR #262
+head `8e9c0b4713eb06692dd3dd1cbcdcf7275ce93f69`. New canonical implementation replaces no
+preserved source commit. A native try-entry point defers busy directory custody, workspace-open,
+managed-edit, checkpoint and live-view locks, and assigned-agent custody. Exact identity,
+nested-mutation refusal, fresh recovery inspection and conservative retention remain enforced.
+Explicit and try-entry points share preparation/deletion execution. No IPC or persisted format
+changes. All 13 focused cleanup tests pass. A deliberate blocking-lock mutation fails the new
+response-before-release regression; source was restored byte-for-byte. Full validation and hosted
+delivery are pending. Admission does not bound filesystem or admitted writer-exclusion latency,
+and automatic scheduling and pressure policy remain separate unfinished work.
+
+R125 full local gate passed 3,793 native tests in 162.513s (1 slow, 17 skipped),
+185 rendered tests, 646 desktop tests and all 44 real-daemon checks. The restored implementation
+is the tested source. Hosted checks and merge remain pending; checkpoint builds are unchanged.

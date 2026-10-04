@@ -34,6 +34,7 @@
 //! re-implemented here.
 
 mod orphan_collection;
+pub(crate) use orphan_collection::OrphanCollectionSource;
 mod remote_input_export;
 pub use remote_input_export::RemoteInputSource;
 
