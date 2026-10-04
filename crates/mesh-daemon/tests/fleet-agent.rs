@@ -3034,6 +3034,7 @@ fn ordinary_saved_progress_is_immutable_without_handoff_and_survives_restart() {
     let lanes = summary.get("lanes").unwrap().as_array().unwrap();
     assert_eq!(text(&lanes[0], "saved_version"), version);
     let page = f.service.saved_progress_versions(&f.lane, None).unwrap();
+    assert_eq!(text(&lanes[0], "base"), text(&page, "source_version"));
     let rows = page
         .get("progress")
         .unwrap()
