@@ -6054,6 +6054,28 @@ required by the fleet plan.
 
 R147 implementation `af708ababc2f42a8e75a06ebd0d8152d9bfd4d13` passed full `npm test`: 3,837 native tests in 173.217s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
 
+## R148 — native dependency payload validation and historical replay
+
+New canonical implementation based on PR #296 at
+`d04729e505007fd04aebcbdad43417e385b9c2e7`; no preserved source commit is replaced.
+Tracks issue #297 and the native policy prerequisite of #289. Canonical bounded payloads must match
+the exact storage digest, authority, kind, ordinal and predecessor. Enrollment matches an independently
+supplied native registration binding. Replay separates ledger order, exact input/destination grant
+generations and per-input decision revisions. It rejects contradictory requests, stale/revoked grants
+and stale/ineligible review vectors before changing state. Exact historical replay remains idempotent
+at capacity. Rejection and replacement preserve direct operation/policy references and earlier reviews.
+
+Nine focused native tests pass, including independent byte vectors, malformed/truncated/oversized
+payloads, external-binding and envelope substitution, atomic refusal, distinct installation versus
+stable-work identity, unrelated decisions, replacement, revocation and full record/aggregate-byte
+limits. Weakening eligibility or current-grant enforcement makes the intended regression fail; exact
+source restored. The initial missing digest-trait import compile failure is retained. Full repository
+and hosted validation pending. This read-only projection does not authenticate control writes, verify
+source ancestry or complete transitive closure, fence older writers or authorize consumption/publication.
+Existing native dependency refusals and the fixed user checkpoint are unchanged.
+
+R148 implementation `f7978bf33cb7ed82dd40ecb70c12191b14863170` passed full `npm test`: 3,847 native tests in 171.254s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
+
 ## R149 — durable preparation fence for older native writers
 
 New canonical work based on main `60441cb0013df707d71f8781b27964514cb32310` (merged #294);
@@ -6086,3 +6108,5 @@ packaged acceptance remain unproven. The fixed user checkpoint is unchanged.
 R149 implementation `ae1e2c0aa20380b4a63ae31113442ebc269d0584` passed full `npm test`: 3,837 native tests in 175.729s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Hosted validation and merge remain pending.
 
 R147 reconciliation with merged R149: implementation `291e09663237c65c15084d431dae5d2b7fe190b6` passed full `npm test`: 3,844 native tests in 175.049s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained; no native conflict required resolution. Hosted verification of the reconciled head is pending.
+
+R148 reconciliation with merged R149 and published R147 `6320642214f4bcbc31c6dbc4f266e397b2645f92`: Full `npm test` passed on reconciliation `6c7779b5f022b70047933352ba9a507483903618`: 3,853 native tests in 175.953s (2 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. Both independent documentation sections were retained and native code merged without manual resolution. Fresh hosted validation remains pending.

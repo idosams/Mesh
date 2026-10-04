@@ -1162,6 +1162,17 @@ running-old-desktop compatibility; enrollment must first fence cached old writer
 private consumption or publication eligibility are enabled yet. Full repository and hosted checks
 remain pending. See the [dependency contract](decisions/private-dependency-authority.md).
 
+## Native dependency payload history
+
+R148 validates canonical dependency payloads against an independently supplied native project binding
+and their stored envelope/digest, then reconstructs grant generations, consumption bindings,
+per-input decisions and historical review vectors. Nine focused tests cover malformed and substituted
+records, atomic refusal, revocation, independent decisions, replacement, retained direct references
+and complete count/byte limits. Weakening grant or eligibility checks fails the regression. This is
+read-only historical validation, not native control authorization or full dependency-closure proof.
+Consumption and publication remain disabled for dependency-bearing histories; writer fencing and
+runtime integration are still required. Full and hosted checks are pending.
+
 ## Dependency enrollment preparation
 
 R149 adds a native-only required custody marker that blocks generic older writers before future
