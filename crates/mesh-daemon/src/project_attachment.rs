@@ -52,7 +52,9 @@ pub use background::{
 pub(crate) use candidates::CandidateAdmission;
 
 mod approval;
+mod consumption_prepare;
 mod consumption_start;
+pub use consumption_prepare::{NativeConsumedStartRequest, PreparedNativeConsumedStart};
 mod dependency_decision;
 mod dependency_grant;
 mod grant_admission;

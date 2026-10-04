@@ -38,6 +38,21 @@ pub struct NativeGrantedInput<'a> {
     snapshot: &'a HistoricalWorkspacePreview,
 }
 impl NativeGrantedInput<'_> {
+    pub(super) fn starting_exclusion_rules(&self) -> io::Result<(Option<String>, Option<String>)> {
+        let read = |name: &str| -> io::Result<Option<String>> {
+            let Some(file) = self.files().find(|file| file.path == name) else {
+                return Ok(None);
+            };
+            if file.byte_length > 65_536 {
+                return Err(invalid("starting exclusion rules exceed their bound"));
+            }
+            let mut bytes = Vec::new();
+            self.write_file(name, &mut bytes)?;
+            String::from_utf8(bytes).map(Some).map_err(error)
+        };
+        Ok((read(".gitignore")?, read(".meshignore")?))
+    }
+
     /// Enumerate exact saved files, never current editor contents.
     pub fn files(&self) -> impl Iterator<Item = NativeGrantedFile<'_>> {
         self.snapshot.files.iter().map(|file| NativeGrantedFile {

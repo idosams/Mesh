@@ -483,6 +483,103 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
     let empty_child = storage
         .reserve_dependency_lane(&owner, &owner, second, d(120))
         .unwrap();
+    let initial_grant = storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &owner,
+                version: second,
+                destination: &empty_child,
+                allowed: true,
+                expected_previous: None,
+                request: d(122),
+            },
+        )
+        .unwrap();
+    let preparation_request = || crate::project_attachment::NativeConsumedStartRequest {
+        input: crate::project_attachment::NativeGrantInspection {
+            source: &owner,
+            version: second,
+            destination: &empty_child,
+            grant: initial_grant.record(),
+        },
+        available: &[],
+        request: d(123),
+        limits: ObservationLimits::default(),
+    };
+    let before_owner = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let before_destination =
+        fs::read(empty_child.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let prepared_start = storage
+        .prepare_consumed_start(
+            &owner,
+            preparation_request(),
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                // This independent acquisition would refuse if the signer inherited native custody.
+                let _guard = crate::workspace_custody::lock_workspace_initialization_set(&[
+                    owner.store.clone(),
+                    empty_child.store.clone(),
+                ])
+                .unwrap();
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    assert_eq!(prepared_start.request(), d(123));
+    assert_eq!(prepared_start.dependency_digest(), graph.digest());
+    assert_ne!(prepared_start.operation(), d(0));
+    prepared_start.revalidate(&storage).unwrap();
+    assert_eq!(
+        fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        before_owner
+    );
+    assert_eq!(
+        fs::read(empty_child.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
+        before_destination
+    );
+    assert_eq!(
+        fs::read_dir(empty_child.project().root()).unwrap().count(),
+        0
+    );
+    fs::write(
+        empty_child.project().root().join("unexpected"),
+        b"retain this editor work",
+    )
+    .unwrap();
+    assert!(prepared_start.revalidate(&storage).is_err());
+    assert_eq!(
+        fs::read(empty_child.project().root().join("unexpected")).unwrap(),
+        b"retain this editor work"
+    );
+    fs::remove_file(empty_child.project().root().join("unexpected")).unwrap();
+    prepared_start.revalidate(&storage).unwrap();
+    storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &owner,
+                version: second,
+                destination: &empty_child,
+                allowed: false,
+                expected_previous: Some(initial_grant.record()),
+                request: d(124),
+            },
+        )
+        .unwrap();
+    assert!(prepared_start.revalidate(&storage).is_err());
+    assert!(storage
+        .prepare_consumed_start(
+            &owner,
+            preparation_request(),
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |_| -> Result<mesh_types::Signature, &'static str> {
+                panic!("revoked preparation entered signer")
+            }
+        )
+        .is_err());
     let empty_start = append_signed_operations_fixture(
         &empty_child,
         &[],
@@ -524,6 +621,57 @@ fn native_saved_graph_survives_reopen_and_ignores_later_editor_bytes() {
             empty_graph
         );
     }
+    let empty_version = empty_child.saved_versions().unwrap()[0];
+    let empty_destination = storage
+        .reserve_dependency_lane(&owner, &empty_child, empty_version, d(125))
+        .unwrap();
+    let empty_grant = storage
+        .grant_saved_input(
+            &owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &empty_child,
+                version: empty_version,
+                destination: &empty_destination,
+                allowed: true,
+                expected_previous: None,
+                request: d(126),
+            },
+        )
+        .unwrap();
+    let signed_empty = storage
+        .prepare_consumed_start(
+            &owner,
+            crate::project_attachment::NativeConsumedStartRequest {
+                input: crate::project_attachment::NativeGrantInspection {
+                    source: &empty_child,
+                    version: empty_version,
+                    destination: &empty_destination,
+                    grant: empty_grant.record(),
+                },
+                available: &[],
+                request: d(127),
+                limits: ObservationLimits::default(),
+            },
+            mesh_types::PublicKey::from_bytes(key.verifying_key().to_bytes()),
+            |payload| {
+                Ok::<_, &'static str>(mesh_types::Signature::from_bytes(
+                    key.sign(payload.as_bytes()).to_bytes(),
+                ))
+            },
+        )
+        .unwrap();
+    signed_empty.revalidate(&storage).unwrap();
+    assert_ne!(signed_empty.operation(), empty_start);
+    assert_eq!(
+        fs::read_dir(empty_destination.project().root())
+            .unwrap()
+            .count(),
+        0
+    );
+    assert!(
+        empty_destination.saved_versions().unwrap().is_empty(),
+        "signing is not a saved-version commit"
+    );
     let child = storage
         .reserve_dependency_lane(&owner, &owner, second, d(81))
         .unwrap();

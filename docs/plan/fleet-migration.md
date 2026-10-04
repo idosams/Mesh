@@ -6610,3 +6610,19 @@ the copied snapshot's ignore rules: the empty reservation already bound its orig
 so copied rule files cannot silently change that policy or break later captures. Resolve that in the
 required consumption binding together with the pending-writer fence. The full #323 scope remains
 open and the published draft head remains fixed while hosted checks run.
+
+R161 signed preparation now connects complete graph/current-grant checks, exact empty native
+reservation validation and bounded snapshot construction to authentication outside custody. Its
+result is an immutable candidate, not saved work: no history, policy or destination files are
+written. Revalidation reacquires the complete set and refreshes the graph, current grant, physical
+binding, enrollment and empty destination. Native fixtures prove that signing can independently
+acquire custody, unexpected destination edits remain preserved/refused, revoked candidates cannot
+be reused, and an empty source prepares a signed candidate without creating a saved version or fake
+files. Five graph tests pass in 4.47s; the initial compile check passed without warnings.
+
+The candidate computes a prospective history binding from saved ignore-rule files without changing
+the reservation's current binding. Persisting and verifying that transition belongs to the upcoming
+required transaction fence; dedicated rule-binding fault coverage is still needed. There is no
+commit API yet. Full validation of these local refinements is pending. All seven hosted checks on
+the older published draft head `81babaa25ea86064a7e40b831f41f3d5fafa7970` passed (run `37215060435`);
+that result must not be attributed to the newer local signed-preparation implementation.
