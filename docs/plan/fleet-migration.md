@@ -5517,3 +5517,27 @@ and automatic scheduling and pressure policy remain separate unfinished work.
 R125 full local gate passed 3,793 native tests in 162.513s (1 slow, 17 skipped),
 185 rendered tests, 646 desktop tests and all 44 real-daemon checks. The restored implementation
 is the tested source. Hosted checks and merge remain pending; checkpoint builds are unchanged.
+
+
+## R126 — periodic orphan cleanup with one native owner
+
+Depends on R125 / PR #263 at `d4adb9a142c57e9daa1d49e5cfa40b7890a8eacf`, staged on canonical
+main `f1e1ee3d9273adc2faf18440a6e47dc98bb2e0d8` through related-history merges with identical
+source trees. New canonical implementation replaces no preserved source commit. Desktop and
+headless daemon retain one worker, waiting 60 seconds between attempts, selecting exact current
+workspace identity through a try-lock, and calling R125 admission. Native status is redacted;
+no IPC or persisted-format change. Duplicate owners refuse. Sleeping workers do not retain the
+daemon; owner drop wakes and joins the worker before resources can be abandoned.
+
+All 17 focused cleanup tests pass, including four new scheduler tests covering real deletion,
+retained history/reopen, busy retry, torn-history refusal, single ownership and shutdown. A worker
+changed to dry-run only fails the deletion assertion; source restored byte-for-byte. Full validation
+and hosted delivery are pending. Admitted disk I/O can still delay writers or shutdown. This does
+not expire history, traverse closed workspaces, establish pressure policy, prove packaged operation
+or complete the full fleet storage-pressure and fault acceptance requirements.
+
+R126 full local gate passed 3,797 native tests in 162.557s (1 slow, 17 skipped), 185 rendered
+tests, 646 desktop tests and all 44 real-daemon checks. The initial full gate identified six
+desktop fixtures missing the new owner; those fixtures now start the real worker, and the failure
+log is preserved. Hosted delivery remains pending. R125's original head passed all seven hosted
+checks before its source-identical main reconciliation; no active CI head was replaced.

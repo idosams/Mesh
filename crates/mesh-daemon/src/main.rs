@@ -199,6 +199,9 @@ mod serve {
                 format!("could not start serving at {}: {error}", endpoint.display())
             })?;
 
+        let _cleanup = daemon
+            .start_orphan_cleanup()
+            .map_err(|_| "could not start native cleanup worker".to_string())?;
         announce(&endpoint, opened.as_deref(), daemon.as_ref(), backend);
         wait_for_stop();
 
