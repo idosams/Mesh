@@ -7742,3 +7742,34 @@ a different actor or prospective destination. Removing the destination compariso
 refusal regression in 13.180s; source was restored byte-for-byte. The full repository gate and
 PR delivery are pending. This does not complete private consumed resolution, publication writes,
 recovery across all routes, or the full fleet acceptance plan.
+
+
+R175 is published as PR #356 at `4c2f507236a4330ab8489637093d27e7d1a95fdd`.
+Its full `npm test` passed: 3,967 native tests in 320.042s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus the repository,
+docs, license, storage, formatting and lint gates. The consumed regression passed in 44.257s.
+Hosted checks and merged delivery remain pending at this observation.
+
+R173 / #354 merged at `48de561cccb38c9eb97c404d5462bde865f69810` after all seven hosted
+checks passed. R174 / #355 was reconciled to that main at
+`3eb7817b3316073479029918de21a728fe144469` with its complete tested tree unchanged;
+fresh hosted checks and merge remain pending.
+
+R176 retained consumption reconstruction is new canonical work based on published R175
+`4c2f507236a4330ab8489637093d27e7d1a95fdd`, replacing no preserved legacy commit.
+Related R174 ancestry was adopted at `0ee548d54bdfc9103499fd18219420c9efe16c9d` without
+changing the complete tree. Ordinary recovery and the private integration fixture now share
+retained signed-transaction reconstruction. The fixture rebuilds from durable material after
+an owner publication record, verifies the completed child, and refuses a foreign owner.
+It passed in 29.657s. Removing the exact start-body comparison failed the foreign-owner
+assertion in 13.161s; source was restored byte-for-byte. Strict daemon lint passed.
+Full checks and PR delivery remain pending. Complete private graph/binding discovery, trusted
+consumed publication replay, production commit/recovery and all fleet acceptance exits remain open.
+
+R176 full `npm test` passed on `31de31ac558395335789dac2b60934095bb2d8a5`:
+3,967 native tests in 323.398s (six slow, 18 skipped), 194 rendered tests, 672 desktop
+tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy gates.
+The consumed regression passed in 44.798s. Adopting reconciled R175 parent
+`d3b19c9fafa30f5c0c83cd910c539809de92d54d` at
+`d7664ef4985922d42225f7ec57c868ae2fd7c96b` preserved the complete tested tree.
+Hosted checks, merge and the remaining complete private-context integration are still required.

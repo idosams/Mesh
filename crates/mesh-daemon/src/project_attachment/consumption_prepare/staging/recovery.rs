@@ -9,10 +9,19 @@ use crate::{
 use mesh_cas::{Blake3, Cas};
 use mesh_store::{scan_journal, Checkpoint, DependencyKind, StoredRecord};
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum RecoveryPhase {
+pub(in crate::project_attachment) enum RecoveryPhase {
     Start,
     Installed,
     CompletedRead,
+}
+pub(in crate::project_attachment) struct RecoveryMaterial<'a> {
+    pub owner: &'a ProvisionedAttachment,
+    pub request: NativeConsumedStartRequest<'a>,
+    pub phase: RecoveryPhase,
+    pub graph: &'a crate::project_attachment::NativeDependencyGraph,
+    pub source_binding: &'a NativeDependencyWorkBinding,
+    pub destination_binding: &'a NativeDependencyWorkBinding,
+    pub owner_binding: crate::dependency_policy::NativeDependencyBinding,
 }
 impl AttachmentStorage {
     /// Reconstruct an interrupted start from its retained signed material. No signer is invoked.
@@ -224,7 +233,6 @@ impl AttachmentStorage {
             &crate::workspace_custody::WorkspaceInitializationGuard,
         ) -> io::Result<T>,
     ) -> io::Result<T> {
-        let installed = phase != RecoveryPhase::Start;
         request.limits.validate()?;
         if request.request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing recovery request"));
@@ -265,6 +273,101 @@ impl AttachmentStorage {
         }
         let source_binding = context.validate(self, &selected_source, guard)?;
         let destination_binding = context.validate(self, &selected_destination, guard)?;
+        let destination = request.input.destination;
+        let (_, owner_proof) = context.read(owner)?;
+        let owner_binding = owner_proof
+            .ok_or_else(|| invalid("owner enrollment missing"))?
+            .binding();
+        let (result, recovered_operation) = self.with_recovered_consumed_material(
+            RecoveryMaterial {
+                owner,
+                request,
+                phase,
+                graph: &graph,
+                source_binding: &source_binding,
+                destination_binding: &destination_binding,
+                owner_binding,
+            },
+            guard,
+            |operation, expected| {
+                self.with_input_grant_owner(
+                    &selected_grant,
+                    guard,
+                    &context.clone().for_operation(operation),
+                    |input| {
+                        super::super::source_verification::verify_starting_source(
+                            destination,
+                            &input,
+                            guard,
+                            expected,
+                        )
+                    },
+                )
+            },
+            |operation| {
+                self.with_input_grant_owner(
+                    &selected_grant,
+                    guard,
+                    &context.clone().for_operation(operation),
+                    |_| Ok(()),
+                )
+            },
+            |candidate, staged, graph, guard| {
+                let operation = candidate.operation();
+                Ok((action(candidate, staged, graph, guard)?, operation))
+            },
+        )?;
+        let context = context.for_operation(recovered_operation);
+        if self
+            .inspect_dependency_graph_with_owner(&selected_graph, guard, &context)?
+            .digest()
+            != graph.digest()
+            || context.validate(self, &selected_source, guard)? != source_binding
+            || context.validate(self, &selected_destination, guard)? != destination_binding
+        {
+            return Err(invalid("consumed source changed during inspection"));
+        }
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
+    }
+
+    // Rebuild retained signed transaction material without opening ordinary owner history.
+    // Callers supply independently verified graph/bindings and revalidate source authority;
+    // a returned candidate is still not completed-history admission or publication authority.
+    pub(in crate::project_attachment) fn with_recovered_consumed_material<T>(
+        &self,
+        selected: RecoveryMaterial<'_>,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        inspect_source: impl FnOnce(
+            RecordDigest,
+            super::super::source_verification::StartingSource<'_>,
+        ) -> io::Result<String>,
+        recheck_source: impl FnOnce(RecordDigest) -> io::Result<()>,
+        action: impl FnOnce(
+            PreparedNativeConsumedStart,
+            StagedNativeConsumedStart,
+            &crate::project_attachment::NativeDependencyGraph,
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let RecoveryMaterial {
+            owner,
+            request,
+            phase,
+            graph,
+            source_binding,
+            destination_binding,
+            owner_binding,
+        } = selected;
+        request.limits.validate()?;
+        if request.request == RecordDigest::from_bytes([0; 32]) || graph.operation_count() > 256 {
+            return Err(invalid("invalid retained recovery request or closure"));
+        }
+        for work in [owner, request.input.source, request.input.destination] {
+            let prepared = self.prepare_dependency_work(owner, work)?;
+            guard.require_roots(&prepared.roots).map_err(error)?;
+        }
+        let installed = phase != RecoveryPhase::Start;
         let destination = request.input.destination;
         let origin = self
             .lane_origin_bound(destination)?
@@ -322,7 +425,7 @@ impl AttachmentStorage {
         let body = payload
             .get("body")
             .ok_or_else(|| invalid("missing start body"))?;
-        let context = context.for_operation(digest(text(body, "operation")?)?);
+        let selected_operation = digest(text(body, "operation")?)?;
         let descriptor_id = digest(text(body, "staged")?)?;
         let descriptor = read_payload(&cas, descriptor_id, 4096)?;
         let descriptor_json =
@@ -409,21 +512,16 @@ impl AttachmentStorage {
         }
         let envelope =
             AuthenticatedChangeSet::from_canonical_bytes(&signed_bytes).map_err(error)?;
-        let prospective =
-            self.with_input_grant_owner(&selected_grant, guard, &context, |input| {
-                super::super::source_verification::verify_starting_source(
-                    destination,
-                    &input,
-                    guard,
-                    super::super::source_verification::StartingSource {
-                        configuration: &configuration,
-                        prospective: text(&stage, "prospective")?,
-                        actor,
-                        limits: request.limits,
-                        envelope: &envelope,
-                    },
-                )
-            })?;
+        let prospective = inspect_source(
+            selected_operation,
+            super::super::source_verification::StartingSource {
+                configuration: &configuration,
+                prospective: text(&stage, "prospective")?,
+                actor,
+                limits: request.limits,
+                envelope: &envelope,
+            },
+        )?;
         drop(envelope);
         drop(signed_bytes);
         let Some(Json::Array(names)) = stage.get("objects") else {
@@ -501,15 +599,11 @@ impl AttachmentStorage {
             checkpoint,
             plan,
         };
-        let (_, owner_proof) = context.read(owner)?;
-        let owner_binding = owner_proof
-            .ok_or_else(|| invalid("owner enrollment missing"))?
-            .binding();
         if body
             != &candidate.start_body(
                 owner_binding,
-                &source_binding,
-                &destination_binding,
+                source_binding,
+                destination_binding,
                 descriptor_id,
             )
             || if phase == RecoveryPhase::CompletedRead {
@@ -557,7 +651,7 @@ impl AttachmentStorage {
                 return Err(invalid("installed work lacks a complete start"));
             }
         }
-        self.with_input_grant_owner(&selected_grant, guard, &context, |_| Ok(()))?;
+        recheck_source(selected_operation)?;
         let (after_configuration, after_facts) = read_start()?;
         if after_configuration != configuration
             || after_facts.as_ref() != Some(&facts)
@@ -573,18 +667,9 @@ impl AttachmentStorage {
                 receipt: stage_id,
                 request: request.request,
             },
-            &graph,
+            graph,
             guard,
         )?;
-        if self
-            .inspect_dependency_graph_with_owner(&selected_graph, guard, &context)?
-            .digest()
-            != graph.digest()
-            || context.validate(self, &selected_source, guard)? != source_binding
-            || context.validate(self, &selected_destination, guard)? != destination_binding
-        {
-            return Err(invalid("consumed source changed during inspection"));
-        }
         guard.ensure_current().map_err(error)?;
         Ok(result)
     }

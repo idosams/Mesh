@@ -9,6 +9,8 @@ pub(in crate::project_attachment) use completed_read::VerifiedConsumedHistory;
 mod installation;
 mod owner;
 mod recovery;
+#[cfg(test)]
+pub(in crate::project_attachment) use recovery::{RecoveryMaterial, RecoveryPhase};
 mod resolver;
 mod start_fence;
 use super::*;
