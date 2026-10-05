@@ -7993,3 +7993,42 @@ Provenance: new canonical implementation based on R181 #362 at
 cb7b6acabfd7788abd4bbbdb7f4653646ab01f83; it replaces no preserved legacy commit. R182 #363's
 ordinary-reader pending-publication fence is a separate sibling increment and remains required
 for combined delivery. Original work and repository history remain preserved.
+
+## Saved native reviews after publication (R184)
+
+Native storage can bind an already-retained exact review snapshot after accepted publication.
+The writer resolves complete saved content and work identity, verifies accepted publication
+receipts with configured trust, and computes the new review against verified current main.
+An exact historical retry reconstructs the original verified main and bundle; later publication
+cannot silently rebase a saved review. Reused requests with different opener or evidence refuse.
+
+Input decisions and saved-review bindings share a closed native transaction implementation.
+Only the two explicit request variants can select records; arbitrary payloads, publication and
+consumption are not accepted. Existing eligibility v1 and review-binding v4 records and canonical
+pending intents are reused. Partial recovery binds the intended record kind as well as the exact
+request, journal prefix, pinned namespace and payload. Complete graph and trust verification is
+repeated before the sole journal-sync commit and after append. No runtime/agent endpoint, human
+presence collection or ordinary workspace admission is added.
+
+The new real-process fixture saves the second review through this API rather than a test-only
+journal append. Staging, partial append, synchronized commit before acknowledgement and two exact
+retries are exercised, including foreign-request and missing-trust refusal. A second publication
+then advances main; retrying the prior review must preserve its original record and bundle with no
+journal change. Wrong-work and unknown-snapshot requests refuse without changing owner history;
+child history and uncaptured editor content remain outside approval. Independent replay fixtures
+remain independent. This is process-exit evidence, not simultaneous-race or power-loss proof.
+
+This increment binds existing immutable snapshots. Fresh snapshot capture after publication,
+all-route integration, retention/collection and complete manual/harness/fleet/provider/host and
+eligible signed-package acceptance remain required under #345. The b064029 checkpoint is unchanged.
+
+Provenance: new canonical work based on R183 #364 at
+7e98b2401fe61849095109b0a1cc84220074275a; no preserved legacy commit is replaced.
+
+Validation: the new review process regression and existing input-decision process regression
+passed together in 60.483s. A mutation rebuilding historical review retries against current main
+failed the new regression in 57.845s after main advanced; the implementation was restored exactly
+(SHA256 5079d7daf674f46072546313b9723b03fa7d4f65b5fed7f7edef59013208910d).
+Full npm test passed: 3,978 native tests in 357.904s (nine slow, 18 skipped), 194 rendered
+tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/
+fmt/clippy. Exact-head hosted checks remain required before merged delivery.

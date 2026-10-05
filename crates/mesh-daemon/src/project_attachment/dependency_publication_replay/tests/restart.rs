@@ -29,57 +29,80 @@ fn publication_restart_child() {
     } else {
         crate::TrustedReviewers::with_human_credentials([credential])
     };
-    if v.get("kind").and_then(Json::as_text) == Some("input-decision") {
+    if matches!(
+        v.get("kind").and_then(Json::as_text),
+        Some("input-decision" | "saved-review")
+    ) {
         use super::super::super::dependency_private_context::control::Step as ControlStep;
         let operation = RecordDigest::parse_hex(text("operation")).unwrap();
         let previous = RecordDigest::parse_hex(text("previous")).unwrap();
-        let result = storage.decide_native_saved_input_with_io(
-            text("work"),
-            operation,
-            crate::project_attachment::NativeSavedInputDecision::Rejected,
-            Some(previous),
-            if mode == "foreign-request" {
-                RecordDigest::from_bytes([96; 32])
-            } else {
-                request
-            },
-            &trust,
-            |step, file, frame| {
-                if matches!(step, ControlStep::Staged) {
-                    if mode == "staged" {
-                        std::process::exit(85);
-                    }
-                    if mode == "partial" {
-                        let cut = match text("cut") {
-                            "first" => 1,
-                            "last" => frame.len() - 1,
-                            _ => frame.len() / 2,
-                        };
-                        file.write_all(&frame[..cut])?;
-                        file.sync_all()?;
-                        std::process::exit(86);
-                    }
+        let hook = |step, file: &mut fs::File, frame: &[u8]| {
+            if matches!(step, ControlStep::Staged) {
+                if mode == "staged" {
+                    std::process::exit(85);
                 }
-                if matches!(step, ControlStep::Appended) && mode == "lost-ack" {
-                    std::process::exit(87);
+                if mode == "partial" {
+                    let cut = match text("cut") {
+                        "first" => 1,
+                        "last" => frame.len() - 1,
+                        _ => frame.len() / 2,
+                    };
+                    file.write_all(&frame[..cut])?;
+                    file.sync_all()?;
+                    std::process::exit(86);
                 }
-                Ok(())
-            },
-            |file| file.sync_all(),
-        );
+            }
+            if matches!(step, ControlStep::Appended) && mode == "lost-ack" {
+                std::process::exit(87);
+            }
+            Ok(())
+        };
+        let exact_request = if mode == "foreign-request" {
+            RecordDigest::from_bytes([96; 32])
+        } else {
+            request
+        };
+        let result = if text("kind") == "saved-review" {
+            storage
+                .save_native_review_with_io(
+                    text("work"),
+                    operation,
+                    previous,
+                    exact_request,
+                    &trust,
+                    hook,
+                    |f| f.sync_all(),
+                )
+                .map(|result| {
+                    Json::object([
+                        ("record", Json::text(result.record().to_hex())),
+                        ("bundle", Json::text(result.bundle().to_hex())),
+                    ])
+                })
+        } else {
+            storage
+                .decide_native_saved_input_with_io(
+                    text("work"),
+                    operation,
+                    crate::project_attachment::NativeSavedInputDecision::Rejected,
+                    Some(previous),
+                    exact_request,
+                    &trust,
+                    hook,
+                    |f| f.sync_all(),
+                )
+                .map(|result| {
+                    Json::object([
+                        ("record", Json::text(result.record().to_hex())),
+                        ("revision", Json::Number(result.revision())),
+                    ])
+                })
+        };
         if mode == "missing-trust" || mode == "foreign-request" {
             assert!(result.is_err());
         } else {
             let result = result.unwrap();
-            fs::write(
-                root.join("decision-restart-result"),
-                Json::object([
-                    ("record", Json::text(result.record().to_hex())),
-                    ("revision", Json::Number(result.revision())),
-                ])
-                .encode(),
-            )
-            .unwrap();
+            fs::write(root.join("decision-restart-result"), result.encode()).unwrap();
         }
         return;
     }
@@ -230,10 +253,60 @@ pub(super) fn interrupted_native_decision(
     published: bool,
     cut: &str,
 ) -> Json {
+    interrupted_native_control(
+        root,
+        work,
+        operation,
+        previous,
+        request,
+        public,
+        journal,
+        published,
+        cut,
+        "input-decision",
+    )
+}
+#[allow(clippy::too_many_arguments)]
+pub(super) fn interrupted_native_review(
+    root: &Path,
+    work: &str,
+    snapshot: RecordDigest,
+    opener: RecordDigest,
+    request: RecordDigest,
+    public: &[u8],
+    journal: &Path,
+) -> Json {
+    interrupted_native_control(
+        root,
+        work,
+        snapshot,
+        opener,
+        request,
+        public,
+        journal,
+        true,
+        "mid",
+        "saved-review",
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn interrupted_native_control(
+    root: &Path,
+    work: &str,
+    operation: RecordDigest,
+    previous: RecordDigest,
+    request: RecordDigest,
+    public: &[u8],
+    journal: &Path,
+    published: bool,
+    cut: &str,
+    kind: &str,
+) -> Json {
     fs::write(root.join("restart-public-key"), public).unwrap();
     let run = |mode: &str, expected: i32| {
         let value = Json::object([
-            ("kind", Json::text("input-decision")),
+            ("kind", Json::text(kind)),
             ("root", Json::text(root.to_string_lossy())),
             ("work", Json::text(work)),
             ("operation", Json::text(operation.to_hex())),

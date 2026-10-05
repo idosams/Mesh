@@ -18,6 +18,7 @@ impl VerifiedControlPrefix {
     pub(super) fn read(
         owner: &ProvisionedAttachment,
         request: RecordDigest,
+        kind: DependencyKind,
     ) -> io::Result<Option<Self>> {
         let raw = match read_private_in_store(&owner.store, PENDING) {
             Ok(raw) => raw,
@@ -42,7 +43,10 @@ impl VerifiedControlPrefix {
         let payload = read_payload(&cas, payload_id, 65536)?;
         let (length, record, decoded_payload) =
             super::super::super::dependency_decision::pending_prefix(&cas, &raw, identity, &bytes)?;
-        if record.kind != DependencyKind::Eligibility
+        if !matches!(
+            kind,
+            DependencyKind::Eligibility | DependencyKind::ReviewSnapshot
+        ) || record.kind != kind
             || digest(text(&value, "request")?)? != request
             || decoded_payload != payload
         {

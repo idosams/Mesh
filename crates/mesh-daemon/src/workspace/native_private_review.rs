@@ -162,6 +162,19 @@ impl<'a> NativePrivateReviewHistory<'a> {
         &self,
         evidence: &crate::dependency_policy::NativeReviewEvidence,
     ) -> Result<(mesh_approval::HeadId, RecordDigest), String> {
+        let canonical = self
+            .latest
+            .map_or(crate::publication::GENESIS_SHARED_HEAD, |claim| {
+                mesh_approval::HeadId::from_bytes(*claim.result.as_bytes())
+            });
+        Ok((canonical, self.review_bundle_at(evidence, canonical)?))
+    }
+
+    pub(crate) fn review_bundle_at(
+        &self,
+        evidence: &crate::dependency_policy::NativeReviewEvidence,
+        canonical: mesh_approval::HeadId,
+    ) -> Result<RecordDigest, String> {
         self.ensure_current()?;
         let output = evidence.output();
         if (output.0, output.1) != (self.selected.work(), self.selected.installation())
@@ -169,23 +182,19 @@ impl<'a> NativePrivateReviewHistory<'a> {
         {
             return Err("private review evidence belongs to another native work".into());
         }
-        let canonical = self
-            .latest
-            .map_or(crate::publication::GENESIS_SHARED_HEAD, |claim| {
-                mesh_approval::HeadId::from_bytes(*claim.result.as_bytes())
-            });
+        let native_base = self.canonical.get(&canonical);
+        if canonical != crate::publication::GENESIS_SHARED_HEAD && native_base.is_none() {
+            return Err("verified native canonical ancestry is unavailable".into());
+        }
         let (bundle, _, _) = self.history.publication_review_with_evidence(
             output.2,
             canonical,
             false,
             Some(evidence),
-            self.canonical.get(&canonical),
+            native_base,
         )?;
         self.ensure_current()?;
-        Ok((
-            canonical,
-            RecordDigest::from_bytes(*bundle.id().digest().as_bytes()),
-        ))
+        Ok(RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
     }
 
     pub(crate) fn approval_context(

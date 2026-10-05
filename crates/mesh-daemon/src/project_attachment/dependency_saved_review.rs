@@ -30,6 +30,10 @@ pub struct NativeSavedDependencyReview {
     bundle: RecordDigest,
 }
 impl NativeSavedDependencyReview {
+    pub(super) fn from_verified_record(record: RecordDigest, bundle: RecordDigest) -> Self {
+        Self { record, bundle }
+    }
+
     /// Exact retained owner-journal binding payload.
     pub fn record(&self) -> RecordDigest {
         self.record
