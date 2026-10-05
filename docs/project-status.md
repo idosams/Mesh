@@ -2461,6 +2461,9 @@ The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s 
 
 CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672010fda93`: 3,949 native tests in 339.809s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 real-daemon checks, plus all repository/docs/license/storage/format/lint gates. The new compile-only nextest command also succeeded locally. Canonical main post-merge run `37249215287` attempt 2 passed all seven checks; the earlier cancelled attempt remains preserved. This does not resolve repeated near-budget cancellation in the dependent PRs. The independent workflow correction still needs hosted proof and merge before propagation through #330–#333.
 
+
+R162 consumed-work decisions address [issue #337](https://github.com/idosams/Mesh/issues/337). The trusted native host can reject, replace or revalidate an exact consumed child version using complete retained inputs. It reconstructs the guarded history at both native control selections, including the staged owner prefix, while missing inputs and stale predecessors refuse. Decisions update owner policy only; child history and saved previews remain unchanged. No renderer, agent, CLI or publication permission is added. The original incomplete-context regression failed in 14.625s; the final seven-test focus passed in 21.619s, including a dedicated 6.815s torn-append/lost-reply/input-loss recovery test. Full gate, hosted checks and merge remain required. Review snapshot binding, publication/runtime enforcement and user-facing enrollment remain open.
+
 Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
 in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
 history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now

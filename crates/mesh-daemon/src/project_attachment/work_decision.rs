@@ -35,6 +35,23 @@ impl AttachmentStorage {
         self.decide_work_with_io(owner, request, |_, _, _| Ok(()), |file| file.sync_all())
     }
 
+    /// Apply an exact native eligibility decision with the source's complete retained inputs.
+    /// This does not grant execution, consumption, publication or protected-main authority.
+    pub fn decide_work_input_with_inputs(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeWorkDecisionRequest<'_>,
+        available: &[&ProvisionedAttachment],
+    ) -> io::Result<NativeInputDecision> {
+        self.decide_work_with_inputs_and_io(
+            owner,
+            request,
+            available,
+            |_, _, _| Ok(()),
+            |file| file.sync_all(),
+        )
+    }
+
     fn decide_work_with_io(
         &self,
         owner: &ProvisionedAttachment,
@@ -42,19 +59,44 @@ impl AttachmentStorage {
         hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
         sync: impl FnMut(&File) -> io::Result<()>,
     ) -> io::Result<NativeInputDecision> {
+        self.decide_work_with_inputs_and_io(owner, request, &[], hook, sync)
+    }
+
+    fn decide_work_with_inputs_and_io(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeWorkDecisionRequest<'_>,
+        available: &[&ProvisionedAttachment],
+        hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<NativeInputDecision> {
         let prepared = self.prepare_dependency_work(owner, request.source)?;
-        let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
+        let works = std::iter::once(request.source)
+            .chain(available.iter().copied())
+            .collect::<Vec<_>>();
+        let graph = self.prepare_dependency_graph(
+            owner,
+            request.source,
+            request.version.operation(),
+            &works,
+        )?;
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&graph.roots)
             .map_err(error)?;
         let result = owner.control_with_io(
             request.expected_previous,
             request.request,
             |owner_history, proof| {
-                let work = self.validate_dependency_work_with_history(
-                    &prepared,
+                // Reconstruct on both selections: the second call carries the exact staged
+                // owner prefix and must recheck every consumed source before the owner append.
+                let context = self.resolve_consumed_histories(
+                    owner,
+                    &works,
                     &guard,
-                    proof,
-                    owner_history,
+                    super::dependency_owner_context::OwnerHistoryContext::for_control(
+                        owner, proof,
+                    )?,
                 )?;
+                let work = context.validate(self, &prepared, &guard)?;
                 let validate = |version: SavedAttachmentVersion| -> io::Result<()> {
                     if request.source.id() == owner.id() {
                         if !owner_history
@@ -65,6 +107,15 @@ impl AttachmentStorage {
                             return Err(invalid("decision input is not saved in its native work"));
                         }
                         owner_history
+                            .historical_workspace_preview(version.operation())
+                            .map_err(error)?;
+                    } else if context.has_verified_history(request.source) {
+                        let (_, _, history) = context.history(request.source)?;
+                        SavedAttachmentVersion::from_verified_history(
+                            &history,
+                            version.operation(),
+                        )?;
+                        history
                             .historical_workspace_preview(version.operation())
                             .map_err(error)?;
                     } else {
@@ -115,3 +166,6 @@ impl AttachmentStorage {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod consumed_tests;
