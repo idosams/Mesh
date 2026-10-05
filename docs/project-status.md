@@ -13,16 +13,17 @@ passed again, and its post-merge CI completed successfully. Its native packaged 
 its graphical fleet journey and protected-main approval remain unverified. Earlier checkpoint
 `5052009` is preserved. These copies stay fixed while development continues.
 
-Consumed decisions, retained snapshots, bound reviews, publication framing, receipt inspection,
-private-evidence separation, root publication replay and private completed-consumption evidence
-are merged through #355. Shared source verification #356 and retained reconstruction #357 have
-passed their full local gates and await hosted validation/reconciliation and merge. R177 adds
-native discovery and complete private consumed-content graphs from registrations; its full local
-repository gate passed, including publication discovery and chained-lane regressions. Hosted
-validation and merged delivery remain pending.
-These graph reads do not assert accepted main or grant publication authority. Trusted consumed
-publication replay, production commit/recovery, eligible signing, another provider/host and the
-full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
+Consumed decisions, retained snapshots, bound reviews, receipt inspection, complete private
+content graphs, trusted root/consumed publication replay, native publication commit/recovery and
+pending-publication fences are merged through #363. Native input controls #364 are also merged.
+These are internal native foundations; they do not establish runtime or packaged approval readiness.
+Saved-review #365 and snapshot #366 remain open. The latest snapshot head passed hosted checks;
+the saved-review head encountered a Linux deadline and is undergoing a measured test-profile
+correction. See the delivery ledger for exact revisions, failures and validation scope.
+
+Capturing new private progress after publication still fails a preserved regression. Dedicated
+trusted capture, runtime integration, retention/collection, eligible signing, another provider/host
+and the full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
 Older dated observations below retain their historical scope.
 
 ## Product direction

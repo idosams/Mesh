@@ -8119,3 +8119,40 @@ under #345 remains open. Fixed checkpoint b064029 is unchanged.
 ### Saved-review validation with the final recovery fixtures
 
 R184 #365 incorporates R187 #363 at c44cfc310e818750a1708d419b20f9c7f1432077 through a normal related-history merge. Both documentation additions are retained. The saved-review implementation is unchanged. Full npm test passed on the combined source: 3,981 native tests in 354.193s (nine slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Prior run 37331209602 passed six checks including macOS but timed out on Linux, so it is not passing delivery evidence. Fixed checkpoint b064029 is unchanged.
+
+
+## Test-only signature arithmetic optimization (R189)
+
+PR #363 merged at canonical main f4085692c770efb594761c87937dc40c9159ec96 after all seven
+checks passed on c44cfc310e818750a1708d419b20f9c7f1432077 (run 37335039314).
+The separate main run 37337695207 passed Linux but its macOS job was cancelled after
+3,980 native, 194 rendered and 672 desktop tests passed; the remaining job checks did not
+complete. That run is not passing delivery evidence.
+
+Saved-review PR #365 at f71e92ea92a07cc5489785937bab6e016cfe1827 again exceeded Linux's
+unchanged 15-minute test deadline in run 37336306717. Six other checks passed. A normal
+related-history merge at 09fb49c9c6052fd9b5d2fd5114fdb9b0124df964 adopts canonical main
+without changing that implementation tree. No historical work is discarded or replaced.
+
+The test profile now optimizes only curve25519-dalek arithmetic, explicitly retaining debug
+assertions and overflow checks. Mesh code, release profiles, assertions, byte-prefix coverage,
+runner capacity and deadlines are unchanged. A fresh verbose build confirmed the compiler's
+optimization and debug-assertion flags; a runtime overflow probe confirmed overflow trapping
+with those emitted flags. No cryptographic algorithm or dependency version changes.
+
+The unchanged focused recovery regression passed in 159.252s before and 148.910s after this
+change. Full npm test passed with 3,981 native tests in 340.916s (nine slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository, docs,
+license, storage, formatting and clippy gates. The prior combined native suite took 354.193s.
+These individual local runs suggest only a modest improvement, not a controlled benchmark or
+hosted performance guarantee. Fresh exact-head hosted checks are required before merging #365.
+
+Snapshot PR #366 at aa3e9439d7896a3b0842605f89bd8d40d69f7314 passed all seven checks in
+run 37337600941: Linux 3,544 tests in 867.673s and macOS 3,982 tests in 683.572s, plus four
+ignored renderer tests. It remains dependent on #365 and needs combined validation after
+incorporating this correction. Neither open PR is counted as merged.
+
+Provenance: canonical delivery correction to R184/R187; no preserved legacy commit is replaced.
+The failing new-capture-after-publication regression is preserved separately at de89ff0 on
+idosams/native-capture-after-publication; the trusted capture implementation remains unfinished.
+The full fleet scope under #345 and fixed user checkpoint b064029 remain unchanged.
