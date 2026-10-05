@@ -2348,3 +2348,11 @@ PR #327 merged normally at `e6ebb4f4ee048e7ac98063b81715dd07b7b65363` after all 
 passed (run `37244695215`); post-merge CI is tracked separately. Discovery #328 still requires
 base reconciliation and normal merge, and owning-root selection still requires its own PR and
 hosted checks. Desktop/harness integration and full fleet acceptance remain open in #323.
+R161 discovery PR #328 passed all seven hosted checks on
+`67e6c0cc3b765378f7f9d89f38a4b9fd68c313f7` (run `37245205962`). Reconciliation
+`bb83272fc1e56466627ef5b93b518d9b75c71372` incorporates merged catalog-read #327/main
+`e6ebb4f4ee048e7ac98063b81715dd07b7b65363`; its entire tree is identical to that tested head.
+The following update records evidence only. PR #328 now needs fresh current-head checks against
+main before normal merge. The full local gate remains 3,949 native, 194 rendered, 672 desktop and
+44 daemon checks. Owning-root selection is separately preserved and fully locally tested but not
+published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
