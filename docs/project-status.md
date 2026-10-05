@@ -2464,6 +2464,28 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 Registered external-harness acceptance now has a portable opt-in runner and [reproduction instructions](plan/registered-external-harness-proof.md). A real external Codex process passed on a fresh synthetic consumed lane: two new saves while running, joined Mesh stop, continued provider edit and unchanged post-stop history, Git HEAD/index, root inode and original input. The [result](plan/evidence/registered-external-harness-2026-10-05.json) records 24.503s on exact native executable dff7384212c0ed7422594fab06bc35dfcd092036; fixture preparation passed in 27.435s and wrong executable SHA-256 refused before mutation. This is controlled noninteractive native evidence, not graphical, packaged, protected-main, integration/restore, second-provider or second-host acceptance. The full fleet objective remains open. Full repository validation and publication of this runner remain required.
 
+R162 consumed-work decisions address [issue #337](https://github.com/idosams/Mesh/issues/337). The trusted native host can reject, replace or revalidate an exact consumed child version using complete retained inputs. It reconstructs the guarded history at both native control selections, including the staged owner prefix, while missing inputs and stale predecessors refuse. Decisions update owner policy only; child history and saved previews remain unchanged. No renderer, agent, CLI or publication permission is added. The original incomplete-context regression failed in 14.625s; the final seven-test focus passed in 21.619s, including a dedicated 6.815s torn-append/lost-reply/input-loss recovery test. Full gate, hosted checks and merge remain required. Review snapshot binding, publication/runtime enforcement and user-facing enrollment remain open.
+
+## Native exact review snapshots (R163)
+
+Native hosts can now retain an exact dependency review snapshot under the complete custody set.
+It binds the saved output, canonical transitive graph object, qualified eligible input decisions
+and their revisions, and a deterministic validation digest. New snapshots refuse missing or
+ineligible inputs. Exact historical retries recover their original result after later rejection;
+that result grants no current publication authority. Graph objects are retained in their actual
+owner store and verified on ordinary and pending native history replay. Interrupted append,
+lost reply and required-root loss recover only the same retained request.
+
+Seventeen focused tests passed in 8.888s, including real consumed history, torn append, reopened
+catalog, conflicting retry, lost acknowledgement, root loss after staging, unrelated decisions,
+retained graph substitution and malformed graph refusal. The pre-change regression failed as
+expected. The exact previous policy reader from `fb5149cd54128804debdaca2c9b3e5e2bcf6739e`
+was separately compiled and refused the new required payload without changing its projection.
+This proves reader-format refusal, not a packaged old-application journey. Full validation,
+published PR and hosted delivery remain pending. Ordinary review creation, human approval,
+all publication paths and user-facing eligibility controls remain subsequent requirements under
+[issue #339](https://github.com/idosams/Mesh/issues/339) and the full fleet plan.
+
 Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
 in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
 history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now
@@ -2471,3 +2493,57 @@ schedules that scenario at priority 100, removing avoidable queue delay without 
 set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
 remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
 a measured product-performance improvement or a guarantee of future runner duration.
+
+R163 compatibility acceptance now includes the preserved pre-snapshot executable at exact
+revision `dff7384212c0ed7422594fab06bc35dfcd092036`, SHA-256
+`1af4edfe29e790f002d75840f8140f3d87df14ed19e7da9857f8ede96a974fd5`.
+The fully asserted synthetic snapshot fixture passed in 9.072s. Four separate old-executable
+owner/child `versions` and `capture` invocations refused without saved acknowledgement in 0.109s;
+owner/child journals, retained graph, both project files and executable bytes remained unchanged.
+The reproducible standard-library runner is
+`apps/desktop/scripts/prove-previous-snapshot-writer.py`; fixture export is explicit via
+`MESH_REVIEW_SNAPSHOT_FIXTURE`, and normal tests retain cleanup and all assertions. This proves
+fresh-process previous-reader/writer refusal, not an already-running cached writer or graphical
+journey. The snapshot branch also incorporates updated #338 and the published #343 scheduling
+prerequisite. Full validation and hosted checks are required again on the combined revision.
+
+## Native saved review binding (R164, in progress)
+
+Native saved reviews now retain an owner-journal binding to exact snapshot, output, canonical
+base, bundle and opener. Registered historical detail/list, exact file reads and human-review
+preview resolve that same binding under complete custody. Current input eligibility is separate
+from immutable historical evidence; ordinary review computation keeps its existing path.
+
+The two new policy regressions failed before implementation. Eighteen policy tests passed, and
+the expanded consumed-history journey passed with 19 focused tests in 20.245s, including torn
+append, changed retry refusal, reopened recovery, independent snapshots, lost reply, foreign work,
+missing review, substituted graph, later rejection and a later saved version. Removing native
+evidence from bundle identity failed the intended distinct-snapshot assertion in 6.957s; source
+was restored byte-for-byte. The exact previous reader from `125c3b7692ada4cfdb6d37bd94df6bf424905deb`
+refused the required v4 binding without projection changes in 0.025s. This is compiled-reader
+proof, not an old packaged executable or in-flight writer proof. Failed parser, identity-selection
+and build attempts remain preserved alongside their corrected evidence.
+
+Full repository validation, publication, exact-head hosted checks and merge remain required.
+The canonical-base advancement and eligible-signed packaged publication journeys remain pending
+with publication enforcement. No new renderer, agent or CLI controls are enabled. Issue #341 and
+the complete fleet objective remain open; the user's fixed checkpoint is unchanged.
+
+The first full R164 gate passed: 3,956 native tests in 312.476s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks. A subsequent real revalidation
+regression failed in 21.072s because the read model conflated current eligibility with exact saved
+decision freshness. Those are now separate fields in list and detail. The corrected 19-test focus
+passed in 22.102s, proving eligible inputs can coexist with a stale historical vector without
+changing the saved review. Fresh full and hosted validation are required on this correction.
+
+
+The corrected R164 full gate passed 3,957 native tests in 311.575s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks. New review creation now
+uses the same verified-main selector as ordinary attached approval: an existing unverified
+approval cannot silently select genesis. The isolated selector regression failed before this
+change; the corrected 20-test focus passed in 21.859s. Its synthetic unverified legacy receipt
+is not proof of a migrated signed approval. The public native snapshot path already refused
+this fixture earlier for missing legacy ancestry migration evidence; that refusal and original
+journal/source preservation remain tested. This is an explicit base-selector safeguard, not
+a demonstrated public publication bypass. Canonical-base advancement and native publication
+remain pending under issue #345. Hosted validation is required for the updated PR #344 head.

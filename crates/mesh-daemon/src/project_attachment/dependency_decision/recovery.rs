@@ -11,6 +11,7 @@ pub(in crate::project_attachment) fn pending_prefix(
     let kind = match text(&value, "schema")? {
         "mesh.dependency-decision-intent/v1" => DependencyKind::Eligibility,
         "mesh.dependency-grant-intent/v1" => DependencyKind::Grant,
+        "mesh.dependency-review-intent/v1" => DependencyKind::ReviewSnapshot,
         "mesh.native-consumption-owner-commit/v1" => DependencyKind::Consumption,
         "mesh.native-consumption-start-intent/v1" => DependencyKind::ConsumptionStart,
         _ => return Err(invalid("unknown native control intent")),
@@ -105,7 +106,7 @@ impl ProvisionedAttachment {
         }
         proof.verify(&self.store, &file, &bytes)?;
         let identity = (file.metadata()?.dev(), file.metadata()?.ino());
-        let (prefix, record, _) = pending_prefix(&cas, &raw, identity, &bytes)?;
+        let (prefix, record, staged_payload) = pending_prefix(&cas, &raw, identity, &bytes)?;
         if proof.pending() != Some((prefix, record)) {
             return Err(invalid("native control recovery record changed"));
         }
@@ -113,6 +114,11 @@ impl ProvisionedAttachment {
             .policy()
             .policy_payloads()
             .collect::<std::collections::BTreeSet<_>>();
+        let mut staged_policy = proof.policy().clone();
+        staged_policy
+            .apply(record, &staged_payload)
+            .map_err(error)?;
+        payloads.extend(staged_policy.policy_payloads());
         payloads.extend([proof.binding().authority, record.payload]);
         let store = self.store.identity()?;
         let facts = Json::object([

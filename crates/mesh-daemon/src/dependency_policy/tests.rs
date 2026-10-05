@@ -863,3 +863,187 @@ fn consumed_start_rejects_malformed_identity_and_noncanonical_fields_without_los
         );
     }
 }
+
+#[test]
+fn complete_review_snapshot_preserves_exact_decision_revision_and_historical_replay() {
+    let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+    let enrolled = enrollment();
+    apply(&mut history, &enrolled);
+    let eligible = decide(2, enrolled.0.payload, 70, 1, ZERO, "eligible");
+    apply(&mut history, &eligible);
+    let decisions = Json::Array(vec![Json::Array(vec![
+        i(10),
+        Json::Number(1),
+        Json::text(eligible.0.payload.to_hex()),
+    ])]);
+    let validation = Json::object([
+        ("schema", Json::text("mesh.native-review-validation/v1")),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions.clone()),
+    ])
+    .encode();
+    let body = Json::object([
+        ("request", j(71)),
+        ("revision", Json::Number(1)),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions),
+        (
+            "validation",
+            Json::text(Blake3::digest_bytes(validation.as_bytes()).to_hex()),
+        ),
+    ]);
+    let (mut record, bytes) = payload(DependencyKind::ReviewSnapshot, 3, eligible.0.payload, body);
+    let bytes = String::from_utf8(bytes)
+        .unwrap()
+        .replacen("mesh.dependency-policy/v1", "mesh.dependency-policy/v3", 1)
+        .into_bytes();
+    record.payload = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+    let snapshot = (record, bytes);
+    apply(&mut history, &snapshot);
+    let rejected = decide(4, snapshot.0.payload, 72, 2, eligible.0.payload, "rejected");
+    apply(&mut history, &rejected);
+    let before = history.clone();
+    apply(&mut history, &snapshot);
+    assert_eq!(
+        history, before,
+        "historical retry must not assert current eligibility"
+    );
+}
+
+fn versioned_review(
+    revision: u64,
+    previous: RecordDigest,
+    body: Json,
+    schema: &str,
+) -> (DependencyRecord, Vec<u8>) {
+    let (mut record, bytes) = payload(DependencyKind::ReviewSnapshot, revision, previous, body);
+    let bytes = String::from_utf8(bytes)
+        .unwrap()
+        .replacen(SCHEMA, schema, 1)
+        .into_bytes();
+    record.payload = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+    (record, bytes)
+}
+fn bound_review_fixture() -> (DependencyPolicyHistory, RecordDigest) {
+    let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+    let enrolled = enrollment();
+    apply(&mut history, &enrolled);
+    let decisions = Json::Array(vec![]);
+    let validation = Json::object([
+        ("schema", Json::text("mesh.native-review-validation/v1")),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions.clone()),
+    ])
+    .encode();
+    let snapshot = versioned_review(
+        2,
+        enrolled.0.payload,
+        Json::object([
+            ("request", j(71)),
+            ("revision", Json::Number(1)),
+            ("output", i(20)),
+            ("graph", j(80)),
+            ("decisions", decisions),
+            (
+                "validation",
+                Json::text(Blake3::digest_bytes(validation.as_bytes()).to_hex()),
+            ),
+        ]),
+        "mesh.dependency-policy/v3",
+    );
+    apply(&mut history, &snapshot);
+    (history, snapshot.0.payload)
+}
+fn bound_review_body(snapshot: RecordDigest) -> Json {
+    Json::object([
+        ("request", j(90)),
+        ("revision", Json::Number(1)),
+        ("snapshot", Json::text(snapshot.to_hex())),
+        ("output", i(20)),
+        ("canonical", j(0)),
+        ("bundle", j(91)),
+        ("opener", j(92)),
+    ])
+}
+#[test]
+fn saved_review_binding_retains_exact_snapshot_and_replays_without_new_authority() {
+    let (mut history, snapshot) = bound_review_fixture();
+    let bound = versioned_review(
+        3,
+        snapshot,
+        bound_review_body(snapshot),
+        "mesh.dependency-policy/v4",
+    );
+    apply(&mut history, &bound);
+    let before = history.clone();
+    apply(&mut history, &bound);
+    assert_eq!(history, before);
+    let roots = history.policy_payloads().collect::<BTreeSet<_>>();
+    assert!(
+        roots.contains(&snapshot) && roots.contains(&bound.0.payload) && roots.contains(&d(80))
+    );
+    assert!(
+        !roots.contains(&d(91)),
+        "a computed bundle identity is not a local CAS object"
+    );
+}
+#[test]
+fn saved_review_binding_refuses_missing_foreign_and_noncanonical_evidence_atomically() {
+    let (mut history, snapshot) = bound_review_fixture();
+    let Json::Object(body) = bound_review_body(snapshot) else {
+        unreachable!()
+    };
+    for (field, bad) in [
+        ("snapshot", j(99)),
+        ("snapshot", j(0)),
+        ("output", i(30)),
+        ("bundle", j(0)),
+        ("opener", j(0)),
+        ("revision", Json::Number(2)),
+    ] {
+        let mut changed = body.clone();
+        changed
+            .iter_mut()
+            .find(|(name, _)| name == field)
+            .unwrap()
+            .1 = bad;
+        refuse(
+            &mut history,
+            &versioned_review(
+                3,
+                snapshot,
+                Json::Object(changed),
+                "mesh.dependency-policy/v4",
+            ),
+        );
+    }
+    for position in 0..body.len() {
+        let mut changed = body.clone();
+        changed.remove(position);
+        refuse(
+            &mut history,
+            &versioned_review(
+                3,
+                snapshot,
+                Json::Object(changed),
+                "mesh.dependency-policy/v4",
+            ),
+        );
+    }
+    let mut changed = body.clone();
+    changed.reverse();
+    refuse(
+        &mut history,
+        &versioned_review(
+            3,
+            snapshot,
+            Json::Object(changed),
+            "mesh.dependency-policy/v4",
+        ),
+    );
+    let valid = versioned_review(3, snapshot, Json::Object(body), "mesh.dependency-policy/v4");
+    apply(&mut history, &valid);
+}

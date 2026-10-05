@@ -105,6 +105,7 @@ pub(super) fn transaction_intent(
             "schema",
             Json::text(match kind {
                 DependencyKind::Grant => "mesh.dependency-grant-intent/v1",
+                DependencyKind::ReviewSnapshot => "mesh.dependency-review-intent/v1",
                 DependencyKind::Consumption => "mesh.native-consumption-owner-commit/v1",
                 DependencyKind::ConsumptionStart => "mesh.native-consumption-start-intent/v1",
                 _ => "mesh.dependency-decision-intent/v1",
@@ -326,6 +327,12 @@ impl ProvisionedAttachment {
                 "schema",
                 Json::text(if selected.kind == DependencyKind::Grant {
                     "mesh.dependency-policy/v2"
+                } else if selected.kind == DependencyKind::ReviewSnapshot
+                    && selected.body.get("snapshot").is_some()
+                {
+                    "mesh.dependency-policy/v4"
+                } else if selected.kind == DependencyKind::ReviewSnapshot {
+                    "mesh.dependency-policy/v3"
                 } else {
                     "mesh.dependency-policy/v1"
                 }),
@@ -346,6 +353,11 @@ impl ProvisionedAttachment {
             kind: selected.kind,
         };
         policy.apply(record, &bytes).map_err(error)?;
+        if let Some(graph) = policy.review_graph(record.payload) {
+            policy
+                .verify_review_graph(record.payload, &read_payload(&cas, graph, 4 * 1024 * 1024)?)
+                .map_err(error)?;
+        }
         let identity = journal.metadata()?;
         let pending = transaction_intent(
             selected.kind,

@@ -7574,9 +7574,38 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 R161 registered external-harness acceptance is new proof work, replacing no preserved implementation commit. It depends on process-proof #335 and records a portable real-Codex runner, exact executable identity, positive continued-work evidence and wrong-digest refusal. The copied runner is byte-identical to the successful retained run (SHA-256 7dbc26f38fe364b35272e53329f486c3ca20d395143cc17ff9a11dad0bbc0717). Native source behavior is unchanged. Full gate, publication, fresh CI and merge remain required; all broader fleet exits remain open.
 
+R162 consumed-input decision correction is new work from canonical main 2dcb1b7dbca09dc8fbdaa4810e3df37479aaeaca; it replaces no preserved legacy commit. The existing ordinary child-decision reader refused consumed history. The complete-input native path now shares bounded custody and exact staged-owner context with native grants, preserving ordinary decisions and durable request identity. Failing-before evidence, seven focused passes, and the independent consumed recovery test are retained; the long existing consumption scenario is unchanged. Full validation, publication and merge remain required under issue #337. This does not close the full dependency-publication or fleet objective.
+
+R163 exact native review snapshots are new canonical work from published consumed-input decision
+head `fb5149cd54128804debdaca2c9b3e5e2bcf6739e` (PR #338), replacing no preserved legacy commit.
+The increment retains a complete graph and per-input revision vector through the existing native
+control transaction, adds closed policy/v3 snapshot decoding and exact retained-graph verification,
+and preserves historical retry independently of current publication admission. Seventeen focused
+tests and compiled previous-reader refusal passed; failing and corrected logs are preserved.
+Full validation, publication and merge remain required for issue #339. This is not completion of
+review presentation, publication enforcement, packaged acceptance or the complete fleet objective.
+
 The R163 recovery scheduling correction is new canonical CI work from main
 `0599b49e480cbc5797b4bc6095ddd912e0a7b270`, replacing no preserved implementation. It prioritizes
 the dominant independent recovery scenario after Linux run `37259723091` passed every assertion
 but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
 separate correction requires its own full validation, hosted checks and normal merge before
 propagation to the snapshot branch. The original failed run is preserved.
+
+R163 snapshot follow-up incorporates canonical consumed-decision head
+`db712fa2ac8c537e0b40a2c387decd15c86b3af9` and published scheduling prerequisite
+`56310edb01721f07f2881b4a79bbcc7642f25a2d` (#343), preserving both append-only documentation
+histories. The original snapshot run passed all Linux assertions but failed its execution deadline;
+that failed run remains preserved. New explicit fixture export and the previous-executable runner
+prove owner/child read/write refusal without changing retained evidence. No existing test is skipped
+and no preserved legacy commit is replaced. The complete combined revision requires fresh full and
+hosted validation before normal delivery of #340; #343 is a merge prerequisite.
+
+R164 native saved review binding is new canonical work based on published snapshot head
+`125c3b7692ada4cfdb6d37bd94df6bf424905deb` (#340); it replaces no preserved legacy commit. It adds
+required closed owner binding replay, native bundle validation evidence, durable request recovery,
+and complete-context historical review/list/artifact/preview paths. Both failed-before policy
+regressions, the 19-test consumed-history focus, the intended missing-evidence mutation failure
+and exact previous-reader refusal are preserved. Full validation and a coherent dependent PR
+remain required. This increment does not close protected-main admission, signed packaged tests,
+user-facing controls, second-provider/host acceptance or the full fleet plan.
