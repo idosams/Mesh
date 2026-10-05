@@ -531,3 +531,6 @@ Chained consumed-child recovery is delivered separately in PR #325, with complet
 acceptance in PR #326. Generic caller integration, runtime and publication controls, whole-store
 retention admission and packaged acceptance remain required; foundation delivery does not complete
 the phase exit above.
+
+
+Native eligibility control now has an explicit complete-input path for consumed child versions. It resolves retained consumed history under the same bounded custody set and reconstructs that context for the pre-append selection using the exact staged owner proof. Rejection, replacement and revalidation append only owner decisions; historical child content remains readable. Recovery tests cover a torn decision frame, conflicting retry intent, lost acknowledgement, catalog reopen, historical idempotence, stale predecessor and input disappearance after staging. This is a trusted-native-host control, not a renderer/agent route or an approval/publication permit. Current review snapshot and publication serialization integration remain required before user-facing enrollment.

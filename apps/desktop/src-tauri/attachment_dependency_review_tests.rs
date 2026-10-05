@@ -1,6 +1,7 @@
 use super::*;
 use mesh_daemon::project_attachment::{
-    NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest, ObservationLimits,
+    NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
+    NativeWorkDecisionRequest, ObservationLimits, SavedInputDecision,
 };
 use mesh_daemon::ManagedContentDigest;
 use std::fs;
@@ -211,5 +212,81 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     assert_eq!(
         text_preview(&reopened, child.id(), &first_id),
         "saved original"
+    );
+
+    // Eligibility control must read consumed history without falling back to legacy capture.
+    let request = |decision, previous, number| NativeWorkDecisionRequest {
+        source: &child,
+        version: later,
+        decision,
+        expected_previous: previous,
+        request: request_id(number),
+    };
+    let child_journal = child.metadata_path().join("records.mesh");
+    let before_child = fs::read(&child_journal).unwrap();
+    assert!(
+        storage
+            .decide_work_input(&owner, request(SavedInputDecision::Rejected, None, 210))
+            .is_err(),
+        "missing consumed input context must refuse"
+    );
+    let rejected = storage
+        .decide_work_input_with_inputs(
+            &owner,
+            request(SavedInputDecision::Rejected, None, 210),
+            &[&native_source],
+        )
+        .expect("complete native context must permit a consumed-child decision");
+    assert_eq!(rejected.revision(), 1);
+    let owner_journal = owner.metadata_path().join("records.mesh");
+    let acknowledged = fs::read(&owner_journal).unwrap();
+    let repeated = storage
+        .decide_work_input_with_inputs(
+            &owner,
+            request(SavedInputDecision::Rejected, None, 210),
+            &[&native_source],
+        )
+        .unwrap();
+    assert_eq!(repeated, rejected);
+    assert_eq!(fs::read(&owner_journal).unwrap(), acknowledged);
+    assert!(
+        storage
+            .decide_work_input_with_inputs(
+                &owner,
+                request(SavedInputDecision::Eligible, None, 211),
+                &[&native_source],
+            )
+            .is_err(),
+        "stale decision cannot replace current rejection"
+    );
+    assert_eq!(fs::read(&owner_journal).unwrap(), acknowledged);
+    let replaced = storage
+        .decide_work_input_with_inputs(
+            &owner,
+            request(
+                SavedInputDecision::Replaced(first),
+                Some(rejected.record()),
+                212,
+            ),
+            &[&native_source],
+        )
+        .unwrap();
+    assert_eq!(replaced.revision(), 2);
+    let eligible = storage
+        .decide_work_input_with_inputs(
+            &owner,
+            request(SavedInputDecision::Eligible, Some(replaced.record()), 213),
+            &[&native_source],
+        )
+        .unwrap();
+    assert_eq!(eligible.revision(), 3);
+    assert_eq!(fs::read(&child_journal).unwrap(), before_child);
+    assert_eq!(
+        text_preview(&reopened, child.id(), &first_id),
+        "saved original"
+    );
+    assert_eq!(
+        text_preview(&reopened, child.id(), &later_id),
+        "later saved progress"
     );
 }
