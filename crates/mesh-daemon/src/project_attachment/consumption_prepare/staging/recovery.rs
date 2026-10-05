@@ -634,6 +634,21 @@ pub(super) fn run_child_if_requested() -> bool {
     let value = Json::parse(&raw).unwrap();
     let text = |name| value.get(name).and_then(Json::as_text).unwrap();
     let storage = AttachmentStorage::open(Path::new(text("storage"))).unwrap();
+    if text("mode") == "registered-capture-recover" {
+        // Reconstruct from only the selected native registration and exact capture request.
+        let destination = storage.reopen(text("destination")).unwrap();
+        let recovered = storage
+            .recover_registered_dependency_capture(&destination, digest(text("capture")).unwrap())
+            .unwrap();
+        assert_eq!(recovered.operation().to_hex(), text("operation"));
+        let saved = storage
+            .registered_dependency_versions(destination.id())
+            .unwrap();
+        assert!(saved
+            .iter()
+            .any(|version| version.operation() == recovered.operation()));
+        return true;
+    }
     let owner = storage.reopen(text("owner")).unwrap();
     let source = storage.reopen(text("source")).unwrap();
     let destination = storage.reopen(text("destination")).unwrap();

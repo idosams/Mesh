@@ -366,6 +366,15 @@ impl AttachmentStorage {
     }
 }
 
+/// Reconstruction hints only; the capture writer must authenticate the complete transaction.
+pub(super) struct NativeConsumedCaptureHint {
+    pub(super) source: (mesh_store::RecordDigest, mesh_store::RecordDigest),
+    pub(super) operation: mesh_store::RecordDigest,
+    pub(super) grant: mesh_store::RecordDigest,
+    pub(super) request: mesh_store::RecordDigest,
+    pub(super) limits: ObservationLimits,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

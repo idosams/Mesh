@@ -2408,6 +2408,27 @@ is ready for publication against #329, followed by hosted checks and normal merg
 acceptance, harness capture/start, runtime/publication/import/remote integration and full fleet
 acceptance remain open in #323. The user checkpoint stays fixed.
 
+
+R161 native capture discovery now reconstructs candidate source/grant/request/limits from retained
+start records, selects native registrations through owner consumption facts and allocation ancestry,
+and obtains the source version from verified history. These hints never admit history: existing
+capture preparation/commit/recovery still reconstruct and authenticate the complete consumption
+transaction under custody. Missing start intent cannot downgrade consumed work to independent
+capture. Public enrolled prepare/recover entry points accept the retained registration and exact
+capture request; no caller-built original start request is required. No runtime or main authority is
+added, and automatic desktop/harness capture scheduling still needs integration.
+
+The focused real journey passed in 143.942s, exercising torn append and sync recovery in fresh
+processes, exact retries, stale prepared work, wrong-request refusal without journal changes and
+stale owner refusal at commit. Added deep-lane and desktop capture cases plus missing-intent
+refusal before signing await full validation. Disabling reconstructed context failed the actual
+capture in 47.095s with native transaction verification required; production source was restored
+byte-for-byte. Compilation passed in 6.62s. Full validation, publication and hosted checks remain
+required; #323 and the full fleet scope stay open. The fixed checkpoint is unchanged.
+
+
+Capture-discovery full validation completed on `295a42070020298472d0390ab138eaa058a88b99`: 3,950 native tests passed in 348.848s (18 skipped), plus the rendered, desktop and 44-check real daemon gates. This includes automatic deep-lane capture, desktop consumed capture and missing-intent refusal before signing. The first full attempt stopped on strict lint for a type declared after a test module; moving that declaration before the test module fixed it without changing behavior. Both logs are preserved. Publication and hosted validation remain required; automatic capture-service integration and the full fleet acceptance scope remain open.
+
 Linux CI budget correction: runs `37249269700` and `37249297691` spent about 90s compiling before more than 13 minutes of native test execution, then reached the shared 15-minute job limit. Main run `37249215287` even recorded all 3,512 tests passing in 785.664s but ended cancelled at 15m3s. Keep all tests, assertions, leak detection and per-test deadlines. Compile in a separate step, allow 20 minutes for the complete Linux job, and explicitly bound the unchanged test command to 15 minutes. The independent check name remains `test-linux`; no failed test is tolerated or skipped. Hosted validation must still prove the correction.
 
 The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s during a sampled run. A test-only crypto optimization experiment passed in 126.665s, insufficient to establish a robust fix; its patch and logs are preserved and the original manifest restored. The stack sample showed substantial identity/history work. This budget correction does not claim improved product runtime or measured fleet velocity. Full validation and a separate canonical PR remain required.
