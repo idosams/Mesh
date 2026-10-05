@@ -7485,3 +7485,12 @@ Disabling dependency-aware routing caused the expected preview failure in 3.385s
 was restored byte-for-byte. Compilation passed; full canonical validation and hosted PR checks remain
 required. This is host-level evidence, not packaged graphical acceptance. The fixed checkpoint is
 unchanged and the complete fleet scope remains open in #323.
+R161 discovery PR #328 merged normally at `8e5f662f7c1f7897d29c1548b8c5773a16ef28d2`
+after all seven checks passed on `c15d7b43c0d46f30486380b9feb9fb163ac1b6a4`
+(run `37246187227`). Owning-root PR #329 passed all seven checks on
+`dec2ac442e37381459f4ccbd418031ada57cb156` (run `37246233164`). Reconciliation
+`ea146e3b0e92dd1829fa743fb5c1f9a676d6815d` incorporates main while preserving that entire tested tree; only the
+following evidence update changes documentation. PR #329 now requires fresh checks against main
+and normal merge. Desktop review integration is separately preserved: its first full local gate
+passed 3,950 native tests in 351.698s, 194 rendered, 672 desktop and 44 daemon checks; the separate
+changed-path action still needs integration before publication. Full fleet acceptance remains open.
