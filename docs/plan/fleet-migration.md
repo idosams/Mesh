@@ -7573,3 +7573,10 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 
 R161 registered external-harness acceptance is new proof work, replacing no preserved implementation commit. It depends on process-proof #335 and records a portable real-Codex runner, exact executable identity, positive continued-work evidence and wrong-digest refusal. The copied runner is byte-identical to the successful retained run (SHA-256 7dbc26f38fe364b35272e53329f486c3ca20d395143cc17ff9a11dad0bbc0717). Native source behavior is unchanged. Full gate, publication, fresh CI and merge remain required; all broader fleet exits remain open.
+
+The R163 recovery scheduling correction is new canonical CI work from main
+`0599b49e480cbc5797b4bc6095ddd912e0a7b270`, replacing no preserved implementation. It prioritizes
+the dominant independent recovery scenario after Linux run `37259723091` passed every assertion
+but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
+separate correction requires its own full validation, hosted checks and normal merge before
+propagation to the snapshot branch. The original failed run is preserved.

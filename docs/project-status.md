@@ -2463,3 +2463,11 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 
 Registered external-harness acceptance now has a portable opt-in runner and [reproduction instructions](plan/registered-external-harness-proof.md). A real external Codex process passed on a fresh synthetic consumed lane: two new saves while running, joined Mesh stop, continued provider edit and unchanged post-stop history, Git HEAD/index, root inode and original input. The [result](plan/evidence/registered-external-harness-2026-10-05.json) records 24.503s on exact native executable dff7384212c0ed7422594fab06bc35dfcd092036; fixture preparation passed in 27.435s and wrong executable SHA-256 refused before mutation. This is controlled noninteractive native evidence, not graphical, packaged, protected-main, integration/restore, second-provider or second-host acceptance. The full fleet objective remains open. Full repository validation and publication of this runner remain required.
+
+Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
+in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
+history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now
+schedules that scenario at priority 100, removing avoidable queue delay without changing the test
+set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
+remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
+a measured product-performance improvement or a guarantee of future runner duration.
