@@ -228,6 +228,100 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     let versions = reopened.versions(child.id(), None).unwrap();
     assert!(versions.contains(&first_id) && versions.contains(&later_id));
     assert!(reopened.versions(child.id(), Some("unknown")).is_err());
+    let harness_args = |action: &str| {
+        vec![
+            "--mesh-registered-attachment".to_owned(),
+            action.to_owned(),
+            metadata.to_str().unwrap().to_owned(),
+            child.id().to_owned(),
+        ]
+    };
+    let harness = |action: &str| {
+        let mut output = Vec::new();
+        crate::attachment_capture::test_run(
+            &harness_args(action),
+            std::io::Cursor::new(Vec::<u8>::new()),
+            &mut output,
+        )?;
+        Ok::<_, String>(output)
+    };
+    // The command parser and dispatcher share the same saved identities with desktop review.
+    let unchanged_output = harness("capture").unwrap();
+    let unchanged = Json::parse(std::str::from_utf8(&unchanged_output).unwrap().trim()).unwrap();
+    assert_eq!(unchanged.get("saved_version"), Some(&Json::text(&later_id)));
+    fs::write(
+        child.project().root().join("note.txt"),
+        b"harness saved progress",
+    )
+    .unwrap();
+    let captured = harness("capture").unwrap();
+    let captured = Json::parse(std::str::from_utf8(&captured).unwrap().trim()).unwrap();
+    let harness_id = captured
+        .get("saved_version")
+        .and_then(Json::as_text)
+        .unwrap();
+    assert_ne!(harness_id, later_id);
+    assert_eq!(
+        text_preview(&reopened, child.id(), harness_id),
+        "harness saved progress"
+    );
+    let listed = harness("versions").unwrap();
+    let listed = Json::parse(std::str::from_utf8(&listed).unwrap().trim()).unwrap();
+    assert_eq!(
+        listed
+            .get("versions")
+            .and_then(Json::as_array)
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        text_preview(&reopened, child.id(), &first_id),
+        "saved original"
+    );
+
+    use std::io::Write as _;
+    let (mut controls, input) = std::os::unix::net::UnixStream::pair().unwrap();
+    let args = harness_args("watch");
+    let watcher = std::thread::spawn(move || {
+        let mut output = Vec::new();
+        let result = crate::attachment_capture::test_run(&args, input, &mut output);
+        (result, output)
+    });
+    fs::write(child.project().root().join("note.txt"), b"watched progress").unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let watched = loop {
+        let versions = storage.registered_review_versions(&child).unwrap();
+        if versions.len() == 4 {
+            break Some(*versions.last().unwrap());
+        }
+        if std::time::Instant::now() >= deadline {
+            break None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    controls.write_all(b"stop\n").unwrap();
+    let (result, output) = watcher.join().unwrap();
+    result.unwrap();
+    let watched = watched.expect("registered watch must capture new input");
+    let final_status = Json::parse(
+        std::str::from_utf8(&output)
+            .unwrap()
+            .lines()
+            .last()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(final_status.get("phase"), Some(&Json::text("stopped")));
+    assert_eq!(
+        text_preview(&reopened, child.id(), &watched.operation().to_string()),
+        "watched progress"
+    );
+    assert_eq!(
+        fs::read(source.join("note.txt")).unwrap(),
+        b"saved original"
+    );
+
     let moved = root.join("source-offline");
     fs::rename(&source, &moved).unwrap();
     let restore = Restore(source.clone(), moved);
@@ -245,7 +339,10 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
             signed.set(true);
             signer.sign(payload)
         });
+    let refused_harness_capture = harness("capture");
+    let refused_harness_versions = harness("versions");
     drop(restore);
+    assert!(refused_harness_capture.is_err() && refused_harness_versions.is_err());
     assert!(refused_capture.is_err());
     assert!(!signed.get(), "missing owner must refuse before signing");
     assert!(refused_path.is_err());
