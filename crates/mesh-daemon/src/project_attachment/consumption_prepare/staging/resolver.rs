@@ -7,16 +7,18 @@ use crate::project_attachment::{
 use crate::{root_authority::PinnedRootFs, workspace_custody::WorkspaceInitializationGuard};
 use mesh_cas::{Blake3, Cas};
 
-struct Selection<'a> {
-    work: &'a ProvisionedAttachment,
-    source: (RecordDigest, RecordDigest),
-    operation: RecordDigest,
-    grant: RecordDigest,
-    request: RecordDigest,
-    limits: ObservationLimits,
+pub(in crate::project_attachment) struct Selection<'a> {
+    pub work: &'a ProvisionedAttachment,
+    pub source: (RecordDigest, RecordDigest),
+    pub operation: RecordDigest,
+    pub grant: RecordDigest,
+    pub request: RecordDigest,
+    pub limits: ObservationLimits,
 }
 impl Selection<'_> {
-    fn read(work: &ProvisionedAttachment) -> io::Result<Selection<'_>> {
+    pub(in crate::project_attachment) fn read(
+        work: &ProvisionedAttachment,
+    ) -> io::Result<Selection<'_>> {
         // These are local facts used only to select a reconstruction attempt, never a read proof.
         let (_, facts) =
             work.project()

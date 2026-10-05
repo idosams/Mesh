@@ -13,7 +13,7 @@ use std::{
 
 type Key = (RecordDigest, RecordDigest);
 type Hint = (Key, Vec<String>);
-type CatalogHints = (BTreeMap<String, Hint>, BTreeMap<Key, Vec<String>>);
+pub(super) type CatalogHints = (BTreeMap<String, Hint>, BTreeMap<Key, Vec<String>>);
 #[derive(PartialEq, Eq)]
 struct Selection {
     owner: (String, Option<VerifiedDependencyRead>),
@@ -179,7 +179,10 @@ impl AttachmentStorage {
         self.select_dependency_read(&owner, work_id, hints, &guard)
     }
 
-    fn catalog_discovery_hints(&self, owner: &ProvisionedAttachment) -> io::Result<CatalogHints> {
+    pub(super) fn catalog_discovery_hints(
+        &self,
+        owner: &ProvisionedAttachment,
+    ) -> io::Result<CatalogHints> {
         // An unavailable unrelated registration is not an input. Required keys must nevertheless
         // resolve uniquely below; omission never becomes a partial-history success.
         let mut hints: BTreeMap<String, Hint> = BTreeMap::new();

@@ -37,7 +37,7 @@ pub struct SavedAttachmentVersion {
     operation: RecordDigest,
 }
 impl SavedAttachmentVersion {
-    pub(in crate::project_attachment) fn from_verified_history(
+    pub(crate) fn from_verified_history(
         history: &OpenWorkspace,
         operation: RecordDigest,
     ) -> io::Result<Self> {

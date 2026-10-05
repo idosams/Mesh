@@ -14,11 +14,15 @@ its graphical fleet journey and protected-main approval remain unverified. Earli
 `5052009` is preserved. These copies stay fixed while development continues.
 
 Consumed decisions, retained snapshots, bound reviews, publication framing, receipt inspection,
-and private-evidence separation are merged through #351. Restricted private reconstruction #352
-has passed all seven hosted checks and awaits normal merge at this observation. R172 adds trusted
-owning-project replay and subsequent review candidates, with its full local gate passing; it is
-not yet merged. Production publication, consumed-child replay, complete recovery, eligible signing,
-another provider/host and the full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
+private-evidence separation, root publication replay and private completed-consumption evidence
+are merged through #355. Shared source verification #356 and retained reconstruction #357 have
+passed their full local gates and await hosted validation/reconciliation and merge. R177 adds
+native discovery and complete private consumed-content graphs from registrations; its full local
+repository gate passed, including publication discovery and chained-lane regressions. Hosted
+validation and merged delivery remain pending.
+These graph reads do not assert accepted main or grant publication authority. Trusted consumed
+publication replay, production commit/recovery, eligible signing, another provider/host and the
+full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
 Older dated observations below retain their historical scope.
 
 ## Product direction
