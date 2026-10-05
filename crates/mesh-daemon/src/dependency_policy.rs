@@ -158,6 +158,19 @@ impl NativeReviewBinding {
     }
 }
 
+/// A structurally checked durable claim, never verified human authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NativePublicationClaim {
+    pub(crate) record: DependencyRecord,
+    pub(crate) review: NativeReviewBinding,
+    pub(crate) revision: u64,
+    pub(crate) previous: RecordDigest,
+    pub(crate) receipt: RecordDigest,
+    pub(crate) result: RecordDigest,
+    pub(crate) credential: RecordDigest,
+    pub(crate) challenge: RecordDigest,
+}
+
 /// Bounded, reconstructible historical projection. It grants no permission to consume or publish.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DependencyPolicyHistory {
@@ -613,6 +626,30 @@ impl DependencyPolicyHistory {
             bundle: review.bundle,
             opener: review.opener,
         })
+    }
+    pub(crate) fn publication_claim(&self, record: RecordDigest) -> Option<NativePublicationClaim> {
+        let (envelope, Event::Publication(claim)) = self.records.get(&record)? else {
+            return None;
+        };
+        Some(NativePublicationClaim {
+            record: *envelope,
+            review: self.bound_review(claim.review)?,
+            revision: claim.revision,
+            previous: claim.previous,
+            receipt: claim.receipt,
+            result: claim.result,
+            credential: claim.credential,
+            challenge: claim.challenge,
+        })
+    }
+    pub(crate) fn publication_claims_in_order(&self) -> Vec<NativePublicationClaim> {
+        let mut claims = self
+            .records
+            .keys()
+            .filter_map(|id| self.publication_claim(*id))
+            .collect::<Vec<_>>();
+        claims.sort_by_key(|claim| claim.record.revision);
+        claims
     }
     pub(crate) fn has_publication_claims(&self) -> bool {
         !self.publications.is_empty()
