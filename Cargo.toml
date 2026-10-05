@@ -103,3 +103,11 @@ codegen-units = 1
 [profile.bench]
 inherits = "release"
 debug = true
+
+# Exhaustive recovery tests repeatedly verify real signatures. Optimize only the
+# dependency arithmetic; retain test diagnostics and overflow checks. Mesh code
+# and production profiles are unchanged.
+[profile.test.package.curve25519-dalek]
+opt-level = 3
+debug-assertions = true
+overflow-checks = true
