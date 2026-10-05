@@ -14,6 +14,8 @@ use std::io::{Seek as _, Write as _};
 
 #[path = "consumed_capture.rs"]
 mod consumed;
+#[path = "registered_capture.rs"]
+mod registered;
 use consumed::{CaptureRead, ConsumedCaptureContext};
 
 const PENDING: &str = "dependency-capture.pending";

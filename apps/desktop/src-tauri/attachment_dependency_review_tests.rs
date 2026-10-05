@@ -146,21 +146,51 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         b"later saved progress",
     )
     .unwrap();
-    let input = child
-        .project()
-        .capture_inputs(ObservationLimits::default())
-        .unwrap();
-    let later = storage
-        .prepare_registered_dependency_capture(
-            &child,
-            &input,
-            signer.public_key(),
-            request_id(204),
-            |payload| signer.sign(payload),
-        )
+    let generation = host.state.lock().unwrap().projects[child.id()]
+        .generation
+        .to_string();
+    host.control(child.id(), &generation, "resume").unwrap();
+    let service = host
+        .state
+        .lock()
         .unwrap()
-        .commit()
+        .projects
+        .get_mut(child.id())
+        .unwrap()
+        .service
+        .take()
         .unwrap();
+    let wait = |attempt| {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        loop {
+            let status = service.status();
+            if status.attempts >= attempt && status.phase == CapturePhase::Waiting {
+                break status;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "capture did not complete: {status:?}"
+            );
+            service.wait_for_update(status.revision, std::time::Duration::from_millis(100));
+        }
+    };
+    let first_capture = wait(1);
+    assert_eq!(first_capture.last_outcome, CaptureOutcome::Saved);
+    let later = first_capture.saved_version.unwrap();
+    assert!(service.request_capture());
+    let unchanged = wait(first_capture.attempts + 1);
+    assert_eq!(unchanged.last_outcome, CaptureOutcome::Unchanged);
+    assert_eq!(unchanged.saved_version, Some(later));
+    assert_eq!(unchanged.versions_saved, 1);
+    let stopped = service.stop_and_join().unwrap();
+    assert_eq!(stopped.phase, CapturePhase::Stopped);
+    host.state
+        .lock()
+        .unwrap()
+        .projects
+        .get_mut(child.id())
+        .unwrap()
+        .recovered = stopped;
     let later_id = later.operation().to_string();
     assert_eq!(text_preview(&host, child.id(), &first_id), "saved original");
     assert_eq!(
@@ -205,7 +235,19 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     let refused_preview = reopened.inspect(child.id(), &first_id, Some("note.txt"), None);
     let refused_comparison = reopened.compare(child.id(), &first_id, &later_id, None);
     let refused_path = reopened.comparison_path(child.id(), &first_id, &later_id, "note.txt");
+    let input = child
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let signed = std::cell::Cell::new(false);
+    let refused_capture =
+        storage.save_registered_capture(&child, &input, signer.public_key(), |payload| {
+            signed.set(true);
+            signer.sign(payload)
+        });
     drop(restore);
+    assert!(refused_capture.is_err());
+    assert!(!signed.get(), "missing owner must refuse before signing");
     assert!(refused_path.is_err());
     assert!(refused_versions.is_err() && refused_preview.is_err() && refused_comparison.is_err());
     assert_eq!(
