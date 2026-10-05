@@ -76,19 +76,20 @@ impl NativeDependencyFacts {
         Ok(())
     }
 }
-/// Native workspace admission capability. Local facts alone cannot admit consumed history.
-/// Construction is private so recovery inspection cannot accidentally create a read proof.
+/// Native enrollment and, where present, completed consumption have been verified.
+/// Saved operation/content verification still belongs to the read-only workspace opening.
+/// It is deliberately not a workspace admission capability or publication authority.
 #[derive(Clone, PartialEq, Eq)]
-pub(crate) struct VerifiedDependencyRead(NativeDependencyFacts);
-impl VerifiedDependencyRead {
-    pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
-        &self.0 == facts
+struct VerifiedPrivateHistory {
+    facts: NativeDependencyFacts,
+}
+impl VerifiedPrivateHistory {
+    fn from_consumption(verified: super::consumption_prepare::VerifiedConsumedHistory) -> Self {
+        Self {
+            facts: verified.into_facts(),
+        }
     }
-    pub(super) fn from_consumption(
-        verified: super::consumption_prepare::VerifiedConsumedHistory,
-    ) -> Self {
-        Self(verified.into_facts())
-    }
+
     fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
         if facts.policy.has_consumption_transaction()
             || facts.pending.is_some_and(|(_, record)| {
@@ -99,19 +100,51 @@ impl VerifiedDependencyRead {
                 "consumed history requires native transaction verification",
             ));
         }
-        Ok(Self(facts))
+        Ok(Self { facts })
+    }
+
+    fn admit_without_publication(self) -> io::Result<VerifiedDependencyRead> {
+        if self.facts.policy.has_publication_claims()
+            || self
+                .facts
+                .pending
+                .is_some_and(|(_, record)| record.kind == mesh_store::DependencyKind::Publication)
+        {
+            return Err(invalid(
+                "native publication receipt verification is unavailable",
+            ));
+        }
+        Ok(VerifiedDependencyRead(self))
+    }
+}
+
+/// Ordinary native workspace admission. Private evidence is necessary but cannot by itself
+/// admit an owner journal containing publication claims, including a pending publication.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedDependencyRead(VerifiedPrivateHistory);
+impl VerifiedDependencyRead {
+    pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
+        &self.0.facts == facts
+    }
+    pub(super) fn from_consumption(
+        verified: super::consumption_prepare::VerifiedConsumedHistory,
+    ) -> io::Result<Self> {
+        VerifiedPrivateHistory::from_consumption(verified).admit_without_publication()
+    }
+    fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
+        VerifiedPrivateHistory::from_independent_facts(facts)?.admit_without_publication()
     }
     pub(super) fn binding(&self) -> NativeDependencyBinding {
-        self.0.binding()
+        self.0.facts.binding()
     }
     pub(super) fn policy(&self) -> &DependencyPolicyHistory {
-        self.0.policy()
+        self.0.facts.policy()
     }
     pub(super) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
-        self.0.is_legacy_operation(operation)
+        self.0.facts.is_legacy_operation(operation)
     }
     pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
-        self.0.pending()
+        self.0.facts.pending()
     }
     pub(crate) fn verify(
         &self,
@@ -119,7 +152,7 @@ impl VerifiedDependencyRead {
         file: &File,
         bytes: &[u8],
     ) -> io::Result<()> {
-        self.0.verify(store, file, bytes)
+        self.0.facts.verify(store, file, bytes)
     }
 }
 fn error(e: impl std::fmt::Display) -> io::Error {
@@ -553,6 +586,147 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
+    }
+
+    #[test]
+    fn private_evidence_cannot_admit_a_pending_publication() {
+        let fixture = Fixture::new("private-admission");
+        let work = &fixture.attachment;
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&work.store).unwrap();
+        let (_, facts) = work
+            .project()
+            .read_native_facts(work.metadata_path(), &work.store, None, None)
+            .unwrap();
+        let facts = facts.unwrap();
+        let private = VerifiedPrivateHistory::from_independent_facts(facts.clone()).unwrap();
+        assert!(private
+            .admit_without_publication()
+            .unwrap()
+            .matches_facts(&facts));
+        let before = fs::read(fixture.journal()).unwrap();
+        let mut pending = facts.clone();
+        pending.pending = Some((
+            before.len(),
+            mesh_store::DependencyRecord {
+                authority: facts.binding.authority,
+                revision: 2,
+                previous: facts.policy.native_head().unwrap().1,
+                payload: RecordDigest::from_bytes([219; 32]),
+                kind: mesh_store::DependencyKind::Publication,
+            },
+        ));
+        let private = VerifiedPrivateHistory::from_independent_facts(pending).unwrap();
+        let refusal = private.admit_without_publication().err().unwrap();
+        assert!(refusal
+            .to_string()
+            .contains("native publication receipt verification"));
+        assert_eq!(fs::read(fixture.journal()).unwrap(), before);
+        assert!(VerifiedDependencyRead::from_independent_facts(facts).is_ok());
+    }
+
+    #[test]
+    fn private_evidence_cannot_admit_structurally_valid_publication_claims() {
+        let fixture = Fixture::new("private-publication-claim");
+        let work = &fixture.attachment;
+        let _guard = crate::workspace_custody::lock_workspace_initialization(&work.store).unwrap();
+        let (_, facts) = work
+            .project()
+            .read_native_facts(work.metadata_path(), &work.store, None, None)
+            .unwrap();
+        let mut facts = facts.unwrap();
+        let before = fs::read(fixture.journal()).unwrap();
+        let id = |n| Json::text(RecordDigest::from_bytes([n; 32]).to_hex());
+        let output = Json::Array(vec![Json::Array(vec![id(20), id(21)]), id(22)]);
+        let decisions = Json::Array(vec![]);
+        let validation = Json::object([
+            ("schema", Json::text("mesh.native-review-validation/v1")),
+            ("output", output.clone()),
+            ("graph", id(80)),
+            ("decisions", decisions.clone()),
+        ])
+        .encode();
+        let apply = |policy: &mut DependencyPolicyHistory,
+                     kind: mesh_store::DependencyKind,
+                     schema: &str,
+                     body: Json| {
+            let (ordinal, previous) = policy.native_head().unwrap();
+            let value = Json::object([
+                ("schema", Json::text(schema)),
+                ("authority", Json::text(facts.binding.authority.to_hex())),
+                ("revision", Json::Number(ordinal + 1)),
+                ("previous", Json::text(previous.to_hex())),
+                ("kind", Json::Number(kind.code().into())),
+                ("body", body),
+            ])
+            .encode();
+            let payload = hash(value.as_bytes());
+            policy
+                .apply(
+                    mesh_store::DependencyRecord {
+                        authority: facts.binding.authority,
+                        revision: ordinal + 1,
+                        previous,
+                        payload,
+                        kind,
+                    },
+                    value.as_bytes(),
+                )
+                .unwrap();
+            Json::text(payload.to_hex())
+        };
+        let snapshot = apply(
+            &mut facts.policy,
+            mesh_store::DependencyKind::ReviewSnapshot,
+            "mesh.dependency-policy/v3",
+            Json::object([
+                ("request", id(71)),
+                ("revision", Json::Number(1)),
+                ("output", output.clone()),
+                ("graph", id(80)),
+                ("decisions", decisions),
+                (
+                    "validation",
+                    Json::text(hash(validation.as_bytes()).to_hex()),
+                ),
+            ]),
+        );
+        let review = apply(
+            &mut facts.policy,
+            mesh_store::DependencyKind::ReviewSnapshot,
+            "mesh.dependency-policy/v4",
+            Json::object([
+                ("request", id(90)),
+                ("revision", Json::Number(1)),
+                ("snapshot", snapshot),
+                ("output", output),
+                ("canonical", id(0)),
+                ("bundle", id(91)),
+                ("opener", id(92)),
+            ]),
+        );
+        apply(
+            &mut facts.policy,
+            mesh_store::DependencyKind::Publication,
+            "mesh.dependency-policy/v5",
+            Json::object([
+                ("request", id(100)),
+                ("revision", Json::Number(1)),
+                ("previous", id(0)),
+                ("review", review),
+                ("receipt", id(101)),
+                ("result", id(102)),
+                ("credential", id(103)),
+                ("challenge", id(104)),
+            ]),
+        );
+        assert!(facts.policy.has_publication_claims());
+        // Structural policy success does not prove the retained receipt, closure or human trust.
+        let private = VerifiedPrivateHistory::from_independent_facts(facts).unwrap();
+        let refusal = private.admit_without_publication().err().unwrap();
+        assert!(refusal
+            .to_string()
+            .contains("native publication receipt verification"));
+        assert_eq!(fs::read(fixture.journal()).unwrap(), before);
     }
 
     #[test]

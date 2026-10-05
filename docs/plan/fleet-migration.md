@@ -7660,3 +7660,15 @@ full validation and delivery remain pending. Native trusted replay/commit and is
 R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.
+
+
+R170 private-evidence separation is new canonical work on published R169 head
+`b7dceee4c6e658951ed39218bf24b1327d70c9d0`; it replaces no preserved legacy commit. Both independent
+and completed-consumption evidence now pass an explicit no-publication admission boundary. Nine
+focused/integration tests passed, including consumed desktop history; mutation testing detected
+removal of the boundary. Full checks and delivery remain pending. This is a prerequisite refactor
+for issue #345, not completed native replay or publication.
+
+R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.

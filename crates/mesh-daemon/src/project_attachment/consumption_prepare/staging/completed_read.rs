@@ -219,7 +219,7 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("consumed history contains non-capture suffix"));
         }
-        let proof = VerifiedDependencyRead::from_consumption(VerifiedConsumedHistory { facts });
+        let proof = VerifiedDependencyRead::from_consumption(VerifiedConsumedHistory { facts })?;
         let (after_configuration, after) = read_facts()?;
         let (after_owner_configuration, after_owner) = context.read(&self.owner)?;
         if after_configuration != configuration
