@@ -7598,3 +7598,12 @@ that failed run remains preserved. New explicit fixture export and the previous-
 prove owner/child read/write refusal without changing retained evidence. No existing test is skipped
 and no preserved legacy commit is replaced. The complete combined revision requires fresh full and
 hosted validation before normal delivery of #340; #343 is a merge prerequisite.
+
+R164 native saved review binding is new canonical work based on published snapshot head
+`125c3b7692ada4cfdb6d37bd94df6bf424905deb` (#340); it replaces no preserved legacy commit. It adds
+required closed owner binding replay, native bundle validation evidence, durable request recovery,
+and complete-context historical review/list/artifact/preview paths. Both failed-before policy
+regressions, the 19-test consumed-history focus, the intended missing-evidence mutation failure
+and exact previous-reader refusal are preserved. Full validation and a coherent dependent PR
+remain required. This increment does not close protected-main admission, signed packaged tests,
+user-facing controls, second-provider/host acceptance or the full fleet plan.

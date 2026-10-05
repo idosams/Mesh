@@ -327,6 +327,10 @@ impl ProvisionedAttachment {
                 "schema",
                 Json::text(if selected.kind == DependencyKind::Grant {
                     "mesh.dependency-policy/v2"
+                } else if selected.kind == DependencyKind::ReviewSnapshot
+                    && selected.body.get("snapshot").is_some()
+                {
+                    "mesh.dependency-policy/v4"
                 } else if selected.kind == DependencyKind::ReviewSnapshot {
                     "mesh.dependency-policy/v3"
                 } else {

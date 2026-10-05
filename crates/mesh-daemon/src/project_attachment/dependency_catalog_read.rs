@@ -10,6 +10,16 @@ fn error(error: impl std::fmt::Display) -> io::Error {
     io::Error::other(error.to_string())
 }
 
+/// All references are valid only inside the same complete native custody barrier.
+pub(super) struct VerifiedCatalogDependencyRead<'a> {
+    pub(super) work: &'a ProvisionedAttachment,
+    pub(super) history: &'a OpenWorkspace,
+    pub(super) configuration: &'a str,
+    pub(super) owner: &'a ProvisionedAttachment,
+    pub(super) owner_proof: &'a super::VerifiedDependencyRead,
+    pub(super) work_binding: &'a super::NativeDependencyWorkBinding,
+}
+
 impl AttachmentStorage {
     /// List exact versions of enrolled native work, including completed consumed lanes.
     /// IDs select existing native registrations, not paths or authority. The supplied input IDs
@@ -82,6 +92,25 @@ impl AttachmentStorage {
         ) -> io::Result<()>,
         action: impl FnOnce(&ProvisionedAttachment, &OpenWorkspace, &str) -> io::Result<T>,
     ) -> io::Result<T> {
+        self.with_checked_catalog_dependency_context(
+            owner_id,
+            work_id,
+            input_ids,
+            check_selection,
+            |context| action(context.work, context.history, context.configuration),
+        )
+    }
+
+    pub(super) fn with_checked_catalog_dependency_context<T>(
+        &self,
+        owner_id: &str,
+        work_id: &str,
+        input_ids: &[&str],
+        check_selection: impl Fn(
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<()>,
+        action: impl FnOnce(&VerifiedCatalogDependencyRead<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
         if input_ids.len() > 256 {
             return Err(invalid("catalog input selection exceeds bound"));
         }
@@ -121,13 +150,29 @@ impl AttachmentStorage {
             OwnerHistoryContext::current(owner),
         )?;
         let mut before = Vec::new();
+        let mut work_binding = None;
         for (candidate, selection) in &selected {
-            context.validate(self, selection, &guard)?;
+            let binding = context.validate(self, selection, &guard)?;
+            if candidate.id() == work.id() {
+                work_binding = Some(binding);
+            }
             before.push(context.read(candidate)?);
             context.verified_history_roots(candidate)?;
         }
         let (configuration, proof, history) = context.history(work)?;
-        let result = action(work, &history, &configuration)?;
+        let owner_proof = context
+            .read(owner)?
+            .1
+            .ok_or_else(|| invalid("native owner proof is missing"))?;
+        let result = action(&VerifiedCatalogDependencyRead {
+            work,
+            history: &history,
+            configuration: &configuration,
+            owner,
+            owner_proof: &owner_proof,
+            work_binding: &work_binding
+                .ok_or_else(|| invalid("verified selected work binding is missing"))?,
+        })?;
         for ((candidate, selection), snapshot) in selected.iter().zip(before) {
             context.validate(self, selection, &guard)?;
             if context.read(candidate)? != snapshot {

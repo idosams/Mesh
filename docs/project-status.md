@@ -2504,3 +2504,44 @@ The reproducible standard-library runner is
 fresh-process previous-reader/writer refusal, not an already-running cached writer or graphical
 journey. The snapshot branch also incorporates updated #338 and the published #343 scheduling
 prerequisite. Full validation and hosted checks are required again on the combined revision.
+
+## Native saved review binding (R164, in progress)
+
+Native saved reviews now retain an owner-journal binding to exact snapshot, output, canonical
+base, bundle and opener. Registered historical detail/list, exact file reads and human-review
+preview resolve that same binding under complete custody. Current input eligibility is separate
+from immutable historical evidence; ordinary review computation keeps its existing path.
+
+The two new policy regressions failed before implementation. Eighteen policy tests passed, and
+the expanded consumed-history journey passed with 19 focused tests in 20.245s, including torn
+append, changed retry refusal, reopened recovery, independent snapshots, lost reply, foreign work,
+missing review, substituted graph, later rejection and a later saved version. Removing native
+evidence from bundle identity failed the intended distinct-snapshot assertion in 6.957s; source
+was restored byte-for-byte. The exact previous reader from `125c3b7692ada4cfdb6d37bd94df6bf424905deb`
+refused the required v4 binding without projection changes in 0.025s. This is compiled-reader
+proof, not an old packaged executable or in-flight writer proof. Failed parser, identity-selection
+and build attempts remain preserved alongside their corrected evidence.
+
+Full repository validation, publication, exact-head hosted checks and merge remain required.
+The canonical-base advancement and eligible-signed packaged publication journeys remain pending
+with publication enforcement. No new renderer, agent or CLI controls are enabled. Issue #341 and
+the complete fleet objective remain open; the user's fixed checkpoint is unchanged.
+
+The first full R164 gate passed: 3,956 native tests in 312.476s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks. A subsequent real revalidation
+regression failed in 21.072s because the read model conflated current eligibility with exact saved
+decision freshness. Those are now separate fields in list and detail. The corrected 19-test focus
+passed in 22.102s, proving eligible inputs can coexist with a stale historical vector without
+changing the saved review. Fresh full and hosted validation are required on this correction.
+
+
+The corrected R164 full gate passed 3,957 native tests in 311.575s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks. New review creation now
+uses the same verified-main selector as ordinary attached approval: an existing unverified
+approval cannot silently select genesis. The isolated selector regression failed before this
+change; the corrected 20-test focus passed in 21.859s. Its synthetic unverified legacy receipt
+is not proof of a migrated signed approval. The public native snapshot path already refused
+this fixture earlier for missing legacy ancestry migration evidence; that refusal and original
+journal/source preservation remain tested. This is an explicit base-selector safeguard, not
+a demonstrated public publication bypass. Canonical-base advancement and native publication
+remain pending under issue #345. Hosted validation is required for the updated PR #344 head.

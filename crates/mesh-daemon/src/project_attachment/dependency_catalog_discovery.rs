@@ -116,6 +116,18 @@ impl AttachmentStorage {
             &str,
         ) -> io::Result<T>,
     ) -> io::Result<T> {
+        self.with_registered_dependency_context(work_id, |context| {
+            action(context.work, context.history, context.configuration)
+        })
+    }
+
+    pub(super) fn with_registered_dependency_context<T>(
+        &self,
+        work_id: &str,
+        action: impl FnOnce(
+            &super::dependency_catalog_read::VerifiedCatalogDependencyRead<'_>,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
         let owner_id = self.candidate_owning_root(work_id)?;
         let selection = self.discover_dependency_read(&owner_id, work_id)?;
         let inputs = selection
@@ -123,7 +135,7 @@ impl AttachmentStorage {
             .keys()
             .map(String::as_str)
             .collect::<Vec<_>>();
-        self.with_checked_catalog_dependency_history(
+        self.with_checked_catalog_dependency_context(
             &owner_id,
             work_id,
             &inputs,
