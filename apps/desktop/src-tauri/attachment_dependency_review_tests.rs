@@ -5,10 +5,12 @@ use mesh_daemon::project_attachment::{
 use mesh_daemon::ManagedContentDigest;
 use std::fs;
 
-struct Fixture(PathBuf);
+struct Fixture(PathBuf, bool);
 impl Drop for Fixture {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        if !self.1 {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
 }
 struct Restore(PathBuf, PathBuf);
@@ -34,7 +36,7 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         std::process::id()
     ));
     fs::create_dir(&root).unwrap();
-    let _fixture = Fixture(root.clone());
+    let mut fixture = Fixture(root.clone(), false);
     let source = root.join("source");
     fs::create_dir(&source).unwrap();
     fs::write(source.join("note.txt"), b"saved original").unwrap();
@@ -351,4 +353,38 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         text_preview(&reopened, child.id(), &first_id),
         "saved original"
     );
+    // An explicit executable-proof run may retain this already-verified fixture. Ordinary
+    // test runs still clean it up, and no assertion above is skipped by exporting it.
+    if let Some(path) = std::env::var_os("MESH_REGISTERED_CAPTURE_FIXTURE") {
+        let manifest = Json::object([
+            ("schema", Json::text("mesh.registered-capture-fixture/v1")),
+            ("root", Json::text(root.to_str().unwrap())),
+            ("storage", Json::text(metadata.to_str().unwrap())),
+            (
+                "project",
+                Json::text(child.project().root().to_str().unwrap()),
+            ),
+            ("registration", Json::text(child.id())),
+            (
+                "journal",
+                Json::text(
+                    child
+                        .metadata_path()
+                        .join(mesh_daemon::RECORD_FILE_NAME)
+                        .to_str()
+                        .unwrap(),
+                ),
+            ),
+            ("owner", Json::text(source.to_str().unwrap())),
+        ])
+        .encode();
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .unwrap();
+        file.write_all(manifest.as_bytes()).unwrap();
+        file.sync_all().unwrap();
+        fixture.1 = true;
+    }
 }

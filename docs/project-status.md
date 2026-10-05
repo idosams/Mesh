@@ -2444,3 +2444,6 @@ Post-merge #329 CI run `37249215287` reported Linux cancelled at its 15-minute j
 
 
 Registered harness full `npm test` passed on `e519f1b9149e73d1192751bfb6dff68feedf12df`: 3,950 native tests in 349.622s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 real-daemon checks, with all remaining repository/docs/license/storage/format/lint gates. Consumed-lane recovery passed in 194.915s and the expanded host/harness dispatcher journey in 40.136s. This increment is ready for a separate PR against #332; hosted checks and merge remain required. Packaged and external-provider acceptance remain unproven.
+
+
+A separate registered-harness executable proof is being added. The existing fully asserted native fixture can be explicitly retained for a proof run; normal tests still clean up and no assertions are skipped. The script checks exact executable-reported build identity and byte digest, launches real save/list/watch processes, retains prior versions, checks unchanged-save deduplication, joined stop, missing-owner refusal without journal changes, unknown-registration refusal and unchanged original project contents. This proof is headless and launches no provider. Actual execution and full validation remain pending; no packaged or external-provider acceptance is claimed.
