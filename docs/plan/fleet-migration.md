@@ -7570,3 +7570,6 @@ The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s 
 
 
 CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672010fda93`: 3,949 native tests in 339.809s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 real-daemon checks, plus all repository/docs/license/storage/format/lint gates. The new compile-only nextest command also succeeded locally. Canonical main post-merge run `37249215287` attempt 2 passed all seven checks; the earlier cancelled attempt remains preserved. This does not resolve repeated near-budget cancellation in the dependent PRs. The independent workflow correction still needs hosted proof and merge before propagation through #330–#333.
+
+
+R161 registered external-harness acceptance is new proof work, replacing no preserved implementation commit. It depends on process-proof #335 and records a portable real-Codex runner, exact executable identity, positive continued-work evidence and wrong-digest refusal. The copied runner is byte-identical to the successful retained run (SHA-256 7dbc26f38fe364b35272e53329f486c3ca20d395143cc17ff9a11dad0bbc0717). Native source behavior is unchanged. Full gate, publication, fresh CI and merge remain required; all broader fleet exits remain open.
