@@ -489,3 +489,6 @@ impl AttachmentStorage {
         Ok(graph.to_json())
     }
 }
+
+#[cfg(test)]
+mod tests;
