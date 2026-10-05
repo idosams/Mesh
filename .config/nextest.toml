@@ -3,6 +3,12 @@
 nextest-version = "0.9.145"
 
 [[profile.default.overrides]]
+# Start the longest independent recovery campaign immediately, rather than spending
+# its CI deadline queued behind shorter tests. Keep its assertions and all deadlines.
+filter = 'test(saved_ignore_rules_bind_candidate_without_changing_empty_reservation)'
+priority = 100
+
+[[profile.default.overrides]]
 # This wall-clock boundary test intentionally sleeps across two checkpoint timers.
 # Reserve the complete nextest worker pool so unrelated CPU and I/O pressure cannot
 # turn scheduler delay into a false product failure. The assertion and timing

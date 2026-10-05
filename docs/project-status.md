@@ -2451,3 +2451,11 @@ The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s 
 
 
 CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672010fda93`: 3,949 native tests in 339.809s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 real-daemon checks, plus all repository/docs/license/storage/format/lint gates. The new compile-only nextest command also succeeded locally. Canonical main post-merge run `37249215287` attempt 2 passed all seven checks; the earlier cancelled attempt remains preserved. This does not resolve repeated near-budget cancellation in the dependent PRs. The independent workflow correction still needs hosted proof and merge before propagation through #330–#333.
+
+Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
+in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
+history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now
+schedules that scenario at priority 100, removing avoidable queue delay without changing the test
+set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
+remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
+a measured product-performance improvement or a guarantee of future runner duration.
