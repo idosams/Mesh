@@ -1047,3 +1047,212 @@ fn saved_review_binding_refuses_missing_foreign_and_noncanonical_evidence_atomic
     let valid = versioned_review(3, snapshot, Json::Object(body), "mesh.dependency-policy/v4");
     apply(&mut history, &valid);
 }
+
+fn publication_fixture() -> (DependencyPolicyHistory, RecordDigest, RecordDigest) {
+    let mut h = DependencyPolicyHistory::new(binding()).unwrap();
+    let enrolled = enrollment();
+    apply(&mut h, &enrolled);
+    let eligible = decide(2, enrolled.0.payload, 70, 1, ZERO, "eligible");
+    apply(&mut h, &eligible);
+    let decisions = Json::Array(vec![Json::Array(vec![
+        i(10),
+        Json::Number(1),
+        Json::text(eligible.0.payload.to_hex()),
+    ])]);
+    let validation = Json::object([
+        ("schema", Json::text("mesh.native-review-validation/v1")),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions.clone()),
+    ])
+    .encode();
+    let snapshot = versioned_review(
+        3,
+        eligible.0.payload,
+        Json::object([
+            ("request", j(71)),
+            ("revision", Json::Number(1)),
+            ("output", i(20)),
+            ("graph", j(80)),
+            ("decisions", decisions),
+            (
+                "validation",
+                Json::text(Blake3::digest_bytes(validation.as_bytes()).to_hex()),
+            ),
+        ]),
+        "mesh.dependency-policy/v3",
+    );
+    apply(&mut h, &snapshot);
+    let bound = versioned_review(
+        4,
+        snapshot.0.payload,
+        bound_review_body(snapshot.0.payload),
+        "mesh.dependency-policy/v4",
+    );
+    apply(&mut h, &bound);
+    (h, bound.0.payload, eligible.0.payload)
+}
+fn publication_body(review: RecordDigest) -> Json {
+    Json::object([
+        ("request", j(100)),
+        ("revision", Json::Number(1)),
+        ("previous", j(0)),
+        ("review", Json::text(review.to_hex())),
+        ("receipt", j(101)),
+        ("result", j(102)),
+        ("credential", j(103)),
+        ("challenge", j(104)),
+    ])
+}
+fn changed(mut body: Json, name: &str, value: Json) -> Json {
+    let Json::Object(ref mut fields) = body else {
+        unreachable!()
+    };
+    fields
+        .iter_mut()
+        .find(|(field, _)| field == name)
+        .unwrap()
+        .1 = value;
+    body
+}
+fn publication_payload(h: &DependencyPolicyHistory, body: Json) -> (DependencyRecord, Vec<u8>) {
+    let (ordinal, previous) = h.native_head().unwrap();
+    let (mut record, bytes) = payload(DependencyKind::Publication, ordinal + 1, previous, body);
+    let bytes = String::from_utf8(bytes)
+        .unwrap()
+        .replacen(SCHEMA, "mesh.dependency-policy/v5", 1)
+        .into_bytes();
+    record.payload = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+    (record, bytes)
+}
+#[test]
+fn publication_claim_replay_preserves_order_and_retains_only_local_objects() {
+    let (mut h, review, eligible) = publication_fixture();
+    let publication = publication_payload(&h, publication_body(review));
+    apply(&mut h, &publication);
+    let expected = (1, publication.0.payload, d(102));
+    assert_eq!(h.publications.get(&Work(d(20), d(21))), Some(&expected));
+    let roots = h.policy_payloads().collect::<BTreeSet<_>>();
+    assert!(
+        roots.contains(&publication.0.payload)
+            && roots.contains(&review)
+            && roots.contains(&d(101))
+            && roots.contains(&d(80))
+    );
+    assert!([d(102), d(103), d(104), d(91)]
+        .iter()
+        .all(|id| !roots.contains(id)));
+    let rejected = decide(6, publication.0.payload, 105, 2, eligible, "rejected");
+    apply(&mut h, &rejected);
+    let before = h.clone();
+    apply(&mut h, &publication);
+    assert_eq!(h, before);
+    assert_eq!(
+        h.publications.get(&Work(d(20), d(21))),
+        Some(&expected),
+        "later rejection cannot rewrite historical publication"
+    );
+}
+#[test]
+fn publication_claim_refuses_rejection_revalidation_and_malformed_bindings_atomically() {
+    let (h, review, eligible) = publication_fixture();
+    for (field, value) in [
+        ("review", j(99)),
+        ("review", j(0)),
+        ("receipt", j(0)),
+        ("result", j(0)),
+        ("credential", j(0)),
+        ("challenge", j(0)),
+        ("revision", Json::Number(0)),
+        ("revision", Json::Number(2)),
+        ("previous", j(99)),
+    ] {
+        let mut candidate = h.clone();
+        let invalid =
+            publication_payload(&candidate, changed(publication_body(review), field, value));
+        refuse(&mut candidate, &invalid);
+    }
+    let Json::Object(fields) = publication_body(review) else {
+        unreachable!()
+    };
+    for position in 0..fields.len() {
+        let mut body = fields.clone();
+        body.remove(position);
+        let mut candidate = h.clone();
+        let invalid = publication_payload(&candidate, Json::Object(body));
+        refuse(&mut candidate, &invalid);
+    }
+    let mut reversed = fields;
+    reversed.reverse();
+    let mut candidate = h.clone();
+    let invalid = publication_payload(&candidate, Json::Object(reversed));
+    refuse(&mut candidate, &invalid);
+    let mut rejected = h.clone();
+    let decision = decide(5, review, 105, 2, eligible, "rejected");
+    apply(&mut rejected, &decision);
+    let invalid = publication_payload(&rejected, publication_body(review));
+    refuse(&mut rejected, &invalid);
+    let revalidated = decide(
+        6,
+        decision.0.payload,
+        106,
+        3,
+        decision.0.payload,
+        "eligible",
+    );
+    apply(&mut rejected, &revalidated);
+    let invalid = publication_payload(&rejected, publication_body(review));
+    refuse(&mut rejected, &invalid);
+    // An unrelated work decision does not stale the exact vector.
+    let mut unrelated = h;
+    let decision = decide(5, review, 107, 1, ZERO, "eligible");
+    let value = Json::parse(std::str::from_utf8(&decision.1).unwrap()).unwrap();
+    let body = changed(value.get("body").unwrap().clone(), "input", i(30));
+    let decision = payload(DependencyKind::Eligibility, 5, review, body);
+    apply(&mut unrelated, &decision);
+    let publication = publication_payload(&unrelated, publication_body(review));
+    apply(&mut unrelated, &publication);
+}
+#[test]
+fn publication_claim_requires_exact_previous_main_and_unused_challenge() {
+    let (mut h, review, _) = publication_fixture();
+    let first = publication_payload(&h, publication_body(review));
+    apply(&mut h, &first);
+    let second_body = changed(
+        changed(
+            changed(publication_body(review), "request", j(110)),
+            "revision",
+            Json::Number(2),
+        ),
+        "previous",
+        Json::text(first.0.payload.to_hex()),
+    );
+    let stale = publication_payload(&h, changed(second_body.clone(), "challenge", j(111)));
+    refuse(&mut h, &stale);
+    let snapshot = h.bound_review(review).unwrap().evidence().snapshot();
+    let next_review_body = changed(
+        changed(bound_review_body(snapshot), "request", j(112)),
+        "canonical",
+        j(102),
+    );
+    let bound = versioned_review(
+        6,
+        first.0.payload,
+        next_review_body,
+        "mesh.dependency-policy/v4",
+    );
+    apply(&mut h, &bound);
+    let body = changed(
+        changed(second_body, "review", Json::text(bound.0.payload.to_hex())),
+        "result",
+        j(113),
+    );
+    let duplicate_challenge = publication_payload(&h, body.clone());
+    refuse(&mut h, &duplicate_challenge);
+    let valid = publication_payload(&h, changed(body, "challenge", j(111)));
+    apply(&mut h, &valid);
+    assert_eq!(
+        h.publications.get(&Work(d(20), d(21))),
+        Some(&(2, valid.0.payload, d(113)))
+    );
+}

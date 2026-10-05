@@ -457,11 +457,64 @@ fn consumption_kind_migration_preserves_populated_dependency_rows() {
         .unwrap());
     assert!(database
         .execute_batch(&format!(
-            "INSERT INTO dependency_record VALUES (X'{}',3,X'{}',X'{}',7);",
+            "INSERT INTO dependency_record VALUES (X'{}',3,X'{}',X'{}',8);",
             digest(1).to_hex(),
             digest(12).to_hex(),
             digest(13).to_hex()
         ))
         .is_err());
     assert_eq!(database.read_table(table).unwrap(), before);
+}
+
+#[test]
+fn publication_kind_migration_preserves_every_existing_dependency_kind() {
+    let directory = TempDir::new("publication-kind-upgrade");
+    let mut database = database_at_version(&directory, "metadata.sqlite", 4);
+    for kind in 0..=6u8 {
+        database
+            .execute_batch(&format!(
+                "INSERT INTO dependency_record VALUES (X'{}',{},X'{}',X'{}',{});",
+                digest(1).to_hex(),
+                kind + 1,
+                digest(if kind == 0 { 0 } else { kind + 10 }).to_hex(),
+                digest(kind + 11).to_hex(),
+                kind,
+            ))
+            .unwrap();
+    }
+    let table = TABLES
+        .iter()
+        .find(|table| table.name == "dependency_record")
+        .unwrap();
+    let before = database.read_table(table).unwrap();
+    assert_eq!(before.len(), 7);
+    let store = Store::open(Sqlite3::at(directory.join("metadata.sqlite"))).unwrap();
+    assert_eq!(store.schema_version(), 5);
+    drop(store);
+    assert_eq!(database.read_table(table).unwrap(), before);
+    assert!(!database
+        .table_exists("dependency_record_before_publication")
+        .unwrap());
+    database
+        .execute_batch(&format!(
+            "INSERT INTO dependency_record VALUES (X'{}',8,X'{}',X'{}',7);",
+            digest(1).to_hex(),
+            digest(17).to_hex(),
+            digest(18).to_hex(),
+        ))
+        .unwrap();
+    let published = database.read_table(table).unwrap();
+    assert_eq!(published.len(), 8);
+    assert!(database
+        .execute_batch(&format!(
+            "INSERT INTO dependency_record VALUES (X'{}',9,X'{}',X'{}',8);",
+            digest(1).to_hex(),
+            digest(18).to_hex(),
+            digest(19).to_hex(),
+        ))
+        .is_err());
+    assert_eq!(database.read_table(table).unwrap(), published);
+    let reopened = Store::open(Sqlite3::at(directory.join("metadata.sqlite"))).unwrap();
+    assert_eq!(reopened.schema_version(), 5);
+    assert_eq!(database.read_table(table).unwrap(), published);
 }

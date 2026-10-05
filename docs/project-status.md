@@ -2545,3 +2545,20 @@ this fixture earlier for missing legacy ancestry migration evidence; that refusa
 journal/source preservation remain tested. This is an explicit base-selector safeguard, not
 a demonstrated public publication bypass. Canonical-base advancement and native publication
 remain pending under issue #345. Hosted validation is required for the updated PR #344 head.
+
+
+## Native publication records (R165, in progress)
+
+The [publication contract](decisions/native-dependency-publication.md) adds a required owner-journal
+kind and policy/v5 claim bound to an exact saved review, receipt identity and work-local publication
+chain. Replay validates the snapshot's decisions at that journal position, preserving historical
+publication after rejection while refusing stale revalidation and reused challenges. Forward-only
+SQLite migration 5 preserves all prior dependency rows; local retention includes actual receipt
+objects and excludes computed identity digests. Native readers still refuse publication claims
+until exact receipt verification and commit/recovery are implemented. No user-facing route is added.
+
+The missing-kind regression failed before implementation; SQLite constraint and test-fixture
+failures are preserved. All 41 focused tests passed in 2.496s. An eligibility-only mutation failed
+the intended stale-review assertion in 0.033s and the source was restored exactly. Full validation,
+published PR, hosted checks and merge remain required. Issue #345 and the complete fleet goal stay
+open, including signed publication, all-path enforcement and separate-process commit-order proof.

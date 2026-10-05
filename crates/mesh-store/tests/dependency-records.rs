@@ -65,11 +65,12 @@ fn dependency_envelope_has_a_fixed_required_tag_and_exact_canonical_body() {
         (DependencyKind::ReviewSnapshot, 4),
         (DependencyKind::ConsumptionStart, 5),
         (DependencyKind::ConsumptionComplete, 6),
+        (DependencyKind::Publication, 7),
     ] {
         assert_eq!(kind.code(), code);
         assert_eq!(DependencyKind::from_code(code), Some(kind));
     }
-    assert_eq!(DependencyKind::from_code(7), None);
+    assert_eq!(DependencyKind::from_code(8), None);
     assert_eq!(DependencyKind::from_code(255), None);
 }
 #[test]
@@ -195,12 +196,13 @@ fn unvalidated_dependency_history_refuses_collection_instead_of_dropping_unknown
 }
 
 #[test]
-fn consumed_start_and_completion_replay_rebuild_and_retain_as_required_records() {
+fn consumed_and_publication_records_replay_rebuild_and_retain_as_required_records() {
     let dir = TempDir::new("consumption-required-records");
     let mut records = history();
     for (offset, kind) in [
         DependencyKind::ConsumptionStart,
         DependencyKind::ConsumptionComplete,
+        DependencyKind::Publication,
     ]
     .into_iter()
     .enumerate()
@@ -233,7 +235,7 @@ fn consumed_start_and_completion_replay_rebuild_and_retain_as_required_records()
         expected
     );
     let expected_rows = store.index().rows("dependency_record").unwrap();
-    assert_eq!(expected_rows.len(), 7);
+    assert_eq!(expected_rows.len(), 8);
     drop(store);
     let mut reopened = Store::open(Sqlite3::at(&path)).unwrap();
     let persisted = read_all_tables(&mut Sqlite3::at(&path)).unwrap();

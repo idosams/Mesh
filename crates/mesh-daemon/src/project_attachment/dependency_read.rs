@@ -397,6 +397,11 @@ impl ProjectAttachment {
         for record in suffix.records() {
             match record {
                 StoredRecord::Dependency(record) => {
+                    if record.kind == mesh_store::DependencyKind::Publication {
+                        return Err(invalid(
+                            "native publication receipt verification is unavailable",
+                        ));
+                    }
                     policy
                         .apply(*record, &read_payload(&cas, record.payload, 65_536)?)
                         .map_err(error)?;
@@ -419,6 +424,11 @@ impl ProjectAttachment {
             }
         }
         if let Some((_, record, payload)) = &pending {
+            if record.kind == mesh_store::DependencyKind::Publication {
+                return Err(invalid(
+                    "native publication receipt verification is unavailable",
+                ));
+            }
             let mut staged_policy = policy.clone();
             staged_policy.apply(*record, payload).map_err(error)?;
             if let Some(graph) = staged_policy.review_graph(record.payload) {
@@ -543,6 +553,40 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
+    }
+
+    #[test]
+    fn publication_envelope_without_native_receipt_verification_refuses_ordinary_read() {
+        use std::io::Write;
+        let f = Fixture::new("publication-fence");
+        let original = fs::read(f.journal()).unwrap();
+        let scan = scan_journal(&original).unwrap();
+        let Some(StoredRecord::Dependency(previous)) = scan.records().last() else {
+            panic!("enrollment")
+        };
+        let record = StoredRecord::Dependency(mesh_store::DependencyRecord {
+            authority: previous.authority,
+            revision: previous.revision + 1,
+            previous: previous.payload,
+            payload: RecordDigest::from_bytes([217; 32]),
+            kind: mesh_store::DependencyKind::Publication,
+        });
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(f.journal())
+            .unwrap();
+        file.write_all(&mesh_store::frame_record(&record)).unwrap();
+        file.sync_all().unwrap();
+        let before = fs::read(f.journal()).unwrap();
+        let error = f.attachment.saved_versions().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("native publication receipt verification is unavailable"));
+        assert_eq!(fs::read(f.journal()).unwrap(), before);
+        assert_eq!(
+            fs::read(f.root.join("source/note")).unwrap(),
+            b"saved original"
+        );
     }
 
     #[test]
