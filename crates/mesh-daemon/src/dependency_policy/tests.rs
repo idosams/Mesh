@@ -863,3 +863,51 @@ fn consumed_start_rejects_malformed_identity_and_noncanonical_fields_without_los
         );
     }
 }
+
+#[test]
+fn complete_review_snapshot_preserves_exact_decision_revision_and_historical_replay() {
+    let mut history = DependencyPolicyHistory::new(binding()).unwrap();
+    let enrolled = enrollment();
+    apply(&mut history, &enrolled);
+    let eligible = decide(2, enrolled.0.payload, 70, 1, ZERO, "eligible");
+    apply(&mut history, &eligible);
+    let decisions = Json::Array(vec![Json::Array(vec![
+        i(10),
+        Json::Number(1),
+        Json::text(eligible.0.payload.to_hex()),
+    ])]);
+    let validation = Json::object([
+        ("schema", Json::text("mesh.native-review-validation/v1")),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions.clone()),
+    ])
+    .encode();
+    let body = Json::object([
+        ("request", j(71)),
+        ("revision", Json::Number(1)),
+        ("output", i(20)),
+        ("graph", j(80)),
+        ("decisions", decisions),
+        (
+            "validation",
+            Json::text(Blake3::digest_bytes(validation.as_bytes()).to_hex()),
+        ),
+    ]);
+    let (mut record, bytes) = payload(DependencyKind::ReviewSnapshot, 3, eligible.0.payload, body);
+    let bytes = String::from_utf8(bytes)
+        .unwrap()
+        .replacen("mesh.dependency-policy/v1", "mesh.dependency-policy/v3", 1)
+        .into_bytes();
+    record.payload = RecordDigest::from_bytes(*Blake3::digest_bytes(&bytes).as_bytes());
+    let snapshot = (record, bytes);
+    apply(&mut history, &snapshot);
+    let rejected = decide(4, snapshot.0.payload, 72, 2, eligible.0.payload, "rejected");
+    apply(&mut history, &rejected);
+    let before = history.clone();
+    apply(&mut history, &snapshot);
+    assert_eq!(
+        history, before,
+        "historical retry must not assert current eligibility"
+    );
+}

@@ -2464,6 +2464,26 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 R162 consumed-work decisions address [issue #337](https://github.com/idosams/Mesh/issues/337). The trusted native host can reject, replace or revalidate an exact consumed child version using complete retained inputs. It reconstructs the guarded history at both native control selections, including the staged owner prefix, while missing inputs and stale predecessors refuse. Decisions update owner policy only; child history and saved previews remain unchanged. No renderer, agent, CLI or publication permission is added. The original incomplete-context regression failed in 14.625s; the final seven-test focus passed in 21.619s, including a dedicated 6.815s torn-append/lost-reply/input-loss recovery test. Full gate, hosted checks and merge remain required. Review snapshot binding, publication/runtime enforcement and user-facing enrollment remain open.
 
+## Native exact review snapshots (R163)
+
+Native hosts can now retain an exact dependency review snapshot under the complete custody set.
+It binds the saved output, canonical transitive graph object, qualified eligible input decisions
+and their revisions, and a deterministic validation digest. New snapshots refuse missing or
+ineligible inputs. Exact historical retries recover their original result after later rejection;
+that result grants no current publication authority. Graph objects are retained in their actual
+owner store and verified on ordinary and pending native history replay. Interrupted append,
+lost reply and required-root loss recover only the same retained request.
+
+Seventeen focused tests passed in 8.888s, including real consumed history, torn append, reopened
+catalog, conflicting retry, lost acknowledgement, root loss after staging, unrelated decisions,
+retained graph substitution and malformed graph refusal. The pre-change regression failed as
+expected. The exact previous policy reader from `fb5149cd54128804debdaca2c9b3e5e2bcf6739e`
+was separately compiled and refused the new required payload without changing its projection.
+This proves reader-format refusal, not a packaged old-application journey. Full validation,
+published PR and hosted delivery remain pending. Ordinary review creation, human approval,
+all publication paths and user-facing eligibility controls remain subsequent requirements under
+[issue #339](https://github.com/idosams/Mesh/issues/339) and the full fleet plan.
+
 Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
 in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
 history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now
@@ -2471,3 +2491,16 @@ schedules that scenario at priority 100, removing avoidable queue delay without 
 set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
 remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
 a measured product-performance improvement or a guarantee of future runner duration.
+
+R163 compatibility acceptance now includes the preserved pre-snapshot executable at exact
+revision `dff7384212c0ed7422594fab06bc35dfcd092036`, SHA-256
+`1af4edfe29e790f002d75840f8140f3d87df14ed19e7da9857f8ede96a974fd5`.
+The fully asserted synthetic snapshot fixture passed in 9.072s. Four separate old-executable
+owner/child `versions` and `capture` invocations refused without saved acknowledgement in 0.109s;
+owner/child journals, retained graph, both project files and executable bytes remained unchanged.
+The reproducible standard-library runner is
+`apps/desktop/scripts/prove-previous-snapshot-writer.py`; fixture export is explicit via
+`MESH_REVIEW_SNAPSHOT_FIXTURE`, and normal tests retain cleanup and all assertions. This proves
+fresh-process previous-reader/writer refusal, not an already-running cached writer or graphical
+journey. The snapshot branch also incorporates updated #338 and the published #343 scheduling
+prerequisite. Full validation and hosted checks are required again on the combined revision.

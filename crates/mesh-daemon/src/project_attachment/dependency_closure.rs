@@ -48,6 +48,12 @@ struct Node {
     consumption: Option<NativeConsumptionFact>,
 }
 impl NativeDependencyGraph {
+    pub(super) fn review_output(&self) -> Input {
+        self.root
+    }
+    pub(super) fn review_inputs(&self) -> impl Iterator<Item = Input> + '_ {
+        self.nodes.keys().filter(|i| i.0 != self.root.0).copied()
+    }
     /// Canonical complete graph digest, independent of work-list and traversal ordering.
     pub fn digest(&self) -> RecordDigest {
         self.digest

@@ -534,3 +534,36 @@ the phase exit above.
 
 
 Native eligibility control now has an explicit complete-input path for consumed child versions. It resolves retained consumed history under the same bounded custody set and reconstructs that context for the pre-append selection using the exact staged owner proof. Rejection, replacement and revalidation append only owner decisions; historical child content remains readable. Recovery tests cover a torn decision frame, conflicting retry intent, lost acknowledgement, catalog reopen, historical idempotence, stale predecessor and input disappearance after staging. This is a trusted-native-host control, not a renderer/agent route or an approval/publication permit. Current review snapshot and publication serialization integration remain required before user-facing enrollment.
+
+## Exact native snapshot transaction (R163)
+
+The native-only snapshot writer records required `ReviewSnapshot` payloads with closed
+`mesh.dependency-policy/v3` schema. Legacy policy/v1 review records remain historical projections;
+they are not upgraded into complete snapshots. Other record kinds retain their existing schemas.
+The immutable snapshot revision is 1; the owner journal ordinal remains independent. Each sorted
+input row binds qualified work/installation/operation, per-input decision revision and payload.
+The validation digest binds output, graph digest and that exact vector; it is historical evidence,
+not actor-provided permission. Graphs retain the existing 4 MiB, 4,096-node and 16,384-edge bounds;
+the policy vector keeps its 256-input and 65,536-byte payload limits and refuses overflow.
+
+Native replay verifies the locally retained graph hash, closed canonical shape, selected root,
+complete reachable acyclic graph and exact cross-work decision coverage. Local graph objects are
+retained alongside policy payloads, including unfinished control requests; cross-work references
+remain qualified and are not reclassified as local objects. The native writer verifies actual
+registered histories and full custody before initial selection and again against the staged owner
+proof before append. Existing required history fences and ordinary-reader refusal remain intact.
+
+A committed exact request is recovered with its historical decisions after later rejection.
+A new request requires current exact eligible decisions. This does not implement protected-main
+publication: ordinary review integration and every approval/import/integration/recovery path must
+still independently revalidate the snapshot and receipt under the authority barrier before this
+control can be exposed through the renderer or agent runtime. Existing human receipt format and
+old accepted approvals are unchanged. Previous-reader format refusal is tested from exact parent
+source; a packaged previous-writer journey has not been claimed.
+
+The fresh-process compatibility proof now invokes the exact preserved pre-snapshot desktop
+executable on both the owner and consumed-child registrations after snapshot creation and later
+input rejection. Both registered `versions` and `capture` commands refuse with no saved response;
+retained journals, graph content and working project files remain byte-identical. This supplements
+the compiled previous-policy test. It does not claim an in-flight cached older writer was exercised;
+the existing mandatory native history fence remains required for that boundary.

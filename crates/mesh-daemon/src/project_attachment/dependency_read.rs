@@ -400,6 +400,14 @@ impl ProjectAttachment {
                     policy
                         .apply(*record, &read_payload(&cas, record.payload, 65_536)?)
                         .map_err(error)?;
+                    if let Some(graph) = policy.review_graph(record.payload) {
+                        policy
+                            .verify_review_graph(
+                                record.payload,
+                                &read_payload(&cas, graph, 4 * 1024 * 1024)?,
+                            )
+                            .map_err(error)?;
+                    }
                 }
                 // A valid legacy receipt alone cannot establish a dependency-aware publication.
                 StoredRecord::Approval(_) => {
@@ -411,7 +419,16 @@ impl ProjectAttachment {
             }
         }
         if let Some((_, record, payload)) = &pending {
-            policy.clone().apply(*record, payload).map_err(error)?;
+            let mut staged_policy = policy.clone();
+            staged_policy.apply(*record, payload).map_err(error)?;
+            if let Some(graph) = staged_policy.review_graph(record.payload) {
+                staged_policy
+                    .verify_review_graph(
+                        record.payload,
+                        &read_payload(&cas, graph, 4 * 1024 * 1024)?,
+                    )
+                    .map_err(error)?;
+            }
             if record.kind == mesh_store::DependencyKind::ConsumptionStart {
                 let value =
                     Json::parse(std::str::from_utf8(payload).map_err(error)?).map_err(error)?;
