@@ -2637,3 +2637,22 @@ passed on reconciled executable `8d82dd1` in 31.664s after a 41.858s fresh fixtu
 previews remained exact after later external edits. Wrong-digest refusal preserved all fixture
 bytes. This still does not establish graphical, signed-main, second-provider/host or velocity
 acceptance; fresh hosted validation and normal merged delivery remain required.
+
+
+## Native publication origin correction (R169)
+
+The first native publication claim now refuses a nonzero canonical base without a prior native
+publication for that work/installation. The regression failed before the fix and all 21 focused
+policy tests passed afterward. Ordinary approval is unchanged; native trusted replay, publication
+commit/recovery, platform signing and the full fleet acceptance remain unfinished. Full tests,
+hosted checks and merge are still required for this correction.
+
+The fixed local user checkpoint `b064029` was built from merged PR #349. Its exact copied executable
+passed revision/resource-seal checks and the native fleet bridge test (two child lanes, pinned
+review, feedback, retry and revoked-session refusal). Its graphical/provider journey was not run;
+the Mac remained locked at the current observation. The checkpoint uses separate application data
+and remains fixed while later implementation proceeds.
+
+R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.

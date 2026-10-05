@@ -1256,3 +1256,36 @@ fn publication_claim_requires_exact_previous_main_and_unused_challenge() {
         Some(&(2, valid.0.payload, d(113)))
     );
 }
+
+#[test]
+fn first_publication_claim_cannot_invent_a_prior_main() {
+    let (mut history, snapshot) = bound_review_fixture();
+    let bound = versioned_review(
+        3,
+        snapshot,
+        changed(bound_review_body(snapshot), "canonical", j(120)),
+        "mesh.dependency-policy/v4",
+    );
+    apply(&mut history, &bound);
+    let publication = publication_payload(&history, publication_body(bound.0.payload));
+    refuse(&mut history, &publication);
+    assert!(history.publications.is_empty());
+    assert!(history.publication_challenges.is_empty());
+    assert!(!history.policy_payloads().any(|root| root == d(101)));
+
+    // Refusing the unsupported predecessor must not consume the request or challenge.
+    let (ordinal, previous) = history.native_head().unwrap();
+    let genesis_review = versioned_review(
+        ordinal + 1,
+        previous,
+        changed(bound_review_body(snapshot), "request", j(121)),
+        "mesh.dependency-policy/v4",
+    );
+    apply(&mut history, &genesis_review);
+    let valid = publication_payload(&history, publication_body(genesis_review.0.payload));
+    apply(&mut history, &valid);
+    assert_eq!(
+        history.publications.get(&Work(d(20), d(21))),
+        Some(&(1, valid.0.payload, d(102)))
+    );
+}

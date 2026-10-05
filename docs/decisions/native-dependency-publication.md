@@ -158,3 +158,28 @@ verified main head to exact saved operation, then supply it to native review rec
 new base selection. Default-trust native history opens cannot establish accepted main. Removing
 the publication read fence or manufacturing an ordinary child review is not that integration.
 Second-review/second-approval proof against the first native accepted main remains required.
+
+
+## Native publication origin (R169)
+
+The first native publication claim for an exact work/installation must bind a review based on
+genesis. Later claims must bind the preceding native publication result. Previously the structural
+policy verifier checked the latter case but accepted an unexplained nonzero base when there was
+no preceding native publication. It now refuses that unsupported history before changing any
+request, challenge, publication or retained-object state. A valid genesis request may still use
+the same request/challenge after refusal. This does not treat absence of configured reviewer trust
+as genesis: native cryptographic replay and ordinary workspace admission remain separately fenced.
+
+This is a stricter semantic check within required kind 7 / policy v5; the byte format is unchanged.
+No native publication writer is enabled. There is no implicit migration from ordinary or imported
+accepted main into the native chain; such a bridge needs independently verified authority and an
+explicit contract before it can be supported. Existing ordinary approval behavior is unchanged.
+
+The new regression failed before the fix because policy replay returned success. After the fix,
+all 21 dependency-policy tests passed in 2.41s, including valid genesis/later publications,
+rejection/revalidation, reused challenges, atomic refusal and idempotent historical replay.
+Full validation, hosted checks and delivery remain pending. Issue #345 remains open.
+
+R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.
