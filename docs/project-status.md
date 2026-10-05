@@ -3007,3 +3007,34 @@ Focused validation passed all three campaigns in 175.781s: start 175.771s, check
 ### Saved-review delivery adopts the publication fence and recovery scheduling
 
 R184 #365 incorporates published R182/R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b through a normal related-history merge. Both native control implementations and all regression assertions are retained. Only appended documentation sections conflicted; both were preserved. The combined source passed full npm test: 3,981 native tests in 383.075s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Historical separate-branch results above do not substitute for this combined validation. Fixed checkpoints remain unchanged.
+
+
+## Recovery fixtures retain coverage without repeating unrelated journeys (R187)
+
+R186 passed hosted Linux run 37330138945: all 3,542 tests in 732.871s, within the unchanged
+15-minute execution limit. Its macOS job passed all 3,980 native tests in 880.416s and 194 rendered
+tests, then reached the 20-minute job limit during desktop verification. That cancelled job is not
+a complete gate. The failed/cancelled logs remain preserved; no deadline is extended.
+
+The Start fixture retains every original staging, installation, owner, completion, read, capture,
+process-restart and exact-retry assertion, including every progressive start-frame append byte.
+The separate checkpoint fixture prepares the same phase through real staging/fencing/installation
+APIs, executes the actual partial-checkpoint process, verifies every correct and corrupted byte
+prefix, then stops. The completion fixture commits the prior phases, retains the owner-commit
+regression with its unrelated decision, revokes the grant as in the original context, and verifies
+every correct and corrupted completion prefix. Later unrelated fault campaigns remain in Start.
+Thus each original assertion remains covered, while the two prefix fixtures no longer repeat the
+complete journey. Production code, formats, deadlines and ignored tests are unchanged.
+
+Focused verification passed all three tests in 159.152s: Start 159.142s, checkpoint 5.327s and
+completion 8.419s. Before this change the corresponding R186 focused times were 175.771s,
+153.645s and 152.674s. Full npm test passed: 3,980 native tests in 343.955s (seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted checks remain required; local timings do not establish hosted performance.
+
+Provenance: canonical test-only follow-up to R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b;
+no preserved legacy commit is replaced. R184/R185 dependent branches must incorporate the final
+correction before combined merged delivery. The full fleet and native-authority acceptance scope
+under #345 remains open. Fixed checkpoint b064029 is unchanged.
+
+### Saved-review validation with the final recovery fixtures
+
+R184 #365 incorporates R187 #363 at c44cfc310e818750a1708d419b20f9c7f1432077 through a normal related-history merge. Both documentation additions are retained. The saved-review implementation is unchanged; the complete combined gate is being rerun with the final recovery fixtures. Prior run 37331209602 passed six checks including macOS but timed out on Linux, so it is not passing delivery evidence. Fixed checkpoint b064029 is unchanged.

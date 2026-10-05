@@ -245,6 +245,9 @@ pub(super) fn assert_checkpoint(
                     );
                 }
             }
+            // The Start fixture retains the complete process-restart journey below.
+            // This separate fixture owns the exhaustive checkpoint prefix campaign.
+            return;
         }
     }
     let complete = fs::read(&path).unwrap();
