@@ -171,6 +171,19 @@ and invalid input is refused without echoing it. The capture worker is joined be
 control/output failure. A graceful watch exit does not itself assert a save: consumers must inspect
 `saved_version` and the reported outcome.
 
+For a native catalog registration, use
+`--mesh-registered-attachment capture|watch|versions <absolute-storage-folder> <registration-id>`.
+The registration ID is the exact 64-character lowercase identity from that catalog. This route pins
+the existing storage and registration, verifies recorded dependencies for enrolled lines, and shares
+the desktop's registered capture/recovery and review APIs. `capture` recovers exact interrupted work
+before saving newer input; unchanged input returns the existing saved identity. `watch` retains that
+registered authority in the worker and uses the same bounded controls and joined stop described above.
+Missing required inputs refuse; commands never infer a storage parent from a supplied metadata path.
+The older metadata-only command remains available for its existing independent-history scope and
+cannot substitute for the registered path on consumed history. Neither route enrolls projects,
+launches an agent, grants inputs or approves main. Host-level command tests do not establish packaged
+or already-running external-provider acceptance.
+
 The native host uses the existing `SoftwareActorCustody` implementation for a fresh capture-session
 key. The key remains in process, is not written to a key file or project, and is dropped with its
 native session. Restart creates a new capture actor while preserving the same attachment history;
