@@ -96,6 +96,93 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     let consumed = storage
         .registered_dependency_versions(destination.id())
         .unwrap()[0];
+    {
+        let source_selection = storage
+            .prepare_dependency_graph(&owner, &owner, version.operation(), &[])
+            .unwrap();
+        let destination_selection = storage
+            .prepare_dependency_work(&owner, &destination)
+            .unwrap();
+        let roots = source_selection
+            .roots
+            .iter()
+            .chain(&destination_selection.roots)
+            .cloned()
+            .collect::<Vec<_>>();
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots).unwrap();
+        let graph = storage
+            .inspect_prepared_dependency_graph(&source_selection, &guard)
+            .unwrap();
+        let (configuration, owner_private) = owner
+            .project()
+            .read_publication_private_history(owner.metadata_path(), &owner.store)
+            .unwrap();
+        let read_owner = || Ok((configuration.clone(), owner_private.clone()));
+        let (_, child_private) = candidate
+            .verify_completed_private_history(&graph, &guard, None, read_owner)
+            .unwrap();
+        assert_ne!(
+            child_private.binding().installation,
+            owner_private.binding().installation
+        );
+        let foreign = candidate
+            .verify_completed_private_history(&graph, &guard, None, || {
+                Ok((configuration.clone(), child_private.clone()))
+            })
+            .err()
+            .expect("foreign owner proof must refuse");
+        assert!(
+            foreign
+                .to_string()
+                .contains("validated dependency history changed"),
+            "{foreign}"
+        );
+        let wrong_configuration = candidate
+            .verify_completed_private_history(&graph, &guard, None, || {
+                Ok(("another configuration".into(), owner_private.clone()))
+            })
+            .err()
+            .expect("substituted configuration must refuse");
+        assert!(
+            wrong_configuration
+                .to_string()
+                .contains("private history configuration differs"),
+            "{wrong_configuration}"
+        );
+        let journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+        struct RestorePrivateOwner(PathBuf, Vec<u8>);
+        impl Drop for RestorePrivateOwner {
+            fn drop(&mut self) {
+                fs::write(&self.0, &self.1).unwrap();
+            }
+        }
+        let restore = RestorePrivateOwner(journal.clone(), fs::read(&journal).unwrap());
+        let mut changed = restore.1.clone();
+        changed.push(1);
+        let reads = std::cell::Cell::new(0);
+        let stale = candidate
+            .verify_completed_private_history(&graph, &guard, None, || {
+                reads.set(reads.get() + 1);
+                if reads.get() == 2 {
+                    fs::write(&journal, &changed)?;
+                }
+                read_owner()
+            })
+            .err()
+            .expect("cached owner proof must not survive a journal change");
+        assert_eq!(reads.get(), 2);
+        assert!(
+            stale
+                .to_string()
+                .contains("validated dependency history changed"),
+            "{stale}"
+        );
+        assert_eq!(fs::read(&journal).unwrap(), changed);
+        drop(restore);
+        candidate
+            .verify_completed_private_history(&graph, &guard, None, read_owner)
+            .unwrap();
+    }
     let missing = storage
         .save_dependency_review_snapshot(&owner, &destination, consumed, &[], id(10))
         .unwrap_err();
@@ -510,6 +597,119 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
             .canonical_bytes()
     };
     let receipt = receipt_for(preview.0.clone(), 61, ApprovalDecision::Approve);
+    {
+        // A publication-bearing owner can prove completed private content without granting
+        // ordinary admission. This test-only frame is removed before the remaining scenarios.
+        let source_selection = storage
+            .prepare_dependency_graph(&owner, &owner, version.operation(), &[])
+            .unwrap();
+        let destination_selection = storage
+            .prepare_dependency_work(&owner, &destination)
+            .unwrap();
+        let roots = source_selection
+            .roots
+            .iter()
+            .chain(&destination_selection.roots)
+            .cloned()
+            .collect::<Vec<_>>();
+        let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots).unwrap();
+        let graph = storage
+            .inspect_prepared_dependency_graph(&source_selection, &guard)
+            .unwrap();
+        let (_, private) = owner
+            .project()
+            .read_publication_private_history(owner.metadata_path(), &owner.store)
+            .unwrap();
+        let (ordinal, previous) = private.policy().native_head().unwrap();
+        let hash = super::super::dependency_transaction::hash;
+        let j = |digest: RecordDigest| Json::text(digest.to_hex());
+        let bytes = Json::object([
+            ("schema", Json::text("mesh.dependency-policy/v5")),
+            ("authority", j(private.binding().authority)),
+            ("revision", Json::Number(ordinal + 1)),
+            ("previous", j(previous)),
+            (
+                "kind",
+                Json::Number(mesh_store::DependencyKind::Publication.code().into()),
+            ),
+            (
+                "body",
+                Json::object([
+                    ("request", j(id(244))),
+                    ("revision", Json::Number(1)),
+                    ("previous", j(id(0))),
+                    ("review", j(bound.record())),
+                    ("receipt", j(hash(&receipt))),
+                    (
+                        "result",
+                        j(RecordDigest::from_bytes(
+                            *preview.0.reviewed_actor_head().as_bytes(),
+                        )),
+                    ),
+                    (
+                        "credential",
+                        j(RecordDigest::from_bytes(*human_credential.id().as_bytes())),
+                    ),
+                    ("challenge", j(id(61))),
+                ]),
+            ),
+        ])
+        .encode()
+        .into_bytes();
+        let record = mesh_store::DependencyRecord {
+            authority: private.binding().authority,
+            revision: ordinal + 1,
+            previous,
+            payload: hash(&bytes),
+            kind: mesh_store::DependencyKind::Publication,
+        };
+        private.policy().clone().apply(record, &bytes).unwrap();
+        let cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            owner.metadata_path(),
+            owner.store.filesystem(),
+        )
+        .unwrap();
+        cas.promote(receipt.clone()).unwrap();
+        cas.promote(bytes).unwrap();
+        struct RestorePublication(PathBuf, Vec<u8>);
+        impl Drop for RestorePublication {
+            fn drop(&mut self) {
+                fs::write(&self.0, &self.1).unwrap();
+            }
+        }
+        let restore = RestorePublication(owner_journal.clone(), fs::read(&owner_journal).unwrap());
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&owner_journal)
+            .unwrap();
+        file.write_all(&mesh_store::frame_record(
+            &mesh_store::StoredRecord::Dependency(record),
+        ))
+        .unwrap();
+        file.sync_all().unwrap();
+        let published = fs::read(&owner_journal).unwrap();
+        let (configuration, owner_private) = owner
+            .project()
+            .read_publication_private_history(owner.metadata_path(), &owner.store)
+            .unwrap();
+        assert!(owner_private.policy().has_publication_claims());
+        let (_, child_private) = candidate
+            .verify_completed_private_history(&graph, &guard, None, || {
+                Ok((configuration.clone(), owner_private.clone()))
+            })
+            .unwrap();
+        assert_ne!(
+            child_private.binding().installation,
+            owner_private.binding().installation
+        );
+        assert!(owner
+            .project()
+            .read_configuration(owner.metadata_path(), &owner.store)
+            .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), published);
+        assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+        drop(restore);
+    }
     let inspect_receipt = || {
         storage
             .inspect_saved_dependency_review_receipt(

@@ -2730,3 +2730,26 @@ R173 full `npm test` passed: 3,967 native tests in 321.245s (six slow, 18 skippe
 docs, license, storage, formatting and lint gates. The consumed input regression passed in
 43.876s within the full run. Hosted checks and merged delivery remain required. This does not
 complete consumed-publication replay, production approval/recovery or packaged fleet acceptance.
+
+
+## Private completed-consumption evidence (R174)
+
+Completed-consumption verification now produces private history evidence before ordinary admission
+is considered. The supplied owner evidence is checked against its pinned store, exact journal,
+configuration digest and native project receipt on both reads. Existing ordinary readers still
+apply the no-publication admission boundary after verification. The focused consumed review test
+passes with a publication-bearing owner, while ordinary owner admission continues to refuse;
+foreign owner proofs, substituted configuration and a changed owner journal also refuse.
+
+This does not independently replay publication signatures, reconstruct a complete private consumed
+input context, or enable a publication writer. The native resolver still needs the private context
+and shared starting-checkpoint reconstruction. Full checks, mutation evidence and PR delivery remain
+pending; the complete fleet objective remains open.
+
+R174 full `npm test` passed on `4df5c21795124202b0a98f73d48d842061e87799`:
+3,967 native tests in 319.840s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests
+and all 44 real-daemon checks, plus repository, docs, license, storage, formatting and lint gates.
+The consumed fixture passed in 44.168s inside that run. Removing owner-configuration verification
+failed the new refusal assertion; original source was restored. Reconciliation with the published
+parent's canonical-main ancestry preserved the entire tested tree. Hosted checks and merged
+delivery remain required; private resolver integration and full publication/recovery remain open.

@@ -84,6 +84,41 @@ impl PreparedNativeConsumedStart {
         capture: Option<&str>,
         context: &crate::project_attachment::dependency_owner_context::OwnerHistoryContext<'_>,
     ) -> io::Result<(String, VerifiedDependencyRead)> {
+        let (configuration, private) =
+            self.verify_completed_private_history(graph, guard, capture, || {
+                let (configuration, proof) = context.read(&self.owner)?;
+                let proof = proof.ok_or_else(|| invalid("owning authority missing"))?;
+                Ok((configuration, proof.private_evidence().clone()))
+            })?;
+        Ok((
+            configuration,
+            VerifiedDependencyRead::from_private_without_publication(private)?,
+        ))
+    }
+
+    // Completed private content is verified independently of ordinary owner admission. A caller
+    // must reconstruct the signed starting candidate/source graph first; this result still grants
+    // no publication or mutable workspace authority.
+    pub(in crate::project_attachment) fn verify_completed_private_history(
+        &self,
+        graph: &NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+        capture: Option<&str>,
+        read_owner: impl Fn() -> io::Result<(String, crate::project_attachment::VerifiedPrivateHistory)>,
+    ) -> io::Result<(String, crate::project_attachment::VerifiedPrivateHistory)> {
+        guard
+            .require_roots(&[self.owner.store.clone(), self.destination.store.clone()])
+            .map_err(error)?;
+        let read_owner_checked = || {
+            let (configuration, proof) = read_owner()?;
+            proof.verify_current(&self.owner.store)?;
+            proof.verify_configuration(&configuration)?;
+            if proof.binding().project != hash(self.owner.project().receipt()?.encode().as_bytes())
+            {
+                return Err(invalid("private consumption owner binding differs"));
+            }
+            Ok((configuration, proof))
+        };
         guard.ensure_current().map_err(error)?;
         let destination = &self.destination;
         let pending = read_private_in_store(&destination.store, super::super::START_PENDING)?;
@@ -125,8 +160,7 @@ impl PreparedNativeConsumedStart {
         }
         // The exact receipt must already exist in the independently verified owner prefix.
         // A pending record may never stand in for this historical completed consumption.
-        let (owner_configuration, owner) = context.read(&self.owner)?;
-        let owner = owner.ok_or_else(|| invalid("owning authority missing"))?;
+        let (owner_configuration, owner) = read_owner_checked()?;
         let owner_record = owner
             .policy()
             .native_request(self.request)
@@ -219,15 +253,17 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("consumed history contains non-capture suffix"));
         }
-        let proof = VerifiedDependencyRead::from_consumption(VerifiedConsumedHistory { facts })?;
+        let proof = crate::project_attachment::VerifiedPrivateHistory::from_consumption(
+            VerifiedConsumedHistory { facts },
+        );
         let (after_configuration, after) = read_facts()?;
-        let (after_owner_configuration, after_owner) = context.read(&self.owner)?;
+        let (after_owner_configuration, after_owner) = read_owner_checked()?;
         if after_configuration != configuration
             || !after
                 .as_ref()
                 .is_some_and(|facts| proof.matches_facts(facts))
             || after_owner_configuration != owner_configuration
-            || after_owner.as_ref() != Some(&owner)
+            || after_owner != owner
             || read_private_in_store(&destination.store, super::super::START_PENDING)? != pending
         {
             return Err(invalid("consumed history changed during inspection"));
