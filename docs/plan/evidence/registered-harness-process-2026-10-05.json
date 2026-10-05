@@ -1,0 +1,11 @@
+{
+  "proof": "mesh-registered-capture-process/v1",
+  "passed": true,
+  "revision": "dff7384212c0ed7422594fab06bc35dfcd092036",
+  "executable_sha256": "1af4edfe29e790f002d75840f8140f3d87df14ed19e7da9857f8ede96a974fd5",
+  "versions": 6,
+  "elapsed_ms": 11158,
+  "graphical": false,
+  "provider": false,
+  "packaged": false
+}

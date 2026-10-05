@@ -677,3 +677,22 @@ identity remains unchanged through baseline establishment. Existing eight-second
 registration requirement and five-minute reconciliation interval are unchanged. This is a stronger
 baseline assertion, not a workaround for startup failure. The preserved local FSEvents registration
 RPC stall and issue #37 remain unresolved; canonical execution of this test adjustment is pending.
+
+
+### Registered harness executable proof
+
+`apps/desktop/scripts/prove-registered-capture.mjs` checks an exact built executable against a
+retained enrolled fixture. Generate the fixture by setting `MESH_REGISTERED_CAPTURE_FIXTURE` to a
+new absolute JSON filename when running the
+`desktop_reopens_consumed_review_and_preserves_ordinary_projects` native test. All its assertions
+still execute; only an explicitly requested successful fixture is retained. Build the desktop with
+`MESH_BUILD_REVISION` set to its clean committed source revision, then run the script with
+`--fixture`, `--executable` and `--revision`. Use a fresh fixture for each complete proof run.
+
+The [5 October result](../plan/evidence/registered-harness-process-2026-10-05.json) passed on
+`dff7384212c0ed7422594fab06bc35dfcd092036` in 11.158 seconds. Separate executable processes
+confirmed unchanged-save deduplication, one-shot and watched saves, exact version listing, graceful
+stop, missing-owner refusal without journal changes, unknown-registration refusal, stable executable
+bytes and unchanged original project contents. Supplying a different build revision failed before
+capture. The exact executable and fixture are retained for inspection. This is headless development
+executable proof, not packaged graphical, existing external-provider, or protected-main acceptance.
