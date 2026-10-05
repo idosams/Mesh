@@ -836,6 +836,32 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         drop(source_history);
         drop(guard);
         let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        let accepted = reopened
+            .inspect_native_publication_history(destination.id(), &trust)
+            .unwrap();
+        assert_eq!(
+            accepted.get("publication").unwrap().get("operation"),
+            Some(&Json::text(consumed.operation().to_hex()))
+        );
+        assert!(reopened
+            .inspect_native_publication_history(
+                destination.id(),
+                &crate::TrustedReviewers::default()
+            )
+            .is_err());
+        assert!(
+            reopened
+                .inspect_root_publication_history(owner.id(), &trust)
+                .is_err(),
+            "root-only replay must still refuse consumed publications"
+        );
+        let unchanged = reopened
+            .inspect_native_review_candidate(destination.id(), snapshot.record(), &trust)
+            .unwrap_err();
+        assert!(
+            unchanged.to_string().contains("nothing to review"),
+            "{unchanged}"
+        );
         assert_eq!(
             reopened
                 .inspect_private_dependency_graph(destination.id(), consumed.operation())

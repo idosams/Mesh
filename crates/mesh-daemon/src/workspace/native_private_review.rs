@@ -312,4 +312,80 @@ impl<'a> NativePrivateReviewHistory<'a> {
         self.latest = Some(claim);
         Ok(())
     }
+
+    // Distinct consumed-input path: the existing root-only replay method above is unchanged.
+    // A caller cannot substitute a raw graph; the opaque proof rechecks the complete native
+    // owner/source context and snapshot before and after cryptographic receipt verification.
+    pub(crate) fn replay_consumed_publication(
+        &mut self,
+        claim: crate::dependency_policy::NativePublicationClaim,
+        proof: &crate::project_attachment::VerifiedConsumedPublicationGraph<'_, '_>,
+        bytes: &[u8],
+        trusted: &crate::TrustedReviewers,
+    ) -> Result<(), String> {
+        self.ensure_current()?;
+        let graph = proof
+            .verify_for(self.owner.1, claim)
+            .map_err(|e| e.to_string())?;
+        let expected_head = self
+            .latest
+            .map_or(crate::publication::GENESIS_SHARED_HEAD, |prior| {
+                mesh_approval::HeadId::from_bytes(*prior.result.as_bytes())
+            });
+        let expected_revision = self
+            .latest
+            .map_or(Some(1), |prior| prior.revision.checked_add(1));
+        let expected_previous = self
+            .latest
+            .map_or(RecordDigest::from_bytes([0; 32]), |prior| {
+                prior.record.payload
+            });
+        if claim.review.canonical() != expected_head
+            || Some(claim.revision) != expected_revision
+            || claim.previous != expected_previous
+            || self.challenges.contains(&claim.challenge)
+            || graph.review_inputs().next().is_none()
+            || graph.review_output() != claim.review.evidence().output()
+            || self
+                .owner
+                .1
+                .policy()
+                .publication_claim(claim.record.payload)
+                != Some(claim)
+            || self
+                .owner
+                .1
+                .policy()
+                .review_graph(claim.review.evidence().snapshot())
+                != Some(graph.digest())
+            || Blake3::digest_bytes(bytes).as_bytes() != claim.receipt.as_bytes()
+        {
+            return Err("consumed publication sequence or exact evidence differs".into());
+        }
+        let verified = self.check_receipt(&claim.review, bytes, trusted)?;
+        if verified.context().reviewed_actor_head().as_bytes() != claim.result.as_bytes()
+            || verified.credential().id().as_bytes() != claim.credential.as_bytes()
+            || verified.challenge() != claim.challenge.as_bytes()
+        {
+            return Err("consumed publication differs from its verified human receipt".into());
+        }
+        let head = verified.context().reviewed_actor_head();
+        if self.canonical.contains_key(&head) {
+            return Err("consumed publication repeats an accepted head".into());
+        }
+        proof
+            .verify_for(self.owner.1, claim)
+            .map_err(|e| e.to_string())?;
+        self.ensure_current()?;
+        self.canonical.insert(
+            head,
+            VerifiedCanonicalOperation {
+                head,
+                operation: claim.review.evidence().output().2,
+            },
+        );
+        self.challenges.insert(claim.challenge);
+        self.latest = Some(claim);
+        Ok(())
+    }
 }
