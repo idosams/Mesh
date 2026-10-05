@@ -616,6 +616,9 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         let graph = storage
             .inspect_prepared_dependency_graph(&source_selection, &guard)
             .unwrap();
+        let destination_binding = storage
+            .validate_dependency_work(&destination_selection, &guard)
+            .unwrap();
         let (_, private) = owner
             .project()
             .read_publication_private_history(owner.metadata_path(), &owner.store)
@@ -718,6 +721,60 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
             &guard,
         )
         .unwrap();
+        // Rebuild from durable transaction material; do not reuse the original in-memory
+        // candidate. Complete private-context discovery still supplies graph/bindings separately.
+        let rebuild = |selected_owner| {
+            storage.with_recovered_consumed_material(
+                super::super::consumption_prepare::RecoveryMaterial {
+                    owner: &owner,
+                    request: NativeConsumedStartRequest {
+                        input: NativeGrantInspection {
+                            source: &owner,
+                            version,
+                            destination: &destination,
+                            grant: grant.record(),
+                        },
+                        available: &[],
+                        request: id(4),
+                        limits: ObservationLimits::default(),
+                    },
+                    phase: super::super::consumption_prepare::RecoveryPhase::CompletedRead,
+                    graph: &graph,
+                    source_binding: &owner_binding,
+                    destination_binding: &destination_binding,
+                    owner_binding: selected_owner,
+                },
+                &guard,
+                |operation, expected| {
+                    assert_eq!(operation, candidate.operation());
+                    owner_private.verify_current(&owner.store)?;
+                    source_history.with_saved_input(version.operation(), |input| {
+                        super::super::consumption_prepare::source_verification::verify_starting_source(
+                            &destination, &input, &guard, expected,
+                        )
+                    })
+                },
+                |operation| {
+                    assert_eq!(operation, candidate.operation());
+                    owner_private.verify_current(&owner.store)?;
+                    source_history.with_saved_input(version.operation(), |_| Ok(()))
+                },
+                |recovered, _, reconstructed_graph, held| {
+                    recovered.verify_completed_private_history(reconstructed_graph, held, None, || {
+                        Ok((configuration.clone(), owner_private.clone()))
+                    })
+                },
+            )
+        };
+        let reconstructed = rebuild(owner_private.binding()).unwrap();
+        assert_eq!(reconstructed.0, prospective);
+        assert!(reconstructed.1 == child_private);
+        let mut different_owner = owner_private.binding();
+        different_owner.installation = id(248);
+        assert!(
+            rebuild(different_owner).is_err(),
+            "foreign owner must not reconstruct a completed lane"
+        );
         let (initial_configuration, _) = destination
             .project()
             .read_completed_start_facts(destination.metadata_path(), &destination.store)
