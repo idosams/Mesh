@@ -7808,3 +7808,25 @@ in 47.183s and the chained-lane fixture in 232.119s within the full run. Canonic
 reconciliation at `00ce905f57454047178d43617113249707aebe99` preserved the entire tested tree.
 The intended published parent is R176 / #357 at
 `c99e994e41632c9d223e665fe01354bc7065e6c7`. Hosted checks and merged delivery remain required.
+
+
+R177 hosted Linux run 37298356953 completed all 3,529 assertions successfully but failed
+its 15-minute test-step deadline: the combined recovery fixture took 909.201s. This remains
+failed evidence. R178's descendant run 37300116747 passed all seven checks, but the same
+fixture still took 842.852s on Linux. Local compiler experiments were insufficient: baseline
+166.748s, optimized curve dependency 154.130s, optimized daemon 159.811s with added compile
+cost. Neither optimization is adopted; debug checks and CI deadlines remain unchanged.
+
+The two new private chained-graph comparisons move from the long recovery campaign to an
+independent fixture. It creates two consumed generations, compares the complete private graph
+with ordinary verified content before and after a later capture, checks the earlier graph again,
+and confirms all three journals remain unchanged. It passed in 16.159s. Removing consumed
+edges caused reconstruction to refuse in 8.133s before the graph comparison; the mutation
+wrapper expected a later assertion and reported that mismatch. Source was restored byte-for-byte.
+All existing recovery assertions remain, and complete repository/hosted validation is required
+before delivery. This is test execution organization, not a product performance claim.
+
+PR #356 merged at `15198db5e338e8846366a91cf752a489a2f18687`. PR #357 now targets main
+at `4cc74a2a71413355b704ac348545fa4203080c7b`, with the entire tested tree unchanged and
+all seven fresh checks passed. R177 adopted that related parent at
+`aaaaa686da8f2618584a52a82ed2dd236fa64ecc` without changing its complete tree.

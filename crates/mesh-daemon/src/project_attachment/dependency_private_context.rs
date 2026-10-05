@@ -752,3 +752,6 @@ impl AttachmentStorage {
         })
     }
 }
+
+#[cfg(test)]
+mod tests;
