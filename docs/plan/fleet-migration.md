@@ -8021,6 +8021,45 @@ cb7b6acabfd7788abd4bbbdb7f4653646ab01f83; it replaces no preserved legacy commit
 ordinary-reader pending-publication fence is a separate sibling increment and remains required
 for combined delivery. Original work and repository history remain preserved.
 
+## Saved native reviews after publication (R184)
+
+Native storage can bind an already-retained exact review snapshot after accepted publication.
+The writer resolves complete saved content and work identity, verifies accepted publication
+receipts with configured trust, and computes the new review against verified current main.
+An exact historical retry reconstructs the original verified main and bundle; later publication
+cannot silently rebase a saved review. Reused requests with different opener or evidence refuse.
+
+Input decisions and saved-review bindings share a closed native transaction implementation.
+Only the two explicit request variants can select records; arbitrary payloads, publication and
+consumption are not accepted. Existing eligibility v1 and review-binding v4 records and canonical
+pending intents are reused. Partial recovery binds the intended record kind as well as the exact
+request, journal prefix, pinned namespace and payload. Complete graph and trust verification is
+repeated before the sole journal-sync commit and after append. No runtime/agent endpoint, human
+presence collection or ordinary workspace admission is added.
+
+The new real-process fixture saves the second review through this API rather than a test-only
+journal append. Staging, partial append, synchronized commit before acknowledgement and two exact
+retries are exercised, including foreign-request and missing-trust refusal. A second publication
+then advances main; retrying the prior review must preserve its original record and bundle with no
+journal change. Wrong-work and unknown-snapshot requests refuse without changing owner history;
+child history and uncaptured editor content remain outside approval. Independent replay fixtures
+remain independent. This is process-exit evidence, not simultaneous-race or power-loss proof.
+
+This increment binds existing immutable snapshots. Fresh snapshot capture after publication,
+all-route integration, retention/collection and complete manual/harness/fleet/provider/host and
+eligible signed-package acceptance remain required under #345. The b064029 checkpoint is unchanged.
+
+Provenance: new canonical work based on R183 #364 at
+7e98b2401fe61849095109b0a1cc84220074275a; no preserved legacy commit is replaced.
+
+Validation: the new review process regression and existing input-decision process regression
+passed together in 60.483s. A mutation rebuilding historical review retries against current main
+failed the new regression in 57.845s after main advanced; the implementation was restored exactly
+(SHA256 5079d7daf674f46072546313b9723b03fa7d4f65b5fed7f7edef59013208910d).
+Full npm test passed: 3,978 native tests in 357.904s (nine slow, 18 skipped), 194 rendered
+tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/
+fmt/clippy. Exact-head hosted checks remain required before merged delivery.
+
 ### Combined pending-publication fence and native controls
 
 R182 now incorporates merged R183 #364 (main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a).
@@ -8045,6 +8084,10 @@ All three campaigns get early scheduling priority; the 33-review bounded overvie
 Provenance: new test-only correction on canonical PR363 head 9398c2fb18aa9abf70342a053824d71fa01d17ec, based on merged main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a. No preserved legacy commits are replaced. PR365 and PR366 must adopt the correction with their complete dependent implementation before merged delivery. Fixed checkpoint b064029 remains unchanged.
 
 Focused validation passed all three campaigns in 175.781s: start 175.771s, checkpoint 153.645s and completion 152.674s. Full npm test passed: 3,980 native tests in 371.214s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Under the full local load, start took 276.679s, checkpoint 237.174s and completion 235.893s. Exact-head hosted checks remain required; these local results do not establish Linux CI performance.
+
+### Saved-review delivery adopts the publication fence and recovery scheduling
+
+R184 #365 incorporates published R182/R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b through a normal related-history merge. Both native control implementations and all regression assertions are retained. Only appended documentation sections conflicted; both were preserved. The combined source passed full npm test: 3,981 native tests in 383.075s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Historical separate-branch results above do not substitute for this combined validation. Fixed checkpoints remain unchanged.
 
 
 ## Recovery fixtures retain coverage without repeating unrelated journeys (R187)
@@ -8072,3 +8115,44 @@ Provenance: canonical test-only follow-up to R186 #363 at e6e29c24bfc3c64140013c
 no preserved legacy commit is replaced. R184/R185 dependent branches must incorporate the final
 correction before combined merged delivery. The full fleet and native-authority acceptance scope
 under #345 remains open. Fixed checkpoint b064029 is unchanged.
+
+### Saved-review validation with the final recovery fixtures
+
+R184 #365 incorporates R187 #363 at c44cfc310e818750a1708d419b20f9c7f1432077 through a normal related-history merge. Both documentation additions are retained. The saved-review implementation is unchanged. Full npm test passed on the combined source: 3,981 native tests in 354.193s (nine slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Prior run 37331209602 passed six checks including macOS but timed out on Linux, so it is not passing delivery evidence. Fixed checkpoint b064029 is unchanged.
+
+
+## Test-only signature arithmetic optimization (R189)
+
+PR #363 merged at canonical main f4085692c770efb594761c87937dc40c9159ec96 after all seven
+checks passed on c44cfc310e818750a1708d419b20f9c7f1432077 (run 37335039314).
+The separate main run 37337695207 passed Linux but its macOS job was cancelled after
+3,980 native, 194 rendered and 672 desktop tests passed; the remaining job checks did not
+complete. That run is not passing delivery evidence.
+
+Saved-review PR #365 at f71e92ea92a07cc5489785937bab6e016cfe1827 again exceeded Linux's
+unchanged 15-minute test deadline in run 37336306717. Six other checks passed. A normal
+related-history merge at 09fb49c9c6052fd9b5d2fd5114fdb9b0124df964 adopts canonical main
+without changing that implementation tree. No historical work is discarded or replaced.
+
+The test profile now optimizes only curve25519-dalek arithmetic, explicitly retaining debug
+assertions and overflow checks. Mesh code, release profiles, assertions, byte-prefix coverage,
+runner capacity and deadlines are unchanged. A fresh verbose build confirmed the compiler's
+optimization and debug-assertion flags; a runtime overflow probe confirmed overflow trapping
+with those emitted flags. No cryptographic algorithm or dependency version changes.
+
+The unchanged focused recovery regression passed in 159.252s before and 148.910s after this
+change. Full npm test passed with 3,981 native tests in 340.916s (nine slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository, docs,
+license, storage, formatting and clippy gates. The prior combined native suite took 354.193s.
+These individual local runs suggest only a modest improvement, not a controlled benchmark or
+hosted performance guarantee. Fresh exact-head hosted checks are required before merging #365.
+
+Snapshot PR #366 at aa3e9439d7896a3b0842605f89bd8d40d69f7314 passed all seven checks in
+run 37337600941: Linux 3,544 tests in 867.673s and macOS 3,982 tests in 683.572s, plus four
+ignored renderer tests. It remains dependent on #365 and needs combined validation after
+incorporating this correction. Neither open PR is counted as merged.
+
+Provenance: canonical delivery correction to R184/R187; no preserved legacy commit is replaced.
+The failing new-capture-after-publication regression is preserved separately at de89ff0 on
+idosams/native-capture-after-publication; the trusted capture implementation remains unfinished.
+The full fleet scope under #345 and fixed user checkpoint b064029 remain unchanged.

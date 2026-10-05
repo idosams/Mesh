@@ -686,6 +686,10 @@ fn native_writer_refuses_new_publication_after_input_rejection() {
 fn consumed_publication_recovers_after_process_exit_and_lost_acknowledgement() {
     consumed_publication_fixture(4);
 }
+#[test]
+fn native_saved_review_after_publication_recovers_across_processes() {
+    consumed_publication_fixture(5);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -1184,7 +1188,7 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
-    if writer >= 2 {
+    if matches!(writer, 2..=4) {
         return;
     }
     let owner_journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
@@ -1225,30 +1229,74 @@ fn consumed_publication_fixture(writer: u8) {
                 .output())
         })
         .unwrap();
-    let second_review = append_test_policy(
-        &owner,
-        DependencyKind::ReviewSnapshot,
-        "mesh.dependency-policy/v4",
-        Json::object([
-            ("request", Json::text(id(17).to_hex())),
-            ("revision", Json::Number(1)),
-            ("snapshot", Json::text(second_snapshot.record().to_hex())),
-            (
-                "output",
-                Json::Array(vec![
+    let second_review = if writer == 5 {
+        let before = fs::read(&owner_journal).unwrap();
+        assert!(reopened
+            .save_native_review(
+                destination.id(),
+                second_snapshot.record(),
+                id(14),
+                id(17),
+                &crate::TrustedReviewers::default()
+            )
+            .is_err());
+        assert!(reopened
+            .save_native_review(owner.id(), second_snapshot.record(), id(14), id(17), &trust)
+            .is_err());
+        assert!(reopened
+            .save_native_review(destination.id(), id(99), id(14), id(17), &trust)
+            .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), before);
+        let result = restart::interrupted_native_review(
+            &root,
+            destination.id(),
+            second_snapshot.record(),
+            id(14),
+            id(17),
+            human_key.public_key().as_ref(),
+            &owner_journal,
+        );
+        assert_eq!(result.get("bundle"), candidate.get("bundle"));
+        let saved = reopened
+            .save_native_review(
+                destination.id(),
+                second_snapshot.record(),
+                id(14),
+                id(17),
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(
+            result.get("record"),
+            Some(&Json::text(saved.record().to_hex()))
+        );
+        saved.record()
+    } else {
+        append_test_policy(
+            &owner,
+            DependencyKind::ReviewSnapshot,
+            "mesh.dependency-policy/v4",
+            Json::object([
+                ("request", Json::text(id(17).to_hex())),
+                ("revision", Json::Number(1)),
+                ("snapshot", Json::text(second_snapshot.record().to_hex())),
+                (
+                    "output",
                     Json::Array(vec![
-                        Json::text(output.0.to_hex()),
-                        Json::text(output.1.to_hex()),
+                        Json::Array(vec![
+                            Json::text(output.0.to_hex()),
+                            Json::text(output.1.to_hex()),
+                        ]),
+                        Json::text(output.2.to_hex()),
                     ]),
-                    Json::text(output.2.to_hex()),
-                ]),
-            ),
-            ("canonical", candidate.get("canonical").unwrap().clone()),
-            ("bundle", candidate.get("bundle").unwrap().clone()),
-            ("opener", Json::text(id(14).to_hex())),
-        ]),
-        None,
-    );
+                ),
+                ("canonical", candidate.get("canonical").unwrap().clone()),
+                ("bundle", candidate.get("bundle").unwrap().clone()),
+                ("opener", Json::text(id(14).to_hex())),
+            ]),
+            None,
+        )
+    };
     let second_context = reopened
         .with_native_publication_history(destination.id(), &trust, |history, proof| {
             history
@@ -1273,6 +1321,43 @@ fn consumed_publication_fixture(writer: u8) {
         accepted.get("publication").unwrap().get("revision"),
         Some(&Json::Number(2))
     );
+    if writer == 5 {
+        let before = fs::read(&owner_journal).unwrap();
+        let retry = reopened_again
+            .save_native_review(
+                destination.id(),
+                second_snapshot.record(),
+                id(14),
+                id(17),
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(
+            retry.record(),
+            second_review,
+            "historical review retry must retain original main"
+        );
+        assert_eq!(
+            Some(&Json::text(retry.bundle().to_hex())),
+            candidate.get("bundle")
+        );
+        assert!(reopened_again
+            .save_native_review(
+                destination.id(),
+                second_snapshot.record(),
+                id(15),
+                id(17),
+                &trust
+            )
+            .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), before);
+        assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+        assert!(
+            owner.saved_versions().is_err(),
+            "saved review must not grant ordinary admission"
+        );
+        return;
+    }
     let inspection_journals = [&owner, &destination].map(|work| {
         let path = work.metadata_path().join(crate::RECORD_FILE_NAME);
         let bytes = fs::read(&path).unwrap();

@@ -1,4 +1,4 @@
-//! Trusted native input decisions through complete private publication history.
+//! Trusted native input decisions and saved reviews through complete publication history.
 use super::*;
 use crate::{
     project_attachment::{NativeInputDecision, SavedAttachmentVersion, SavedInputDecision},
@@ -25,6 +25,41 @@ pub enum NativeSavedInputDecision {
     Rejected,
     /// Replace it with another saved operation from the same verified native work.
     Replaced(RecordDigest),
+}
+
+#[derive(Clone, Copy)]
+enum ControlRequest {
+    Input {
+        version: RecordDigest,
+        decision: NativeSavedInputDecision,
+        previous: Option<RecordDigest>,
+    },
+    Review {
+        snapshot: RecordDigest,
+        opener: RecordDigest,
+    },
+}
+impl ControlRequest {
+    fn kind(self) -> DependencyKind {
+        match self {
+            Self::Input { .. } => DependencyKind::Eligibility,
+            Self::Review { .. } => DependencyKind::ReviewSnapshot,
+        }
+    }
+    fn previous(self) -> Option<RecordDigest> {
+        match self {
+            Self::Input { previous, .. } => previous,
+            Self::Review { .. } => None,
+        }
+    }
+    fn valid(self) -> bool {
+        match self {
+            Self::Input {
+                version, previous, ..
+            } => version != ZERO && previous != Some(ZERO),
+            Self::Review { snapshot, opener } => snapshot != ZERO && opener != ZERO,
+        }
+    }
 }
 
 fn ensure_control_available(
@@ -64,18 +99,13 @@ pub(in crate::project_attachment) enum Step {
     Appended,
 }
 fn intent(
+    kind: DependencyKind,
     request: RecordDigest,
     identity: (u64, u64),
     before: &[u8],
     payload: RecordDigest,
 ) -> String {
-    super::super::dependency_decision::transaction_intent(
-        DependencyKind::Eligibility,
-        request,
-        identity,
-        before,
-        payload,
-    )
+    super::super::dependency_decision::transaction_intent(kind, request, identity, before, payload)
 }
 fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
     file.rewind()?;
@@ -90,48 +120,123 @@ fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
 }
 impl PrivateContext<'_> {
     #[allow(clippy::too_many_arguments)]
-    fn select_native_decision(
+    fn select_native_control(
         &self,
         storage: &AttachmentStorage,
         work: &ProvisionedAttachment,
         guard: &WorkspaceInitializationGuard,
-        version: RecordDigest,
-        decision: NativeSavedInputDecision,
-        expected_previous: Option<RecordDigest>,
+        command: ControlRequest,
         request: RecordDigest,
         trusted: &TrustedReviewers,
     ) -> io::Result<Selection> {
         self.with_replayed_history(storage, work, trusted, guard, |history, owner| {
-            let binding = self.binding(storage, work, guard)?;
-            self.graph(storage, work, version, guard)?;
-            let version = SavedAttachmentVersion::from_verified_private_history(history, version)?;
-            let decision = match decision {
-                NativeSavedInputDecision::Eligible => SavedInputDecision::Eligible,
-                NativeSavedInputDecision::Rejected => SavedInputDecision::Rejected,
-                NativeSavedInputDecision::Replaced(operation) => {
-                    self.graph(storage, work, operation, guard)?;
-                    SavedInputDecision::Replaced(
-                        SavedAttachmentVersion::from_verified_private_history(history, operation)?,
-                    )
-                }
-            };
-            let selected = NativeControlInput {
-                kind: DependencyKind::Eligibility,
-                revision_field: "revision",
-                body: super::super::dependency_decision::body(
-                    binding.work(),
-                    binding.installation(),
+            let selected = match command {
+                ControlRequest::Input {
                     version,
                     decision,
-                    request,
-                    0,
-                    expected_previous.unwrap_or(ZERO),
-                ),
-                prior: owner.policy().native_decision(
-                    binding.work(),
-                    binding.installation(),
-                    version.operation(),
-                ),
+                    previous,
+                } => {
+                    let binding = self.binding(storage, work, guard)?;
+                    self.graph(storage, work, version, guard)?;
+                    let version =
+                        SavedAttachmentVersion::from_verified_private_history(history, version)?;
+                    let decision = match decision {
+                        NativeSavedInputDecision::Eligible => SavedInputDecision::Eligible,
+                        NativeSavedInputDecision::Rejected => SavedInputDecision::Rejected,
+                        NativeSavedInputDecision::Replaced(operation) => {
+                            self.graph(storage, work, operation, guard)?;
+                            SavedInputDecision::Replaced(
+                                SavedAttachmentVersion::from_verified_private_history(
+                                    history, operation,
+                                )?,
+                            )
+                        }
+                    };
+                    NativeControlInput {
+                        kind: DependencyKind::Eligibility,
+                        revision_field: "revision",
+                        body: super::super::dependency_decision::body(
+                            binding.work(),
+                            binding.installation(),
+                            version,
+                            decision,
+                            request,
+                            0,
+                            previous.unwrap_or(ZERO),
+                        ),
+                        prior: owner.policy().native_decision(
+                            binding.work(),
+                            binding.installation(),
+                            version.operation(),
+                        ),
+                    }
+                }
+                ControlRequest::Review { snapshot, opener } => {
+                    let evidence = owner
+                        .policy()
+                        .review_evidence(snapshot)
+                        .ok_or_else(|| invalid("native review snapshot is unavailable"))?;
+                    let binding = self.binding(storage, work, guard)?;
+                    let output = evidence.output();
+                    if (output.0, output.1) != (binding.work(), binding.installation()) {
+                        return Err(invalid("native review snapshot belongs to another work"));
+                    }
+                    let graph = self.graph(storage, work, output.2, guard)?;
+                    if owner.policy().review_graph(snapshot) != Some(graph.digest()) {
+                        return Err(invalid(
+                            "native review snapshot differs from complete graph",
+                        ));
+                    }
+                    let (canonical, bundle) = if owner.policy().native_request(request).is_some() {
+                        let prior = owner
+                            .policy()
+                            .review_binding_body(request)
+                            .ok_or_else(|| invalid("request is not a saved review"))?;
+                        let canonical = mesh_approval::HeadId::from_bytes(
+                            *digest(super::super::dependency_transaction::text(
+                                &prior,
+                                "canonical",
+                            )?)?
+                            .as_bytes(),
+                        );
+                        (
+                            canonical,
+                            history
+                                .review_bundle_at(&evidence, canonical)
+                                .map_err(error)?,
+                        )
+                    } else {
+                        history.current_review_bundle(&evidence).map_err(error)?
+                    };
+                    NativeControlInput {
+                        kind: DependencyKind::ReviewSnapshot,
+                        revision_field: "revision",
+                        prior: None,
+                        body: Json::object([
+                            ("request", Json::text(request.to_hex())),
+                            ("revision", Json::Number(1)),
+                            ("snapshot", Json::text(snapshot.to_hex())),
+                            (
+                                "output",
+                                Json::Array(vec![
+                                    Json::Array(vec![
+                                        Json::text(output.0.to_hex()),
+                                        Json::text(output.1.to_hex()),
+                                    ]),
+                                    Json::text(output.2.to_hex()),
+                                ]),
+                            ),
+                            (
+                                "canonical",
+                                Json::text(
+                                    RecordDigest::from_bytes(*canonical.as_bytes()).to_hex(),
+                                ),
+                            ),
+                            ("bundle", Json::text(bundle.to_hex())),
+                            ("opener", Json::text(opener.to_hex())),
+                        ]),
+                    }
+                }
             };
             let cas = Cas::<_, Blake3>::with_filesystem(
                 self.owner.metadata_path(),
@@ -151,7 +256,7 @@ impl PrivateContext<'_> {
                     .and_then(|v| v.get("revision"))
                     .and_then(Json::as_u64)
                     .ok_or_else(|| invalid("request is not an input decision"))?;
-                if record.kind != DependencyKind::Eligibility
+                if record.kind != selected.kind
                     || value.get("body") != Some(&selected.body_at(revision)?)
                 {
                     return Err(invalid(
@@ -165,7 +270,7 @@ impl PrivateContext<'_> {
                     existing: true,
                 });
             }
-            if selected.prior.map(|(_, p)| p) != expected_previous {
+            if selected.prior.map(|(_, p)| p) != command.previous() {
                 return Err(invalid("saved-input decision is stale"));
             }
             let revision = selected
@@ -180,14 +285,17 @@ impl PrivateContext<'_> {
                 .checked_add(1)
                 .ok_or_else(|| invalid("native decision history exhausted"))?;
             let payload = Json::object([
-                ("schema", Json::text("mesh.dependency-policy/v1")),
+                (
+                    "schema",
+                    Json::text(match command {
+                        ControlRequest::Input { .. } => "mesh.dependency-policy/v1",
+                        ControlRequest::Review { .. } => "mesh.dependency-policy/v4",
+                    }),
+                ),
                 ("authority", Json::text(owner.binding().authority.to_hex())),
                 ("revision", Json::Number(ordinal)),
                 ("previous", Json::text(previous.to_hex())),
-                (
-                    "kind",
-                    Json::Number(DependencyKind::Eligibility.code().into()),
-                ),
+                ("kind", Json::Number(selected.kind.code().into())),
                 ("body", selected.body_at(revision)?),
             ])
             .encode()
@@ -197,7 +305,7 @@ impl PrivateContext<'_> {
                 revision: ordinal,
                 previous,
                 payload: hash(&payload),
-                kind: DependencyKind::Eligibility,
+                kind: selected.kind,
             };
             let mut projected = owner.policy().clone();
             projected.apply(record, &payload).map_err(error)?;
@@ -244,11 +352,90 @@ impl AttachmentStorage {
         expected_previous: Option<RecordDigest>,
         request: RecordDigest,
         trusted: &TrustedReviewers,
+        hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<NativeInputDecision> {
+        self.write_native_control(
+            work_id,
+            ControlRequest::Input {
+                version,
+                decision,
+                previous: expected_previous,
+            },
+            request,
+            trusted,
+            hook,
+            sync,
+        )
+        .map(|selected| selected.decision())
+    }
+
+    /// Save an immutable review against fully verified native publication history.
+    /// This records historical evidence, never approval or ordinary workspace admission.
+    pub fn save_native_review(
+        &self,
+        work_id: &str,
+        snapshot: RecordDigest,
+        opener: RecordDigest,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<super::super::NativeSavedDependencyReview> {
+        self.save_native_review_with_io(
+            work_id,
+            snapshot,
+            opener,
+            request,
+            trusted,
+            |_, _, _| Ok(()),
+            |file| file.sync_all(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::project_attachment) fn save_native_review_with_io(
+        &self,
+        work_id: &str,
+        snapshot: RecordDigest,
+        opener: RecordDigest,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+        hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<super::super::NativeSavedDependencyReview> {
+        let selected = self.write_native_control(
+            work_id,
+            ControlRequest::Review { snapshot, opener },
+            request,
+            trusted,
+            hook,
+            sync,
+        )?;
+        let value =
+            Json::parse(std::str::from_utf8(&selected.payload).map_err(error)?).map_err(error)?;
+        let body = value
+            .get("body")
+            .ok_or_else(|| invalid("native saved review body missing"))?;
+        let bundle = digest(super::super::dependency_transaction::text(body, "bundle")?)?;
+        Ok(
+            super::super::NativeSavedDependencyReview::from_verified_record(
+                selected.record.payload,
+                bundle,
+            ),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn write_native_control(
+        &self,
+        work_id: &str,
+        command: ControlRequest,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
         mut hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&File) -> io::Result<()>,
-    ) -> io::Result<NativeInputDecision> {
-        if request == ZERO || version == ZERO || expected_previous == Some(ZERO) {
-            return Err(invalid("invalid native decision request"));
+    ) -> io::Result<Selection> {
+        if request == ZERO || !command.valid() {
+            return Err(invalid("invalid native control request"));
         }
         let owner = self.reopen(&self.candidate_owning_root(work_id)?)?;
         let work = self.reopen(work_id)?;
@@ -258,7 +445,7 @@ impl AttachmentStorage {
             let guard =
                 crate::workspace_custody::lock_workspace_initialization_set(&owner_selection.roots)
                     .map_err(error)?;
-            let recovery = recovery::VerifiedControlPrefix::read(&owner, request)?;
+            let recovery = recovery::VerifiedControlPrefix::read(&owner, request, command.kind())?;
             let discovery = self.private_discovery_with_recovery(
                 &owner,
                 work_id,
@@ -297,16 +484,8 @@ impl AttachmentStorage {
             &guard,
             recovery.as_ref().map(OwnerRecovery::Control),
         )?;
-        let selected = context.select_native_decision(
-            self,
-            &work,
-            &guard,
-            version,
-            decision,
-            expected_previous,
-            request,
-            trusted,
-        )?;
+        let selected =
+            context.select_native_control(self, &work, &guard, command, request, trusted)?;
         let mut journal = owner
             .store
             .open_existing_record_file(Path::new(crate::RECORD_FILE_NAME))?;
@@ -342,7 +521,14 @@ impl AttachmentStorage {
                     .filter(|n| *n <= before.len() as u64)
                     .ok_or_else(|| invalid("invalid completed native decision intent"))?
                     as usize;
-                if *raw != intent(request, identity, &before[..n], selected.record.payload)
+                if *raw
+                    != intent(
+                        command.kind(),
+                        request,
+                        identity,
+                        &before[..n],
+                        selected.record.payload,
+                    )
                     || !before[n..].starts_with(&frame)
                 {
                     return Err(invalid(
@@ -354,16 +540,9 @@ impl AttachmentStorage {
             if rediscover()? != discovery {
                 return Err(invalid("native decision retry roots changed"));
             }
-            if PrivateContext::resolve(self, &owner, &works, &guard)?.select_native_decision(
-                self,
-                &work,
-                &guard,
-                version,
-                decision,
-                expected_previous,
-                request,
-                trusted,
-            )? != selected
+            if PrivateContext::resolve(self, &owner, &works, &guard)?
+                .select_native_control(self, &work, &guard, command, request, trusted)?
+                != selected
             {
                 return Err(invalid("native decision retry changed"));
             }
@@ -375,12 +554,18 @@ impl AttachmentStorage {
             }
             owner.store.sync()?;
             guard.ensure_current().map_err(error)?;
-            return Ok(selected.decision());
+            return Ok(selected);
         }
         if before.len().saturating_add(frame.len()) > MAX_JOURNAL {
             return Err(invalid("native decision append exceeds bound"));
         }
-        let expected = intent(request, identity, &before, selected.record.payload);
+        let expected = intent(
+            command.kind(),
+            request,
+            identity,
+            &before,
+            selected.record.payload,
+        );
         if pending.as_ref().is_some_and(|raw| raw != &expected) {
             return Err(invalid("another native decision requires recovery"));
         }
@@ -407,16 +592,8 @@ impl AttachmentStorage {
             recovery.as_ref().map(OwnerRecovery::Control),
         )?;
         if rediscover()? != discovery
-            || after.select_native_decision(
-                self,
-                &work,
-                &guard,
-                version,
-                decision,
-                expected_previous,
-                request,
-                trusted,
-            )? != selected
+            || after.select_native_control(self, &work, &guard, command, request, trusted)?
+                != selected
             || read_private_in_store(&owner.store, PENDING)? != expected
             || super::super::dependency_transaction::read_payload(
                 &cas,
@@ -442,20 +619,12 @@ impl AttachmentStorage {
             ));
         }
         journal.write_all(&frame[written..])?;
-        // Sole durable input-decision commit point. This never constitutes publication approval.
+        // Sole durable native-control commit point. This never constitutes publication approval.
         sync(&journal)?;
         hook(Step::Appended, &mut journal, &frame)?;
         let replay = PrivateContext::resolve(self, &owner, &works, &guard)?;
-        let completed = replay.select_native_decision(
-            self,
-            &work,
-            &guard,
-            version,
-            decision,
-            expected_previous,
-            request,
-            trusted,
-        )?;
+        let completed =
+            replay.select_native_control(self, &work, &guard, command, request, trusted)?;
         if !completed.existing
             || completed.record != selected.record
             || completed.revision != selected.revision
@@ -470,6 +639,6 @@ impl AttachmentStorage {
         owner.store.filesystem().remove_file(Path::new(PENDING))?;
         owner.store.sync()?;
         guard.ensure_current().map_err(error)?;
-        Ok(selected.decision())
+        Ok(selected)
     }
 }
