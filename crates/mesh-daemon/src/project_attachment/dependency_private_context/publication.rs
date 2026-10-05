@@ -10,7 +10,7 @@ use std::{
     os::unix::fs::{MetadataExt as _, PermissionsExt as _},
     path::Path,
 };
-const PENDING: &str = "native-publication.pending";
+pub(in crate::project_attachment) const PENDING: &str = "native-publication.pending";
 const MAX_JOURNAL: usize = 64 * 1024 * 1024;
 const ZERO: RecordDigest = RecordDigest::from_bytes([0; 32]);
 

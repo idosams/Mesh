@@ -7952,3 +7952,30 @@ Provenance: new canonical test coverage based on R180 #361 at
 suite passed: 3,974 native tests in 335.426s (seven slow, 18 skipped), 194 rendered tests,
 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
 Fixed user checkpoints and original work remain unchanged.
+
+## Pending publication preserves native control ordering (R182)
+
+A staged publication intent previously left its complete journal prefix readable by ordinary
+native controls. A real process-exit regression proved that an input decision could append after
+staging and make the publication's exact prefix unrecoverable. The unfixed regression failed in
+0.915s with an ordinary decision overtaking a staged publication.
+
+The enrolled native reader now refuses ordinary inspection/control and non-publication recovery
+while a publication intent exists. Malformed or inaccessible pending intent evidence never
+permits a competing control. Only the explicit private publication replay/recovery paths can
+inspect through this fence; they retain their complete-context, trust and exact-ceremony checks.
+Unenrolled ordinary work is unchanged. This protects routes using the enrolled native reader;
+it is not a claim that every runtime route, retention collector or post-publication control has
+been integrated. It does not expose new authority or turn a staged intent into accepted main.
+
+After the fix, four regressions passed in 17.341s, including the previously failing decision
+ordering case, ordinary read refusal, root first/last-byte process recovery, consumed midpoint
+process recovery, foreign retries and lost acknowledgement. Exact recovery proceeds without
+changing the staged prefix. Full Mesh and hosted checks remain required before merged delivery.
+Separate-process competing publication/rejection ordering, trusted control after publication,
+retention and the complete packaged fleet/provider/host acceptance scope remain open under #345.
+
+Provenance: new canonical fix based on R181 #362 at 181346dd3839fc159d341da91f38e825022068f9;
+no preserved legacy commit is replaced. R181 passed its full local gate: 3,977 native tests in
+341.980s (seven slow, 18 skipped), 194 rendered, 672 desktop and 44 real-daemon checks, plus
+repository/docs/license/storage/fmt/clippy. User checkpoints and original work are unchanged.

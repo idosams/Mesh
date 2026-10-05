@@ -28,6 +28,10 @@ fn native_writer_commits_root_publications_against_verified_main() {
 fn root_publication_recovers_after_process_exit_at_both_frame_edges() {
     root_publication_fixture(2);
 }
+#[test]
+fn staged_publication_fences_ordinary_native_decisions_without_losing_recovery() {
+    root_publication_fixture(3);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -134,7 +138,7 @@ fn root_publication_fixture(writer: u8) {
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
     if writer != 0 {
-        if writer == 2 {
+        if writer >= 2 {
             let result = restart::interrupted_publication(
                 &root,
                 owner.id(),
@@ -144,6 +148,25 @@ fn root_publication_fixture(writer: u8) {
                 key.public_key().as_ref(),
                 &journal,
                 "first",
+                || {
+                    if writer == 3 {
+                        assert!(
+                            owner
+                                .decide_saved_input(
+                                    version,
+                                    crate::project_attachment::SavedInputDecision::Rejected,
+                                    None,
+                                    id(99)
+                                )
+                                .is_err(),
+                            "an ordinary decision overtook a staged publication"
+                        );
+                        assert!(
+                            owner.saved_versions().is_err(),
+                            "ordinary native reads admitted unresolved publication"
+                        );
+                    }
+                },
             );
             assert_eq!(
                 result.get("head").and_then(Json::as_text),
@@ -348,7 +371,7 @@ fn root_publication_fixture(writer: u8) {
         .unwrap()
         .canonical_bytes();
     if writer != 0 {
-        if writer == 2 {
+        if writer >= 2 {
             let result = restart::interrupted_publication(
                 &root,
                 owner.id(),
@@ -358,6 +381,25 @@ fn root_publication_fixture(writer: u8) {
                 key.public_key().as_ref(),
                 &journal,
                 "last",
+                || {
+                    if writer == 3 {
+                        assert!(
+                            owner
+                                .decide_saved_input(
+                                    version,
+                                    crate::project_attachment::SavedInputDecision::Rejected,
+                                    None,
+                                    id(99)
+                                )
+                                .is_err(),
+                            "an ordinary decision overtook a staged publication"
+                        );
+                        assert!(
+                            owner.saved_versions().is_err(),
+                            "ordinary native reads admitted unresolved publication"
+                        );
+                    }
+                },
             );
             assert_eq!(
                 result.get("head").and_then(Json::as_text),
@@ -835,6 +877,7 @@ fn consumed_publication_fixture(writer: u8) {
                     human_key.public_key().as_ref(),
                     &journal,
                     "middle",
+                    || {},
                 );
                 let completed = fs::read(&journal).unwrap();
                 let recovered = storage

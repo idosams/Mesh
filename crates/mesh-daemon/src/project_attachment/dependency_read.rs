@@ -374,6 +374,25 @@ impl ProjectAttachment {
                 self.history_configuration_with_previous(store, None, Some(marker))?;
             return Ok((configuration, None));
         }
+        // An uncommitted publication owns its exact journal prefix until recovery finishes.
+        // Only private trusted publication replay/recovery can inspect through this fence.
+        if !matches!(
+            inspection,
+            RecoveryInspection::PublicationReplay | RecoveryInspection::PublicationRecovery(_)
+        ) {
+            match read_private_in_store(
+                store,
+                super::dependency_private_context::publication::PENDING,
+            ) {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
+                Ok(_) => {
+                    return Err(invalid(
+                        "pending native publication requires exact recovery",
+                    ))
+                }
+            }
+        }
         let basis = text(&parsed, "previous_binding")?;
         let authority = digest(text(&parsed, "dependency_authority")?)?;
         let canonical = Json::object([
