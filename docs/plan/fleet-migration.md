@@ -7648,3 +7648,15 @@ The real-provider v2 saved-preview result and exact executable are revision-boun
 parser failure, corrected fixture compilation, focused/full gates and digest refusal are retained.
 The update remains a new canonical increment, replacing no preserved legacy implementation. Hosted
 checks and normal merge remain required; all broader fleet phase exits stay open.
+
+
+R169 native publication origin is new canonical corrective work from merged main
+`b0640295d763d921ed5cafeea8ea626f9759cb23`; it replaces no preserved legacy commit and tightens
+the first-publication predecessor check introduced in R165 / PR #346. A demonstrated regression
+accepted an unexplained nonzero initial main. The fix requires genesis for the first native claim
+and preserves the exact prior-result requirement thereafter. All 21 focused policy tests passed;
+full validation and delivery remain pending. Native trusted replay/commit and issue #345 remain open.
+
+R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.

@@ -364,7 +364,7 @@ impl DependencyPolicyHistory {
                     prior.map(|(r, p, _)| (*r, *p)),
                     publication.revision,
                     publication.previous,
-                ) || prior.is_some_and(|(_, _, head)| *head != review.canonical)
+                ) || prior.map_or(ZERO, |(_, _, head)| *head) != review.canonical
                     || publication.result == review.canonical
                     || self.publication_challenges.contains(&publication.challenge)
                     || !self.review_decisions_current(review.snapshot)
