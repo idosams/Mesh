@@ -1365,18 +1365,9 @@ impl AttachmentHost {
         target: &str,
         path: &str,
     ) -> Result<String, String> {
-        let history = self
-            .state
-            .lock()
-            .map_err(|_| UNAVAILABLE)?
-            .projects
-            .get(id)
-            .ok_or("This attachment is not open in this desktop session")?
-            .history
-            .clone()
-            .ok_or("Saved history is unavailable")?;
-        let comparison = history
-            .comparison_path(base, target, path)
+        let (storage, history) = self.registered_read_authority(id)?;
+        let comparison = storage
+            .registered_review_comparison(&history, base, target, (None, Some(path)))
             .map_err(|_| "Saved comparison path is unavailable")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }

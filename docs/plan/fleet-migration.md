@@ -7494,3 +7494,14 @@ following evidence update changes documentation. PR #329 now requires fresh chec
 and normal merge. Desktop review integration is separately preserved: its first full local gate
 passed 3,950 native tests in 351.698s, 194 rendered, 672 desktop and 44 daemon checks; the separate
 changed-path action still needs integration before publication. Full fleet acceptance remains open.
+
+
+R161 desktop review's first full gate passed on `d8d12c3e8e84f6ad027b3ed2d0bf2de54117ad40`:
+3,950 native tests in 351.698s (six slow, 18 skipped), 194 rendered, 672 desktop and 44 daemon
+checks plus all other gates. The native consumed-review journey passed in 196.610s. A follow-up
+call-site audit found the separate selected comparison-path action still using independent history;
+it now uses the same registered review context. Its expanded real host regression passed in
+13.704s, covering exact changed-path selection, absent-path refusal and missing-source refusal.
+Reconciliation `bf655d5c0a5ba18d2c49e48aa755f42d15b6d674` retained both documentation histories
+without changing prior production/tests. The final comparison-path edit requires a new full gate
+before publication. No packaged graphical claim is made; the fixed checkpoint remains unchanged.

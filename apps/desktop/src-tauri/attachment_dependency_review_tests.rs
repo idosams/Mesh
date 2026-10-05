@@ -172,6 +172,13 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         .inspect(child.id(), &later_id, None, None)
         .unwrap()
         .contains("note.txt"));
+    let selected_change = host
+        .comparison_path(child.id(), &first_id, &later_id, "note.txt")
+        .unwrap();
+    assert!(selected_change.contains("modified"));
+    assert!(host
+        .comparison_path(child.id(), &first_id, &later_id, "missing")
+        .is_err());
     drop(host);
 
     let reopened = AttachmentHost::new(&root);
@@ -194,7 +201,9 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     let refused_versions = reopened.versions(child.id(), None);
     let refused_preview = reopened.inspect(child.id(), &first_id, Some("note.txt"), None);
     let refused_comparison = reopened.compare(child.id(), &first_id, &later_id, None);
+    let refused_path = reopened.comparison_path(child.id(), &first_id, &later_id, "note.txt");
     drop(restore);
+    assert!(refused_path.is_err());
     assert!(refused_versions.is_err() && refused_preview.is_err() && refused_comparison.is_err());
     assert_eq!(
         text_preview(&reopened, child.id(), &first_id),
