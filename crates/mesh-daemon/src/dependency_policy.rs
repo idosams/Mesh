@@ -611,6 +611,9 @@ impl DependencyPolicyHistory {
             opener: review.opener,
         })
     }
+    pub(crate) fn has_publication_claims(&self) -> bool {
+        !self.publications.is_empty()
+    }
     pub(crate) fn bound_reviews(&self) -> impl Iterator<Item = NativeReviewBinding> + '_ {
         self.records
             .keys()

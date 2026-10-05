@@ -2656,3 +2656,16 @@ and remains fixed while later implementation proceeds.
 R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.
+
+
+## Private-history admission boundary (R170)
+
+Private enrollment/consumption evidence is now separate from ordinary workspace admission, which
+refuses pending or retained publication claims without verified authority. Nine focused tests,
+including the consumed-lane desktop journey, passed; removing the boundary failed both new
+regressions. Full checks and delivery remain pending. Trusted replay, a restricted private workspace
+adapter, subsequent-main reconstruction and publication commit/recovery remain unfinished.
+
+R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.

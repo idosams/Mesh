@@ -183,3 +183,24 @@ Full validation, hosted checks and delivery remain pending. Issue #345 remains o
 R169 full `npm test` passed: 3,964 native tests in 321.553s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 documentation, license, storage, formatting and lint gates. Hosted checks and merge remain pending.
+
+
+## Private evidence and ordinary admission (R170)
+
+Native enrollment/completed-consumption verification now produces a separate private internal
+evidence type. Ordinary workspace admission is a fallible conversion that refuses both durable
+publication claims and pending publication frames. Consumed history and independent history use
+the same conversion. Saved operation/content verification still occurs during read-only workspace
+opening; private evidence does not by itself prove human authority, verified main or complete content.
+
+The existing early publication reader fence remains. This refactor does not yet add a private
+workspace adapter, cryptographic publication replay, second-main reconstruction, a publication
+writer or a new external API. It creates the explicit admission boundary those integrations need.
+Eight read-boundary tests plus the real consumed-lane desktop journey passed (nine tests, 42.669s).
+Removing the conversion check caused both new refusal tests to fail; the source was restored exactly.
+The initial fixture omitted required custody and failed; it was corrected to hold the real lock.
+Full validation and delivery remain required.
+
+R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.
