@@ -19,6 +19,7 @@ const MAX_RECEIPT_BYTES: u64 = 65_536;
 
 mod dependency_catalog_discovery;
 mod dependency_catalog_read;
+mod dependency_catalog_review;
 mod dependency_closure;
 pub use dependency_closure::NativeDependencyGraph;
 mod dependency_reservation;

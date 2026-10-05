@@ -7468,6 +7468,23 @@ main before normal merge. The full local gate remains 3,949 native, 194 rendered
 published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
 
 
+R161 desktop saved-review integration now shares bounded entries, text preview and comparison
+rendering across ordinary and dependency-aware histories. The native registered reader selects the
+history format from verified native facts, retains exact registration identity, and never falls back
+to independent reads after a dependency failure. Desktop recovery, versions, inspection and
+comparison use it; selected storage/history handles are retained before releasing the registry lock.
+Recovery remains stopped. Capture/start, approval/publication and provider permission are unchanged.
+
+Native consumed-review coverage passed in 146.504s (old/new immutable text, entries, comparison,
+invalid cursor/version/path and missing required input). The real desktop host journey passed in
+12.354s: ordinary-project compatibility, native captured input, consumed-lane review, later capture,
+stable old content, fresh host reopen, stopped state and missing-source refusal/restoration. Its
+initial fixture correctly failed when attempting legacy input consumption without migration evidence;
+that refusal was retained and the fixture now captures fresh native input in an enrolled reserved lane.
+Disabling dependency-aware routing caused the expected preview failure in 3.385s. Production source
+was restored byte-for-byte. Compilation passed; full canonical validation and hosted PR checks remain
+required. This is host-level evidence, not packaged graphical acceptance. The fixed checkpoint is
+unchanged and the complete fleet scope remains open in #323.
 R161 discovery PR #328 merged normally at `8e5f662f7c1f7897d29c1548b8c5773a16ef28d2`
 after all seven checks passed on `c15d7b43c0d46f30486380b9feb9fb163ac1b6a4`
 (run `37246187227`). Owning-root PR #329 passed all seven checks on
@@ -7478,6 +7495,28 @@ and normal merge. Desktop review integration is separately preserved: its first 
 passed 3,950 native tests in 351.698s, 194 rendered, 672 desktop and 44 daemon checks; the separate
 changed-path action still needs integration before publication. Full fleet acceptance remains open.
 
+
+R161 desktop review's first full gate passed on `d8d12c3e8e84f6ad027b3ed2d0bf2de54117ad40`:
+3,950 native tests in 351.698s (six slow, 18 skipped), 194 rendered, 672 desktop and 44 daemon
+checks plus all other gates. The native consumed-review journey passed in 196.610s. A follow-up
+call-site audit found the separate selected comparison-path action still using independent history;
+it now uses the same registered review context. Its expanded real host regression passed in
+13.704s, covering exact changed-path selection, absent-path refusal and missing-source refusal.
+Reconciliation `bf655d5c0a5ba18d2c49e48aa755f42d15b6d674` retained both documentation histories
+without changing prior production/tests. The final comparison-path edit requires a new full gate
+before publication. No packaged graphical claim is made; the fixed checkpoint remains unchanged.
+
+
+R161 final desktop-review gate passed on `adeb579a1155412f87376ecd023e5ee79d361b95`:
+3,950 native tests in 349.830s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The native consumed
+review journey passed in 196.616s; the expanded desktop-host journey passed in 23.332s within the
+full concurrent suite. This includes recovery, version listing, preview, comparison and selected
+changed-path review with ordinary-project compatibility and missing-input refusal. Focused,
+mutation, initial-failure and both full-gate logs plus complete history are preserved. This increment
+is ready for publication against #329, followed by hosted checks and normal merge. Packaged visual
+acceptance, harness capture/start, runtime/publication/import/remote integration and full fleet
+acceptance remain open in #323. The user checkpoint stays fixed.
 
 Linux CI budget correction: runs `37249269700` and `37249297691` spent about 90s compiling before more than 13 minutes of native test execution, then reached the shared 15-minute job limit. Main run `37249215287` even recorded all 3,512 tests passing in 785.664s but ended cancelled at 15m3s. Keep all tests, assertions, leak detection and per-test deadlines. Compile in a separate step, allow 20 minutes for the complete Linux job, and explicitly bound the unchanged test command to 15 minutes. The independent check name remains `test-linux`; no failed test is tolerated or skipped. Hosted validation must still prove the correction.
 

@@ -128,7 +128,7 @@ impl AttachmentHost {
             let history = storage.reopen(registration.id()).ok();
             let versions = history
                 .as_ref()
-                .and_then(|history| history.saved_versions().ok());
+                .and_then(|history| storage.registered_review_versions(history).ok());
             let ready = versions.is_some();
             let saved = versions.and_then(|versions| versions.last().copied());
             let mut status = stopped_status();
@@ -732,20 +732,27 @@ impl AttachmentHost {
         .encode())
     }
 
-    pub fn versions(&self, id: &str, before: Option<&str>) -> Result<String, String> {
-        // Retain authority, then release the registry lock before journal verification or disk IO.
-        let history = self
-            .state
-            .lock()
-            .map_err(|_| UNAVAILABLE)?
+    fn registered_read_authority(
+        &self,
+        id: &str,
+    ) -> Result<(AttachmentStorage, ProvisionedAttachment), String> {
+        let state = self.state.lock().map_err(|_| UNAVAILABLE)?;
+        let history = state
             .projects
             .get(id)
             .ok_or("This attachment is not open in this desktop session")?
             .history
             .clone()
             .ok_or("The original project or its saved history is unavailable")?;
-        let versions = history
-            .saved_versions()
+        let storage = state.storage.as_ref().ok_or(UNAVAILABLE)?.clone();
+        Ok((storage, history))
+    }
+
+    pub fn versions(&self, id: &str, before: Option<&str>) -> Result<String, String> {
+        // Retain authority, then release the registry lock before journal verification or disk IO.
+        let (storage, history) = self.registered_read_authority(id)?;
+        let versions = storage
+            .registered_review_versions(&history)
             .map_err(|_| "Saved attachment history is unavailable")?;
         let end = match before {
             None => versions.len(),
@@ -791,19 +798,10 @@ impl AttachmentHost {
         if path.is_some() && after.is_some() {
             return Err("Choose either file preview or entry paging".into());
         }
-        let history = self
-            .state
-            .lock()
-            .map_err(|_| UNAVAILABLE)?
-            .projects
-            .get(id)
-            .ok_or("This attachment is not open in this desktop session")?
-            .history
-            .clone()
-            .ok_or("The original project or its saved history is unavailable")?;
+        let (storage, history) = self.registered_read_authority(id)?;
         let inspection = match path {
-            Some(path) => history.inspect_text(operation, path),
-            None => history.inspect_entries(operation, after),
+            Some(path) => storage.registered_review_text(&history, operation, path),
+            None => storage.registered_review_entries(&history, operation, after),
         }
         .map_err(|_| "The exact saved version could not be inspected")?;
         Ok(Json::object([("project", Json::text(id)), ("inspection", inspection)]).encode())
@@ -816,18 +814,9 @@ impl AttachmentHost {
         target: &str,
         after: Option<&str>,
     ) -> Result<String, String> {
-        let history = self
-            .state
-            .lock()
-            .map_err(|_| UNAVAILABLE)?
-            .projects
-            .get(id)
-            .ok_or("This attachment is not open in this desktop session")?
-            .history
-            .clone()
-            .ok_or("The original project or its saved history is unavailable")?;
-        let comparison = history
-            .compare_versions(base, target, after)
+        let (storage, history) = self.registered_read_authority(id)?;
+        let comparison = storage
+            .registered_review_comparison(&history, base, target, (after, None))
             .map_err(|_| "The exact saved versions could not be compared")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
@@ -1376,18 +1365,9 @@ impl AttachmentHost {
         target: &str,
         path: &str,
     ) -> Result<String, String> {
-        let history = self
-            .state
-            .lock()
-            .map_err(|_| UNAVAILABLE)?
-            .projects
-            .get(id)
-            .ok_or("This attachment is not open in this desktop session")?
-            .history
-            .clone()
-            .ok_or("Saved history is unavailable")?;
-        let comparison = history
-            .comparison_path(base, target, path)
+        let (storage, history) = self.registered_read_authority(id)?;
+        let comparison = storage
+            .registered_review_comparison(&history, base, target, (None, Some(path)))
             .map_err(|_| "Saved comparison path is unavailable")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
@@ -2746,3 +2726,7 @@ mod tests {
 }
 
 mod remote_project;
+
+#[cfg(test)]
+#[path = "attachment_dependency_review_tests.rs"]
+mod dependency_review_tests;

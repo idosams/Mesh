@@ -164,7 +164,7 @@ impl AttachmentStorage {
         }
     }
 
-    fn exact_registered_work(
+    pub(super) fn exact_registered_work(
         &self,
         supplied: &ProvisionedAttachment,
     ) -> io::Result<ProvisionedAttachment> {

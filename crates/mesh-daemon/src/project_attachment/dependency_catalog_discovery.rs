@@ -107,6 +107,31 @@ impl AttachmentStorage {
         )
     }
 
+    pub(super) fn with_registered_dependency_history<T>(
+        &self,
+        work_id: &str,
+        action: impl FnOnce(
+            &ProvisionedAttachment,
+            &crate::workspace::OpenWorkspace,
+            &str,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let owner_id = self.candidate_owning_root(work_id)?;
+        let selection = self.discover_dependency_read(&owner_id, work_id)?;
+        let inputs = selection
+            .works
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        self.with_checked_catalog_dependency_history(
+            &owner_id,
+            work_id,
+            &inputs,
+            |guard| self.verify_discovery(&owner_id, work_id, &selection, guard),
+            action,
+        )
+    }
+
     fn verify_discovery(
         &self,
         owner_id: &str,
