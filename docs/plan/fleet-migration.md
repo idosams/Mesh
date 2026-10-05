@@ -7732,3 +7732,13 @@ The consumed fixture passed in 44.168s inside that run. Removing owner-configura
 failed the new refusal assertion; original source was restored. Reconciliation with the published
 parent's canonical-main ancestry preserved the entire tested tree. Hosted checks and merged
 delivery remain required; private resolver integration and full publication/recovery remain open.
+
+
+R175 shared saved-source reconstruction is new canonical work from published R174 head
+`0476d4d6742d3edceeb2c7f3a9b348c1271a96be` (PR #355), replacing no preserved legacy commit.
+Ordinary recovery and restricted private saved-input inspection now use the same exact signed
+starting-state verifier. The consumed fixture passed with a publication-bearing owner and refused
+a different actor or prospective destination. Removing the destination comparison failed the
+refusal regression in 13.180s; source was restored byte-for-byte. The full repository gate and
+PR delivery are pending. This does not complete private consumed resolution, publication writes,
+recovery across all routes, or the full fleet acceptance plan.
