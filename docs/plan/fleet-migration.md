@@ -8032,3 +8032,47 @@ failed the new regression in 57.845s after main advanced; the implementation was
 Full npm test passed: 3,978 native tests in 357.904s (nine slow, 18 skipped), 194 rendered
 tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/
 fmt/clippy. Exact-head hosted checks remain required before merged delivery.
+
+## Fresh native review snapshots after publication (R185)
+
+Native storage can freeze a fresh immutable review snapshot through accepted publication history.
+The closed native transaction resolves the exact saved operation and complete graph, verifies
+configured publication trust and records the current eligible decision revision for every input.
+An exact historical retry preserves its original vector, graph and validation; a later rejection
+refuses a fresh request without invalidating the historical snapshot or rewriting accepted main.
+An existing saved-review binding request cannot be reused as a snapshot request.
+
+The existing v3 snapshot format and canonical pending intent are reused. Selection remains
+read-only. Fresh transactions promote and verify the bounded canonical graph before staging;
+pending retries require that same retained graph and never silently reconstruct missing evidence.
+The writer verifies graph bytes again before the sole journal-sync commit. Explicit partial-control
+replay also verifies staged review graphs before producing private history evidence. Ordinary
+workspace admission and root-only publication guards remain intact; no runtime endpoint, execution
+permission or human approval is added. This is not a retention/collection oracle.
+
+A real-process fixture first publishes, rejects and revalidates an input, then creates a fresh
+snapshot whose vector contains the new eligible revision. It exercises staged, last-byte and
+synchronized-before-acknowledgement interruptions, foreign requests, missing configured trust,
+wrong work, unknown operation and repeated exact recovery. Missing and substituted graph objects
+are tested at both staged and partial prefixes, preserving journal and pending evidence. The fresh
+snapshot is bound to a real review and published. A later rejection leaves exact snapshot retry
+unchanged while a new snapshot refuses. Independent replay and earlier publication/review fault
+fixtures are preserved; their fault campaigns are not duplicated in the snapshot-only fixture.
+
+Native capture after publication, all-route integration, retention/collection, actual competing
+processes and full manual/harness/fleet/provider/host and eligible-signed packaged acceptance remain
+required by #345 and the complete fleet plan. Fixed user checkpoint b064029 is unchanged.
+
+Provenance: new canonical implementation based on published R184 #365 at
+0c2afb2dad7d8c4e639f7ff691b9368105a7d2bf. Its entire tree matches previously fully verified
+44428e4fc89044c3636f4e2baefe30f192a00b96 after adopting merged parent #364. No preserved legacy
+commit is replaced. Sibling #363's pending-publication fence remains required for combined delivery.
+
+Validation: the initial expanded snapshot fixture passed in 102.782s. Keeping earlier publication
+and review fault campaigns in their existing fixtures reduced the snapshot-only regression to
+68.643s, with all snapshot-specific assertions retained. A mutation that silently recreated a lost
+staged graph failed in 21.838s at the missing-evidence refusal. The production writer was restored
+byte-for-byte (SHA256 474d18c6bc2f82e4ac4874a50cc449707b060bda6e0abc130f393295084842b1).
+These are local measurements, not a hosted-CI performance guarantee. Full npm test passed: 3,979 native tests in 368.228s (11 slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. Exact-head hosted validation remains required before merged delivery.

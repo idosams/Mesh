@@ -618,6 +618,10 @@ fn consumed_publication_recovers_after_process_exit_and_lost_acknowledgement() {
 fn native_saved_review_after_publication_recovers_across_processes() {
     consumed_publication_fixture(5);
 }
+#[test]
+fn native_snapshot_after_publication_preserves_graph_and_historical_decisions() {
+    consumed_publication_fixture(6);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -755,9 +759,15 @@ fn consumed_publication_fixture(writer: u8) {
         .unwrap()
         .commit()
         .unwrap();
-    let second_snapshot = storage
-        .save_dependency_review_snapshot(&owner, &destination, second_version, &[], id(16))
-        .unwrap();
+    let early_second_snapshot = if writer == 6 {
+        None
+    } else {
+        Some(
+            storage
+                .save_dependency_review_snapshot(&owner, &destination, second_version, &[], id(16))
+                .unwrap(),
+        )
+    };
     let rng = SystemRandom::new();
     let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
     let human_key =
@@ -781,6 +791,21 @@ fn consumed_publication_fixture(writer: u8) {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
+        if writer == 6 {
+            // The snapshot fixture uses real publication; earlier writer fixtures retain
+            // the complete publication fault/refusal campaign without repeating it here.
+            let committed = storage
+                .commit_native_publication(
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    &trust,
+                )
+                .unwrap();
+            assert_eq!(committed.revision(), revision);
+            return committed.record();
+        }
         if writer != 0 {
             use super::super::dependency_private_context::publication::Step;
             let journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
@@ -1140,6 +1165,171 @@ fn consumed_publication_fixture(writer: u8) {
         b"uncaptured editor work must not become approval",
     )
     .unwrap();
+    let mut snapshot_predecessor = None;
+    let second_snapshot = if writer == 6 {
+        use crate::project_attachment::NativeSavedInputDecision as Decision;
+        let rejected = reopened
+            .decide_native_saved_input(
+                owner.id(),
+                version.operation(),
+                Decision::Rejected,
+                Some(initial_decision.record()),
+                id(80),
+                &trust,
+            )
+            .unwrap();
+        let before = fs::read(&owner_journal).unwrap();
+        assert!(reopened
+            .save_native_review_snapshot(
+                destination.id(),
+                second_version.operation(),
+                id(16),
+                &trust
+            )
+            .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), before);
+        let eligible = reopened
+            .decide_native_saved_input(
+                owner.id(),
+                version.operation(),
+                Decision::Eligible,
+                Some(rejected.record()),
+                id(81),
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(eligible.revision(), 3);
+        snapshot_predecessor = Some(eligible.record());
+        let before = fs::read(&owner_journal).unwrap();
+        assert!(reopened
+            .save_native_review_snapshot(
+                destination.id(),
+                second_version.operation(),
+                id(16),
+                &crate::TrustedReviewers::default()
+            )
+            .is_err());
+        assert!(reopened
+            .save_native_review_snapshot(owner.id(), second_version.operation(), id(16), &trust)
+            .is_err());
+        assert!(reopened
+            .save_native_review_snapshot(destination.id(), id(99), id(16), &trust)
+            .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), before);
+        let result = restart::interrupted_native_snapshot(
+            &root,
+            destination.id(),
+            second_version.operation(),
+            id(16),
+            human_key.public_key().as_ref(),
+            &owner_journal,
+            |_phase| {
+                use mesh_cas::{Blake3, Cas};
+                let cas = Cas::<_, Blake3>::with_filesystem(
+                    owner.metadata_path(),
+                    owner.store.filesystem().read_only(),
+                )
+                .unwrap();
+                let raw =
+                    fs::read_to_string(owner.metadata_path().join("dependency-decision.pending"))
+                        .unwrap();
+                let intent = Json::parse(&raw).unwrap();
+                let payload =
+                    RecordDigest::parse_hex(intent.get("payload").and_then(Json::as_text).unwrap())
+                        .unwrap();
+                let bytes =
+                    super::super::dependency_transaction::read_payload(&cas, payload, 65536)
+                        .unwrap();
+                let value = Json::parse(std::str::from_utf8(&bytes).unwrap()).unwrap();
+                let graph = RecordDigest::parse_hex(
+                    value
+                        .get("body")
+                        .unwrap()
+                        .get("graph")
+                        .and_then(Json::as_text)
+                        .unwrap(),
+                )
+                .unwrap();
+                let path = cas
+                    .layout()
+                    .chunk_path(&mesh_cas::Digest32::from_bytes(*graph.as_bytes()));
+                let original = fs::read(&path).unwrap();
+                let journal_before = fs::read(&owner_journal).unwrap();
+                fs::remove_file(&path).unwrap();
+                assert!(
+                    reopened
+                        .save_native_review_snapshot(
+                            destination.id(),
+                            second_version.operation(),
+                            id(16),
+                            &trust
+                        )
+                        .is_err(),
+                    "missing staged graph must refuse, not rebuild"
+                );
+                assert!(!path.exists(), "retry reconstructed lost retained graph");
+                assert_eq!(fs::read(&owner_journal).unwrap(), journal_before);
+                assert_eq!(
+                    fs::read_to_string(owner.metadata_path().join("dependency-decision.pending"))
+                        .unwrap(),
+                    raw
+                );
+                fs::write(&path, b"substituted retained snapshot graph").unwrap();
+                assert!(reopened
+                    .save_native_review_snapshot(
+                        destination.id(),
+                        second_version.operation(),
+                        id(16),
+                        &trust
+                    )
+                    .is_err());
+                assert_eq!(
+                    fs::read(&path).unwrap(),
+                    b"substituted retained snapshot graph"
+                );
+                assert_eq!(fs::read(&owner_journal).unwrap(), journal_before);
+                fs::write(&path, original).unwrap();
+            },
+        );
+        let saved = reopened
+            .save_native_review_snapshot(
+                destination.id(),
+                second_version.operation(),
+                id(16),
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(
+            result.get("record"),
+            Some(&Json::text(saved.record().to_hex()))
+        );
+        assert_eq!(
+            result.get("graph"),
+            Some(&Json::text(saved.graph().to_hex()))
+        );
+        assert_eq!(
+            result.get("validation"),
+            Some(&Json::text(saved.validation().to_hex()))
+        );
+        reopened
+            .with_native_publication_history(destination.id(), &trust, |_, proof| {
+                let body = proof.policy().review_snapshot_body(id(16)).unwrap();
+                let Json::Array(decisions) = body.get("decisions").unwrap() else {
+                    panic!("decisions missing")
+                };
+                assert_eq!(decisions.len(), 1);
+                let Json::Array(exact) = &decisions[0] else {
+                    panic!("decision missing")
+                };
+                assert_eq!(exact[1], Json::Number(3));
+                assert_eq!(exact[2], Json::text(eligible.record().to_hex()));
+                Ok(())
+            })
+            .unwrap();
+        saved
+    } else {
+        early_second_snapshot.unwrap()
+    };
     let candidate = reopened
         .inspect_native_review_candidate(destination.id(), second_snapshot.record(), &trust)
         .unwrap();
@@ -1156,7 +1346,18 @@ fn consumed_publication_fixture(writer: u8) {
                 .output())
         })
         .unwrap();
-    let second_review = if writer == 5 {
+    let second_review = if writer == 6 {
+        reopened
+            .save_native_review(
+                destination.id(),
+                second_snapshot.record(),
+                id(14),
+                id(17),
+                &trust,
+            )
+            .unwrap()
+            .record()
+    } else if writer == 5 {
         let before = fs::read(&owner_journal).unwrap();
         assert!(reopened
             .save_native_review(
@@ -1248,6 +1449,62 @@ fn consumed_publication_fixture(writer: u8) {
         accepted.get("publication").unwrap().get("revision"),
         Some(&Json::Number(2))
     );
+    if writer == 6 {
+        reopened_again
+            .decide_native_saved_input(
+                owner.id(),
+                version.operation(),
+                crate::project_attachment::NativeSavedInputDecision::Rejected,
+                snapshot_predecessor,
+                id(82),
+                &trust,
+            )
+            .unwrap();
+        let before = fs::read(&owner_journal).unwrap();
+        assert_eq!(
+            reopened_again
+                .save_native_review_snapshot(
+                    destination.id(),
+                    second_version.operation(),
+                    id(16),
+                    &trust
+                )
+                .unwrap(),
+            second_snapshot
+        );
+        assert!(reopened_again
+            .save_native_review_snapshot(
+                destination.id(),
+                second_version.operation(),
+                id(18),
+                &trust
+            )
+            .is_err());
+        assert!(
+            reopened_again
+                .save_native_review_snapshot(
+                    destination.id(),
+                    second_version.operation(),
+                    id(17),
+                    &trust
+                )
+                .is_err(),
+            "binding request must not become a snapshot"
+        );
+        assert_eq!(fs::read(&owner_journal).unwrap(), before);
+        assert_eq!(
+            reopened_again
+                .inspect_native_publication_history(destination.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+        assert!(
+            owner.saved_versions().is_err(),
+            "snapshot must not grant ordinary admission"
+        );
+        return;
+    }
     if writer == 5 {
         let before = fs::read(&owner_journal).unwrap();
         let retry = reopened_again

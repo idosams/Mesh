@@ -31,7 +31,7 @@ fn publication_restart_child() {
     };
     if matches!(
         v.get("kind").and_then(Json::as_text),
-        Some("input-decision" | "saved-review")
+        Some("input-decision" | "saved-review" | "snapshot")
     ) {
         use super::super::super::dependency_private_context::control::Step as ControlStep;
         let operation = RecordDigest::parse_hex(text("operation")).unwrap();
@@ -62,7 +62,24 @@ fn publication_restart_child() {
         } else {
             request
         };
-        let result = if text("kind") == "saved-review" {
+        let result = if text("kind") == "snapshot" {
+            storage
+                .save_native_review_snapshot_with_io(
+                    text("work"),
+                    operation,
+                    exact_request,
+                    &trust,
+                    hook,
+                    |f| f.sync_all(),
+                )
+                .map(|result| {
+                    Json::object([
+                        ("record", Json::text(result.record().to_hex())),
+                        ("graph", Json::text(result.graph().to_hex())),
+                        ("validation", Json::text(result.validation().to_hex())),
+                    ])
+                })
+        } else if text("kind") == "saved-review" {
             storage
                 .save_native_review_with_io(
                     text("work"),
@@ -264,6 +281,7 @@ pub(super) fn interrupted_native_decision(
         published,
         cut,
         "input-decision",
+        |_| {},
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -287,6 +305,32 @@ pub(super) fn interrupted_native_review(
         true,
         "mid",
         "saved-review",
+        |_| {},
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn interrupted_native_snapshot(
+    root: &Path,
+    work: &str,
+    operation: RecordDigest,
+    request: RecordDigest,
+    public: &[u8],
+    journal: &Path,
+    inspect_prefix: impl Fn(&str),
+) -> Json {
+    interrupted_native_control(
+        root,
+        work,
+        operation,
+        RecordDigest::from_bytes([0; 32]),
+        request,
+        public,
+        journal,
+        true,
+        "last",
+        "snapshot",
+        inspect_prefix,
     )
 }
 
@@ -302,6 +346,7 @@ fn interrupted_native_control(
     published: bool,
     cut: &str,
     kind: &str,
+    inspect_prefix: impl Fn(&str),
 ) -> Json {
     fs::write(root.join("restart-public-key"), public).unwrap();
     let run = |mode: &str, expected: i32| {
@@ -320,9 +365,13 @@ fn interrupted_native_control(
     let before = fs::read(journal).unwrap();
     run("staged", 85);
     assert_eq!(fs::read(journal).unwrap(), before);
+    inspect_prefix("staged");
+    assert_eq!(fs::read(journal).unwrap(), before);
     run("partial", 86);
     let torn = fs::read(journal).unwrap();
     assert!(torn.starts_with(&before) && torn.len() > before.len());
+    inspect_prefix("partial");
+    assert_eq!(fs::read(journal).unwrap(), torn);
     if published {
         run("missing-trust", 0);
         assert_eq!(fs::read(journal).unwrap(), torn);
