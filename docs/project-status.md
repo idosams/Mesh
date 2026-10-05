@@ -2562,3 +2562,13 @@ failures are preserved. All 41 focused tests passed in 2.496s. An eligibility-on
 the intended stale-review assertion in 0.033s and the source was restored exactly. Full validation,
 published PR, hosted checks and merge remain required. Issue #345 and the complete fleet goal stay
 open, including signed publication, all-path enforcement and separate-process commit-order proof.
+
+
+R165 full validation passed on `266d07b1c16a9c7541225b28c9483a235cf7e95d`: 3,963 native tests
+in 322.149s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 daemon checks,
+with every repository/docs/license/storage/format/lint gate passing. The exact previous executable
+first read four versions in a fresh fixture, then refused both versions and capture after insertion
+of a correctly framed required publication kind, preserving all fixture and executable bytes in
+0.101s. This uses a synthetic payload identity and proves format refusal only. Full fixture,
+generator, results and failed/corrected logs are preserved. Publication PR, exact-head hosted
+checks and merge remain required; actual signed publication and recovery remain pending.

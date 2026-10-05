@@ -67,7 +67,8 @@ recorded receipt and context without applying today's eligibility retroactively.
 Ordinary native readers currently refuse this kind in enrolled history with an explicit receipt
 verification error. Pending publication claims also refuse. No renderer, agent, CLI or approval
 entry point is enabled. Required kind/schema refusal and forward-only index migration preserve the
-older-reader boundary; a fresh old-executable and cached-writer compatibility run remains required.
+older-reader boundary; fresh-process required-kind refusal is proved below; cached-writer and complete signed-publication
+compatibility remain required.
 
 Before enabling publication, integrate and test attached and managed approval, receipt recovery,
 local/remote import, delegation/fork, grouped integration and restore. Prove both commit orders in
@@ -90,3 +91,19 @@ Replacing exact decision matching with eligibility alone failed the stale-review
 0.033s. Production source was restored exactly. These are deterministic native tests using synthetic
 receipt identities, not signed publication or a separate-process approval/rejection race. Full
 repository validation, exact-head hosted checks and normal merge remain required.
+
+
+The full `npm test` gate passed on `266d07b1c16a9c7541225b28c9483a235cf7e95d`: 3,963 native
+tests in 322.149s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44
+real-daemon checks, plus repository/docs/license/storage/format/lint checks. The saved-review
+prerequisite #344 merged at `09389e9e3a52bcbf93e3af72f38a1a7a9c4f925d`; the reconciliation
+changed ancestry only, with the entire implementation tree preserved.
+
+A fresh fixture passed in 37.900s. The preserved pre-publication executable at
+`170518353d8901561ddd7dce5e6572d1f0ffacb0`, SHA-256
+`97b60cc81cb51f1586819b3d26cdfc7e25588896ff05789bbebab84b7abea370`, first read its four versions.
+After appending a correctly framed required kind 7, separate old processes refused both versions
+and capture (exit 1, no acknowledgement), preserving all fixture file bytes and executable bytes
+in 0.101s. The frame was generated and scanned by current mesh-store; its payload identity was
+synthetic. This proves required-kind refusal, not a valid signed publication, cached writer or
+GUI journey. Generator source, manifest, raw result, hashes and fixture are retained locally.
