@@ -560,3 +560,10 @@ still independently revalidate the snapshot and receipt under the authority barr
 control can be exposed through the renderer or agent runtime. Existing human receipt format and
 old accepted approvals are unchanged. Previous-reader format refusal is tested from exact parent
 source; a packaged previous-writer journey has not been claimed.
+
+The fresh-process compatibility proof now invokes the exact preserved pre-snapshot desktop
+executable on both the owner and consumed-child registrations after snapshot creation and later
+input rejection. Both registered `versions` and `capture` commands refuse with no saved response;
+retained journals, graph content and working project files remain byte-identical. This supplements
+the compiled previous-policy test. It does not claim an in-flight cached older writer was exercised;
+the existing mandatory native history fence remains required for that boundary.

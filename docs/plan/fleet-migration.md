@@ -7580,3 +7580,12 @@ the dominant independent recovery scenario after Linux run `37259723091` passed 
 but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
 separate correction requires its own full validation, hosted checks and normal merge before
 propagation to the snapshot branch. The original failed run is preserved.
+
+R163 snapshot follow-up incorporates canonical consumed-decision head
+`db712fa2ac8c537e0b40a2c387decd15c86b3af9` and published scheduling prerequisite
+`56310edb01721f07f2881b4a79bbcc7642f25a2d` (#343), preserving both append-only documentation
+histories. The original snapshot run passed all Linux assertions but failed its execution deadline;
+that failed run remains preserved. New explicit fixture export and the previous-executable runner
+prove owner/child read/write refusal without changing retained evidence. No existing test is skipped
+and no preserved legacy commit is replaced. The complete combined revision requires fresh full and
+hosted validation before normal delivery of #340; #343 is a merge prerequisite.

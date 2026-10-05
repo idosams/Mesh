@@ -2482,3 +2482,16 @@ schedules that scenario at priority 100, removing avoidable queue delay without 
 set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
 remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
 a measured product-performance improvement or a guarantee of future runner duration.
+
+R163 compatibility acceptance now includes the preserved pre-snapshot executable at exact
+revision `dff7384212c0ed7422594fab06bc35dfcd092036`, SHA-256
+`1af4edfe29e790f002d75840f8140f3d87df14ed19e7da9857f8ede96a974fd5`.
+The fully asserted synthetic snapshot fixture passed in 9.072s. Four separate old-executable
+owner/child `versions` and `capture` invocations refused without saved acknowledgement in 0.109s;
+owner/child journals, retained graph, both project files and executable bytes remained unchanged.
+The reproducible standard-library runner is
+`apps/desktop/scripts/prove-previous-snapshot-writer.py`; fixture export is explicit via
+`MESH_REVIEW_SNAPSHOT_FIXTURE`, and normal tests retain cleanup and all assertions. This proves
+fresh-process previous-reader/writer refusal, not an already-running cached writer or graphical
+journey. The snapshot branch also incorporates updated #338 and the published #343 scheduling
+prerequisite. Full validation and hosted checks are required again on the combined revision.

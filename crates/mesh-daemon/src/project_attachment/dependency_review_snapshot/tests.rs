@@ -10,10 +10,12 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     use ed25519_dalek::{Signer as _, SigningKey};
     use mesh_crypto::SigningPayload;
     use mesh_types::{PublicKey, Signature};
-    struct Cleanup(PathBuf);
+    struct Cleanup(PathBuf, bool);
     impl Drop for Cleanup {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            if !self.1 {
+                let _ = fs::remove_dir_all(&self.0);
+            }
         }
     }
     let root = std::env::temp_dir().join(format!(
@@ -21,7 +23,7 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         std::process::id()
     ));
     fs::create_dir(&root).unwrap();
-    let _cleanup = Cleanup(root.clone());
+    let mut cleanup = Cleanup(root.clone(), false);
     fs::create_dir(root.join("source")).unwrap();
     fs::create_dir(root.join("metadata")).unwrap();
     fs::write(root.join("source/note"), b"exact native input").unwrap();
@@ -290,4 +292,41 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     assert_eq!(fs::read(&owner_journal).unwrap(), rejected);
     fs::write(&graph_path, graph_bytes).unwrap();
     assert_eq!(recover(id(10)), snapshot);
+    // Retain only this fully asserted synthetic fixture when explicitly requested by a proof run.
+    if let Some(export) = std::env::var_os("MESH_REVIEW_SNAPSHOT_FIXTURE") {
+        let export = PathBuf::from(export);
+        assert!(export.is_absolute());
+        let path = |p: &std::path::Path| Json::text(p.to_str().unwrap());
+        let manifest = Json::object([
+            (
+                "schema",
+                Json::text("mesh.native-review-snapshot-fixture/v1"),
+            ),
+            ("root", path(&root)),
+            ("storage", path(&root.join("metadata"))),
+            ("owner_registration", Json::text(owner.id())),
+            ("child_registration", Json::text(destination.id())),
+            ("snapshot", Json::text(snapshot.record().to_hex())),
+            ("graph", Json::text(snapshot.graph().to_hex())),
+            (
+                "preserved_files",
+                Json::Array(vec![
+                    path(&owner_journal),
+                    path(&child_journal),
+                    path(&graph_path),
+                    path(&owner.project().root().join("note")),
+                    path(&destination.project().root().join("note")),
+                ]),
+            ),
+        ])
+        .encode();
+        let mut output = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(export)
+            .unwrap();
+        output.write_all(manifest.as_bytes()).unwrap();
+        output.sync_all().unwrap();
+        cleanup.1 = true;
+    }
 }
