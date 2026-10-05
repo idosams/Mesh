@@ -150,6 +150,21 @@ fn root_publication_fixture(writer: u8) {
                 "first",
                 || {
                     if writer == 3 {
+                        let error = storage
+                            .decide_native_saved_input(
+                                owner.id(),
+                                version.operation(),
+                                crate::project_attachment::NativeSavedInputDecision::Rejected,
+                                None,
+                                id(98),
+                                &trust,
+                            )
+                            .unwrap_err();
+                        assert!(
+                            error.to_string().contains("pending")
+                                && error.to_string().contains("publication"),
+                            "{error}"
+                        );
                         assert!(
                             owner
                                 .decide_saved_input(
@@ -383,6 +398,21 @@ fn root_publication_fixture(writer: u8) {
                 "last",
                 || {
                     if writer == 3 {
+                        let error = storage
+                            .decide_native_saved_input(
+                                owner.id(),
+                                version.operation(),
+                                crate::project_attachment::NativeSavedInputDecision::Rejected,
+                                None,
+                                id(98),
+                                &trust,
+                            )
+                            .unwrap_err();
+                        assert!(
+                            error.to_string().contains("pending")
+                                && error.to_string().contains("publication"),
+                            "{error}"
+                        );
                         assert!(
                             owner
                                 .decide_saved_input(

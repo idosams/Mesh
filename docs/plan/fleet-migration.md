@@ -8020,3 +8020,16 @@ Provenance: new canonical implementation based on R181 #362 at
 cb7b6acabfd7788abd4bbbdb7f4653646ab01f83; it replaces no preserved legacy commit. R182 #363's
 ordinary-reader pending-publication fence is a separate sibling increment and remains required
 for combined delivery. Original work and repository history remain preserved.
+
+### Combined pending-publication fence and native controls
+
+R182 now incorporates merged R183 #364 (main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a).
+The reader fence still excludes private control recovery from its publication-only exceptions.
+The staged-publication process regression additionally calls the new trusted native input-control
+API before first and subsequent publication recovery; it must refuse pending publication and leave
+the exact journal prefix unchanged. Both original documentation sections and all source checks
+are preserved. Prior head 711e301496cb893b17af1f96ee7d09343608fbc7 had six successful hosted checks
+and a cancelled macOS job; cancellation is not success. Full npm test passed on the combined source: 3,978 native tests in 349.018s
+(seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks,
+plus repository/docs/license/storage/fmt/clippy. The expanded staging regression passed in 7.015s.
+Fresh hosted checks remain required for this combined head. This changes no runtime exposure or fixed user checkpoint.
