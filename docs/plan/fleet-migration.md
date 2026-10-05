@@ -7799,3 +7799,12 @@ R174 / #355 merged at `82d2e2b504b322a6fd28d71fd51d3cf09dd1edb1` after all seven
 checks passed on `3eb7817b3316073479029918de21a728fe144469`. R177 source commit
 `4674aff` adopted that related main ancestry at `76b0d208db5c52effc813f339cde482a10068176`
 without changing the complete source tree. The full R177 gate follows this reconciliation.
+
+R177 full `npm test` passed on the content recorded at
+`2c50d631d06cdb38172eae920fe952f50e95f454`: 3,967 native tests in 328.870s (six slow,
+18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus
+repository/docs/license/storage/fmt/clippy gates. The publication discovery regression passed
+in 47.183s and the chained-lane fixture in 232.119s within the full run. Canonical parent
+reconciliation at `00ce905f57454047178d43617113249707aebe99` preserved the entire tested tree.
+The intended published parent is R176 / #357 at
+`c99e994e41632c9d223e665fe01354bc7065e6c7`. Hosted checks and merged delivery remain required.

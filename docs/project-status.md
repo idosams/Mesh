@@ -17,8 +17,9 @@ Consumed decisions, retained snapshots, bound reviews, publication framing, rece
 private-evidence separation, root publication replay and private completed-consumption evidence
 are merged through #355. Shared source verification #356 and retained reconstruction #357 have
 passed their full local gates and await hosted validation/reconciliation and merge. R177 adds
-native discovery and complete private consumed-content graphs from registrations; its focused
-publication and chained-lane regressions and strict lint passed, with full validation pending.
+native discovery and complete private consumed-content graphs from registrations; its full local
+repository gate passed, including publication discovery and chained-lane regressions. Hosted
+validation and merged delivery remain pending.
 These graph reads do not assert accepted main or grant publication authority. Trusted consumed
 publication replay, production commit/recovery, eligible signing, another provider/host and the
 full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
