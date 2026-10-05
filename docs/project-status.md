@@ -2782,3 +2782,37 @@ This is new canonical work based on #358 at c4bcfcb0e4b70e6f83e1faf5a5caeb9ffefe
 replacing no preserved legacy commit. It is published as #359. Production publication commit,
 exact-retry recovery, all-route admission and the complete fleet acceptance plan remain open.
 No packaged GUI, OS human presence, second provider or second host acceptance is claimed.
+
+## Native publication commit (R179)
+
+A trusted native host can commit an already-signed human receipt against an owner-held saved
+review. The writer discovers and acquires the complete bounded root set, reconstructs and
+replays private history with configured human trust, verifies the exact review/graph/decision
+vector and current main, and validates the projected publication record before staging it.
+It reopens complete context before append. The synchronized owner-journal frame is the sole
+commit point; staged receipt/payload objects and the intent are not an accepted approval.
+
+Exact completed retries verify the original receipt and return the original result without
+appending again, including a lost acknowledgement. A different valid ceremony cannot reuse
+an accepted request. A rejected input refuses a new publication. Ordinary workspace admission,
+actor credentials and runtime interfaces are unchanged. The native API takes receipt bytes;
+it never obtains human presence or waits for a provider while holding custody.
+
+Staged-before-append interruptions and completed-frame retries are supported. Partial frames
+remain preserved and refused, with no acknowledgement or repair; exact torn-frame recovery is
+the next required increment. Production control admission after publication, all entry-point
+integration, retention/collection, separate-process races and packaged OS human-presence proof
+remain required by #345. Test receipts use software keys and do not prove platform signing.
+
+Provenance: new canonical work based on published R178 #359 at
+1db913308b40ebbe5920718b13002af06b797d08. Related merged main was adopted at
+0f796ee6b5e9a8c21954d379a2c9ba863df49ee4 with the whole replay tree unchanged. No preserved
+legacy commit is replaced. Fixed user checkpoints and original work remain unchanged.
+
+Validation: the initial four-test run passed in 43.238s; strict daemon lint passed in 9.73s.
+The expanded writer refusals passed in 45.415s, including a different valid ceremony and
+rejection-before-publication. The approval-before-rejection exact historical retry passed in
+46.883s after fixing a fixture that initially omitted its required read custody; that failed
+log is retained. First and second owner-root writer commits passed in 1.555s. Existing replay
+fixtures continue to construct independent durable histories. Full repository and hosted
+validation remain required before merged delivery.

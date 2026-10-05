@@ -755,3 +755,6 @@ impl AttachmentStorage {
 
 #[cfg(test)]
 mod tests;
+
+pub(in crate::project_attachment) mod publication;
+pub use publication::NativePublicationCommit;
