@@ -233,6 +233,8 @@ pub(super) fn assert_complete(
                 );
             }
         }
+        // The Start fixture retains all subsequent completion/restart assertions.
+        return;
     }
     // A canonical local completion that names a different owner receipt cannot finish this transaction.
     let (_, record, _) = consumption_history::pending_prefix(

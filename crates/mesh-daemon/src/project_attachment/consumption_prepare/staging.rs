@@ -932,9 +932,9 @@ pub(super) fn assert_revocation_after_staging(
     );
 }
 
-// Each independently scheduled fixture retains the full transaction/restart journey,
-// while one phase owns its exhaustive byte-prefix campaign. Together they cover
-// every original boundary without a single serial campaign owning the CI deadline.
+// Start retains the complete transaction/restart journey. Separate prefix fixtures
+// prepare the exact checkpoint/completion phase without repeating unrelated fault
+// campaigns. Together they retain every original assertion and byte boundary.
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RecoveryCampaign {
