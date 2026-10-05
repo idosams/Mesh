@@ -2871,3 +2871,44 @@ Provenance: new canonical test coverage based on R180 #361 at
 suite passed: 3,974 native tests in 335.426s (seven slow, 18 skipped), 194 rendered tests,
 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
 Fixed user checkpoints and original work remain unchanged.
+
+## Native saved-input decisions through publication history (R183)
+
+The native storage API can now reject, revalidate or replace an exact saved input after accepted
+publication. Durable operation IDs are resolved against complete verified private history; they
+are not access or approval capabilities. Every decision reopens the bounded work graph and checks
+configured trust for accepted publications, saved content, the expected per-input predecessor,
+journal identity and exact request intent. Existing v1 eligibility records and the existing pending
+decision format are reused. No persisted format migration or runtime/agent endpoint is added.
+
+A sealed private proof permits only the original partial decision frame to resume. Recovery
+rechecks the entire context, appends only missing bytes and synchronizes before acknowledgement.
+Completed retries return their original revision without duplicating records, even after a later
+revalidation. A rejection cannot rewrite accepted main, and revalidation cannot revive an old
+review's decision vector. Ordinary reads still refuse unsupported publication history; the new
+proof does not grant ordinary admission. Pending publication and capture evidence blocks controls.
+
+Separate processes exercise staging, first/last partial-byte interruption, synchronized commit
+before acknowledgement, foreign-request refusal and exact repeated retries. Missing configured
+trust is refused when accepted publication history exists. Both ordered scenarios are exercised:
+rejection before publication refuses the old receipt; publication before rejection preserves the
+original accepted result. These tests do not claim simultaneous races, power loss, OS signing,
+provider execution or graphical acceptance. All-route integration, retention/collection and the
+complete fleet acceptance plan remain required under #345. The fixed b064029 checkpoint is unchanged.
+
+Validation: process controls passed in 73.725s; expanded revalidation, stale predecessor, reused
+request, self/foreign replacement and historical retry coverage passed in 94.943s. A mutation that
+appended the whole decision frame instead of its missing suffix failed the real-process regression
+in 5.348s with foreign bytes after the decision prefix. The implementation was restored byte-for-byte
+(SHA256 7564625e80fea4b6ee1d2e1cdb9116165a485088a71b2e71456376934e47d627).
+Full npm test passed: 3,977 native tests in 346.073s (seven slow, 18 skipped), 194 rendered
+tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/
+fmt/clippy. The first full attempt stopped on a test-only let-and-return lint; the expression was
+simplified without changing assertions, and that failed log is retained. Hosted checks remain
+required before merged delivery.
+
+Provenance: new canonical implementation based on R181 #362 at
+8cc19f6855f197c4b19904123fa09177f0d84fbd. Includes the local saved-version read prerequisite
+cb7b6acabfd7788abd4bbbdb7f4653646ab01f83; it replaces no preserved legacy commit. R182 #363's
+ordinary-reader pending-publication fence is a separate sibling increment and remains required
+for combined delivery. Original work and repository history remain preserved.
