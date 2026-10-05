@@ -8207,3 +8207,16 @@ Provenance: canonical delivery correction to R184/R187; no preserved legacy comm
 The failing new-capture-after-publication regression is preserved separately at de89ff0 on
 idosams/native-capture-after-publication; the trusted capture implementation remains unfinished.
 The full fleet scope under #345 and fixed user checkpoint b064029 remain unchanged.
+
+
+### Snapshot validation with the test-only arithmetic correction
+
+R185 #366 incorporates published R189 #365 at b3ec71e67495a600eddb3235e12924cf9e60112b
+through related-history merge 93a794e5d7b631092206e3c5a50af9fd8ead57c7. Both appended
+delivery records were preserved. Snapshot production code, all regression assertions and
+unchanged deadlines remain intact. Full npm test passed on this combined source: 3,982 native
+tests in 355.472s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44
+real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh combined-head hosted
+checks remain required; the earlier green aa3e943 run does not validate this new head.
+No preserved legacy commit is replaced. The full #345/fleet acceptance scope and fixed user
+checkpoint b064029 remain unchanged.
