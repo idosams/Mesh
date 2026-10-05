@@ -2626,3 +2626,14 @@ covered by the focused regression; the first corrected two-test run passed in 41
 missing-input-root refusal is included in full verification. Full tests, refreshed real-provider
 proof, hosted checks and merged delivery remain required. This does not enable native publication,
 prove graphical parallel review, or change the fixed user checkpoint.
+
+
+R168 full `npm test` passed on `42132431d15f0fb8b21dd9c05dccee2cb277992f`: 3,963 native tests in
+317.694s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 daemon checks.
+Reconciliation with merged #348 at `fa7f79ab19fb4f0e0004fc9744ceb1970cb136a4` changed documentation
+only; all runtime/test/manifest/CI files were compared unchanged. Documentation checks passed again.
+The [exact v2 provider result](plan/evidence/registered-external-harness-preview-2026-10-05.json)
+passed on reconciled executable `8d82dd1` in 31.664s after a 41.858s fresh fixture run. Both saved
+previews remained exact after later external edits. Wrong-digest refusal preserved all fixture
+bytes. This still does not establish graphical, signed-main, second-provider/host or velocity
+acceptance; fresh hosted validation and normal merged delivery remain required.

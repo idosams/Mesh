@@ -51,3 +51,18 @@ saved identities and native content digests. Each preview comes from a separate 
 process over retained history. The extension requires a new exact executable/provider run; existing
 v1 evidence does not retroactively prove saved previews. Native inspection is still not graphical
 review or protected-main approval.
+
+
+## Exact saved-preview run — 5 October 2026
+
+The [v2 result](evidence/registered-external-harness-preview-2026-10-05.json) passed on executable
+revision `8d82dd1308427c7513f29dc0954cbe45cf76dd5b`, SHA-256
+`c489e8390296030efdcbd1ee454e38d91509099a18011efab64534b2ad2487ae`, with Codex CLI
+`0.158.0-alpha.2.1`. Fresh fixture preparation passed in 41.858s; the provider journey passed in
+31.664s, advancing history from four to six versions. Separate native preview processes verified
+exact stage-one and stage-two text and reread both unchanged after the final uncaptured edit.
+The result retains both saved identities and content digests. The same provider remained alive
+before watching and after joined stop; original input, Git HEAD/index, root inode, stopped history
+and executable bytes were preserved. Wrong executable digest refused before fixture/output
+mutation, with all fixture file bytes compared unchanged. Raw logs, exact executable and fixture
+remain retained locally. This is native saved-text evidence, not graphical review or approval.
