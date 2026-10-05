@@ -1196,6 +1196,37 @@ fn consumed_publication_fixture(writer: u8) {
         accepted.get("publication").unwrap().get("revision"),
         Some(&Json::Number(2))
     );
+    let inspection_journals = [&owner, &destination].map(|work| {
+        let path = work.metadata_path().join(crate::RECORD_FILE_NAME);
+        let bytes = fs::read(&path).unwrap();
+        (path, bytes)
+    });
+    assert_eq!(
+        reopened_again
+            .inspect_native_saved_version(destination.id(), second_version.operation(), &trust)
+            .unwrap(),
+        second_version
+    );
+    assert!(reopened_again
+        .inspect_native_saved_version(destination.id(), id(99), &trust)
+        .is_err());
+    assert!(reopened_again
+        .inspect_native_saved_version(
+            destination.id(),
+            second_version.operation(),
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    assert!(reopened_again
+        .inspect_native_saved_version(owner.id(), second_version.operation(), &trust)
+        .is_err());
+    for (path, bytes) in inspection_journals {
+        assert_eq!(
+            fs::read(path).unwrap(),
+            bytes,
+            "saved version inspection changed native history"
+        );
+    }
     let owner_before = fs::read(&owner_journal).unwrap();
     reopened_again
         .with_native_publication_history(destination.id(), &trust, |history, proof| {

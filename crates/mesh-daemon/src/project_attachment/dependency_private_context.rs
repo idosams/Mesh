@@ -704,6 +704,22 @@ impl AttachmentStorage {
         Ok(result)
     }
 
+    /// Resolve an exact saved point through complete private history and configured receipt trust.
+    /// This grants no ordinary workspace admission, input eligibility or publication authority.
+    pub fn inspect_native_saved_version(
+        &self,
+        work_id: &str,
+        operation: RecordDigest,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<super::SavedAttachmentVersion> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            context.graph(self, work, operation, guard)?;
+            context.with_replayed_history(self, work, trusted, guard, |history, _| {
+                super::SavedAttachmentVersion::from_verified_private_history(history, operation)
+            })
+        })
+    }
+
     pub(super) fn with_native_publication_history<T: PartialEq>(
         &self,
         work_id: &str,
