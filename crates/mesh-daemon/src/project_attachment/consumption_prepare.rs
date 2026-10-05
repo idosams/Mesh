@@ -624,7 +624,7 @@ mod tests {
                 })
                 .is_err());
             assert!(!called, "revoked grant reached the transaction callback");
-        } else {
+        } else if campaign == staging::RecoveryCampaign::Start {
             staging::assert_private_stage(&prepared, &storage);
         }
         assert_eq!(fs::read(&marker).unwrap(), before_marker);

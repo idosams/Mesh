@@ -500,6 +500,10 @@ pub(super) fn assert_start_fence(
     storage: &AttachmentStorage,
     campaign: super::RecoveryCampaign,
 ) {
+    if campaign != super::RecoveryCampaign::Start {
+        assert_prefix_campaign(prepared, storage, campaign);
+        return;
+    }
     let staged = prepared.stage(storage).unwrap();
     let journal_path = prepared
         .destination
@@ -525,17 +529,14 @@ pub(super) fn assert_start_fence(
     assert_eq!(fs::read(&journal_path).unwrap(), before);
     let intent = read_private_in_store(&prepared.destination.store, PENDING).unwrap();
     super::recovery::assert_reloaded(prepared, storage, &staged);
-    let exhaustive_start = campaign == super::RecoveryCampaign::Start;
-    let first_boundary = if exhaustive_start { 1 } else { length };
-    for boundary in first_boundary..=length {
+    for boundary in 1..=length {
         let failure = prepared
             .fence_with_io(
                 storage,
                 &staged,
                 |step, file, frame| {
                     assert_eq!(step, "staged");
-                    let begin = if exhaustive_start { boundary - 1 } else { 0 };
-                    file.write_all(&frame[begin..boundary])?;
+                    file.write_all(&frame[boundary - 1..boundary])?;
                     file.sync_all()?;
                     Err(io::Error::other("interrupted required start append"))
                 },
@@ -663,5 +664,44 @@ pub(super) fn assert_start_fence(
             .count(),
         prepared.top_entries().len()
     );
+    super::complete::assert_complete(prepared, storage, &staged, receipt, campaign);
+}
+
+#[cfg(test)]
+fn assert_prefix_campaign(
+    prepared: &PreparedNativeConsumedStart,
+    storage: &AttachmentStorage,
+    campaign: super::RecoveryCampaign,
+) {
+    let staged = prepared.stage(storage).unwrap();
+    let receipt = prepared.fence_consumption_start(storage, &staged).unwrap();
+    prepared
+        .install_fenced_consumed_start(storage, &staged)
+        .unwrap();
+    if campaign == super::RecoveryCampaign::Checkpoint {
+        super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt, campaign);
+        return;
+    }
+    assert_eq!(campaign, super::RecoveryCampaign::Completion);
+    prepared
+        .commit_fenced_consumed_checkpoint(storage, &staged)
+        .unwrap();
+    // Preserve the original completion context: owner commit across an unrelated
+    // decision, followed by grant revocation. The complete journey owns all other
+    // cross-phase faults; this fixture owns every completion byte prefix.
+    super::owner::assert_owner(prepared, storage, &staged, receipt);
+    storage
+        .grant_saved_input(
+            &prepared.owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &prepared.source,
+                version: prepared.version,
+                destination: &prepared.destination,
+                allowed: false,
+                expected_previous: Some(prepared.grant),
+                request: RecordDigest::from_bytes([92; 32]),
+            },
+        )
+        .unwrap();
     super::complete::assert_complete(prepared, storage, &staged, receipt, campaign);
 }

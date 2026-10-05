@@ -2964,3 +2964,30 @@ All three campaigns get early scheduling priority; the 33-review bounded overvie
 Provenance: new test-only correction on canonical PR363 head 9398c2fb18aa9abf70342a053824d71fa01d17ec, based on merged main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a. No preserved legacy commits are replaced. PR365 and PR366 must adopt the correction with their complete dependent implementation before merged delivery. Fixed checkpoint b064029 remains unchanged.
 
 Focused validation passed all three campaigns in 175.781s: start 175.771s, checkpoint 153.645s and completion 152.674s. Full npm test passed: 3,980 native tests in 371.214s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Under the full local load, start took 276.679s, checkpoint 237.174s and completion 235.893s. Exact-head hosted checks remain required; these local results do not establish Linux CI performance.
+
+
+## Recovery fixtures retain coverage without repeating unrelated journeys (R187)
+
+R186 passed hosted Linux run 37330138945: all 3,542 tests in 732.871s, within the unchanged
+15-minute execution limit. Its macOS job passed all 3,980 native tests in 880.416s and 194 rendered
+tests, then reached the 20-minute job limit during desktop verification. That cancelled job is not
+a complete gate. The failed/cancelled logs remain preserved; no deadline is extended.
+
+The Start fixture retains every original staging, installation, owner, completion, read, capture,
+process-restart and exact-retry assertion, including every progressive start-frame append byte.
+The separate checkpoint fixture prepares the same phase through real staging/fencing/installation
+APIs, executes the actual partial-checkpoint process, verifies every correct and corrupted byte
+prefix, then stops. The completion fixture commits the prior phases, retains the owner-commit
+regression with its unrelated decision, revokes the grant as in the original context, and verifies
+every correct and corrupted completion prefix. Later unrelated fault campaigns remain in Start.
+Thus each original assertion remains covered, while the two prefix fixtures no longer repeat the
+complete journey. Production code, formats, deadlines and ignored tests are unchanged.
+
+Focused verification passed all three tests in 159.152s: Start 159.142s, checkpoint 5.327s and
+completion 8.419s. Before this change the corresponding R186 focused times were 175.771s,
+153.645s and 152.674s. Full npm test passed: 3,980 native tests in 343.955s (seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted checks remain required; local timings do not establish hosted performance.
+
+Provenance: canonical test-only follow-up to R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b;
+no preserved legacy commit is replaced. R184/R185 dependent branches must incorporate the final
+correction before combined merged delivery. The full fleet and native-authority acceptance scope
+under #345 remains open. Fixed checkpoint b064029 is unchanged.
