@@ -7701,3 +7701,17 @@ R172 full `npm test` passed: 3,967 native tests in 317.354s (six slow, 18 skippe
 documentation, license, storage, formatting and lint gates. The two-approval regression passed
 inside the full run. Hosted checks and merged delivery remain required. No packaged, graphical,
 OS human-presence or consumed-publication acceptance is claimed.
+
+
+R173 restricted historical input inspection is new canonical work based on published R172 head
+`faaa88a0b9d7199e9e72ee23dfcf4f577533e3a8` (PR #353), replacing no preserved legacy commit. The
+private adapter now supplies exact saved input without an ordinary workspace escape, and normal
+grant reads share the same saved-content constructor. Ten focused regressions passed; a mutation
+removing the final owner/work recheck failed as intended. Full checks and delivery remain pending.
+This is a consumption-replay prerequisite, not completion of that replay or the full fleet plan.
+
+R173 full `npm test` passed: 3,967 native tests in 321.245s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and lint gates. The consumed input regression passed in
+43.876s within the full run. Hosted checks and merged delivery remain required. This does not
+complete consumed-publication replay, production approval/recovery or packaged fleet acceptance.

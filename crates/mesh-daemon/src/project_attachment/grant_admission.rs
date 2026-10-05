@@ -38,6 +38,23 @@ pub struct NativeGrantedInput<'a> {
     snapshot: &'a HistoricalWorkspacePreview,
 }
 impl NativeGrantedInput<'_> {
+    // Saved-content construction only. Callers establish and revalidate their own access or
+    // private-history custody. This helper neither checks nor creates a current input grant.
+    pub(crate) fn with_history<T>(
+        history: &OpenWorkspace,
+        operation: RecordDigest,
+        read: impl FnOnce(NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
+        SavedAttachmentVersion::from_verified_history(history, operation)?;
+        let snapshot = history
+            .historical_workspace_preview(operation)
+            .map_err(error)?;
+        read(NativeGrantedInput {
+            history,
+            snapshot: &snapshot,
+        })
+    }
+
     pub(super) fn starting_exclusion_rules(&self) -> io::Result<(Option<String>, Option<String>)> {
         let read = |name: &str| -> io::Result<Option<String>> {
             let Some(file) = self.files().find(|file| file.path == name) else {
@@ -214,41 +231,16 @@ impl AttachmentStorage {
         };
         let owner_history = validate()?;
         let value = if request.source.id() == owner.id() {
-            SavedAttachmentVersion::from_verified_history(
-                &owner_history,
-                request.version.operation(),
-            )?;
-            let snapshot = owner_history
-                .historical_workspace_preview(request.version.operation())
-                .map_err(error)?;
-            read(NativeGrantedInput {
-                history: &owner_history,
-                snapshot: &snapshot,
-            })?
+            NativeGrantedInput::with_history(&owner_history, request.version.operation(), read)?
         } else if context.has_verified_history(request.source) {
             let (_, _, history) = context.history(request.source)?;
-            SavedAttachmentVersion::from_verified_history(&history, request.version.operation())?;
-            let snapshot = history
-                .historical_workspace_preview(request.version.operation())
-                .map_err(error)?;
-            read(NativeGrantedInput {
-                history: &history,
-                snapshot: &snapshot,
-            })?
+            NativeGrantedInput::with_history(&history, request.version.operation(), read)?
         } else {
             request.source.attachment.inspect_saved(
                 request.source.metadata_path(),
                 request.source.store.clone(),
                 &request.version.operation().to_string(),
-                |history, operation| {
-                    let snapshot = history
-                        .historical_workspace_preview(operation)
-                        .map_err(error)?;
-                    read(NativeGrantedInput {
-                        history,
-                        snapshot: &snapshot,
-                    })
-                },
+                |history, operation| NativeGrantedInput::with_history(history, operation, read),
             )?
         };
         // A callback result is acknowledged only if native associations and current access still agree.

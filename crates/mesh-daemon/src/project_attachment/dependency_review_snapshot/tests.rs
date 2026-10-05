@@ -430,6 +430,40 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
                 drop(restore);
                 assert_eq!(private.approval_context(&native).unwrap(), preview.0);
             }
+            let read_input = || {
+                private.with_saved_input(native.evidence().output().2, |input| {
+                    let mut bytes = Vec::new();
+                    input.write_file("note", &mut bytes)?;
+                    Ok(bytes)
+                })
+            };
+            assert_eq!(read_input().unwrap(), b"exact native input");
+            for path in [&owner_journal, &child_journal] {
+                let restore = RestoreJournal(path.clone(), fs::read(path).unwrap());
+                let mut changed = restore.1.clone();
+                changed.push(1);
+                let refused = private
+                    .with_saved_input(native.evidence().output().2, |input| {
+                        let mut bytes = Vec::new();
+                        input.write_file("note", &mut bytes)?;
+                        fs::write(path, &changed)?;
+                        Ok(bytes)
+                    })
+                    .unwrap_err();
+                assert!(
+                    refused
+                        .to_string()
+                        .contains("validated dependency history changed"),
+                    "{refused}"
+                );
+                assert_eq!(
+                    fs::read(path).unwrap(),
+                    changed,
+                    "private input must not repair a changed journal"
+                );
+                drop(restore);
+                assert_eq!(read_input().unwrap(), b"exact native input");
+            }
             Ok(native)
         })
         .unwrap();
