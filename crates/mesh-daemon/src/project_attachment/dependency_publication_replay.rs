@@ -83,6 +83,22 @@ impl AttachmentStorage {
         )
     }
 
+    /// Inspect an exact private saved input after independently replaying owning-root main.
+    /// The synchronous bounded callback must not wait for a provider, network or person.
+    /// This is a historical read, not permission to consume, launch work, or publish. Extracted
+    /// bytes carry no continuing authority, and callback side effects cannot be rolled back.
+    pub fn with_root_saved_input<T>(
+        &self,
+        registration: &str,
+        operation: mesh_store::RecordDigest,
+        trusted: &TrustedReviewers,
+        read: impl FnOnce(super::NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
+        self.with_root_publication_history(registration, trusted, |history, _, _, _| {
+            history.with_saved_input(operation, read)
+        })
+    }
+
     fn with_root_publication_history<T>(
         &self,
         registration: &str,

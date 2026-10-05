@@ -339,6 +339,54 @@ fn root_publication_reopens_only_with_exact_trusted_receipt() {
         "an old output cannot discard accepted main"
     );
     assert_eq!(fs::read(&journal).unwrap(), after_second);
+    for (operation, expected) in [
+        (version.operation(), b"first private version".as_slice()),
+        (
+            later_version.operation(),
+            b"later private version".as_slice(),
+        ),
+    ] {
+        let bytes = reopened_again
+            .with_root_saved_input(owner.id(), operation, &trust, |input| {
+                let files = input.files().collect::<Vec<_>>();
+                assert_eq!(files.len(), 1);
+                assert_eq!(files[0].path, "note");
+                assert_eq!(files[0].byte_length, expected.len() as u64);
+                let mut bytes = Vec::new();
+                input.write_file("note", &mut bytes)?;
+                assert!(input.write_file("../note", &mut Vec::new()).is_err());
+                Ok(bytes)
+            })
+            .unwrap();
+        assert_eq!(bytes, expected);
+    }
+    let mut called = false;
+    assert!(reopened_again
+        .with_root_saved_input(
+            owner.id(),
+            version.operation(),
+            &TrustedReviewers::default(),
+            |_| {
+                called = true;
+                Ok(())
+            }
+        )
+        .is_err());
+    assert!(
+        !called,
+        "missing trust must refuse before exposing saved input"
+    );
+    assert!(reopened_again
+        .with_root_saved_input(owner.id(), id(250), &trust, |_| {
+            called = true;
+            Ok(())
+        })
+        .is_err());
+    assert!(
+        !called,
+        "an unknown saved operation must not invoke the reader"
+    );
+    assert_eq!(fs::read(&journal).unwrap(), after_second);
     fs::OpenOptions::new()
         .append(true)
         .open(&journal)

@@ -98,6 +98,23 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(())
     }
 
+    /// Inspect exact saved input while retaining the private owner/work custody. The callback
+    /// cannot obtain a workspace, write journal records or treat these bytes as a current grant.
+    pub(crate) fn with_saved_input<T>(
+        &self,
+        operation: RecordDigest,
+        read: impl FnOnce(crate::project_attachment::NativeGrantedInput<'_>) -> io::Result<T>,
+    ) -> io::Result<T> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let result = crate::project_attachment::NativeGrantedInput::with_history(
+            &self.history,
+            operation,
+            read,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
     pub(crate) fn graph_operation(
         &self,
         operation: RecordDigest,

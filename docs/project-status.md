@@ -2706,3 +2706,27 @@ R172 full `npm test` passed: 3,967 native tests in 317.354s (six slow, 18 skippe
 documentation, license, storage, formatting and lint gates. The two-approval regression passed
 inside the full run. Hosted checks and merged delivery remain required. No packaged, graphical,
 OS human-presence or consumed-publication acceptance is claimed.
+
+
+## Restricted historical input inspection (R173)
+
+The private review adapter can inspect exact saved files and directories through a bounded,
+synchronous input callback while retaining owner/work custody. It exposes no workspace, append,
+main mutation or current grant. Owning-root callers first verify all native publication receipts;
+missing trust and unknown operations refuse before the callback. Both journals are rechecked after
+reading, and an intervening change refuses acknowledgement without repairing bytes. Ordinary
+grant inspection uses the same saved-content constructor with its existing permission checks.
+
+Ten focused tests passed, including exact input reads after two approvals and consumed-lane input
+inspection. Removing post-read revalidation caused the consumed regression to fail; the source was
+restored byte-for-byte. Full checks and delivery remain pending. This is the source-reading
+prerequisite for completed-consumption reconstruction with published owner history. The existing
+consumption resolver still requires ordinary owner admission; replacing that dependency with the
+complete private context, verifying all historical publication roots, and production commit/recovery
+remain required. No complete consumed-publication, GUI or OS signing acceptance is claimed.
+
+R173 full `npm test` passed: 3,967 native tests in 321.245s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and lint gates. The consumed input regression passed in
+43.876s within the full run. Hosted checks and merged delivery remain required. This does not
+complete consumed-publication replay, production approval/recovery or packaged fleet acceptance.
