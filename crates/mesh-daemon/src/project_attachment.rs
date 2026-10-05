@@ -305,3 +305,7 @@ fn invalid(message: &str) -> io::Error {
 
 mod remote_project_outbox;
 pub use remote_project_outbox::{validate_remote_project_action, RemoteProjectOutbox};
+
+pub(crate) use history::native_capture_draft::NativeCaptureDraft;
+
+pub use dependency_private_context::capture::PreparedVerifiedNativeCapture;

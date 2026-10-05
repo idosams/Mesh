@@ -128,6 +128,44 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(version)
     }
 
+    pub(crate) fn prepare_capture(
+        &self,
+        configuration: &str,
+        input: &crate::project_attachment::CapturedProjectInput,
+        actor: mesh_types::PublicKey,
+    ) -> io::Result<crate::project_attachment::NativeCaptureDraft> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let draft = crate::project_attachment::NativeCaptureDraft::prepare(
+            &self.history,
+            &self.pinned,
+            configuration,
+            input,
+            actor,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(draft)
+    }
+
+    pub(crate) fn authenticate_capture(
+        &self,
+        draft: &crate::project_attachment::NativeCaptureDraft,
+        signature: mesh_types::Signature,
+    ) -> io::Result<crate::checkpoint_storage::PreparedAuthenticatedCheckpoint> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let checkpoint = draft.authenticate(&self.history, &self.pinned, signature)?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(checkpoint)
+    }
+
+    pub(crate) fn verify_capture_basis(
+        &self,
+        draft: &crate::project_attachment::NativeCaptureDraft,
+    ) -> io::Result<()> {
+        self.ensure_current().map_err(io::Error::other)?;
+        draft.verify_basis(&self.history, &self.pinned)?;
+        self.ensure_current().map_err(io::Error::other)
+    }
+
     pub(crate) fn graph_operation(
         &self,
         operation: RecordDigest,

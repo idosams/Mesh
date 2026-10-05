@@ -18,8 +18,8 @@ mod consumed;
 mod registered;
 use consumed::{CaptureRead, ConsumedCaptureContext};
 
-const PENDING: &str = "dependency-capture.pending";
-const MAX_JOURNAL: usize = 80 * 1024 * 1024;
+pub(in crate::project_attachment) const PENDING: &str = "dependency-capture.pending";
+pub(in crate::project_attachment) const MAX_JOURNAL: usize = 80 * 1024 * 1024;
 
 /// Signed private capture prepared without granting publication or holding native custody.
 /// Commit must refresh exact enrollment and history; signing can never reserve the commit order.
@@ -34,7 +34,10 @@ pub struct PreparedNativeCapture {
     prepared: PreparedAuthenticatedCheckpoint,
 }
 
-fn absent(store: &PinnedWorkspaceRoot, name: &str) -> io::Result<()> {
+pub(in crate::project_attachment) fn absent(
+    store: &PinnedWorkspaceRoot,
+    name: &str,
+) -> io::Result<()> {
     match read_private_in_store(store, name) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error),
@@ -357,7 +360,7 @@ enum CaptureStep {
     Staged,
     Appended,
 }
-fn receipt_name(request: RecordDigest) -> String {
+pub(in crate::project_attachment) fn receipt_name(request: RecordDigest) -> String {
     format!("dependency-capture-{}.json", request.to_hex())
 }
 pub(in crate::project_attachment) fn ensure_no_pending_capture(
@@ -366,19 +369,19 @@ pub(in crate::project_attachment) fn ensure_no_pending_capture(
     absent(store, PENDING)
 }
 
-struct CaptureIntent {
-    request: RecordDigest,
-    authority: RecordDigest,
-    configuration: RecordDigest,
-    journal: (u64, u64),
-    before_bytes: usize,
-    before_digest: RecordDigest,
-    frames: RecordDigest,
-    operation: RecordDigest,
-    head: Option<RecordDigest>,
+pub(in crate::project_attachment) struct CaptureIntent {
+    pub(in crate::project_attachment) request: RecordDigest,
+    pub(in crate::project_attachment) authority: RecordDigest,
+    pub(in crate::project_attachment) configuration: RecordDigest,
+    pub(in crate::project_attachment) journal: (u64, u64),
+    pub(in crate::project_attachment) before_bytes: usize,
+    pub(in crate::project_attachment) before_digest: RecordDigest,
+    pub(in crate::project_attachment) frames: RecordDigest,
+    pub(in crate::project_attachment) operation: RecordDigest,
+    pub(in crate::project_attachment) head: Option<RecordDigest>,
 }
 impl CaptureIntent {
-    fn encode(&self) -> String {
+    pub(in crate::project_attachment) fn encode(&self) -> String {
         Json::object([
             ("schema", Json::text("mesh.dependency-capture-intent/v1")),
             ("request", Json::text(self.request.to_hex())),
@@ -520,7 +523,7 @@ fn verify_capture_bytes(history: &OpenWorkspace, operation: RecordDigest) -> io:
     }
     Ok(())
 }
-fn retain_receipt(
+pub(in crate::project_attachment) fn retain_receipt(
     store: &PinnedWorkspaceRoot,
     request: RecordDigest,
     intent: &str,

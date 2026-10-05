@@ -813,3 +813,5 @@ pub(in crate::project_attachment) mod publication;
 pub use publication::NativePublicationCommit;
 
 pub(in crate::project_attachment) mod control;
+
+pub(super) mod capture;

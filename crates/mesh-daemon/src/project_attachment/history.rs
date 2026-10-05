@@ -613,3 +613,6 @@ mod capture_line_tests;
 #[path = "dependency_capture.rs"]
 pub(super) mod dependency_capture;
 pub use dependency_capture::{NativeCaptureRetention, PreparedNativeCapture};
+
+#[path = "native_capture_draft.rs"]
+pub(super) mod native_capture_draft;

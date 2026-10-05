@@ -758,6 +758,7 @@ pub(crate) fn save_authenticated_checkpoint<F: DurableFs, D: HeadDerivation + ?S
 
 /// Verified immutable capture material. Preparing it performs no CAS, index or journal writes.
 /// Native enrolled authoring can stage exact recovery evidence before committing these records.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreparedAuthenticatedCheckpoint {
     pub(crate) checkpoint: Checkpoint,
     pub(crate) objects: Vec<Vec<u8>>,

@@ -310,8 +310,42 @@ fn root_publication_fixture(writer: u8) {
             .project()
             .capture_inputs(ObservationLimits::default())
             .unwrap();
-        let saved = storage
+        let journal_before = fs::read(&journal).unwrap();
+        assert!(storage
             .prepare_registered_dependency_capture(&owner, &input, actor, id(80), sign)
+            .is_err());
+        let mut called = false;
+        assert!(storage
+            .prepare_verified_dependency_capture(
+                &owner,
+                &input,
+                actor,
+                id(80),
+                &crate::TrustedReviewers::default(),
+                |payload| {
+                    called = true;
+                    sign(payload)
+                }
+            )
+            .is_err());
+        assert!(!called, "missing publication trust reached the signer");
+        assert_eq!(fs::read(&journal).unwrap(), journal_before);
+        let saved = storage
+            .prepare_verified_dependency_capture(&owner, &input, actor, id(80), &trust, |payload| {
+                let roots = [owner.store.clone(), owner.project().pinned.clone()];
+                let (send, receive) = std::sync::mpsc::channel();
+                let reader = std::thread::spawn(move || {
+                    let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
+                        .unwrap();
+                    send.send(()).unwrap();
+                    drop(guard);
+                });
+                receive
+                    .recv_timeout(std::time::Duration::from_secs(2))
+                    .expect("signer must run outside custody");
+                reader.join().unwrap();
+                sign(payload)
+            })
             .expect("native capture must remain available after accepted publication")
             .commit()
             .unwrap();
@@ -331,6 +365,48 @@ fn root_publication_fixture(writer: u8) {
         assert!(
             owner.saved_versions().is_err(),
             "private capture must not remove ordinary admission guards"
+        );
+        fs::write(root.join("source/note"), b"later private progress").unwrap();
+        let later_input = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let mut inner_saved = None;
+        assert!(
+            storage
+                .prepare_verified_dependency_capture(
+                    &owner,
+                    &later_input,
+                    actor,
+                    id(81),
+                    &trust,
+                    |payload| {
+                        inner_saved = Some(
+                            storage
+                                .prepare_verified_dependency_capture(
+                                    &owner,
+                                    &later_input,
+                                    actor,
+                                    id(82),
+                                    &trust,
+                                    sign,
+                                )
+                                .unwrap()
+                                .commit()
+                                .unwrap(),
+                        );
+                        sign(payload)
+                    }
+                )
+                .is_err(),
+            "a save during signing must stale the outer authoring basis"
+        );
+        assert_ne!(inner_saved.unwrap().operation(), saved.operation());
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
         );
         return;
     }
