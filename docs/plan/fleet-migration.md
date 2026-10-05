@@ -7794,3 +7794,8 @@ the private graph failed the exact complete-graph assertion in 14.305s; source b
 Full repository validation, hosted checks and delivery remain pending. Trusted consumed publication
 replay, receipt-bound main advancement, all-route recovery/integration and full fleet acceptance
 remain required; this API claims no accepted-main, graphical or packaged completion.
+
+R174 / #355 merged at `82d2e2b504b322a6fd28d71fd51d3cf09dd1edb1` after all seven
+checks passed on `3eb7817b3316073479029918de21a728fe144469`. R177 source commit
+`4674aff` adopted that related main ancestry at `76b0d208db5c52effc813f339cde482a10068176`
+without changing the complete source tree. The full R177 gate follows this reconciliation.
