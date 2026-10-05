@@ -7373,6 +7373,26 @@ head but still needs base reconciliation and merge. The catalog-read increment r
 hosted checks and normal merge. Automatic input discovery, desktop/harness wiring and the full
 remaining fleet acceptance remain open in #323. The fixed checkpoint is unchanged.
 
+R161 automatic input discovery selects required native stores from owner consumption facts plus
+allocation ancestry, using the same canonical work/installation encoding as guarded validation.
+Candidate correlation hints are collected before the owner-only policy guard. The complete read
+then rechecks discovery under its existing guard without adding custody roots, and refreshes history
+and sidecars afterward. Unavailable unrelated registrations are excluded; missing/ambiguous required
+inputs refuse. Callers still select the native owning root; no capture/runtime/publication permission
+or pending-transaction recovery is granted by these read APIs.
+
+The real discovery journey passed in 129.383s: two-level saved history, immutable old/new bytes, a
+peer consuming work from a different allocation branch, exactly four required stores, unrelated
+offline work, missing required input and recovery after its identity is restored. An added stale-
+selection case changes real grant policy before guarded read, refuses the old selection before its
+callback and preserves completed history after revocation; full validation of that addition is pending.
+Removing consumption-edge discovery failed the peer read in 121.059s; source was restored byte-for-
+byte. Strict daemon lint passed in 9.18s. Initial compiler failures and owner-fence/nested-custody
+failures are preserved alongside their fixes. Full `npm test`, publication and hosted checks remain
+required. This increment depends on published #327 and replaces no preserved fleet source commit.
+Local reconciliation `1a5176420741b3015a31f50567c0efb2e5bb840a` incorporated main #325 without
+changing #327's tested tree. Desktop/harness wiring and all broader fleet acceptance remain open.
+The fixed user checkpoint is unchanged.
 R161 chained recovery PR #325 merged normally into canonical `main` on 2026-10-04 at
 `39f75b33ba2586ac2c55b5222ac97ed39196fee6`, after all seven hosted checks passed on
 `26d61d4fb97c99ee7b52f607f15721e07acf63ab` (run `37241603535`). Post-merge CI is separate.
@@ -7404,3 +7424,25 @@ implementation with merged empty-input acceptance on main `7ffbd244346b3ce7e534c
 PR #327 is being republished against main; current-head hosted checks and normal merge remain
 required. Automatic discovery remains a separate preserved, unpublished increment awaiting its
 combined full gate. Issue #323 and the complete fleet acceptance remain open. The checkpoint is fixed.
+
+
+R161 discovery reconciliation `15f2a2ec20e9a4343474b2ae7cee1e0fea14147d` passed full
+`npm test`: 3,949 native tests in 345.982s (six slow, 18 skipped), 194 rendered tests,
+672 desktop tests, 44 real-daemon checks and all repository/docs/license/storage/format/lint gates.
+The real consumption journey passed in 192.603s, including the added stale-selection refusal
+before its read callback and successful historical reads after revocation. The full source tree was
+held fixed during verification. This increment preserves implementation `67f05c5add78bd981474ec74912f4cf6874e0593`
+and depends on published catalog-read #327 at `62cdcadd9afa70df0d5325114d0eb72628eac2eb`.
+Post-merge CI for #326 passed (run `37244087413`). Discovery still requires publication, hosted
+checks and normal merge; desktop/harness integration and the full issue #323 remain open.
+The fixed checkpoint is unchanged.
+
+
+R161 discovery PR #328 passed all seven hosted checks on
+`67e6c0cc3b765378f7f9d89f38a4b9fd68c313f7` (run `37245205962`). Reconciliation
+`bb83272fc1e56466627ef5b93b518d9b75c71372` incorporates merged catalog-read #327/main
+`e6ebb4f4ee048e7ac98063b81715dd07b7b65363`; its entire tree is identical to that tested head.
+The following update records evidence only. PR #328 now needs fresh current-head checks against
+main before normal merge. The full local gate remains 3,949 native, 194 rendered, 672 desktop and
+44 daemon checks. Owning-root selection is separately preserved and fully locally tested but not
+published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
