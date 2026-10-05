@@ -350,6 +350,128 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         preview.0.validation_digest(),
         other_preview.0.validation_digest()
     );
+    use mesh_approval::{
+        ApprovalDecision, ExpectedHumanApproval, HumanApprovalCredential, HumanApprovalReceiptDraft,
+    };
+    use ring::rand::SystemRandom;
+    use ring::signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING};
+    let rng = SystemRandom::new();
+    let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
+    let human_key =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &rng).unwrap();
+    let human_credential = HumanApprovalCredential::from_public_key(
+        human_key.public_key().as_ref().try_into().unwrap(),
+    )
+    .unwrap();
+    let trust = crate::TrustedReviewers::with_human_credentials([human_credential.clone()]);
+    let receipt_for = |context: mesh_approval::HumanApprovalContext, challenge: u8, decision| {
+        let draft = HumanApprovalReceiptDraft::new(
+            ExpectedHumanApproval::new(context, human_credential.clone(), [challenge; 32]),
+            decision,
+        );
+        let signature = human_key.sign(&rng, &draft.canonical_bytes()).unwrap();
+        draft
+            .with_signature(signature.as_ref().to_vec())
+            .unwrap()
+            .canonical_bytes()
+    };
+    let receipt = receipt_for(preview.0.clone(), 61, ApprovalDecision::Approve);
+    let inspect_receipt = || {
+        storage
+            .inspect_saved_dependency_review_receipt(
+                destination.id(),
+                bound.record(),
+                &receipt,
+                &trust,
+            )
+            .unwrap()
+    };
+    let before_receipt_owner = fs::read(&owner_journal).unwrap();
+    let before_receipt_child = fs::read(&child_journal).unwrap();
+    let checked_receipt = inspect_receipt();
+    assert_eq!(
+        checked_receipt.get("receipt_verified"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        checked_receipt.get("publication_committed"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        checked_receipt.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        checked_receipt.get("inputs_currently_eligible"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        checked_receipt.get("historical_decisions_current"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        checked_receipt.get("bundle"),
+        Some(&Json::text(bound.bundle().to_hex()))
+    );
+    assert_eq!(
+        checked_receipt.get("result"),
+        Some(&Json::text(
+            RecordDigest::from_bytes(*preview.0.reviewed_actor_head().as_bytes()).to_hex()
+        ))
+    );
+    let mut corrupted = receipt.clone();
+    *corrupted.last_mut().unwrap() ^= 1;
+    for bad in [
+        receipt_for(other_preview.0.clone(), 62, ApprovalDecision::Approve),
+        receipt_for(preview.0.clone(), 0, ApprovalDecision::Approve),
+        receipt_for(preview.0.clone(), 63, ApprovalDecision::Reject),
+        corrupted,
+        vec![],
+        vec![0; 65_537],
+        b"malformed".to_vec(),
+    ] {
+        assert!(
+            storage
+                .inspect_saved_dependency_review_receipt(
+                    destination.id(),
+                    bound.record(),
+                    &bad,
+                    &trust
+                )
+                .is_err(),
+            "receipt must match native context and trusted approval"
+        );
+    }
+    assert!(storage
+        .inspect_saved_dependency_review_receipt(
+            destination.id(),
+            other_bound.record(),
+            &receipt,
+            &trust
+        )
+        .is_err());
+    assert!(storage
+        .inspect_saved_dependency_review_receipt(owner.id(), bound.record(), &receipt, &trust)
+        .is_err());
+    assert!(storage
+        .inspect_saved_dependency_review_receipt(destination.id(), id(199), &receipt, &trust)
+        .is_err());
+    assert!(storage
+        .inspect_saved_dependency_review_receipt(
+            destination.id(),
+            bound.record(),
+            &receipt,
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    assert_eq!(fs::read(&owner_journal).unwrap(), before_receipt_owner);
+    assert_eq!(fs::read(&child_journal).unwrap(), before_receipt_child);
+    assert_eq!(
+        inspect_receipt(),
+        checked_receipt,
+        "historical inspection is repeatable without committing a challenge"
+    );
+
     struct RestoreRoot(PathBuf, PathBuf);
     impl Drop for RestoreRoot {
         fn drop(&mut self) {
@@ -382,6 +504,9 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         before_loss,
         "lost physical input refuses before append"
     );
+    assert!(storage
+        .inspect_saved_dependency_review_receipt(destination.id(), bound.record(), &receipt, &trust)
+        .is_err());
     drop(restore);
     let restored = recover(id(15));
     assert_eq!(restored.graph(), snapshot.graph());
@@ -428,6 +553,31 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         .unwrap();
     let rejected = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
     let historical = inspect();
+    let rejected_receipt = inspect_receipt();
+    assert_eq!(
+        rejected_receipt.get("receipt_verified"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        rejected_receipt.get("inputs_currently_eligible"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        rejected_receipt.get("historical_decisions_current"),
+        Some(&Json::Bool(false))
+    );
+    for field in [
+        "review",
+        "receipt",
+        "bundle",
+        "canonical",
+        "result",
+        "credential",
+        "challenge",
+    ] {
+        assert_eq!(rejected_receipt.get(field), checked_receipt.get(field));
+    }
+
     assert_eq!(
         historical.get("historical_decisions_current"),
         Some(&Json::Bool(false))
@@ -484,6 +634,10 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     let graph_bytes = fs::read(&graph_path).unwrap();
     fs::write(&graph_path, b"substituted graph object").unwrap();
     assert!(storage
+        .inspect_saved_dependency_review_receipt(destination.id(), bound.record(), &receipt, &trust)
+        .is_err());
+
+    assert!(storage
         .saved_dependency_review(destination.id(), bound.record())
         .is_err());
     assert!(storage
@@ -537,6 +691,31 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         )
         .unwrap();
     let revalidated = inspect();
+    let revalidated_receipt = inspect_receipt();
+    assert_eq!(
+        revalidated_receipt.get("inputs_currently_eligible"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        revalidated_receipt.get("historical_decisions_current"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        revalidated_receipt.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    for field in [
+        "review",
+        "receipt",
+        "bundle",
+        "canonical",
+        "result",
+        "credential",
+        "challenge",
+    ] {
+        assert_eq!(revalidated_receipt.get(field), checked_receipt.get(field));
+    }
+
     assert_eq!(
         revalidated.get("historical_decisions_current"),
         Some(&Json::Bool(false))

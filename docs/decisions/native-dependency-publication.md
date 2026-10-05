@@ -107,3 +107,36 @@ and capture (exit 1, no acknowledgement), preserving all fixture file bytes and 
 in 0.101s. The frame was generated and scanned by current mesh-store; its payload identity was
 synthetic. This proves required-kind refusal, not a valid signed publication, cached writer or
 GUI journey. Generator source, manifest, raw result, hashes and fixture are retained locally.
+
+
+## Exact historical receipt inspection (R166)
+
+The native-only `inspect_saved_dependency_review_receipt` operation resolves the registered work,
+owning authority, exact saved-review binding and complete retained inputs under the existing bounded
+custody context. It reconstructs the review bundle and resulting head from native saved history,
+selects a configured trusted human credential, and verifies the canonical P-256 approval receipt
+against that independently reconstructed context. The receipt cannot select the work, snapshot,
+base, validation digest or resulting head. Empty or oversized receipts (over 65,536 bytes), empty
+challenges, untrusted credentials, rejection decisions, invalid signatures and mismatched contexts
+refuse. Missing or substituted native evidence also refuses through complete context verification.
+
+The returned receipt digest identifies the supplied bytes; inspection does not store them, append
+a record, reserve a challenge, advance main or collect human presence. The response explicitly
+reports `publication_committed: false` and `approval_authority: false`. Current input eligibility
+and exact historical decision freshness are separate fields. A valid historical receipt remains
+cryptographically verifiable after rejection, later private progress or revalidation; none of
+those inspections authorizes a new publication. Exact inspection may repeat without a write.
+
+The shared native checker will be reused by publication/replay under complete custody. That later
+path must additionally verify current main, the exact publication sequence, receipt/object and
+claim-field equality, challenge admission, and the durable commit/recovery boundary. The required
+publication-record reader fence stays intact. No renderer, agent or CLI route is enabled here.
+
+The real consumed-history test now creates P-256 signatures for exact and different snapshots,
+checks malformed/oversized/corrupted/untrusted/rejection/empty-challenge refusal, and verifies
+unchanged owner and child journals. Its first successful run passed in 27.458s. Replacing native
+expected context with the receipt's carried context failed the intended wrong-snapshot assertion
+in 12.946s; production source was restored byte-for-byte. These signatures use test-generated
+credentials, not OS human-presence or eligible-signed packaged proof. Additional missing-root and
+substituted-graph assertions are included in the full gate. Full validation and delivery remain
+required before this increment is considered merged.

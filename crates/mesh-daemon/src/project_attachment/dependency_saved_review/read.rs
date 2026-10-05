@@ -3,7 +3,7 @@ use super::super::dependency_catalog_read::VerifiedCatalogDependencyRead;
 use super::*;
 use crate::dependency_policy::NativeReviewBinding;
 use crate::root_authority::PinnedRootFs;
-use mesh_cas::{Blake3, Cas};
+use mesh_cas::{Blake3, Cas, ContentDigest};
 
 fn exact_binding(
     context: &VerifiedCatalogDependencyRead<'_>,
@@ -169,6 +169,71 @@ impl AttachmentStorage {
                 .native_review_artifact(&binding, object, side)
                 .map(|file| file.bytes)
                 .map_err(error)
+        })
+    }
+    /// Inspect a receipt against the exact native historical review under complete custody.
+    /// A verified signature is not current eligibility, challenge admission or committed main.
+    pub fn inspect_saved_dependency_review_receipt(
+        &self,
+        work_id: &str,
+        record: RecordDigest,
+        bytes: &[u8],
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        if bytes.is_empty() || bytes.len() > super::receipt::MAX_RECEIPT_BYTES {
+            return Err(invalid(
+                "native review receipt exceeds its bound or is empty",
+            ));
+        }
+        self.with_registered_dependency_context(work_id, |context| {
+            let binding = exact_binding(context, record)?;
+            let verified =
+                super::receipt::check_receipt(context.history, &binding, bytes, trusted)?;
+            let digest = |bytes: &[u8; 32]| Json::text(RecordDigest::from_bytes(*bytes).to_hex());
+            let snapshot = binding.evidence().snapshot();
+            Ok(Json::object([
+                (
+                    "schema",
+                    Json::text("mesh.native-review-receipt-inspection/v1"),
+                ),
+                ("review", Json::text(record.to_hex())),
+                ("receipt", Json::text(Blake3::digest_bytes(bytes).to_hex())),
+                (
+                    "bundle",
+                    digest(verified.context().review_bundle().digest().as_bytes()),
+                ),
+                (
+                    "canonical",
+                    digest(verified.context().expected_canonical_head().as_bytes()),
+                ),
+                (
+                    "result",
+                    digest(verified.context().reviewed_actor_head().as_bytes()),
+                ),
+                ("credential", digest(verified.credential().id().as_bytes())),
+                ("challenge", digest(verified.challenge())),
+                ("receipt_verified", Json::Bool(true)),
+                (
+                    "inputs_currently_eligible",
+                    Json::Bool(
+                        context
+                            .owner_proof
+                            .policy()
+                            .review_inputs_eligible(snapshot),
+                    ),
+                ),
+                (
+                    "historical_decisions_current",
+                    Json::Bool(
+                        context
+                            .owner_proof
+                            .policy()
+                            .review_decisions_current(snapshot),
+                    ),
+                ),
+                ("publication_committed", Json::Bool(false)),
+                ("approval_authority", Json::Bool(false)),
+            ]))
         })
     }
     /// Construct the exact human-review context and native summary, without signing or publication.

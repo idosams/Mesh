@@ -178,6 +178,7 @@ impl AttachmentStorage {
 }
 
 mod read;
+mod receipt;
 
 #[cfg(test)]
 mod tests;

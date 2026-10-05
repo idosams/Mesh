@@ -2572,3 +2572,18 @@ of a correctly framed required publication kind, preserving all fixture and exec
 0.101s. This uses a synthetic payload identity and proves format refusal only. Full fixture,
 generator, results and failed/corrected logs are preserved. Publication PR, exact-head hosted
 checks and merge remain required; actual signed publication and recovery remain pending.
+
+
+## Native saved-review receipt verification (R166, in progress)
+
+Native receipt inspection now verifies canonical P-256 approval against the exact owner-bound
+saved review reconstructed under complete custody. It refuses wrong snapshots/work, unknown
+credentials, empty challenges, rejection decisions, malformed/oversized bytes and bad signatures.
+The result separates verified historical receipt evidence from current eligibility and decision
+freshness, and explicitly grants no publication authority. It writes no receipt or journal entry.
+
+The expanded consumed-history test passed in 27.458s with real test-key signatures. A carried-context
+mutation failed the intended wrong-snapshot assertion in 12.946s; source was restored exactly.
+Initial compile failures are preserved with corrected logs. Missing-root and substituted-graph
+receipt assertions are part of full validation. Actual native human presence, publication receipt
+replay, commit/recovery, all-path enforcement and packaged fleet acceptance remain open under #345.
