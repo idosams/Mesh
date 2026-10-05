@@ -87,6 +87,12 @@ Choose **Resume capture** when ready to capture changes made while Mesh was clos
 project or history is unavailable, Mesh keeps the registration visible and requires the exact original
 folder and history before retrying; a replacement folder at the same path is not adopted.
 
+For lines already initialized with recorded inputs from other lines, resumed capture verifies those
+inputs before saving. An interrupted save is recovered from its recorded request, and an unchanged
+scan keeps the same saved version. Missing required project/history data blocks a new save; the
+last acknowledged version remains available only while its required history can be verified.
+This development integration does not yet create such lines through every harness or agent entry point.
+
 Choose **Detach Mesh** to stop Mesh tracking this project across restarts. Mesh joins its capture
 worker before confirming detachment and retains the original files, Git state, saved history and
 comparison pins. You can keep using your existing tools. **Reattach project** checks the original

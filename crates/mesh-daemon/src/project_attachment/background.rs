@@ -241,6 +241,13 @@ impl Shared {
     }
 }
 
+struct CaptureTarget {
+    attachment: ProjectAttachment,
+    store: PinnedWorkspaceRoot,
+    metadata: PathBuf,
+    registered: Option<(super::AttachmentStorage, super::ProvisionedAttachment)>,
+}
+
 /// One native background controller. Starting it explicitly authorizes captures with the supplied
 /// host signer. It provisions no agent and never writes, locks or takes over the original project.
 /// Dropping requests stop without blocking; use `stop_and_join` to wait for capture termination. Native helper cleanup is reported separately.
@@ -249,6 +256,34 @@ pub struct AttachmentCaptureService {
     worker: Option<JoinHandle<()>>,
 }
 impl AttachmentCaptureService {
+    /// Start a worker with retained catalog authority. Ordinary projects remain ordinary;
+    /// enrolled lanes use exact dependency recovery and capture on every attempt.
+    pub fn start_registered(
+        storage: &super::AttachmentStorage,
+        selected: &super::ProvisionedAttachment,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+    ) -> io::Result<Self> {
+        let selected = storage.exact_registered_work(selected)?;
+        let target = CaptureTarget {
+            attachment: selected.project().clone(),
+            store: selected.store.clone(),
+            metadata: selected.metadata_path().to_path_buf(),
+            registered: Some((storage.clone(), selected)),
+        };
+        Self::start_target_with_signals(target, signer, schedule, |shared, path| {
+            #[cfg(target_os = "macos")]
+            signals_worker::start(shared, path);
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = path;
+                shared.change(|state| {
+                    state.status.native_signal_state = NativeSignalState::Unavailable
+                });
+            }
+        })
+    }
+
     /// Pin an existing registration and its external metadata, then start one bounded worker.
     /// The host owns key setup and lifetime. No key is generated or persisted by this service.
     pub fn start(
@@ -299,9 +334,34 @@ impl AttachmentCaptureService {
     where
         F: FnOnce(&Arc<Shared>, &Path) + Send + 'static,
     {
+        Self::start_target_with_signals(
+            CaptureTarget {
+                attachment,
+                store,
+                metadata: metadata.to_path_buf(),
+                registered: None,
+            },
+            signer,
+            schedule,
+            start_signals,
+        )
+    }
+
+    fn start_target_with_signals<F>(
+        target: CaptureTarget,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+        start_signals: F,
+    ) -> io::Result<Self>
+    where
+        F: FnOnce(&Arc<Shared>, &Path) + Send + 'static,
+    {
+        let CaptureTarget {
+            attachment, store, ..
+        } = &target;
         attachment.ensure_current()?;
         store.ensure_namespace_identity()?;
-        super::detachment::ensure_attached(&store)?;
+        super::detachment::ensure_attached(store)?;
         schedule.limits.validate()?;
         if !(Duration::from_millis(250)..=Duration::from_secs(300))
             .contains(&schedule.reconciliation_interval)
@@ -311,7 +371,6 @@ impl AttachmentCaptureService {
                 "capture interval must be between 250 ms and five minutes",
             ));
         }
-        let metadata = metadata.to_path_buf();
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
                 status: CaptureStatus {
@@ -345,15 +404,7 @@ impl AttachmentCaptureService {
             .name("mesh-attachment-capture".to_owned())
             .spawn(move || {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    run(
-                        &running,
-                        attachment,
-                        store,
-                        metadata,
-                        signer,
-                        schedule,
-                        start_signals,
-                    );
+                    run(&running, target, signer, schedule, start_signals);
                 }));
                 running.change(|state| {
                     stop_native_signals(state);
@@ -451,15 +502,19 @@ fn stop_native_signals(state: &mut State) {
 
 fn run<F>(
     shared: &Arc<Shared>,
-    attachment: ProjectAttachment,
-    store: PinnedWorkspaceRoot,
-    metadata: PathBuf,
+    target: CaptureTarget,
     signer: Arc<dyn CheckpointSigner>,
     schedule: CaptureSchedule,
     start_signals: F,
 ) where
     F: FnOnce(&Arc<Shared>, &Path),
 {
+    let CaptureTarget {
+        attachment,
+        store,
+        metadata,
+        registered,
+    } = target;
     if shared.stopped() {
         shared.change(|state| {
             if schedule.native_signals {
@@ -477,7 +532,11 @@ fn run<F>(
         .inspect_entry(Path::new(super::history::HISTORY))
         .is_ok()
     {
-        match attachment.saved_versions_in_store(&metadata, store.clone()) {
+        let versions = match &registered {
+            Some((storage, selected)) => storage.registered_review_versions(selected),
+            None => attachment.saved_versions_in_store(&metadata, store.clone()),
+        };
+        match versions {
             Ok(versions) => {
                 shared.change(|state| state.status.saved_version = versions.last().copied())
             }
@@ -541,22 +600,28 @@ fn run<F>(
                         return;
                     }
                     shared.change(|state| state.status.phase = CapturePhase::Saving);
-                    let result = attachment.save_capture_in_store(
-                        &metadata,
-                        &input,
-                        actor,
-                        |payload| {
-                            if shared.stopped() {
-                                return Err("capture stopped".to_owned());
-                            }
-                            let signature = signer.sign(payload)?;
-                            if shared.stopped() {
-                                return Err("capture stopped".to_owned());
-                            }
-                            Ok(signature)
-                        },
-                        store.clone(),
-                    );
+                    let sign = |payload: &mesh_crypto::SigningPayload| {
+                        if shared.stopped() {
+                            return Err("capture stopped".to_owned());
+                        }
+                        let signature = signer.sign(payload)?;
+                        if shared.stopped() {
+                            return Err("capture stopped".to_owned());
+                        }
+                        Ok(signature)
+                    };
+                    let result = match &registered {
+                        Some((storage, selected)) => {
+                            storage.save_registered_capture(selected, &input, actor, sign)
+                        }
+                        None => attachment.save_capture_in_store(
+                            &metadata,
+                            &input,
+                            actor,
+                            sign,
+                            store.clone(),
+                        ),
+                    };
                     match result {
                         Ok(version) => {
                             saved = Some(version);
