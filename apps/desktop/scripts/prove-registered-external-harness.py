@@ -40,6 +40,13 @@ def mesh(action):
 def versions():
     return json.loads(command(mesh('versions')))['versions']
 
+def preview(version):
+    value = json.loads(command([*mesh('preview'), version, 'note.txt']))
+    assert value['schema'] == 'mesh.attachment-text/v1'
+    assert value['operation'] == version and value['path'] == 'note.txt'
+    assert value['state'] == 'text'
+    return value
+
 def wait_until(predicate, description, processes, seconds=150):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -101,9 +108,26 @@ try:
     saved = lambda: [e['saved_version'] for e in events if e.get('last_outcome') == 'saved' and e.get('saved_version') not in before]
     wait_until(lambda: bool(saved()), 'first external save', [provider, watcher])
     first_save = saved()[-1]
+    first_preview = preview(first_save)
+    assert first_preview['text'] == 'external registered stage one\n'
     (project / '.mesh-proof-continue-1').write_text('continue\n')
     wait_until(lambda: note.read_text() == 'external registered stage two\n', 'provider second edit', [provider, watcher])
-    wait_until(lambda: any(v != first_save for v in saved()), 'second external save', [provider, watcher])
+    second_saves = []
+    inspected = set()
+    def second_saved_text():
+        for version in saved():
+            if version == first_save or version in inspected:
+                continue
+            value = preview(version)
+            inspected.add(version)
+            if value['text'] == 'external registered stage two\n':
+                second_saves.append((version, value))
+                return True
+        return False
+    wait_until(second_saved_text, 'second external saved bytes', [provider, watcher])
+    second_save, second_preview = second_saves[0]
+    assert second_save != first_save
+    assert preview(first_save) == first_preview
     live(provider)
     watcher.stdin.write('stop\n'); watcher.stdin.close()
     assert watcher.wait(timeout=60) == 0
@@ -119,13 +143,15 @@ try:
     wait_until(lambda: note.read_text() == 'external registered stage three\n', 'post-stop external edit', [provider])
     assert provider.wait(timeout=90) == 0
     assert versions() == after_stop
+    assert preview(first_save) == first_preview
+    assert preview(second_save) == second_preview
     assert pathlib.Path(fixture['journal']).read_bytes() == journal_at_stop
     assert owner.read_bytes() == owner_before
     assert command(['git', 'rev-parse', 'HEAD'], project) == head
     assert digest(project / '.git/index') == index
     assert project.stat().st_ino == inode
     assert digest(binary) == expected_hash
-    proof = dict(schema='mesh.registered-external-harness-acceptance/v1', passed=True, revision=revision, executable_sha256=expected_hash, provider_version=command([provider_executable, '--version']).strip(), provider_options=provider_options, provider_started_by_mesh=False, same_provider_alive_before_watch_and_after_stop=True, git_index_and_head_preserved=True, root_inode_preserved=True, owner_content_preserved=True, post_stop_external_edit_preserved=True, history_unchanged_after_stop=True, versions_before=len(before), versions_after=len(after_stop), first_edit_elapsed_ms=first_edit_elapsed, elapsed_ms=round((time.monotonic()-started)*1000), graphical=False, packaged=False, protected_main_approval=False, limitations=['Controlled noninteractive provider process in synthetic registered consumed lane', 'Registration and consumed input prepared by native fixture', 'No graphical review, exact snapshot preview, integration, restoration, second provider or second host verified', 'No matched velocity baseline or cost measurement'])
+    proof = dict(schema='mesh.registered-external-harness-acceptance/v2', passed=True, revision=revision, executable_sha256=expected_hash, provider_version=command([provider_executable, '--version']).strip(), provider_options=provider_options, provider_started_by_mesh=False, same_provider_alive_before_watch_and_after_stop=True, git_index_and_head_preserved=True, root_inode_preserved=True, owner_content_preserved=True, post_stop_external_edit_preserved=True, history_unchanged_after_stop=True, exact_saved_previews_preserved=True, first_saved_version=first_save, second_saved_version=second_save, first_saved_content_digest=first_preview['digest'], second_saved_content_digest=second_preview['digest'], versions_before=len(before), versions_after=len(after_stop), first_edit_elapsed_ms=first_edit_elapsed, elapsed_ms=round((time.monotonic()-started)*1000), graphical=False, packaged=False, protected_main_approval=False, limitations=['Controlled noninteractive provider process in synthetic registered consumed lane', 'Registration and consumed input prepared by native fixture', 'No graphical review, integration, restoration, second provider or second host verified', 'No matched velocity baseline or cost measurement'])
     (output / 'proof.json').write_text(json.dumps(proof, indent=2) + '\n')
     print(json.dumps(proof), flush=True)
 finally:

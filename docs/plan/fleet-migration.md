@@ -7623,3 +7623,11 @@ R166 native receipt inspection is new canonical work from published publication-
 exact historical signature/context verification and read-only native inspection. It does not
 remove the publication-record admission fence or grant new approval/agent/renderer authority.
 Full validation, a dependent PR, hosted checks and merge remain required under issue #345.
+
+
+R168 exact registered saved previews are new canonical work from main
+`fc6d3ce530687a46cfce1e7a44ac954dd152acc2`, replacing no preserved legacy commit. The native command
+reuses desktop saved-text inspection and the provider runner checks immutable bytes across later
+edits. The parser regression failed before implementation; a fixture type mismatch was corrected,
+and both focused tests passed. Full validation, exact provider evidence and PR delivery remain
+required; native publication and the complete fleet acceptance scope remain open.
