@@ -1,4 +1,5 @@
 //! Signed consumption candidates. Preparation writes nothing and does not reserve a commit order.
+pub(super) mod source_verification;
 mod staging;
 pub(super) const START_PENDING: &str = "consumption-start.pending";
 use super::{

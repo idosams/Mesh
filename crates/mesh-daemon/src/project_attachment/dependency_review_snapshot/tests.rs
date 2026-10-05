@@ -693,7 +693,7 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
             .read_publication_private_history(owner.metadata_path(), &owner.store)
             .unwrap();
         assert!(owner_private.policy().has_publication_claims());
-        let (_, child_private) = candidate
+        let (prospective, child_private) = candidate
             .verify_completed_private_history(&graph, &guard, None, || {
                 Ok((configuration.clone(), owner_private.clone()))
             })
@@ -701,6 +701,70 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         assert_ne!(
             child_private.binding().installation,
             owner_private.binding().installation
+        );
+        let root_selection = storage.prepare_dependency_work(&owner, &owner).unwrap();
+        let owner_binding = storage
+            .validate_publication_root(&root_selection, &guard, &owner_private)
+            .unwrap();
+        let source_history = crate::workspace::NativePrivateReviewHistory::open(
+            owner.metadata_path(),
+            owner.store.clone(),
+            &owner_private,
+            (&owner.store, &owner_private),
+            mesh_operations::WorkspaceId::from_bytes(super::super::history::short_id(
+                configuration.as_bytes(),
+            )),
+            &owner_binding,
+            &guard,
+        )
+        .unwrap();
+        let (initial_configuration, _) = destination
+            .project()
+            .read_completed_start_facts(destination.metadata_path(), &destination.store)
+            .unwrap();
+        let child_cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            destination.metadata_path(),
+            destination.store.filesystem().read_only(),
+        )
+        .unwrap();
+        let signed = super::super::dependency_transaction::read_payload(
+            &child_cas,
+            candidate.operation(),
+            16 * 1024 * 1024,
+        )
+        .unwrap();
+        let envelope =
+            crate::authenticated_changeset::AuthenticatedChangeSet::from_canonical_bytes(&signed)
+                .unwrap();
+        let reconstruct = |actor, expected: &str| {
+            source_history.with_saved_input(version.operation(), |input| {
+                super::super::consumption_prepare::source_verification::verify_starting_source(
+                    &destination,
+                    &input,
+                    &guard,
+                    super::super::consumption_prepare::source_verification::StartingSource {
+                        configuration: &initial_configuration,
+                        prospective: expected,
+                        actor,
+                        limits: ObservationLimits::default(),
+                        envelope: &envelope,
+                    },
+                )
+            })
+        };
+        assert_eq!(reconstruct(actor, &prospective).unwrap(), prospective);
+        let wrong_actor = reconstruct(PublicKey::from_bytes([249; 32]), &prospective).unwrap_err();
+        assert!(
+            wrong_actor.to_string().contains("starting actor changed"),
+            "{wrong_actor}"
+        );
+        let wrong_destination =
+            reconstruct(actor, "another prospective configuration").unwrap_err();
+        assert!(
+            wrong_destination
+                .to_string()
+                .contains("retained signed start differs from exact saved source"),
+            "{wrong_destination}"
         );
         assert!(owner
             .project()

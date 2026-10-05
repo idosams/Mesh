@@ -409,56 +409,21 @@ impl AttachmentStorage {
         }
         let envelope =
             AuthenticatedChangeSet::from_canonical_bytes(&signed_bytes).map_err(error)?;
-        if !envelope.signed_by(actor) {
-            return Err(invalid("starting actor changed"));
-        }
-        let (prospective, operations) =
+        let prospective =
             self.with_input_grant_owner(&selected_grant, guard, &context, |input| {
-                let rules = input.starting_exclusion_rules()?;
-                let policy = crate::project_attachment::observation::policy_digest(&rules);
-                let mut proposed = Json::parse(&configuration).map_err(error)?;
-                let Json::Object(fields) = &mut proposed else {
-                    return Err(invalid("invalid destination configuration"));
-                };
-                fields
-                    .iter_mut()
-                    .find(|(key, _)| key == "exclusions")
-                    .ok_or_else(|| invalid("missing exclusions"))?
-                    .1 = Json::text(policy.to_string());
-                let (prospective, _) = destination.project().history_configuration_with_previous(
-                    &destination.store,
-                    Some(policy),
-                    Some(proposed.encode()),
-                )?;
-                let snapshot = prepare_initial_snapshot(
+                super::super::source_verification::verify_starting_source(
+                    destination,
                     &input,
-                    WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
-                    ActorId::from_bytes(*actor.as_bytes()),
-                    request.limits,
-                )?;
-                // Do not retain a second whole-project content copy while loading staged objects.
-                Ok((prospective, snapshot.operations))
+                    guard,
+                    super::super::source_verification::StartingSource {
+                        configuration: &configuration,
+                        prospective: text(&stage, "prospective")?,
+                        actor,
+                        limits: request.limits,
+                        envelope: &envelope,
+                    },
+                )
             })?;
-        let expected_statement = operation_checkpoint_signing_body(
-            &AuthenticatedOperationCheckpointRequest::new(
-                WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
-                ActorId::from_bytes(*actor.as_bytes()),
-                SessionId::from_bytes(short_id(actor.as_bytes())),
-                ActorSequence::FIRST,
-                CausalParents::genesis(),
-                HeadId::from_bytes([0; 32]),
-                PolicyEpoch::new(1),
-                Hlc::new(0, 0),
-                operations,
-                actor,
-                Signature::from_bytes([0; 64]),
-            ),
-            &StartHead,
-        );
-        if envelope.changeset() != expected_statement || text(&stage, "prospective")? != prospective
-        {
-            return Err(invalid("retained signed start differs from granted source"));
-        }
         drop(envelope);
         drop(signed_bytes);
         let Some(Json::Array(names)) = stage.get("objects") else {
