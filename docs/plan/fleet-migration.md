@@ -7685,3 +7685,19 @@ R171 full `npm test` passed: 3,966 native tests in 318.565s (six slow, 18 skippe
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 docs, license, storage, format and lint gates. The exact consumed receipt regression passed
 in 43.836s inside that run. Hosted checks and merged delivery remain required.
+
+
+R172 owning-project publication replay is new canonical work based on published R171 head
+`007600254de767c097a39ccce038a23c89a01963` (PR #352), replacing no preserved legacy commit.
+The independent private reader checks durable claims without granting ordinary admission. Exact
+root correlation, signed content, native review reconstruction and configured human receipt trust
+produce the accepted-head mapping used by subsequent root review candidates. Two approvals across
+reopen pass; disabling the mapping fails the second review as intended. The mutation source was
+restored byte-for-byte. Full validation and PR delivery remain pending. Consumed-context replay,
+production commit/recovery, protected-main integration and all fleet acceptance exits remain open.
+
+R172 full `npm test` passed: 3,967 native tests in 317.354s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+documentation, license, storage, formatting and lint gates. The two-approval regression passed
+inside the full run. Hosted checks and merged delivery remain required. No packaged, graphical,
+OS human-presence or consumed-publication acceptance is claimed.

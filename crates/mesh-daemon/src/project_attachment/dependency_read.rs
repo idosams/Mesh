@@ -84,6 +84,12 @@ pub(crate) struct VerifiedPrivateHistory {
     facts: NativeDependencyFacts,
 }
 impl VerifiedPrivateHistory {
+    pub(crate) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
+        self.facts.is_legacy_operation(operation)
+    }
+    pub(crate) fn policy(&self) -> &DependencyPolicyHistory {
+        &self.facts.policy
+    }
     pub(crate) fn binding(&self) -> NativeDependencyBinding {
         self.facts.binding
     }
@@ -191,6 +197,7 @@ enum RecoveryInspection<'a> {
     Default,
     CompletedStart,
     ConsumedCapture(&'a str),
+    PublicationReplay,
 }
 impl ProjectAttachment {
     pub(super) fn read_configuration(
@@ -251,6 +258,27 @@ impl ProjectAttachment {
             capture,
             RecoveryInspection::Default,
         )
+    }
+
+    // A private replay input, never ordinary admission. Durable publication envelopes are
+    // structurally checked here; configured trust and signed approval are checked by replay.
+    pub(super) fn read_publication_private_history(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+    ) -> io::Result<(String, VerifiedPrivateHistory)> {
+        let (configuration, facts) = self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            None,
+            RecoveryInspection::PublicationReplay,
+        )?;
+        let facts = facts.ok_or_else(|| invalid("publication requires native enrollment"))?;
+        Ok((
+            configuration,
+            VerifiedPrivateHistory::from_independent_facts(facts)?,
+        ))
     }
 
     pub(super) fn read_completed_start_facts(
@@ -378,6 +406,16 @@ impl ProjectAttachment {
         {
             return Err(invalid("invalid legacy enrollment prefix"));
         }
+        if matches!(inspection, RecoveryInspection::PublicationReplay)
+            && base
+                .records()
+                .iter()
+                .any(|r| matches!(r, StoredRecord::Approval(_)))
+        {
+            return Err(invalid(
+                "legacy approved main requires explicit native migration",
+            ));
+        }
         let pending = pending
             .map(|intent| {
                 let parsed = Json::parse(intent).map_err(error)?;
@@ -458,7 +496,9 @@ impl ProjectAttachment {
         for record in suffix.records() {
             match record {
                 StoredRecord::Dependency(record) => {
-                    if record.kind == mesh_store::DependencyKind::Publication {
+                    if record.kind == mesh_store::DependencyKind::Publication
+                        && !matches!(inspection, RecoveryInspection::PublicationReplay)
+                    {
                         return Err(invalid(
                             "native publication receipt verification is unavailable",
                         ));

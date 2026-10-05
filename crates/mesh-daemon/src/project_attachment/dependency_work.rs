@@ -309,6 +309,61 @@ impl AttachmentStorage {
         guard: &crate::workspace_custody::WorkspaceInitializationGuard,
         proof: &super::dependency_read::VerifiedDependencyRead,
         owner_history: &crate::workspace::OpenWorkspace,
+        inspect_parent: impl FnMut(&ProvisionedAttachment, &str) -> io::Result<()>,
+    ) -> io::Result<NativeDependencyWorkBinding> {
+        self.validate_dependency_work_binding(
+            prepared,
+            guard,
+            proof.binding(),
+            |version| {
+                if !owner_history
+                    .workspace_versions()
+                    .iter()
+                    .any(|v| v.operation() == version)
+                {
+                    return Err(invalid(
+                        "ancestry input is not a saved operation of its parent",
+                    ));
+                }
+                owner_history
+                    .historical_workspace_preview(version)
+                    .map(|_| ())
+                    .map_err(error)
+            },
+            inspect_parent,
+        )
+    }
+
+    pub(super) fn validate_publication_root(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        proof: &super::dependency_read::VerifiedPrivateHistory,
+    ) -> io::Result<NativeDependencyWorkBinding> {
+        if prepared.chain.len() != 1
+            || prepared.chain[0].work.id() != prepared.owner.id()
+            || prepared.chain[0].origin.is_some()
+        {
+            return Err(invalid(
+                "root publication replay requires the owning project",
+            ));
+        }
+        proof.verify_current(&prepared.owner.store)?;
+        self.validate_dependency_work_binding(
+            prepared,
+            guard,
+            proof.binding(),
+            |_| Err(invalid("unexpected root publication ancestry")),
+            |_, _| Err(invalid("unexpected root publication parent")),
+        )
+    }
+
+    fn validate_dependency_work_binding(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        owner_binding: crate::dependency_policy::NativeDependencyBinding,
+        mut inspect_owner: impl FnMut(RecordDigest) -> io::Result<()>,
         mut inspect_parent: impl FnMut(&ProvisionedAttachment, &str) -> io::Result<()>,
     ) -> io::Result<NativeDependencyWorkBinding> {
         guard.require_roots(&prepared.roots).map_err(error)?;
@@ -319,7 +374,6 @@ impl AttachmentStorage {
         if self.lane_origin(owner)?.is_some() {
             return Err(invalid("owning root ancestry changed"));
         }
-        let owner_binding = proof.binding();
         if owner_binding.project != hash(owner.project().receipt()?.encode().as_bytes()) {
             return Err(invalid("work owner differs from policy authority"));
         }
@@ -354,18 +408,7 @@ impl AttachmentStorage {
                 let version = field(origin, "source_version")?;
                 if parent.id() == owner.id() {
                     let version = digest(version.strip_prefix("blake3:").unwrap_or(version))?;
-                    if !owner_history
-                        .workspace_versions()
-                        .iter()
-                        .any(|v| v.operation() == version)
-                    {
-                        return Err(invalid(
-                            "ancestry input is not a saved operation of its parent",
-                        ));
-                    }
-                    owner_history
-                        .historical_workspace_preview(version)
-                        .map_err(error)?;
+                    inspect_owner(version)?;
                 } else {
                     inspect_parent(parent, version)?;
                 }

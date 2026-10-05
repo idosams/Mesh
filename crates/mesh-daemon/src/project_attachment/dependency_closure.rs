@@ -48,10 +48,10 @@ struct Node {
     consumption: Option<NativeConsumptionFact>,
 }
 impl NativeDependencyGraph {
-    pub(super) fn review_output(&self) -> Input {
+    pub(crate) fn review_output(&self) -> Input {
         self.root
     }
-    pub(super) fn review_inputs(&self) -> impl Iterator<Item = Input> + '_ {
+    pub(crate) fn review_inputs(&self) -> impl Iterator<Item = Input> + '_ {
         self.nodes.keys().filter(|i| i.0 != self.root.0).copied()
     }
     /// Canonical complete graph digest, independent of work-list and traversal ordering.
@@ -185,6 +185,73 @@ impl NativeDependencyGraph {
         ])
     }
 }
+// Shared content verification for ordinary inspection and private publication replay.
+fn verified_chunks(
+    id: Input,
+    manifests: &BTreeSet<RecordDigest>,
+    cache: &mut BTreeMap<Input, BTreeSet<RecordDigest>>,
+    budget: &mut u64,
+    mut load: impl FnMut(RecordDigest, &mut u64) -> io::Result<BTreeSet<RecordDigest>>,
+) -> io::Result<BTreeSet<RecordDigest>> {
+    if manifests.len() > 4096 {
+        return Err(invalid("operation manifest count exceeds its bound"));
+    }
+    let mut chunks = BTreeSet::new();
+    for manifest in manifests {
+        let key = (id.0, id.1, *manifest);
+        if let std::collections::btree_map::Entry::Vacant(entry) = cache.entry(key) {
+            entry.insert(load(*manifest, budget)?);
+        }
+        chunks.extend(cache[&key].iter().copied());
+        if chunks.len() > 65536 {
+            return Err(invalid("dependency chunk roots exceed their bound"));
+        }
+    }
+    Ok(chunks)
+}
+
+// Private replay graph only: it has no retention projection or collection authority.
+// Consumed works must use a complete independently verified input context.
+pub(super) fn root_publication_graph(
+    root: Input,
+    workspace: mesh_operations::WorkspaceId,
+    history: &crate::workspace::NativePrivateReviewHistory<'_>,
+) -> io::Result<NativeDependencyGraph> {
+    let mut cache = BTreeMap::new();
+    let mut budget = 1024 * 1024 * 1024u64;
+    walk(
+        root,
+        |id| {
+            if (id.0, id.1) != (root.0, root.1) {
+                return Err(invalid("root publication graph contains foreign work"));
+            }
+            let fact = history.graph_operation(id.2).map_err(error)?;
+            if fact.workspace != workspace || fact.operation != id.2 {
+                return Err(invalid(
+                    "signed operation belongs to another native history",
+                ));
+            }
+            let chunks = verified_chunks(
+                id,
+                &fact.manifests,
+                &mut cache,
+                &mut budget,
+                |manifest, budget| history.graph_chunks(manifest, budget).map_err(error),
+            )?;
+            Ok(Node {
+                parents: fact.parents.iter().map(|p| (id.0, id.1, *p)).collect(),
+                manifests: fact.manifests,
+                chunks,
+                consumption: None,
+            })
+        },
+        MAX_NODES,
+        MAX_EDGES,
+        MAX_NODES,
+        MAX_BYTES,
+    )
+}
+
 fn walk(
     root: Input,
     mut load: impl FnMut(Input) -> io::Result<Node>,
@@ -502,25 +569,17 @@ impl AttachmentStorage {
                     }
                     parents.insert(receipt.source);
                 }
-                if fact.manifests.len() > 4096 {
-                    return Err(invalid("operation manifest count exceeds its bound"));
-                }
-                let mut chunks = BTreeSet::new();
-                for manifest in &fact.manifests {
-                    let key = (id.0, id.1, *manifest);
-                    if let std::collections::btree_map::Entry::Vacant(entry) =
-                        verified_manifests.entry(key)
-                    {
-                        let retained = history
-                            .dependency_manifest_chunks(*manifest, &mut content_budget)
-                            .map_err(error)?;
-                        entry.insert(retained);
-                    }
-                    chunks.extend(verified_manifests[&key].iter().copied());
-                    if chunks.len() > 65536 {
-                        return Err(invalid("dependency chunk roots exceed their bound"));
-                    }
-                }
+                let chunks = verified_chunks(
+                    id,
+                    &fact.manifests,
+                    &mut verified_manifests,
+                    &mut content_budget,
+                    |manifest, budget| {
+                        history
+                            .dependency_manifest_chunks(manifest, budget)
+                            .map_err(error)
+                    },
+                )?;
                 Ok(Node {
                     chunks,
                     parents,

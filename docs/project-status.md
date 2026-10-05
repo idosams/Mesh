@@ -7,19 +7,19 @@ PR checks and merge status; this page describes capability and acceptance bounda
 
 ## Current acceptance observation — 5 October 2026
 
-The [acceptance map](plan/fleet-acceptance.md) is refreshed through canonical main `cd9924d`
-and merged registered external-harness proof [#336](https://github.com/idosams/Mesh/pull/336).
-The fixed user checkpoint is `5052009`, with its separate-data launcher, sample project and up to
-four saved-progress panels. Its executable hash and strict signature check passed again; the
-checkpoint is unchanged and does not contain later native dependency/publication work.
+The fixed user checkpoint is now `b064029`, from canonical merged PR #349, with its
+separate-data launcher and sample project. Its executable checksum and strict signature check
+passed again, and its post-merge CI completed successfully. Its native packaged bridge test passed;
+its graphical fleet journey and protected-main approval remain unverified. Earlier checkpoint
+`5052009` is preserved. These copies stay fixed while development continues.
 
-Consumed decisions, retained snapshots, bound reviews and publication framing are merged. Exact
-receipt inspection [#347](https://github.com/idosams/Mesh/pull/347) is published on its reconciled
-base and awaits fresh checks and merge at this observation. Native publication replay, accepted-main
-advancement and complete commit/recovery enforcement remain unfinished. The refreshed external
-Codex result is exact-revision native evidence, not graphical or protected-main acceptance. The Mac
-remained locked at the latest graphical test attempt; signing, another provider/host and the full
-acceptance campaign remain open. Older dated observations below retain their historical scope.
+Consumed decisions, retained snapshots, bound reviews, publication framing, receipt inspection,
+and private-evidence separation are merged through #351. Restricted private reconstruction #352
+has passed all seven hosted checks and awaits normal merge at this observation. R172 adds trusted
+owning-project replay and subsequent review candidates, with its full local gate passing; it is
+not yet merged. Production publication, consumed-child replay, complete recovery, eligible signing,
+another provider/host and the full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
+Older dated observations below retain their historical scope.
 
 ## Product direction
 
@@ -2684,3 +2684,25 @@ R171 full `npm test` passed: 3,966 native tests in 318.565s (six slow, 18 skippe
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 docs, license, storage, format and lint gates. The exact consumed receipt regression passed
 in 43.836s inside that run. Hosted checks and merged delivery remain required.
+
+
+## Owning-project publication replay (R172)
+
+Native read-only replay now verifies ordered owning-project publication receipts against configured
+human credentials, the exact retained snapshot and signed saved-content closure. A sealed mapping
+connects accepted main heads to their saved operations; subsequent review candidates use that
+mapping rather than searching ordinary child review records. Missing trust, unavailable evidence,
+legacy approved-main migration and torn history refuse. Ordinary workspace admission stays fenced.
+
+The focused regression verifies two test-signed approvals across reopen, immutable older review
+contexts after later private saves, and refusal to discard accepted main. Removing the sealed base
+mapping makes that regression fail. Fourteen earlier read/graph/replay regressions passed before the
+second-approval extension; full checks and delivery are pending. These signatures are test fixtures,
+not OS human-presence evidence. This adds no production publication writer, ordinary admission,
+consumed-child replay, recovery completion, or graphical acceptance. Issue #345 remains open.
+
+R172 full `npm test` passed: 3,967 native tests in 317.354s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+documentation, license, storage, formatting and lint gates. The two-approval regression passed
+inside the full run. Hosted checks and merged delivery remain required. No packaged, graphical,
+OS human-presence or consumed-publication acceptance is claimed.

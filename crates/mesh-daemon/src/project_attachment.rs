@@ -78,6 +78,7 @@ mod dependency_work;
 pub use dependency_work::NativeDependencyWorkBinding;
 mod dependency_enrollment;
 mod dependency_owner_context;
+mod dependency_publication_replay;
 mod dependency_read;
 mod dependency_transaction;
 pub use dependency_decision::{NativeInputDecision, SavedInputDecision};
