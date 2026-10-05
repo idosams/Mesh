@@ -40,6 +40,10 @@ pub struct NativeInputDecision {
     revision: u64,
 }
 impl NativeInputDecision {
+    pub(super) fn from_verified_record(record: RecordDigest, revision: u64) -> Self {
+        Self { record, revision }
+    }
+
     /// Exact retained decision payload.
     pub fn record(&self) -> RecordDigest {
         self.record
@@ -128,7 +132,7 @@ pub(super) struct NativeControlInput {
     pub(super) prior: Option<(u64, RecordDigest)>,
 }
 impl NativeControlInput {
-    fn body_at(&self, revision: u64) -> io::Result<Json> {
+    pub(super) fn body_at(&self, revision: u64) -> io::Result<Json> {
         let mut body = self.body.clone();
         let Json::Object(fields) = &mut body else {
             return Err(invalid("invalid native control body"));
