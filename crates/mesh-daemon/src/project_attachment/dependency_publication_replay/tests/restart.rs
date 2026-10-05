@@ -168,6 +168,7 @@ pub(super) fn interrupted_publication(
     public: &[u8],
     journal: &Path,
     cut: &str,
+    after_staging: impl FnOnce(),
 ) -> Json {
     fs::write(root.join("restart-public-key"), public).unwrap();
     fs::write(root.join("restart-receipt"), receipt).unwrap();
@@ -184,6 +185,8 @@ pub(super) fn interrupted_publication(
     };
     let before = fs::read(journal).unwrap();
     run("staged", 75);
+    assert_eq!(fs::read(journal).unwrap(), before);
+    after_staging();
     assert_eq!(fs::read(journal).unwrap(), before);
     run("partial", 76);
     let torn = fs::read(journal).unwrap();

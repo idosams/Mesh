@@ -932,12 +932,24 @@ pub(super) fn assert_revocation_after_staging(
     );
 }
 
+// Each independently scheduled fixture retains the full transaction/restart journey,
+// while one phase owns its exhaustive byte-prefix campaign. Together they cover
+// every original boundary without a single serial campaign owning the CI deadline.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RecoveryCampaign {
+    Start,
+    Checkpoint,
+    Completion,
+}
+
 #[cfg(test)]
 pub(super) fn assert_start_fence(
     prepared: &PreparedNativeConsumedStart,
     storage: &AttachmentStorage,
+    campaign: RecoveryCampaign,
 ) {
-    start_fence::assert_start_fence(prepared, storage);
+    start_fence::assert_start_fence(prepared, storage, campaign);
 }
 
 #[cfg(test)]
