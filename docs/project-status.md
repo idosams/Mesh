@@ -2533,3 +2533,15 @@ regression failed in 21.072s because the read model conflated current eligibilit
 decision freshness. Those are now separate fields in list and detail. The corrected 19-test focus
 passed in 22.102s, proving eligible inputs can coexist with a stale historical vector without
 changing the saved review. Fresh full and hosted validation are required on this correction.
+
+
+The corrected R164 full gate passed 3,957 native tests in 311.575s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks. New review creation now
+uses the same verified-main selector as ordinary attached approval: an existing unverified
+approval cannot silently select genesis. The isolated selector regression failed before this
+change; the corrected 20-test focus passed in 21.859s. Its synthetic unverified legacy receipt
+is not proof of a migrated signed approval. The public native snapshot path already refused
+this fixture earlier for missing legacy ancestry migration evidence; that refusal and original
+journal/source preservation remain tested. This is an explicit base-selector safeguard, not
+a demonstrated public publication bypass. Canonical-base advancement and native publication
+remain pending under issue #345. Hosted validation is required for the updated PR #344 head.

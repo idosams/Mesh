@@ -42,6 +42,12 @@ impl NativeSavedDependencyReview {
 fn error(e: impl std::fmt::Display) -> io::Error {
     io::Error::other(e.to_string())
 }
+fn current_review_base(
+    history: &crate::workspace::OpenWorkspace,
+) -> io::Result<mesh_approval::HeadId> {
+    Ok(super::approval::main_head(history)?.unwrap_or(crate::publication::GENESIS_SHARED_HEAD))
+}
+
 impl AttachmentStorage {
     /// Bind a complete retained native snapshot to one exact immutable saved review.
     pub fn save_dependency_review(
@@ -120,9 +126,7 @@ impl AttachmentStorage {
                             .as_bytes(),
                     )
                 } else {
-                    history
-                        .shared_version()
-                        .unwrap_or(crate::publication::GENESIS_SHARED_HEAD)
+                    current_review_base(&history)?
                 };
                 let bundle = history
                     .native_saved_review_bundle(request.version.operation(), canonical, &evidence)
@@ -174,3 +178,6 @@ impl AttachmentStorage {
 }
 
 mod read;
+
+#[cfg(test)]
+mod tests;
