@@ -16,6 +16,13 @@ use std::{fs, io::Write as _, path::PathBuf};
 
 #[test]
 fn root_publication_reopens_only_with_exact_trusted_receipt() {
+    root_publication_fixture(false);
+}
+#[test]
+fn native_writer_commits_root_publications_against_verified_main() {
+    root_publication_fixture(true);
+}
+fn root_publication_fixture(writer: bool) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
         fn drop(&mut self) {
@@ -23,7 +30,7 @@ fn root_publication_reopens_only_with_exact_trusted_receipt() {
         }
     }
     let root = std::env::temp_dir().join(format!(
-        "mesh-root-publication-replay-{}",
+        "mesh-root-publication-replay-{writer}-{}",
         std::process::id()
     ));
     fs::create_dir(&root).unwrap();
@@ -120,7 +127,16 @@ fn root_publication_reopens_only_with_exact_trusted_receipt() {
     let journal = owner
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
-    {
+    if writer {
+        let committed = storage
+            .commit_native_publication(owner.id(), id(6), bound.record(), &receipt, &trust)
+            .unwrap();
+        assert_eq!(committed.revision(), 1);
+        assert_eq!(
+            committed.head().as_bytes(),
+            preview.reviewed_actor_head().as_bytes()
+        );
+    } else {
         // Test-only durable fixture. This does not exercise OS human presence or a publication writer.
         let _guard = crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
         let (_, evidence) = owner
@@ -274,34 +290,45 @@ fn root_publication_reopens_only_with_exact_trusted_receipt() {
         .with_signature(signature.as_ref().to_vec())
         .unwrap()
         .canonical_bytes();
-    append_test_policy(
-        &owner,
-        DependencyKind::Publication,
-        "mesh.dependency-policy/v5",
-        Json::object([
-            ("request", Json::text(id(9).to_hex())),
-            ("revision", Json::Number(2)),
-            ("previous", Json::text(prior_record.to_hex())),
-            ("review", Json::text(next_review.to_hex())),
-            (
-                "receipt",
-                Json::text(super::super::dependency_transaction::hash(&receipt).to_hex()),
-            ),
-            (
-                "result",
-                Json::text(
-                    RecordDigest::from_bytes(*second_context.reviewed_actor_head().as_bytes())
-                        .to_hex(),
+    if writer {
+        let committed = storage
+            .commit_native_publication(owner.id(), id(9), next_review, &receipt, &trust)
+            .unwrap();
+        assert_eq!(committed.revision(), 2);
+        assert_eq!(
+            committed.head().as_bytes(),
+            second_context.reviewed_actor_head().as_bytes()
+        );
+    } else {
+        append_test_policy(
+            &owner,
+            DependencyKind::Publication,
+            "mesh.dependency-policy/v5",
+            Json::object([
+                ("request", Json::text(id(9).to_hex())),
+                ("revision", Json::Number(2)),
+                ("previous", Json::text(prior_record.to_hex())),
+                ("review", Json::text(next_review.to_hex())),
+                (
+                    "receipt",
+                    Json::text(super::super::dependency_transaction::hash(&receipt).to_hex()),
                 ),
-            ),
-            (
-                "credential",
-                Json::text(RecordDigest::from_bytes(*credential.id().as_bytes()).to_hex()),
-            ),
-            ("challenge", Json::text(id(62).to_hex())),
-        ]),
-        Some(receipt),
-    );
+                (
+                    "result",
+                    Json::text(
+                        RecordDigest::from_bytes(*second_context.reviewed_actor_head().as_bytes())
+                            .to_hex(),
+                    ),
+                ),
+                (
+                    "credential",
+                    Json::text(RecordDigest::from_bytes(*credential.id().as_bytes()).to_hex()),
+                ),
+                ("challenge", Json::text(id(62).to_hex())),
+            ]),
+            Some(receipt),
+        );
+    }
     let reopened_again = AttachmentStorage::open(&root.join("metadata")).unwrap();
     let second = reopened_again
         .inspect_root_publication_history(owner.id(), &trust)
@@ -461,6 +488,21 @@ fn append_test_policy(
 
 #[test]
 fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
+    consumed_publication_fixture(0);
+}
+#[test]
+fn native_writer_commits_consumed_publications_and_recovers_completed_retries() {
+    consumed_publication_fixture(1);
+}
+#[test]
+fn native_writer_preserves_torn_publication_without_acknowledging_or_repairing() {
+    consumed_publication_fixture(2);
+}
+#[test]
+fn native_writer_refuses_new_publication_after_input_rejection() {
+    consumed_publication_fixture(3);
+}
+fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
         ObservationLimits,
@@ -478,7 +520,7 @@ fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
         }
     }
     let root = std::env::temp_dir().join(format!(
-        "mesh-consumed-publication-replay-{}",
+        "mesh-consumed-publication-replay-{writer}-{}",
         std::process::id()
     ));
     fs::create_dir(&root).unwrap();
@@ -555,7 +597,7 @@ fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
     let consumed = storage
         .registered_dependency_versions(destination.id())
         .unwrap()[0];
-    owner
+    let initial_decision = owner
         .decide_saved_input(
             version,
             super::super::SavedInputDecision::Eligible,
@@ -623,6 +665,217 @@ fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
+        if writer != 0 {
+            use super::super::dependency_private_context::publication::Step;
+            let journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+            let before = fs::read(&journal).unwrap();
+            if writer == 3 {
+                owner
+                    .decide_saved_input(
+                        version,
+                        super::super::SavedInputDecision::Rejected,
+                        Some(initial_decision.record()),
+                        id(99),
+                    )
+                    .unwrap();
+                let rejected = fs::read(&journal).unwrap();
+                assert!(storage
+                    .commit_native_publication(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &receipt,
+                        &trust
+                    )
+                    .is_err());
+                assert_eq!(
+                    fs::read(&journal).unwrap(),
+                    rejected,
+                    "rejected input must refuse a new publication without altering history"
+                );
+                assert!(!owner
+                    .metadata_path()
+                    .join("native-publication.pending")
+                    .exists());
+                return id(0);
+            }
+
+            assert!(storage
+                .commit_native_publication(
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    &crate::TrustedReviewers::default()
+                )
+                .is_err());
+            assert!(storage
+                .commit_native_publication(owner.id(), id(challenge), review, &receipt, &trust)
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), before);
+            if writer == 2 {
+                let failure = storage
+                    .commit_native_publication_with_io(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &receipt,
+                        &trust,
+                        |step, file, frame| {
+                            if matches!(step, Step::Staged) {
+                                file.write_all(&frame[..frame.len() / 2])?;
+                                file.sync_all()?;
+                                return Err(std::io::Error::other("interrupted publication frame"));
+                            }
+                            Ok(())
+                        },
+                        |file| file.sync_all(),
+                    )
+                    .unwrap_err();
+                assert!(failure
+                    .to_string()
+                    .contains("interrupted publication frame"));
+                let torn = fs::read(&journal).unwrap();
+                assert!(torn.starts_with(&before) && torn.len() > before.len());
+                assert!(storage
+                    .commit_native_publication(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &receipt,
+                        &trust
+                    )
+                    .is_err());
+                assert!(storage
+                    .inspect_native_publication_history(destination.id(), &trust)
+                    .is_err());
+                assert_eq!(
+                    fs::read(&journal).unwrap(),
+                    torn,
+                    "torn publication must be preserved without acknowledging or repairing"
+                );
+                return id(0);
+            }
+            let failure = storage
+                .commit_native_publication_with_io(
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    &trust,
+                    |step, _, _| {
+                        if matches!(step, Step::Staged) {
+                            Err(std::io::Error::other("staged publication interruption"))
+                        } else {
+                            Ok(())
+                        }
+                    },
+                    |file| file.sync_all(),
+                )
+                .unwrap_err();
+            assert!(failure
+                .to_string()
+                .contains("staged publication interruption"));
+            assert_eq!(
+                fs::read(&journal).unwrap(),
+                before,
+                "staging alone cannot commit approval"
+            );
+            let failure = storage
+                .commit_native_publication_with_io(
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    &trust,
+                    |step, _, _| {
+                        if matches!(step, Step::Appended) {
+                            Err(std::io::Error::other("lost publication acknowledgement"))
+                        } else {
+                            Ok(())
+                        }
+                    },
+                    |file| file.sync_all(),
+                )
+                .unwrap_err();
+            assert!(failure
+                .to_string()
+                .contains("lost publication acknowledgement"));
+            let committed = fs::read(&journal).unwrap();
+            assert!(committed.len() > before.len());
+            let result = storage
+                .commit_native_publication(
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    &trust,
+                )
+                .unwrap();
+            assert_eq!(result.revision(), revision);
+            assert_eq!(
+                result.head().as_bytes(),
+                context.reviewed_actor_head().as_bytes()
+            );
+            assert_eq!(
+                storage
+                    .commit_native_publication(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &receipt,
+                        &trust
+                    )
+                    .unwrap(),
+                result
+            );
+            assert_eq!(
+                fs::read(&journal).unwrap(),
+                committed,
+                "retry must not append twice"
+            );
+            assert!(!owner
+                .metadata_path()
+                .join("native-publication.pending")
+                .exists());
+
+            let other_draft = HumanApprovalReceiptDraft::new(
+                ExpectedHumanApproval::new(
+                    context.clone(),
+                    credential.clone(),
+                    [challenge + 1; 32],
+                ),
+                ApprovalDecision::Approve,
+            );
+            let other_signature = human_key
+                .sign(&rng, &other_draft.canonical_bytes())
+                .unwrap();
+            let other_receipt = other_draft
+                .with_signature(other_signature.as_ref().to_vec())
+                .unwrap()
+                .canonical_bytes();
+            assert!(
+                storage
+                    .commit_native_publication(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &other_receipt,
+                        &trust
+                    )
+                    .is_err(),
+                "a different valid ceremony must not reuse an accepted request"
+            );
+            assert_eq!(fs::read(&journal).unwrap(), committed);
+            let mut wrong = receipt.clone();
+            let last = wrong.len() - 1;
+            wrong[last] ^= 1;
+            assert!(storage
+                .commit_native_publication(destination.id(), id(challenge), review, &wrong, &trust)
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), committed);
+            return result.record();
+        }
         append_test_policy(
             &owner,
             DependencyKind::Publication,
@@ -654,6 +907,9 @@ fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if writer >= 2 {
+        return;
+    }
     let owner_journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
     let child_journal = destination.metadata_path().join(crate::RECORD_FILE_NAME);
     let child_before = fs::read(&child_journal).unwrap();
@@ -777,4 +1033,63 @@ fn consumed_publications_reopen_with_exact_trust_and_prior_main() {
         owner.saved_versions().is_err(),
         "verified replay must not grant ordinary admission"
     );
+
+    if writer == 1 {
+        let (proof, first_receipt) = {
+            let _guard =
+                crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
+            let (_, proof) = owner
+                .project()
+                .read_publication_private_history(owner.metadata_path(), &owner.store)
+                .unwrap();
+            let claim = proof.policy().publication_claim(first_record).unwrap();
+            let cas = Cas::<_, Blake3>::with_filesystem(
+                owner.metadata_path(),
+                owner.store.filesystem().read_only(),
+            )
+            .unwrap();
+            let first_receipt =
+                super::super::dependency_transaction::read_payload(&cas, claim.receipt, 65536)
+                    .unwrap();
+            (proof, first_receipt)
+        };
+        // Independent policy fixture: production control admission after publication is still
+        // separate work. Replay must preserve this historically valid ordering now.
+        append_test_policy(
+            &owner,
+            DependencyKind::Eligibility,
+            "mesh.dependency-policy/v1",
+            super::super::dependency_decision::body(
+                proof.binding().project,
+                proof.binding().installation,
+                version,
+                super::super::SavedInputDecision::Rejected,
+                id(98),
+                2,
+                initial_decision.record(),
+            ),
+            None,
+        );
+        let rejected = fs::read(&owner_journal).unwrap();
+        let recovered = storage
+            .commit_native_publication(
+                destination.id(),
+                id(71),
+                first_review.record(),
+                &first_receipt,
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(recovered.record(), first_record);
+        assert_eq!(recovered.revision(), 1);
+        assert_eq!(
+            recovered.head().as_bytes(),
+            first_context.reviewed_actor_head().as_bytes()
+        );
+        assert_eq!(
+            fs::read(&owner_journal).unwrap(),
+            rejected,
+            "later input rejection must not append or invalidate an exact completed retry"
+        );
+    }
 }
