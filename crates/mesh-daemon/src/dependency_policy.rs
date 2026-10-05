@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod consumption;
 mod review;
 use consumption::{ConsumedComplete, ConsumedStart};
-use review::CompleteReview;
+use review::{BoundReview, CompleteReview};
 
 const SCHEMA: &str = "mesh.dependency-policy/v1";
 const MAX_BYTES: usize = 65_536;
@@ -72,6 +72,7 @@ enum Event {
         replacement: Option<Input>,
     },
     CompleteReview(CompleteReview),
+    BoundReview(BoundReview),
     Review {
         output: Input,
         decisions: Vec<(Input, RecordDigest)>,
@@ -90,6 +91,65 @@ pub(crate) struct NativeConsumptionFact {
 }
 fn qualified(input: Input) -> QualifiedDependencyInput {
     (input.0 .0, input.0 .1, input.1)
+}
+
+/// Native-resolved historical evidence. It grants no present publication authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NativeReviewEvidence {
+    owner: NativeDependencyBinding,
+    snapshot: RecordDigest,
+    output: QualifiedDependencyInput,
+    validation: RecordDigest,
+}
+impl NativeReviewEvidence {
+    pub(crate) fn snapshot(&self) -> RecordDigest {
+        self.snapshot
+    }
+    pub(crate) fn output(&self) -> QualifiedDependencyInput {
+        self.output
+    }
+    pub(crate) fn validation(&self) -> RecordDigest {
+        self.validation
+    }
+    pub(crate) fn detail(&self) -> String {
+        Json::object([
+            ("schema", Json::text("mesh.native-saved-review-evidence/v1")),
+            ("authority", Json::text(self.owner.authority.to_hex())),
+            ("project", Json::text(self.owner.project.to_hex())),
+            ("installation", Json::text(self.owner.installation.to_hex())),
+            ("snapshot", Json::text(self.snapshot.to_hex())),
+            ("validation", Json::text(self.validation.to_hex())),
+        ])
+        .encode()
+    }
+}
+
+/// A retained owner binding resolved together with its exact historical snapshot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NativeReviewBinding {
+    record: RecordDigest,
+    evidence: NativeReviewEvidence,
+    canonical: RecordDigest,
+    bundle: RecordDigest,
+    opener: RecordDigest,
+}
+impl NativeReviewBinding {
+    pub(crate) fn record(&self) -> RecordDigest {
+        self.record
+    }
+    pub(crate) fn evidence(&self) -> &NativeReviewEvidence {
+        &self.evidence
+    }
+    pub(crate) fn canonical(&self) -> mesh_approval::HeadId {
+        mesh_approval::HeadId::from_bytes(*self.canonical.as_bytes())
+    }
+    pub(crate) fn review(&self) -> mesh_store::ReviewRecord {
+        mesh_store::ReviewRecord {
+            bundle: self.bundle,
+            subject_operation: self.evidence.output.2,
+            opened_by: self.opener,
+        }
+    }
 }
 
 /// Bounded, reconstructible historical projection. It grants no permission to consume or publish.
@@ -162,7 +222,12 @@ impl DependencyPolicyHistory {
         let complete_review = value(&json, "schema")?.as_text()
             == Some("mesh.dependency-policy/v3")
             && envelope.kind == DependencyKind::ReviewSnapshot;
-        if (!bound_grant && !complete_review && value(&json, "schema")?.as_text() != Some(SCHEMA))
+        let bound_review = value(&json, "schema")?.as_text() == Some("mesh.dependency-policy/v4")
+            && envelope.kind == DependencyKind::ReviewSnapshot;
+        if (!bound_grant
+            && !complete_review
+            && !bound_review
+            && value(&json, "schema")?.as_text() != Some(SCHEMA))
             || digest(value(&json, "authority")?, false)? != envelope.authority
             || number(value(&json, "revision")?)? != envelope.revision
             || digest(value(&json, "previous")?, true)? != envelope.previous
@@ -176,6 +241,7 @@ impl DependencyPolicyHistory {
             self.binding,
             bound_grant,
             complete_review,
+            bound_review,
         )?;
         if let Some((old, prior)) = self.records.get(&envelope.payload) {
             return if *old == envelope && *prior == event {
@@ -274,6 +340,15 @@ impl DependencyPolicyHistory {
                     *revision,
                     *previous,
                 ) {
+                    return Err(InvalidDependencyHistory);
+                }
+            }
+            Event::BoundReview(review) => {
+                let Some((_, Event::CompleteReview(snapshot))) = self.records.get(&review.snapshot)
+                else {
+                    return Err(InvalidDependencyHistory);
+                };
+                if snapshot.output != review.output {
                     return Err(InvalidDependencyHistory);
                 }
             }
@@ -468,6 +543,65 @@ impl DependencyPolicyHistory {
             _ => None,
         }
     }
+    pub(crate) fn review_evidence(&self, record: RecordDigest) -> Option<NativeReviewEvidence> {
+        let Event::CompleteReview(snapshot) = &self.records.get(&record)?.1 else {
+            return None;
+        };
+        Some(NativeReviewEvidence {
+            owner: self.binding,
+            snapshot: record,
+            output: qualified(snapshot.output),
+            validation: snapshot.validation,
+        })
+    }
+    pub(crate) fn review_binding_body(&self, request: RecordDigest) -> Option<Json> {
+        let record = self.requests.get(&request)?;
+        let Event::BoundReview(review) = &self.records.get(record)?.1 else {
+            return None;
+        };
+        Some(review.body())
+    }
+    pub(crate) fn bound_review(&self, record: RecordDigest) -> Option<NativeReviewBinding> {
+        let Event::BoundReview(review) = &self.records.get(&record)?.1 else {
+            return None;
+        };
+        Some(NativeReviewBinding {
+            record,
+            evidence: self.review_evidence(review.snapshot)?,
+            canonical: review.canonical,
+            bundle: review.bundle,
+            opener: review.opener,
+        })
+    }
+    pub(crate) fn bound_reviews(&self) -> impl Iterator<Item = NativeReviewBinding> + '_ {
+        self.records
+            .keys()
+            .filter_map(|record| self.bound_review(*record))
+    }
+    pub(crate) fn review_snapshot_record_body(&self, record: RecordDigest) -> Option<Json> {
+        let Event::CompleteReview(snapshot) = &self.records.get(&record)?.1 else {
+            return None;
+        };
+        Some(snapshot.body())
+    }
+    pub(crate) fn review_inputs_eligible(&self, record: RecordDigest) -> bool {
+        let Some((_, Event::CompleteReview(snapshot))) = self.records.get(&record) else {
+            return false;
+        };
+        snapshot.decisions.iter().all(|(input, _, _)| {
+            self.decisions
+                .get(input)
+                .is_some_and(|(_, _, eligible)| *eligible)
+        })
+    }
+    pub(crate) fn review_decisions_current(&self, record: RecordDigest) -> bool {
+        let Some((_, Event::CompleteReview(snapshot))) = self.records.get(&record) else {
+            return false;
+        };
+        snapshot.decisions.iter().all(|(input, revision, payload)| {
+            self.decisions.get(input) == Some(&(*revision, *payload, true))
+        })
+    }
     pub(crate) fn eligible_decision(
         &self,
         input: QualifiedDependencyInput,
@@ -571,6 +705,7 @@ fn decode(
     binding: NativeDependencyBinding,
     bound_grant: bool,
     complete_review: bool,
+    bound_review: bool,
 ) -> Result<(Option<RecordDigest>, Event, BTreeSet<RecordDigest>)> {
     let mut roots = BTreeSet::new();
     let mut request = None;
@@ -704,6 +839,12 @@ fn decode(
                 state,
                 replacement,
             }
+        }
+        DependencyKind::ReviewSnapshot if bound_review => {
+            let review = BoundReview::decode(body)?;
+            request = Some(review.request);
+            roots.extend([review.snapshot, review.output.1]);
+            Event::BoundReview(review)
         }
         DependencyKind::ReviewSnapshot if complete_review => {
             let snapshot = CompleteReview::decode(body)?;

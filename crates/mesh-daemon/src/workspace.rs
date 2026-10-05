@@ -2382,7 +2382,46 @@ impl OpenWorkspace {
         String,
     > {
         let canonical_head = self.canonical_head_for_review(review)?;
-        let (context, bundle, state) = self.human_approval_artifact_at(review, canonical_head)?;
+        self.human_approval_preview_with_evidence(review, canonical_head, None)
+    }
+
+    pub(crate) fn native_human_approval_preview(
+        &self,
+        binding: &crate::dependency_policy::NativeReviewBinding,
+    ) -> Result<
+        (
+            mesh_approval::HumanApprovalContext,
+            String,
+            mesh_approval::Digest32,
+            mesh_approval::ReviewBundle,
+            mesh_approval::WorkspaceState,
+        ),
+        String,
+    > {
+        self.human_approval_preview_with_evidence(
+            &binding.review(),
+            binding.canonical(),
+            Some(binding.evidence()),
+        )
+    }
+
+    fn human_approval_preview_with_evidence(
+        &self,
+        review: &ReviewRecord,
+        canonical_head: mesh_approval::HeadId,
+        evidence: Option<&crate::dependency_policy::NativeReviewEvidence>,
+    ) -> Result<
+        (
+            mesh_approval::HumanApprovalContext,
+            String,
+            mesh_approval::Digest32,
+            mesh_approval::ReviewBundle,
+            mesh_approval::WorkspaceState,
+        ),
+        String,
+    > {
+        let (context, bundle, state) =
+            self.human_approval_artifact_with_evidence(review, canonical_head, evidence)?;
         let presentation = bundle.presentation();
         let mut summary = format!("Exact reviewed changes: {}\n", presentation.len());
         for (index, change) in presentation.entries().iter().enumerate() {
@@ -2423,8 +2462,28 @@ impl OpenWorkspace {
         ),
         String,
     > {
-        let (bundle, _, state) =
-            self.publication_review(review.subject_operation, canonical_head, false)?;
+        self.human_approval_artifact_with_evidence(review, canonical_head, None)
+    }
+
+    fn human_approval_artifact_with_evidence(
+        &self,
+        review: &ReviewRecord,
+        canonical_head: mesh_approval::HeadId,
+        evidence: Option<&crate::dependency_policy::NativeReviewEvidence>,
+    ) -> Result<
+        (
+            mesh_approval::HumanApprovalContext,
+            mesh_approval::ReviewBundle,
+            mesh_approval::WorkspaceState,
+        ),
+        String,
+    > {
+        let (bundle, _, state) = self.publication_review_with_evidence(
+            review.subject_operation,
+            canonical_head,
+            false,
+            evidence,
+        )?;
         if bundle.id().digest().as_bytes() != review.bundle.as_bytes() {
             return Err(
                 "the durable review identifier does not match its recomputed bundle".into(),
@@ -2552,6 +2611,33 @@ impl OpenWorkspace {
         ),
         String,
     > {
+        self.publication_review_with_evidence(target, canonical_head, require_current, None)
+    }
+
+    pub(crate) fn native_saved_review_bundle(
+        &self,
+        target: RecordDigest,
+        canonical: mesh_approval::HeadId,
+        evidence: &crate::dependency_policy::NativeReviewEvidence,
+    ) -> Result<RecordDigest, String> {
+        self.publication_review_with_evidence(target, canonical, false, Some(evidence))
+            .map(|(bundle, _, _)| RecordDigest::from_bytes(*bundle.id().digest().as_bytes()))
+    }
+
+    fn publication_review_with_evidence(
+        &self,
+        target: RecordDigest,
+        canonical_head: mesh_approval::HeadId,
+        require_current: bool,
+        evidence: Option<&crate::dependency_policy::NativeReviewEvidence>,
+    ) -> Result<
+        (
+            mesh_approval::ReviewBundle,
+            BTreeMap<mesh_approval::ObjectId, crate::ipc::Json>,
+            mesh_approval::WorkspaceState,
+        ),
+        String,
+    > {
         self.ensure_physical_root()
             .map_err(|error| format!("the workspace directory changed: {error}"))?;
         if require_current {
@@ -2626,6 +2712,19 @@ impl OpenWorkspace {
             private_head,
             mesh_approval::ActorId::from_bytes(*subject_actor.as_bytes()),
         );
+        let request = if let Some(evidence) = evidence {
+            if evidence.output().2 != target {
+                return Err("native review evidence names another saved output".to_owned());
+            }
+            request.with_validations(vec![mesh_approval::ValidationResult::new(
+                "mesh-native-historical-input-evidence/v1",
+                None,
+                mesh_approval::Verdict::Passed,
+                &evidence.detail(),
+            )])
+        } else {
+            request
+        };
         let bundle = mesh_approval::compute_bundle(&request)
             .map_err(|error| format!("the review bundle cannot be computed: {error}"))?;
         let verified_text = bundle
@@ -2926,8 +3025,6 @@ impl OpenWorkspace {
         object: mesh_materializer::ObjectId,
         side: ReviewArtifactSide,
     ) -> Result<VerifiedReviewArtifact, String> {
-        const MAX_ARTIFACT_BYTES: usize = 32 * 1024 * 1024;
-
         let canonical_head = if let Some(review) = self.review(&bundle) {
             if review.subject_operation != target {
                 return Err("the review bundle names another saved version".to_owned());
@@ -2941,7 +3038,38 @@ impl OpenWorkspace {
             self.shared_version()
                 .unwrap_or(crate::publication::GENESIS_SHARED_HEAD)
         };
-        let (computed, _, _) = self.publication_review(target, canonical_head, false)?;
+        self.review_artifact_with_evidence(bundle, target, object, side, canonical_head, None)
+    }
+
+    pub(crate) fn native_review_artifact(
+        &self,
+        binding: &crate::dependency_policy::NativeReviewBinding,
+        object: mesh_materializer::ObjectId,
+        side: ReviewArtifactSide,
+    ) -> Result<VerifiedReviewArtifact, String> {
+        let review = binding.review();
+        self.review_artifact_with_evidence(
+            review.bundle,
+            review.subject_operation,
+            object,
+            side,
+            binding.canonical(),
+            Some(binding.evidence()),
+        )
+    }
+
+    fn review_artifact_with_evidence(
+        &self,
+        bundle: RecordDigest,
+        target: RecordDigest,
+        object: mesh_materializer::ObjectId,
+        side: ReviewArtifactSide,
+        canonical_head: mesh_approval::HeadId,
+        evidence: Option<&crate::dependency_policy::NativeReviewEvidence>,
+    ) -> Result<VerifiedReviewArtifact, String> {
+        const MAX_ARTIFACT_BYTES: usize = 32 * 1024 * 1024;
+        let (computed, _, _) =
+            self.publication_review_with_evidence(target, canonical_head, false, evidence)?;
         if RecordDigest::from_bytes(*computed.id().digest().as_bytes()) != bundle {
             return Err("the review bundle presentation changed".to_owned());
         }
@@ -3011,6 +3139,32 @@ impl OpenWorkspace {
         review: ReviewRecord,
         recorded: bool,
     ) -> crate::ipc::Json {
+        self.review_item_with_binding(bundle, review, recorded, None)
+    }
+
+    pub(crate) fn native_recorded_review_item(
+        &self,
+        binding: &crate::dependency_policy::NativeReviewBinding,
+    ) -> Result<crate::ipc::Json, String> {
+        let review = binding.review();
+        let computed = self.native_saved_review_bundle(
+            review.subject_operation,
+            binding.canonical(),
+            binding.evidence(),
+        )?;
+        if computed != review.bundle {
+            return Err("native review bundle does not match retained evidence".into());
+        }
+        Ok(self.review_item_with_binding(review.bundle, review, true, Some(binding)))
+    }
+
+    fn review_item_with_binding(
+        &self,
+        bundle: RecordDigest,
+        review: ReviewRecord,
+        recorded: bool,
+        native: Option<&crate::dependency_policy::NativeReviewBinding>,
+    ) -> crate::ipc::Json {
         let Some(subject) = self.record_index.operation(&review.subject_operation) else {
             return review_item_json(
                 bundle,
@@ -3045,10 +3199,18 @@ impl OpenWorkspace {
             Err(code) => (Vec::new(), 0, Some(code)),
         };
 
-        let projection = self
-            .canonical_head_for_review(&review)
+        let projection = native
+            .map_or_else(
+                || self.canonical_head_for_review(&review),
+                |binding| Ok(binding.canonical()),
+            )
             .and_then(|canonical_head| {
-                self.publication_review(review.subject_operation, canonical_head, false)
+                self.publication_review_with_evidence(
+                    review.subject_operation,
+                    canonical_head,
+                    false,
+                    native.map(|binding| binding.evidence()),
+                )
             })
             .map_err(|_| "review-bundle-presentation-unavailable")
             .and_then(|(computed, verified_text, _state)| {
@@ -3062,7 +3224,7 @@ impl OpenWorkspace {
                     verified_text,
                 ))
             });
-        if projection.is_err() {
+        if projection.is_err() && native.is_none() {
             // Inspection records can show a canonical no-op while the input-relative lane comparison
             // contains real deletions. They never become publication bundles or approval contexts.
             if let Ok((id, head)) = self

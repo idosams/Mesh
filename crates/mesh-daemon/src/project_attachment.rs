@@ -68,6 +68,8 @@ mod dependency_grant;
 mod grant_admission;
 pub use grant_admission::{NativeGrantInspection, NativeGrantedFile, NativeGrantedInput};
 mod dependency_review_snapshot;
+mod dependency_saved_review;
+pub use dependency_saved_review::{NativeSavedDependencyReview, NativeSavedReviewRequest};
 mod work_decision;
 pub use dependency_grant::{NativeInputGrant, NativeInputGrantRequest};
 pub use dependency_review_snapshot::NativeDependencyReviewSnapshot;

@@ -186,6 +186,170 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     assert_eq!(recover(id(14)), recovered);
     assert_eq!(fs::read(&owner_journal).unwrap(), durable);
     assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+    // A saved review binds the exact snapshot, not just the output or latest decision.
+    let bind = |selected_snapshot, request| {
+        let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        let current_owner = reopened.reopen(owner.id()).unwrap();
+        let current_destination = reopened.reopen(destination.id()).unwrap();
+        reopened.save_dependency_review(
+            &current_owner,
+            super::super::NativeSavedReviewRequest {
+                source: &current_destination,
+                version: consumed,
+                snapshot: selected_snapshot,
+                request,
+                opener: id(22),
+            },
+            &[],
+        )
+    };
+    let before_binding = fs::read(&owner_journal).unwrap();
+    let failed = storage.save_dependency_review_with_io(
+        &owner,
+        super::super::NativeSavedReviewRequest {
+            source: &destination,
+            version: consumed,
+            snapshot,
+            request: id(20),
+            opener: id(22),
+        },
+        &[],
+        |step, file, frame| {
+            if matches!(step, Step::Staged) {
+                file.write_all(&frame[..1])?;
+                file.sync_all()?;
+                return Err(io::Error::other("interrupted bound review"));
+            }
+            Ok(())
+        },
+        |f| f.sync_all(),
+    );
+    assert!(failed.is_err());
+    let partial_binding = fs::read(&owner_journal).unwrap();
+    assert_eq!(&partial_binding[..before_binding.len()], before_binding);
+    assert_eq!(partial_binding.len(), before_binding.len() + 1);
+    assert!(
+        bind(recovered, id(20)).is_err(),
+        "pending review cannot change its snapshot"
+    );
+    assert_eq!(fs::read(&owner_journal).unwrap(), partial_binding);
+    let bound = bind(snapshot, id(20)).unwrap();
+    let after_binding = fs::read(&owner_journal).unwrap();
+    assert_eq!(bind(snapshot, id(20)).unwrap(), bound);
+    assert_eq!(fs::read(&owner_journal).unwrap(), after_binding);
+    let other_bound = bind(recovered, id(21)).unwrap();
+    assert_ne!(
+        bound.bundle(),
+        other_bound.bundle(),
+        "distinct snapshots remain independently addressable"
+    );
+    assert!(storage
+        .save_dependency_review_with_io(
+            &owner,
+            super::super::NativeSavedReviewRequest {
+                source: &destination,
+                version: consumed,
+                snapshot,
+                request: id(23),
+                opener: id(22),
+            },
+            &[],
+            |step, _, _| {
+                if matches!(step, Step::Appended) {
+                    return Err(io::Error::other("lost bound review reply"));
+                }
+                Ok(())
+            },
+            |f| f.sync_all()
+        )
+        .is_err());
+    let lost_reply = fs::read(&owner_journal).unwrap();
+    let recovered_bound = bind(snapshot, id(23)).unwrap();
+    assert_eq!(recovered_bound.bundle(), bound.bundle());
+    assert_ne!(recovered_bound.record(), bound.record());
+    assert_eq!(fs::read(&owner_journal).unwrap(), lost_reply);
+    assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+    let inspect = || {
+        AttachmentStorage::open(&root.join("metadata"))
+            .unwrap()
+            .saved_dependency_review(destination.id(), bound.record())
+            .unwrap()
+    };
+    let displayed = inspect();
+    assert_eq!(
+        displayed.get("historical_decisions_current"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        displayed.get("inputs_currently_eligible"),
+        Some(&Json::Bool(true))
+    );
+    assert_eq!(
+        displayed.get("approval_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        displayed.get("review").unwrap().get("bundle"),
+        Some(&Json::text(bound.bundle().to_hex()))
+    );
+    let Some(Json::Array(changes)) = displayed.get("review").unwrap().get("bundle_changes") else {
+        panic!("missing exact changes")
+    };
+    let note = changes
+        .iter()
+        .find(|change| change.get("path_after").and_then(Json::as_text) == Some("/note"))
+        .unwrap();
+    let object =
+        mesh_materializer::ObjectId::parse(note.get("object_id").and_then(Json::as_text).unwrap())
+            .unwrap();
+    let inspect_file = || {
+        AttachmentStorage::open(&root.join("metadata"))
+            .unwrap()
+            .saved_dependency_review_file(destination.id(), bound.record(), object, true)
+            .unwrap()
+    };
+    assert_eq!(inspect_file(), b"exact native input");
+    assert!(storage
+        .saved_dependency_review_file(destination.id(), bound.record(), object, false)
+        .is_err());
+    assert!(storage
+        .saved_dependency_review_file(
+            destination.id(),
+            bound.record(),
+            mesh_materializer::ObjectId::from_bytes([255; 16]),
+            true
+        )
+        .is_err());
+    assert!(storage
+        .saved_dependency_review(owner.id(), bound.record())
+        .is_err());
+    assert!(storage
+        .saved_dependency_review(destination.id(), id(99))
+        .is_err());
+    let listed = storage
+        .saved_dependency_reviews(destination.id(), None)
+        .unwrap();
+    let Some(Json::Array(rows)) = listed.get("reviews") else {
+        panic!("missing review list")
+    };
+    assert_eq!(rows.len(), 3);
+    assert!(rows
+        .iter()
+        .any(|row| row.get("record") == Some(&Json::text(other_bound.record().to_hex()))));
+    let preview = storage
+        .saved_dependency_review_preview(destination.id(), bound.record())
+        .unwrap();
+    assert_eq!(
+        preview.0.review_bundle().digest().as_bytes(),
+        bound.bundle().as_bytes()
+    );
+    let other_preview = storage
+        .saved_dependency_review_preview(destination.id(), other_bound.record())
+        .unwrap();
+    assert_ne!(
+        preview.0.validation_digest(),
+        other_preview.0.validation_digest()
+    );
     struct RestoreRoot(PathBuf, PathBuf);
     impl Drop for RestoreRoot {
         fn drop(&mut self) {
@@ -254,7 +418,7 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap(),
         journal
     );
-    owner
+    let rejection = owner
         .decide_saved_input(
             version,
             super::super::SavedInputDecision::Rejected,
@@ -263,6 +427,39 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         )
         .unwrap();
     let rejected = fs::read(owner.metadata_path().join(crate::RECORD_FILE_NAME)).unwrap();
+    let historical = inspect();
+    assert_eq!(
+        historical.get("historical_decisions_current"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(
+        historical.get("inputs_currently_eligible"),
+        Some(&Json::Bool(false))
+    );
+    for field in [
+        "record",
+        "snapshot",
+        "canonical",
+        "historical_validation",
+        "historical_decisions",
+        "historical_graph",
+        "review",
+    ] {
+        assert_eq!(
+            historical.get(field),
+            displayed.get(field),
+            "historical {field} changed after rejection"
+        );
+    }
+    assert_eq!(inspect_file(), b"exact native input");
+    assert_eq!(
+        storage
+            .saved_dependency_review_preview(destination.id(), bound.record())
+            .unwrap(),
+        preview
+    );
+
+    assert_eq!(bind(snapshot, id(20)).unwrap(), bound);
     assert_eq!(
         storage
             .save_dependency_review_snapshot(&owner, &destination, consumed, &[], id(10))
@@ -287,11 +484,87 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     let graph_bytes = fs::read(&graph_path).unwrap();
     fs::write(&graph_path, b"substituted graph object").unwrap();
     assert!(storage
+        .saved_dependency_review(destination.id(), bound.record())
+        .is_err());
+    assert!(storage
+        .saved_dependency_review_preview(destination.id(), bound.record())
+        .is_err());
+    assert!(storage
+        .saved_dependency_review_file(destination.id(), bound.record(), object, true)
+        .is_err());
+
+    assert!(bind(snapshot, id(20)).is_err());
+    assert!(storage
         .save_dependency_review_snapshot(&owner, &destination, consumed, &[], id(10))
         .is_err());
     assert_eq!(fs::read(&owner_journal).unwrap(), rejected);
     fs::write(&graph_path, graph_bytes).unwrap();
     assert_eq!(recover(id(10)), snapshot);
+    fs::write(
+        destination.project().root().join("note"),
+        b"later private progress",
+    )
+    .unwrap();
+    let later_input = destination
+        .project()
+        .capture_inputs(ObservationLimits::default())
+        .unwrap();
+    let later = storage
+        .prepare_registered_dependency_capture(&destination, &later_input, actor, id(30), sign)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert_ne!(later.operation(), consumed.operation());
+    assert_eq!(
+        inspect(),
+        historical,
+        "later saved output replaced historical review evidence"
+    );
+    assert_eq!(inspect_file(), b"exact native input");
+    assert_eq!(
+        storage
+            .saved_dependency_review_preview(destination.id(), bound.record())
+            .unwrap(),
+        preview
+    );
+    assert_eq!(bind(snapshot, id(20)).unwrap(), bound);
+    owner
+        .decide_saved_input(
+            version,
+            super::super::SavedInputDecision::Eligible,
+            Some(rejection.record()),
+            id(31),
+        )
+        .unwrap();
+    let revalidated = inspect();
+    assert_eq!(
+        revalidated.get("historical_decisions_current"),
+        Some(&Json::Bool(false))
+    );
+    let revalidated_list = storage
+        .saved_dependency_reviews(destination.id(), None)
+        .unwrap();
+    let Some(Json::Array(items)) = revalidated_list.get("reviews") else {
+        panic!("missing reviews")
+    };
+    for item in items {
+        assert_eq!(
+            item.get("inputs_currently_eligible"),
+            Some(&Json::Bool(true))
+        );
+        assert_eq!(
+            item.get("historical_decisions_current"),
+            Some(&Json::Bool(false))
+        );
+    }
+
+    assert_eq!(
+        revalidated.get("inputs_currently_eligible"),
+        Some(&Json::Bool(true)),
+        "revalidated input is eligible even when the historical decision revision is stale"
+    );
+    assert_eq!(revalidated.get("review"), displayed.get("review"));
+    assert_eq!(inspect_file(), b"exact native input");
     // Retain only this fully asserted synthetic fixture when explicitly requested by a proof run.
     if let Some(export) = std::env::var_os("MESH_REVIEW_SNAPSHOT_FIXTURE") {
         let export = PathBuf::from(export);

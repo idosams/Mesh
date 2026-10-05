@@ -320,3 +320,53 @@ mod tests {
         }
     }
 }
+
+/// Required owner-journal link to one complete immutable snapshot. This is historical
+/// review evidence, not a grant, current-eligibility assertion or human receipt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct BoundReview {
+    pub(super) request: RecordDigest,
+    pub(super) snapshot: RecordDigest,
+    pub(super) output: Input,
+    pub(super) canonical: RecordDigest,
+    pub(super) bundle: RecordDigest,
+    pub(super) opener: RecordDigest,
+}
+impl BoundReview {
+    pub(super) fn body(&self) -> Json {
+        Json::object([
+            ("request", Json::text(self.request.to_hex())),
+            ("revision", Json::Number(1)),
+            ("snapshot", Json::text(self.snapshot.to_hex())),
+            ("output", input_json(self.output)),
+            ("canonical", Json::text(self.canonical.to_hex())),
+            ("bundle", Json::text(self.bundle.to_hex())),
+            ("opener", Json::text(self.opener.to_hex())),
+        ])
+    }
+    pub(super) fn decode(body: &Json) -> Result<Self> {
+        fields(
+            body,
+            &[
+                "request",
+                "revision",
+                "snapshot",
+                "output",
+                "canonical",
+                "bundle",
+                "opener",
+            ],
+        )?;
+        if number(value(body, "revision")?)? != 1 {
+            return Err(InvalidDependencyHistory);
+        }
+        Ok(Self {
+            request: digest(value(body, "request")?, false)?,
+            snapshot: digest(value(body, "snapshot")?, false)?,
+            output: input(value(body, "output")?)?,
+            canonical: digest(value(body, "canonical")?, true)?,
+            bundle: digest(value(body, "bundle")?, false)?,
+            opener: digest(value(body, "opener")?, false)?,
+        })
+    }
+}

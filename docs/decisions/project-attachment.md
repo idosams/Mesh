@@ -696,3 +696,32 @@ stop, missing-owner refusal without journal changes, unknown-registration refusa
 bytes and unchanged original project contents. Supplying a different build revision failed before
 capture. The exact executable and fixture are retained for inspection. This is headless development
 executable proof, not packaged graphical, existing external-provider, or protected-main acceptance.
+
+### Native saved dependency review bindings
+
+A required `mesh.dependency-policy/v4` review binding lives in the owning authority journal.
+It names one already-retained complete snapshot, its exact qualified output, selected canonical
+base, computed bundle and opener, with a stable native request identity. The opener is attribution,
+not approval authority. Replay rejects missing or foreign snapshots, changed outputs, incomplete
+fields and unsupported revisions. The earlier v3 reader refuses this required format.
+
+The bundle carries native-resolved historical evidence that includes owner identity, snapshot
+record and validation digest. Existing ordinary reviews retain their computation without that
+evidence. Native creation, reopening, list/detail, exact file sides and human-review preview use
+one explicit binding through complete registered custody; a child lane is matched by its verified
+stable work and installation identities, not its enrollment project identity. There is no ordinary
+review fallback and no actor-supplied validation string.
+
+Historical graph, input decisions, bundle, file bytes and review context stay pinned after a later
+save or rejection. Present input eligibility is reported separately. Exact request recovery keeps
+the retained canonical base; changed retry evidence refuses. Interrupted append and lost reply
+recover the same binding without a child-journal write. Bundle identifiers are not local CAS roots.
+These APIs are native-only: they do not expose enrollment, collect a human receipt, authorize a
+provider, or admit protected-main publication. All publication paths still require the separate
+complete-context admission and rejection-order work before user-facing activation.
+
+The native read model reports `inputs_currently_eligible` independently from
+`historical_decisions_current`. Revalidation can make the selected inputs eligible again while
+leaving the review's retained decision revisions stale. Neither flag grants publication authority;
+publication must independently admit the exact current vector under custody. List and detail use
+the same distinction, and historical graph, bundle, preview and file bytes remain unchanged.
