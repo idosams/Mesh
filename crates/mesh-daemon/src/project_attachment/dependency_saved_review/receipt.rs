@@ -1,12 +1,14 @@
 //! Exact historical receipt verification. This does not commit or authorize publication.
 use super::*;
-use crate::{dependency_policy::NativeReviewBinding, workspace::OpenWorkspace, TrustedReviewers};
+use crate::{
+    dependency_policy::NativeReviewBinding, workspace::NativePrivateReviewHistory, TrustedReviewers,
+};
 use mesh_approval::{ExpectedHumanApproval, HumanApprovalReceipt};
 
 pub(super) const MAX_RECEIPT_BYTES: usize = 65_536;
 
 pub(super) fn check_receipt(
-    history: &OpenWorkspace,
+    history: &NativePrivateReviewHistory<'_>,
     binding: &NativeReviewBinding,
     bytes: &[u8],
     trusted: &TrustedReviewers,
@@ -26,9 +28,7 @@ pub(super) fn check_receipt(
     }
     // Reconstruct from the owner-held binding and exact saved output. Carried context never
     // selects the work, bundle, canonical base, validation evidence or resulting head.
-    let (native, _, _, _, _) = history
-        .native_human_approval_preview(binding)
-        .map_err(error)?;
+    let native = history.approval_context(binding).map_err(error)?;
     let expected = ExpectedHumanApproval::new(native, credential, *carried.challenge());
     mesh_approval::verify_human_approval_receipt(bytes, &expected).map_err(error)?;
     Ok(expected)

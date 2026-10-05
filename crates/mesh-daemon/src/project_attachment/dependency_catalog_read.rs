@@ -18,6 +18,27 @@ pub(super) struct VerifiedCatalogDependencyRead<'a> {
     pub(super) owner: &'a ProvisionedAttachment,
     pub(super) owner_proof: &'a super::VerifiedDependencyRead,
     pub(super) work_binding: &'a super::NativeDependencyWorkBinding,
+    work_proof: &'a super::VerifiedDependencyRead,
+    guard: &'a crate::workspace_custody::WorkspaceInitializationGuard,
+}
+
+impl VerifiedCatalogDependencyRead<'_> {
+    pub(super) fn private_review_history(
+        &self,
+    ) -> io::Result<crate::workspace::NativePrivateReviewHistory<'_>> {
+        crate::workspace::NativePrivateReviewHistory::open(
+            self.work.metadata_path(),
+            self.work.store.clone(),
+            self.work_proof.private_evidence(),
+            (&self.owner.store, self.owner_proof.private_evidence()),
+            mesh_operations::WorkspaceId::from_bytes(super::history::short_id(
+                self.configuration.as_bytes(),
+            )),
+            self.work_binding,
+            self.guard,
+        )
+        .map_err(error)
+    }
 }
 
 impl AttachmentStorage {
@@ -170,6 +191,8 @@ impl AttachmentStorage {
             configuration: &configuration,
             owner,
             owner_proof: &owner_proof,
+            work_proof: &proof,
+            guard: &guard,
             work_binding: &work_binding
                 .ok_or_else(|| invalid("verified selected work binding is missing"))?,
         })?;

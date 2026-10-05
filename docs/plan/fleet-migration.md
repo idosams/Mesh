@@ -7672,3 +7672,16 @@ for issue #345, not completed native replay or publication.
 R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.
+
+
+R171 restricted private review reconstruction is new canonical work on published R170 head
+`cc27577ca07748e49e82f2bf01cdf72d96054112`; it replaces no preserved legacy implementation. Native
+receipt inspection now uses a read-only, custody-bound adapter with exact owner/work revalidation.
+The exact receipt fixture passed and the corrected stale-journal mutation failed as intended.
+An earlier desktop-only mutation did not cover the new assertions; its log is retained. Full
+validation and delivery remain pending. Trusted replay and the complete fleet scope remain open.
+
+R171 full `npm test` passed: 3,966 native tests in 318.565s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, format and lint gates. The exact consumed receipt regression passed
+in 43.836s inside that run. Hosted checks and merged delivery remain required.

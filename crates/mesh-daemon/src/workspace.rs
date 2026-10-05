@@ -34,6 +34,8 @@
 //! re-implemented here.
 
 mod dependency_ancestry;
+mod native_private_review;
+pub(crate) use native_private_review::NativePrivateReviewHistory;
 mod orphan_collection;
 pub(crate) use orphan_collection::OrphanCollectionSource;
 mod remote_input_export;
@@ -1149,6 +1151,7 @@ enum WorkspaceOpenRecovery<'a> {
     MetadataOnly,
     HistoryOnly,
     DependencyHistory(&'a crate::project_attachment::VerifiedDependencyRead),
+    PrivateDependencyHistory(&'a crate::project_attachment::VerifiedPrivateHistory),
 }
 
 struct PreparedWorkspaceAuthority {
@@ -1600,7 +1603,9 @@ impl OpenWorkspace {
             RecordFile::open_pinned(&storage_pinned_root, record_relative, record_file.clone())
         } else if matches!(
             recovery,
-            WorkspaceOpenRecovery::HistoryOnly | WorkspaceOpenRecovery::DependencyHistory(_)
+            WorkspaceOpenRecovery::HistoryOnly
+                | WorkspaceOpenRecovery::DependencyHistory(_)
+                | WorkspaceOpenRecovery::PrivateDependencyHistory(_)
         ) {
             storage_pinned_root
                 .filesystem()
@@ -1623,6 +1628,10 @@ impl OpenWorkspace {
         let scan = scan_journal(&bytes).map_err(OpenFailure::Damaged)?;
         let boundary = scan.boundary();
         if let WorkspaceOpenRecovery::DependencyHistory(proof) = recovery {
+            proof
+                .verify(&storage_pinned_root, &file.file, &bytes)
+                .map_err(OpenFailure::Unreachable)?;
+        } else if let WorkspaceOpenRecovery::PrivateDependencyHistory(proof) = recovery {
             proof
                 .verify(&storage_pinned_root, &file.file, &bytes)
                 .map_err(OpenFailure::Unreachable)?;
@@ -1672,7 +1681,9 @@ impl OpenWorkspace {
         let filesystem = storage_pinned_root.filesystem();
         let filesystem = if matches!(
             recovery,
-            WorkspaceOpenRecovery::HistoryOnly | WorkspaceOpenRecovery::DependencyHistory(_)
+            WorkspaceOpenRecovery::HistoryOnly
+                | WorkspaceOpenRecovery::DependencyHistory(_)
+                | WorkspaceOpenRecovery::PrivateDependencyHistory(_)
         ) {
             filesystem.read_only()
         } else {

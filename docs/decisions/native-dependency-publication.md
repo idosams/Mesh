@@ -204,3 +204,32 @@ Full validation and delivery remain required.
 R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.
+
+
+## Restricted private review reconstruction (R171)
+
+Native receipt inspection now reconstructs its expected context through a private read-only
+workspace adapter. The adapter owns a read-only journal/CAS view, borrows the complete custody
+guard, checks the selected work/installation and owner binding, and rechecks both exact journal
+snapshots before and after reconstruction. It exposes only approval-context reconstruction, with
+no workspace accessor, Deref, main lookup, append, receipt promotion or mutation method. It verifies
+the native configuration and explicitly refuses a nonzero canonical head until sealed trusted
+predecessor replay is available. An absent trusted main is never silently interpreted as genesis.
+
+The current catalog route supplies private evidence downgraded from already-admitted history.
+The early publication-record fence remains: this does not yet open journals containing native
+publications, resolve consumed histories against such an owner, or commit approval. No external API
+or persisted format changes. Repeated journal reads are bounded; no latency improvement is claimed.
+
+The exact consumed receipt fixture passed in 29.133s, including changed owner/child journals,
+wrong-work and unsupported-ancestry refusals, historical signatures and unchanged source/history.
+Removing adapter freshness checks made its stale-journal assertion fail in 12.357s; source was
+restored byte-for-byte. An earlier mutation selected only the desktop saved-progress journey and
+passed; it did not exercise these assertions. That selection mistake was corrected, not treated
+as mutation proof. The separate desktop journey passed in 41.158s. Initial compilation used the
+wrong WorkspaceId type; using the existing operation identity fixed it. Full checks remain required.
+
+R171 full `npm test` passed: 3,966 native tests in 318.565s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, format and lint gates. The exact consumed receipt regression passed
+in 43.836s inside that run. Hosted checks and merged delivery remain required.
