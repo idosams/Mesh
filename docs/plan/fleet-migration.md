@@ -7436,3 +7436,13 @@ and depends on published catalog-read #327 at `62cdcadd9afa70df0d5325114d0eb7262
 Post-merge CI for #326 passed (run `37244087413`). Discovery still requires publication, hosted
 checks and normal merge; desktop/harness integration and the full issue #323 remain open.
 The fixed checkpoint is unchanged.
+
+
+R161 discovery PR #328 passed all seven hosted checks on
+`67e6c0cc3b765378f7f9d89f38a4b9fd68c313f7` (run `37245205962`). Reconciliation
+`bb83272fc1e56466627ef5b93b518d9b75c71372` incorporates merged catalog-read #327/main
+`e6ebb4f4ee048e7ac98063b81715dd07b7b65363`; its entire tree is identical to that tested head.
+The following update records evidence only. PR #328 now needs fresh current-head checks against
+main before normal merge. The full local gate remains 3,949 native, 194 rendered, 672 desktop and
+44 daemon checks. Owning-root selection is separately preserved and fully locally tested but not
+published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
