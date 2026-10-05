@@ -1,0 +1,40 @@
+{
+  "schema": "mesh.registered-external-harness-acceptance/v1",
+  "passed": true,
+  "revision": "170518353d8901561ddd7dce5e6572d1f0ffacb0",
+  "executable_sha256": "97b60cc81cb51f1586819b3d26cdfc7e25588896ff05789bbebab84b7abea370",
+  "provider_version": "codex-cli 0.158.0-alpha.2.1",
+  "provider_options": [
+    "exec",
+    "--ignore-user-config",
+    "--sandbox",
+    "workspace-write",
+    "--json",
+    "--ephemeral",
+    "--color",
+    "never",
+    "-c",
+    "approval_policy=\"never\"",
+    "-"
+  ],
+  "provider_started_by_mesh": false,
+  "same_provider_alive_before_watch_and_after_stop": true,
+  "git_index_and_head_preserved": true,
+  "root_inode_preserved": true,
+  "owner_content_preserved": true,
+  "post_stop_external_edit_preserved": true,
+  "history_unchanged_after_stop": true,
+  "versions_before": 4,
+  "versions_after": 6,
+  "first_edit_elapsed_ms": 16307,
+  "elapsed_ms": 28148,
+  "graphical": false,
+  "packaged": false,
+  "protected_main_approval": false,
+  "limitations": [
+    "Controlled noninteractive provider process in synthetic registered consumed lane",
+    "Registration and consumed input prepared by native fixture",
+    "No graphical review, exact snapshot preview, integration, restoration, second provider or second host verified",
+    "No matched velocity baseline or cost measurement"
+  ]
+}
