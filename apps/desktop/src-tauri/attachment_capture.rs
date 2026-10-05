@@ -4,7 +4,8 @@
 use mesh_crypto::{KeyCustody as _, SigningPayload};
 use mesh_daemon::ipc::Json;
 use mesh_daemon::project_attachment::{
-    AttachmentCaptureService, CapturePhase, CaptureSchedule, ObservationLimits, ProjectAttachment,
+    AttachmentCaptureService, AttachmentStorage, CapturePhase, CaptureSchedule, ObservationLimits,
+    ProjectAttachment,
 };
 use mesh_daemon::CheckpointSigner;
 use mesh_keychain::SoftwareActorCustody;
@@ -86,14 +87,17 @@ enum Action {
 struct Invocation {
     action: Action,
     metadata: PathBuf,
+    registration: Option<String>,
 }
 fn parse(args: &[String]) -> Result<Option<Invocation>, String> {
-    if args.first().map(String::as_str) != Some("--mesh-attachment") {
-        return Ok(None);
-    }
-    if args.len() != 3 {
+    let registered = match args.first().map(String::as_str) {
+        Some("--mesh-attachment") => false,
+        Some("--mesh-registered-attachment") => true,
+        _ => return Ok(None),
+    };
+    if args.len() != if registered { 4 } else { 3 } {
         return Err(
-            "Usage: Mesh --mesh-attachment <capture|watch|versions> <absolute-metadata-folder>"
+            "Usage: Mesh --mesh-attachment <capture|watch|versions> <absolute-metadata-folder>, or Mesh --mesh-registered-attachment <capture|watch|versions> <absolute-storage-folder> <registration-id>"
                 .to_owned(),
         );
     }
@@ -107,7 +111,26 @@ fn parse(args: &[String]) -> Result<Option<Invocation>, String> {
     if !metadata.is_absolute() {
         return Err("The attachment metadata folder must be absolute".to_owned());
     }
-    Ok(Some(Invocation { action, metadata }))
+    let registration = if registered {
+        let id = &args[3];
+        if id.len() != 64
+            || !id
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(
+                "The registration identity must be 64 lowercase hexadecimal characters".into(),
+            );
+        }
+        Some(id.clone())
+    } else {
+        None
+    };
+    Ok(Some(Invocation {
+        action,
+        metadata,
+        registration,
+    }))
 }
 
 pub fn run_if_requested() -> Option<Result<(), String>> {
@@ -128,8 +151,25 @@ fn run(
     input: impl Read + Send + 'static,
     mut output: impl Write,
 ) -> Result<(), String> {
-    let attachment = ProjectAttachment::reopen(&invocation.metadata)
-        .map_err(|_| "The registered project is unavailable or its identity changed".to_owned())?;
+    let registered = invocation
+        .registration
+        .as_ref()
+        .map(|id| {
+            let storage = AttachmentStorage::open(&invocation.metadata).map_err(|_| {
+                "Registered storage is unavailable or its identity changed".to_owned()
+            })?;
+            let selected = storage.reopen(id).map_err(|_| {
+                "The registered project is unavailable or its identity changed".to_owned()
+            })?;
+            Ok::<_, String>((storage, selected))
+        })
+        .transpose()?;
+    let attachment = match &registered {
+        Some((_, selected)) => selected.project().clone(),
+        None => ProjectAttachment::reopen(&invocation.metadata).map_err(|_| {
+            "The registered project is unavailable or its identity changed".to_owned()
+        })?,
+    };
     match invocation.action {
         Action::Capture => {
             let signer = NativeCaptureSigner::generate()?;
@@ -138,8 +178,10 @@ fn run(
                 .map_err(|_| {
                     "A complete bounded capture could not be read; no version was saved".to_owned()
                 })?;
-            let saved = attachment.save_capture(&invocation.metadata, &captured, signer.public_key(), |payload| signer.sign(payload))
-                .map_err(|_| "Capture could not be confirmed; existing history was preserved and may need reconciliation".to_owned())?;
+            let saved = match &registered {
+                Some((storage, selected)) => storage.save_registered_capture(selected, &captured, signer.public_key(), |payload| signer.sign(payload)),
+                None => attachment.save_capture(&invocation.metadata, &captured, signer.public_key(), |payload| signer.sign(payload)),
+            }.map_err(|_| "Capture could not be confirmed; existing history was preserved and may need reconciliation".to_owned())?;
             emit(
                 &mut output,
                 Json::object([
@@ -151,11 +193,13 @@ fn run(
             )
         }
         Action::Versions => {
-            let versions = attachment
-                .saved_versions(&invocation.metadata)
-                .map_err(|_| {
-                    "Saved attachment history is unavailable or needs reconciliation".to_owned()
-                })?;
+            let versions = match &registered {
+                Some((storage, selected)) => storage.registered_review_versions(selected),
+                None => attachment.saved_versions(&invocation.metadata),
+            }
+            .map_err(|_| {
+                "Saved attachment history is unavailable or needs reconciliation".to_owned()
+            })?;
             emit(
                 &mut output,
                 Json::object([
@@ -173,11 +217,20 @@ fn run(
             )
         }
         Action::Watch => {
-            let service = AttachmentCaptureService::start(
-                &invocation.metadata,
-                NativeCaptureSigner::generate()?,
-                CaptureSchedule::default(),
-            )
+            let signer = NativeCaptureSigner::generate()?;
+            let service = match &registered {
+                Some((storage, selected)) => AttachmentCaptureService::start_registered(
+                    storage,
+                    selected,
+                    signer,
+                    CaptureSchedule::default(),
+                ),
+                None => AttachmentCaptureService::start(
+                    &invocation.metadata,
+                    signer,
+                    CaptureSchedule::default(),
+                ),
+            }
             .map_err(|_| "Background capture could not start for this registration".to_owned())?;
             watch(service, input, &mut output)
         }
@@ -274,6 +327,19 @@ fn watch(
 }
 
 #[cfg(test)]
+pub(crate) fn test_run(
+    args: &[String],
+    input: impl Read + Send + 'static,
+    output: impl Write,
+) -> Result<(), String> {
+    run(
+        parse(args)?.ok_or("attachment invocation required")?,
+        input,
+        output,
+    )
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
@@ -307,7 +373,35 @@ mod tests {
                 .action,
             Action::Capture
         );
+        let id = "a".repeat(64);
+        let registered = parse(&args(&[
+            "--mesh-registered-attachment",
+            "watch",
+            "/storage",
+            &id,
+        ]))
+        .unwrap()
+        .unwrap();
+        assert_eq!(registered.registration.as_deref(), Some(id.as_str()));
+        assert_eq!(registered.action, Action::Watch);
         for values in [
+            vec!["--mesh-registered-attachment", "capture", "/storage"],
+            vec!["--mesh-registered-attachment", "capture", "relative", &id],
+            vec![
+                "--mesh-registered-attachment",
+                "capture",
+                "/storage",
+                "../project",
+            ],
+            vec!["--mesh-registered-attachment", "capture", "/storage", "A"],
+            vec!["--mesh-registered-attachment", "approve", "/storage", &id],
+            vec![
+                "--mesh-registered-attachment",
+                "capture",
+                "/storage",
+                &id,
+                "extra",
+            ],
             vec!["--mesh-attachment"],
             vec!["--mesh-attachment", "capture", "relative"],
             vec!["--mesh-attachment", "approve", "/metadata"],
@@ -333,6 +427,7 @@ mod tests {
             Invocation {
                 action: Action::Capture,
                 metadata: metadata.clone(),
+                registration: None,
             },
             Cursor::new(Vec::<u8>::new()),
             &mut output,
@@ -344,6 +439,7 @@ mod tests {
             Invocation {
                 action: Action::Capture,
                 metadata: metadata.clone(),
+                registration: None,
             },
             Cursor::new(Vec::<u8>::new()),
             &mut output,
@@ -364,6 +460,7 @@ mod tests {
             Invocation {
                 action: Action::Versions,
                 metadata: metadata.clone(),
+                registration: None,
             },
             Cursor::new(Vec::<u8>::new()),
             &mut output,
