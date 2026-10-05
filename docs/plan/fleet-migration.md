@@ -7570,3 +7570,10 @@ The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s 
 
 
 CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672010fda93`: 3,949 native tests in 339.809s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests and 44 real-daemon checks, plus all repository/docs/license/storage/format/lint gates. The new compile-only nextest command also succeeded locally. Canonical main post-merge run `37249215287` attempt 2 passed all seven checks; the earlier cancelled attempt remains preserved. This does not resolve repeated near-budget cancellation in the dependent PRs. The independent workflow correction still needs hosted proof and merge before propagation through #330–#333.
+
+The R163 recovery scheduling correction is new canonical CI work from main
+`0599b49e480cbc5797b4bc6095ddd912e0a7b270`, replacing no preserved implementation. It prioritizes
+the dominant independent recovery scenario after Linux run `37259723091` passed every assertion
+but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
+separate correction requires its own full validation, hosted checks and normal merge before
+propagation to the snapshot branch. The original failed run is preserved.
