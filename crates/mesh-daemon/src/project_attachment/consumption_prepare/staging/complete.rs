@@ -153,6 +153,7 @@ pub(super) fn assert_complete(
     storage: &AttachmentStorage,
     staged: &StagedNativeConsumedStart,
     start: RecordDigest,
+    campaign: super::RecoveryCampaign,
 ) {
     use crate::project_attachment::{
         consumption_history,
@@ -200,23 +201,10 @@ pub(super) fn assert_complete(
     .unwrap();
     let metadata = fs::metadata(&path).unwrap();
     let identity_pair = (metadata.dev(), metadata.ino());
-    for length in 0..=frame.len() {
-        let mut bytes = before.clone();
-        bytes.extend_from_slice(&frame[..length]);
-        assert!(
-            consumption_history::pending_prefix(
-                &cas,
-                &start_intent,
-                &history,
-                identity_pair,
-                &bytes,
-                Some(&raw)
-            )
-            .is_ok(),
-            "completion prefix {length}"
-        );
-        if length > 0 {
-            *bytes.last_mut().unwrap() ^= 1;
+    if campaign == super::RecoveryCampaign::Completion {
+        for length in 0..=frame.len() {
+            let mut bytes = before.clone();
+            bytes.extend_from_slice(&frame[..length]);
             assert!(
                 consumption_history::pending_prefix(
                     &cas,
@@ -226,10 +214,27 @@ pub(super) fn assert_complete(
                     &bytes,
                     Some(&raw)
                 )
-                .is_err(),
-                "foreign completion prefix {length}"
+                .is_ok(),
+                "completion prefix {length}"
             );
+            if length > 0 {
+                *bytes.last_mut().unwrap() ^= 1;
+                assert!(
+                    consumption_history::pending_prefix(
+                        &cas,
+                        &start_intent,
+                        &history,
+                        identity_pair,
+                        &bytes,
+                        Some(&raw)
+                    )
+                    .is_err(),
+                    "foreign completion prefix {length}"
+                );
+            }
         }
+        // The Start fixture retains all subsequent completion/restart assertions.
+        return;
     }
     // A canonical local completion that names a different owner receipt cannot finish this transaction.
     let (_, record, _) = consumption_history::pending_prefix(

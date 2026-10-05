@@ -134,6 +134,7 @@ pub(super) fn assert_checkpoint(
     storage: &AttachmentStorage,
     staged: &StagedNativeConsumedStart,
     receipt: RecordDigest,
+    campaign: super::RecoveryCampaign,
 ) {
     let path = prepared
         .destination
@@ -200,7 +201,7 @@ pub(super) fn assert_checkpoint(
                 *ino
             );
         }
-        if mode == "checkpoint-partial" {
+        if mode == "checkpoint-partial" && campaign == super::RecoveryCampaign::Checkpoint {
             let raw =
                 read_private_in_store(&prepared.destination.store, consumption_history::PENDING)
                     .unwrap();
@@ -244,6 +245,9 @@ pub(super) fn assert_checkpoint(
                     );
                 }
             }
+            // The Start fixture retains the complete process-restart journey below.
+            // This separate fixture owns the exhaustive checkpoint prefix campaign.
+            return;
         }
     }
     let complete = fs::read(&path).unwrap();

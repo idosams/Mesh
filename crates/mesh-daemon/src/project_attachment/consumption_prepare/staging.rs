@@ -932,12 +932,24 @@ pub(super) fn assert_revocation_after_staging(
     );
 }
 
+// Start retains the complete transaction/restart journey. Separate prefix fixtures
+// prepare the exact checkpoint/completion phase without repeating unrelated fault
+// campaigns. Together they retain every original assertion and byte boundary.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RecoveryCampaign {
+    Start,
+    Checkpoint,
+    Completion,
+}
+
 #[cfg(test)]
 pub(super) fn assert_start_fence(
     prepared: &PreparedNativeConsumedStart,
     storage: &AttachmentStorage,
+    campaign: RecoveryCampaign,
 ) {
-    start_fence::assert_start_fence(prepared, storage);
+    start_fence::assert_start_fence(prepared, storage, campaign);
 }
 
 #[cfg(test)]

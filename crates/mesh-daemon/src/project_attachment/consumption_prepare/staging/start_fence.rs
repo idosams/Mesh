@@ -498,7 +498,12 @@ impl PreparedNativeConsumedStart {
 pub(super) fn assert_start_fence(
     prepared: &PreparedNativeConsumedStart,
     storage: &AttachmentStorage,
+    campaign: super::RecoveryCampaign,
 ) {
+    if campaign != super::RecoveryCampaign::Start {
+        assert_prefix_campaign(prepared, storage, campaign);
+        return;
+    }
     let staged = prepared.stage(storage).unwrap();
     let journal_path = prepared
         .destination
@@ -607,7 +612,7 @@ pub(super) fn assert_start_fence(
     assert_eq!(fs::read(&journal_path).unwrap(), foreign);
     fs::write(&journal_path, &complete).unwrap();
     super::installation::assert_installation(prepared, storage, &staged, receipt);
-    super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt);
+    super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt, campaign);
     let owner_receipt = super::owner::assert_owner(prepared, storage, &staged, receipt);
     let complete = fs::read(&journal_path).unwrap();
     storage
@@ -659,5 +664,44 @@ pub(super) fn assert_start_fence(
             .count(),
         prepared.top_entries().len()
     );
-    super::complete::assert_complete(prepared, storage, &staged, receipt);
+    super::complete::assert_complete(prepared, storage, &staged, receipt, campaign);
+}
+
+#[cfg(test)]
+fn assert_prefix_campaign(
+    prepared: &PreparedNativeConsumedStart,
+    storage: &AttachmentStorage,
+    campaign: super::RecoveryCampaign,
+) {
+    let staged = prepared.stage(storage).unwrap();
+    let receipt = prepared.fence_consumption_start(storage, &staged).unwrap();
+    prepared
+        .install_fenced_consumed_start(storage, &staged)
+        .unwrap();
+    if campaign == super::RecoveryCampaign::Checkpoint {
+        super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt, campaign);
+        return;
+    }
+    assert_eq!(campaign, super::RecoveryCampaign::Completion);
+    prepared
+        .commit_fenced_consumed_checkpoint(storage, &staged)
+        .unwrap();
+    // Preserve the original completion context: owner commit across an unrelated
+    // decision, followed by grant revocation. The complete journey owns all other
+    // cross-phase faults; this fixture owns every completion byte prefix.
+    super::owner::assert_owner(prepared, storage, &staged, receipt);
+    storage
+        .grant_saved_input(
+            &prepared.owner,
+            crate::project_attachment::NativeInputGrantRequest {
+                source: &prepared.source,
+                version: prepared.version,
+                destination: &prepared.destination,
+                allowed: false,
+                expected_previous: Some(prepared.grant),
+                request: RecordDigest::from_bytes([92; 32]),
+            },
+        )
+        .unwrap();
+    super::complete::assert_complete(prepared, storage, &staged, receipt, campaign);
 }

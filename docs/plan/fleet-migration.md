@@ -7953,6 +7953,33 @@ suite passed: 3,974 native tests in 335.426s (seven slow, 18 skipped), 194 rende
 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
 Fixed user checkpoints and original work remain unchanged.
 
+## Pending publication preserves native control ordering (R182)
+
+A staged publication intent previously left its complete journal prefix readable by ordinary
+native controls. A real process-exit regression proved that an input decision could append after
+staging and make the publication's exact prefix unrecoverable. The unfixed regression failed in
+0.915s with an ordinary decision overtaking a staged publication.
+
+The enrolled native reader now refuses ordinary inspection/control and non-publication recovery
+while a publication intent exists. Malformed or inaccessible pending intent evidence never
+permits a competing control. Only the explicit private publication replay/recovery paths can
+inspect through this fence; they retain their complete-context, trust and exact-ceremony checks.
+Unenrolled ordinary work is unchanged. This protects routes using the enrolled native reader;
+it is not a claim that every runtime route, retention collector or post-publication control has
+been integrated. It does not expose new authority or turn a staged intent into accepted main.
+
+After the fix, four regressions passed in 17.341s, including the previously failing decision
+ordering case, ordinary read refusal, root first/last-byte process recovery, consumed midpoint
+process recovery, foreign retries and lost acknowledgement. Exact recovery proceeds without
+changing the staged prefix. Full Mesh and hosted checks remain required before merged delivery.
+Separate-process competing publication/rejection ordering, trusted control after publication,
+retention and the complete packaged fleet/provider/host acceptance scope remain open under #345.
+
+Provenance: new canonical fix based on R181 #362 at 181346dd3839fc159d341da91f38e825022068f9;
+no preserved legacy commit is replaced. R181 passed its full local gate: 3,977 native tests in
+341.980s (seven slow, 18 skipped), 194 rendered, 672 desktop and 44 real-daemon checks, plus
+repository/docs/license/storage/fmt/clippy. User checkpoints and original work are unchanged.
+
 ## Native saved-input decisions through publication history (R183)
 
 The native storage API can now reject, revalidate or replace an exact saved input after accepted
@@ -7993,3 +8020,55 @@ Provenance: new canonical implementation based on R181 #362 at
 cb7b6acabfd7788abd4bbbdb7f4653646ab01f83; it replaces no preserved legacy commit. R182 #363's
 ordinary-reader pending-publication fence is a separate sibling increment and remains required
 for combined delivery. Original work and repository history remain preserved.
+
+### Combined pending-publication fence and native controls
+
+R182 now incorporates merged R183 #364 (main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a).
+The reader fence still excludes private control recovery from its publication-only exceptions.
+The staged-publication process regression additionally calls the new trusted native input-control
+API before first and subsequent publication recovery; it must refuse pending publication and leave
+the exact journal prefix unchanged. Both original documentation sections and all source checks
+are preserved. Prior head 711e301496cb893b17af1f96ee7d09343608fbc7 had six successful hosted checks
+and a cancelled macOS job; cancellation is not success. Full npm test passed on the combined source: 3,978 native tests in 349.018s
+(seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks,
+plus repository/docs/license/storage/fmt/clippy. The expanded staging regression passed in 7.015s.
+Fresh hosted checks remain required for this combined head. This changes no runtime exposure or fixed user checkpoint.
+
+## R186: independent exhaustive consumed-start recovery campaigns
+
+The canonical PR363 and PR365 Linux runs hit the existing 15-minute execution deadline. PR365's single serial consumed-start campaign alone took 905.885s; an earlier passing identical source tree took 724.677s for that campaign. PR363 also left the bounded overview fixture until the end. These are failed checks, not passing assertions for the entire suite.
+
+The test-only correction gives start-frame, checkpoint-prefix and completion-prefix campaigns three named tests. Each uses its own fixture and retains the full staging, installation, owner-receipt, revocation, retry and process-restart journey. Start still exercises every progressive append byte. Checkpoint and completion still verify every prefix from zero through the complete frame, and reject each corrupted nonempty prefix. Only the exhaustive phase changes between fixtures; all other assertions remain. This duplicates the shorter cross-phase checks, preserving their ordering/context while allowing nextest to schedule the expensive phases independently.
+
+All three campaigns get early scheduling priority; the 33-review bounded overview test gets the next priority. No test is ignored, no assertions or time limits are relaxed, and production code/formats remain unchanged. Hosted validation must determine whether this resolves the Linux deadline in practice.
+
+Provenance: new test-only correction on canonical PR363 head 9398c2fb18aa9abf70342a053824d71fa01d17ec, based on merged main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a. No preserved legacy commits are replaced. PR365 and PR366 must adopt the correction with their complete dependent implementation before merged delivery. Fixed checkpoint b064029 remains unchanged.
+
+Focused validation passed all three campaigns in 175.781s: start 175.771s, checkpoint 153.645s and completion 152.674s. Full npm test passed: 3,980 native tests in 371.214s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Under the full local load, start took 276.679s, checkpoint 237.174s and completion 235.893s. Exact-head hosted checks remain required; these local results do not establish Linux CI performance.
+
+
+## Recovery fixtures retain coverage without repeating unrelated journeys (R187)
+
+R186 passed hosted Linux run 37330138945: all 3,542 tests in 732.871s, within the unchanged
+15-minute execution limit. Its macOS job passed all 3,980 native tests in 880.416s and 194 rendered
+tests, then reached the 20-minute job limit during desktop verification. That cancelled job is not
+a complete gate. The failed/cancelled logs remain preserved; no deadline is extended.
+
+The Start fixture retains every original staging, installation, owner, completion, read, capture,
+process-restart and exact-retry assertion, including every progressive start-frame append byte.
+The separate checkpoint fixture prepares the same phase through real staging/fencing/installation
+APIs, executes the actual partial-checkpoint process, verifies every correct and corrupted byte
+prefix, then stops. The completion fixture commits the prior phases, retains the owner-commit
+regression with its unrelated decision, revokes the grant as in the original context, and verifies
+every correct and corrupted completion prefix. Later unrelated fault campaigns remain in Start.
+Thus each original assertion remains covered, while the two prefix fixtures no longer repeat the
+complete journey. Production code, formats, deadlines and ignored tests are unchanged.
+
+Focused verification passed all three tests in 159.152s: Start 159.142s, checkpoint 5.327s and
+completion 8.419s. Before this change the corresponding R186 focused times were 175.771s,
+153.645s and 152.674s. Full npm test passed: 3,980 native tests in 343.955s (seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted checks remain required; local timings do not establish hosted performance.
+
+Provenance: canonical test-only follow-up to R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b;
+no preserved legacy commit is replaced. R184/R185 dependent branches must incorporate the final
+correction before combined merged delivery. The full fleet and native-authority acceptance scope
+under #345 remains open. Fixed checkpoint b064029 is unchanged.
