@@ -7556,3 +7556,12 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 
 R162 consumed-input decision correction is new work from canonical main 2dcb1b7dbca09dc8fbdaa4810e3df37479aaeaca; it replaces no preserved legacy commit. The existing ordinary child-decision reader refused consumed history. The complete-input native path now shares bounded custody and exact staged-owner context with native grants, preserving ordinary decisions and durable request identity. Failing-before evidence, seven focused passes, and the independent consumed recovery test are retained; the long existing consumption scenario is unchanged. Full validation, publication and merge remain required under issue #337. This does not close the full dependency-publication or fleet objective.
+
+R163 exact native review snapshots are new canonical work from published consumed-input decision
+head `fb5149cd54128804debdaca2c9b3e5e2bcf6739e` (PR #338), replacing no preserved legacy commit.
+The increment retains a complete graph and per-input revision vector through the existing native
+control transaction, adds closed policy/v3 snapshot decoding and exact retained-graph verification,
+and preserves historical retry independently of current publication admission. Seventeen focused
+tests and compiled previous-reader refusal passed; failing and corrected logs are preserved.
+Full validation, publication and merge remain required for issue #339. This is not completion of
+review presentation, publication enforcement, packaged acceptance or the complete fleet objective.

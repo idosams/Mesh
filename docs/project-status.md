@@ -2446,3 +2446,23 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 
 R162 consumed-work decisions address [issue #337](https://github.com/idosams/Mesh/issues/337). The trusted native host can reject, replace or revalidate an exact consumed child version using complete retained inputs. It reconstructs the guarded history at both native control selections, including the staged owner prefix, while missing inputs and stale predecessors refuse. Decisions update owner policy only; child history and saved previews remain unchanged. No renderer, agent, CLI or publication permission is added. The original incomplete-context regression failed in 14.625s; the final seven-test focus passed in 21.619s, including a dedicated 6.815s torn-append/lost-reply/input-loss recovery test. Full gate, hosted checks and merge remain required. Review snapshot binding, publication/runtime enforcement and user-facing enrollment remain open.
+
+## Native exact review snapshots (R163)
+
+Native hosts can now retain an exact dependency review snapshot under the complete custody set.
+It binds the saved output, canonical transitive graph object, qualified eligible input decisions
+and their revisions, and a deterministic validation digest. New snapshots refuse missing or
+ineligible inputs. Exact historical retries recover their original result after later rejection;
+that result grants no current publication authority. Graph objects are retained in their actual
+owner store and verified on ordinary and pending native history replay. Interrupted append,
+lost reply and required-root loss recover only the same retained request.
+
+Seventeen focused tests passed in 8.888s, including real consumed history, torn append, reopened
+catalog, conflicting retry, lost acknowledgement, root loss after staging, unrelated decisions,
+retained graph substitution and malformed graph refusal. The pre-change regression failed as
+expected. The exact previous policy reader from `fb5149cd54128804debdaca2c9b3e5e2bcf6739e`
+was separately compiled and refused the new required payload without changing its projection.
+This proves reader-format refusal, not a packaged old-application journey. Full validation,
+published PR and hosted delivery remain pending. Ordinary review creation, human approval,
+all publication paths and user-facing eligibility controls remain subsequent requirements under
+[issue #339](https://github.com/idosams/Mesh/issues/339) and the full fleet plan.

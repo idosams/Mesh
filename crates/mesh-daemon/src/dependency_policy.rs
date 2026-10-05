@@ -9,7 +9,9 @@ use mesh_store::{DependencyKind, DependencyRecord, RecordDigest};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod consumption;
+mod review;
 use consumption::{ConsumedComplete, ConsumedStart};
+use review::CompleteReview;
 
 const SCHEMA: &str = "mesh.dependency-policy/v1";
 const MAX_BYTES: usize = 65_536;
@@ -69,6 +71,7 @@ enum Event {
         state: String,
         replacement: Option<Input>,
     },
+    CompleteReview(CompleteReview),
     Review {
         output: Input,
         decisions: Vec<(Input, RecordDigest)>,
@@ -156,7 +159,10 @@ impl DependencyPolicyHistory {
         )?;
         let bound_grant = value(&json, "schema")?.as_text() == Some("mesh.dependency-policy/v2")
             && envelope.kind == DependencyKind::Grant;
-        if (!bound_grant && value(&json, "schema")?.as_text() != Some(SCHEMA))
+        let complete_review = value(&json, "schema")?.as_text()
+            == Some("mesh.dependency-policy/v3")
+            && envelope.kind == DependencyKind::ReviewSnapshot;
+        if (!bound_grant && !complete_review && value(&json, "schema")?.as_text() != Some(SCHEMA))
             || digest(value(&json, "authority")?, false)? != envelope.authority
             || number(value(&json, "revision")?)? != envelope.revision
             || digest(value(&json, "previous")?, true)? != envelope.previous
@@ -169,6 +175,7 @@ impl DependencyPolicyHistory {
             envelope.kind,
             self.binding,
             bound_grant,
+            complete_review,
         )?;
         if let Some((old, prior)) = self.records.get(&envelope.payload) {
             return if *old == envelope && *prior == event {
@@ -268,6 +275,13 @@ impl DependencyPolicyHistory {
                     *previous,
                 ) {
                     return Err(InvalidDependencyHistory);
+                }
+            }
+            Event::CompleteReview(snapshot) => {
+                for (input, revision, record) in &snapshot.decisions {
+                    if self.decisions.get(input) != Some(&(*revision, *record, true)) {
+                        return Err(InvalidDependencyHistory);
+                    }
                 }
             }
             Event::Review { decisions, .. } => {
@@ -423,7 +437,45 @@ impl DependencyPolicyHistory {
 
     /// Payloads physically stored in this authority, excluding references into other work.
     pub(crate) fn policy_payloads(&self) -> impl Iterator<Item = RecordDigest> + '_ {
-        self.records.keys().copied()
+        self.records
+            .keys()
+            .copied()
+            .chain(self.records.values().filter_map(|(_, event)| {
+                if let Event::CompleteReview(snapshot) = event {
+                    Some(snapshot.graph)
+                } else {
+                    None
+                }
+            }))
+    }
+
+    pub(crate) fn review_graph(&self, record: RecordDigest) -> Option<RecordDigest> {
+        match &self.records.get(&record)?.1 {
+            Event::CompleteReview(snapshot) => Some(snapshot.graph),
+            _ => None,
+        }
+    }
+    pub(crate) fn verify_review_graph(&self, record: RecordDigest, bytes: &[u8]) -> Result<()> {
+        match &self.records.get(&record).ok_or(InvalidDependencyHistory)?.1 {
+            Event::CompleteReview(snapshot) => snapshot.verify_graph(bytes),
+            _ => Err(InvalidDependencyHistory),
+        }
+    }
+    pub(crate) fn review_snapshot_body(&self, request: RecordDigest) -> Option<Json> {
+        let record = self.requests.get(&request)?;
+        match &self.records.get(record)?.1 {
+            Event::CompleteReview(snapshot) => Some(snapshot.body()),
+            _ => None,
+        }
+    }
+    pub(crate) fn eligible_decision(
+        &self,
+        input: QualifiedDependencyInput,
+    ) -> Option<(u64, RecordDigest)> {
+        self.decisions
+            .get(&Input(Work(input.0, input.1), input.2))
+            .filter(|(_, _, eligible)| *eligible)
+            .map(|(revision, record, _)| (*revision, *record))
     }
 
     /// Direct immutable references only; not a complete retention closure or a collection oracle.
@@ -518,6 +570,7 @@ fn decode(
     kind: DependencyKind,
     binding: NativeDependencyBinding,
     bound_grant: bool,
+    complete_review: bool,
 ) -> Result<(Option<RecordDigest>, Event, BTreeSet<RecordDigest>)> {
     let mut roots = BTreeSet::new();
     let mut request = None;
@@ -651,6 +704,12 @@ fn decode(
                 state,
                 replacement,
             }
+        }
+        DependencyKind::ReviewSnapshot if complete_review => {
+            let snapshot = CompleteReview::decode(body)?;
+            request = Some(snapshot.request);
+            roots.extend(snapshot.references());
+            Event::CompleteReview(snapshot)
         }
         DependencyKind::ReviewSnapshot => {
             fields(body, &["request", "output", "decisions"])?;
