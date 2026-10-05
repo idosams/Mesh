@@ -1,3 +1,5 @@
+#[path = "tests/restart.rs"]
+mod restart;
 use super::*;
 use crate::project_attachment::{NativeSavedReviewRequest, ObservationLimits};
 use crate::workspace::OpenWorkspace;
@@ -16,13 +18,17 @@ use std::{fs, io::Write as _, path::PathBuf};
 
 #[test]
 fn root_publication_reopens_only_with_exact_trusted_receipt() {
-    root_publication_fixture(false);
+    root_publication_fixture(0);
 }
 #[test]
 fn native_writer_commits_root_publications_against_verified_main() {
-    root_publication_fixture(true);
+    root_publication_fixture(1);
 }
-fn root_publication_fixture(writer: bool) {
+#[test]
+fn root_publication_recovers_after_process_exit_at_both_frame_edges() {
+    root_publication_fixture(2);
+}
+fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
         fn drop(&mut self) {
@@ -127,37 +133,58 @@ fn root_publication_fixture(writer: bool) {
     let journal = owner
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
-    if writer {
-        use super::super::dependency_private_context::publication::Step;
-        use std::io::Write as _;
-        let before = fs::read(&journal).unwrap();
-        let failure = storage
-            .commit_native_publication_with_io(
+    if writer != 0 {
+        if writer == 2 {
+            let result = restart::interrupted_publication(
+                &root,
                 owner.id(),
                 id(6),
                 bound.record(),
                 &receipt,
-                &trust,
-                |step, file, frame| {
-                    if matches!(step, Step::Staged) {
-                        file.write_all(&frame[..1])?;
-                        file.sync_all()?;
-                        return Err(std::io::Error::other("root publication torn boundary"));
-                    }
-                    Ok(())
-                },
-                |file| file.sync_all(),
-            )
-            .unwrap_err();
-        assert!(failure
-            .to_string()
-            .contains("root publication torn boundary"));
-        let torn = fs::read(&journal).unwrap();
-        assert!(torn.starts_with(&before) && torn.len() > before.len());
-        assert!(storage
-            .inspect_native_publication_history(owner.id(), &trust)
-            .is_err());
-        assert_eq!(fs::read(&journal).unwrap(), torn);
+                key.public_key().as_ref(),
+                &journal,
+                "first",
+            );
+            assert_eq!(
+                result.get("head").and_then(Json::as_text),
+                Some(
+                    RecordDigest::from_bytes(*preview.reviewed_actor_head().as_bytes())
+                        .to_hex()
+                        .as_str()
+                )
+            );
+        } else {
+            use super::super::dependency_private_context::publication::Step;
+            use std::io::Write as _;
+            let before = fs::read(&journal).unwrap();
+            let failure = storage
+                .commit_native_publication_with_io(
+                    owner.id(),
+                    id(6),
+                    bound.record(),
+                    &receipt,
+                    &trust,
+                    |step, file, frame| {
+                        if matches!(step, Step::Staged) {
+                            file.write_all(&frame[..1])?;
+                            file.sync_all()?;
+                            return Err(std::io::Error::other("root publication torn boundary"));
+                        }
+                        Ok(())
+                    },
+                    |file| file.sync_all(),
+                )
+                .unwrap_err();
+            assert!(failure
+                .to_string()
+                .contains("root publication torn boundary"));
+            let torn = fs::read(&journal).unwrap();
+            assert!(torn.starts_with(&before) && torn.len() > before.len());
+            assert!(storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), torn);
+        }
         let committed = storage
             .commit_native_publication(owner.id(), id(6), bound.record(), &receipt, &trust)
             .unwrap();
@@ -320,37 +347,58 @@ fn root_publication_fixture(writer: bool) {
         .with_signature(signature.as_ref().to_vec())
         .unwrap()
         .canonical_bytes();
-    if writer {
-        use super::super::dependency_private_context::publication::Step;
-        use std::io::Write as _;
-        let before = fs::read(&journal).unwrap();
-        let failure = storage
-            .commit_native_publication_with_io(
+    if writer != 0 {
+        if writer == 2 {
+            let result = restart::interrupted_publication(
+                &root,
                 owner.id(),
                 id(9),
                 next_review,
                 &receipt,
-                &trust,
-                |step, file, frame| {
-                    if matches!(step, Step::Staged) {
-                        file.write_all(&frame[..frame.len() - 1])?;
-                        file.sync_all()?;
-                        return Err(std::io::Error::other("root publication torn boundary"));
-                    }
-                    Ok(())
-                },
-                |file| file.sync_all(),
-            )
-            .unwrap_err();
-        assert!(failure
-            .to_string()
-            .contains("root publication torn boundary"));
-        let torn = fs::read(&journal).unwrap();
-        assert!(torn.starts_with(&before) && torn.len() > before.len());
-        assert!(storage
-            .inspect_native_publication_history(owner.id(), &trust)
-            .is_err());
-        assert_eq!(fs::read(&journal).unwrap(), torn);
+                key.public_key().as_ref(),
+                &journal,
+                "last",
+            );
+            assert_eq!(
+                result.get("head").and_then(Json::as_text),
+                Some(
+                    RecordDigest::from_bytes(*second_context.reviewed_actor_head().as_bytes())
+                        .to_hex()
+                        .as_str()
+                )
+            );
+        } else {
+            use super::super::dependency_private_context::publication::Step;
+            use std::io::Write as _;
+            let before = fs::read(&journal).unwrap();
+            let failure = storage
+                .commit_native_publication_with_io(
+                    owner.id(),
+                    id(9),
+                    next_review,
+                    &receipt,
+                    &trust,
+                    |step, file, frame| {
+                        if matches!(step, Step::Staged) {
+                            file.write_all(&frame[..frame.len() - 1])?;
+                            file.sync_all()?;
+                            return Err(std::io::Error::other("root publication torn boundary"));
+                        }
+                        Ok(())
+                    },
+                    |file| file.sync_all(),
+                )
+                .unwrap_err();
+            assert!(failure
+                .to_string()
+                .contains("root publication torn boundary"));
+            let torn = fs::read(&journal).unwrap();
+            assert!(torn.starts_with(&before) && torn.len() > before.len());
+            assert!(storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), torn);
+        }
         let committed = storage
             .commit_native_publication(owner.id(), id(9), next_review, &receipt, &trust)
             .unwrap();
@@ -561,6 +609,10 @@ fn native_writer_recovers_exact_torn_publication_and_refuses_foreign_retries() {
 #[test]
 fn native_writer_refuses_new_publication_after_input_rejection() {
     consumed_publication_fixture(3);
+}
+#[test]
+fn consumed_publication_recovers_after_process_exit_and_lost_acknowledgement() {
+    consumed_publication_fixture(4);
 }
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
@@ -773,6 +825,49 @@ fn consumed_publication_fixture(writer: u8) {
                 .commit_native_publication(owner.id(), id(challenge), review, &receipt, &trust)
                 .is_err());
             assert_eq!(fs::read(&journal).unwrap(), before);
+            if writer == 4 {
+                let result = restart::interrupted_publication(
+                    &root,
+                    destination.id(),
+                    id(challenge),
+                    review,
+                    &receipt,
+                    human_key.public_key().as_ref(),
+                    &journal,
+                    "middle",
+                );
+                let completed = fs::read(&journal).unwrap();
+                let recovered = storage
+                    .commit_native_publication(
+                        destination.id(),
+                        id(challenge),
+                        review,
+                        &receipt,
+                        &trust,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    result.get("record").and_then(Json::as_text),
+                    Some(recovered.record().to_hex().as_str())
+                );
+                assert_eq!(
+                    result.get("head").and_then(Json::as_text),
+                    Some(recovered.head().to_hex().as_str())
+                );
+                assert_eq!(
+                    result.get("revision").and_then(Json::as_u64),
+                    Some(recovered.revision())
+                );
+                assert_eq!(fs::read(&journal).unwrap(), completed);
+                storage
+                    .inspect_native_publication_history(destination.id(), &trust)
+                    .unwrap();
+                assert!(!owner
+                    .metadata_path()
+                    .join("native-publication.pending")
+                    .exists());
+                return id(0);
+            }
             if writer == 2 {
                 let failure = storage
                     .commit_native_publication_with_io(
