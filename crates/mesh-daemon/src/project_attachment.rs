@@ -21,6 +21,7 @@ mod dependency_catalog_discovery;
 mod dependency_catalog_read;
 mod dependency_catalog_review;
 mod dependency_closure;
+mod dependency_private_context;
 pub use dependency_closure::NativeDependencyGraph;
 mod dependency_reservation;
 mod detachment;

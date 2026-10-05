@@ -53,7 +53,7 @@ impl PreparedNativeConsumedStart {
         context.verified_history_roots(&self.destination)?;
         Ok(result)
     }
-    pub(super) fn completed_graph_roots(
+    pub(in crate::project_attachment) fn completed_graph_roots(
         &self,
         staged: &StagedNativeConsumedStart,
         source_graph: &NativeDependencyGraph,

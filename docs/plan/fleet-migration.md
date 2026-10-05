@@ -7773,3 +7773,24 @@ The consumed regression passed in 44.798s. Adopting reconciled R175 parent
 `d3b19c9fafa30f5c0c83cd910c539809de92d54d` at
 `d7664ef4985922d42225f7ec57c868ae2fd7c96b` preserved the complete tested tree.
 Hosted checks, merge and the remaining complete private-context integration are still required.
+
+
+R176 is published as PR #357 at `7b6199bb5f0852e12179bf117fafdf8bc7aef391`.
+Its full local gate passed as recorded above; hosted validation and merge remain required.
+
+R177 complete private consumed-content context is new canonical work based on that published
+R176 head, replacing no preserved legacy commit. Native registration discovery includes required
+ancestry, consumed inputs and historical publication outputs before acquiring one bounded custody
+set. Completed consumed histories are reconstructed from retained source data, owner receipts and
+signed starts; native correlations and content graphs are verified without ordinary admission.
+The native `inspect_private_dependency_graph` API returns immutable private graph facts only.
+Publication records select histories; they are not treated as accepted main or write authority.
+The full context is reconstructed again before returning, and missing or changed histories refuse.
+
+The publication-bearing consumed regression passed in 30.519s, including unknown-operation and
+torn-child refusal without repair. Chained consumption and a later child capture matched ordinary
+verified graphs in a 166.770s regression. Strict daemon lint passed. Removing consumed edges from
+the private graph failed the exact complete-graph assertion in 14.305s; source bytes were restored.
+Full repository validation, hosted checks and delivery remain pending. Trusted consumed publication
+replay, receipt-bound main advancement, all-route recovery/integration and full fleet acceptance
+remain required; this API claims no accepted-main, graphical or packaged completion.

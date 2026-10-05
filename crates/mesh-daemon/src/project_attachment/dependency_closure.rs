@@ -252,6 +252,91 @@ pub(super) fn root_publication_graph(
     )
 }
 
+// Complete private graph verification shares the canonical walker and content budgets with
+// ordinary inspection. These read facts have no retention projection or collection authority.
+pub(super) struct PrivateGraphHistory<'a, 'guard> {
+    pub history: &'a crate::workspace::NativePrivateReviewHistory<'guard>,
+    pub binding: &'a super::NativeDependencyWorkBinding,
+    pub workspace: mesh_operations::WorkspaceId,
+}
+pub(super) fn private_publication_graph(
+    root: Input,
+    histories: &BTreeMap<(RecordDigest, RecordDigest), PrivateGraphHistory<'_, '_>>,
+    owner: &super::VerifiedPrivateHistory,
+) -> io::Result<NativeDependencyGraph> {
+    let mut consumptions = BTreeMap::new();
+    for fact in owner.policy().consumption_facts() {
+        if consumptions.insert(fact.start, fact).is_some() {
+            return Err(invalid(
+                "conflicting private consumption starting operation",
+            ));
+        }
+    }
+    let mut cache = BTreeMap::new();
+    let mut budget = 1024 * 1024 * 1024u64;
+    walk(
+        root,
+        |id| {
+            let selected = histories
+                .get(&(id.0, id.1))
+                .ok_or_else(|| invalid("required private graph history is unavailable"))?;
+            if (selected.binding.work(), selected.binding.installation()) != (id.0, id.1)
+                || selected.binding.authority() != owner.binding().authority
+                || selected.binding.project() != owner.binding().project
+            {
+                return Err(invalid("private graph binding differs from owner"));
+            }
+            let fact = selected.history.graph_operation(id.2).map_err(error)?;
+            if fact.workspace != selected.workspace || fact.operation != id.2 {
+                return Err(invalid(
+                    "private graph operation belongs to another native history",
+                ));
+            }
+            let mut parents = fact
+                .parents
+                .iter()
+                .map(|p| (id.0, id.1, *p))
+                .collect::<BTreeSet<_>>();
+            let consumption = consumptions.get(&id).cloned();
+            if let Some(receipt) = &consumption {
+                let source = histories
+                    .get(&(receipt.source.0, receipt.source.1))
+                    .ok_or_else(|| invalid("private consumed source is unavailable"))?;
+                if receipt.bindings
+                    != Some((source.binding.correlation, selected.binding.correlation))
+                {
+                    return Err(invalid(
+                        "private consumption has no exact native correlation",
+                    ));
+                }
+                parents.insert(receipt.source);
+            }
+            let chunks = verified_chunks(
+                id,
+                &fact.manifests,
+                &mut cache,
+                &mut budget,
+                |manifest, budget| {
+                    selected
+                        .history
+                        .graph_chunks(manifest, budget)
+                        .map_err(error)
+                },
+            )?;
+            Ok(Node {
+                parents,
+                manifests: fact.manifests,
+                chunks,
+                consumption,
+            })
+        },
+        MAX_NODES,
+        MAX_EDGES,
+        MAX_NODES,
+        MAX_BYTES,
+    )
+}
+
 fn walk(
     root: Input,
     mut load: impl FnMut(Input) -> io::Result<Node>,

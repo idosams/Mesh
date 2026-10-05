@@ -27,8 +27,7 @@ use mesh_store::RecordDigest;
 use mesh_types::{PublicKey, Signature};
 pub use staging::StagedNativeConsumedStart;
 pub(super) use staging::VerifiedConsumedHistory;
-#[cfg(test)]
-pub(super) use staging::{RecoveryMaterial, RecoveryPhase};
+pub(super) use staging::{ConsumedHistorySelection, RecoveryMaterial, RecoveryPhase};
 use std::{collections::BTreeMap, io, path::Path};
 
 /// Exact trusted-native selection. Preparation does not grant access, copy content or start agents.

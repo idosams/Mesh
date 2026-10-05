@@ -221,6 +221,12 @@ impl AttachmentStorage {
             .unwrap();
         assert_eq!(graph.operation_count(), input_graph.operation_count() + 1);
         assert_eq!(
+            self.inspect_private_dependency_graph(destination.id(), saved[0].operation())
+                .unwrap(),
+            graph.to_json(),
+            "private discovery must resolve the intermediate consumed lane"
+        );
+        assert_eq!(
             graph,
             self.inspect_consumed_dependency_graph(owner, request(grant), saved[0])
                 .unwrap()
@@ -284,6 +290,12 @@ impl AttachmentStorage {
             .inspect_dependency_graph(owner, destination, next, &[source, original])
             .unwrap();
         assert_eq!(graph.operation_count(), input_graph.operation_count() + 2);
+        assert_eq!(
+            self.inspect_private_dependency_graph(destination.id(), next.operation())
+                .unwrap(),
+            graph.to_json(),
+            "private discovery must retain consumed ancestry after later capture"
+        );
         assert_eq!(
             self.consumed_saved_file(owner, request(grant), saved[0], "kept")
                 .unwrap(),

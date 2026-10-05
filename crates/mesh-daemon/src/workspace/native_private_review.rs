@@ -115,6 +115,19 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(result)
     }
 
+    pub(crate) fn saved_version(
+        &self,
+        operation: RecordDigest,
+    ) -> io::Result<crate::project_attachment::SavedAttachmentVersion> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let version = crate::project_attachment::SavedAttachmentVersion::from_verified_history(
+            &self.history,
+            operation,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(version)
+    }
+
     pub(crate) fn graph_operation(
         &self,
         operation: RecordDigest,

@@ -358,6 +358,29 @@ impl AttachmentStorage {
         )
     }
 
+    // Private content inspection must revalidate the same native ancestry as ordinary reads.
+    // The supplied owner proof is structural evidence, never accepted-main authority.
+    pub(super) fn validate_private_work_with_parents(
+        &self,
+        prepared: &PreparedDependencyWork,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        proof: &super::dependency_read::VerifiedPrivateHistory,
+        inspect_owner: impl FnMut(RecordDigest) -> io::Result<()>,
+        inspect_parent: impl FnMut(&ProvisionedAttachment, &str) -> io::Result<()>,
+    ) -> io::Result<NativeDependencyWorkBinding> {
+        proof.verify_current(&prepared.owner.store)?;
+        let result = self.validate_dependency_work_binding(
+            prepared,
+            guard,
+            proof.binding(),
+            inspect_owner,
+            inspect_parent,
+        )?;
+        proof.verify_current(&prepared.owner.store)?;
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
+    }
+
     fn validate_dependency_work_binding(
         &self,
         prepared: &PreparedDependencyWork,

@@ -600,6 +600,10 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
     {
         // A publication-bearing owner can prove completed private content without granting
         // ordinary admission. This test-only frame is removed before the remaining scenarios.
+        let expected_private_graph = storage
+            .inspect_dependency_graph(&owner, &destination, consumed, &[&owner])
+            .unwrap()
+            .to_json();
         let source_selection = storage
             .prepare_dependency_graph(&owner, &owner, version.operation(), &[])
             .unwrap();
@@ -827,6 +831,39 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
             .project()
             .read_configuration(owner.metadata_path(), &owner.store)
             .is_err());
+        assert_eq!(fs::read(&owner_journal).unwrap(), published);
+        assert_eq!(fs::read(&child_journal).unwrap(), child_before);
+        drop(source_history);
+        drop(guard);
+        let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        assert_eq!(
+            reopened
+                .inspect_private_dependency_graph(destination.id(), consumed.operation())
+                .unwrap(),
+            expected_private_graph,
+            "private discovery must reconstruct the complete consumed graph after publication"
+        );
+        assert!(reopened
+            .inspect_private_dependency_graph(destination.id(), id(249))
+            .is_err());
+        let child_restore =
+            RestorePublication(child_journal.clone(), fs::read(&child_journal).unwrap());
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&child_journal)
+            .unwrap()
+            .write_all(&[1])
+            .unwrap();
+        let partial_child = fs::read(&child_journal).unwrap();
+        assert!(reopened
+            .inspect_private_dependency_graph(destination.id(), consumed.operation())
+            .is_err());
+        assert_eq!(
+            fs::read(&child_journal).unwrap(),
+            partial_child,
+            "private discovery must not repair a required history"
+        );
+        drop(child_restore);
         assert_eq!(fs::read(&owner_journal).unwrap(), published);
         assert_eq!(fs::read(&child_journal).unwrap(), child_before);
         drop(restore);
