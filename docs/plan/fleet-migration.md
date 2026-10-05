@@ -7765,3 +7765,11 @@ It passed in 29.657s. Removing the exact start-body comparison failed the foreig
 assertion in 13.161s; source was restored byte-for-byte. Strict daemon lint passed.
 Full checks and PR delivery remain pending. Complete private graph/binding discovery, trusted
 consumed publication replay, production commit/recovery and all fleet acceptance exits remain open.
+
+R176 full `npm test` passed on `31de31ac558395335789dac2b60934095bb2d8a5`:
+3,967 native tests in 323.398s (six slow, 18 skipped), 194 rendered tests, 672 desktop
+tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy gates.
+The consumed regression passed in 44.798s. Adopting reconciled R175 parent
+`d3b19c9fafa30f5c0c83cd910c539809de92d54d` at
+`d7664ef4985922d42225f7ec57c868ae2fd7c96b` preserved the complete tested tree.
+Hosted checks, merge and the remaining complete private-context integration are still required.
