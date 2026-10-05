@@ -7924,3 +7924,31 @@ The fixed b064029 user checkpoint is unchanged. These tests do not prove a graph
 
 Provenance: new canonical work based on R179 #360 at
 ae12ebd2b8c3fffa53febbb7b57d223eaca53a47; no preserved legacy commit is replaced.
+
+## Publication recovery across process exits (R181)
+
+Independent child processes now exercise the native publication writer after staging an intent,
+a partial append, and synchronization before acknowledgement. Fresh processes reopen the same
+native registry and journal, refuse missing trust and a foreign request without changing bytes,
+finish the original publication, and retry it twice with identical result and unchanged journal.
+Owner-root coverage interrupts the first and last partial byte across successive publications;
+consumed-lane coverage interrupts the midpoint and reconstructs its complete input context.
+The parent verifies exact result identity and later ordinary trusted replay. Existing in-process
+and independent replay fixtures remain in place. Child waits are bounded and reaped on timeout.
+
+The two process scenarios passed in 15.980s (root 3.457s; consumed 15.974s). A mutation that
+appended the entire frame instead of only its missing suffix failed the root process regression
+in 1.280s: fresh retry refused foreign bytes after the publication prefix. The production writer
+was restored byte-for-byte (SHA256 dbf2a53bce0d616da56301b5f78397d40a2b4eb53fc7125a4a722d122ebe1f24).
+Full validation and hosted checks remain required before merged delivery.
+
+These are real process exits with software test credentials, not OS human presence, machine
+power loss, remote host or graphical acceptance. Separate-process rejection ordering, competing
+publications, all-route admission and retention/collection remain open under #345. The complete
+fleet and provider/host acceptance plan remains intact. No runtime authority is exposed here.
+
+Provenance: new canonical test coverage based on R180 #361 at
+502c789ce49fe5b4da2d6d6348571fe4bca35ea4, replacing no preserved legacy commit. R180's full local
+suite passed: 3,974 native tests in 335.426s (seven slow, 18 skipped), 194 rendered tests,
+672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Fixed user checkpoints and original work remain unchanged.
