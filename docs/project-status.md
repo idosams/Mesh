@@ -2474,3 +2474,11 @@ This proves reader-format refusal, not a packaged old-application journey. Full 
 published PR and hosted delivery remain pending. Ordinary review creation, human approval,
 all publication paths and user-facing eligibility controls remain subsequent requirements under
 [issue #339](https://github.com/idosams/Mesh/issues/339) and the full fleet plan.
+
+Recovery test scheduling correction: snapshot run `37259723091` completed all 3,516 Linux tests
+in 910.276s but correctly failed the 15-minute test-step limit. The longest independent consumed
+history recovery scenario started about 65s into the run and passed after 845.181s. Nextest now
+schedules that scenario at priority 100, removing avoidable queue delay without changing the test
+set, assertions, retries, exclusive reservations or deadlines. Full local and hosted validation
+remain required under [issue #342](https://github.com/idosams/Mesh/issues/342); scheduling is not
+a measured product-performance improvement or a guarantee of future runner duration.

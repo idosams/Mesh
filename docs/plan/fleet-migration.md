@@ -7573,3 +7573,10 @@ and preserves historical retry independently of current publication admission. S
 tests and compiled previous-reader refusal passed; failing and corrected logs are preserved.
 Full validation, publication and merge remain required for issue #339. This is not completion of
 review presentation, publication enforcement, packaged acceptance or the complete fleet objective.
+
+The R163 recovery scheduling correction is new canonical CI work from main
+`0599b49e480cbc5797b4bc6095ddd912e0a7b270`, replacing no preserved implementation. It prioritizes
+the dominant independent recovery scenario after Linux run `37259723091` passed every assertion
+but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
+separate correction requires its own full validation, hosted checks and normal merge before
+propagation to the snapshot branch. The original failed run is preserved.
