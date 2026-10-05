@@ -328,6 +328,17 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
         )
         .unwrap_err();
     assert_eq!(failure.to_string(), "consumed capture sync refused");
+    let recovered = storage
+        .save_registered_capture(
+            destination,
+            &input,
+            actor,
+            |_| -> Result<Signature, String> {
+                panic!("recovery and unchanged input must not sign")
+            },
+        )
+        .unwrap();
+    assert_eq!(recovered.operation(), last_operation);
     child(id(113), last_operation);
     let final_journal = fs::read(&journal_path).unwrap();
     child(id(113), last_operation);

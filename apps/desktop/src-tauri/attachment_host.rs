@@ -191,9 +191,13 @@ impl AttachmentHost {
         }
         let source = provisioned.project().root().to_owned();
         let generation = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
-        let service = provisioned
-            .start_capture(NativeCaptureSigner::generate()?, CaptureSchedule::default())
-            .map_err(|_| UNAVAILABLE)?;
+        let service = AttachmentCaptureService::start_registered(
+            state.storage.as_ref().ok_or(UNAVAILABLE)?,
+            &provisioned,
+            NativeCaptureSigner::generate()?,
+            CaptureSchedule::default(),
+        )
+        .map_err(|_| UNAVAILABLE)?;
         state.generation = generation;
         let project = Project {
             lane: lane_origin(state.storage.as_ref().ok_or(UNAVAILABLE)?, &provisioned),
@@ -243,11 +247,15 @@ impl AttachmentHost {
         let lane = lane_origin(storage, &child);
         if !state.projects.contains_key(&child_id) {
             let generation = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
-            let service = child
-                .start_capture(NativeCaptureSigner::generate()?, CaptureSchedule::default())
-                .map_err(|_| {
-                    "The lane is retained, but capture could not start. Retry the same request."
-                })?;
+            let service = AttachmentCaptureService::start_registered(
+                storage,
+                &child,
+                NativeCaptureSigner::generate()?,
+                CaptureSchedule::default(),
+            )
+            .map_err(|_| {
+                "The lane is retained, but capture could not start. Retry the same request."
+            })?;
             state.generation = generation;
             state.projects.insert(
                 child_id.clone(),
@@ -1456,9 +1464,13 @@ impl AttachmentHost {
                         .map_err(|_| UNAVAILABLE)?,
                 };
                 let next = state.generation.checked_add(1).ok_or(UNAVAILABLE)?;
-                let service = history
-                    .start_capture(NativeCaptureSigner::generate()?, CaptureSchedule::default())
-                    .map_err(|_| UNAVAILABLE)?;
+                let service = AttachmentCaptureService::start_registered(
+                    state.storage.as_ref().ok_or(UNAVAILABLE)?,
+                    &history,
+                    NativeCaptureSigner::generate()?,
+                    CaptureSchedule::default(),
+                )
+                .map_err(|_| UNAVAILABLE)?;
                 state.generation = next;
                 state.projects.insert(
                     id.to_owned(),
