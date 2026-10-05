@@ -3,10 +3,15 @@
 nextest-version = "0.9.145"
 
 [[profile.default.overrides]]
-# Start the longest independent recovery campaign immediately, rather than spending
-# its CI deadline queued behind shorter tests. Keep its assertions and all deadlines.
-filter = 'test(saved_ignore_rules_bind_candidate_without_changing_empty_reservation)'
+# Start all exhaustive recovery campaigns early. Each retains its byte boundaries;
+# independent phases no longer share one serial test's CI critical path.
+filter = 'test(saved_ignore_rules_bind_candidate_without_changing_empty_reservation) | test(consumed_checkpoint_recovers_every_byte_prefix) | test(consumed_completion_recovers_every_byte_prefix)'
 priority = 100
+
+[[profile.default.overrides]]
+# Build the bounded overview fixture early instead of after the recovery campaigns.
+filter = 'test(an_attached_review_outside_the_overview_bound_remains_directly_reviewable)'
+priority = 90
 
 [[profile.default.overrides]]
 # This wall-clock boundary test intentionally sleeps across two checkpoint timers.
