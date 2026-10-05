@@ -239,6 +239,17 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
             child.id().to_owned(),
         ]
     };
+    let harness_preview = |operation: &str, path: &str| {
+        let mut args = harness_args("preview");
+        args.extend([operation.to_owned(), path.to_owned()]);
+        let mut output = Vec::new();
+        crate::attachment_capture::test_run(
+            &args,
+            std::io::Cursor::new(Vec::<u8>::new()),
+            &mut output,
+        )?;
+        Json::parse(std::str::from_utf8(&output).unwrap().trim()).map_err(|e| e.to_string())
+    };
     let harness = |action: &str| {
         let mut output = Vec::new();
         crate::attachment_capture::test_run(
@@ -267,6 +278,30 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     assert_eq!(
         text_preview(&reopened, child.id(), harness_id),
         "harness saved progress"
+    );
+    let owner_before_preview =
+        fs::read(owner.metadata_path().join(mesh_daemon::RECORD_FILE_NAME)).unwrap();
+    let child_before_preview =
+        fs::read(child.metadata_path().join(mesh_daemon::RECORD_FILE_NAME)).unwrap();
+    for (operation, expected) in [
+        (first_id.as_str(), "saved original"),
+        (later_id.as_str(), "later saved progress"),
+        (harness_id, "harness saved progress"),
+    ] {
+        let preview = harness_preview(operation, "note.txt").unwrap();
+        assert_eq!(preview.get("operation"), Some(&Json::text(operation)));
+        assert_eq!(preview.get("text"), Some(&Json::text(expected)));
+    }
+    assert!(harness_preview(&"0".repeat(64), "note.txt").is_err());
+    assert!(harness_preview(&first_id, "missing").is_err());
+    assert!(harness_preview(&first_id, "../note.txt").is_err());
+    assert_eq!(
+        fs::read(owner.metadata_path().join(mesh_daemon::RECORD_FILE_NAME)).unwrap(),
+        owner_before_preview
+    );
+    assert_eq!(
+        fs::read(child.metadata_path().join(mesh_daemon::RECORD_FILE_NAME)).unwrap(),
+        child_before_preview
     );
     let listed = harness("versions").unwrap();
     let listed = Json::parse(std::str::from_utf8(&listed).unwrap().trim()).unwrap();
@@ -330,6 +365,7 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     let restore = Restore(source.clone(), moved);
     let refused_versions = reopened.versions(child.id(), None);
     let refused_preview = reopened.inspect(child.id(), &first_id, Some("note.txt"), None);
+    let refused_harness_preview = harness_preview(&first_id, "note.txt");
     let refused_comparison = reopened.compare(child.id(), &first_id, &later_id, None);
     let refused_path = reopened.comparison_path(child.id(), &first_id, &later_id, "note.txt");
     let input = child
@@ -350,6 +386,7 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
     assert!(!signed.get(), "missing owner must refuse before signing");
     assert!(refused_path.is_err());
     assert!(refused_versions.is_err() && refused_preview.is_err() && refused_comparison.is_err());
+    assert!(refused_harness_preview.is_err());
     assert_eq!(
         text_preview(&reopened, child.id(), &first_id),
         "saved original"

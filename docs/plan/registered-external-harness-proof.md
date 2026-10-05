@@ -2,7 +2,7 @@
 
 This opt-in test runs an external Codex process in a fresh synthetic consumed lane. Mesh begins watching after the provider's first edit, acknowledges saved progress, then stops and joins. The same provider process makes another edit after stop. The test verifies unchanged Git HEAD/index, root inode, original input bytes, retained history after stop, and executable bytes. It preserves the fixture and raw logs for inspection.
 
-This is a controlled noninteractive native test. It does not establish existing interactive-session compatibility, graphical review, exact saved-file preview, packaged acceptance, protected-main approval, integration/restore, another provider or another host. Timing includes provider startup and coordination and is not a velocity comparison. Native registration and input consumption are prepared by the fixture; this is not proof of UI provisioning.
+This is a controlled noninteractive native test. It does not establish existing interactive-session compatibility, graphical review, packaged acceptance, protected-main approval, integration/restore, another provider or another host. Timing includes provider startup and coordination and is not a velocity comparison. Native registration and input consumption are prepared by the fixture; this is not proof of UI provisioning.
 
 ## Reproduce
 
@@ -28,7 +28,7 @@ python3 apps/desktop/scripts/prove-registered-external-harness.py \
 
 An absolute `--provider` path can select the Codex executable; otherwise the runner uses the executable found on PATH. Keep the source and executable fixed during the run. The runner checks exact embedded revision plus the supplied SHA-256 before editing, then checks the executable again after completion. A mismatched digest is refused before fixture or output mutation.
 
-Inspect `proof.json` and both processes' stdout/stderr in the output directory. Failure leaves evidence and the synthetic fixture in place. The successful result requires at least two new saved versions, a joined stopped watcher, a still-live provider after stop, its final edit, and no subsequent journal or version-list change. Gate files are synthetic test coordination and may enter captured content; saved snapshot text is not independently previewed by this test. Process cleanup covers child handles started by the runner and is not an OS-containment claim.
+Inspect `proof.json` and both processes' stdout/stderr in the output directory. Failure leaves evidence and the synthetic fixture in place. The successful result requires at least two new saved versions, a joined stopped watcher, a still-live provider after stop, its final edit, and no subsequent journal or version-list change. Gate files are synthetic test coordination and may enter captured content. The current runner separately previews the exact first and second saved versions and verifies both remain identical after the final uncaptured edit. It waits for the expected second saved text, so a gate-only save cannot satisfy the second-edit assertion. Earlier recorded v1 results did not include these preview checks. Process cleanup covers child handles started by the runner and is not an OS-containment claim.
 
 ## Recorded run
 
@@ -44,3 +44,25 @@ before mutation. Both exact executables, raw process logs and manifests remain p
 #336 merged this runner and its original evidence at `cd9924dc427b9d0f3d949f4168634c9331192630`;
 this refresh records already-observed evidence, not a new provider run or proof on the merge revision.
 All graphical, signing, main-approval, provider/host and measurement limits above still apply.
+
+
+The saved-preview extension records `mesh.registered-external-harness-acceptance/v2` with both exact
+saved identities and native content digests. Each preview comes from a separate native command
+process over retained history. The extension requires a new exact executable/provider run; existing
+v1 evidence does not retroactively prove saved previews. Native inspection is still not graphical
+review or protected-main approval.
+
+
+## Exact saved-preview run — 5 October 2026
+
+The [v2 result](evidence/registered-external-harness-preview-2026-10-05.json) passed on executable
+revision `8d82dd1308427c7513f29dc0954cbe45cf76dd5b`, SHA-256
+`c489e8390296030efdcbd1ee454e38d91509099a18011efab64534b2ad2487ae`, with Codex CLI
+`0.158.0-alpha.2.1`. Fresh fixture preparation passed in 41.858s; the provider journey passed in
+31.664s, advancing history from four to six versions. Separate native preview processes verified
+exact stage-one and stage-two text and reread both unchanged after the final uncaptured edit.
+The result retains both saved identities and content digests. The same provider remained alive
+before watching and after joined stop; original input, Git HEAD/index, root inode, stopped history
+and executable bytes were preserved. Wrong executable digest refused before fixture/output
+mutation, with all fixture file bytes compared unchanged. Raw logs, exact executable and fixture
+remain retained locally. This is native saved-text evidence, not graphical review or approval.

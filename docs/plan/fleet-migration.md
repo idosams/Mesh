@@ -7632,3 +7632,19 @@ corrects the fixed checkpoint reference to `5052009`, and preserves the original
 alongside the already-observed exact `1705183` refresh. No runtime, checkpoint or authority behavior
 changes. Documentation checks and public-result field comparison validate this increment; hosted
 checks and normal merge remain required. Every unfinished fleet phase exit stays open.
+
+
+R168 exact registered saved previews are new canonical work from main
+`fc6d3ce530687a46cfce1e7a44ac954dd152acc2`, replacing no preserved legacy commit. The native command
+reuses desktop saved-text inspection and the provider runner checks immutable bytes across later
+edits. The parser regression failed before implementation; a fixture type mismatch was corrected,
+and both focused tests passed. Full validation, exact provider evidence and PR delivery remain
+required; native publication and the complete fleet acceptance scope remain open.
+
+
+R168 validation is now recorded on source `42132431d15f0fb8b21dd9c05dccee2cb277992f`, with the full
+gate passing and no runtime change during reconciliation to `8d82dd1308427c7513f29dc0954cbe45cf76dd5b`.
+The real-provider v2 saved-preview result and exact executable are revision-bound; the initial
+parser failure, corrected fixture compilation, focused/full gates and digest refusal are retained.
+The update remains a new canonical increment, replacing no preserved legacy implementation. Hosted
+checks and normal merge remain required; all broader fleet phase exits stay open.

@@ -725,3 +725,15 @@ The native read model reports `inputs_currently_eligible` independently from
 leaving the review's retained decision revisions stale. Neither flag grants publication authority;
 publication must independently admit the exact current vector under custody. List and detail use
 the same distinction, and historical graph, bundle, preview and file bytes remain unchanged.
+
+
+The registered harness also accepts
+`--mesh-registered-attachment preview <absolute-storage-folder> <registration-id> <saved-version> <relative-path>`.
+It returns the existing bounded `mesh.attachment-text/v1` projection used by desktop inspection:
+exact saved operation/path/content digest, byte count and text state. Binary or oversized content
+retains metadata-only behavior. The version must be 64 lowercase hexadecimal characters; the path
+must be nonempty, at most 4,096 bytes, relative, and contain no NUL, empty, dot or parent component.
+Native registration, complete dependency history and exact saved-operation checks still govern the
+read. Unknown versions, missing/substituted roots or missing saved files refuse; current editor
+bytes are never a fallback. This read-only action does not create a signing identity, capture work,
+reserve a challenge or approve main. Unregistered metadata-only preview is not exposed here.

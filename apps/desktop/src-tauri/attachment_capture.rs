@@ -77,11 +77,12 @@ impl mesh_daemon::fleet::CandidateImportSigner for NativeImportSigner {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Action {
     Capture,
     Watch,
     Versions,
+    Preview { operation: String, path: String },
 }
 #[derive(Debug, PartialEq, Eq)]
 struct Invocation {
@@ -95,9 +96,18 @@ fn parse(args: &[String]) -> Result<Option<Invocation>, String> {
         Some("--mesh-registered-attachment") => true,
         _ => return Ok(None),
     };
-    if args.len() != if registered { 4 } else { 3 } {
+    let preview = registered && args.get(1).map(String::as_str) == Some("preview");
+    if args.len()
+        != if preview {
+            6
+        } else if registered {
+            4
+        } else {
+            3
+        }
+    {
         return Err(
-            "Usage: Mesh --mesh-attachment <capture|watch|versions> <absolute-metadata-folder>, or Mesh --mesh-registered-attachment <capture|watch|versions> <absolute-storage-folder> <registration-id>"
+            "Usage: Mesh --mesh-attachment <capture|watch|versions> <absolute-metadata-folder>, or Mesh --mesh-registered-attachment <capture|watch|versions> <absolute-storage-folder> <registration-id>; registered preview additionally requires <saved-version> <relative-path>"
                 .to_owned(),
         );
     }
@@ -105,7 +115,36 @@ fn parse(args: &[String]) -> Result<Option<Invocation>, String> {
         "capture" => Action::Capture,
         "watch" => Action::Watch,
         "versions" => Action::Versions,
-        _ => return Err("Attachment action must be capture, watch or versions".to_owned()),
+        "preview" if preview => {
+            let operation = &args[4];
+            let path = &args[5];
+            if operation.len() != 64
+                || !operation
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err("The saved version must be 64 lowercase hexadecimal characters".into());
+            }
+            if path.is_empty()
+                || path.len() > 4096
+                || path.contains('\0')
+                || path
+                    .split('/')
+                    .any(|part| part.is_empty() || part == "." || part == "..")
+            {
+                return Err("The saved path must be a bounded relative file path".into());
+            }
+            Action::Preview {
+                operation: operation.clone(),
+                path: path.clone(),
+            }
+        }
+        _ => {
+            return Err(
+                "Attachment action must be capture, watch, versions or registered preview"
+                    .to_owned(),
+            )
+        }
     };
     let metadata = PathBuf::from(&args[2]);
     if !metadata.is_absolute() {
@@ -171,6 +210,17 @@ fn run(
         })?,
     };
     match invocation.action {
+        Action::Preview { operation, path } => {
+            let (storage, selected) = registered
+                .as_ref()
+                .ok_or_else(|| "Saved preview requires a retained registration".to_owned())?;
+            let value = storage
+                .registered_review_text(selected, &operation, &path)
+                .map_err(|_| {
+                    "The exact saved preview is unavailable or needs reconciliation".to_owned()
+                })?;
+            emit(&mut output, value)
+        }
         Action::Capture => {
             let signer = NativeCaptureSigner::generate()?;
             let captured = attachment
@@ -384,6 +434,36 @@ mod tests {
         .unwrap();
         assert_eq!(registered.registration.as_deref(), Some(id.as_str()));
         assert_eq!(registered.action, Action::Watch);
+        let preview = parse(&args(&[
+            "--mesh-registered-attachment",
+            "preview",
+            "/storage",
+            &id,
+            &"b".repeat(64),
+            "note.txt",
+        ]))
+        .expect("exact registered saved preview must parse")
+        .unwrap();
+        assert_eq!(preview.registration.as_deref(), Some(id.as_str()));
+        for (version, path) in [
+            ("not-a-version".to_owned(), "note.txt"),
+            ("B".repeat(64), "note.txt"),
+            ("b".repeat(64), "../note.txt"),
+            ("b".repeat(64), "/note.txt"),
+            ("b".repeat(64), "a//b"),
+            ("b".repeat(64), ""),
+        ] {
+            assert!(parse(&args(&[
+                "--mesh-registered-attachment",
+                "preview",
+                "/storage",
+                &id,
+                &version,
+                path
+            ]))
+            .is_err());
+        }
+        assert!(parse(&args(&["--mesh-attachment", "preview", "/metadata"])).is_err());
         for values in [
             vec!["--mesh-registered-attachment", "capture", "/storage"],
             vec!["--mesh-registered-attachment", "capture", "relative", &id],
