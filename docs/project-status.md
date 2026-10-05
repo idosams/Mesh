@@ -2745,3 +2745,11 @@ This does not independently replay publication signatures, reconstruct a complet
 input context, or enable a publication writer. The native resolver still needs the private context
 and shared starting-checkpoint reconstruction. Full checks, mutation evidence and PR delivery remain
 pending; the complete fleet objective remains open.
+
+R174 full `npm test` passed on `4df5c21795124202b0a98f73d48d842061e87799`:
+3,967 native tests in 319.840s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests
+and all 44 real-daemon checks, plus repository, docs, license, storage, formatting and lint gates.
+The consumed fixture passed in 44.168s inside that run. Removing owner-configuration verification
+failed the new refusal assertion; original source was restored. Reconciliation with the published
+parent's canonical-main ancestry preserved the entire tested tree. Hosted checks and merged
+delivery remain required; private resolver integration and full publication/recovery remain open.
