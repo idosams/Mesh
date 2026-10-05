@@ -33,3 +33,14 @@ Inspect `proof.json` and both processes' stdout/stderr in the output directory. 
 ## Recorded run
 
 The 2026-10-05 portable run used exact native executable revision `dff7384212c0ed7422594fab06bc35dfcd092036`, SHA-256 `1af4edfe29e790f002d75840f8140f3d87df14ed19e7da9857f8ede96a974fd5`, and Codex CLI `0.158.0-alpha.2.1`. Fresh fixture creation passed in 27.435s. The provider run passed in 24.503s, taking history from four to six versions. Wrong-SHA refusal was verified separately before fixture mutation. The runner, result and process logs were retained and seven artifact hashes independently verified. Raw provider logs and private paths are not published.
+
+
+The [refreshed run](evidence/registered-external-harness-2026-10-05-refresh.json) used exact combined
+revision `170518353d8901561ddd7dce5e6572d1f0ffacb0`, executable SHA-256
+`97b60cc81cb51f1586819b3d26cdfc7e25588896ff05789bbebab84b7abea370`, and the same Codex CLI version.
+Fresh fixture preparation passed in 33.898s; the provider journey passed in 28.148s with four to six
+versions and all original preservation/continued-process assertions. Wrong-digest refusal passed
+before mutation. Both exact executables, raw process logs and manifests remain preserved locally.
+#336 merged this runner and its original evidence at `cd9924dc427b9d0f3d949f4168634c9331192630`;
+this refresh records already-observed evidence, not a new provider run or proof on the merge revision.
+All graphical, signing, main-approval, provider/host and measurement limits above still apply.
