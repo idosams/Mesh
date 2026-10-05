@@ -498,6 +498,7 @@ impl PreparedNativeConsumedStart {
 pub(super) fn assert_start_fence(
     prepared: &PreparedNativeConsumedStart,
     storage: &AttachmentStorage,
+    campaign: super::RecoveryCampaign,
 ) {
     let staged = prepared.stage(storage).unwrap();
     let journal_path = prepared
@@ -524,14 +525,17 @@ pub(super) fn assert_start_fence(
     assert_eq!(fs::read(&journal_path).unwrap(), before);
     let intent = read_private_in_store(&prepared.destination.store, PENDING).unwrap();
     super::recovery::assert_reloaded(prepared, storage, &staged);
-    for boundary in 1..=length {
+    let exhaustive_start = campaign == super::RecoveryCampaign::Start;
+    let first_boundary = if exhaustive_start { 1 } else { length };
+    for boundary in first_boundary..=length {
         let failure = prepared
             .fence_with_io(
                 storage,
                 &staged,
                 |step, file, frame| {
                     assert_eq!(step, "staged");
-                    file.write_all(&frame[boundary - 1..boundary])?;
+                    let begin = if exhaustive_start { boundary - 1 } else { 0 };
+                    file.write_all(&frame[begin..boundary])?;
                     file.sync_all()?;
                     Err(io::Error::other("interrupted required start append"))
                 },
@@ -607,7 +611,7 @@ pub(super) fn assert_start_fence(
     assert_eq!(fs::read(&journal_path).unwrap(), foreign);
     fs::write(&journal_path, &complete).unwrap();
     super::installation::assert_installation(prepared, storage, &staged, receipt);
-    super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt);
+    super::checkpoint::assert_checkpoint(prepared, storage, &staged, receipt, campaign);
     let owner_receipt = super::owner::assert_owner(prepared, storage, &staged, receipt);
     let complete = fs::read(&journal_path).unwrap();
     storage
@@ -659,5 +663,5 @@ pub(super) fn assert_start_fence(
             .count(),
         prepared.top_entries().len()
     );
-    super::complete::assert_complete(prepared, storage, &staged, receipt);
+    super::complete::assert_complete(prepared, storage, &staged, receipt, campaign);
 }

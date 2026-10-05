@@ -8033,3 +8033,15 @@ and a cancelled macOS job; cancellation is not success. Full npm test passed on 
 (seven slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks,
 plus repository/docs/license/storage/fmt/clippy. The expanded staging regression passed in 7.015s.
 Fresh hosted checks remain required for this combined head. This changes no runtime exposure or fixed user checkpoint.
+
+## R186: independent exhaustive consumed-start recovery campaigns
+
+The canonical PR363 and PR365 Linux runs hit the existing 15-minute execution deadline. PR365's single serial consumed-start campaign alone took 905.885s; an earlier passing identical source tree took 724.677s for that campaign. PR363 also left the bounded overview fixture until the end. These are failed checks, not passing assertions for the entire suite.
+
+The test-only correction gives start-frame, checkpoint-prefix and completion-prefix campaigns three named tests. Each uses its own fixture and retains the full staging, installation, owner-receipt, revocation, retry and process-restart journey. Start still exercises every progressive append byte. Checkpoint and completion still verify every prefix from zero through the complete frame, and reject each corrupted nonempty prefix. Only the exhaustive phase changes between fixtures; all other assertions remain. This duplicates the shorter cross-phase checks, preserving their ordering/context while allowing nextest to schedule the expensive phases independently.
+
+All three campaigns get early scheduling priority; the 33-review bounded overview test gets the next priority. No test is ignored, no assertions or time limits are relaxed, and production code/formats remain unchanged. Hosted validation must determine whether this resolves the Linux deadline in practice.
+
+Provenance: new test-only correction on canonical PR363 head 9398c2fb18aa9abf70342a053824d71fa01d17ec, based on merged main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a. No preserved legacy commits are replaced. PR365 and PR366 must adopt the correction with their complete dependent implementation before merged delivery. Fixed checkpoint b064029 remains unchanged.
+
+Focused validation passed all three campaigns in 175.781s: start 175.771s, checkpoint 153.645s and completion 152.674s. Full npm test passed: 3,980 native tests in 371.214s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Under the full local load, start took 276.679s, checkpoint 237.174s and completion 235.893s. Exact-head hosted checks remain required; these local results do not establish Linux CI performance.

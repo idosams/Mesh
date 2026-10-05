@@ -451,15 +451,23 @@ mod tests {
         if staging::run_fence_child_if_requested() || staging::run_stage_child_if_requested() {
             return;
         }
-        saved_rules_fixture(false);
+        saved_rules_fixture(false, staging::RecoveryCampaign::Start);
     }
     #[test]
     fn staging_rechecks_revocation_after_releasing_private_custody() {
-        saved_rules_fixture(true);
+        saved_rules_fixture(true, staging::RecoveryCampaign::Start);
     }
-    fn saved_rules_fixture(revoke: bool) {
+    #[test]
+    fn consumed_checkpoint_recovers_every_byte_prefix() {
+        saved_rules_fixture(false, staging::RecoveryCampaign::Checkpoint);
+    }
+    #[test]
+    fn consumed_completion_recovers_every_byte_prefix() {
+        saved_rules_fixture(false, staging::RecoveryCampaign::Completion);
+    }
+    fn saved_rules_fixture(revoke: bool, campaign: staging::RecoveryCampaign) {
         let root = std::env::temp_dir().join(format!(
-            "mesh-consumed-start-rules-{revoke}-{}",
+            "mesh-consumed-start-rules-{revoke}-{campaign:?}-{}",
             std::process::id()
         ));
         fs::create_dir(&root).unwrap();
@@ -647,7 +655,7 @@ mod tests {
             0
         );
         if !revoke {
-            staging::assert_start_fence(&prepared, &storage);
+            staging::assert_start_fence(&prepared, &storage, campaign);
         }
     }
 }
