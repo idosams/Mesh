@@ -32,6 +32,10 @@ fn root_publication_recovers_after_process_exit_at_both_frame_edges() {
 fn staged_publication_fences_ordinary_native_decisions_without_losing_recovery() {
     root_publication_fixture(3);
 }
+#[test]
+fn native_capture_after_publication_preserves_accepted_main() {
+    root_publication_fixture(4);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -138,7 +142,7 @@ fn root_publication_fixture(writer: u8) {
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
     if writer != 0 {
-        if writer >= 2 {
+        if matches!(writer, 2 | 3) {
             let result = restart::interrupted_publication(
                 &root,
                 owner.id(),
@@ -191,7 +195,7 @@ fn root_publication_fixture(writer: u8) {
                         .as_str()
                 )
             );
-        } else {
+        } else if writer == 1 {
             use super::super::dependency_private_context::publication::Step;
             use std::io::Write as _;
             let before = fs::read(&journal).unwrap();
@@ -292,6 +296,43 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if writer == 4 {
+        let accepted = storage
+            .inspect_native_publication_history(owner.id(), &trust)
+            .unwrap();
+        fs::write(
+            root.join("source/note"),
+            b"new private progress after publication",
+        )
+        .unwrap();
+        let input = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let saved = storage
+            .prepare_registered_dependency_capture(&owner, &input, actor, id(80), sign)
+            .expect("native capture must remain available after accepted publication")
+            .commit()
+            .unwrap();
+        assert_ne!(saved.operation(), later_version.operation());
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        assert_eq!(
+            storage
+                .inspect_native_saved_version(owner.id(), saved.operation(), &trust)
+                .unwrap(),
+            saved
+        );
+        assert!(
+            owner.saved_versions().is_err(),
+            "private capture must not remove ordinary admission guards"
+        );
+        return;
     }
     let before = fs::read(&journal).unwrap();
     let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
