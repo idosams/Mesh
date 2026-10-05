@@ -7625,6 +7625,15 @@ remove the publication-record admission fence or grant new approval/agent/render
 Full validation, a dependent PR, hosted checks and merge remain required under issue #345.
 
 
+R167 acceptance reconciliation is documentation/evidence work from published receipt head
+`f08d629e5f20218211ae85b9707d7911dae72abc` (#347), replacing no preserved implementation commit.
+It updates the dated requirement map from verified merged #336/#338/#340/#344/#346 and #260/#261,
+corrects the fixed checkpoint reference to `5052009`, and preserves the original provider result
+alongside the already-observed exact `1705183` refresh. No runtime, checkpoint or authority behavior
+changes. Documentation checks and public-result field comparison validate this increment; hosted
+checks and normal merge remain required. Every unfinished fleet phase exit stays open.
+
+
 R168 exact registered saved previews are new canonical work from main
 `fc6d3ce530687a46cfce1e7a44ac954dd152acc2`, replacing no preserved legacy commit. The native command
 reuses desktop saved-text inspection and the provider runner checks immutable bytes across later

@@ -5,6 +5,22 @@ Mesh is an early functional local alpha. Its canonical product and development r
 destination. The [delivery ledger](plan/fleet-migration.md) records exact revisions, source mappings,
 PR checks and merge status; this page describes capability and acceptance boundaries.
 
+## Current acceptance observation — 5 October 2026
+
+The [acceptance map](plan/fleet-acceptance.md) is refreshed through canonical main `cd9924d`
+and merged registered external-harness proof [#336](https://github.com/idosams/Mesh/pull/336).
+The fixed user checkpoint is `5052009`, with its separate-data launcher, sample project and up to
+four saved-progress panels. Its executable hash and strict signature check passed again; the
+checkpoint is unchanged and does not contain later native dependency/publication work.
+
+Consumed decisions, retained snapshots, bound reviews and publication framing are merged. Exact
+receipt inspection [#347](https://github.com/idosams/Mesh/pull/347) is published on its reconciled
+base and awaits fresh checks and merge at this observation. Native publication replay, accepted-main
+advancement and complete commit/recovery enforcement remain unfinished. The refreshed external
+Codex result is exact-revision native evidence, not graphical or protected-main acceptance. The Mac
+remained locked at the latest graphical test attempt; signing, another provider/host and the full
+acceptance campaign remain open. Older dated observations below retain their historical scope.
+
 ## Product direction
 
 Mesh provides the underlying files, saved versions and work correlation for an existing project.
