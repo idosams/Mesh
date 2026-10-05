@@ -47,6 +47,70 @@ impl AttachmentStorage {
             owner.saved_versions().unwrap()
         );
         assert_eq!(saved.len(), 2);
+        let old_operation = saved[0].operation().to_string();
+        let new_operation = version.operation().to_string();
+        let old_preview = self
+            .registered_dependency_text(source.id(), &old_operation, "kept")
+            .unwrap();
+        assert_eq!(
+            old_preview.get("text").and_then(crate::ipc::Json::as_text),
+            Some("sync recovery progress")
+        );
+        let new_preview = self
+            .registered_dependency_text(source.id(), &new_operation, "kept")
+            .unwrap();
+        assert_eq!(
+            new_preview.get("text").and_then(crate::ipc::Json::as_text),
+            Some("new child progress")
+        );
+        let entries = self
+            .registered_dependency_entries(source.id(), &old_operation, None)
+            .unwrap();
+        assert!(entries.encode().contains("kept"));
+        assert!(self
+            .registered_dependency_entries(source.id(), &old_operation, Some("missing-cursor"))
+            .is_err());
+        let comparison = self
+            .registered_dependency_comparison(
+                source.id(),
+                &old_operation,
+                &new_operation,
+                (None, Some("kept")),
+            )
+            .unwrap();
+        assert!(comparison.encode().contains("modified"));
+        assert!(self
+            .registered_dependency_comparison(
+                source.id(),
+                &old_operation,
+                &new_operation,
+                (None, Some("absent"))
+            )
+            .is_err());
+        assert!(self
+            .registered_dependency_text(source.id(), &"00".repeat(32), "kept")
+            .is_err());
+        assert!(self
+            .registered_dependency_text(source.id(), &old_operation, "../kept")
+            .is_err());
+        let root_operation = owner
+            .saved_versions()
+            .unwrap()
+            .last()
+            .unwrap()
+            .operation()
+            .to_string();
+        assert_eq!(
+            self.registered_dependency_entries(owner.id(), &root_operation, None)
+                .unwrap(),
+            owner.inspect_entries(&root_operation, None).unwrap()
+        );
+        assert_eq!(
+            self.registered_dependency_text(owner.id(), &root_operation, "kept")
+                .unwrap(),
+            owner.inspect_text(&root_operation, "kept").unwrap()
+        );
+
         assert_eq!(saved.last(), Some(&version));
         assert_eq!(
             self.discovered_dependency_file(owner.id(), source.id(), saved[0], "kept")
@@ -220,8 +284,18 @@ impl AttachmentStorage {
         let missing = RestoreName::move_aside(source.project().root());
         let refused = self.discovered_dependency_versions(owner.id(), peer.id());
         let automatic_refused = self.registered_dependency_versions(peer.id());
+        let review_refused = self.registered_dependency_text(
+            peer.id(),
+            &expected[0].operation().to_string(),
+            "kept",
+        );
 
         drop(missing);
+        assert!(
+            review_refused.is_err(),
+            "missing required input became a partial preview"
+        );
+
         assert!(
             automatic_refused.is_err(),
             "automatic owner selection omitted a required input"

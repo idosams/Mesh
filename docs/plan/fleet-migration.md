@@ -7466,3 +7466,22 @@ The following update records evidence only. PR #328 now needs fresh current-head
 main before normal merge. The full local gate remains 3,949 native, 194 rendered, 672 desktop and
 44 daemon checks. Owning-root selection is separately preserved and fully locally tested but not
 published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
+
+
+R161 desktop saved-review integration now shares bounded entries, text preview and comparison
+rendering across ordinary and dependency-aware histories. The native registered reader selects the
+history format from verified native facts, retains exact registration identity, and never falls back
+to independent reads after a dependency failure. Desktop recovery, versions, inspection and
+comparison use it; selected storage/history handles are retained before releasing the registry lock.
+Recovery remains stopped. Capture/start, approval/publication and provider permission are unchanged.
+
+Native consumed-review coverage passed in 146.504s (old/new immutable text, entries, comparison,
+invalid cursor/version/path and missing required input). The real desktop host journey passed in
+12.354s: ordinary-project compatibility, native captured input, consumed-lane review, later capture,
+stable old content, fresh host reopen, stopped state and missing-source refusal/restoration. Its
+initial fixture correctly failed when attempting legacy input consumption without migration evidence;
+that refusal was retained and the fixture now captures fresh native input in an enrolled reserved lane.
+Disabling dependency-aware routing caused the expected preview failure in 3.385s. Production source
+was restored byte-for-byte. Compilation passed; full canonical validation and hosted PR checks remain
+required. This is host-level evidence, not packaged graphical acceptance. The fixed checkpoint is
+unchanged and the complete fleet scope remains open in #323.

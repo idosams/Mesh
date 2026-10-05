@@ -615,3 +615,16 @@ complete enrollment evidence. An incomplete or changed enrollment remains unavai
 does not repair it or change your project files. New capture and approval stay unavailable until
 policy-aware writing is integrated. There is no automatic enrollment or user-facing enrollment
 control yet. This work is not included in the fixed `5052009` testing checkpoint.
+
+
+### Reviewing saved work with native inputs
+
+For work created through native dependency-aware lanes, the desktop resolves the owning project
+and required saved inputs when listing versions, previewing files or comparing saves. Existing
+ordinary projects keep their usual saved-history view. Reopening the desktop restores review in a
+stopped state; it does not restart agents. If a required project or input is unavailable, review
+refuses until that exact project is restored rather than showing incomplete saved work.
+
+This read integration has host-level test coverage. Packaged graphical acceptance and the complete
+agent start/capture workflow remain tracked in the project status; saved visibility grants no approval
+or protected-main permission.
