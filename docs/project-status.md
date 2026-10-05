@@ -2425,3 +2425,6 @@ refusal before signing await full validation. Disabling reconstructed context fa
 capture in 47.095s with native transaction verification required; production source was restored
 byte-for-byte. Compilation passed in 6.62s. Full validation, publication and hosted checks remain
 required; #323 and the full fleet scope stay open. The fixed checkpoint is unchanged.
+
+
+Capture-discovery full validation completed on `295a42070020298472d0390ab138eaa058a88b99`: 3,950 native tests passed in 348.848s (18 skipped), plus the rendered, desktop and 44-check real daemon gates. This includes automatic deep-lane capture, desktop consumed capture and missing-intent refusal before signing. The first full attempt stopped on strict lint for a type declared after a test module; moving that declaration before the test module fixed it without changing behavior. Both logs are preserved. Publication and hosted validation remain required; automatic capture-service integration and the full fleet acceptance scope remain open.
