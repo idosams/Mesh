@@ -7564,3 +7564,10 @@ CI budget correction full validation passed on `6e75454ac91c42de7b5805ca115bc672
 
 
 R162 consumed-input decision correction is new work from canonical main 2dcb1b7dbca09dc8fbdaa4810e3df37479aaeaca; it replaces no preserved legacy commit. The existing ordinary child-decision reader refused consumed history. The complete-input native path now shares bounded custody and exact staged-owner context with native grants, preserving ordinary decisions and durable request identity. Failing-before evidence, seven focused passes, and the independent consumed recovery test are retained; the long existing consumption scenario is unchanged. Full validation, publication and merge remain required under issue #337. This does not close the full dependency-publication or fleet objective.
+
+The R163 recovery scheduling correction is new canonical CI work from main
+`0599b49e480cbc5797b4bc6095ddd912e0a7b270`, replacing no preserved implementation. It prioritizes
+the dominant independent recovery scenario after Linux run `37259723091` passed every assertion
+but exceeded its unchanged execution deadline. Test coverage and deadlines remain intact. This
+separate correction requires its own full validation, hosted checks and normal merge before
+propagation to the snapshot branch. The original failed run is preserved.
