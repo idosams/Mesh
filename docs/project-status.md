@@ -2407,3 +2407,21 @@ mutation, initial-failure and both full-gate logs plus complete history are pres
 is ready for publication against #329, followed by hosted checks and normal merge. Packaged visual
 acceptance, harness capture/start, runtime/publication/import/remote integration and full fleet
 acceptance remain open in #323. The user checkpoint stays fixed.
+
+
+R161 native capture discovery now reconstructs candidate source/grant/request/limits from retained
+start records, selects native registrations through owner consumption facts and allocation ancestry,
+and obtains the source version from verified history. These hints never admit history: existing
+capture preparation/commit/recovery still reconstruct and authenticate the complete consumption
+transaction under custody. Missing start intent cannot downgrade consumed work to independent
+capture. Public enrolled prepare/recover entry points accept the retained registration and exact
+capture request; no caller-built original start request is required. No runtime or main authority is
+added, and automatic desktop/harness capture scheduling still needs integration.
+
+The focused real journey passed in 143.942s, exercising torn append and sync recovery in fresh
+processes, exact retries, stale prepared work, wrong-request refusal without journal changes and
+stale owner refusal at commit. Added deep-lane and desktop capture cases plus missing-intent
+refusal before signing await full validation. Disabling reconstructed context failed the actual
+capture in 47.095s with native transaction verification required; production source was restored
+byte-for-byte. Compilation passed in 6.62s. Full validation, publication and hosted checks remain
+required; #323 and the full fleet scope stay open. The fixed checkpoint is unchanged.

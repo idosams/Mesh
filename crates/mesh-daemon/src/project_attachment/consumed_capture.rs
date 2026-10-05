@@ -175,8 +175,43 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     let stale = storage
         .prepare_consumed_capture(owner, request(), &input, actor, id(111), sign)
         .unwrap();
+    {
+        struct RestoreStart(std::path::PathBuf, std::path::PathBuf);
+        impl Drop for RestoreStart {
+            fn drop(&mut self) {
+                fs::rename(&self.1, &self.0).expect("restore capture fixture start");
+            }
+        }
+        let original = destination
+            .metadata_path()
+            .join(crate::project_attachment::consumption_prepare::START_PENDING);
+        let moved = original.with_extension("test-held");
+        assert!(!moved.exists());
+        let journal = destination.metadata_path().join(crate::RECORD_FILE_NAME);
+        let before = fs::read(&journal).unwrap();
+        fs::rename(&original, &moved).unwrap();
+        let restore = RestoreStart(original, moved);
+        let called = std::cell::Cell::new(false);
+        let refused = storage.prepare_registered_dependency_capture(
+            destination,
+            &input,
+            actor,
+            id(118),
+            |payload| {
+                called.set(true);
+                sign(payload)
+            },
+        );
+        drop(restore);
+        assert!(
+            refused.is_err(),
+            "missing start intent downgraded consumed capture"
+        );
+        assert!(!called.get(), "missing start intent reached signing");
+        assert_eq!(fs::read(&journal).unwrap(), before);
+    }
     let first = storage
-        .prepare_consumed_capture(owner, request(), &input, actor, id(110), sign)
+        .prepare_registered_dependency_capture(destination, &input, actor, id(110), sign)
         .unwrap();
     let operation = first.operation();
     let journal_path = destination.metadata_path().join(crate::RECORD_FILE_NAME);
@@ -213,7 +248,7 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
             ("request", Json::text(start.request.to_hex())),
             ("operation", Json::text(operation.to_hex())),
             ("capture", Json::text(capture.to_hex())),
-            ("mode", Json::text("capture-recover")),
+            ("mode", Json::text("registered-capture-recover")),
         ]);
         let child = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "project_attachment::consumption_prepare::tests::saved_ignore_rules_bind_candidate_without_changing_empty_reservation", "--nocapture"])
@@ -225,6 +260,15 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
             String::from_utf8_lossy(&child.stderr)
         );
     };
+    let interrupted = fs::read(&journal_path).unwrap();
+    assert!(storage
+        .recover_registered_dependency_capture(destination, id(119))
+        .is_err());
+    assert_eq!(
+        fs::read(&journal_path).unwrap(),
+        interrupted,
+        "wrong automatic recovery request changed history"
+    );
     child(id(110), operation);
     let first_committed = fs::read(&journal_path).unwrap();
     child(id(110), operation);
@@ -253,7 +297,7 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     .unwrap();
     let input = destination.project().capture_inputs(start.limits).unwrap();
     let next = storage
-        .prepare_consumed_capture(owner, request(), &input, actor, id(112), sign)
+        .prepare_registered_dependency_capture(destination, &input, actor, id(112), sign)
         .unwrap()
         .commit()
         .unwrap();
@@ -274,7 +318,7 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     .unwrap();
     let input = destination.project().capture_inputs(start.limits).unwrap();
     let pending = storage
-        .prepare_consumed_capture(owner, request(), &input, actor, id(113), sign)
+        .prepare_registered_dependency_capture(destination, &input, actor, id(113), sign)
         .unwrap();
     let last_operation = pending.operation();
     let failure = pending
@@ -311,7 +355,7 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     .unwrap();
     let input = destination.project().capture_inputs(start.limits).unwrap();
     let stale_owner = storage
-        .prepare_consumed_capture(owner, request(), &input, actor, id(114), sign)
+        .prepare_registered_dependency_capture(destination, &input, actor, id(114), sign)
         .unwrap();
     let owner_path = owner.metadata_path().join(crate::RECORD_FILE_NAME);
     let owner_before = fs::read(&owner_path).unwrap();
@@ -474,4 +518,86 @@ pub(in crate::project_attachment) fn assert_consumed_capture(
     assert_eq!(fs::read(&journal_path).unwrap(), final_journal);
     assert!(destination.saved_versions().is_err());
     storage.assert_consumed_child_reservation(owner, &start, *final_versions.last().unwrap());
+}
+
+impl AttachmentStorage {
+    fn registered_capture_context(
+        &self,
+        selected: &ProvisionedAttachment,
+    ) -> io::Result<Option<ConsumedCaptureContext>> {
+        let destination = self.exact_registered_work(selected)?;
+        let Some(hint) = self.consumed_capture_selection_hint(&destination)? else {
+            // Missing intent cannot downgrade consumed history: the independent writer verifies
+            // enrollment and refuses consumption records without the authenticated context.
+            return Ok(None);
+        };
+        let (owner, inputs) = self.registered_capture_inputs(destination.id())?;
+        let source_ids = inputs
+            .iter()
+            .filter(|(_, key)| **key == hint.source)
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+        let [source_id] = source_ids.as_slice() else {
+            return Err(invalid("capture source hint is unavailable or ambiguous"));
+        };
+        let source = self.reopen(source_id)?;
+        let version = self
+            .registered_dependency_versions(source.id())?
+            .into_iter()
+            .find(|version| version.operation() == hint.operation)
+            .ok_or_else(|| invalid("capture source version is unavailable"))?;
+        let available = inputs
+            .keys()
+            .filter(|id| id.as_str() != destination.id())
+            .map(|id| self.reopen(id))
+            .collect::<io::Result<Vec<_>>>()?;
+        let handles = available.iter().collect::<Vec<_>>();
+        Ok(Some(ConsumedCaptureContext::new(
+            self,
+            &owner,
+            NativeConsumedStartRequest {
+                input: NativeGrantInspection {
+                    source: &source,
+                    version,
+                    destination: &destination,
+                    grant: hint.grant,
+                },
+                available: &handles,
+                request: hint.request,
+                limits: hint.limits,
+            },
+        )))
+    }
+
+    /// Prepare enrolled private progress using native recorded context, without a caller start request.
+    /// Candidate reconstruction grants nothing; the existing writer revalidates before signing and commit.
+    pub fn prepare_registered_dependency_capture<F, E>(
+        &self,
+        selected: &ProvisionedAttachment,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+        request: RecordDigest,
+        sign: F,
+    ) -> io::Result<PreparedNativeCapture>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        let selected = self.exact_registered_work(selected)?;
+        let context = self.registered_capture_context(&selected)?;
+        selected.prepare_capture_in(input, actor, request, sign, context)
+    }
+
+    /// Recover only an exact enrolled capture request using freshly reconstructed native context.
+    pub fn recover_registered_dependency_capture(
+        &self,
+        selected: &ProvisionedAttachment,
+        request: RecordDigest,
+    ) -> io::Result<SavedAttachmentVersion> {
+        let selected = self.exact_registered_work(selected)?;
+        let context = self.registered_capture_context(&selected)?;
+        selected.with_capture_custody(context.as_ref(), |read| {
+            selected.recover_capture_held(request, read, |file| file.sync_all())
+        })
+    }
 }

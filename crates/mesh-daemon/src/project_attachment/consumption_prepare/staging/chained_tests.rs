@@ -245,9 +245,8 @@ impl AttachmentStorage {
             .capture_inputs(ObservationLimits::default())
             .unwrap();
         let next = self
-            .prepare_consumed_capture(
-                owner,
-                request(grant),
+            .prepare_registered_dependency_capture(
+                destination,
                 &capture,
                 actor,
                 RecordDigest::from_bytes([162; 32]),

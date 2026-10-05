@@ -132,6 +132,15 @@ impl AttachmentStorage {
         )
     }
 
+    pub(super) fn registered_capture_inputs(
+        &self,
+        work_id: &str,
+    ) -> io::Result<(ProvisionedAttachment, BTreeMap<String, Key>)> {
+        let owner_id = self.candidate_owning_root(work_id)?;
+        let selection = self.discover_dependency_read(&owner_id, work_id)?;
+        Ok((self.reopen(&owner_id)?, selection.works))
+    }
+
     fn verify_discovery(
         &self,
         owner_id: &str,

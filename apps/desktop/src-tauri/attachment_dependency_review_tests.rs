@@ -88,10 +88,14 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         .project()
         .capture_inputs(ObservationLimits::default())
         .unwrap();
-    let initial = native_source
-        .prepare_dependency_capture(&input, signer.public_key(), request_id(205), |payload| {
-            signer.sign(payload)
-        })
+    let initial = storage
+        .prepare_registered_dependency_capture(
+            &native_source,
+            &input,
+            signer.public_key(),
+            request_id(205),
+            |payload| signer.sign(payload),
+        )
         .unwrap()
         .commit()
         .unwrap();
@@ -147,9 +151,8 @@ fn desktop_reopens_consumed_review_and_preserves_ordinary_projects() {
         .capture_inputs(ObservationLimits::default())
         .unwrap();
     let later = storage
-        .prepare_consumed_capture(
-            &owner,
-            start(),
+        .prepare_registered_dependency_capture(
+            &child,
             &input,
             signer.public_key(),
             request_id(204),

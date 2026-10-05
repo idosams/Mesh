@@ -26,12 +26,19 @@ impl Selection<'_> {
             .policy()
             .completed_consumption_records()
             .ok_or_else(|| invalid("resolved lane consumption is incomplete"))?;
+        Self::from_payload(work, start.payload)
+    }
+
+    fn from_payload(
+        work: &ProvisionedAttachment,
+        payload: RecordDigest,
+    ) -> io::Result<Selection<'_>> {
         let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
             work.metadata_path(),
             work.store.filesystem().read_only(),
         )
         .map_err(error)?;
-        let bytes = read_payload(&cas, start.payload, 65536)?;
+        let bytes = read_payload(&cas, payload, 65536)?;
         let value = Json::parse(std::str::from_utf8(&bytes).map_err(error)?).map_err(error)?;
         let body = value
             .get("body")
@@ -80,6 +87,42 @@ impl Selection<'_> {
 }
 
 impl AttachmentStorage {
+    pub(in crate::project_attachment) fn consumed_capture_selection_hint(
+        &self,
+        work: &ProvisionedAttachment,
+    ) -> io::Result<Option<crate::project_attachment::consumption_prepare::NativeConsumedCaptureHint>>
+    {
+        let _guard =
+            crate::workspace_custody::lock_workspace_initialization(&work.store).map_err(error)?;
+        let raw = match crate::project_attachment::dependency_enrollment::read_private_in_store(
+            &work.store,
+            super::super::START_PENDING,
+        ) {
+            Ok(raw) => raw,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let intent = Json::parse(&raw).map_err(error)?;
+        if intent.get("schema").and_then(Json::as_text)
+            != Some("mesh.native-consumption-start-intent/v1")
+        {
+            return Err(invalid("capture start hint has unknown schema"));
+        }
+        let selection = Selection::from_payload(work, digest(text(&intent, "payload")?)?)?;
+        if digest(text(&intent, "request")?)? != selection.request {
+            return Err(invalid("capture start hint request differs"));
+        }
+        Ok(Some(
+            crate::project_attachment::consumption_prepare::NativeConsumedCaptureHint {
+                source: selection.source,
+                operation: selection.operation,
+                grant: selection.grant,
+                request: selection.request,
+                limits: selection.limits,
+            },
+        ))
+    }
+
     pub(in crate::project_attachment) fn resolve_consumed_histories<'a>(
         &self,
         owner: &'a ProvisionedAttachment,
