@@ -7505,3 +7505,15 @@ it now uses the same registered review context. Its expanded real host regressio
 Reconciliation `bf655d5c0a5ba18d2c49e48aa755f42d15b6d674` retained both documentation histories
 without changing prior production/tests. The final comparison-path edit requires a new full gate
 before publication. No packaged graphical claim is made; the fixed checkpoint remains unchanged.
+
+
+R161 final desktop-review gate passed on `adeb579a1155412f87376ecd023e5ee79d361b95`:
+3,950 native tests in 349.830s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all repository/docs/license/storage/format/lint gates. The native consumed
+review journey passed in 196.616s; the expanded desktop-host journey passed in 23.332s within the
+full concurrent suite. This includes recovery, version listing, preview, comparison and selected
+changed-path review with ordinary-project compatibility and missing-input refusal. Focused,
+mutation, initial-failure and both full-gate logs plus complete history are preserved. This increment
+is ready for publication against #329, followed by hosted checks and normal merge. Packaged visual
+acceptance, harness capture/start, runtime/publication/import/remote integration and full fleet
+acceptance remain open in #323. The user checkpoint stays fixed.
