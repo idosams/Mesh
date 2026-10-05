@@ -33,6 +33,52 @@ struct PrivateContext<'a> {
     owner: &'a ProvisionedAttachment,
     histories: BTreeMap<String, Snapshot>,
 }
+// This proof can only be constructed by complete native private-context verification.
+// It borrows the same custody set and re-verifies graph content at each use. It does not
+// verify a human receipt itself and cannot authorize a write or ordinary workspace opening.
+pub(crate) struct VerifiedConsumedPublicationGraph<'read, 'owner> {
+    context: &'read PrivateContext<'owner>,
+    storage: &'read AttachmentStorage,
+    work: &'read ProvisionedAttachment,
+    guard: &'read WorkspaceInitializationGuard,
+    claim: crate::dependency_policy::NativePublicationClaim,
+    graph: NativeDependencyGraph,
+}
+impl VerifiedConsumedPublicationGraph<'_, '_> {
+    pub(crate) fn verify_for(
+        &self,
+        owner: &VerifiedPrivateHistory,
+        claim: crate::dependency_policy::NativePublicationClaim,
+    ) -> io::Result<&NativeDependencyGraph> {
+        let current = self.context.read(self.context.owner, self.guard)?;
+        if current.proof != *owner
+            || self.claim != claim
+            || owner.policy().publication_claim(claim.record.payload) != Some(claim)
+            || self.graph.review_output() != claim.review.evidence().output()
+            || self.graph.review_inputs().next().is_none()
+            || owner
+                .policy()
+                .review_graph(claim.review.evidence().snapshot())
+                != Some(self.graph.digest())
+        {
+            return Err(invalid(
+                "consumed publication proof differs from its exact owner, inputs or snapshot",
+            ));
+        }
+        if self.context.graph(
+            self.storage,
+            self.work,
+            claim.review.evidence().output().2,
+            self.guard,
+        )? != self.graph
+        {
+            return Err(invalid("consumed publication input content changed"));
+        }
+        self.guard.ensure_current().map_err(error)?;
+        Ok(&self.graph)
+    }
+}
+
 impl<'a> PrivateContext<'a> {
     fn read(
         &self,
@@ -210,6 +256,121 @@ impl<'a> PrivateContext<'a> {
         }
         Ok(result)
     }
+    fn consumed_publication_graph<'read>(
+        &'read self,
+        storage: &'read AttachmentStorage,
+        claim: crate::dependency_policy::NativePublicationClaim,
+        guard: &'read WorkspaceInitializationGuard,
+    ) -> io::Result<VerifiedConsumedPublicationGraph<'read, 'a>> {
+        let output = claim.review.evidence().output();
+        let mut selected = None;
+        for snapshot in self.histories.values() {
+            let binding = self.binding(storage, &snapshot.work, guard)?;
+            if (binding.work(), binding.installation()) == (output.0, output.1)
+                && selected.replace(&snapshot.work).is_some()
+            {
+                return Err(invalid("consumed publication work is ambiguous"));
+            }
+        }
+        let work = selected.ok_or_else(|| invalid("consumed publication work is unavailable"))?;
+        let graph = self.graph(storage, work, output.2, guard)?;
+        let proof = VerifiedConsumedPublicationGraph {
+            context: self,
+            storage,
+            work,
+            guard,
+            claim,
+            graph,
+        };
+        proof.verify_for(&self.read(self.owner, guard)?.proof, claim)?;
+        Ok(proof)
+    }
+
+    fn with_replayed_history<T>(
+        &self,
+        storage: &AttachmentStorage,
+        work: &ProvisionedAttachment,
+        trusted: &crate::TrustedReviewers,
+        guard: &WorkspaceInitializationGuard,
+        inspect: impl FnOnce(&NativePrivateReviewHistory<'_>, &VerifiedPrivateHistory) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let owner = self.read(self.owner, guard)?;
+        let mut bindings = BTreeMap::new();
+        for snapshot in self.histories.values() {
+            self.read(&snapshot.work, guard)?;
+            let binding = self.binding(storage, &snapshot.work, guard)?;
+            if bindings
+                .insert(
+                    (binding.work(), binding.installation()),
+                    (snapshot, binding),
+                )
+                .is_some()
+            {
+                return Err(invalid("ambiguous publication history"));
+            }
+        }
+        let mut histories = BTreeMap::new();
+        for (key, (snapshot, binding)) in &bindings {
+            let workspace = mesh_operations::WorkspaceId::from_bytes(super::history::short_id(
+                snapshot.configuration.as_bytes(),
+            ));
+            histories.insert(
+                *key,
+                NativePrivateReviewHistory::open(
+                    snapshot.work.metadata_path(),
+                    snapshot.work.store.clone(),
+                    &snapshot.proof,
+                    (&self.owner.store, &owner.proof),
+                    workspace,
+                    binding,
+                    guard,
+                )
+                .map_err(error)?,
+            );
+        }
+        let cas = mesh_cas::Cas::<_, mesh_cas::Blake3>::with_filesystem(
+            self.owner.metadata_path(),
+            self.owner.store.filesystem().read_only(),
+        )
+        .map_err(error)?;
+        let claims = owner.proof.policy().publication_claims_in_order();
+        if claims.len() > 4096 {
+            return Err(invalid("publication replay exceeds its bound"));
+        }
+        for claim in claims {
+            let output = claim.review.evidence().output();
+            let key = (output.0, output.1);
+            let (snapshot, _) = bindings
+                .get(&key)
+                .ok_or_else(|| invalid("publication output history is unavailable"))?;
+            let graph = self.graph(storage, &snapshot.work, output.2, guard)?;
+            let receipt = super::dependency_transaction::read_payload(&cas, claim.receipt, 65536)?;
+            let history = histories
+                .get_mut(&key)
+                .ok_or_else(|| invalid("publication history disappeared"))?;
+            if graph.review_inputs().next().is_some() {
+                let complete = self.consumed_publication_graph(storage, claim, guard)?;
+                history
+                    .replay_consumed_publication(claim, &complete, &receipt, trusted)
+                    .map_err(error)?;
+            } else {
+                history
+                    .replay_publication(claim, &graph, &receipt, trusted)
+                    .map_err(error)?;
+            }
+        }
+        let selected = self.binding(storage, work, guard)?;
+        let history = histories
+            .get(&(selected.work(), selected.installation()))
+            .ok_or_else(|| invalid("selected publication history is unavailable"))?;
+        let result = inspect(history, &owner.proof)?;
+        for snapshot in self.histories.values() {
+            self.read(&snapshot.work, guard)?;
+        }
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
+    }
+
     fn resolve(
         storage: &AttachmentStorage,
         owner: &'a ProvisionedAttachment,
@@ -440,6 +601,24 @@ impl AttachmentStorage {
         work_id: &str,
         operation: RecordDigest,
     ) -> io::Result<Json> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            context
+                .graph(self, work, operation, guard)
+                .map(|graph| graph.to_json())
+        })
+    }
+
+    // Repeat the complete read after reconstructing retained material. A failed second read
+    // never acknowledges the first result, and no workspace escapes the custody boundary.
+    fn with_private_inspection<T: PartialEq>(
+        &self,
+        work_id: &str,
+        inspect: impl Fn(
+            &PrivateContext<'_>,
+            &ProvisionedAttachment,
+            &WorkspaceInitializationGuard,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
         let owner = self.reopen(&self.candidate_owning_root(work_id)?)?;
         let work = self.reopen(work_id)?;
         let owner_selection = self.prepare_dependency_work(&owner, &owner)?;
@@ -457,7 +636,12 @@ impl AttachmentStorage {
             .map(|id| self.reopen(id))
             .collect::<io::Result<Vec<_>>>()?;
         let available = works.iter().collect::<Vec<_>>();
-        let prepared = self.prepare_dependency_graph(&owner, &work, operation, &available)?;
+        let prepared = self.prepare_dependency_graph(
+            &owner,
+            &work,
+            RecordDigest::from_bytes([0; 32]),
+            &available,
+        )?;
         let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
             .map_err(error)?;
         if self.private_discovery(
@@ -470,7 +654,7 @@ impl AttachmentStorage {
             return Err(invalid("private input discovery changed"));
         }
         let context = PrivateContext::resolve(self, &owner, &works, &guard)?;
-        let graph = context.graph(self, &work, operation, &guard)?;
+        let result = inspect(&context, &work, &guard)?;
         if self.private_discovery(
             &owner,
             work_id,
@@ -482,11 +666,90 @@ impl AttachmentStorage {
         }
         // Reconstruct again to verify retained material as well as journal/sidecar identity.
         let after = PrivateContext::resolve(self, &owner, &works, &guard)?;
-        if after.graph(self, &work, operation, &guard)? != graph {
+        if inspect(&after, &work, &guard)? != result {
             return Err(invalid("private content changed during inspection"));
         }
         guard.ensure_current().map_err(error)?;
-        Ok(graph.to_json())
+        Ok(result)
+    }
+
+    pub(super) fn with_native_publication_history<T: PartialEq>(
+        &self,
+        work_id: &str,
+        trusted: &crate::TrustedReviewers,
+        inspect: impl Fn(&NativePrivateReviewHistory<'_>, &VerifiedPrivateHistory) -> io::Result<T>,
+    ) -> io::Result<T> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            context.with_replayed_history(self, work, trusted, guard, &inspect)
+        })
+    }
+
+    /// Replay owning-project publications with configured human receipt trust and complete
+    /// consumed-input proofs. This is read-only accepted-main evidence, never permission
+    /// to publish, mutate, launch work or bypass human presence for a new decision.
+    pub fn inspect_native_publication_history(
+        &self,
+        work_id: &str,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.with_native_publication_history(work_id, trusted, |history, _| {
+            Ok(Json::object([
+                ("schema", Json::text("mesh.native-publication-history/v1")),
+                (
+                    "publication",
+                    history.verified_publication().map_or(Json::Null, |claim| {
+                        Json::object([
+                            ("head", Json::text(claim.result.to_hex())),
+                            (
+                                "operation",
+                                Json::text(claim.review.evidence().output().2.to_hex()),
+                            ),
+                            ("revision", Json::Number(claim.revision)),
+                            ("receipt", Json::text(claim.receipt.to_hex())),
+                        ])
+                    }),
+                ),
+            ]))
+        })
+    }
+
+    /// Reconstruct a prospective review against independently verified native main. This
+    /// saves no review and requests no signature; its snapshot must match the complete graph.
+    pub fn inspect_native_review_candidate(
+        &self,
+        work_id: &str,
+        snapshot: RecordDigest,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            context.with_replayed_history(self, work, trusted, guard, |history, owner| {
+                let review = owner
+                    .policy()
+                    .review_evidence(snapshot)
+                    .ok_or_else(|| invalid("native review snapshot is unavailable"))?;
+                let binding = context.binding(self, work, guard)?;
+                let output = review.output();
+                if (output.0, output.1) != (binding.work(), binding.installation()) {
+                    return Err(invalid("native review snapshot belongs to another work"));
+                }
+                let graph = context.graph(self, work, output.2, guard)?;
+                if owner.policy().review_graph(snapshot) != Some(graph.digest()) {
+                    return Err(invalid(
+                        "native review snapshot differs from complete content",
+                    ));
+                }
+                let (canonical, bundle) = history.current_review_bundle(&review).map_err(error)?;
+                Ok(Json::object([
+                    ("schema", Json::text("mesh.native-review-candidate/v1")),
+                    (
+                        "canonical",
+                        Json::text(RecordDigest::from_bytes(*canonical.as_bytes()).to_hex()),
+                    ),
+                    ("bundle", Json::text(bundle.to_hex())),
+                    ("snapshot", Json::text(snapshot.to_hex())),
+                ]))
+            })
+        })
     }
 }
 

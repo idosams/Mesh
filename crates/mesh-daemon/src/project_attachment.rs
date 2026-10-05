@@ -23,6 +23,7 @@ mod dependency_catalog_review;
 mod dependency_closure;
 mod dependency_private_context;
 pub use dependency_closure::NativeDependencyGraph;
+pub(crate) use dependency_private_context::VerifiedConsumedPublicationGraph;
 mod dependency_reservation;
 mod detachment;
 mod fleet_pins;

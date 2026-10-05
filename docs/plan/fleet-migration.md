@@ -7830,3 +7830,36 @@ PR #356 merged at `15198db5e338e8846366a91cf752a489a2f18687`. PR #357 now target
 at `4cc74a2a71413355b704ac348545fa4203080c7b`, with the entire tested tree unchanged and
 all seven fresh checks passed. R177 adopted that related parent at
 `aaaaa686da8f2618584a52a82ed2dd236fa64ecc` without changing its complete tree.
+
+## Trusted consumed publication replay (R178)
+
+Native publication history can be reopened across consumed lanes using configured human-receipt
+trust and complete private input proofs. The next prospective review uses the exact operation
+identified by the prior accepted main. The existing root-only replay restriction remains intact;
+the consumed path requires an opaque complete-graph proof before and after receipt validation.
+Both new native read APIs repeat complete content verification before returning and expose no
+workspace, publication writer or current grant.
+
+The two-consumed-approval regression covers reopen, missing trust, source replacement, historical
+approval contexts, unchanged journals and the root-only refusal. The same-version review remains
+a refused no-op. Three focused regressions passed in 35.954s; strict daemon lint passed in 9.72s.
+Removing the exact consumed canonical mapping caused the second review to fail in 8.733s;
+source was restored byte-for-byte. Full npm test passed on source commit
+45d8de6b370282bd1899a8c50064fd5c0bdb05c9: 3,968 native tests in 333.979s (six slow,
+18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks. All seven
+hosted checks passed in run 37300116747. The Linux recovery fixture took 842.852s, motivating
+the separately validated fixture reorganization in R177. Validation after incorporating that
+parent correction remains required.
+
+This is new canonical work based on #358 at c4bcfcb0e4b70e6f83e1faf5a5caeb9ffefe48ce,
+replacing no preserved legacy commit. It is published as #359. Production publication commit,
+exact-retry recovery, all-route admission and the complete fleet acceptance plan remain open.
+No packaged GUI, OS human presence, second provider or second host acceptance is claimed.
+
+R177's corrected source at 85f303daea370d042540b8772da4fb09b4bf957c passed the full local
+gate: 3,968 native tests in 325.069s (six slow, 18 skipped), 194 rendered tests, 672 desktop
+tests and all 44 real-daemon checks. Its independent graph fixture passed in 27.755s and the
+long recovery campaign in 229.278s. R176 / #357 merged at
+f3aab31e1140b27b778ed470771eb8e2a0196533. R178 incorporated published R177 at
+63bb816dc9ef962c4304ef6b02abd64ae08a0930; its product source remains unchanged, while
+both graph comparisons now run in the independent fixture. The combined full gate follows.
