@@ -2367,3 +2367,8 @@ following evidence update changes documentation. PR #329 now requires fresh chec
 and normal merge. Desktop review integration is separately preserved: its first full local gate
 passed 3,950 native tests in 351.698s, 194 rendered, 672 desktop and 44 daemon checks; the separate
 changed-path action still needs integration before publication. Full fleet acceptance remains open.
+
+
+Linux CI budget correction: runs `37249269700` and `37249297691` spent about 90s compiling before more than 13 minutes of native test execution, then reached the shared 15-minute job limit. Main run `37249215287` even recorded all 3,512 tests passing in 785.664s but ended cancelled at 15m3s. Keep all tests, assertions, leak detection and per-test deadlines. Compile in a separate step, allow 20 minutes for the complete Linux job, and explicitly bound the unchanged test command to 15 minutes. The independent check name remains `test-linux`; no failed test is tolerated or skipped. Hosted validation must still prove the correction.
+
+The unchanged canonical-main scenario passed locally in 137.923s, then 138.323s during a sampled run. A test-only crypto optimization experiment passed in 126.665s, insufficient to establish a robust fix; its patch and logs are preserved and the original manifest restored. The stack sample showed substantial identity/history work. This budget correction does not claim improved product runtime or measured fleet velocity. Full validation and a separate canonical PR remain required.
