@@ -84,6 +84,20 @@ pub(crate) struct VerifiedPrivateHistory {
     facts: NativeDependencyFacts,
 }
 impl VerifiedPrivateHistory {
+    pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
+        &self.facts == facts
+    }
+    pub(super) fn pending(&self) -> Option<(usize, mesh_store::DependencyRecord)> {
+        self.facts.pending()
+    }
+    pub(super) fn verify_configuration(&self, configuration: &str) -> io::Result<()> {
+        if self.facts.configuration != hash(configuration.as_bytes()) {
+            return Err(invalid(
+                "private history configuration differs from verified facts",
+            ));
+        }
+        Ok(())
+    }
     pub(crate) fn is_legacy_operation(&self, operation: RecordDigest) -> bool {
         self.facts.is_legacy_operation(operation)
     }
@@ -115,7 +129,9 @@ impl VerifiedPrivateHistory {
     ) -> io::Result<()> {
         self.facts.verify(store, file, bytes)
     }
-    fn from_consumption(verified: super::consumption_prepare::VerifiedConsumedHistory) -> Self {
+    pub(super) fn from_consumption(
+        verified: super::consumption_prepare::VerifiedConsumedHistory,
+    ) -> Self {
         Self {
             facts: verified.into_facts(),
         }
@@ -160,10 +176,10 @@ impl VerifiedDependencyRead {
     pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
         &self.0.facts == facts
     }
-    pub(super) fn from_consumption(
-        verified: super::consumption_prepare::VerifiedConsumedHistory,
+    pub(super) fn from_private_without_publication(
+        verified: VerifiedPrivateHistory,
     ) -> io::Result<Self> {
-        VerifiedPrivateHistory::from_consumption(verified).admit_without_publication()
+        verified.admit_without_publication()
     }
     fn from_independent_facts(facts: NativeDependencyFacts) -> io::Result<Self> {
         VerifiedPrivateHistory::from_independent_facts(facts)?.admit_without_publication()

@@ -7715,3 +7715,12 @@ R173 full `npm test` passed: 3,967 native tests in 321.245s (six slow, 18 skippe
 docs, license, storage, formatting and lint gates. The consumed input regression passed in
 43.876s within the full run. Hosted checks and merged delivery remain required. This does not
 complete consumed-publication replay, production approval/recovery or packaged fleet acceptance.
+
+
+R174 private completed-consumption evidence is new canonical work from published R173 head
+`f1aaaa2dda1ad5a2b6294e701944ad09c0af6286` (PR #354), replacing no preserved legacy implementation.
+The shared completed-history verifier now separates private evidence from ordinary admission and
+revalidates the exact supplied owner facts. Compilation and the consumed review fixture passed,
+including a publication-bearing owner and foreign/configuration/stale-journal refusals. Full checks,
+mutation evidence and publication remain pending. Complete consumed-publication replay and all
+remaining fleet phase exits are still required.
