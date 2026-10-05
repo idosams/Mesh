@@ -7616,3 +7616,10 @@ R165 native publication records are new canonical work from published saved-revi
 increment defines the required journal/index format and chronological structural checks. It
 does not enable publication or replace receipt verification. The publication contract records
 the remaining writer, recovery, compatibility and acceptance sequence under issue #345.
+
+
+R166 native receipt inspection is new canonical work from published publication-format head
+`128b8ec30d74813f59f5d443160344113f8176f8` (#346), replacing no preserved legacy commit. It adds
+exact historical signature/context verification and read-only native inspection. It does not
+remove the publication-record admission fence or grant new approval/agent/renderer authority.
+Full validation, a dependent PR, hosted checks and merge remain required under issue #345.
