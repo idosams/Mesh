@@ -40,12 +40,18 @@ jobs:
 
   test-linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Keep test execution bounded separately from checkout, cache restore and compilation.
+    # The growing recovery campaign must not lose its execution budget to a cold build.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
-      - run: cargo nextest run --workspace --exclude mesh-desktop
+      - name: Build Linux test binaries
+        run: cargo nextest run --workspace --exclude mesh-desktop --no-run
+      - name: Run Linux tests
+        timeout-minutes: 15
+        run: cargo nextest run --workspace --exclude mesh-desktop
 
   test-macos:
     runs-on: macos-latest
