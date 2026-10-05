@@ -119,6 +119,8 @@ pub enum DependencyKind {
     ConsumptionStart,
     /// Required destination acknowledgement of its exact owner-authority consumption record.
     ConsumptionComplete,
+    /// Required native publication claim; receipt and authority verification remain separate.
+    Publication,
 }
 impl DependencyKind {
     /// Stable journal and SQL code. Unknown values must refuse, never default.
@@ -132,6 +134,7 @@ impl DependencyKind {
             Self::ReviewSnapshot => 4,
             Self::ConsumptionStart => 5,
             Self::ConsumptionComplete => 6,
+            Self::Publication => 7,
         }
     }
     /// Decode only explicitly supported native envelope kinds.
@@ -145,6 +148,7 @@ impl DependencyKind {
             4 => Some(Self::ReviewSnapshot),
             5 => Some(Self::ConsumptionStart),
             6 => Some(Self::ConsumptionComplete),
+            7 => Some(Self::Publication),
             _ => None,
         }
     }
@@ -344,6 +348,15 @@ pub struct ContextRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_publication_kind_has_a_distinct_required_code() {
+        let publication = DependencyKind::from_code(7)
+            .expect("native publication requires its own durable envelope kind");
+        assert_eq!(publication.code(), 7);
+        assert!((0..7).all(|code| DependencyKind::from_code(code) != Some(publication)));
+        assert!(DependencyKind::from_code(8).is_none());
+    }
 
     fn digest(seed: u8) -> RecordDigest {
         RecordDigest::from_bytes([seed; 32])

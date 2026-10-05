@@ -9,8 +9,10 @@ use mesh_store::{DependencyKind, DependencyRecord, RecordDigest};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod consumption;
+mod publication;
 mod review;
 use consumption::{ConsumedComplete, ConsumedStart};
+use publication::Publication;
 use review::{BoundReview, CompleteReview};
 
 const SCHEMA: &str = "mesh.dependency-policy/v1";
@@ -73,6 +75,7 @@ enum Event {
     },
     CompleteReview(CompleteReview),
     BoundReview(BoundReview),
+    Publication(Publication),
     Review {
         output: Input,
         decisions: Vec<(Input, RecordDigest)>,
@@ -163,6 +166,8 @@ pub struct DependencyPolicyHistory {
     roots: BTreeSet<RecordDigest>,
     head: Option<(u64, RecordDigest)>,
     payload_bytes: usize,
+    publications: BTreeMap<Work, (u64, RecordDigest, RecordDigest)>,
+    publication_challenges: BTreeSet<RecordDigest>,
     consumption_start: Option<RecordDigest>,
     consumption_complete: Option<RecordDigest>,
 }
@@ -181,6 +186,8 @@ impl DependencyPolicyHistory {
             roots: BTreeSet::new(),
             head: None,
             payload_bytes: 0,
+            publications: BTreeMap::new(),
+            publication_challenges: BTreeSet::new(),
             consumption_start: None,
             consumption_complete: None,
         })
@@ -224,7 +231,10 @@ impl DependencyPolicyHistory {
             && envelope.kind == DependencyKind::ReviewSnapshot;
         let bound_review = value(&json, "schema")?.as_text() == Some("mesh.dependency-policy/v4")
             && envelope.kind == DependencyKind::ReviewSnapshot;
+        let publication = value(&json, "schema")?.as_text() == Some("mesh.dependency-policy/v5")
+            && envelope.kind == DependencyKind::Publication;
         if (!bound_grant
+            && !publication
             && !complete_review
             && !bound_review
             && value(&json, "schema")?.as_text() != Some(SCHEMA))
@@ -242,6 +252,7 @@ impl DependencyPolicyHistory {
             bound_grant,
             complete_review,
             bound_review,
+            publication,
         )?;
         if let Some((old, prior)) = self.records.get(&envelope.payload) {
             return if *old == envelope && *prior == event {
@@ -343,6 +354,24 @@ impl DependencyPolicyHistory {
                     return Err(InvalidDependencyHistory);
                 }
             }
+            Event::Publication(publication) => {
+                let Some((_, Event::BoundReview(review))) = self.records.get(&publication.review)
+                else {
+                    return Err(InvalidDependencyHistory);
+                };
+                let prior = self.publications.get(&review.output.0);
+                if !next_revision(
+                    prior.map(|(r, p, _)| (*r, *p)),
+                    publication.revision,
+                    publication.previous,
+                ) || prior.is_some_and(|(_, _, head)| *head != review.canonical)
+                    || publication.result == review.canonical
+                    || self.publication_challenges.contains(&publication.challenge)
+                    || !self.review_decisions_current(review.snapshot)
+                {
+                    return Err(InvalidDependencyHistory);
+                }
+            }
             Event::BoundReview(review) => {
                 let Some((_, Event::CompleteReview(snapshot))) = self.records.get(&review.snapshot)
                 else {
@@ -372,6 +401,17 @@ impl DependencyPolicyHistory {
             }
         }
         match &event {
+            Event::Publication(publication) => {
+                // The immutable binding and every fallible check were resolved above.
+                let (_, Event::BoundReview(review)) = &self.records[&publication.review] else {
+                    unreachable!()
+                };
+                self.publications.insert(
+                    review.output.0,
+                    (publication.revision, envelope.payload, publication.result),
+                );
+                self.publication_challenges.insert(publication.challenge);
+            }
             Event::ConsumptionStart(_) => self.consumption_start = Some(envelope.payload),
             Event::ConsumptionComplete(_) => self.consumption_complete = Some(envelope.payload),
             Event::Grant {
@@ -515,12 +555,10 @@ impl DependencyPolicyHistory {
         self.records
             .keys()
             .copied()
-            .chain(self.records.values().filter_map(|(_, event)| {
-                if let Event::CompleteReview(snapshot) = event {
-                    Some(snapshot.graph)
-                } else {
-                    None
-                }
+            .chain(self.records.values().filter_map(|(_, event)| match event {
+                Event::CompleteReview(snapshot) => Some(snapshot.graph),
+                Event::Publication(publication) => Some(publication.receipt),
+                _ => None,
             }))
     }
 
@@ -706,10 +744,23 @@ fn decode(
     bound_grant: bool,
     complete_review: bool,
     bound_review: bool,
+    publication: bool,
 ) -> Result<(Option<RecordDigest>, Event, BTreeSet<RecordDigest>)> {
     let mut roots = BTreeSet::new();
     let mut request = None;
     let event = match kind {
+        DependencyKind::Publication => {
+            if !publication {
+                return Err(InvalidDependencyHistory);
+            }
+            let publication = Publication::decode(body)?;
+            request = Some(publication.request);
+            roots.extend([publication.review, publication.receipt]);
+            if publication.previous != ZERO {
+                roots.insert(publication.previous);
+            }
+            Event::Publication(publication)
+        }
         DependencyKind::ConsumptionStart => {
             let start = ConsumedStart::decode(body, binding)?;
             request = Some(start.request);

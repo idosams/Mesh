@@ -7607,3 +7607,10 @@ regressions, the 19-test consumed-history focus, the intended missing-evidence m
 and exact previous-reader refusal are preserved. Full validation and a coherent dependent PR
 remain required. This increment does not close protected-main admission, signed packaged tests,
 user-facing controls, second-provider/host acceptance or the full fleet plan.
+
+
+R165 native publication records are new canonical work from published saved-review head
+`cab5ae451b5993059f9ffbf504fa73f8529b2ee7` (#344), replacing no preserved legacy commit. This
+increment defines the required journal/index format and chronological structural checks. It
+does not enable publication or replace receipt verification. The publication contract records
+the remaining writer, recovery, compatibility and acceptance sequence under issue #345.
