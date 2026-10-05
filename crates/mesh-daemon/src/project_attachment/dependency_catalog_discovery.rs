@@ -24,6 +24,29 @@ fn error(error: impl std::fmt::Display) -> io::Error {
 }
 
 impl AttachmentStorage {
+    /// Resolve recorded owning-root ancestry and required inputs for one enrolled native work.
+    /// Catalog IDs are selectors only; the final read validates exact ancestry and history under
+    /// complete custody. Unenrolled work and incomplete ancestry refuse without a local fallback.
+    pub fn registered_dependency_versions(
+        &self,
+        work_id: &str,
+    ) -> io::Result<Vec<SavedAttachmentVersion>> {
+        let owner_id = self.candidate_owning_root(work_id)?;
+        self.discovered_dependency_versions(&owner_id, work_id)
+    }
+
+    /// Read exact saved bytes after resolving owning-root ancestry from native registrations.
+    /// This grants no capture, execution, publication or pending-transaction recovery authority.
+    pub fn registered_dependency_file(
+        &self,
+        work_id: &str,
+        version: SavedAttachmentVersion,
+        relative: &str,
+    ) -> io::Result<Option<Vec<u8>>> {
+        let owner_id = self.candidate_owning_root(work_id)?;
+        self.discovered_dependency_file(&owner_id, work_id, version, relative)
+    }
+
     /// Discover required native inputs and list exact saved versions without a caller input list.
     /// The owner must be the native owning root; this grants no capture or publication permission.
     pub fn discovered_dependency_versions(

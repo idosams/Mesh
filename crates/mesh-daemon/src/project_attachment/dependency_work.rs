@@ -144,6 +144,26 @@ fn identity(value: (u64, u64)) -> Json {
 }
 
 impl AttachmentStorage {
+    /// A bounded candidate selector only. The caller must validate the entire ancestry under
+    /// the complete read guard; choosing this root never admits history or grants permission.
+    pub(super) fn candidate_owning_root(&self, work_id: &str) -> io::Result<String> {
+        let mut current = self.reopen(work_id)?;
+        let mut seen = BTreeSet::new();
+        loop {
+            if seen.len() > MAX_DEPTH || !seen.insert(current.id().to_owned()) {
+                return Err(invalid(
+                    "native owning-root ancestry exceeds its bound or cycles",
+                ));
+            }
+            match self.lane_origin_bound(&current)? {
+                Some(origin) => {
+                    current = self.reopen(field(&origin.value, "source_project")?)?;
+                }
+                None => return Ok(current.id().to_owned()),
+            }
+        }
+    }
+
     fn exact_registered_work(
         &self,
         supplied: &ProvisionedAttachment,

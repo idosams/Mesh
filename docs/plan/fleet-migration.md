@@ -7438,6 +7438,26 @@ checks and normal merge; desktop/harness integration and the full issue #323 rem
 The fixed checkpoint is unchanged.
 
 
+R161 owning-root selection now follows bounded recorded allocation ancestry from a registered lane
+before using the existing complete dependency read guard. Callers can request versions or saved
+bytes using only the lane ID; candidate root selection itself grants no authority. Enrolled root,
+chained lane and cross-branch consumed history passed the focused journey in 136.561s, including
+unenrolled-work and missing-input refusal. An added missing-owner refusal/restoration case awaits
+full validation. Deliberately stopping ancestry traversal after one edge failed the real root identity
+assertion in 104.417s; production source was restored byte-for-byte. Full validation, publication and
+hosted checks are pending. This local increment depends on #328 and replaces no preserved source
+commit. Desktop review/capture wiring and all remaining fleet acceptance stay open in #323.
+
+
+R161 owning-root full validation passed on `8ec5d23af3f32d70ab62cb498ea7d3288466f2ef`:
+3,949 native tests in 341.828s (six slow, 18 skipped), 194 rendered tests, 672 desktop tests,
+44 real-daemon checks and all other canonical gates. The real consumption journey passed in
+187.691s, including missing-owner refusal and exact-identity restoration. Reconciliation with
+merged catalog-read #327 preserved the complete source tree of implementation `25c15ea`.
+PR #327 merged normally at `e6ebb4f4ee048e7ac98063b81715dd07b7b65363` after all seven checks
+passed (run `37244695215`); post-merge CI is tracked separately. Discovery #328 still requires
+base reconciliation and normal merge, and owning-root selection still requires its own PR and
+hosted checks. Desktop/harness integration and full fleet acceptance remain open in #323.
 R161 discovery PR #328 passed all seven hosted checks on
 `67e6c0cc3b765378f7f9d89f38a4b9fd68c313f7` (run `37245205962`). Reconciliation
 `bb83272fc1e56466627ef5b93b518d9b75c71372` incorporates merged catalog-read #327/main
@@ -7446,3 +7466,14 @@ The following update records evidence only. PR #328 now needs fresh current-head
 main before normal merge. The full local gate remains 3,949 native, 194 rendered, 672 desktop and
 44 daemon checks. Owning-root selection is separately preserved and fully locally tested but not
 published yet. Desktop/harness integration and the complete fleet scope remain open in #323.
+
+
+R161 discovery PR #328 merged normally at `8e5f662f7c1f7897d29c1548b8c5773a16ef28d2`
+after all seven checks passed on `c15d7b43c0d46f30486380b9feb9fb163ac1b6a4`
+(run `37246187227`). Owning-root PR #329 passed all seven checks on
+`dec2ac442e37381459f4ccbd418031ada57cb156` (run `37246233164`). Reconciliation
+`ea146e3b0e92dd1829fa743fb5c1f9a676d6815d` incorporates main while preserving that entire tested tree; only the
+following evidence update changes documentation. PR #329 now requires fresh checks against main
+and normal merge. Desktop review integration is separately preserved: its first full local gate
+passed 3,950 native tests in 351.698s, 194 rendered, 672 desktop and 44 daemon checks; the separate
+changed-path action still needs integration before publication. Full fleet acceptance remains open.
