@@ -214,6 +214,9 @@ enum RecoveryInspection<'a> {
     CompletedStart,
     ConsumedCapture(&'a str),
     PublicationReplay,
+    PublicationControlRecovery(
+        &'a super::dependency_private_context::control::recovery::VerifiedControlPrefix,
+    ),
     PublicationRecovery(
         &'a super::dependency_private_context::publication::recovery::VerifiedPublicationPrefix,
     ),
@@ -314,6 +317,26 @@ impl ProjectAttachment {
             RecoveryInspection::PublicationRecovery(recovery),
         )?;
         let facts = facts.ok_or_else(|| invalid("publication requires native enrollment"))?;
+        Ok((
+            configuration,
+            VerifiedPrivateHistory::from_independent_facts(facts)?,
+        ))
+    }
+
+    pub(super) fn read_native_control_recovery_history(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        recovery: &super::dependency_private_context::control::recovery::VerifiedControlPrefix,
+    ) -> io::Result<(String, VerifiedPrivateHistory)> {
+        let (configuration, facts) = self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            None,
+            RecoveryInspection::PublicationControlRecovery(recovery),
+        )?;
+        let facts = facts.ok_or_else(|| invalid("native control requires native enrollment"))?;
         Ok((
             configuration,
             VerifiedPrivateHistory::from_independent_facts(facts)?,
@@ -466,7 +489,9 @@ impl ProjectAttachment {
         }
         if matches!(
             inspection,
-            RecoveryInspection::PublicationReplay | RecoveryInspection::PublicationRecovery(_)
+            RecoveryInspection::PublicationReplay
+                | RecoveryInspection::PublicationRecovery(_)
+                | RecoveryInspection::PublicationControlRecovery(_)
         ) && base
             .records()
             .iter()
@@ -540,6 +565,12 @@ impl ProjectAttachment {
                 }
                 Some(proof.verify(store, &journal, &bytes)?)
             }
+            RecoveryInspection::PublicationControlRecovery(proof) => {
+                if pending.is_some() || capture_prefix.is_some() {
+                    return Err(invalid("conflicting native decision recovery evidence"));
+                }
+                Some(proof.verify(store, &journal, &bytes)?)
+            }
             _ => None,
         };
         let prefix_end = publication_pending
@@ -574,6 +605,7 @@ impl ProjectAttachment {
                             inspection,
                             RecoveryInspection::PublicationReplay
                                 | RecoveryInspection::PublicationRecovery(_)
+                                | RecoveryInspection::PublicationControlRecovery(_)
                         )
                     {
                         return Err(invalid(

@@ -29,9 +29,14 @@ struct Snapshot {
     proof: VerifiedPrivateHistory,
     retained: VerifiedHistoryRoots,
 }
+#[derive(Clone, Copy)]
+enum OwnerRecovery<'a> {
+    Publication(&'a publication::recovery::VerifiedPublicationPrefix),
+    Control(&'a control::recovery::VerifiedControlPrefix),
+}
 struct PrivateContext<'a> {
     owner: &'a ProvisionedAttachment,
-    recovery: Option<&'a publication::recovery::VerifiedPublicationPrefix>,
+    recovery: Option<OwnerRecovery<'a>>,
     histories: BTreeMap<String, Snapshot>,
 }
 // This proof can only be constructed by complete native private-context verification.
@@ -82,14 +87,15 @@ impl VerifiedConsumedPublicationGraph<'_, '_> {
 
 fn read_publication_owner(
     owner: &ProvisionedAttachment,
-    recovery: Option<&publication::recovery::VerifiedPublicationPrefix>,
+    recovery: Option<OwnerRecovery<'_>>,
 ) -> io::Result<(String, VerifiedPrivateHistory)> {
     match recovery {
-        Some(proof) => owner.project().read_publication_recovery_history(
-            owner.metadata_path(),
-            &owner.store,
-            proof,
-        ),
+        Some(OwnerRecovery::Publication(proof)) => owner
+            .project()
+            .read_publication_recovery_history(owner.metadata_path(), &owner.store, proof),
+        Some(OwnerRecovery::Control(proof)) => owner
+            .project()
+            .read_native_control_recovery_history(owner.metadata_path(), &owner.store, proof),
         None => owner
             .project()
             .read_publication_private_history(owner.metadata_path(), &owner.store),
@@ -399,7 +405,7 @@ impl<'a> PrivateContext<'a> {
         owner: &'a ProvisionedAttachment,
         works: &[ProvisionedAttachment],
         guard: &WorkspaceInitializationGuard,
-        recovery: Option<&'a publication::recovery::VerifiedPublicationPrefix>,
+        recovery: Option<OwnerRecovery<'a>>,
     ) -> io::Result<Self> {
         let (configuration, proof) = read_publication_owner(owner, recovery)?;
         let mut context = Self {
@@ -570,7 +576,7 @@ impl AttachmentStorage {
         work_id: &str,
         guard: &WorkspaceInitializationGuard,
         catalog: super::dependency_catalog_discovery::CatalogHints,
-        recovery: Option<&publication::recovery::VerifiedPublicationPrefix>,
+        recovery: Option<OwnerRecovery<'_>>,
     ) -> io::Result<Discovery> {
         let selected = self.prepare_dependency_work(owner, owner)?;
         guard.require_roots(&selected.roots).map_err(error)?;
@@ -704,6 +710,22 @@ impl AttachmentStorage {
         Ok(result)
     }
 
+    /// Resolve an exact saved point through complete private history and configured receipt trust.
+    /// This grants no ordinary workspace admission, input eligibility or publication authority.
+    pub fn inspect_native_saved_version(
+        &self,
+        work_id: &str,
+        operation: RecordDigest,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<super::SavedAttachmentVersion> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            context.graph(self, work, operation, guard)?;
+            context.with_replayed_history(self, work, trusted, guard, |history, _| {
+                super::SavedAttachmentVersion::from_verified_private_history(history, operation)
+            })
+        })
+    }
+
     pub(super) fn with_native_publication_history<T: PartialEq>(
         &self,
         work_id: &str,
@@ -789,3 +811,5 @@ mod tests;
 
 pub(in crate::project_attachment) mod publication;
 pub use publication::NativePublicationCommit;
+
+pub(in crate::project_attachment) mod control;

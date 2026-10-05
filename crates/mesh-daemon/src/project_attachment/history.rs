@@ -37,6 +37,15 @@ pub struct SavedAttachmentVersion {
     operation: RecordDigest,
 }
 impl SavedAttachmentVersion {
+    pub(crate) fn from_verified_private_history(
+        history: &crate::workspace::NativePrivateReviewHistory<'_>,
+        operation: RecordDigest,
+    ) -> io::Result<Self> {
+        history
+            .with_saved_input(operation, |_| Ok(Self { operation }))
+            .map_err(io::Error::other)
+    }
+
     pub(crate) fn from_verified_history(
         history: &OpenWorkspace,
         operation: RecordDigest,

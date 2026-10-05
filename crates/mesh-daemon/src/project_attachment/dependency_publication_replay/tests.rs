@@ -824,14 +824,18 @@ fn consumed_publication_fixture(writer: u8) {
             let journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
             let before = fs::read(&journal).unwrap();
             if writer == 3 {
-                owner
-                    .decide_saved_input(
-                        version,
-                        super::super::SavedInputDecision::Rejected,
-                        Some(initial_decision.record()),
-                        id(99),
-                    )
-                    .unwrap();
+                let result = restart::interrupted_native_decision(
+                    &root,
+                    owner.id(),
+                    version.operation(),
+                    initial_decision.record(),
+                    id(99),
+                    human_key.public_key().as_ref(),
+                    &journal,
+                    false,
+                    "first",
+                );
+                assert_eq!(result.get("revision").and_then(Json::as_u64), Some(2));
                 let rejected = fs::read(&journal).unwrap();
                 assert!(storage
                     .commit_native_publication(
@@ -1239,6 +1243,37 @@ fn consumed_publication_fixture(writer: u8) {
         accepted.get("publication").unwrap().get("revision"),
         Some(&Json::Number(2))
     );
+    let inspection_journals = [&owner, &destination].map(|work| {
+        let path = work.metadata_path().join(crate::RECORD_FILE_NAME);
+        let bytes = fs::read(&path).unwrap();
+        (path, bytes)
+    });
+    assert_eq!(
+        reopened_again
+            .inspect_native_saved_version(destination.id(), second_version.operation(), &trust)
+            .unwrap(),
+        second_version
+    );
+    assert!(reopened_again
+        .inspect_native_saved_version(destination.id(), id(99), &trust)
+        .is_err());
+    assert!(reopened_again
+        .inspect_native_saved_version(
+            destination.id(),
+            second_version.operation(),
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    assert!(reopened_again
+        .inspect_native_saved_version(owner.id(), second_version.operation(), &trust)
+        .is_err());
+    for (path, bytes) in inspection_journals {
+        assert_eq!(
+            fs::read(path).unwrap(),
+            bytes,
+            "saved version inspection changed native history"
+        );
+    }
     let owner_before = fs::read(&owner_journal).unwrap();
     reopened_again
         .with_native_publication_history(destination.id(), &trust, |history, proof| {
@@ -1278,7 +1313,7 @@ fn consumed_publication_fixture(writer: u8) {
     );
 
     if writer == 1 {
-        let (proof, first_receipt) = {
+        let first_receipt = {
             let _guard =
                 crate::workspace_custody::lock_workspace_initialization(&owner.store).unwrap();
             let (_, proof) = owner
@@ -1291,27 +1326,51 @@ fn consumed_publication_fixture(writer: u8) {
                 owner.store.filesystem().read_only(),
             )
             .unwrap();
-            let first_receipt =
-                super::super::dependency_transaction::read_payload(&cas, claim.receipt, 65536)
-                    .unwrap();
-            (proof, first_receipt)
+            super::super::dependency_transaction::read_payload(&cas, claim.receipt, 65536).unwrap()
         };
-        // Independent policy fixture: production control admission after publication is still
-        // separate work. Replay must preserve this historically valid ordering now.
-        append_test_policy(
-            &owner,
-            DependencyKind::Eligibility,
-            "mesh.dependency-policy/v1",
-            super::super::dependency_decision::body(
-                proof.binding().project,
-                proof.binding().installation,
-                version,
-                super::super::SavedInputDecision::Rejected,
+        let decision_result = restart::interrupted_native_decision(
+            &root,
+            owner.id(),
+            version.operation(),
+            initial_decision.record(),
+            id(98),
+            human_key.public_key().as_ref(),
+            &owner_journal,
+            true,
+            "last",
+        );
+        let rejected_decision = storage
+            .decide_native_saved_input(
+                owner.id(),
+                version.operation(),
+                super::super::NativeSavedInputDecision::Rejected,
+                Some(initial_decision.record()),
                 id(98),
-                2,
-                initial_decision.record(),
-            ),
-            None,
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(rejected_decision.revision(), 2);
+        assert_eq!(
+            decision_result.get("record").and_then(Json::as_text),
+            Some(rejected_decision.record().to_hex().as_str())
+        );
+        assert!(!owner
+            .metadata_path()
+            .join(super::super::dependency_decision::PENDING)
+            .exists());
+
+        assert_eq!(
+            storage
+                .decide_native_saved_input(
+                    owner.id(),
+                    version.operation(),
+                    super::super::NativeSavedInputDecision::Rejected,
+                    Some(initial_decision.record()),
+                    id(98),
+                    &trust
+                )
+                .unwrap(),
+            rejected_decision
         );
         let rejected = fs::read(&owner_journal).unwrap();
         let recovered = storage
@@ -1333,6 +1392,91 @@ fn consumed_publication_fixture(writer: u8) {
             fs::read(&owner_journal).unwrap(),
             rejected,
             "later input rejection must not append or invalidate an exact completed retry"
+        );
+
+        use super::super::NativeSavedInputDecision as Decision;
+        for (operation, decision, previous, request) in [
+            (
+                version.operation(),
+                Decision::Eligible,
+                Some(initial_decision.record()),
+                id(98),
+            ),
+            (version.operation(), Decision::Eligible, None, id(95)),
+            (
+                version.operation(),
+                Decision::Replaced(second_version.operation()),
+                Some(rejected_decision.record()),
+                id(95),
+            ),
+            (
+                version.operation(),
+                Decision::Replaced(version.operation()),
+                Some(rejected_decision.record()),
+                id(95),
+            ),
+        ] {
+            assert!(storage
+                .decide_native_saved_input(
+                    owner.id(),
+                    operation,
+                    decision,
+                    previous,
+                    request,
+                    &trust
+                )
+                .is_err());
+            assert_eq!(fs::read(&owner_journal).unwrap(), rejected);
+        }
+        let revalidated = storage
+            .decide_native_saved_input(
+                owner.id(),
+                version.operation(),
+                Decision::Eligible,
+                Some(rejected_decision.record()),
+                id(97),
+                &trust,
+            )
+            .unwrap();
+        assert_eq!(revalidated.revision(), 3);
+        let after_revalidation = fs::read(&owner_journal).unwrap();
+        assert_eq!(
+            storage
+                .decide_native_saved_input(
+                    owner.id(),
+                    version.operation(),
+                    Decision::Rejected,
+                    Some(initial_decision.record()),
+                    id(98),
+                    &trust
+                )
+                .unwrap(),
+            rejected_decision
+        );
+        assert_eq!(fs::read(&owner_journal).unwrap(), after_revalidation);
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(destination.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        let stale = storage
+            .commit_native_publication(
+                destination.id(),
+                id(95),
+                first_review.record(),
+                &first_receipt,
+                &trust,
+            )
+            .unwrap_err();
+        assert!(
+            stale.to_string().contains("exact decisions changed"),
+            "{stale}"
+        );
+        assert_eq!(fs::read(&owner_journal).unwrap(), after_revalidation);
+        assert!(
+            owner.saved_versions().is_err(),
+            "native controls granted ordinary admission"
         );
     }
 }

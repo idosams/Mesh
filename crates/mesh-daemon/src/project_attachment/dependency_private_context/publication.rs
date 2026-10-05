@@ -218,7 +218,7 @@ impl PrivateContext<'_> {
 impl AttachmentStorage {
     /// Commit an exact already-signed human approval using complete native custody and trust.
     /// No caller should wait for a person or provider inside this call. This development API
-    /// is not exposed to agents or runtime controls; torn-frame recovery remains refused.
+    /// is not exposed to agents or runtime controls; exact torn-frame recovery rechecks full custody.
     pub fn commit_native_publication(
         &self,
         work_id: &str,
@@ -266,7 +266,7 @@ impl AttachmentStorage {
                 work_id,
                 &guard,
                 hints,
-                recovery.as_ref(),
+                recovery.as_ref().map(OwnerRecovery::Publication),
             )?;
             (discovery, recovery)
         };
@@ -285,7 +285,7 @@ impl AttachmentStorage {
                 work_id,
                 &guard,
                 self.catalog_discovery_hints(&owner)?,
-                recovery.as_ref(),
+                recovery.as_ref().map(OwnerRecovery::Publication),
             )
         };
         if rediscover()? != discovery {
@@ -304,8 +304,13 @@ impl AttachmentStorage {
         }
 
         super::super::history::dependency_capture::ensure_no_pending_capture(&owner.store)?;
-        let context =
-            PrivateContext::resolve_with_recovery(self, &owner, &works, &guard, recovery.as_ref())?;
+        let context = PrivateContext::resolve_with_recovery(
+            self,
+            &owner,
+            &works,
+            &guard,
+            recovery.as_ref().map(OwnerRecovery::Publication),
+        )?;
         let selected =
             context.select_publication(self, &work, &guard, request, review, receipt, trusted)?;
         let mut journal = owner
@@ -397,8 +402,13 @@ impl AttachmentStorage {
         owner.store.filesystem().sync_file(Path::new(PENDING))?;
         owner.store.sync()?;
         hook(Step::Staged, &mut journal, &frame)?;
-        let after =
-            PrivateContext::resolve_with_recovery(self, &owner, &works, &guard, recovery.as_ref())?;
+        let after = PrivateContext::resolve_with_recovery(
+            self,
+            &owner,
+            &works,
+            &guard,
+            recovery.as_ref().map(OwnerRecovery::Publication),
+        )?;
         if rediscover()? != discovery
             || after.select_publication(self, &work, &guard, request, review, receipt, trusted)?
                 != selected
