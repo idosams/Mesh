@@ -2816,3 +2816,30 @@ rejection-before-publication. The approval-before-rejection exact historical ret
 log is retained. First and second owner-root writer commits passed in 1.555s. Existing replay
 fixtures continue to construct independent durable histories. Full repository and hosted
 validation remain required before merged delivery.
+
+## Exact partial native publication recovery (R180)
+
+An interrupted native publication can resume the exact staged owner-journal frame. A sealed
+private prefix proof binds the request, review, receipt, journal identity, prefix digest,
+observed partial bytes and pinned object contents. Complete native enrollment and policy
+are reconstructed from that prefix; configured trust, exact saved content, the full consumed
+input graph, current decisions and main are checked again under complete bounded custody.
+The writer appends only the missing suffix and synchronizes it before ordinary full replay
+and intent cleanup. It never truncates or rewrites existing journal bytes. Exact completed
+retries continue to return the original result without another append.
+
+The new evidence is private read input, not ordinary workspace admission or approval authority.
+Ordinary pending-publication refusal remains intact. Ordinary reads still refuse torn history;
+foreign request/receipt or missing trust refuses recovery without changing bytes. Root-only
+publication replay still refuses consumed input graphs; consumed replay retains its separate
+complete-graph proof. No agent credential, runtime endpoint or human-presence collection is added.
+
+Validation so far: all frame byte boundaries and altered-byte/identity/ceremony refusals passed;
+real owner-root first-byte and last-byte interruptions recover, as does a consumed-lane midpoint
+interruption. The three focused regressions passed in 12.269s. Full repository validation,
+hosted checks and separate-process crash/race coverage remain required. All-route admission,
+retention/collection and packaged OS signing/provider/host acceptance remain open under #345.
+The fixed b064029 user checkpoint is unchanged. These tests do not prove a graphical journey.
+
+Provenance: new canonical work based on R179 #360 at
+ae12ebd2b8c3fffa53febbb7b57d223eaca53a47; no preserved legacy commit is replaced.

@@ -1,5 +1,6 @@
 //! Native publication commit. Human presence is completed before entering this module.
 use super::*;
+pub(in crate::project_attachment) mod recovery;
 use crate::{dependency_policy::NativePublicationClaim, TrustedReviewers};
 use mesh_cas::{Blake3, Cas, DurableFs as _};
 use mesh_store::{frame_record, DependencyKind, DependencyRecord, StoredRecord};
@@ -254,11 +255,20 @@ impl AttachmentStorage {
         let work = self.reopen(work_id)?;
         let owner_selection = self.prepare_dependency_work(&owner, &owner)?;
         let hints = self.catalog_discovery_hints(&owner)?;
-        let discovery = {
+        let (discovery, recovery) = {
             let guard =
                 crate::workspace_custody::lock_workspace_initialization_set(&owner_selection.roots)
                     .map_err(error)?;
-            self.private_discovery(&owner, work_id, &guard, hints)?
+            let recovery =
+                recovery::VerifiedPublicationPrefix::read(&owner, request, review, receipt)?;
+            let discovery = self.private_discovery_with_recovery(
+                &owner,
+                work_id,
+                &guard,
+                hints,
+                recovery.as_ref(),
+            )?;
+            (discovery, recovery)
         };
         let works = discovery
             .works
@@ -270,11 +280,12 @@ impl AttachmentStorage {
         let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
             .map_err(error)?;
         let rediscover = || {
-            self.private_discovery(
+            self.private_discovery_with_recovery(
                 &owner,
                 work_id,
                 &guard,
                 self.catalog_discovery_hints(&owner)?,
+                recovery.as_ref(),
             )
         };
         if rediscover()? != discovery {
@@ -293,17 +304,28 @@ impl AttachmentStorage {
         }
 
         super::super::history::dependency_capture::ensure_no_pending_capture(&owner.store)?;
-        let context = PrivateContext::resolve(self, &owner, &works, &guard)?;
+        let context =
+            PrivateContext::resolve_with_recovery(self, &owner, &works, &guard, recovery.as_ref())?;
         let selected =
             context.select_publication(self, &work, &guard, request, review, receipt, trusted)?;
         let mut journal = owner
             .store
             .open_existing_record_file(Path::new(crate::RECORD_FILE_NAME))?;
-        let before = journal_bytes(&mut journal)?;
+        let observed_before = journal_bytes(&mut journal)?;
         context
             .read(&owner, &guard)?
             .proof
-            .verify(&owner.store, &journal, &before)?;
+            .verify(&owner.store, &journal, &observed_before)?;
+        let before = if let Some(proof) = &recovery {
+            let (length, record, payload) =
+                proof.verify(&owner.store, &journal, &observed_before)?;
+            if selected.existing || selected.claim.record != record || selected.payload != payload {
+                return Err(invalid("publication recovery selection changed"));
+            }
+            observed_before[..length].to_vec()
+        } else {
+            observed_before.clone()
+        };
         let metadata = journal.metadata()?;
         let identity = (metadata.dev(), metadata.ino());
         let pending = match read_private_in_store(&owner.store, PENDING) {
@@ -375,7 +397,8 @@ impl AttachmentStorage {
         owner.store.filesystem().sync_file(Path::new(PENDING))?;
         owner.store.sync()?;
         hook(Step::Staged, &mut journal, &frame)?;
-        let after = PrivateContext::resolve(self, &owner, &works, &guard)?;
+        let after =
+            PrivateContext::resolve_with_recovery(self, &owner, &works, &guard, recovery.as_ref())?;
         if rediscover()? != discovery
             || after.select_publication(self, &work, &guard, request, review, receipt, trusted)?
                 != selected
@@ -398,11 +421,17 @@ impl AttachmentStorage {
             .read(&owner, &guard)?
             .proof
             .verify(&owner.store, &journal, &observed)?;
-        if observed != before {
+        if observed != observed_before {
             return Err(invalid("publication journal changed before append"));
         }
         guard.ensure_current().map_err(error)?;
-        journal.write_all(&frame)?;
+        let written = observed_before.len() - before.len();
+        if written >= frame.len() || !frame.starts_with(&observed_before[before.len()..]) {
+            return Err(invalid(
+                "publication recovery bytes differ from exact frame",
+            ));
+        }
+        journal.write_all(&frame[written..])?;
         // Sole durable commit point. Neither the intent nor staged CAS objects constitute approval.
         sync(&journal)?;
         hook(Step::Appended, &mut journal, &frame)?;

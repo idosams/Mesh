@@ -31,6 +31,7 @@ struct Snapshot {
 }
 struct PrivateContext<'a> {
     owner: &'a ProvisionedAttachment,
+    recovery: Option<&'a publication::recovery::VerifiedPublicationPrefix>,
     histories: BTreeMap<String, Snapshot>,
 }
 // This proof can only be constructed by complete native private-context verification.
@@ -79,6 +80,22 @@ impl VerifiedConsumedPublicationGraph<'_, '_> {
     }
 }
 
+fn read_publication_owner(
+    owner: &ProvisionedAttachment,
+    recovery: Option<&publication::recovery::VerifiedPublicationPrefix>,
+) -> io::Result<(String, VerifiedPrivateHistory)> {
+    match recovery {
+        Some(proof) => owner.project().read_publication_recovery_history(
+            owner.metadata_path(),
+            &owner.store,
+            proof,
+        ),
+        None => owner
+            .project()
+            .read_publication_private_history(owner.metadata_path(), &owner.store),
+    }
+}
+
 impl<'a> PrivateContext<'a> {
     fn read(
         &self,
@@ -99,9 +116,7 @@ impl<'a> PrivateContext<'a> {
         }
         selected.proof.verify_current(&work.store)?;
         if work.id() == self.owner.id() {
-            let (configuration, proof) = work
-                .project()
-                .read_publication_private_history(work.metadata_path(), &work.store)?;
+            let (configuration, proof) = read_publication_owner(work, self.recovery)?;
             if configuration != selected.configuration || proof != selected.proof {
                 return Err(invalid("private owner history changed"));
             }
@@ -377,11 +392,19 @@ impl<'a> PrivateContext<'a> {
         works: &[ProvisionedAttachment],
         guard: &WorkspaceInitializationGuard,
     ) -> io::Result<Self> {
-        let (configuration, proof) = owner
-            .project()
-            .read_publication_private_history(owner.metadata_path(), &owner.store)?;
+        Self::resolve_with_recovery(storage, owner, works, guard, None)
+    }
+    fn resolve_with_recovery(
+        storage: &AttachmentStorage,
+        owner: &'a ProvisionedAttachment,
+        works: &[ProvisionedAttachment],
+        guard: &WorkspaceInitializationGuard,
+        recovery: Option<&'a publication::recovery::VerifiedPublicationPrefix>,
+    ) -> io::Result<Self> {
+        let (configuration, proof) = read_publication_owner(owner, recovery)?;
         let mut context = Self {
             owner,
+            recovery,
             histories: BTreeMap::from([(
                 owner.id().to_owned(),
                 Snapshot {
@@ -539,11 +562,19 @@ impl AttachmentStorage {
         guard: &WorkspaceInitializationGuard,
         catalog: super::dependency_catalog_discovery::CatalogHints,
     ) -> io::Result<Discovery> {
+        self.private_discovery_with_recovery(owner, work_id, guard, catalog, None)
+    }
+    fn private_discovery_with_recovery(
+        &self,
+        owner: &ProvisionedAttachment,
+        work_id: &str,
+        guard: &WorkspaceInitializationGuard,
+        catalog: super::dependency_catalog_discovery::CatalogHints,
+        recovery: Option<&publication::recovery::VerifiedPublicationPrefix>,
+    ) -> io::Result<Discovery> {
         let selected = self.prepare_dependency_work(owner, owner)?;
         guard.require_roots(&selected.roots).map_err(error)?;
-        let (configuration, proof) = owner
-            .project()
-            .read_publication_private_history(owner.metadata_path(), &owner.store)?;
+        let (configuration, proof) = read_publication_owner(owner, recovery)?;
         let (hints, keys) = catalog;
         let exact = |key: Key| -> io::Result<String> {
             let matches = keys

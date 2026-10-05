@@ -214,6 +214,9 @@ enum RecoveryInspection<'a> {
     CompletedStart,
     ConsumedCapture(&'a str),
     PublicationReplay,
+    PublicationRecovery(
+        &'a super::dependency_private_context::publication::recovery::VerifiedPublicationPrefix,
+    ),
 }
 impl ProjectAttachment {
     pub(super) fn read_configuration(
@@ -289,6 +292,26 @@ impl ProjectAttachment {
             None,
             None,
             RecoveryInspection::PublicationReplay,
+        )?;
+        let facts = facts.ok_or_else(|| invalid("publication requires native enrollment"))?;
+        Ok((
+            configuration,
+            VerifiedPrivateHistory::from_independent_facts(facts)?,
+        ))
+    }
+
+    pub(super) fn read_publication_recovery_history(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        recovery: &super::dependency_private_context::publication::recovery::VerifiedPublicationPrefix,
+    ) -> io::Result<(String, VerifiedPrivateHistory)> {
+        let (configuration, facts) = self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            None,
+            RecoveryInspection::PublicationRecovery(recovery),
         )?;
         let facts = facts.ok_or_else(|| invalid("publication requires native enrollment"))?;
         Ok((
@@ -422,11 +445,13 @@ impl ProjectAttachment {
         {
             return Err(invalid("invalid legacy enrollment prefix"));
         }
-        if matches!(inspection, RecoveryInspection::PublicationReplay)
-            && base
-                .records()
-                .iter()
-                .any(|r| matches!(r, StoredRecord::Approval(_)))
+        if matches!(
+            inspection,
+            RecoveryInspection::PublicationReplay | RecoveryInspection::PublicationRecovery(_)
+        ) && base
+            .records()
+            .iter()
+            .any(|r| matches!(r, StoredRecord::Approval(_)))
         {
             return Err(invalid(
                 "legacy approved main requires explicit native migration",
@@ -489,11 +514,24 @@ impl ProjectAttachment {
                 )
             })
             .transpose()?;
-        let prefix_end = capture_prefix.unwrap_or_else(|| {
-            pending
-                .as_ref()
-                .map_or(bytes.len(), |(length, _, _)| *length)
-        });
+        let publication_pending = match inspection {
+            RecoveryInspection::PublicationRecovery(proof) => {
+                if pending.is_some() || capture_prefix.is_some() {
+                    return Err(invalid("conflicting publication recovery evidence"));
+                }
+                Some(proof.verify(store, &journal, &bytes)?)
+            }
+            _ => None,
+        };
+        let prefix_end = publication_pending
+            .as_ref()
+            .map(|(length, _, _)| *length)
+            .or(capture_prefix)
+            .unwrap_or_else(|| {
+                pending
+                    .as_ref()
+                    .map_or(bytes.len(), |(length, _, _)| *length)
+            });
         if prefix_end <= base_len {
             return Err(invalid("decision prefix predates enrollment"));
         }
@@ -513,7 +551,11 @@ impl ProjectAttachment {
             match record {
                 StoredRecord::Dependency(record) => {
                     if record.kind == mesh_store::DependencyKind::Publication
-                        && !matches!(inspection, RecoveryInspection::PublicationReplay)
+                        && !matches!(
+                            inspection,
+                            RecoveryInspection::PublicationReplay
+                                | RecoveryInspection::PublicationRecovery(_)
+                        )
                     {
                         return Err(invalid(
                             "native publication receipt verification is unavailable",
@@ -569,6 +611,10 @@ impl ProjectAttachment {
                 }
             }
         }
+        if let Some((_, record, payload)) = &publication_pending {
+            let mut staged_policy = policy.clone();
+            staged_policy.apply(*record, payload).map_err(error)?;
+        }
         let proof = NativeDependencyFacts {
             configuration: hash(configuration.as_bytes()),
             store: identity,
@@ -580,7 +626,9 @@ impl ProjectAttachment {
                 installation,
             },
             policy,
-            pending: pending.map(|(length, record, _)| (length, record)),
+            pending: pending
+                .or(publication_pending)
+                .map(|(length, record, _)| (length, record)),
             legacy_operations: base
                 .records()
                 .iter()

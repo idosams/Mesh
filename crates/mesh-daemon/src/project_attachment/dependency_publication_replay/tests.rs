@@ -128,6 +128,36 @@ fn root_publication_fixture(writer: bool) {
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
     if writer {
+        use super::super::dependency_private_context::publication::Step;
+        use std::io::Write as _;
+        let before = fs::read(&journal).unwrap();
+        let failure = storage
+            .commit_native_publication_with_io(
+                owner.id(),
+                id(6),
+                bound.record(),
+                &receipt,
+                &trust,
+                |step, file, frame| {
+                    if matches!(step, Step::Staged) {
+                        file.write_all(&frame[..1])?;
+                        file.sync_all()?;
+                        return Err(std::io::Error::other("root publication torn boundary"));
+                    }
+                    Ok(())
+                },
+                |file| file.sync_all(),
+            )
+            .unwrap_err();
+        assert!(failure
+            .to_string()
+            .contains("root publication torn boundary"));
+        let torn = fs::read(&journal).unwrap();
+        assert!(torn.starts_with(&before) && torn.len() > before.len());
+        assert!(storage
+            .inspect_native_publication_history(owner.id(), &trust)
+            .is_err());
+        assert_eq!(fs::read(&journal).unwrap(), torn);
         let committed = storage
             .commit_native_publication(owner.id(), id(6), bound.record(), &receipt, &trust)
             .unwrap();
@@ -291,6 +321,36 @@ fn root_publication_fixture(writer: bool) {
         .unwrap()
         .canonical_bytes();
     if writer {
+        use super::super::dependency_private_context::publication::Step;
+        use std::io::Write as _;
+        let before = fs::read(&journal).unwrap();
+        let failure = storage
+            .commit_native_publication_with_io(
+                owner.id(),
+                id(9),
+                next_review,
+                &receipt,
+                &trust,
+                |step, file, frame| {
+                    if matches!(step, Step::Staged) {
+                        file.write_all(&frame[..frame.len() - 1])?;
+                        file.sync_all()?;
+                        return Err(std::io::Error::other("root publication torn boundary"));
+                    }
+                    Ok(())
+                },
+                |file| file.sync_all(),
+            )
+            .unwrap_err();
+        assert!(failure
+            .to_string()
+            .contains("root publication torn boundary"));
+        let torn = fs::read(&journal).unwrap();
+        assert!(torn.starts_with(&before) && torn.len() > before.len());
+        assert!(storage
+            .inspect_native_publication_history(owner.id(), &trust)
+            .is_err());
+        assert_eq!(fs::read(&journal).unwrap(), torn);
         let committed = storage
             .commit_native_publication(owner.id(), id(9), next_review, &receipt, &trust)
             .unwrap();
@@ -495,7 +555,7 @@ fn native_writer_commits_consumed_publications_and_recovers_completed_retries() 
     consumed_publication_fixture(1);
 }
 #[test]
-fn native_writer_preserves_torn_publication_without_acknowledging_or_repairing() {
+fn native_writer_recovers_exact_torn_publication_and_refuses_foreign_retries() {
     consumed_publication_fixture(2);
 }
 #[test]
@@ -738,22 +798,67 @@ fn consumed_publication_fixture(writer: u8) {
                 let torn = fs::read(&journal).unwrap();
                 assert!(torn.starts_with(&before) && torn.len() > before.len());
                 assert!(storage
+                    .inspect_native_publication_history(destination.id(), &trust)
+                    .is_err());
+                for (request, receipt_bytes, reviewers) in [
+                    (
+                        id(challenge),
+                        receipt.as_slice(),
+                        crate::TrustedReviewers::default(),
+                    ),
+                    (id(99), receipt.as_slice(), trust.clone()),
+                    (id(challenge), b"foreign receipt".as_slice(), trust.clone()),
+                ] {
+                    assert!(storage
+                        .commit_native_publication(
+                            destination.id(),
+                            request,
+                            review,
+                            receipt_bytes,
+                            &reviewers
+                        )
+                        .is_err());
+                    assert_eq!(
+                        fs::read(&journal).unwrap(),
+                        torn,
+                        "refused recovery changed the journal"
+                    );
+                }
+                let recovered = storage
                     .commit_native_publication(
                         destination.id(),
                         id(challenge),
                         review,
                         &receipt,
-                        &trust
+                        &trust,
                     )
-                    .is_err());
-                assert!(storage
-                    .inspect_native_publication_history(destination.id(), &trust)
-                    .is_err());
+                    .unwrap();
+                let completed = fs::read(&journal).unwrap();
+                assert!(completed.starts_with(&torn) && completed.len() > torn.len());
+                assert_eq!(
+                    storage
+                        .commit_native_publication(
+                            destination.id(),
+                            id(challenge),
+                            review,
+                            &receipt,
+                            &trust
+                        )
+                        .unwrap(),
+                    recovered
+                );
                 assert_eq!(
                     fs::read(&journal).unwrap(),
-                    torn,
-                    "torn publication must be preserved without acknowledging or repairing"
+                    completed,
+                    "exact retry appended twice"
                 );
+                storage
+                    .inspect_native_publication_history(destination.id(), &trust)
+                    .unwrap();
+                assert!(!owner
+                    .metadata_path()
+                    .join("native-publication.pending")
+                    .exists());
                 return id(0);
             }
             let failure = storage
