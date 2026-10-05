@@ -343,6 +343,106 @@ fn consumed_review_snapshot_recovers_and_preserves_historical_decisions() {
         preview.0.review_bundle().digest().as_bytes(),
         bound.bundle().as_bytes()
     );
+    let native_bound = storage
+        .with_registered_dependency_context(destination.id(), |context| {
+            let native = context
+                .owner_proof
+                .policy()
+                .bound_review(bound.record())
+                .unwrap();
+            let private = context.private_review_history()?;
+            assert_eq!(private.approval_context(&native).unwrap(), preview.0);
+            let mut claims = context.owner_proof.policy().clone();
+            let (ordinal, previous) = claims.native_head().unwrap();
+            let output = native.evidence().output();
+            let digest_json = |digest: RecordDigest| Json::text(digest.to_hex());
+            let value = Json::object([
+                ("schema", Json::text("mesh.dependency-policy/v4")),
+                (
+                    "authority",
+                    digest_json(context.owner_proof.binding().authority),
+                ),
+                ("revision", Json::Number(ordinal + 1)),
+                ("previous", digest_json(previous)),
+                (
+                    "kind",
+                    Json::Number(mesh_store::DependencyKind::ReviewSnapshot.code().into()),
+                ),
+                (
+                    "body",
+                    Json::object([
+                        ("request", digest_json(id(240))),
+                        ("revision", Json::Number(1)),
+                        ("snapshot", digest_json(native.evidence().snapshot())),
+                        (
+                            "output",
+                            Json::Array(vec![
+                                Json::Array(vec![digest_json(output.0), digest_json(output.1)]),
+                                digest_json(output.2),
+                            ]),
+                        ),
+                        ("canonical", digest_json(id(241))),
+                        ("bundle", digest_json(native.review().bundle)),
+                        ("opener", digest_json(native.review().opened_by)),
+                    ]),
+                ),
+            ])
+            .encode();
+            let payload = super::super::dependency_transaction::hash(value.as_bytes());
+            claims
+                .apply(
+                    mesh_store::DependencyRecord {
+                        authority: context.owner_proof.binding().authority,
+                        revision: ordinal + 1,
+                        previous,
+                        payload,
+                        kind: mesh_store::DependencyKind::ReviewSnapshot,
+                    },
+                    value.as_bytes(),
+                )
+                .unwrap();
+            let unsupported = claims.bound_review(payload).unwrap();
+            assert_eq!(
+                private.approval_context(&unsupported).unwrap_err(),
+                "verified native canonical ancestry is unavailable"
+            );
+            struct RestoreJournal(PathBuf, Vec<u8>);
+            impl Drop for RestoreJournal {
+                fn drop(&mut self) {
+                    fs::write(&self.0, &self.1).unwrap();
+                }
+            }
+            for path in [&owner_journal, &child_journal] {
+                let restore = RestoreJournal(path.clone(), fs::read(path).unwrap());
+                let mut changed = restore.1.clone();
+                changed.push(1);
+                fs::write(path, &changed).unwrap();
+                let refused = private.approval_context(&native).unwrap_err();
+                assert!(
+                    refused.contains("validated dependency history changed"),
+                    "{refused}"
+                );
+                assert_eq!(
+                    fs::read(path).unwrap(),
+                    changed,
+                    "private read must not repair history"
+                );
+                drop(restore);
+                assert_eq!(private.approval_context(&native).unwrap(), preview.0);
+            }
+            Ok(native)
+        })
+        .unwrap();
+    storage
+        .with_registered_dependency_context(owner.id(), |context| {
+            let private = context.private_review_history()?;
+            assert!(private
+                .approval_context(&native_bound)
+                .unwrap_err()
+                .contains("another native work"));
+            Ok(())
+        })
+        .unwrap();
     let other_preview = storage
         .saved_dependency_review_preview(destination.id(), other_bound.record())
         .unwrap();

@@ -2669,3 +2669,18 @@ adapter, subsequent-main reconstruction and publication commit/recovery remain u
 R170 full `npm test` passed: 3,966 native tests in 318.200s (six slow, 18 skipped),
 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
 docs, license, storage, formatting and lint gates. Hosted checks and merged delivery remain required.
+
+
+## Restricted private review reconstruction (R171)
+
+Native receipt inspection now uses a read-only adapter that binds the work, owner, configuration
+and held custody, rechecking both journals around reconstruction. The exact receipt fixture passed
+in 29.133s; removing freshness checks failed its stale-journal assertion. The prior desktop-only
+mutation selected the wrong test and is not evidence for this boundary. Full validation and delivery
+remain pending. Publication-bearing history, trusted predecessor replay, commit/recovery and the
+full fleet acceptance remain unfinished.
+
+R171 full `npm test` passed: 3,966 native tests in 318.565s (six slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, format and lint gates. The exact consumed receipt regression passed
+in 43.836s inside that run. Hosted checks and merged delivery remain required.

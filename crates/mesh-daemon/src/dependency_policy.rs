@@ -105,6 +105,9 @@ pub(crate) struct NativeReviewEvidence {
     validation: RecordDigest,
 }
 impl NativeReviewEvidence {
+    pub(crate) fn owner(&self) -> NativeDependencyBinding {
+        self.owner
+    }
     pub(crate) fn snapshot(&self) -> RecordDigest {
         self.snapshot
     }

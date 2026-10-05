@@ -80,10 +80,35 @@ impl NativeDependencyFacts {
 /// Saved operation/content verification still belongs to the read-only workspace opening.
 /// It is deliberately not a workspace admission capability or publication authority.
 #[derive(Clone, PartialEq, Eq)]
-struct VerifiedPrivateHistory {
+pub(crate) struct VerifiedPrivateHistory {
     facts: NativeDependencyFacts,
 }
 impl VerifiedPrivateHistory {
+    pub(crate) fn binding(&self) -> NativeDependencyBinding {
+        self.facts.binding
+    }
+    pub(crate) fn verify_current(&self, store: &PinnedWorkspaceRoot) -> io::Result<()> {
+        let mut file = store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(RECORD_FILE_NAME))?;
+        let mut bytes = Vec::new();
+        (&mut file)
+            .take((MAX_HISTORY + 1) as u64)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_HISTORY {
+            return Err(invalid("private history exceeds its verified bound"));
+        }
+        self.facts.verify(store, &file, &bytes)
+    }
+    pub(crate) fn verify(
+        &self,
+        store: &PinnedWorkspaceRoot,
+        file: &File,
+        bytes: &[u8],
+    ) -> io::Result<()> {
+        self.facts.verify(store, file, bytes)
+    }
     fn from_consumption(verified: super::consumption_prepare::VerifiedConsumedHistory) -> Self {
         Self {
             facts: verified.into_facts(),
@@ -123,6 +148,9 @@ impl VerifiedPrivateHistory {
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct VerifiedDependencyRead(VerifiedPrivateHistory);
 impl VerifiedDependencyRead {
+    pub(super) fn private_evidence(&self) -> &VerifiedPrivateHistory {
+        &self.0
+    }
     pub(super) fn matches_facts(&self, facts: &NativeDependencyFacts) -> bool {
         &self.0.facts == facts
     }

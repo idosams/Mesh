@@ -187,8 +187,8 @@ impl AttachmentStorage {
         }
         self.with_registered_dependency_context(work_id, |context| {
             let binding = exact_binding(context, record)?;
-            let verified =
-                super::receipt::check_receipt(context.history, &binding, bytes, trusted)?;
+            let private = context.private_review_history()?;
+            let verified = super::receipt::check_receipt(&private, &binding, bytes, trusted)?;
             let digest = |bytes: &[u8; 32]| Json::text(RecordDigest::from_bytes(*bytes).to_hex());
             let snapshot = binding.evidence().snapshot();
             Ok(Json::object([

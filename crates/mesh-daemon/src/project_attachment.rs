@@ -81,7 +81,7 @@ mod dependency_owner_context;
 mod dependency_read;
 mod dependency_transaction;
 pub use dependency_decision::{NativeInputDecision, SavedInputDecision};
-pub(crate) use dependency_read::VerifiedDependencyRead;
+pub(crate) use dependency_read::{VerifiedDependencyRead, VerifiedPrivateHistory};
 pub use dependency_transaction::NativeDependencyEnrollment;
 mod group_integration;
 mod history;
