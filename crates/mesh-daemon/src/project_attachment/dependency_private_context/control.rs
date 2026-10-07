@@ -13,6 +13,7 @@ use std::{
     path::Path,
 };
 pub(in crate::project_attachment) mod recovery;
+mod snapshot;
 use super::super::dependency_decision::{NativeControlInput, PENDING};
 const MAX_JOURNAL: usize = 64 * 1024 * 1024;
 const ZERO: RecordDigest = RecordDigest::from_bytes([0; 32]);
@@ -34,6 +35,9 @@ enum ControlRequest {
         decision: NativeSavedInputDecision,
         previous: Option<RecordDigest>,
     },
+    Snapshot {
+        operation: RecordDigest,
+    },
     Review {
         snapshot: RecordDigest,
         opener: RecordDigest,
@@ -43,13 +47,13 @@ impl ControlRequest {
     fn kind(self) -> DependencyKind {
         match self {
             Self::Input { .. } => DependencyKind::Eligibility,
-            Self::Review { .. } => DependencyKind::ReviewSnapshot,
+            Self::Review { .. } | Self::Snapshot { .. } => DependencyKind::ReviewSnapshot,
         }
     }
     fn previous(self) -> Option<RecordDigest> {
         match self {
             Self::Input { previous, .. } => previous,
-            Self::Review { .. } => None,
+            Self::Review { .. } | Self::Snapshot { .. } => None,
         }
     }
     fn valid(self) -> bool {
@@ -58,6 +62,7 @@ impl ControlRequest {
                 version, previous, ..
             } => version != ZERO && previous != Some(ZERO),
             Self::Review { snapshot, opener } => snapshot != ZERO && opener != ZERO,
+            Self::Snapshot { operation } => operation != ZERO,
         }
     }
 }
@@ -87,6 +92,7 @@ struct Selection {
     payload: Vec<u8>,
     revision: u64,
     existing: bool,
+    graph: Option<snapshot::RetainedGraph>,
 }
 impl Selection {
     fn decision(&self) -> NativeInputDecision {
@@ -130,6 +136,7 @@ impl PrivateContext<'_> {
         trusted: &TrustedReviewers,
     ) -> io::Result<Selection> {
         self.with_replayed_history(storage, work, trusted, guard, |history, owner| {
+            let mut retained_graph = None;
             let selected = match command {
                 ControlRequest::Input {
                     version,
@@ -170,6 +177,12 @@ impl PrivateContext<'_> {
                             version.operation(),
                         ),
                     }
+                }
+                ControlRequest::Snapshot { operation } => {
+                    let (input, graph) =
+                        snapshot::select(self, storage, work, guard, owner, operation, request)?;
+                    retained_graph = Some(graph);
+                    input
                 }
                 ControlRequest::Review { snapshot, opener } => {
                     let evidence = owner
@@ -268,6 +281,7 @@ impl PrivateContext<'_> {
                     payload,
                     revision,
                     existing: true,
+                    graph: retained_graph,
                 });
             }
             if selected.prior.map(|(_, p)| p) != command.previous() {
@@ -289,6 +303,7 @@ impl PrivateContext<'_> {
                     "schema",
                     Json::text(match command {
                         ControlRequest::Input { .. } => "mesh.dependency-policy/v1",
+                        ControlRequest::Snapshot { .. } => "mesh.dependency-policy/v3",
                         ControlRequest::Review { .. } => "mesh.dependency-policy/v4",
                     }),
                 ),
@@ -314,6 +329,7 @@ impl PrivateContext<'_> {
                 payload,
                 revision,
                 existing: false,
+                graph: retained_graph,
             })
         })
     }
@@ -368,6 +384,58 @@ impl AttachmentStorage {
             sync,
         )
         .map(|selected| selected.decision())
+    }
+
+    /// Freeze exact saved content and current eligible decisions through verified publication history.
+    /// A retained snapshot is historical evidence, never approval or permission to consume inputs.
+    pub fn save_native_review_snapshot(
+        &self,
+        work_id: &str,
+        operation: RecordDigest,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<super::super::NativeDependencyReviewSnapshot> {
+        self.save_native_review_snapshot_with_io(
+            work_id,
+            operation,
+            request,
+            trusted,
+            |_, _, _| Ok(()),
+            |file| file.sync_all(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::project_attachment) fn save_native_review_snapshot_with_io(
+        &self,
+        work_id: &str,
+        operation: RecordDigest,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+        hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<super::super::NativeDependencyReviewSnapshot> {
+        let selected = self.write_native_control(
+            work_id,
+            ControlRequest::Snapshot { operation },
+            request,
+            trusted,
+            hook,
+            sync,
+        )?;
+        let value =
+            Json::parse(std::str::from_utf8(&selected.payload).map_err(error)?).map_err(error)?;
+        let body = value
+            .get("body")
+            .ok_or_else(|| invalid("native snapshot body missing"))?;
+        let read_id = |key| digest(super::super::dependency_transaction::text(body, key)?);
+        Ok(
+            super::super::NativeDependencyReviewSnapshot::from_verified_record(
+                selected.record.payload,
+                read_id("graph")?,
+                read_id("validation")?,
+            ),
+        )
     }
 
     /// Save an immutable review against fully verified native publication history.
@@ -572,6 +640,13 @@ impl AttachmentStorage {
         let cas =
             Cas::<_, Blake3>::with_filesystem(owner.metadata_path(), owner.store.filesystem())
                 .map_err(error)?;
+        if let Some(graph) = &selected.graph {
+            // Recovery must not silently recreate graph evidence that was lost after staging.
+            if pending.is_none() {
+                graph.promote(&owner)?;
+            }
+            graph.verify(&owner)?;
+        }
         cas.promote(selected.payload.clone()).map_err(error)?;
         if pending.is_none() {
             owner.store.filesystem().write_new_file(
@@ -603,6 +678,9 @@ impl AttachmentStorage {
         {
             return Err(invalid("native decision evidence changed before append"));
         }
+        if let Some(graph) = &selected.graph {
+            graph.verify(&owner)?;
+        }
         let observed = journal_bytes(&mut journal)?;
         context
             .read(&owner, &guard)?
@@ -629,6 +707,7 @@ impl AttachmentStorage {
             || completed.record != selected.record
             || completed.revision != selected.revision
             || completed.payload != selected.payload
+            || completed.graph != selected.graph
         {
             return Err(invalid("native decision failed exact durable replay"));
         }

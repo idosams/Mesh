@@ -8060,6 +8060,50 @@ Full npm test passed: 3,978 native tests in 357.904s (nine slow, 18 skipped), 19
 tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/
 fmt/clippy. Exact-head hosted checks remain required before merged delivery.
 
+## Fresh native review snapshots after publication (R185)
+
+Native storage can freeze a fresh immutable review snapshot through accepted publication history.
+The closed native transaction resolves the exact saved operation and complete graph, verifies
+configured publication trust and records the current eligible decision revision for every input.
+An exact historical retry preserves its original vector, graph and validation; a later rejection
+refuses a fresh request without invalidating the historical snapshot or rewriting accepted main.
+An existing saved-review binding request cannot be reused as a snapshot request.
+
+The existing v3 snapshot format and canonical pending intent are reused. Selection remains
+read-only. Fresh transactions promote and verify the bounded canonical graph before staging;
+pending retries require that same retained graph and never silently reconstruct missing evidence.
+The writer verifies graph bytes again before the sole journal-sync commit. Explicit partial-control
+replay also verifies staged review graphs before producing private history evidence. Ordinary
+workspace admission and root-only publication guards remain intact; no runtime endpoint, execution
+permission or human approval is added. This is not a retention/collection oracle.
+
+A real-process fixture first publishes, rejects and revalidates an input, then creates a fresh
+snapshot whose vector contains the new eligible revision. It exercises staged, last-byte and
+synchronized-before-acknowledgement interruptions, foreign requests, missing configured trust,
+wrong work, unknown operation and repeated exact recovery. Missing and substituted graph objects
+are tested at both staged and partial prefixes, preserving journal and pending evidence. The fresh
+snapshot is bound to a real review and published. A later rejection leaves exact snapshot retry
+unchanged while a new snapshot refuses. Independent replay and earlier publication/review fault
+fixtures are preserved; their fault campaigns are not duplicated in the snapshot-only fixture.
+
+Native capture after publication, all-route integration, retention/collection, actual competing
+processes and full manual/harness/fleet/provider/host and eligible-signed packaged acceptance remain
+required by #345 and the complete fleet plan. Fixed user checkpoint b064029 is unchanged.
+
+Provenance: new canonical implementation based on published R184 #365 at
+0c2afb2dad7d8c4e639f7ff691b9368105a7d2bf. Its entire tree matches previously fully verified
+44428e4fc89044c3636f4e2baefe30f192a00b96 after adopting merged parent #364. No preserved legacy
+commit is replaced. Sibling #363's pending-publication fence remains required for combined delivery.
+
+Validation: the initial expanded snapshot fixture passed in 102.782s. Keeping earlier publication
+and review fault campaigns in their existing fixtures reduced the snapshot-only regression to
+68.643s, with all snapshot-specific assertions retained. A mutation that silently recreated a lost
+staged graph failed in 21.838s at the missing-evidence refusal. The production writer was restored
+byte-for-byte (SHA256 474d18c6bc2f82e4ac4874a50cc449707b060bda6e0abc130f393295084842b1).
+These are local measurements, not a hosted-CI performance guarantee. Full npm test passed: 3,979 native tests in 368.228s (11 slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. Exact-head hosted validation remains required before merged delivery.
+
 ### Combined pending-publication fence and native controls
 
 R182 now incorporates merged R183 #364 (main 16198812c9f0855dc3710c0f3cd3d1fa0b4b5b2a).
@@ -8088,6 +8132,10 @@ Focused validation passed all three campaigns in 175.781s: start 175.771s, check
 ### Saved-review delivery adopts the publication fence and recovery scheduling
 
 R184 #365 incorporates published R182/R186 #363 at e6e29c24bfc3c64140013c102ea9f78cb18d2e0b through a normal related-history merge. Both native control implementations and all regression assertions are retained. Only appended documentation sections conflicted; both were preserved. The combined source passed full npm test: 3,981 native tests in 383.075s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Historical separate-branch results above do not substitute for this combined validation. Fixed checkpoints remain unchanged.
+
+### Snapshot delivery adopts the combined saved-review parent
+
+R185 #366 incorporates published R184 #365 at 19cba349f20337f3366ad287ba7a5d274ae30d16, including R182 publication fencing and R186 exhaustive recovery scheduling. The related histories and both appended documentation sections are preserved. All snapshot graph-retention checks remain intact, and pending publication still excludes private control recovery. Full combined npm test passed: 3,982 native tests in 397.596s (12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted validation remains required before merge. Fixed checkpoint b064029 is unchanged.
 
 
 ## Recovery fixtures retain coverage without repeating unrelated journeys (R187)
@@ -8120,6 +8168,9 @@ under #345 remains open. Fixed checkpoint b064029 is unchanged.
 
 R184 #365 incorporates R187 #363 at c44cfc310e818750a1708d419b20f9c7f1432077 through a normal related-history merge. Both documentation additions are retained. The saved-review implementation is unchanged. Full npm test passed on the combined source: 3,981 native tests in 354.193s (nine slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh exact-head hosted checks remain required before merge. Prior run 37331209602 passed six checks including macOS but timed out on Linux, so it is not passing delivery evidence. Fixed checkpoint b064029 is unchanged.
 
+### Snapshot validation with the final recovery fixtures
+
+R185 #366 incorporates published R184 #365 at f71e92ea92a07cc5489785937bab6e016cfe1827, including R187. The snapshot implementation is unchanged; both documentation additions and all source histories are preserved. Full npm test passed on the final combined source: 3,982 native tests in 366.263s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted checks remain required before merge. Prior run 37332637003 timed out on Linux and was cancelled on macOS after native tests passed, so neither is passing delivery evidence. Fixed checkpoint b064029 is unchanged.
 
 ## Test-only signature arithmetic optimization (R189)
 
@@ -8156,3 +8207,16 @@ Provenance: canonical delivery correction to R184/R187; no preserved legacy comm
 The failing new-capture-after-publication regression is preserved separately at de89ff0 on
 idosams/native-capture-after-publication; the trusted capture implementation remains unfinished.
 The full fleet scope under #345 and fixed user checkpoint b064029 remain unchanged.
+
+
+### Snapshot validation with the test-only arithmetic correction
+
+R185 #366 incorporates published R189 #365 at b3ec71e67495a600eddb3235e12924cf9e60112b
+through related-history merge 93a794e5d7b631092206e3c5a50af9fd8ead57c7. Both appended
+delivery records were preserved. Snapshot production code, all regression assertions and
+unchanged deadlines remain intact. Full npm test passed on this combined source: 3,982 native
+tests in 355.472s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44
+real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh combined-head hosted
+checks remain required; the earlier green aa3e943 run does not validate this new head.
+No preserved legacy commit is replaced. The full #345/fleet acceptance scope and fixed user
+checkpoint b064029 remain unchanged.

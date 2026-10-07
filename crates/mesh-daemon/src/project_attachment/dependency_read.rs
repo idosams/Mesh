@@ -665,6 +665,14 @@ impl ProjectAttachment {
         if let Some((_, record, payload)) = &publication_pending {
             let mut staged_policy = policy.clone();
             staged_policy.apply(*record, payload).map_err(error)?;
+            if let Some(graph) = staged_policy.review_graph(record.payload) {
+                staged_policy
+                    .verify_review_graph(
+                        record.payload,
+                        &read_payload(&cas, graph, 4 * 1024 * 1024)?,
+                    )
+                    .map_err(error)?;
+            }
         }
         let proof = NativeDependencyFacts {
             configuration: hash(configuration.as_bytes()),

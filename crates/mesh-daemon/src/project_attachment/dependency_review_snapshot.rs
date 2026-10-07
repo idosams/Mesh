@@ -18,6 +18,18 @@ pub struct NativeDependencyReviewSnapshot {
     validation: RecordDigest,
 }
 impl NativeDependencyReviewSnapshot {
+    pub(super) fn from_verified_record(
+        record: RecordDigest,
+        graph: RecordDigest,
+        validation: RecordDigest,
+    ) -> Self {
+        Self {
+            record,
+            graph,
+            validation,
+        }
+    }
+
     /// Exact owner-journal snapshot payload.
     pub fn record(&self) -> RecordDigest {
         self.record
