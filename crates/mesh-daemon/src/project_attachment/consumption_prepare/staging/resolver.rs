@@ -31,6 +31,27 @@ impl Selection<'_> {
         Self::from_payload(work, start.payload)
     }
 
+    // A capture can leave a partial authoring suffix after a fully completed start. Select only
+    // an attempted reconstruction from the exact original start; completed owner/source/history
+    // verification still must succeed before this becomes private history evidence.
+    pub(in crate::project_attachment) fn read_capture_recovery<'a>(
+        work: &'a ProvisionedAttachment,
+        capture: &crate::project_attachment::dependency_private_context::capture::recovery::VerifiedCapturePrefix,
+    ) -> io::Result<Selection<'a>> {
+        capture.raw_for(work)?;
+        let (_, facts) = work
+            .project()
+            .read_completed_start_facts(work.metadata_path(), &work.store)?;
+        let facts = facts.ok_or_else(|| invalid("capture recovery start enrollment missing"))?;
+        let (_, record) = facts
+            .pending()
+            .ok_or_else(|| invalid("capture recovery original start missing"))?;
+        if record.kind != mesh_store::DependencyKind::ConsumptionStart {
+            return Err(invalid("capture recovery has another starting record"));
+        }
+        Self::from_payload(work, record.payload)
+    }
+
     fn from_payload(
         work: &ProvisionedAttachment,
         payload: RecordDigest,

@@ -214,6 +214,9 @@ enum RecoveryInspection<'a> {
     CompletedStart,
     ConsumedCapture(&'a str),
     PublicationReplay,
+    PublicationCaptureRecovery(
+        &'a super::dependency_private_context::capture::recovery::VerifiedCapturePrefix,
+    ),
     PublicationControlRecovery(
         &'a super::dependency_private_context::control::recovery::VerifiedControlPrefix,
     ),
@@ -340,6 +343,27 @@ impl ProjectAttachment {
         Ok((
             configuration,
             VerifiedPrivateHistory::from_independent_facts(facts)?,
+        ))
+    }
+
+    pub(super) fn read_native_capture_recovery_history(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        recovery: &super::dependency_private_context::capture::recovery::VerifiedCapturePrefix,
+    ) -> io::Result<(String, VerifiedPrivateHistory)> {
+        let (configuration, facts) = self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            None,
+            RecoveryInspection::PublicationCaptureRecovery(recovery),
+        )?;
+        Ok((
+            configuration,
+            VerifiedPrivateHistory::from_independent_facts(
+                facts.ok_or_else(|| invalid("native capture enrollment missing"))?,
+            )?,
         ))
     }
 
@@ -492,6 +516,7 @@ impl ProjectAttachment {
             RecoveryInspection::PublicationReplay
                 | RecoveryInspection::PublicationRecovery(_)
                 | RecoveryInspection::PublicationControlRecovery(_)
+                | RecoveryInspection::PublicationCaptureRecovery(_)
         ) && base
             .records()
             .iter()
@@ -558,6 +583,15 @@ impl ProjectAttachment {
                 )
             })
             .transpose()?;
+        let capture_prefix =
+            if let RecoveryInspection::PublicationCaptureRecovery(proof) = inspection {
+                if pending.is_some() || capture_prefix.is_some() {
+                    return Err(invalid("conflicting native capture recovery evidence"));
+                }
+                Some(proof.verify(store, &journal, &bytes, authority, &configuration)?)
+            } else {
+                capture_prefix
+            };
         let publication_pending = match inspection {
             RecoveryInspection::PublicationRecovery(proof) => {
                 if pending.is_some() || capture_prefix.is_some() {
@@ -606,6 +640,7 @@ impl ProjectAttachment {
                             RecoveryInspection::PublicationReplay
                                 | RecoveryInspection::PublicationRecovery(_)
                                 | RecoveryInspection::PublicationControlRecovery(_)
+                                | RecoveryInspection::PublicationCaptureRecovery(_)
                         )
                     {
                         return Err(invalid(

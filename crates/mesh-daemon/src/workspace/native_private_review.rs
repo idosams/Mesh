@@ -166,6 +166,46 @@ impl<'a> NativePrivateReviewHistory<'a> {
         self.ensure_current().map_err(io::Error::other)
     }
 
+    pub(crate) fn capture_result(
+        &self,
+        operation: RecordDigest,
+        predecessor: Option<RecordDigest>,
+        configuration: &str,
+    ) -> io::Result<(
+        crate::project_attachment::SavedAttachmentVersion,
+        crate::project_attachment::NativeCaptureLine,
+    )> {
+        self.ensure_current().map_err(io::Error::other)?;
+        if self
+            .history
+            .linear_history(Some(operation))
+            .map_err(io::Error::other)?
+            .iter()
+            .rev()
+            .nth(1)
+            .copied()
+            != predecessor
+        {
+            return Err(io::Error::other(
+                "capture operation has a different predecessor",
+            ));
+        }
+        self.with_saved_input(operation, |input| {
+            for file in input.files() {
+                input.write_file(file.path, &mut io::sink())?;
+            }
+            Ok(())
+        })?;
+        let line = crate::project_attachment::NativeCaptureLine::load(
+            &self.pinned,
+            &self.history,
+            configuration,
+        )?;
+        let saved = self.saved_version(operation)?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok((saved, line))
+    }
+
     pub(crate) fn graph_operation(
         &self,
         operation: RecordDigest,

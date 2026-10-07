@@ -309,3 +309,5 @@ pub use remote_project_outbox::{validate_remote_project_action, RemoteProjectOut
 pub(crate) use history::native_capture_draft::NativeCaptureDraft;
 
 pub use dependency_private_context::capture::PreparedVerifiedNativeCapture;
+
+pub(crate) use capture_line::CaptureLine as NativeCaptureLine;

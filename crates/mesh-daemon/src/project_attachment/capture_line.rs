@@ -14,7 +14,7 @@ use std::path::Path;
 const RECORD: &str = "attachment-capture-line.json";
 const TEMP: &str = "attachment-capture-line.pending";
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct CaptureLine {
+pub(crate) struct CaptureLine {
     pub head: Option<RecordDigest>,
     pending: Option<RecordDigest>,
 }

@@ -111,27 +111,140 @@ impl AttachmentStorage {
             request,
         })
     }
+    /// Recover exactly one retained private capture. Configured trust is checked before any
+    /// append; historical receipt retries never rewind the current capture position.
+    pub fn recover_verified_dependency_capture(
+        &self,
+        selected: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<SavedAttachmentVersion> {
+        self.recover_verified_capture_with_sync(selected, request, trusted, |file| file.sync_all())
+    }
+    pub(in crate::project_attachment) fn recover_verified_capture_with_sync(
+        &self,
+        selected: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+        mut sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<SavedAttachmentVersion> {
+        self.exact_registered_work(selected)?;
+        self.with_capture_write(
+            selected.id(),
+            Some(request),
+            |context, work, works, guard, recovery| {
+                self.exact_registered_work(selected)?;
+                let recovery =
+                    recovery.ok_or_else(|| invalid("capture recovery evidence missing"))?;
+                for root in [context.owner, work] {
+                    super::super::detachment::ensure_attached(&root.store)?;
+                    absent(&root.store, super::super::dependency_decision::PENDING)?;
+                    absent(&root.store, super::publication::PENDING)?;
+                }
+                if context.owner.id() != work.id() {
+                    absent(&context.owner.store, PENDING)?;
+                }
+                work.check_dependency_registration()?;
+                let snapshot = context.read(work, guard)?;
+                let configuration = &snapshot.configuration;
+                let main_before =
+                    context.with_replayed_history(self, work, trusted, guard, |history, _| {
+                        Ok(history.verified_publication())
+                    })?;
+                let mut journal = work
+                    .store
+                    .open_existing_record_file(Path::new(crate::RECORD_FILE_NAME))?;
+                let bytes = journal_bytes(&mut journal)?;
+                snapshot.proof.verify(&work.store, &journal, &bytes)?;
+                recovery.verify(
+                    &work.store,
+                    &journal,
+                    &bytes,
+                    snapshot.proof.binding().authority,
+                    configuration,
+                )?;
+                let written = bytes.len() - recovery.intent.before_bytes;
+                guard.ensure_current().map_err(error)?;
+                if written < recovery.frames.len() {
+                    journal.write_all(&recovery.frames[written..])?;
+                }
+                sync(&journal)?;
+                let after = PrivateContext::resolve(self, context.owner, works, guard)?;
+                if after.read(work, guard)?.configuration != *configuration {
+                    return Err(invalid("capture recovery configuration changed"));
+                }
+                let (saved, line) =
+                    after.with_replayed_history(self, work, trusted, guard, |history, _| {
+                        if history.verified_publication() != main_before {
+                            return Err(invalid("private capture recovery changed accepted main"));
+                        }
+                        history.capture_result(
+                            recovery.intent.operation,
+                            recovery.intent.head,
+                            configuration,
+                        )
+                    })?;
+                self.exact_registered_work(selected)?;
+                if recovery.pending {
+                    if read_private_in_store(&work.store, PENDING)? != recovery.raw {
+                        return Err(invalid("capture recovery intent changed after append"));
+                    }
+                    if line.head == Some(recovery.intent.operation) {
+                        line.persist(&work.store, configuration)?;
+                    } else if line.head == recovery.intent.head {
+                        line.begin(recovery.intent.operation, &work.store, configuration)?;
+                        line.finish(recovery.intent.operation, &work.store, configuration)?;
+                    } else {
+                        return Err(invalid(
+                            "capture recovery would rewind a different private line",
+                        ));
+                    }
+                    retain_receipt(&work.store, request, &recovery.raw)?;
+                    work.store.filesystem().remove_file(Path::new(PENDING))?;
+                    work.store.sync()?;
+                }
+                Ok(saved)
+            },
+        )
+    }
+
     // A single write callback under the complete revalidated root set. Unlike private inspection,
     // this callback must never be repeated. The writer verifies its exact before/after journal.
     fn with_capture_write<T>(
         &self,
         work_id: &str,
+        recover: Option<RecordDigest>,
         write: impl FnOnce(
             &PrivateContext<'_>,
             &ProvisionedAttachment,
             &[ProvisionedAttachment],
             &WorkspaceInitializationGuard,
+            Option<&recovery::VerifiedCapturePrefix>,
         ) -> io::Result<T>,
     ) -> io::Result<T> {
         let owner = self.reopen(&self.candidate_owning_root(work_id)?)?;
         let work = self.reopen(work_id)?;
-        let owner_selection = self.prepare_dependency_work(&owner, &owner)?;
+        let owner_selection = self.prepare_dependency_work(&owner, &work)?;
         let hints = self.catalog_discovery_hints(&owner)?;
-        let discovery = {
+        let (discovery, capture) = {
             let guard =
                 crate::workspace_custody::lock_workspace_initialization_set(&owner_selection.roots)
                     .map_err(error)?;
-            self.private_discovery(&owner, work_id, &guard, hints)?
+            let capture = recover
+                .map(|request| recovery::VerifiedCapturePrefix::read(&work, request))
+                .transpose()?;
+            let owner_recovery = capture
+                .as_ref()
+                .filter(|proof| proof.applies(&owner))
+                .map(OwnerRecovery::Capture);
+            let discovery = self.private_discovery_with_recovery(
+                &owner,
+                work_id,
+                &guard,
+                hints,
+                owner_recovery,
+            )?;
+            (discovery, capture)
         };
         let works = discovery
             .works
@@ -147,17 +260,29 @@ impl AttachmentStorage {
         )?;
         let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
             .map_err(error)?;
-        if self.private_discovery(
+        let owner_recovery = capture
+            .as_ref()
+            .filter(|proof| proof.applies(&owner))
+            .map(OwnerRecovery::Capture);
+        if self.private_discovery_with_recovery(
             &owner,
             work_id,
             &guard,
             self.catalog_discovery_hints(&owner)?,
+            owner_recovery,
         )? != discovery
         {
             return Err(invalid("native capture discovery changed"));
         }
-        let context = PrivateContext::resolve(self, &owner, &works, &guard)?;
-        let result = write(&context, &work, &works, &guard)?;
+        let context = PrivateContext::resolve_with_capture(
+            self,
+            &owner,
+            &works,
+            &guard,
+            owner_recovery,
+            capture.as_ref(),
+        )?;
+        let result = write(&context, &work, &works, &guard, capture.as_ref())?;
         guard.ensure_current().map_err(error)?;
         Ok(result)
     }
@@ -177,8 +302,10 @@ impl PreparedVerifiedNativeCapture {
         mut hook: impl FnMut(&str, &mut File, &[u8]) -> io::Result<()>,
         mut sync: impl FnMut(&File) -> io::Result<()>,
     ) -> io::Result<SavedAttachmentVersion> {
-        self.storage
-            .with_capture_write(self.selected.id(), |context, work, works, guard| {
+        self.storage.with_capture_write(
+            self.selected.id(),
+            None,
+            |context, work, works, guard, _| {
                 self.storage.exact_registered_work(&self.selected)?;
                 available(context.owner, work, self.request)?;
                 work.check_dependency_registration()?;
@@ -308,6 +435,9 @@ impl PreparedVerifiedNativeCapture {
                 work.store.filesystem().remove_file(Path::new(PENDING))?;
                 work.store.sync()?;
                 Ok(saved)
-            })
+            },
+        )
     }
 }
+
+pub(in crate::project_attachment) mod recovery;

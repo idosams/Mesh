@@ -406,7 +406,7 @@ impl CaptureIntent {
         ])
         .encode()
     }
-    fn parse(raw: &str) -> io::Result<Self> {
+    pub(in crate::project_attachment) fn parse(raw: &str) -> io::Result<Self> {
         let v = Json::parse(raw).map_err(error)?;
         let before_bytes =
             v.get("before_bytes")
@@ -438,7 +438,7 @@ impl CaptureIntent {
     }
 }
 
-fn validate_frames(
+pub(in crate::project_attachment) fn validate_frames(
     cas: &Cas<crate::root_authority::PinnedRootFs, mesh_cas::Blake3>,
     intent: &CaptureIntent,
 ) -> io::Result<Vec<u8>> {
