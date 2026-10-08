@@ -8274,6 +8274,37 @@ checks, plus repository, docs, license, storage, formatting and clippy gates. Th
 does not establish packaged graphical or provider acceptance. Hosted checks and merge remain pending.
 
 
+## Trusted native background capture (R190)
+
+The prerequisite capture/recovery increment is published as [#367](https://github.com/idosams/Mesh/pull/367)
+at b5e8c1986fbbe19a1640f43d72a2b2b89803910f, based on main 1205926753b11c3c5d892012828533a84020a4ac.
+Its final local full gate passed. Hosted run 37813799708 has five passing non-platform checks;
+Linux/macOS and merge remain pending at this observation. Its published head is unchanged.
+
+A separate increment connects the capture path to the existing native background worker through
+`AttachmentCaptureService::start_verified_dependency`, requiring host-configured publication trust.
+`save_verified_dependency_capture` first recovers the exact retained pending request, then checks the
+complete trusted context and captured input. An unchanged observation verifies retained saved content
+and returns the saved identity without signing or appending. New progress uses a fresh retained
+request and the existing verified preparation/commit path. The worker receives an explicit changed
+result, so its first unchanged observation does not inflate the new-version count. Ordinary
+registration and capture retain their existing behavior. No persisted schema changes are introduced.
+
+The original scheduler-route regression failed after a real publication (0.958s). The updated
+root worker test passed in 8.070s and the consumed-lane case in 77.856s (combined 77.863s): new and
+unchanged observations, no extra signing/appending, unchanged main/owner history, missing trust,
+staged/partial/lost-acknowledgement recovery before saving newer observed content, original request
+retry, worker counts and stop/join. Strict mesh-daemon all-target clippy passed. Final `npm test` passed 3,985 native tests
+(376.270s, 12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy gates. Hosted validation and merge remain
+pending; this increment is delivered as a dependent PR until #367 completes its platform checks.
+
+This proves the internal native service route, not desktop enrollment of trusted credentials,
+ordinary packaged controls, a graphical provider journey, exhaustive crash boundaries or final
+fleet acceptance. Desktop/helper host trust configuration, capture retention/collection and the
+remaining #345 routes and acceptance are still required. Fixed checkpoint b064029 stays unchanged.
+The increment is new canonical work on the published #367 dependency; it replaces no legacy commit.
+
 ## Trusted capture retention inspection (R191)
 
 Capture/recovery [#367](https://github.com/idosams/Mesh/pull/367) merged at
@@ -8306,3 +8337,20 @@ cleanup of publication-aware history. The private graph's empty retention projec
 not a collection oracle. Full #345 route, signing, provider/host and packaged fleet acceptance
 remain open. Fixed checkpoint b064029 is unchanged. This is new canonical work from merged #367,
 independent of the background-worker code in #368; no legacy commit is replaced.
+
+## Background capture merge and retention reconciliation — 8 October
+
+Background saving [#368](https://github.com/idosams/Mesh/pull/368) merged at
+3c16ac7eadb504ac7895eefc109b3b0af35876b6 on 8 October, 18:23:03 UTC, after all seven
+checks passed on reconciled head 2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b (run 37821567718).
+Its main reconciliation preserved the complete previously tested tree. The initial macOS deadline
+cancellation on the preceding head is retained separately from its successful unchanged-job retry.
+
+Retention [#369](https://github.com/idosams/Mesh/pull/369) passed all seven checks on
+21eccf58ead7a0d4d282e689f6fd0cc0696dfdbf (run 37818788636). It now incorporates the actual
+background-saving code from main. The capture API conflict retains both the inspection and saving
+methods; documentation retains both increments. This is a combined-content reconciliation, not
+a claim of tree identity. Fresh full local and hosted verification are required before delivery.
+Historical capture retry roots [#370](https://github.com/idosams/Mesh/pull/370) are separately
+published at df4b5acec7aafe6fc7ebe63a209479cedc1693a2 with full local verification passed and
+hosted checks running; that increment is not folded into this PR. Fixed checkpoint b064029 is unchanged.
