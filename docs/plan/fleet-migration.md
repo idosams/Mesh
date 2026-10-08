@@ -8294,8 +8294,10 @@ The original scheduler-route regression failed after a real publication (0.958s)
 root worker test passed in 8.070s and the consumed-lane case in 77.856s (combined 77.863s): new and
 unchanged observations, no extra signing/appending, unchanged main/owner history, missing trust,
 staged/partial/lost-acknowledgement recovery before saving newer observed content, original request
-retry, worker counts and stop/join. Strict mesh-daemon all-target clippy passed. Full repository
-validation and this increment's publication remain pending.
+retry, worker counts and stop/join. Strict mesh-daemon all-target clippy passed. Final `npm test` passed 3,985 native tests
+(376.270s, 12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy gates. Hosted validation and merge remain
+pending; this increment is delivered as a dependent PR until #367 completes its platform checks.
 
 This proves the internal native service route, not desktop enrollment of trusted credentials,
 ordinary packaged controls, a graphical provider journey, exhaustive crash boundaries or final
