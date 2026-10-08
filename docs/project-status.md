@@ -30,7 +30,9 @@ remain unfinished. See the delivery ledger for exact revisions and verification 
 Capture/recovery #367 has merged after all seven hosted checks passed. A separate trusted local
 capture-retention inspector now passes focused root/consumed tests, including corrupt/missing-object
 refusal without repair. Its full gate passed 3,984 native, 194 rendered, 672 desktop and 44 daemon
-checks; hosted checks and merge are pending. Complete cross-project retention
+checks. Its reconciliation with merged background saving also passed the complete gate with
+3,985 native, 194 rendered, 672 desktop and 44 daemon checks; fresh hosted checks and merge
+are pending. Complete cross-project retention
 and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
 
 A separate native background-service increment now passes focused root and consumed-lane tests

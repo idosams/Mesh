@@ -8354,3 +8354,9 @@ a claim of tree identity. Fresh full local and hosted verification are required 
 Historical capture retry roots [#370](https://github.com/idosams/Mesh/pull/370) are separately
 published at df4b5acec7aafe6fc7ebe63a209479cedc1693a2 with full local verification passed and
 hosted checks running; that increment is not folded into this PR. Fixed checkpoint b064029 is unchanged.
+
+The combined #369 reconciliation passed `npm test`: 3,985 native tests (378.362s, 11 slow,
+18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and clippy. This validates merge af7dca96f9732373783ceaae6cb5256bb31d3018,
+including both background saving and local capture-retention inspection. Fresh hosted validation
+of the published reconciliation and its merge remain pending.
