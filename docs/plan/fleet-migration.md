@@ -8304,3 +8304,30 @@ ordinary packaged controls, a graphical provider journey, exhaustive crash bound
 fleet acceptance. Desktop/helper host trust configuration, capture retention/collection and the
 remaining #345 routes and acceptance are still required. Fixed checkpoint b064029 stays unchanged.
 The increment is new canonical work on the published #367 dependency; it replaces no legacy commit.
+
+## Remove duplicate desktop work from the macOS critical path (R193)
+
+Runs 37823616215 (#370), 37825176134 (#369) and 37823853764 (main after #368) each
+reached the macOS job's 20-minute limit. Every native test and all 44 daemon checks passed in
+those logs; the latter two also completed all four native renderer tests. The cancelled jobs
+remain cancelled, not passing merge evidence. Desktop verification consumed 71.7–75.8 seconds
+inside each Rust/macOS job while also running in the separately required desktop-and-docs job.
+
+The workflow now runs the macOS Rust, daemon and renderer commands in test-macos and leaves
+repository/docs/storage/desktop verification in desktop-and-docs, with both license commands
+in license. Together the same seven required jobs execute every component of the unchanged local
+`npm test` gate plus the extra renderer/dependency checks. No tests, job deadlines, per-test
+deadlines, required check names or repository settings change. This removes duplicated work;
+it does not establish a runtime improvement until the new hosted jobs complete.
+
+This is an independent correction based on canonical main 3c16ac7eadb504ac7895eefc109b3b0af35876b6.
+The separate #369 and #370 implementations and reconciliation candidates remain preserved.
+Their cancelled validation cannot authorize merge. Local full validation and hosted delivery of
+this workflow correction remain pending. No legacy commit is replaced and checkpoint b064029 stays fixed.
+
+R193 local verification passed the unchanged `npm test` gate: 3,985 native tests (373.548s,
+11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks.
+The separate macOS renderer command passed all four integration cases in 0.799s. A static
+command-allocation audit accounts for every local gate component and confirms all seven job
+names, job timeouts, the package scripts and nextest configuration remain unchanged. This audit
+and the local tests do not prove the hosted jobs finish within budget; fresh CI remains required.

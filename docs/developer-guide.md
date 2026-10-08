@@ -72,12 +72,17 @@ checks local Markdown file destinations and literal npm script examples against 
 It checks neither external URLs nor heading fragments and does not execute examples. Rendered HTML
 and packaged text guides still need the desktop guide tests and visual verification.
 
-Pull requests and main pushes run the complete `npm test` gate in the macOS test job, followed by
-the native renderer checks. The seven existing jobs remain, including independent Linux Rust,
-desktop/React, documentation, storage, license and dependency-policy checks. Rust test failures do
-not stop the remaining Rust cases; the command still fails, and later gate stages require success.
-The nightly job also runs the complete local command plus dependency policy. A configured workflow
-is not evidence of a successful hosted run;
+Pull requests and main pushes distribute the complete `npm test` gate across the seven required
+jobs. The macOS test job runs `verify:rust`, `verify:demo` and the additional native renderer checks.
+The desktop-and-docs job runs `verify:repository`, `verify:docs`, `verify:storage` and `verify:desktop`;
+the license job runs both commands in `verify:license`. The independent fmt, clippy, Linux Rust and
+dependency-policy jobs remain. All seven must pass: a passing macOS Rust job alone is insufficient.
+Desktop installation, build and tests run once in their own required job, leaving the macOS Rust
+job's unchanged 20-minute limit for native tests, the real daemon and renderers. No tests, Rust
+per-test deadlines or job time limits are relaxed. Rust test failures do not stop the remaining
+Rust cases; the command still fails, and later gate stages require success. Contributors still run
+the unchanged complete `npm test` command locally. The nightly job also runs that complete command
+plus dependency policy. A configured workflow is not evidence of a successful hosted run;
 inspect the exact revision's results before release.
 
 On macOS, `npm run test:macos-renderers` runs all four PDFKit and Office integration cases using checked-in synthetic fixtures.

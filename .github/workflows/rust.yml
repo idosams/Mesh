@@ -63,9 +63,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
-      # Exercise the same complete gate contributors run, including the real daemon demo.
-      # Keep the independent jobs above/below for early, separately named failure reporting.
-      - run: npm test
+      # Keep all macOS Rust, real-daemon and native-renderer checks here. The separately
+      # required desktop-and-docs job runs repository/docs/storage/desktop verification;
+      # license runs both license checks. Together the seven jobs cover the full npm test
+      # gate without repeating the desktop install/build/tests on this critical path.
+      - run: npm run verify:rust
+      - run: npm run verify:demo
       - run: npm run test:macos-renderers
 
   deny:
