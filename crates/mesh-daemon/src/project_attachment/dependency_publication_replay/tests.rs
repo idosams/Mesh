@@ -36,6 +36,10 @@ fn staged_publication_fences_ordinary_native_decisions_without_losing_recovery()
 fn native_capture_after_publication_preserves_accepted_main() {
     root_publication_fixture(4);
 }
+#[test]
+fn registered_scheduler_capture_after_publication_saves_and_recognizes_unchanged() {
+    root_publication_fixture(5);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -296,6 +300,208 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if writer == 5 {
+        let accepted = storage
+            .inspect_native_publication_history(owner.id(), &trust)
+            .unwrap();
+        fs::write(
+            root.join("source/note"),
+            b"scheduled progress after publication",
+        )
+        .unwrap();
+        let observed = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let saved = storage
+            .save_verified_dependency_capture(&owner, &observed, actor, &trust, sign)
+            .unwrap();
+        let bytes = fs::read(&journal).unwrap();
+        let unchanged = storage
+            .save_verified_dependency_capture(
+                &owner,
+                &observed,
+                actor,
+                &trust,
+                |_| -> Result<Signature, &'static str> {
+                    panic!("unchanged observation reached signer")
+                },
+            )
+            .unwrap();
+        assert_eq!(saved, unchanged);
+        assert_eq!(fs::read(&journal).unwrap(), bytes);
+        assert!(storage
+            .save_verified_dependency_capture(
+                &owner,
+                &observed,
+                actor,
+                &TrustedReviewers::default(),
+                |_| -> Result<Signature, &'static str> { panic!("missing trust reached signer") }
+            )
+            .is_err());
+        assert_eq!(fs::read(&journal).unwrap(), bytes);
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        for interruption in 0..3 {
+            fs::write(
+                root.join("source/note"),
+                format!("pending scheduled {interruption}"),
+            )
+            .unwrap();
+            let observed = owner
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            let request = id(91 + interruption);
+            let prepared = storage
+                .prepare_verified_dependency_capture(
+                    &owner, &observed, actor, request, &trust, sign,
+                )
+                .unwrap();
+            let pending_operation = prepared.operation();
+            assert!(prepared
+                .commit_with_io(
+                    |step, file, frames| {
+                        if interruption < 2 && step == "staged" {
+                            if interruption == 1 {
+                                file.write_all(&frames[..frames.len() / 2])?;
+                                file.sync_all()?;
+                            }
+                            return Err(std::io::Error::other("scheduled interruption"));
+                        }
+                        if interruption == 2 && step == "appended" {
+                            return Err(std::io::Error::other("scheduled acknowledgement lost"));
+                        }
+                        Ok(())
+                    },
+                    |file| file.sync_all()
+                )
+                .is_err());
+            fs::write(
+                root.join("source/note"),
+                format!("newer scheduled {interruption}"),
+            )
+            .unwrap();
+            let newer = owner
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            let pending_path = owner.metadata_path().join("dependency-capture.pending");
+            let pending = fs::read(&pending_path).unwrap();
+            let before = fs::read(&journal).unwrap();
+            assert!(storage
+                .save_verified_dependency_capture(
+                    &owner,
+                    &newer,
+                    actor,
+                    &TrustedReviewers::default(),
+                    sign
+                )
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), before);
+            assert_eq!(fs::read(&pending_path).unwrap(), pending);
+            let newer_saved = storage
+                .save_verified_dependency_capture(&owner, &newer, actor, &trust, sign)
+                .unwrap();
+            assert_ne!(newer_saved.operation(), pending_operation);
+            assert_eq!(
+                storage
+                    .recover_verified_dependency_capture(&owner, request, &trust)
+                    .unwrap()
+                    .operation(),
+                pending_operation
+            );
+            assert!(!pending_path.exists());
+        }
+        use crate::project_attachment::{
+            AttachmentCaptureService, CaptureOutcome, CapturePhase, CaptureSchedule,
+        };
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        use std::time::{Duration, Instant};
+        struct TestSigner(AtomicUsize);
+        impl crate::CheckpointSigner for TestSigner {
+            fn public_key(&self) -> PublicKey {
+                PublicKey::from_bytes(
+                    SigningKey::from_bytes(&[191; 32])
+                        .verifying_key()
+                        .to_bytes(),
+                )
+            }
+            fn sign(&self, payload: &SigningPayload) -> Result<Signature, String> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(Signature::from_bytes(
+                    SigningKey::from_bytes(&[191; 32])
+                        .sign(payload.as_bytes())
+                        .to_bytes(),
+                ))
+            }
+        }
+        let signer = Arc::new(TestSigner(AtomicUsize::new(0)));
+        let schedule = CaptureSchedule {
+            native_signals: false,
+            reconciliation_interval: Duration::from_secs(300),
+            ..CaptureSchedule::default()
+        };
+        let service = AttachmentCaptureService::start_verified_dependency(
+            &storage,
+            &owner,
+            signer.clone(),
+            schedule,
+            &trust,
+        )
+        .unwrap();
+        let wait = |attempts| {
+            let deadline = Instant::now() + Duration::from_secs(30);
+            loop {
+                let status = service.status();
+                if status.attempts >= attempts && status.phase == CapturePhase::Waiting {
+                    break status;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "scheduled capture did not finish: {status:?}"
+                );
+                service.wait_for_update(status.revision, Duration::from_millis(100));
+            }
+        };
+        let first = wait(1);
+        assert_eq!(first.last_outcome, CaptureOutcome::Unchanged);
+        assert_eq!(first.versions_saved, 0);
+        assert_eq!(signer.0.load(Ordering::SeqCst), 0);
+        fs::write(root.join("source/note"), b"background worker progress").unwrap();
+        assert!(service.request_capture());
+        let second = wait(2);
+        assert_eq!(second.last_outcome, CaptureOutcome::Saved);
+        assert_ne!(second.saved_version, first.saved_version);
+        assert_eq!(second.versions_saved, 1);
+        assert_eq!(signer.0.load(Ordering::SeqCst), 1);
+        let before = fs::read(&journal).unwrap();
+        assert!(service.request_capture());
+        let third = wait(3);
+        assert_eq!(third.last_outcome, CaptureOutcome::Unchanged);
+        assert_eq!(third.saved_version, second.saved_version);
+        assert_eq!(third.versions_saved, 1);
+        service.stop_and_join().unwrap();
+        assert_eq!(fs::read(&journal).unwrap(), before);
+        assert_eq!(
+            fs::read(root.join("source/note")).unwrap(),
+            b"background worker progress"
+        );
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        return;
     }
     if writer == 4 {
         let accepted = storage
@@ -1737,6 +1943,41 @@ fn consumed_publication_fixture(writer: u8) {
             first_capture.unwrap()
         );
         assert_eq!(fs::read(&child_journal).unwrap(), complete);
+        fs::write(
+            destination.project().root().join("note"),
+            b"scheduled consumed progress",
+        )
+        .unwrap();
+        let observed = destination
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let saved = storage
+            .save_verified_dependency_capture(&destination, &observed, actor, &trust, sign)
+            .unwrap();
+        let after = fs::read(&child_journal).unwrap();
+        assert_eq!(
+            storage
+                .save_verified_dependency_capture(
+                    &destination,
+                    &observed,
+                    actor,
+                    &trust,
+                    |_| -> Result<Signature, &'static str> {
+                        panic!("unchanged consumed capture signed")
+                    }
+                )
+                .unwrap(),
+            saved
+        );
+        assert_eq!(fs::read(&child_journal).unwrap(), after);
+        assert_eq!(fs::read(&owner_journal).unwrap(), owner_before);
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(destination.id(), &trust)
+                .unwrap(),
+            accepted
+        );
         return;
     }
     if matches!(writer, 2..=4) {

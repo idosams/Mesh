@@ -128,6 +128,32 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(version)
     }
 
+    pub(crate) fn unchanged_capture(
+        &self,
+        configuration: &str,
+        input: &crate::project_attachment::CapturedProjectInput,
+        actor: mesh_types::PublicKey,
+    ) -> io::Result<Option<crate::project_attachment::SavedAttachmentVersion>> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let Some(head) = crate::project_attachment::NativeCaptureDraft::unchanged(
+            &self.history,
+            &self.pinned,
+            configuration,
+            input,
+            actor,
+        )?
+        else {
+            return Ok(None);
+        };
+        self.with_saved_input(head, |saved| {
+            for file in saved.files() {
+                saved.write_file(file.path, &mut io::sink())?;
+            }
+            Ok(())
+        })?;
+        self.saved_version(head).map(Some)
+    }
+
     pub(crate) fn prepare_capture(
         &self,
         configuration: &str,

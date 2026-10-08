@@ -30,7 +30,9 @@ remain unfinished. See the delivery ledger for exact revisions and verification 
 Capture/recovery #367 has merged after all seven hosted checks passed. A separate trusted local
 capture-retention inspector now passes focused root/consumed tests, including corrupt/missing-object
 refusal without repair. Its full gate passed 3,984 native, 194 rendered, 672 desktop and 44 daemon
-checks; hosted checks and merge are pending. Complete cross-project retention
+checks. Its reconciliation with merged background saving also passed the complete gate with
+3,985 native, 194 rendered, 672 desktop and 44 daemon checks; fresh hosted checks and merge
+are pending. Complete cross-project retention
 and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
 The capture inspector also verifies all completed historical capture receipts and retains their
 retry frame objects and sidecar digests. Focused root/consumed and ordinary capture tests cover
@@ -38,6 +40,13 @@ successful inspection and historical missing/corrupt-object refusal without repa
 full gate passed 3,984 native, 194 rendered, 672 desktop and 44 real-daemon checks. Hosted validation
 and delivery of this extension remain pending. This still does not establish the complete store
 inventory or authorize collection.
+
+
+A separate native background-service increment now passes focused root and consumed-lane tests
+for explicitly trusted saves, unchanged observations and recovery before newer progress. Its full gate passed 3,985 native, 194 rendered, 672 desktop and 44 daemon checks. It merged as #368 at
+3c16ac7eadb504ac7895eefc109b3b0af35876b6 after all seven hosted checks passed on reconciled
+head 2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b (run 37821567718). Desktop/helper credential configuration and packaged UI adoption
+remain unfinished; the passing service fixture does not establish those outcomes.
 Older dated observations below retain their historical scope.
 
 ## Product direction
