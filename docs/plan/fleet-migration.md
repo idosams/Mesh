@@ -8272,3 +8272,35 @@ passing full gate. Final full validation after the header fix passed: `npm test`
 (380.317s, 11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
 checks, plus repository, docs, license, storage, formatting and clippy gates. This source gate
 does not establish packaged graphical or provider acceptance. Hosted checks and merge remain pending.
+
+
+## Trusted native background capture (R190)
+
+The prerequisite capture/recovery increment is published as [#367](https://github.com/idosams/Mesh/pull/367)
+at b5e8c1986fbbe19a1640f43d72a2b2b89803910f, based on main 1205926753b11c3c5d892012828533a84020a4ac.
+Its final local full gate passed. Hosted run 37813799708 has five passing non-platform checks;
+Linux/macOS and merge remain pending at this observation. Its published head is unchanged.
+
+A separate increment connects the capture path to the existing native background worker through
+`AttachmentCaptureService::start_verified_dependency`, requiring host-configured publication trust.
+`save_verified_dependency_capture` first recovers the exact retained pending request, then checks the
+complete trusted context and captured input. An unchanged observation verifies retained saved content
+and returns the saved identity without signing or appending. New progress uses a fresh retained
+request and the existing verified preparation/commit path. The worker receives an explicit changed
+result, so its first unchanged observation does not inflate the new-version count. Ordinary
+registration and capture retain their existing behavior. No persisted schema changes are introduced.
+
+The original scheduler-route regression failed after a real publication (0.958s). The updated
+root worker test passed in 8.070s and the consumed-lane case in 77.856s (combined 77.863s): new and
+unchanged observations, no extra signing/appending, unchanged main/owner history, missing trust,
+staged/partial/lost-acknowledgement recovery before saving newer observed content, original request
+retry, worker counts and stop/join. Strict mesh-daemon all-target clippy passed. Final `npm test` passed 3,985 native tests
+(376.270s, 12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy gates. Hosted validation and merge remain
+pending; this increment is delivered as a dependent PR until #367 completes its platform checks.
+
+This proves the internal native service route, not desktop enrollment of trusted credentials,
+ordinary packaged controls, a graphical provider journey, exhaustive crash boundaries or final
+fleet acceptance. Desktop/helper host trust configuration, capture retention/collection and the
+remaining #345 routes and acceptance are still required. Fixed checkpoint b064029 stays unchanged.
+The increment is new canonical work on the published #367 dependency; it replaces no legacy commit.

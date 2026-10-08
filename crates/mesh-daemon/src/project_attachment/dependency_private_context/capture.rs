@@ -50,6 +50,91 @@ fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 impl AttachmentStorage {
+    /// Reconcile one native scheduled observation using explicit publication trust. Recover the
+    /// exact pending request first; unchanged content returns its verified saved identity without
+    /// signing or appending. Ordinary, unenrolled attachments use the ordinary registered API.
+    pub fn save_verified_dependency_capture<F, E>(
+        &self,
+        selected: &ProvisionedAttachment,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+        trusted: &TrustedReviewers,
+        sign: F,
+    ) -> io::Result<SavedAttachmentVersion>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        self.save_verified_dependency_capture_attempt(selected, input, actor, trusted, sign)
+            .map(|(saved, _)| saved)
+    }
+    pub(in crate::project_attachment) fn save_verified_dependency_capture_attempt<F, E>(
+        &self,
+        selected: &ProvisionedAttachment,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+        trusted: &TrustedReviewers,
+        sign: F,
+    ) -> io::Result<(SavedAttachmentVersion, bool)>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
+        let current = self.exact_registered_work(selected)?;
+        let pending = {
+            let _guard = crate::workspace_custody::lock_workspace_initialization(&current.store)
+                .map_err(error)?;
+            match read_private_in_store(&current.store, PENDING) {
+                Ok(raw) => Some(CaptureIntent::parse(&raw)?.request),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                Err(e) => return Err(e),
+            }
+        };
+        if let Some(request) = pending {
+            self.recover_verified_dependency_capture(&current, request, trusted)?;
+        }
+        let unchanged = self.with_private_inspection(current.id(), |context, work, guard| {
+            self.exact_registered_work(&current)?;
+            for root in [context.owner, work] {
+                super::super::detachment::ensure_attached(&root.store)?;
+                absent(&root.store, PENDING)?;
+                absent(&root.store, super::super::dependency_decision::PENDING)?;
+                absent(&root.store, super::publication::PENDING)?;
+            }
+            work.check_dependency_registration()?;
+            work.project().ensure_current()?;
+            if input.root() != work.project().root()
+                || input.identity() != work.project().pinned.identity()?
+            {
+                return Err(invalid("capture belongs to a different native attachment"));
+            }
+            let configuration = &context.read(work, guard)?.configuration;
+            work.project().history_configuration_with_previous(
+                &work.store,
+                Some(input.exclusion_digest()),
+                Some(configuration.clone()),
+            )?;
+            context.with_replayed_history(self, work, trusted, guard, |history, _| {
+                history.unchanged_capture(configuration, input, actor)
+            })
+        })?;
+        if let Some(saved) = unchanged {
+            return Ok((saved, false));
+        }
+        let mut nonce = [0; 32];
+        File::open("/dev/urandom")?.read_exact(&mut nonce)?;
+        self.prepare_verified_dependency_capture(
+            &current,
+            input,
+            actor,
+            RecordDigest::from_bytes(nonce),
+            trusted,
+            sign,
+        )?
+        .commit()
+        .map(|saved| (saved, true))
+    }
+
     /// Prepare a private save with explicitly configured publication trust. The signer executes
     /// outside native custody. This neither enrolls work nor changes accepted main or eligibility.
     pub fn prepare_verified_dependency_capture<F, E>(

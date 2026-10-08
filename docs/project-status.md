@@ -27,6 +27,10 @@ remain pending. The ordinary registered capture path still refuses publication h
 registered scheduler/runtime integration, exhaustive capture fault coverage, retention/collection,
 eligible signing, another provider/host and the full [acceptance map](plan/fleet-acceptance.md)
 remain unfinished. See the delivery ledger for exact revisions and verification scope.
+A separate native background-service increment now passes focused root and consumed-lane tests
+for explicitly trusted saves, unchanged observations and recovery before newer progress. Its full gate passed 3,985 native, 194 rendered, 672 desktop and 44 daemon checks; hosted
+validation and merge remain pending. Desktop/helper credential configuration and packaged UI adoption
+remain unfinished; the passing service fixture does not establish those outcomes.
 Older dated observations below retain their historical scope.
 
 ## Product direction
