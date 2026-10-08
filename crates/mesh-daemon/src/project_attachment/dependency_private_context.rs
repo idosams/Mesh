@@ -33,10 +33,12 @@ struct Snapshot {
 enum OwnerRecovery<'a> {
     Publication(&'a publication::recovery::VerifiedPublicationPrefix),
     Control(&'a control::recovery::VerifiedControlPrefix),
+    Capture(&'a capture::recovery::VerifiedCapturePrefix),
 }
 struct PrivateContext<'a> {
     owner: &'a ProvisionedAttachment,
     recovery: Option<OwnerRecovery<'a>>,
+    capture: Option<&'a capture::recovery::VerifiedCapturePrefix>,
     histories: BTreeMap<String, Snapshot>,
 }
 // This proof can only be constructed by complete native private-context verification.
@@ -96,6 +98,9 @@ fn read_publication_owner(
         Some(OwnerRecovery::Control(proof)) => owner
             .project()
             .read_native_control_recovery_history(owner.metadata_path(), &owner.store, proof),
+        Some(OwnerRecovery::Capture(proof)) => owner
+            .project()
+            .read_native_capture_recovery_history(owner.metadata_path(), &owner.store, proof),
         None => owner
             .project()
             .read_publication_private_history(owner.metadata_path(), &owner.store),
@@ -127,9 +132,20 @@ impl<'a> PrivateContext<'a> {
                 return Err(invalid("private owner history changed"));
             }
         } else {
-            let (_, facts) =
-                work.project()
-                    .read_native_facts(work.metadata_path(), &work.store, None, None)?;
+            let (_, facts) = match self.capture.filter(|proof| proof.applies(work)) {
+                Some(proof) => work.project().read_consumed_capture_facts(
+                    work.metadata_path(),
+                    &work.store,
+                    proof.checked_raw(work, &selected.configuration)?,
+                    &selected.configuration,
+                )?,
+                None => work.project().read_native_facts(
+                    work.metadata_path(),
+                    &work.store,
+                    None,
+                    None,
+                )?,
+            };
             if !facts
                 .as_ref()
                 .is_some_and(|f| selected.proof.matches_facts(f))
@@ -407,10 +423,21 @@ impl<'a> PrivateContext<'a> {
         guard: &WorkspaceInitializationGuard,
         recovery: Option<OwnerRecovery<'a>>,
     ) -> io::Result<Self> {
+        Self::resolve_with_capture(storage, owner, works, guard, recovery, None)
+    }
+    fn resolve_with_capture(
+        storage: &AttachmentStorage,
+        owner: &'a ProvisionedAttachment,
+        works: &[ProvisionedAttachment],
+        guard: &WorkspaceInitializationGuard,
+        recovery: Option<OwnerRecovery<'a>>,
+        capture: Option<&'a capture::recovery::VerifiedCapturePrefix>,
+    ) -> io::Result<Self> {
         let (configuration, proof) = read_publication_owner(owner, recovery)?;
         let mut context = Self {
             owner,
             recovery,
+            capture,
             histories: BTreeMap::from([(
                 owner.id().to_owned(),
                 Snapshot {
@@ -441,7 +468,10 @@ impl<'a> PrivateContext<'a> {
                         },
                     );
                 }
-                Err(_) => pending.push(ConsumedHistorySelection::read(work)?),
+                Err(_) => pending.push(match capture.filter(|proof| proof.applies(work)) {
+                    Some(proof) => ConsumedHistorySelection::read_capture_recovery(work, proof)?,
+                    None => ConsumedHistorySelection::read(work)?,
+                }),
             }
         }
         while !pending.is_empty() {
@@ -522,7 +552,7 @@ impl<'a> PrivateContext<'a> {
                             super::consumption_prepare::source_verification::verify_starting_source(selection.work, &input, guard, expected)
                         }))
                     }, verify_source, |candidate, staged, graph, held| {
-                        let (configuration, proof) = candidate.verify_completed_private_history(graph, held, None, || {
+                        let (configuration, proof) = candidate.verify_completed_private_history(graph, held, capture.filter(|proof| proof.applies(selection.work)).map(|proof| proof.raw_for(selection.work)).transpose()?, || {
                             let snapshot = context.read(owner, held)?;
                             Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
                         })?;
@@ -813,3 +843,5 @@ pub(in crate::project_attachment) mod publication;
 pub use publication::NativePublicationCommit;
 
 pub(in crate::project_attachment) mod control;
+
+pub(super) mod capture;

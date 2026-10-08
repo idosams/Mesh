@@ -128,6 +128,84 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(version)
     }
 
+    pub(crate) fn prepare_capture(
+        &self,
+        configuration: &str,
+        input: &crate::project_attachment::CapturedProjectInput,
+        actor: mesh_types::PublicKey,
+    ) -> io::Result<crate::project_attachment::NativeCaptureDraft> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let draft = crate::project_attachment::NativeCaptureDraft::prepare(
+            &self.history,
+            &self.pinned,
+            configuration,
+            input,
+            actor,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(draft)
+    }
+
+    pub(crate) fn authenticate_capture(
+        &self,
+        draft: &crate::project_attachment::NativeCaptureDraft,
+        signature: mesh_types::Signature,
+    ) -> io::Result<crate::checkpoint_storage::PreparedAuthenticatedCheckpoint> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let checkpoint = draft.authenticate(&self.history, &self.pinned, signature)?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(checkpoint)
+    }
+
+    pub(crate) fn verify_capture_basis(
+        &self,
+        draft: &crate::project_attachment::NativeCaptureDraft,
+    ) -> io::Result<()> {
+        self.ensure_current().map_err(io::Error::other)?;
+        draft.verify_basis(&self.history, &self.pinned)?;
+        self.ensure_current().map_err(io::Error::other)
+    }
+
+    pub(crate) fn capture_result(
+        &self,
+        operation: RecordDigest,
+        predecessor: Option<RecordDigest>,
+        configuration: &str,
+    ) -> io::Result<(
+        crate::project_attachment::SavedAttachmentVersion,
+        crate::project_attachment::NativeCaptureLine,
+    )> {
+        self.ensure_current().map_err(io::Error::other)?;
+        if self
+            .history
+            .linear_history(Some(operation))
+            .map_err(io::Error::other)?
+            .iter()
+            .rev()
+            .nth(1)
+            .copied()
+            != predecessor
+        {
+            return Err(io::Error::other(
+                "capture operation has a different predecessor",
+            ));
+        }
+        self.with_saved_input(operation, |input| {
+            for file in input.files() {
+                input.write_file(file.path, &mut io::sink())?;
+            }
+            Ok(())
+        })?;
+        let line = crate::project_attachment::NativeCaptureLine::load(
+            &self.pinned,
+            &self.history,
+            configuration,
+        )?;
+        let saved = self.saved_version(operation)?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok((saved, line))
+    }
+
     pub(crate) fn graph_operation(
         &self,
         operation: RecordDigest,

@@ -32,6 +32,10 @@ fn root_publication_recovers_after_process_exit_at_both_frame_edges() {
 fn staged_publication_fences_ordinary_native_decisions_without_losing_recovery() {
     root_publication_fixture(3);
 }
+#[test]
+fn native_capture_after_publication_preserves_accepted_main() {
+    root_publication_fixture(4);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -138,7 +142,7 @@ fn root_publication_fixture(writer: u8) {
         .metadata_path()
         .join(crate::workspace::RECORD_FILE_NAME);
     if writer != 0 {
-        if writer >= 2 {
+        if matches!(writer, 2 | 3) {
             let result = restart::interrupted_publication(
                 &root,
                 owner.id(),
@@ -191,7 +195,7 @@ fn root_publication_fixture(writer: u8) {
                         .as_str()
                 )
             );
-        } else {
+        } else if writer == 1 {
             use super::super::dependency_private_context::publication::Step;
             use std::io::Write as _;
             let before = fs::read(&journal).unwrap();
@@ -292,6 +296,249 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if writer == 4 {
+        let accepted = storage
+            .inspect_native_publication_history(owner.id(), &trust)
+            .unwrap();
+        fs::write(
+            root.join("source/note"),
+            b"new private progress after publication",
+        )
+        .unwrap();
+        let input = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let journal_before = fs::read(&journal).unwrap();
+        assert!(storage
+            .prepare_registered_dependency_capture(&owner, &input, actor, id(80), sign)
+            .is_err());
+        let mut called = false;
+        assert!(storage
+            .prepare_verified_dependency_capture(
+                &owner,
+                &input,
+                actor,
+                id(80),
+                &crate::TrustedReviewers::default(),
+                |payload| {
+                    called = true;
+                    sign(payload)
+                }
+            )
+            .is_err());
+        assert!(!called, "missing publication trust reached the signer");
+        assert_eq!(fs::read(&journal).unwrap(), journal_before);
+        let saved = storage
+            .prepare_verified_dependency_capture(&owner, &input, actor, id(80), &trust, |payload| {
+                let roots = [owner.store.clone(), owner.project().pinned.clone()];
+                let (send, receive) = std::sync::mpsc::channel();
+                let reader = std::thread::spawn(move || {
+                    let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
+                        .unwrap();
+                    send.send(()).unwrap();
+                    drop(guard);
+                });
+                receive
+                    .recv_timeout(std::time::Duration::from_secs(2))
+                    .expect("signer must run outside custody");
+                reader.join().unwrap();
+                sign(payload)
+            })
+            .expect("native capture must remain available after accepted publication")
+            .commit()
+            .unwrap();
+        assert_ne!(saved.operation(), later_version.operation());
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        assert_eq!(
+            storage
+                .inspect_native_saved_version(owner.id(), saved.operation(), &trust)
+                .unwrap(),
+            saved
+        );
+        assert!(
+            owner.saved_versions().is_err(),
+            "private capture must not remove ordinary admission guards"
+        );
+        fs::write(root.join("source/note"), b"later private progress").unwrap();
+        let later_input = owner
+            .project()
+            .capture_inputs(ObservationLimits::default())
+            .unwrap();
+        let mut inner_saved = None;
+        assert!(
+            storage
+                .prepare_verified_dependency_capture(
+                    &owner,
+                    &later_input,
+                    actor,
+                    id(81),
+                    &trust,
+                    |payload| {
+                        inner_saved = Some(
+                            storage
+                                .prepare_verified_dependency_capture(
+                                    &owner,
+                                    &later_input,
+                                    actor,
+                                    id(82),
+                                    &trust,
+                                    sign,
+                                )
+                                .unwrap()
+                                .commit()
+                                .unwrap(),
+                        );
+                        sign(payload)
+                    }
+                )
+                .is_err(),
+            "a save during signing must stale the outer authoring basis"
+        );
+        assert_ne!(inner_saved.unwrap().operation(), saved.operation());
+        assert_eq!(
+            storage
+                .inspect_native_publication_history(owner.id(), &trust)
+                .unwrap(),
+            accepted
+        );
+        for interruption in 0..3 {
+            fs::write(
+                root.join("source/note"),
+                format!("interrupted capture {interruption}"),
+            )
+            .unwrap();
+            let observed = owner
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            let request = id(83 + interruption);
+            let prepared = storage
+                .prepare_verified_dependency_capture(
+                    &owner, &observed, actor, request, &trust, sign,
+                )
+                .unwrap();
+            let operation = prepared.operation();
+            assert!(prepared
+                .commit_with_io(
+                    |step, file, frames| {
+                        if interruption < 2 && step == "staged" {
+                            if interruption == 1 {
+                                file.write_all(&frames[..frames.len() / 2])?;
+                                file.sync_all()?;
+                            }
+                            return Err(io::Error::other("interrupted capture"));
+                        }
+                        if interruption == 2 && step == "appended" {
+                            return Err(io::Error::other("lost capture acknowledgement"));
+                        }
+                        Ok(())
+                    },
+                    |file| file.sync_all()
+                )
+                .is_err());
+            let interrupted = fs::read(&journal).unwrap();
+            let pending_path = owner.metadata_path().join("dependency-capture.pending");
+            let pending = fs::read(&pending_path).unwrap();
+            let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
+            assert!(reopened
+                .recover_verified_dependency_capture(&owner, id(90), &trust)
+                .is_err());
+            assert!(reopened
+                .recover_verified_dependency_capture(
+                    &owner,
+                    request,
+                    &crate::TrustedReviewers::default()
+                )
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), interrupted);
+            assert_eq!(fs::read(&pending_path).unwrap(), pending);
+            if interruption == 0 {
+                let cas = Cas::<_, Blake3>::with_filesystem(
+                    owner.metadata_path(),
+                    owner.store.filesystem(),
+                )
+                .unwrap();
+                let mut intent =
+                    crate::project_attachment::history::dependency_capture::CaptureIntent::parse(
+                        std::str::from_utf8(&pending).unwrap(),
+                    )
+                    .unwrap();
+                let frames =
+                    crate::project_attachment::history::dependency_capture::validate_frames(
+                        &cas, &intent,
+                    )
+                    .unwrap();
+                let scan = mesh_store::scan_journal(&frames).unwrap();
+                for mode in 0..8 {
+                    let mut records = scan.records().to_vec();
+                    let Some(StoredRecord::Operation(operation)) = records.last_mut() else {
+                        panic!("capture operation missing");
+                    };
+                    match mode {
+                        0 => operation.actor_sequence += 1,
+                        1 => operation.session = mesh_store::EntityUuid::from_bytes([99; 16]),
+                        2 => operation.policy_epoch += 1,
+                        3 => operation.hlc_millis += 1,
+                        4 => operation.hlc_counter += 1,
+                        5 => operation.actor = id(99),
+                        6 => operation.parents.clear(),
+                        7 => operation.parents = vec![id(99)],
+                        _ => unreachable!(),
+                    }
+                    let forged = records
+                        .iter()
+                        .flat_map(mesh_store::frame_record)
+                        .collect::<Vec<_>>();
+                    intent.frames = super::super::dependency_transaction::hash(&forged);
+                    cas.promote(forged).unwrap();
+                    fs::write(&pending_path, intent.encode()).unwrap();
+                    let result =
+                        reopened.recover_verified_dependency_capture(&owner, request, &trust);
+                    assert_eq!(
+                        fs::read(&journal).unwrap(),
+                        interrupted,
+                        "forged capture metadata must be refused before journal append"
+                    );
+                    assert!(result.is_err(), "forged capture metadata must refuse");
+                    fs::write(&pending_path, &pending).unwrap();
+                }
+            }
+            let recovered = reopened
+                .recover_verified_dependency_capture(&owner, request, &trust)
+                .unwrap();
+            assert_eq!(recovered.operation(), operation);
+            let completed = fs::read(&journal).unwrap();
+            assert_eq!(
+                reopened
+                    .recover_verified_dependency_capture(&owner, request, &trust)
+                    .unwrap(),
+                recovered
+            );
+            assert_eq!(fs::read(&journal).unwrap(), completed);
+            assert!(!pending_path.exists());
+            assert_eq!(
+                reopened
+                    .inspect_native_publication_history(owner.id(), &trust)
+                    .unwrap(),
+                accepted
+            );
+        }
+        let after_later_saves = fs::read(&journal).unwrap();
+        assert_eq!(
+            storage
+                .recover_verified_dependency_capture(&owner, id(80), &trust)
+                .unwrap(),
+            saved
+        );
+        assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
+        return;
     }
     let before = fs::read(&journal).unwrap();
     let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
@@ -694,6 +941,10 @@ fn native_saved_review_after_publication_recovers_across_processes() {
 fn native_snapshot_after_publication_preserves_graph_and_historical_decisions() {
     consumed_publication_fixture(6);
 }
+#[test]
+fn consumed_capture_after_publication_recovers_without_changing_owner() {
+    consumed_publication_fixture(7);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -863,8 +1114,8 @@ fn consumed_publication_fixture(writer: u8) {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
-        if writer == 6 {
-            // The snapshot fixture uses real publication; earlier writer fixtures retain
+        if matches!(writer, 6 | 7) {
+            // Snapshot/capture fixtures use real publication; earlier writer fixtures retain
             // the complete publication fault/refusal campaign without repeating it here.
             let committed = storage
                 .commit_native_publication(
@@ -1213,6 +1464,122 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if writer == 7 {
+        let owner_journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+        let child_journal = destination.metadata_path().join(crate::RECORD_FILE_NAME);
+        let owner_before = fs::read(&owner_journal).unwrap();
+        let accepted = storage
+            .inspect_native_publication_history(destination.id(), &trust)
+            .unwrap();
+        let mut first_capture = None;
+        for interruption in 0..4 {
+            fs::write(
+                destination.project().root().join("note"),
+                format!("child capture after publication {interruption}"),
+            )
+            .unwrap();
+            let observed = destination
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            let request = id(80 + interruption);
+            assert!(storage
+                .prepare_registered_dependency_capture(
+                    &destination,
+                    &observed,
+                    actor,
+                    request,
+                    sign
+                )
+                .is_err());
+            let prepared = storage
+                .prepare_verified_dependency_capture(
+                    &destination,
+                    &observed,
+                    actor,
+                    request,
+                    &trust,
+                    sign,
+                )
+                .unwrap();
+            let operation = prepared.operation();
+            let saved = if interruption == 0 {
+                prepared.commit().unwrap()
+            } else {
+                assert!(prepared
+                    .commit_with_io(
+                        |step, file, frames| {
+                            if interruption < 3 && step == "staged" {
+                                if interruption == 2 {
+                                    file.write_all(&frames[..frames.len() / 2])?;
+                                    file.sync_all()?;
+                                }
+                                return Err(io::Error::other("interrupted child capture"));
+                            }
+                            if interruption == 3 && step == "appended" {
+                                return Err(io::Error::other("lost child capture acknowledgement"));
+                            }
+                            Ok(())
+                        },
+                        |file| file.sync_all()
+                    )
+                    .is_err());
+                let before = fs::read(&child_journal).unwrap();
+                let pending_path = destination
+                    .metadata_path()
+                    .join("dependency-capture.pending");
+                let pending = fs::read(&pending_path).unwrap();
+                let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
+                assert!(reopened
+                    .recover_verified_dependency_capture(&destination, id(90), &trust)
+                    .is_err());
+                assert!(reopened
+                    .recover_verified_dependency_capture(
+                        &destination,
+                        request,
+                        &crate::TrustedReviewers::default()
+                    )
+                    .is_err());
+                assert_eq!(fs::read(&child_journal).unwrap(), before);
+                assert_eq!(fs::read(&pending_path).unwrap(), pending);
+                reopened
+                    .recover_verified_dependency_capture(&destination, request, &trust)
+                    .unwrap()
+            };
+            assert_eq!(saved.operation(), operation);
+            let complete = fs::read(&child_journal).unwrap();
+            assert_eq!(
+                storage
+                    .recover_verified_dependency_capture(&destination, request, &trust)
+                    .unwrap(),
+                saved
+            );
+            assert_eq!(fs::read(&child_journal).unwrap(), complete);
+            assert_eq!(
+                storage
+                    .inspect_native_saved_version(destination.id(), operation, &trust)
+                    .unwrap(),
+                saved
+            );
+            assert_eq!(
+                storage
+                    .inspect_native_publication_history(destination.id(), &trust)
+                    .unwrap(),
+                accepted
+            );
+            assert_eq!(fs::read(&owner_journal).unwrap(), owner_before);
+            first_capture.get_or_insert(saved);
+        }
+        let complete = fs::read(&child_journal).unwrap();
+        assert_eq!(
+            storage
+                .recover_verified_dependency_capture(&destination, id(80), &trust)
+                .unwrap(),
+            first_capture.unwrap()
+        );
+        assert_eq!(fs::read(&child_journal).unwrap(), complete);
+        return;
+    }
     if matches!(writer, 2..=4) {
         return;
     }

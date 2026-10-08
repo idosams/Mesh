@@ -8220,3 +8220,55 @@ real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Fresh combi
 checks remain required; the earlier green aa3e943 run does not validate this new head.
 No preserved legacy commit is replaced. The full #345/fleet acceptance scope and fixed user
 checkpoint b064029 remain unchanged.
+
+
+## Trusted native private capture and exact recovery (R188)
+
+Saved-review #365 merged at 19fb1d36582404af43a1e9efdea8a4b4ed7c4444 after all seven checks
+passed on b3ec71e67495a600eddb3235e12924cf9e60112b (run 37341505885). Snapshot #366 merged
+at 1205926753b11c3c5d892012828533a84020a4ac after all seven checks passed on the reconciled,
+content-identical bf903312acf784cd58994e8195dcba64416df1af (run 37344165537). Separate
+post-merge main run 37754185590 passed on 1205926753b11c3c5d892012828533a84020a4ac.
+
+The preserved regression de89ff07d1e4a6f974360da8dbb6439dc521ad58 demonstrated that ordinary
+registered capture refuses publication history. That refusal remains. A dedicated
+`prepare_verified_dependency_capture` API now requires configured publication trust, reconstructs
+the complete private root/source context, prepares a read-only authoring draft, releases custody
+for signing, and reopens the exact basis before committing Manifest/Operation records only.
+The private history adapter exposes no OpenWorkspace or write capability. New private saves
+preserve accepted main and do not change input eligibility or grant publication permission.
+
+`recover_verified_dependency_capture` uses exact retained capture v1 intent/frames and identity-bound
+prefix evidence. It verifies the complete trusted context before appending only the missing suffix;
+journal synchronization remains the durable commit point. Recovery verifies saved content before
+acknowledging, retains the receipt and updates the capture position without rewinding historical
+retries. Existing ordinary admission and pending-publication fences remain unchanged. No persisted
+schema changes are introduced; older ordinary readers still refuse unsupported publication history.
+
+Focused root and consumed-lane regressions passed in 65.061s: root 5.769s and consumed 65.052s.
+They cover fresh saves, staged interruption, partial append, lost acknowledgement, repeated exact
+and historical retries, missing trust, foreign requests, owner bytes/main preservation, signing
+outside custody and stale signing after a concurrent completed save. The initial consumed partial
+recovery test failed with `incomplete dependency enrollment`; the fix selects only an attempted
+reconstruction from the exact retained start, then still verifies complete owner/source/history.
+Focused clippy passed. The final full repository gate passed as recorded below; hosted validation and delivery remain pending.
+
+Provenance: canonical preparation/commit a81a97ad340d2b119bd6cb07cccf54588254cd5e and recovery
+40be99c, atop the preserved regression and related-history merges. No legacy commit is replaced.
+This is an internal native API increment. Exhaustive publication-aware capture byte/process fault
+campaigns, capture retention/collection, registered scheduler/runtime integration and the complete
+manual/harness/fleet/provider/host/signed-package acceptance remain unfinished under #345.
+The existing registered capture path still refuses accepted publication history. Fixed user
+checkpoint b064029 remains unchanged; this source increment is not packaged acceptance.
+
+R188 recovery review found a concrete pre-append defect: a changed operation sequence with the
+original authenticated payload was appended before refusal (focused regression failed in 3.126s).
+Frame validation now reuses the pure signed operation verifier, binding every journal header to its
+signed body before recovery writes. Eight header mutations refuse without changing journal bytes;
+restoring the original intent still recovers. Updated root/consumed regressions passed in 67.588s
+(root 6.058s, consumed 67.581s). The original full run passed 3,984 native tests but failed daemon
+readiness; its separate already-built smoke-test retry passed all 44 checks. That retry is not a
+passing full gate. Final full validation after the header fix passed: `npm test` completed with 3,984 native tests
+(380.317s, 11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository, docs, license, storage, formatting and clippy gates. This source gate
+does not establish packaged graphical or provider acceptance. Hosted checks and merge remain pending.
