@@ -27,6 +27,10 @@ remain pending. The ordinary registered capture path still refuses publication h
 registered scheduler/runtime integration, exhaustive capture fault coverage, retention/collection,
 eligible signing, another provider/host and the full [acceptance map](plan/fleet-acceptance.md)
 remain unfinished. See the delivery ledger for exact revisions and verification scope.
+Capture/recovery #367 has merged after all seven hosted checks passed. A separate trusted local
+capture-retention inspector now passes focused root/consumed tests, including corrupt/missing-object
+refusal without repair. Its full gate and delivery are pending. Complete cross-project retention
+and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
 Older dated observations below retain their historical scope.
 
 ## Product direction

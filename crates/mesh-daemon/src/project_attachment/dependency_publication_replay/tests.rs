@@ -446,6 +446,66 @@ fn root_publication_fixture(writer: u8) {
             let interrupted = fs::read(&journal).unwrap();
             let pending_path = owner.metadata_path().join("dependency-capture.pending");
             let pending = fs::read(&pending_path).unwrap();
+            let retention = storage
+                .inspect_verified_dependency_capture_retention(&owner, request, &trust)
+                .unwrap();
+            assert!(retention.pending());
+            assert_eq!(retention.operation(), operation);
+            let retained_json = retention.to_json();
+            let Json::Array(payloads) = retained_json.get("payloads").unwrap() else {
+                panic!("capture retention payloads missing");
+            };
+            for digest in [
+                operation,
+                super::super::dependency_transaction::hash(&receipt),
+                super::super::dependency_transaction::hash(
+                    format!("interrupted capture {interruption}").as_bytes(),
+                ),
+            ] {
+                assert!(payloads.contains(&Json::text(digest.to_hex())));
+            }
+            if interruption == 0 {
+                let cas = Cas::<_, Blake3>::with_filesystem(
+                    owner.metadata_path(),
+                    owner.store.filesystem(),
+                )
+                .unwrap();
+                let path = owner.metadata_path().join(
+                    cas.layout()
+                        .chunk_path(&mesh_cas::Digest32::from_bytes(*operation.as_bytes())),
+                );
+                let exact = fs::read(&path).unwrap();
+                fs::write(&path, b"corrupt capture payload").unwrap();
+                assert!(storage
+                    .inspect_verified_dependency_capture_retention(&owner, request, &trust)
+                    .is_err());
+                assert_eq!(fs::read(&path).unwrap(), b"corrupt capture payload");
+                fs::remove_file(&path).unwrap();
+                assert!(storage
+                    .inspect_verified_dependency_capture_retention(&owner, request, &trust)
+                    .is_err());
+                assert!(!path.exists());
+                fs::write(&path, exact).unwrap();
+                assert_eq!(
+                    storage
+                        .inspect_verified_dependency_capture_retention(&owner, request, &trust)
+                        .unwrap(),
+                    retention
+                );
+            }
+
+            assert!(storage
+                .inspect_verified_dependency_capture_retention(
+                    &owner,
+                    request,
+                    &crate::TrustedReviewers::default()
+                )
+                .is_err());
+            assert!(storage
+                .inspect_verified_dependency_capture_retention(&owner, id(90), &trust)
+                .is_err());
+            assert_eq!(fs::read(&journal).unwrap(), interrupted);
+            assert_eq!(fs::read(&pending_path).unwrap(), pending);
             let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
             assert!(reopened
                 .recover_verified_dependency_capture(&owner, id(90), &trust)
@@ -537,6 +597,12 @@ fn root_publication_fixture(writer: u8) {
                 .unwrap(),
             saved
         );
+        assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
+        assert!(owner.inspect_dependency_capture_retention(id(85)).is_err());
+        let retained = storage
+            .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
+            .unwrap();
+        assert!(!retained.pending());
         assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
         return;
     }
@@ -1529,6 +1595,13 @@ fn consumed_publication_fixture(writer: u8) {
                     .metadata_path()
                     .join("dependency-capture.pending");
                 let pending = fs::read(&pending_path).unwrap();
+                let retained = storage
+                    .inspect_verified_dependency_capture_retention(&destination, request, &trust)
+                    .unwrap();
+                assert!(retained.pending());
+                assert_eq!(retained.operation(), operation);
+                assert_eq!(fs::read(&child_journal).unwrap(), before);
+                assert_eq!(fs::read(&pending_path).unwrap(), pending);
                 let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();
                 assert!(reopened
                     .recover_verified_dependency_capture(&destination, id(90), &trust)
@@ -1547,6 +1620,11 @@ fn consumed_publication_fixture(writer: u8) {
                     .unwrap()
             };
             assert_eq!(saved.operation(), operation);
+            let retained = storage
+                .inspect_verified_dependency_capture_retention(&destination, request, &trust)
+                .unwrap();
+            assert!(!retained.pending());
+            assert_eq!(retained.operation(), operation);
             let complete = fs::read(&child_journal).unwrap();
             assert_eq!(
                 storage

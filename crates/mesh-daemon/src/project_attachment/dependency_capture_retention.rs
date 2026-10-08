@@ -68,6 +68,25 @@ impl ProvisionedAttachment {
         &self,
         request: RecordDigest,
     ) -> io::Result<NativeCaptureRetention> {
+        self.inspect_capture_retention_with_context(request, |raw| {
+            let (configuration, proof) = self.attachment.read_capture_configuration(
+                self.metadata_path(),
+                &self.store,
+                raw,
+            )?;
+            let proof = proof.ok_or_else(|| invalid("capture recovery enrollment missing"))?;
+            Ok((configuration, proof.private_evidence().clone()))
+        })
+    }
+
+    pub(in crate::project_attachment) fn inspect_capture_retention_with_context(
+        &self,
+        request: RecordDigest,
+        read: impl FnOnce(
+            &str,
+        )
+            -> io::Result<(String, crate::project_attachment::VerifiedPrivateHistory)>,
+    ) -> io::Result<NativeCaptureRetention> {
         if request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing capture request"));
         }
@@ -90,10 +109,8 @@ impl ProvisionedAttachment {
         if intent.request != request {
             return Err(invalid("another capture owns this recovery"));
         }
-        let (configuration, proof) =
-            self.attachment
-                .read_capture_configuration(self.metadata_path(), &self.store, &raw)?;
-        let proof = proof.ok_or_else(|| invalid("capture recovery enrollment missing"))?;
+        let (configuration, proof) = read(&raw)?;
+        proof.verify_configuration(&configuration)?;
         let cas = Cas::with_filesystem(self.metadata_path(), self.store.filesystem().read_only())
             .map_err(error)?;
         let frames = validate_frames(&cas, &intent)?;

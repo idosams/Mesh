@@ -8272,3 +8272,36 @@ passing full gate. Final full validation after the header fix passed: `npm test`
 (380.317s, 11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
 checks, plus repository, docs, license, storage, formatting and clippy gates. This source gate
 does not establish packaged graphical or provider acceptance. Hosted checks and merge remain pending.
+
+
+## Trusted capture retention inspection (R191)
+
+Capture/recovery [#367](https://github.com/idosams/Mesh/pull/367) merged at
+61fc2e0ae9d48c169c24b85de98306d30a37c192 after all seven checks passed on
+b5e8c1986fbbe19a1640f43d72a2b2b89803910f (run 37813799708). Its separate main run
+37816486985 remains distinct. Background service [#368](https://github.com/idosams/Mesh/pull/368)
+is published at 90b6e88ef2769e5969f4f9fb4a80af9f5e89ebf6 with passing full local validation;
+its platform validation and main reconciliation remain pending at this observation.
+
+The ordinary capture-retention reader refused accepted publication history in a reproduced
+root regression (5.444s). `inspect_verified_dependency_capture_retention` now uses the complete
+native capture recovery context and explicitly configured publication trust, checks exact
+registration and sidecar identity, and repeats trusted replay and bounded retention inspection.
+It does not append missing bytes, repair missing/corrupt objects, acquire a durable pin or grant
+collection authority. The ordinary reader retains its refusal. Its existing local retention schema,
+operation/manifest checks, ancestry bounds, CAS verification and journal/sidecar checks are reused.
+
+Focused root/consumed regressions passed in 77.417s (root 7.091s, consumed 77.410s). They cover
+staged, partial and lost-acknowledgement captures, completed requests, missing trust and foreign
+requests, unchanged journal/sidecars/owner history, retained saved content and publication receipts,
+and missing/corrupt operation payload refusal without repair. Restoring the exact object restores
+the same retention facts. Strict daemon all-target clippy passed. Full repository validation and
+publication of this increment remain pending.
+
+These are exact local capture recovery facts, not a complete retention set across projects.
+Supporting owner/source stores, other transaction sidecars, complete qualified collection roots,
+concurrent cleanup validation and actual collection acceptance remain required before enabling
+cleanup of publication-aware history. The private graph's empty retention projection is still
+not a collection oracle. Full #345 route, signing, provider/host and packaged fleet acceptance
+remain open. Fixed checkpoint b064029 is unchanged. This is new canonical work from merged #367,
+independent of the background-worker code in #368; no legacy commit is replaced.
