@@ -8295,8 +8295,9 @@ Focused root/consumed regressions passed in 77.417s (root 7.091s, consumed 77.41
 staged, partial and lost-acknowledgement captures, completed requests, missing trust and foreign
 requests, unchanged journal/sidecars/owner history, retained saved content and publication receipts,
 and missing/corrupt operation payload refusal without repair. Restoring the exact object restores
-the same retention facts. Strict daemon all-target clippy passed. Full repository validation and
-publication of this increment remain pending.
+the same retention facts. Strict daemon all-target clippy passed. Final `npm test` passed 3,984 native tests
+(392.777s, 12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. Hosted checks and merge remain pending.
 
 These are exact local capture recovery facts, not a complete retention set across projects.
 Supporting owner/source stores, other transaction sidecars, complete qualified collection roots,

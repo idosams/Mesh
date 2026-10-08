@@ -29,7 +29,8 @@ eligible signing, another provider/host and the full [acceptance map](plan/fleet
 remain unfinished. See the delivery ledger for exact revisions and verification scope.
 Capture/recovery #367 has merged after all seven hosted checks passed. A separate trusted local
 capture-retention inspector now passes focused root/consumed tests, including corrupt/missing-object
-refusal without repair. Its full gate and delivery are pending. Complete cross-project retention
+refusal without repair. Its full gate passed 3,984 native, 194 rendered, 672 desktop and 44 daemon
+checks; hosted checks and merge are pending. Complete cross-project retention
 and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
 Older dated observations below retain their historical scope.
 
