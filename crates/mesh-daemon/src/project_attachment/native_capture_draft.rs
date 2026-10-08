@@ -22,6 +22,33 @@ impl NativeCaptureDraft {
         input: &CapturedProjectInput,
         actor: PublicKey,
     ) -> io::Result<Self> {
+        let draft = Self::observe(history, store, configuration, input, actor)?;
+        if draft.operations.is_empty() {
+            return Err(invalid("capture contains no new private progress"));
+        }
+        Ok(draft)
+    }
+    pub(crate) fn unchanged(
+        history: &OpenWorkspace,
+        store: &PinnedWorkspaceRoot,
+        configuration: &str,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+    ) -> io::Result<Option<RecordDigest>> {
+        let draft = Self::observe(history, store, configuration, input, actor)?;
+        Ok(draft
+            .operations
+            .is_empty()
+            .then_some(draft.line.head)
+            .flatten())
+    }
+    fn observe(
+        history: &OpenWorkspace,
+        store: &PinnedWorkspaceRoot,
+        configuration: &str,
+        input: &CapturedProjectInput,
+        actor: PublicKey,
+    ) -> io::Result<Self> {
         verify_history_binding(history, configuration)?;
         let line = CaptureLine::load(store, history, configuration)?;
         let workspace_id = WorkspaceId::from_bytes(short_id(configuration.as_bytes()));
@@ -46,10 +73,7 @@ impl NativeCaptureDraft {
             }
         };
         let (operations, files) = prepare_snapshot(history, input, &basis, line.head)?;
-        if operations.is_empty() {
-            return Err(invalid("capture contains no new private progress"));
-        }
-        if let Some(head) = line.head {
+        if let Some(head) = line.head.filter(|_| !operations.is_empty()) {
             history
                 .prepare_historical_operations(head, actor, &operations)
                 .map_err(error)?;

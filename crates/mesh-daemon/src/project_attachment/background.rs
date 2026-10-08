@@ -245,7 +245,11 @@ struct CaptureTarget {
     attachment: ProjectAttachment,
     store: PinnedWorkspaceRoot,
     metadata: PathBuf,
-    registered: Option<(super::AttachmentStorage, super::ProvisionedAttachment)>,
+    registered: Option<(
+        super::AttachmentStorage,
+        super::ProvisionedAttachment,
+        Option<crate::TrustedReviewers>,
+    )>,
 }
 
 /// One native background controller. Starting it explicitly authorizes captures with the supplied
@@ -264,12 +268,34 @@ impl AttachmentCaptureService {
         signer: Arc<dyn CheckpointSigner>,
         schedule: CaptureSchedule,
     ) -> io::Result<Self> {
+        Self::start_registered_trust(storage, selected, signer, schedule, None)
+    }
+
+    /// Start native enrolled capture with host-configured publication trust. Each attempt
+    /// revalidates current trust, exact recovery and saved content; no main authority is granted.
+    pub fn start_verified_dependency(
+        storage: &super::AttachmentStorage,
+        selected: &super::ProvisionedAttachment,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Self> {
+        Self::start_registered_trust(storage, selected, signer, schedule, Some(trusted.clone()))
+    }
+
+    fn start_registered_trust(
+        storage: &super::AttachmentStorage,
+        selected: &super::ProvisionedAttachment,
+        signer: Arc<dyn CheckpointSigner>,
+        schedule: CaptureSchedule,
+        trusted: Option<crate::TrustedReviewers>,
+    ) -> io::Result<Self> {
         let selected = storage.exact_registered_work(selected)?;
         let target = CaptureTarget {
             attachment: selected.project().clone(),
             store: selected.store.clone(),
             metadata: selected.metadata_path().to_path_buf(),
-            registered: Some((storage.clone(), selected)),
+            registered: Some((storage.clone(), selected, trusted)),
         };
         Self::start_target_with_signals(target, signer, schedule, |shared, path| {
             #[cfg(target_os = "macos")]
@@ -533,7 +559,10 @@ fn run<F>(
         .is_ok()
     {
         let versions = match &registered {
-            Some((storage, selected)) => storage.registered_review_versions(selected),
+            // The first trusted attempt establishes the exact current capture position,
+            // including pending recovery, without using the ordinary history reader.
+            Some((_, _, Some(_))) => Ok(Vec::new()),
+            Some((storage, selected, None)) => storage.registered_review_versions(selected),
             None => attachment.saved_versions_in_store(&metadata, store.clone()),
         };
         match versions {
@@ -611,21 +640,23 @@ fn run<F>(
                         Ok(signature)
                     };
                     let result = match &registered {
-                        Some((storage, selected)) => {
-                            storage.save_registered_capture(selected, &input, actor, sign)
-                        }
-                        None => attachment.save_capture_in_store(
-                            &metadata,
-                            &input,
-                            actor,
-                            sign,
-                            store.clone(),
-                        ),
+                        Some((storage, selected, Some(trusted))) => storage
+                            .save_verified_dependency_capture_attempt(
+                                selected, &input, actor, trusted, sign,
+                            )
+                            .map(|(saved, changed)| (saved, Some(changed))),
+                        Some((storage, selected, None)) => storage
+                            .save_registered_capture(selected, &input, actor, sign)
+                            .map(|saved| (saved, None)),
+                        None => attachment
+                            .save_capture_in_store(&metadata, &input, actor, sign, store.clone())
+                            .map(|saved| (saved, None)),
                     };
                     match result {
-                        Ok(version) => {
+                        Ok((version, changed)) => {
                             saved = Some(version);
-                            if shared.lock().status.saved_version == saved {
+                            if changed == Some(false) || shared.lock().status.saved_version == saved
+                            {
                                 CaptureOutcome::Unchanged
                             } else {
                                 CaptureOutcome::Saved
