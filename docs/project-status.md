@@ -17,13 +17,16 @@ Consumed decisions, retained snapshots, bound reviews, receipt inspection, compl
 content graphs, trusted root/consumed publication replay, native publication commit/recovery and
 pending-publication fences are merged through #363. Native input controls #364 are also merged.
 These are internal native foundations; they do not establish runtime or packaged approval readiness.
-Saved-review #365 and snapshot #366 remain open. The latest snapshot head passed hosted checks;
-the saved-review head encountered a Linux deadline and is undergoing a measured test-profile
-correction. See the delivery ledger for exact revisions, failures and validation scope.
+Saved-review #365 and snapshot #366 are now merged after their exact PR revisions passed
+all seven hosted checks. Post-merge main run 37754185590 also passed at 1205926753b11c3c5d892012828533a84020a4ac.
 
-Capturing new private progress after publication still fails a preserved regression. Dedicated
-trusted capture, runtime integration, retention/collection, eligible signing, another provider/host
-and the full [acceptance map](plan/fleet-acceptance.md) remain unfinished.
+A dedicated explicit-trust private capture and recovery path passes focused root and consumed-lane
+regressions after real publication, preserving accepted main. Its full repository gate passed
+3,984 native, 194 rendered, 672 desktop and 44 real-daemon checks; hosted validation and delivery
+remain pending. The ordinary registered capture path still refuses publication history;
+registered scheduler/runtime integration, exhaustive capture fault coverage, retention/collection,
+eligible signing, another provider/host and the full [acceptance map](plan/fleet-acceptance.md)
+remain unfinished. See the delivery ledger for exact revisions and verification scope.
 Older dated observations below retain their historical scope.
 
 ## Product direction

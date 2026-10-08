@@ -459,14 +459,7 @@ pub(in crate::project_attachment) fn validate_frames(
                     && op.parents == intent.head.into_iter().collect::<Vec<_>>() =>
             {
                 let payload = read_payload(cas, op.payload_digest, 16 * 1024 * 1024)?;
-                let signed =
-                    crate::authenticated_changeset::AuthenticatedChangeSet::from_canonical_bytes(
-                        &payload,
-                    )
-                    .map_err(error)?;
-                if !signed.signed_by(PublicKey::from_bytes(*op.actor.as_bytes())) {
-                    return Err(invalid("capture actor binding changed"));
-                }
+                crate::workspace::NativeOperationFact::verify(op, &payload).map_err(error)?;
             }
             _ => {
                 return Err(invalid(

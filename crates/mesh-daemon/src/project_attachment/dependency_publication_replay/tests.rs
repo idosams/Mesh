@@ -459,6 +459,57 @@ fn root_publication_fixture(writer: u8) {
                 .is_err());
             assert_eq!(fs::read(&journal).unwrap(), interrupted);
             assert_eq!(fs::read(&pending_path).unwrap(), pending);
+            if interruption == 0 {
+                let cas = Cas::<_, Blake3>::with_filesystem(
+                    owner.metadata_path(),
+                    owner.store.filesystem(),
+                )
+                .unwrap();
+                let mut intent =
+                    crate::project_attachment::history::dependency_capture::CaptureIntent::parse(
+                        std::str::from_utf8(&pending).unwrap(),
+                    )
+                    .unwrap();
+                let frames =
+                    crate::project_attachment::history::dependency_capture::validate_frames(
+                        &cas, &intent,
+                    )
+                    .unwrap();
+                let scan = mesh_store::scan_journal(&frames).unwrap();
+                for mode in 0..8 {
+                    let mut records = scan.records().to_vec();
+                    let Some(StoredRecord::Operation(operation)) = records.last_mut() else {
+                        panic!("capture operation missing");
+                    };
+                    match mode {
+                        0 => operation.actor_sequence += 1,
+                        1 => operation.session = mesh_store::EntityUuid::from_bytes([99; 16]),
+                        2 => operation.policy_epoch += 1,
+                        3 => operation.hlc_millis += 1,
+                        4 => operation.hlc_counter += 1,
+                        5 => operation.actor = id(99),
+                        6 => operation.parents.clear(),
+                        7 => operation.parents = vec![id(99)],
+                        _ => unreachable!(),
+                    }
+                    let forged = records
+                        .iter()
+                        .flat_map(mesh_store::frame_record)
+                        .collect::<Vec<_>>();
+                    intent.frames = super::super::dependency_transaction::hash(&forged);
+                    cas.promote(forged).unwrap();
+                    fs::write(&pending_path, intent.encode()).unwrap();
+                    let result =
+                        reopened.recover_verified_dependency_capture(&owner, request, &trust);
+                    assert_eq!(
+                        fs::read(&journal).unwrap(),
+                        interrupted,
+                        "forged capture metadata must be refused before journal append"
+                    );
+                    assert!(result.is_err(), "forged capture metadata must refuse");
+                    fs::write(&pending_path, &pending).unwrap();
+                }
+            }
             let recovered = reopened
                 .recover_verified_dependency_capture(&owner, request, &trust)
                 .unwrap();

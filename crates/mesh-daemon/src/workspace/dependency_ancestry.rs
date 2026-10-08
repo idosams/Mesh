@@ -17,7 +17,7 @@ fn refused() -> String {
     "native operation ancestry is unavailable or inconsistent".to_owned()
 }
 impl NativeOperationFact {
-    fn verify(record: &OperationRecord, bytes: &[u8]) -> Result<Self, String> {
+    pub(crate) fn verify(record: &OperationRecord, bytes: &[u8]) -> Result<Self, String> {
         if bytes.len() > MAX_PAYLOAD_BYTES
             || record.actor_sequence == 0
             || record.id != record.payload_digest
