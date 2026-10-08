@@ -603,6 +603,87 @@ fn root_publication_fixture(writer: u8) {
             .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
             .unwrap();
         assert!(!retained.pending());
+        let old_intent =
+            crate::project_attachment::history::dependency_capture::CaptureIntent::parse(
+                &fs::read_to_string(
+                    owner
+                        .metadata_path()
+                        .join(format!("dependency-capture-{}.json", id(80).to_hex())),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let projection = retained.to_json();
+        let Json::Array(payloads) = projection.get("payloads").unwrap() else {
+            panic!("retention payloads missing");
+        };
+        assert!(
+            payloads.contains(&Json::text(old_intent.frames.to_hex())),
+            "capture retention must preserve historical capture retry frames"
+        );
+        let receipt_path = owner
+            .metadata_path()
+            .join(format!("dependency-capture-{}.json", id(80).to_hex()));
+        let original_receipt = fs::read(&receipt_path).unwrap();
+        let Json::Array(sidecars) = projection.get("receipt_sidecars").unwrap() else {
+            panic!("historical capture sidecars missing");
+        };
+        assert!(sidecars.contains(&Json::object([
+            (
+                "name",
+                Json::text(format!("dependency-capture-{}.json", id(80).to_hex()))
+            ),
+            (
+                "digest",
+                Json::text(super::super::dependency_transaction::hash(&original_receipt).to_hex())
+            ),
+        ])));
+        let cas =
+            Cas::<_, Blake3>::with_filesystem(owner.metadata_path(), owner.store.filesystem())
+                .unwrap();
+        let frames_path =
+            owner
+                .metadata_path()
+                .join(cas.layout().chunk_path(&mesh_cas::Digest32::from_bytes(
+                    *old_intent.frames.as_bytes(),
+                )));
+        let original_frames = fs::read(&frames_path).unwrap();
+        fs::write(&frames_path, b"corrupt historical retry frames").unwrap();
+        assert!(storage
+            .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
+            .is_err());
+        assert_eq!(
+            fs::read(&frames_path).unwrap(),
+            b"corrupt historical retry frames"
+        );
+        fs::remove_file(&frames_path).unwrap();
+        assert!(storage
+            .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
+            .is_err());
+        assert!(!frames_path.exists());
+        fs::write(&frames_path, original_frames).unwrap();
+        let mut foreign = old_intent;
+        foreign.operation = id(99);
+        fs::write(&receipt_path, foreign.encode()).unwrap();
+        assert!(storage
+            .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
+            .is_err());
+        assert_eq!(fs::read_to_string(&receipt_path).unwrap(), foreign.encode());
+        fs::write(&receipt_path, &original_receipt).unwrap();
+        assert_eq!(
+            storage
+                .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
+                .unwrap(),
+            retained
+        );
+        assert_eq!(fs::read(&receipt_path).unwrap(), original_receipt);
+        assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
+        assert_eq!(
+            storage
+                .recover_verified_dependency_capture(&owner, id(80), &trust)
+                .unwrap(),
+            saved
+        );
         assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
         return;
     }

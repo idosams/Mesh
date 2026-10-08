@@ -8306,3 +8306,42 @@ cleanup of publication-aware history. The private graph's empty retention projec
 not a collection oracle. Full #345 route, signing, provider/host and packaged fleet acceptance
 remain open. Fixed checkpoint b064029 is unchanged. This is new canonical work from merged #367,
 independent of the background-worker code in #368; no legacy commit is replaced.
+
+## Historical capture retry retention (R192)
+
+The latest capture's local retention facts did not include older completed capture frame objects.
+A root regression failed in 6.262s when it required the first saved request's retry frames after
+later captures. The inspector now verifies all completed capture receipts against the same sealed
+configuration and physical journal and retains their frame objects and exact sidecar digests.
+Receipt names, request identities, signed frames, journal prefixes and complete operation membership
+must agree. Existing aggregate byte/reference limits and directory/journal rechecks remain enforced.
+Missing or corrupt historical objects and receipts naming absent operations refuse inspection;
+inspection neither repairs nor removes them. The ordinary selected graph still supports its
+fully journaled pending capture, and now includes the corresponding historical receipt sidecars.
+
+This extends the read-only v1 projection with `receipt_sidecars`; no persisted format changes.
+It grants no writer, durable pin, review approval or collection authority. This increment closes
+historical capture retry coverage only. Other transaction recovery roots, store-qualified complete
+inventory, independent deletion veto and concurrent collector/writer acceptance remain unfinished
+under #345. The private graph's empty retained projection remains unsuitable for cleanup.
+Fixed user checkpoint b064029 is unchanged. This is new canonical work based on #369 at
+21eccf58ead7a0d4d282e689f6fd0cc0696dfdbf, replacing no preserved legacy commit.
+
+The first full gate found a configuration-boundary regression in the exhaustive consumption
+fixture: 3,983 native tests passed and one failed in 368.380s. The shared helper incorrectly
+required the prospective consumed configuration to equal the original physical-journal proof.
+The corrected helper preserves each caller's existing verification: the owner context authenticates
+its prospective configuration through the retained consumption start, while the direct capture
+inspector retains exact configuration equality. No existing assertion or gate was removed.
+The four focused tests, including the actual exhaustive failing fixture, passed after correction;
+strict daemon all-target clippy also passed. A fresh full repository gate remains required.
+
+Final R192 `npm test` passed: 3,984 native tests (372.884s, 11 slow, 18 skipped),
+194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus the repository,
+docs, license, storage, formatting and clippy gates. The initial failed full run remains recorded
+above. The corrected four-test focus passed in 152.062s, including the exhaustive consumption
+fixture (152.055s). Publication and hosted validation of this increment remain pending.
+Parent #369 passed all seven hosted checks at 21eccf58ead7a0d4d282e689f6fd0cc0696dfdbf
+(run 37818788636). Background service #368 now targets main at
+2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b, whose complete tree matches its previously passing
+90b6e88 revision; fresh run 37821567718 remains required before merge.
