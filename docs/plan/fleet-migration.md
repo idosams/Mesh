@@ -8455,3 +8455,12 @@ produced f0c70f1135ab01dc16313f929e414832d76d028e with an identical whole Git tr
 This supersedes the local-validation-pending statements above. The cancelled older #369 CI
 remains recorded; fresh seven-job validation of the final published head is still required.
 No runtime code changed in this CI reconciliation, and checkpoint b064029 remains fixed.
+
+The #370 candidate now incorporates #369 head f4c63b29561c292483d2b1ce0d20fe2a04e411d1
+and merged CI correction #371. Candidate c4977a318000a1f2c00ec41b59f0076a6fd1a255
+changes only workflow allocation and documentation relative to the previously tested cfa60ee
+candidate; runtime sources are identical. Its full `npm test` passed: 3,985 native tests
+(406.590s; 12 slow, 18 skipped), 194 rendered, 672 desktop and all 44 real-daemon checks,
+plus repository/docs/license/storage/fmt/clippy. Earlier failed and cancelled runs remain
+recorded. The final published head still requires all seven hosted checks; no collection
+permission, packaged acceptance or checkpoint replacement is claimed.
