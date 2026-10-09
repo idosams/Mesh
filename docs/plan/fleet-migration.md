@@ -8398,3 +8398,15 @@ full rerun: 3,985 native tests (374.571s, 11 slow, 18 skipped), 194 rendered, 67
 44 daemon checks. The earlier run ended with 11 expiration-related failures after a multi-hour
 interruption; those 11 cases also passed unchanged in a focused rerun (3.885s). The failed run
 is retained. This candidate remains unpublished and does not yet include the CI correction.
+
+R193 was merged as #371 at canonical main 6c29c28ef6d3db304007b4d4eefe5fc7a969f594
+after all seven exact-head checks passed (run 37858097647). The macOS job completed in
+12m47s within its unchanged deadline; this is an observed run, not a controlled performance comparison.
+
+The #369 combined CI candidate c02e2e29cb8a0787fef593090b250c0c54524b87 passed
+`npm test`: 3,985 native tests (373.215s; 11 slow, 18 skipped), 194 rendered, 672 desktop
+and 44 real-daemon checks, plus all other local gates. Incorporating the #371 main merge
+produced f0c70f1135ab01dc16313f929e414832d76d028e with an identical whole Git tree.
+This supersedes the local-validation-pending statements above. The cancelled older #369 CI
+remains recorded; fresh seven-job validation of the final published head is still required.
+No runtime code changed in this CI reconciliation, and checkpoint b064029 remains fixed.
