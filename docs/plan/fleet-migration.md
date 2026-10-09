@@ -8405,3 +8405,53 @@ a43ee6bc04d22931b3f1f0ba5940b3f3fadc09df, including merged background saving. Bo
 sections are preserved and the source/tests merge without source conflicts. The existing published
 #370 head remains unchanged while its hosted run finishes. Full combined validation is required
 before advancing that published branch. No cleanup capability or checkpoint replacement is added.
+
+## Remove duplicate desktop work from the macOS critical path (R193)
+
+Runs 37823616215 (#370), 37825176134 (#369) and 37823853764 (main after #368) each
+reached the macOS job's 20-minute limit. Every native test and all 44 daemon checks passed in
+those logs; the latter two also completed all four native renderer tests. The cancelled jobs
+remain cancelled, not passing merge evidence. Desktop verification consumed 71.7–75.8 seconds
+inside each Rust/macOS job while also running in the separately required desktop-and-docs job.
+
+The workflow now runs the macOS Rust, daemon and renderer commands in test-macos and leaves
+repository/docs/storage/desktop verification in desktop-and-docs, with both license commands
+in license. Together the same seven required jobs execute every component of the unchanged local
+`npm test` gate plus the extra renderer/dependency checks. No tests, job deadlines, per-test
+deadlines, required check names or repository settings change. This removes duplicated work;
+it does not establish a runtime improvement until the new hosted jobs complete.
+
+This is an independent correction based on canonical main 3c16ac7eadb504ac7895eefc109b3b0af35876b6.
+The separate #369 and #370 implementations and reconciliation candidates remain preserved.
+Their cancelled validation cannot authorize merge. Local full validation and hosted delivery of
+this workflow correction remain pending. No legacy commit is replaced and checkpoint b064029 stays fixed.
+
+R193 local verification passed the unchanged `npm test` gate: 3,985 native tests (373.548s,
+11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks.
+The separate macOS renderer command passed all four integration cases in 0.799s. A static
+command-allocation audit accounts for every local gate component and confirms all seven job
+names, job timeouts, the package scripts and nextest configuration remain unchanged. This audit
+and the local tests do not prove the hosted jobs finish within budget; fresh CI remains required.
+
+The #369 CI-reconciliation candidate incorporates published #371 at
+659a45e29c8a554ec82b979b66e10427b721bc7f. This preserves the cancelled validation records and
+all seven checks; its full local gate and final hosted checks remain required before publication.
+The published #369 and #371 heads remain unchanged while this candidate is tested.
+
+Separately, #370 candidate cfa60ee40124d43f6dbf811f81f10247a4c6a127 passed its unchanged
+full rerun: 3,985 native tests (374.571s, 11 slow, 18 skipped), 194 rendered, 672 desktop and
+44 daemon checks. The earlier run ended with 11 expiration-related failures after a multi-hour
+interruption; those 11 cases also passed unchanged in a focused rerun (3.885s). The failed run
+is retained. This candidate remains unpublished and does not yet include the CI correction.
+
+R193 was merged as #371 at canonical main 6c29c28ef6d3db304007b4d4eefe5fc7a969f594
+after all seven exact-head checks passed (run 37858097647). The macOS job completed in
+12m47s within its unchanged deadline; this is an observed run, not a controlled performance comparison.
+
+The #369 combined CI candidate c02e2e29cb8a0787fef593090b250c0c54524b87 passed
+`npm test`: 3,985 native tests (373.215s; 11 slow, 18 skipped), 194 rendered, 672 desktop
+and 44 real-daemon checks, plus all other local gates. Incorporating the #371 main merge
+produced f0c70f1135ab01dc16313f929e414832d76d028e with an identical whole Git tree.
+This supersedes the local-validation-pending statements above. The cancelled older #369 CI
+remains recorded; fresh seven-job validation of the final published head is still required.
+No runtime code changed in this CI reconciliation, and checkpoint b064029 remains fixed.
