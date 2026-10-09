@@ -8305,6 +8305,62 @@ fleet acceptance. Desktop/helper host trust configuration, capture retention/col
 remaining #345 routes and acceptance are still required. Fixed checkpoint b064029 stays unchanged.
 The increment is new canonical work on the published #367 dependency; it replaces no legacy commit.
 
+## Trusted capture retention inspection (R191)
+
+Capture/recovery [#367](https://github.com/idosams/Mesh/pull/367) merged at
+61fc2e0ae9d48c169c24b85de98306d30a37c192 after all seven checks passed on
+b5e8c1986fbbe19a1640f43d72a2b2b89803910f (run 37813799708). Its separate main run
+37816486985 remains distinct. Background service [#368](https://github.com/idosams/Mesh/pull/368)
+is published at 90b6e88ef2769e5969f4f9fb4a80af9f5e89ebf6 with passing full local validation;
+its platform validation and main reconciliation remain pending at this observation.
+
+The ordinary capture-retention reader refused accepted publication history in a reproduced
+root regression (5.444s). `inspect_verified_dependency_capture_retention` now uses the complete
+native capture recovery context and explicitly configured publication trust, checks exact
+registration and sidecar identity, and repeats trusted replay and bounded retention inspection.
+It does not append missing bytes, repair missing/corrupt objects, acquire a durable pin or grant
+collection authority. The ordinary reader retains its refusal. Its existing local retention schema,
+operation/manifest checks, ancestry bounds, CAS verification and journal/sidecar checks are reused.
+
+Focused root/consumed regressions passed in 77.417s (root 7.091s, consumed 77.410s). They cover
+staged, partial and lost-acknowledgement captures, completed requests, missing trust and foreign
+requests, unchanged journal/sidecars/owner history, retained saved content and publication receipts,
+and missing/corrupt operation payload refusal without repair. Restoring the exact object restores
+the same retention facts. Strict daemon all-target clippy passed. Final `npm test` passed 3,984 native tests
+(392.777s, 12 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. Hosted checks and merge remain pending.
+
+These are exact local capture recovery facts, not a complete retention set across projects.
+Supporting owner/source stores, other transaction sidecars, complete qualified collection roots,
+concurrent cleanup validation and actual collection acceptance remain required before enabling
+cleanup of publication-aware history. The private graph's empty retention projection is still
+not a collection oracle. Full #345 route, signing, provider/host and packaged fleet acceptance
+remain open. Fixed checkpoint b064029 is unchanged. This is new canonical work from merged #367,
+independent of the background-worker code in #368; no legacy commit is replaced.
+
+## Background capture merge and retention reconciliation — 8 October
+
+Background saving [#368](https://github.com/idosams/Mesh/pull/368) merged at
+3c16ac7eadb504ac7895eefc109b3b0af35876b6 on 8 October, 18:23:03 UTC, after all seven
+checks passed on reconciled head 2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b (run 37821567718).
+Its main reconciliation preserved the complete previously tested tree. The initial macOS deadline
+cancellation on the preceding head is retained separately from its successful unchanged-job retry.
+
+Retention [#369](https://github.com/idosams/Mesh/pull/369) passed all seven checks on
+21eccf58ead7a0d4d282e689f6fd0cc0696dfdbf (run 37818788636). It now incorporates the actual
+background-saving code from main. The capture API conflict retains both the inspection and saving
+methods; documentation retains both increments. This is a combined-content reconciliation, not
+a claim of tree identity. Fresh full local and hosted verification are required before delivery.
+Historical capture retry roots [#370](https://github.com/idosams/Mesh/pull/370) are separately
+published at df4b5acec7aafe6fc7ebe63a209479cedc1693a2 with full local verification passed and
+hosted checks running; that increment is not folded into this PR. Fixed checkpoint b064029 is unchanged.
+
+The combined #369 reconciliation passed `npm test`: 3,985 native tests (378.362s, 11 slow,
+18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository,
+docs, license, storage, formatting and clippy. This validates merge af7dca96f9732373783ceaae6cb5256bb31d3018,
+including both background saving and local capture-retention inspection. Fresh hosted validation
+of the published reconciliation and its merge remain pending.
+
 ## Remove duplicate desktop work from the macOS critical path (R193)
 
 Runs 37823616215 (#370), 37825176134 (#369) and 37823853764 (main after #368) each
@@ -8331,3 +8387,26 @@ The separate macOS renderer command passed all four integration cases in 0.799s.
 command-allocation audit accounts for every local gate component and confirms all seven job
 names, job timeouts, the package scripts and nextest configuration remain unchanged. This audit
 and the local tests do not prove the hosted jobs finish within budget; fresh CI remains required.
+
+The #369 CI-reconciliation candidate incorporates published #371 at
+659a45e29c8a554ec82b979b66e10427b721bc7f. This preserves the cancelled validation records and
+all seven checks; its full local gate and final hosted checks remain required before publication.
+The published #369 and #371 heads remain unchanged while this candidate is tested.
+
+Separately, #370 candidate cfa60ee40124d43f6dbf811f81f10247a4c6a127 passed its unchanged
+full rerun: 3,985 native tests (374.571s, 11 slow, 18 skipped), 194 rendered, 672 desktop and
+44 daemon checks. The earlier run ended with 11 expiration-related failures after a multi-hour
+interruption; those 11 cases also passed unchanged in a focused rerun (3.885s). The failed run
+is retained. This candidate remains unpublished and does not yet include the CI correction.
+
+R193 was merged as #371 at canonical main 6c29c28ef6d3db304007b4d4eefe5fc7a969f594
+after all seven exact-head checks passed (run 37858097647). The macOS job completed in
+12m47s within its unchanged deadline; this is an observed run, not a controlled performance comparison.
+
+The #369 combined CI candidate c02e2e29cb8a0787fef593090b250c0c54524b87 passed
+`npm test`: 3,985 native tests (373.215s; 11 slow, 18 skipped), 194 rendered, 672 desktop
+and 44 real-daemon checks, plus all other local gates. Incorporating the #371 main merge
+produced f0c70f1135ab01dc16313f929e414832d76d028e with an identical whole Git tree.
+This supersedes the local-validation-pending statements above. The cancelled older #369 CI
+remains recorded; fresh seven-job validation of the final published head is still required.
+No runtime code changed in this CI reconciliation, and checkpoint b064029 remains fixed.

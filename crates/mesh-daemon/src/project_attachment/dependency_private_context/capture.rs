@@ -50,6 +50,51 @@ fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 impl AttachmentStorage {
+    /// Inspect exact local capture recovery objects through configured publication trust.
+    /// This performs no recovery, acquires no durable pin and cannot authorize collection.
+    /// Owner/source stores and other transaction sidecars need their own complete retention proof.
+    pub fn inspect_verified_dependency_capture_retention(
+        &self,
+        selected: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<crate::project_attachment::NativeCaptureRetention> {
+        self.exact_registered_work(selected)?;
+        self.with_capture_write(
+            selected.id(),
+            Some(request),
+            |context, work, _, guard, recovery| {
+                self.exact_registered_work(selected)?;
+                let recovery =
+                    recovery.ok_or_else(|| invalid("capture retention evidence missing"))?;
+                for root in [context.owner, work] {
+                    super::super::detachment::ensure_attached(&root.store)?;
+                    absent(&root.store, super::super::dependency_decision::PENDING)?;
+                    absent(&root.store, super::publication::PENDING)?;
+                }
+                if context.owner.id() != work.id() {
+                    absent(&context.owner.store, PENDING)?;
+                }
+                let inspect = || {
+                    context.with_replayed_history(self, work, trusted, guard, |_, _| Ok(()))?;
+                    let snapshot = context.read(work, guard)?;
+                    work.inspect_capture_retention_with_context(request, |raw| {
+                        if raw != recovery.raw_for(work)? {
+                            return Err(invalid("capture retention intent changed"));
+                        }
+                        Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
+                    })
+                };
+                let retained = inspect()?;
+                if inspect()? != retained {
+                    return Err(invalid("capture retention changed during inspection"));
+                }
+                self.exact_registered_work(selected)?;
+                Ok(retained)
+            },
+        )
+    }
+
     /// Reconcile one native scheduled observation using explicit publication trust. Recover the
     /// exact pending request first; unchanged content returns its verified saved identity without
     /// signing or appending. Ordinary, unenrolled attachments use the ordinary registered API.

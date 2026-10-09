@@ -27,9 +27,18 @@ remain pending. The ordinary registered capture path still refuses publication h
 registered scheduler/runtime integration, exhaustive capture fault coverage, retention/collection,
 eligible signing, another provider/host and the full [acceptance map](plan/fleet-acceptance.md)
 remain unfinished. See the delivery ledger for exact revisions and verification scope.
+Capture/recovery #367 has merged after all seven hosted checks passed. A separate trusted local
+capture-retention inspector now passes focused root/consumed tests, including corrupt/missing-object
+refusal without repair. Its full gate passed 3,984 native, 194 rendered, 672 desktop and 44 daemon
+checks. Its reconciliation with merged background saving also passed the complete gate with
+3,985 native, 194 rendered, 672 desktop and 44 daemon checks; fresh hosted checks and merge
+are pending. Complete cross-project retention
+and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
+
 A separate native background-service increment now passes focused root and consumed-lane tests
-for explicitly trusted saves, unchanged observations and recovery before newer progress. Its full gate passed 3,985 native, 194 rendered, 672 desktop and 44 daemon checks; hosted
-validation and merge remain pending. Desktop/helper credential configuration and packaged UI adoption
+for explicitly trusted saves, unchanged observations and recovery before newer progress. Its full gate passed 3,985 native, 194 rendered, 672 desktop and 44 daemon checks. It merged as #368 at
+3c16ac7eadb504ac7895eefc109b3b0af35876b6 after all seven hosted checks passed on reconciled
+head 2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b (run 37821567718). Desktop/helper credential configuration and packaged UI adoption
 remain unfinished; the passing service fixture does not establish those outcomes.
 Older dated observations below retain their historical scope.
 
