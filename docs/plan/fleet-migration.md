@@ -8600,3 +8600,59 @@ its failed log and fixture remain preserved. No code or assertions changed betwe
 Only delivery documentation receipts changed after the full pass; exact-head hosted checks and
 merge remain pending. Parent #373's unchanged macOS retry passed in 13m44s, and its ordinary merge
 completed on 10 October at 22:31:19 UTC. Independent main run 38091737788 is still running.
+
+
+## Inventory exact interrupted captures with completed local roots (R197)
+
+[Issue #376](https://github.com/idosams/Mesh/issues/376) advances the full native/fleet requirement
+in #345. This new canonical implementation replaces no preserved legacy commit. It began on
+published parent #375 / 40836480d916d0135e7cfe456be5012c14169632. Parent #375 subsequently merged
+at 4164c1bf52987740457369554610cbc3b5b0c0a4 after all seven exact-head checks passed (run
+38092007335); the native branch fast-forwarded only after focused verification finished, with
+identical incoming source trees and retained patch bytes. The intended delivery base is main.
+
+`inspect_native_history_retention_during_capture` is a separate, explicit-request read-only API.
+It uses existing deterministic complete custody, exact registered-work/currentness, pending-prefix
+reconstruction and configured publication trust. The result qualifies one physical work/store and
+combines every reconstructed signed operation/manifest/content object with local policy payloads,
+its physical enrollment intent, known completed consumption roots and historical/exact capture
+receipt facts. It includes the exact capture inspection, observed journal/sidecar digests and
+pending status. It performs neither recovery nor repair and always reports collection_authority=false.
+Other stores and pending publication/control transactions remain separately fenced.
+
+The new `mesh.native-history-capture-retention/v1` JSON is bounded and uses scope
+`selected-store-capture-recovery`. Operations remain limited to 4,096; manifests/payloads to 65,536,
+with existing byte budgets and a 4 MiB total encoding bound. The original completed-only inventory
+and capture JSON retain their old schemas/shapes. No persisted-format, writer, runtime admission,
+protected-main or collection permission changes. Private root access remains immutable and checks
+the selected physical store; it exposes neither writable workspace nor CAS capabilities.
+
+A baseline adapter to the existing completed-only reader failed the real staged root fixture with
+"pending native work requires exact recovery" (3.14s). The first combined implementation correctly
+hit the ordinary authored-history reader's incomplete-journal refusal (4.88s). The correction uses
+the capture inspector's already-verified complete reconstruction for pending authoring roots; it
+does not admit torn journals to ordinary history scanning. An earlier new fixture's missing type
+import and both failed runs are preserved. No assertion or refusal was weakened.
+
+Corrected root coverage passed in 8.34s; final root coverage passed in 8.55s after adding a valid
+foreign-request sidecar refusal and completed-request inspection. The consumed-lane interruption
+fixture passed in 100.70s. These preserve earlier completed roots and exact recovery contents,
+original project note bytes and observed journal/sidecar bytes; wrong request/trust and corrupted/
+missing payloads refuse without repair. The ordinary completed-only API still refuses each pending
+state, and later exact recovery succeeds. Focused clippy passed before the last fixture additions;
+a final explicit internal physical-store check and documentation still require the full gate.
+
+The #373 post-merge main run 38091737788 also passed. #375's independent post-merge main run is
+tracked separately. Complete unknown-metadata classification, pending control/publication/
+consumption inventories, qualified cross-store reachability, independent deletion veto, custody
+through bounded unlink/arrival rewrite, concurrent promotion/crash/storage-pressure acceptance,
+signed graphical routes, another provider/host and final velocity evidence remain open. The
+full fleet objective is unchanged, and neither this inspection nor private graph roots authorize GC.
+
+
+The final full `npm test` gate passed on the combined canonical source: 3,985 native tests in
+373.266s (11 slow, 18 skipped), 194 rendered tests, 676 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. This includes the final physical-store
+check and all added regressions. Source and assertions remain unchanged after that pass; only
+these delivery receipts changed and receive a final docs check. Exact-final-head hosted checks
+and merged delivery remain pending. The fixed checkpoints and installed app are unchanged.

@@ -16,10 +16,33 @@ pub struct NativeCaptureRetention {
     sidecar_digest: RecordDigest,
     pending: bool,
     receipt_sidecars: BTreeMap<String, RecordDigest>,
+    operations: BTreeSet<RecordDigest>,
     payloads: BTreeSet<RecordDigest>,
     manifests: BTreeSet<RecordDigest>,
 }
 impl NativeCaptureRetention {
+    pub(in crate::project_attachment) fn retained_operations(&self) -> &BTreeSet<RecordDigest> {
+        &self.operations
+    }
+
+    pub(in crate::project_attachment) fn local_roots(
+        &self,
+        store: (u64, u64),
+    ) -> io::Result<CaptureReceiptRoots> {
+        if self.store != store {
+            return Err(invalid(
+                "capture retention belongs to another physical store",
+            ));
+        }
+        let mut sidecars = self.receipt_sidecars.clone();
+        sidecars.insert(self.sidecar.clone(), self.sidecar_digest);
+        Ok(CaptureReceiptRoots {
+            payloads: self.payloads.clone(),
+            manifests: self.manifests.clone(),
+            sidecars,
+        })
+    }
+
     /// Exact operation this request can recover; its presence does not imply completed commit.
     pub fn operation(&self) -> RecordDigest {
         self.operation
@@ -239,6 +262,7 @@ impl ProvisionedAttachment {
             sidecar_digest: hash(raw.as_bytes()),
             pending,
             receipt_sidecars: receipts.sidecars,
+            operations,
             payloads,
             manifests: manifests.keys().copied().collect(),
         };
