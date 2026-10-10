@@ -1160,7 +1160,12 @@ test('the production route contract is closed, complete, and owns static page to
     route.productionRouteFocusSelector('import', '[data-mesh-import-choose]'),
     '[data-mesh-import-choose]',
   );
-  for (const forged of ['[', 'button', '[data-mesh-import-preview]', '[data-mesh-proof="destination-choose"]']) {
+  assert.equal(
+    route.productionRouteFocusSelector('import', '[data-mesh-attach-choose]'),
+    '[data-mesh-attach-choose]',
+  );
+  assert.equal(route.productionRouteFocusSelector('workspaces', '[data-mesh-attach-choose]'), undefined);
+  for (const forged of ['[', 'button', '[data-mesh-attach-choose] button', '[data-mesh-import-preview]', '[data-mesh-proof="destination-choose"]']) {
     assert.equal(route.productionRouteFocusSelector('import', forged), undefined);
   }
   for (const selector of [
@@ -2450,6 +2455,7 @@ test('the production workspace entry page accepts only fresh bounded state and c
     disclosureOpen: true,
     chooseLabel: 'Choose a folder',
     canChoose: true,
+    canShowProjects: true,
     canChooseManaged: true,
     retryLabel: 'Refresh',
     canRetry: true,
@@ -2471,6 +2477,15 @@ test('the production workspace entry page accepts only fresh bounded state and c
   assert.equal(Object.isFrozen(accepted.model.recents), true);
   assert.deepEqual(module.workspaceEntryIntent({ type: 'choose-folder' }), { type: 'choose-folder' });
   assert.deepEqual(module.workspaceEntryIntent({ type: 'retry' }), { type: 'retry' });
+  assert.deepEqual(module.workspaceEntryIntent({ type: 'show-existing-projects' }), { type: 'show-existing-projects' });
+  assert.throws(
+    () => module.workspaceEntryIntent({ type: 'show-existing-projects', path: '/forged' }),
+    /unrecognized or missing fields/,
+  );
+  assert.throws(
+    () => module.workspaceEntryEnvelope({ generation: 9, entry: { ...entry, canShowProjects: 'true' } }, 8),
+    /not boolean/,
+  );
   assert.deepEqual(module.workspaceEntryIntent({ type: 'set-disclosure', open: true }), {
     type: 'set-disclosure',
     open: true,

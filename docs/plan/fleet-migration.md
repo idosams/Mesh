@@ -8556,3 +8556,47 @@ Its parent R194 merged as #372 at cfdd65c20fa8066b4ade08244fefceeeec86f0b3 after
 checks passed on 75cfbb871f3759977737797fd21bc495b423b9ce (run 38077176246). Independent
 post-merge main run 38088441941 was still running its macOS job when this receipt was recorded;
 its other six checks passed. Neither this receipt nor R194 grants collection authority.
+
+
+## Reach existing-project attachment from Workspaces (R196)
+
+[Issue #374](https://github.com/idosams/Mesh/issues/374) records the discovery gap: the welcome
+screen opened a working-copy picker directly, while attachment and optional fleets appeared only
+in Import's selection phase. This canonical increment starts from parent #373 /
+7b1af15c0749d69bd345eb7ef2ae31fe187cb815 and replaces no legacy commit. Parent #373 merged at
+f926520cc3fdf2890822f077f10d1b228a6c4e3b after all seven exact-head checks passed. The working
+branch fast-forwarded to that merged main only after local verification finished; the incoming
+source tree and retained local patch were independently verified byte-identical. The delivery base
+is canonical main, with no unrelated-history merge or rewritten published commit.
+
+The new closed `show-existing-projects` intent and boolean availability reveal Import selection
+and request only its exact attachment chooser focus selector. Selection/refresh and workspace
+mutation/transition/launch busy states refuse navigation. Existing preview confirmation is revoked;
+no picker, native attachment, worker start or workspace switch occurs. Unsaved editor text remains
+source-owned. Empty/ready welcome modes make existing-project entry primary; remembered unsaved
+folders retain their preview as primary, and the working-copy action stays available.
+
+Both new coordinator regressions failed on the unchanged parent: navigation emitted no page
+request and the old review preview stayed actionable. The fixed focused run passed four tests in
+0.240s, covering navigation/refusal, preview revocation, refresh refusal and the existing managed
+workspace/draft fixture. Rendered tests cover the emitted action, one primary action in all three
+modes, disabled availability, closed boolean/intent bounds and the exact route focus selector.
+Full repository verification and exact-final-head hosted checks remain required. No persisted
+format, native authority, credential or protected-main behavior changes; full native retention/
+collection, signed packaged journeys, another provider/host and fleet velocity acceptance remain
+unfinished. Both user checkpoints remain unchanged.
+
+Parent #373's first macOS run 38089479429 exceeded its unchanged 20-minute job deadline. All
+3,985 native tests (807.220s), the daemon demo and four native renderer tests (3.471s) passed, but
+the job concluded CANCELLED and was not merged. The logs and explicit deadline annotation are
+preserved; only the unchanged macOS job was retried once. The other six exact-head checks passed.
+This receipt does not count the cancelled job as passing or alter a test/deadline requirement.
+
+R196 corrected full `npm test` passed with the complete compiler path: 3,985 native tests in
+374.560s (11 slow, 18 skipped), 194 renderer, 676 desktop and all 44 real-daemon checks, plus
+repository/docs/license/storage/fmt/clippy. The earlier full invocation passed native/rendered/
+desktop checks but stopped before the daemon demo because its process PATH omitted the compiler;
+its failed log and fixture remain preserved. No code or assertions changed between those runs.
+Only delivery documentation receipts changed after the full pass; exact-head hosted checks and
+merge remain pending. Parent #373's unchanged macOS retry passed in 13m44s, and its ordinary merge
+completed on 10 October at 22:31:19 UTC. Independent main run 38091737788 is still running.

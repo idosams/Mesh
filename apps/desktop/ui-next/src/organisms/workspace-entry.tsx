@@ -21,8 +21,15 @@ export function WorkspaceEntry({ model, onIntent }: Readonly<{
           <Badge tone={model.mode === "ready" ? "positive" : "neutral"}>{t(model.eyebrow)}</Badge>
           <h1 id="workspace-entry-title" className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">{t(model.title)}</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">{t(model.description)}</p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button variant="primary" disabled={!model.canChoose} onClick={() => onIntent({ type: "choose-folder" })}>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              variant={model.mode === "needs-import" ? "secondary" : "primary"}
+              disabled={!model.canShowProjects}
+              onClick={() => onIntent({ type: "show-existing-projects" })}
+            >
+              {t("Use your existing project")}
+            </Button>
+            <Button variant={model.mode === "needs-import" ? "primary" : "secondary"} disabled={!model.canChoose} onClick={() => onIntent({ type: "choose-folder" })}>
               {t(model.chooseLabel)}
             </Button>
             <Button
