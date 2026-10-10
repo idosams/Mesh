@@ -8464,3 +8464,13 @@ candidate; runtime sources are identical. Its full `npm test` passed: 3,985 nati
 plus repository/docs/license/storage/fmt/clippy. Earlier failed and cancelled runs remain
 recorded. The final published head still requires all seven hosted checks; no collection
 permission, packaged acceptance or checkpoint replacement is claimed.
+
+R191 / #369 merged at canonical main 7feae13391f79a9701e581e8017042ad24ccace1 after
+all seven checks passed on f4c63b29561c292483d2b1ce0d20fe2a04e411d1 (run 37907589928).
+The macOS job completed successfully in 19m40s within the unchanged deadline.
+
+R192 / #370 then passed all seven checks on 826717e06b2c20031a9e74156ea4729949944515
+(run 37908613241; macOS 17m35s). Reconciliation d34d2c4a863d2bbd8f8f2958ee184079d15e3930
+incorporates merged main with an identical whole tree to that tested head. This final delivery
+revision changes only evidence documentation beyond that tree; fresh CI on the main-based PR
+remains required before merge. The fixed checkpoint and full fleet acceptance scope are unchanged.
