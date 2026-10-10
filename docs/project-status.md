@@ -3169,3 +3169,27 @@ limit; the unchanged retry passed in 13m44s. The local checkpoint at that PR hea
 original files and separate test data, with a verified exact-package native fleet bridge; the
 selected-comparison fix itself still needs graphical verification. Independent post-merge main
 run 38091737788 remains pending. Earlier observations above retain their historical scope.
+
+
+## Exact interrupted-capture inventory (11 October 2026, in development)
+
+A separate native reader combines one explicitly named capture recovery with the selected store's
+completed policy, enrollment and consumption roots. It uses the capture inspector's authenticated
+complete reconstruction for staged/torn frames, keeps physical store qualifiers and exact journal/
+sidecar facts, replays publication trust and repeats inspection under full custody. It performs no
+recovery or repair and reports no collection authority. The ordinary completed-history reader
+continues to refuse unfinished capture; its existing JSON shape and persisted history are unchanged.
+
+Focused native root and consumed-lane cases passed, including exact later recovery, wrong trust/
+request and corrupt/missing/foreign-object refusal with observed bytes preserved. A completed
+capture request also remains inspectable. Full repository validation, hosted checks and delivery
+remain pending. Pending control/publication inventories, unknown metadata classification, complete
+cross-store cleanup authority and the complete fleet acceptance remain unfinished.
+
+
+The final full `npm test` gate passed on the combined canonical source: 3,985 native tests in
+373.266s (11 slow, 18 skipped), 194 rendered tests, 676 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. This includes the final physical-store
+check and all added regressions. Source and assertions remain unchanged after that pass; only
+these delivery receipts changed and receive a final docs check. Exact-final-head hosted checks
+and merged delivery remain pending. The fixed checkpoints and installed app are unchanged.

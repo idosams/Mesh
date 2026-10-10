@@ -1,7 +1,9 @@
 #[path = "tests/restart.rs"]
 mod restart;
 use super::*;
-use crate::project_attachment::{NativeSavedReviewRequest, ObservationLimits};
+use crate::project_attachment::{
+    NativeSavedReviewRequest, ObservationLimits, ProvisionedAttachment,
+};
 use crate::workspace::OpenWorkspace;
 use ed25519_dalek::{Signer as _, SigningKey};
 use mesh_approval::{
@@ -15,6 +17,67 @@ use ring::{
     signature::{EcdsaKeyPair, KeyPair as _, ECDSA_P256_SHA256_ASN1_SIGNING},
 };
 use std::{fs, io::Write as _, path::PathBuf};
+
+fn assert_capture_history_inventory(
+    storage: &AttachmentStorage,
+    work: &ProvisionedAttachment,
+    request: RecordDigest,
+    trusted: &crate::TrustedReviewers,
+    capture: &crate::project_attachment::NativeCaptureRetention,
+    completed: &Json,
+) {
+    let inventory = storage
+        .inspect_native_history_retention_during_capture(work, request, trusted)
+        .unwrap();
+    assert_eq!(
+        inventory.get("schema"),
+        Some(&Json::text("mesh.native-history-capture-retention/v1"))
+    );
+    assert_eq!(
+        inventory.get("scope"),
+        Some(&Json::text("selected-store-capture-recovery"))
+    );
+    assert_eq!(
+        inventory.get("collection_authority"),
+        Some(&Json::Bool(false))
+    );
+    let exact = capture.to_json();
+    assert_eq!(inventory.get("capture"), Some(&exact));
+    for name in ["device", "inode"] {
+        assert_eq!(inventory.get(name), exact.get(name));
+    }
+    for name in ["operations", "manifests", "payloads", "sidecars"] {
+        let Json::Array(retained) = inventory.get(name).unwrap() else {
+            panic!("inventory roots missing")
+        };
+        let Json::Array(previous) = completed.get(name).unwrap() else {
+            panic!("completed roots missing")
+        };
+        assert!(
+            previous.iter().all(|object| retained.contains(object)),
+            "completed {name} roots lost during capture"
+        );
+    }
+    for name in ["manifests", "payloads"] {
+        let Json::Array(retained) = inventory.get(name).unwrap() else {
+            panic!("inventory roots missing")
+        };
+        let Json::Array(recovery) = exact.get(name).unwrap() else {
+            panic!("capture roots missing")
+        };
+        assert!(
+            recovery.iter().all(|object| retained.contains(object)),
+            "staged {name} roots missing"
+        );
+    }
+    let Json::Array(sidecars) = inventory.get("sidecars").unwrap() else {
+        panic!("sidecars missing")
+    };
+    assert!(sidecars.contains(&Json::object([
+        ("name", exact.get("sidecar").unwrap().clone()),
+        ("digest", exact.get("sidecar_digest").unwrap().clone()),
+    ])));
+}
 
 #[test]
 fn root_publication_reopens_only_with_exact_trusted_receipt() {
@@ -614,6 +677,9 @@ fn root_publication_fixture(writer: u8) {
                 .unwrap(),
             accepted
         );
+        let completed_before_capture = storage
+            .inspect_native_history_retention(owner.id(), &trust)
+            .unwrap();
         for interruption in 0..3 {
             fs::write(
                 root.join("source/note"),
@@ -662,6 +728,33 @@ fn root_publication_fixture(writer: u8) {
                 .unwrap();
             assert!(retention.pending());
             assert_eq!(retention.operation(), operation);
+            let source_before_inventory = fs::read(root.join("source/note")).unwrap();
+            assert_capture_history_inventory(
+                &storage,
+                &owner,
+                request,
+                &trust,
+                &retention,
+                &completed_before_capture,
+            );
+            assert_eq!(
+                fs::read(root.join("source/note")).unwrap(),
+                source_before_inventory
+            );
+            assert_eq!(fs::read(&pending_path).unwrap(), pending);
+            assert_eq!(fs::read(&journal).unwrap(), interrupted);
+            if interruption == 0 {
+                assert!(storage
+                    .inspect_native_history_retention_during_capture(&owner, id(90), &trust)
+                    .is_err());
+                assert!(storage
+                    .inspect_native_history_retention_during_capture(
+                        &owner,
+                        request,
+                        &crate::TrustedReviewers::default()
+                    )
+                    .is_err());
+            }
             let retained_json = retention.to_json();
             let Json::Array(payloads) = retained_json.get("payloads").unwrap() else {
                 panic!("capture retention payloads missing");
@@ -676,6 +769,19 @@ fn root_publication_fixture(writer: u8) {
                 assert!(payloads.contains(&Json::text(digest.to_hex())));
             }
             if interruption == 0 {
+                let foreign = String::from_utf8(pending.clone()).unwrap().replacen(
+                    &request.to_hex(),
+                    &id(90).to_hex(),
+                    1,
+                );
+                assert_ne!(foreign.as_bytes(), pending.as_slice());
+                fs::write(&pending_path, foreign.as_bytes()).unwrap();
+                assert!(storage
+                    .inspect_native_history_retention_during_capture(&owner, request, &trust)
+                    .is_err());
+                assert_eq!(fs::read(&pending_path).unwrap(), foreign.as_bytes());
+                assert_eq!(fs::read(&journal).unwrap(), interrupted);
+                fs::write(&pending_path, &pending).unwrap();
                 let cas = Cas::<_, Blake3>::with_filesystem(
                     owner.metadata_path(),
                     owner.store.filesystem(),
@@ -690,10 +796,16 @@ fn root_publication_fixture(writer: u8) {
                 assert!(storage
                     .inspect_verified_dependency_capture_retention(&owner, request, &trust)
                     .is_err());
+                assert!(storage
+                    .inspect_native_history_retention_during_capture(&owner, request, &trust)
+                    .is_err());
                 assert_eq!(fs::read(&path).unwrap(), b"corrupt capture payload");
                 fs::remove_file(&path).unwrap();
                 assert!(storage
                     .inspect_verified_dependency_capture_retention(&owner, request, &trust)
+                    .is_err());
+                assert!(storage
+                    .inspect_native_history_retention_during_capture(&owner, request, &trust)
                     .is_err());
                 assert!(!path.exists());
                 fs::write(&path, exact).unwrap();
@@ -817,6 +929,15 @@ fn root_publication_fixture(writer: u8) {
         let history_retention = storage
             .inspect_native_history_retention(owner.id(), &trust)
             .unwrap();
+        assert_capture_history_inventory(
+            &storage,
+            &owner,
+            id(85),
+            &trust,
+            &retained,
+            &history_retention,
+        );
+        assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
         assert_eq!(
             history_retention.get("collection_authority"),
             Some(&Json::Bool(false))
@@ -1868,6 +1989,9 @@ fn consumed_publication_fixture(writer: u8) {
             .inspect_native_publication_history(destination.id(), &trust)
             .unwrap();
         let mut first_capture = None;
+        let completed_before_capture = storage
+            .inspect_native_history_retention(destination.id(), &trust)
+            .unwrap();
         for interruption in 0..4 {
             fs::write(
                 destination.project().root().join("note"),
@@ -1935,6 +2059,36 @@ fn consumed_publication_fixture(writer: u8) {
                     .unwrap();
                 assert!(retained.pending());
                 assert_eq!(retained.operation(), operation);
+                let source_before_inventory =
+                    fs::read(destination.project().root().join("note")).unwrap();
+                assert_capture_history_inventory(
+                    &storage,
+                    &destination,
+                    request,
+                    &trust,
+                    &retained,
+                    &completed_before_capture,
+                );
+                assert_eq!(
+                    fs::read(destination.project().root().join("note")).unwrap(),
+                    source_before_inventory
+                );
+                if interruption == 1 {
+                    assert!(storage
+                        .inspect_native_history_retention_during_capture(
+                            &destination,
+                            id(90),
+                            &trust
+                        )
+                        .is_err());
+                    assert!(storage
+                        .inspect_native_history_retention_during_capture(
+                            &destination,
+                            request,
+                            &crate::TrustedReviewers::default()
+                        )
+                        .is_err());
+                }
                 assert_eq!(fs::read(&child_journal).unwrap(), before);
                 assert_eq!(fs::read(&pending_path).unwrap(), pending);
                 let reopened = AttachmentStorage::open(&root.join("metadata")).unwrap();

@@ -95,6 +95,50 @@ impl AttachmentStorage {
         )
     }
 
+    /// Inspect completed local roots plus one exact capture's recovery objects under full custody.
+    /// The ordinary completed-history reader remains fenced. No recovery, pin or deletion occurs.
+    pub fn inspect_native_history_retention_during_capture(
+        &self,
+        selected: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.exact_registered_work(selected)?;
+        self.with_capture_write(
+            selected.id(),
+            Some(request),
+            |context, work, _, guard, recovery| {
+                self.exact_registered_work(selected)?;
+                let recovery =
+                    recovery.ok_or_else(|| invalid("capture inventory evidence missing"))?;
+                for root in [context.owner, work] {
+                    super::super::detachment::ensure_attached(&root.store)?;
+                    absent(&root.store, super::super::dependency_decision::PENDING)?;
+                    absent(&root.store, super::publication::PENDING)?;
+                }
+                if context.owner.id() != work.id() {
+                    absent(&context.owner.store, PENDING)?;
+                }
+                let inspect = || {
+                    let snapshot = context.read(work, guard)?;
+                    let capture = work.inspect_capture_retention_with_context(request, |raw| {
+                        if raw != recovery.raw_for(work)? {
+                            return Err(invalid("capture inventory intent changed"));
+                        }
+                        Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
+                    })?;
+                    context.native_history_retention(self, work, trusted, guard, Some(&capture))
+                };
+                let inventory = inspect()?;
+                if inspect()? != inventory {
+                    return Err(invalid("capture inventory changed during inspection"));
+                }
+                self.exact_registered_work(selected)?;
+                Ok(inventory)
+            },
+        )
+    }
+
     /// Reconcile one native scheduled observation using explicit publication trust. Recover the
     /// exact pending request first; unchanged content returns its verified saved identity without
     /// signing or appending. Ordinary, unenrolled attachments use the ordinary registered API.
