@@ -3114,3 +3114,24 @@ R184 #365 incorporates R187 #363 at c44cfc310e818750a1708d419b20f9c7f1432077 thr
 ### Snapshot validation with the final recovery fixtures
 
 R185 #366 incorporates published R184 #365 at f71e92ea92a07cc5489785937bab6e016cfe1827, including R187. The snapshot implementation is unchanged; both documentation additions and all source histories are preserved. Full npm test passed on the final combined source: 3,982 native tests in 366.263s (11 slow, 18 skipped), 194 rendered tests, 672 desktop tests and all 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy. Exact-head hosted checks remain required before merge. Prior run 37332637003 timed out on Linux and was cancelled on macOS after native tests passed, so neither is passing delivery evidence. Fixed checkpoint b064029 is unchanged.
+
+### Completed native history retention inventory (R194)
+
+Native inspection now verifies all authored versions and manifest chunks in one selected store,
+including superseded versions, its local enrollment and policy objects, historical capture retry
+frames, and retained consumption objects and sidecars. The result binds work, installation and
+physical store identity. It uses complete trusted publication replay and repeated verification
+under native custody, with bounded objects and bytes. Missing or corrupt content, incomplete
+ancestry, foreign signed identity and pending capture/control/publication intents refuse.
+
+This grants no durable pin, workspace admission, publication or deletion authority. Pending
+transaction inventories, complete metadata classification, independent deletion checks and
+concurrent cleanup remain required. The full graphical, signing, provider and second-host fleet
+acceptance scope under #345 remains open. No persisted format changes; checkpoint b064029 is fixed.
+
+The enrollment-object regression failed before correction. Both strengthened root and consumed
+regressions passed afterward (100.889s), including exact consumption sidecars/objects, historical
+retries, store identity, foreign and missing-object refusal, and pending-state byte preservation.
+The corrected full gate passed: 3,985 native tests (797.192s), 194 rendered, 672 desktop and
+44 real-daemon checks, plus the other Mesh gates. Hosted checks and merge of this increment remain
+pending. Based on merged #370 at a1e8e891500e19109dcc22105e17e1e4e65fb6ae; no legacy commit is replaced.

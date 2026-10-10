@@ -34,6 +34,12 @@ pub(crate) struct NativePrivateReviewHistory<'a> {
     selected: &'a NativeDependencyWorkBinding,
     guard: &'a WorkspaceInitializationGuard,
 }
+pub(crate) struct NativeAuthoringObjects {
+    pub(crate) operations: BTreeSet<RecordDigest>,
+    pub(crate) manifests: BTreeSet<RecordDigest>,
+    pub(crate) payloads: BTreeSet<RecordDigest>,
+}
+
 impl<'a> NativePrivateReviewHistory<'a> {
     pub(crate) fn open(
         metadata: &Path,
@@ -230,6 +236,85 @@ impl<'a> NativePrivateReviewHistory<'a> {
         let saved = self.saved_version(operation)?;
         self.ensure_current().map_err(io::Error::other)?;
         Ok((saved, line))
+    }
+
+    /// Verify every authored object in this physical journal, including superseded versions.
+    /// This immutable inventory does not expose the workspace or authorize collection.
+    pub(crate) fn retained_authoring_objects(
+        &self,
+        payload_budget: &mut usize,
+        content_budget: &mut u64,
+    ) -> Result<NativeAuthoringObjects, String> {
+        self.ensure_current()?;
+        if self.history.tail.is_fragment()
+            || !self.history.names_answered
+            || !self.history.conditions.is_empty()
+        {
+            return Err("retention history is incomplete".into());
+        }
+        let index = &self.history.record_index;
+        if index.operation_count() > 4096 {
+            return Err("retention operation bound exceeded".into());
+        }
+        let operations: BTreeSet<_> = index.causally_ready_operations().into_iter().collect();
+        let manifests = index.manifest_ids();
+        if operations.len() != index.operation_count() || manifests.len() > 65536 {
+            return Err("retention history has missing parents or exceeds its bound".into());
+        }
+        let mut payloads = BTreeSet::new();
+        let workspace = if operations.is_empty() {
+            None
+        } else {
+            Some(self.history.journal_workspace_id()?)
+        };
+        for operation in &operations {
+            if self.evidence.is_legacy_operation(*operation) {
+                return Err("legacy retention needs explicit migration evidence".into());
+            }
+            let record = index
+                .operation(operation)
+                .ok_or("retention operation missing")?;
+            let digest = CasDigest::from_bytes(*record.payload_digest.as_bytes());
+            let mut file = self
+                .history
+                .payload_store
+                .filesystem()
+                .read_file(&self.history.payload_store.layout().chunk_path(&digest))
+                .map_err(|e| e.to_string())?;
+            if !file.metadata().map_err(|e| e.to_string())?.is_file() {
+                return Err("retention payload is not a file".into());
+            }
+            let limit = (*payload_budget).min(16 * 1024 * 1024);
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take((limit + 1) as u64)
+                .read_to_end(&mut bytes)
+                .map_err(|e| e.to_string())?;
+            if bytes.len() > limit {
+                return Err("retention payload budget exceeded".into());
+            }
+            *payload_budget -= bytes.len();
+            let fact = super::NativeOperationFact::verify(record, &bytes)?;
+            if Some(fact.workspace) != workspace || !fact.manifests.is_subset(&manifests) {
+                return Err("retention operation has foreign identity or missing manifests".into());
+            }
+            payloads.insert(record.payload_digest);
+        }
+        for manifest in &manifests {
+            payloads.extend(
+                self.history
+                    .dependency_manifest_chunks(*manifest, content_budget)?,
+            );
+            if payloads.len() > 65536 {
+                return Err("retention object bound exceeded".into());
+            }
+        }
+        self.ensure_current()?;
+        Ok(NativeAuthoringObjects {
+            operations,
+            manifests,
+            payloads,
+        })
     }
 
     pub(crate) fn graph_operation(

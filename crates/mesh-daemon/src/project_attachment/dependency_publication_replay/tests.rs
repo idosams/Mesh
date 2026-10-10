@@ -652,6 +652,11 @@ fn root_publication_fixture(writer: u8) {
             let interrupted = fs::read(&journal).unwrap();
             let pending_path = owner.metadata_path().join("dependency-capture.pending");
             let pending = fs::read(&pending_path).unwrap();
+            assert!(storage
+                .inspect_native_history_retention(owner.id(), &trust)
+                .is_err());
+            assert_eq!(fs::read(&pending_path).unwrap(), pending);
+            assert_eq!(fs::read(&journal).unwrap(), interrupted);
             let retention = storage
                 .inspect_verified_dependency_capture_retention(&owner, request, &trust)
                 .unwrap();
@@ -809,6 +814,16 @@ fn root_publication_fixture(writer: u8) {
             .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
             .unwrap();
         assert!(!retained.pending());
+        let history_retention = storage
+            .inspect_native_history_retention(owner.id(), &trust)
+            .unwrap();
+        assert_eq!(
+            history_retention.get("collection_authority"),
+            Some(&Json::Bool(false))
+        );
+        assert!(storage
+            .inspect_native_history_retention(owner.id(), &crate::TrustedReviewers::default())
+            .is_err());
         let old_intent =
             crate::project_attachment::history::dependency_capture::CaptureIntent::parse(
                 &fs::read_to_string(
@@ -827,6 +842,19 @@ fn root_publication_fixture(writer: u8) {
             payloads.contains(&Json::text(old_intent.frames.to_hex())),
             "capture retention must preserve historical capture retry frames"
         );
+        let Json::Array(history_payloads) = history_retention.get("payloads").unwrap() else {
+            panic!("completed history payloads missing");
+        };
+        assert!(history_payloads.contains(&Json::text(old_intent.frames.to_hex())));
+        assert!(
+            history_payloads.contains(&Json::text(old_intent.authority.to_hex())),
+            "completed history must retain its local enrollment object"
+        );
+
+        let Json::Array(history_operations) = history_retention.get("operations").unwrap() else {
+            panic!("completed history operations missing");
+        };
+        assert!(history_operations.contains(&Json::text(saved.operation().to_hex())));
         let receipt_path = owner
             .metadata_path()
             .join(format!("dependency-capture-{}.json", id(80).to_hex()));
@@ -856,6 +884,9 @@ fn root_publication_fixture(writer: u8) {
         let original_frames = fs::read(&frames_path).unwrap();
         fs::write(&frames_path, b"corrupt historical retry frames").unwrap();
         assert!(storage
+            .inspect_native_history_retention(owner.id(), &trust)
+            .is_err());
+        assert!(storage
             .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
             .is_err());
         assert_eq!(
@@ -864,6 +895,9 @@ fn root_publication_fixture(writer: u8) {
         );
         fs::remove_file(&frames_path).unwrap();
         assert!(storage
+            .inspect_native_history_retention(owner.id(), &trust)
+            .is_err());
+        assert!(storage
             .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
             .is_err());
         assert!(!frames_path.exists());
@@ -871,6 +905,9 @@ fn root_publication_fixture(writer: u8) {
         let mut foreign = old_intent;
         foreign.operation = id(99);
         fs::write(&receipt_path, foreign.encode()).unwrap();
+        assert!(storage
+            .inspect_native_history_retention(owner.id(), &trust)
+            .is_err());
         assert!(storage
             .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
             .is_err());
@@ -881,6 +918,12 @@ fn root_publication_fixture(writer: u8) {
                 .inspect_verified_dependency_capture_retention(&owner, id(85), &trust)
                 .unwrap(),
             retained
+        );
+        assert_eq!(
+            storage
+                .inspect_native_history_retention(owner.id(), &trust)
+                .unwrap(),
+            history_retention
         );
         assert_eq!(fs::read(&receipt_path).unwrap(), original_receipt);
         assert_eq!(fs::read(&journal).unwrap(), after_later_saves);
@@ -1882,6 +1925,11 @@ fn consumed_publication_fixture(writer: u8) {
                     .metadata_path()
                     .join("dependency-capture.pending");
                 let pending = fs::read(&pending_path).unwrap();
+                assert!(storage
+                    .inspect_native_history_retention(destination.id(), &trust)
+                    .is_err());
+                assert_eq!(fs::read(&pending_path).unwrap(), pending);
+                assert_eq!(fs::read(&child_journal).unwrap(), before);
                 let retained = storage
                     .inspect_verified_dependency_capture_retention(&destination, request, &trust)
                     .unwrap();
@@ -1912,6 +1960,86 @@ fn consumed_publication_fixture(writer: u8) {
                 .unwrap();
             assert!(!retained.pending());
             assert_eq!(retained.operation(), operation);
+            let history_retention = storage
+                .inspect_native_history_retention(destination.id(), &trust)
+                .unwrap();
+            assert_eq!(
+                history_retention.get("collection_authority"),
+                Some(&Json::Bool(false))
+            );
+            let Json::Array(objects) = history_retention.get("payloads").unwrap() else {
+                panic!("consumed history objects missing");
+            };
+            assert!(objects.contains(&Json::text(operation.to_hex())));
+            let Json::Array(sidecars) = history_retention.get("sidecars").unwrap() else {
+                panic!("consumed history receipts missing");
+            };
+            use crate::project_attachment::dependency_transaction::{digest, hash, text};
+            for name in [
+                "consumption-start.pending",
+                "consumption-history.pending",
+                "consumption-complete.pending",
+                "consumption-owner.pending",
+            ] {
+                let raw = fs::read(destination.metadata_path().join(name)).unwrap();
+                assert!(
+                    sidecars.contains(&Json::object([
+                        ("name", Json::text(name)),
+                        ("digest", Json::text(hash(&raw).to_hex())),
+                    ])),
+                    "missing exact consumed receipt {name}"
+                );
+            }
+            let local_cas = Cas::<_, Blake3>::with_filesystem(
+                destination.metadata_path(),
+                destination.store.filesystem().read_only(),
+            )
+            .unwrap();
+            let read_json = |id: RecordDigest| {
+                assert!(
+                    objects.contains(&Json::text(id.to_hex())),
+                    "missing consumed object {id:?}"
+                );
+                let raw = fs::read(
+                    destination.metadata_path().join(
+                        local_cas
+                            .layout()
+                            .chunk_path(&mesh_cas::Digest32::from_bytes(*id.as_bytes())),
+                    ),
+                )
+                .unwrap();
+                assert_eq!(hash(&raw), id);
+                Json::parse(std::str::from_utf8(&raw).unwrap()).unwrap()
+            };
+            let start_intent = Json::parse(
+                &fs::read_to_string(
+                    destination
+                        .metadata_path()
+                        .join("consumption-start.pending"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            let start = read_json(digest(text(&start_intent, "payload").unwrap()).unwrap());
+            assert!(
+                objects.contains(&Json::text(text(&start, "authority").unwrap())),
+                "consumed history must retain its own local enrollment object"
+            );
+            let descriptor =
+                read_json(digest(text(start.get("body").unwrap(), "staged").unwrap()).unwrap());
+            let stage = read_json(digest(text(&descriptor, "stage").unwrap()).unwrap());
+            let frames = digest(text(&stage, "frames").unwrap()).unwrap();
+            assert!(objects.contains(&Json::text(frames.to_hex())));
+            assert!(!objects.contains(&Json::text(grant.record().to_hex())));
+            let identity = destination.store.identity().unwrap();
+            assert_eq!(
+                history_retention.get("device"),
+                Some(&Json::text(format!("{:x}", identity.0)))
+            );
+            assert_eq!(
+                history_retention.get("inode"),
+                Some(&Json::text(format!("{:x}", identity.1)))
+            );
             let complete = fs::read(&child_journal).unwrap();
             assert_eq!(
                 storage
