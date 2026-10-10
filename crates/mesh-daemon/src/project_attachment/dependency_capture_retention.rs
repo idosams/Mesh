@@ -297,6 +297,23 @@ impl ProvisionedAttachment {
         Ok(result)
     }
 
+    pub(in crate::project_attachment) fn all_completed_capture_receipt_roots(
+        &self,
+        operations: &BTreeSet<RecordDigest>,
+        budget: &mut usize,
+        configuration: &str,
+        proof: &crate::project_attachment::VerifiedPrivateHistory,
+    ) -> io::Result<CaptureReceiptRoots> {
+        absent(&self.store, PENDING)?;
+        self.capture_receipt_roots_with_context(
+            operations,
+            budget,
+            configuration,
+            proof,
+            CaptureReceiptScope::AllCompleted,
+        )
+    }
+
     // The selected-operation graph includes a fully committed pending capture. The complete
     // capture inspector handles its own possibly torn pending frames and requires every receipt
     // to name an operation in its reconstructed journal.

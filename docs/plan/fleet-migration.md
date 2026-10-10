@@ -8474,3 +8474,47 @@ R192 / #370 then passed all seven checks on 826717e06b2c20031a9e74156ea472994994
 incorporates merged main with an identical whole tree to that tested head. This final delivery
 revision changes only evidence documentation beyond that tree; fresh CI on the main-based PR
 remains required before merge. The fixed checkpoint and full fleet acceptance scope are unchanged.
+
+### Completed native history retention inventory (R194, in development)
+
+A read-only inspection now verifies all authored operations and manifest chunks in the selected
+physical store, including superseded versions, and combines local policy payloads, completed capture
+retry frames and retained consumption objects/sidecars. It binds work, installation and store identity,
+uses complete trusted publication replay and repeats inspection under the native custody set. It
+refuses incomplete ancestry, foreign signed identity, missing/corrupt objects and active capture,
+control or publication intents. It does not acquire a durable pin or authorize collection.
+
+This is a selected completed-history inventory, not a global catalog inventory or a cleanup plan.
+Pending transaction inventories, complete sidecar allowlisting, independent deletion veto, concurrent
+collection and packaged fleet acceptance remain required under #345. No persisted format changes.
+Root and consumed publication/capture regressions passed (2 cases, 97.723s), including old retry
+objects and corrupt/missing historical-frame refusal without repair. Initial strict lint rejected
+the three-set tuple return type; it was replaced by a named internal immutable facts structure.
+Full validation and hosted delivery remain pending. This builds on #370 and replaces no legacy
+commit. Fixed checkpoint b064029 remains unchanged.
+
+R194's initial full gate passed: 3,985 native tests (473.918s; 12 slow, 18 skipped),
+194 rendered, 672 desktop and 44 daemon checks. Review then strengthened the two focused tests
+to require all four exact consumption sidecars/hashes, start/descriptor/stage/frame objects,
+physical store identity, exclusion of the owner's grant, and refusal of pending captures and
+foreign historical receipts without changing bytes. Both passed in 99.495s. Final full validation
+of these stronger tests remains pending. Parent #370 merged at a1e8e891500e19109dcc22105e17e1e4e65fb6ae
+after all seven final CI checks passed; incorporating its merge ancestry preserved every local
+file byte and the full implementation diff.
+
+R194 review found one missing local object: the enrollment intent. The added root regression
+failed before the fix (7.079s) because the inventory omitted that object. Inspection now includes
+the selected physical history proof's enrollment digest, then verifies its bytes through that
+store's read-only CAS. This is not the owning project's authority reference for another store.
+Both root and consumed regressions passed after correction in 100.889s, including explicit
+enrollment retention. The previous full gate (3,985 native tests in 418.665s, 194 rendered,
+672 desktop and 44 daemon checks) predates this correction; corrected full validation remains
+required before publication. The failing-before log is retained.
+
+Corrected R194 full validation passed: 3,985 native tests (797.192s; 14 slow, 18 skipped),
+194 rendered, 672 desktop and all 44 real-daemon checks, plus repository/docs/license/storage/
+fmt/clippy. This result includes the local enrollment-object correction and supersedes earlier
+pending-full statements for this implementation. The explicit missing-enrollment regression
+failed before correction and passed afterward. Fresh hosted checks remain required before merge.
+Independent post-merge main validation of #370 also passed (run 38034837137). The fixed checkpoint
+is unchanged; no graphical acceptance or collection authority is claimed.
