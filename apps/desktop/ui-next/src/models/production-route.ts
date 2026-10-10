@@ -124,7 +124,7 @@ const updateDestinationSelectors = new Set([
   '[data-mesh-proof="destination-choose"]',
   '[data-mesh-proof="destination-preview-all"]',
 ]);
-const importChooserSelector = '[data-mesh-import-choose]';
+const importChooserSelectors = new Set(['[data-mesh-import-choose]', '[data-mesh-attach-choose]']);
 const changesWorkflowSelectors = new Set([
   'textarea',
   '[data-mesh-work-action="scan-files"]',
@@ -147,7 +147,7 @@ export function productionRouteFocusSelector(
       : undefined;
   }
   if (route.focusSelectorPolicy === "import-chooser") {
-    return selectorValue === importChooserSelector ? selectorValue : undefined;
+    return importChooserSelectors.has(selectorValue) ? selectorValue : undefined;
   }
   if (route.focusSelectorPolicy === "changes-workflow") {
     return changesWorkflowSelectors.has(selectorValue) ? selectorValue : undefined;

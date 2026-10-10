@@ -297,7 +297,7 @@ function workspaceEntryActionKey(intent) {
   if (intent === null || typeof intent !== 'object' || Array.isArray(intent)
     || typeof intent.type !== 'string') return null;
   const keys = Object.keys(intent).sort();
-  if (['choose-folder', 'choose-managed-folder', 'retry'].includes(intent.type)) {
+  if (['choose-folder', 'choose-managed-folder', 'show-existing-projects', 'retry'].includes(intent.type)) {
     return keys.length === 1 && keys[0] === 'type' ? intent.type : null;
   }
   if (intent.type === 'set-disclosure') {
@@ -4906,6 +4906,15 @@ function renderWorkspaceEntryNext(interactionGeneration = null, interactionKind 
   }
   if (!retryBlocked) {
     actions.set('retry', retryWorkspaceEntryState);
+    actions.set('show-existing-projects', () => {
+      if (workspaceInteractionInFlight()
+        || workspaceEntrySelectionInFlight > 0
+        || workspaceEntryRefreshInFlight) return;
+      // Reveal the attachment chooser without choosing, attaching or switching any folder.
+      // Revoke a previous working-copy confirmation before exposing the selection page.
+      beginSourceSelection();
+      focusReactWorkspacePage('import', '[data-mesh-attach-choose]');
+    });
   }
   const canEditManagedPath = !entryActionBlocked;
   if (canEditManagedPath) {
@@ -4954,6 +4963,7 @@ function renderWorkspaceEntryNext(interactionGeneration = null, interactionKind 
         disclosureOpen: workspaceEntryDisclosureOpen,
         chooseLabel: previewsCurrentFolder ? 'Preview this folder' : presentation.chooseLabel,
         canChoose: actions.has('choose-folder'),
+        canShowProjects: actions.has('show-existing-projects'),
         canChooseManaged: actions.has('choose-managed-folder'),
         retryLabel: localService.state === 'attention' ? 'Retry verification' : 'Refresh',
         canRetry: actions.has('retry'),

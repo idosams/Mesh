@@ -135,6 +135,7 @@ test("the workspace entry page keeps one primary action and responsive keyboard-
     disclosureOpen: true,
     chooseLabel: "Choose a folder",
     canChoose: true,
+    canShowProjects: true,
     canChooseManaged: true,
     retryLabel: 'Refresh',
     canRetry: true,
@@ -170,6 +171,19 @@ test("the workspace entry page keeps one primary action and responsive keyboard-
     "recent selection and its two actions must not compete for one narrow laptop row",
   );
   assert.match(html, /Your original folder stays untouched\./);
+  for (const mode of ['empty', 'ready', 'needs-import']) {
+    const rendered = renderToStaticMarkup(React.createElement(WorkspaceEntryPage, {
+      model: { ...model, mode, chooseLabel: mode === 'needs-import' ? 'Preview this folder' : 'Choose a folder' },
+      onIntent: () => {},
+    }));
+    const primary = rendered.match(/<button[^>]*bg-primary text-primary-foreground[^>]*>([^<]+)<\/button>/g) || [];
+    assert.equal(primary.length, 1);
+    assert.match(primary[0], mode === 'needs-import' ? /Preview this folder/ : /Use your existing project/);
+  }
+  const unavailable = renderToStaticMarkup(React.createElement(WorkspaceEntryPage, {
+    model: { ...model, canShowProjects: false }, onIntent: () => {},
+  }));
+  assert.match(unavailable, /<button[^>]*disabled=""[^>]*>Use your existing project<\/button>/);
   assert.match(organism, /onToggle=\{\(event\) => onIntent\(\{ type: "set-disclosure", open: event\.currentTarget\.open \}\)\}/);
   assert.doesNotMatch(recentPicker, /key=\{selectedPath\}/);
   assert.match(recentPicker, /value=\{selectedPath\}/);
@@ -196,6 +210,10 @@ test("the workspace entry page keeps one primary action and responsive keyboard-
   const pathInput = findElement(tree, (element) => element.props?.id === "workspace-entry-path");
   const retryButton = findElement(tree, (element) => element.props?.children === "Refresh"
     && typeof element.props?.onClick === "function");
+  const projectsButton = findElement(tree, (element) => element.props?.children === "Use your existing project"
+    && typeof element.props?.onClick === "function");
+  assert.ok(projectsButton, "the existing-project entry was absent from the component tree");
+  projectsButton.props.onClick();
   assert.ok(pathInput, "the managed path input was absent from the component tree");
   assert.ok(retryButton, "the workspace-independent Refresh action was absent from the component tree");
   retryButton.props.onClick();
@@ -209,6 +227,7 @@ test("the workspace entry page keeps one primary action and responsive keyboard-
   });
   assert.equal(prevented, true);
   assert.deepEqual(intents, [
+    { type: "show-existing-projects" },
     { type: "retry" },
     { type: "update-managed-path", path: "/private/live.mesh" },
     { type: "open-managed-path", path: "/private/live.mesh" },

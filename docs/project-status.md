@@ -59,6 +59,19 @@ during inspection remain protected; an open comparison still pauses automatic sa
 passed 3,985 native, 194 rendered, 674 desktop and 44 real-daemon checks; exact-head hosted
 checks and merge remain pending. This is not yet packaged proof of the fix. The fixed checkpoint remains unchanged, and the wider fleet acceptance remains open.
 
+## Existing-project welcome entry (11 October 2026)
+
+A new **Use your existing project** action on Workspaces reveals the existing attachment controls
+in Import and requests focus on their chooser. It performs no folder selection, attachment,
+agent start or managed-workspace switch. Returning to selection revokes a prior working-copy
+import confirmation while preserving in-window editor text. Stale/malformed intents and entry
+selection/refresh busy states refuse navigation. The working-copy workflow and remembered-folder
+preview remain available, with exactly one primary welcome action. Focused coordinator and rendered
+regressions passed. The corrected full gate passed 3,985 native, 194 rendered, 676 desktop and
+44 real-daemon checks; the first invocation's compiler-path failure is preserved in the ledger.
+Exact-head hosted checks and merge remain pending. Graphical verification, signed packaging and
+the complete fleet acceptance remain open.
+
 ## Product direction
 
 Mesh provides the underlying files, saved versions and work correlation for an existing project.
@@ -3145,3 +3158,14 @@ retries, store identity, foreign and missing-object refusal, and pending-state b
 The corrected full gate passed: 3,985 native tests (797.192s), 194 rendered, 672 desktop and
 44 real-daemon checks, plus the other Mesh gates. Hosted checks and merge of this increment remain
 pending. Based on merged #370 at a1e8e891500e19109dcc22105e17e1e4e65fb6ae; no legacy commit is replaced.
+
+
+## Comparison delivery receipt (11 October 2026)
+
+The external-editor comparison fix merged as [#373](https://github.com/idosams/Mesh/pull/373)
+at f926520cc3fdf2890822f077f10d1b228a6c4e3b after all seven checks passed on exact head
+7b1af15c0749d69bd345eb7ef2ae31fe187cb815. Its first macOS attempt exceeded the 20-minute job
+limit; the unchanged retry passed in 13m44s. The local checkpoint at that PR head retains its
+original files and separate test data, with a verified exact-package native fleet bridge; the
+selected-comparison fix itself still needs graphical verification. Independent post-merge main
+run 38091737788 remains pending. Earlier observations above retain their historical scope.

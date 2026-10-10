@@ -1531,12 +1531,104 @@ test('Workspaces Retry stays visible but disabled while its exact read-only refr
   await document.emitWorkspaceEntryIntent({ type: 'retry' });
   await waitFor(() => recentReads === 2);
   assert.equal(document.workspaceEntry.entry.canRetry, false);
+  assert.equal(document.workspaceEntry.entry.canShowProjects, false);
+  const requestsWhileRefreshing = [];
+  document.addEventListener('mesh:workspace-page-request', (event) => requestsWhileRefreshing.push(event.detail));
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' });
+  assert.deepEqual(requestsWhileRefreshing, [], 'navigation took over a pending workspace refresh');
   await document.emitWorkspaceEntryIntent({ type: 'retry' });
   assert.equal(recentReads, 2, 'a disabled Retry dispatched another overlapping refresh');
 
   releaseRefresh(JSON.stringify({ auto_opened: false }));
   await waitFor(() => document.workspaceEntry.entry.canRetry === true);
   assert.equal(document.serviceState.state, 'ready');
+});
+
+test('Workspaces opens existing-project choices without native work and refuses stale, malformed or picker-busy entry intents', async () => {
+  const document = fakeDocument();
+  const nativeCalls = [];
+  const requests = [];
+  let releasePicker;
+  document.addEventListener('mesh:workspace-page-request', (event) => requests.push(event.detail));
+  const invoke = async (command, parameters = {}) => {
+    nativeCalls.push(command);
+    if (command === 'recent_workspace_status') return JSON.stringify({ auto_opened: false });
+    if (command === 'pick_folder') return new Promise((resolve) => { releasePicker = resolve; });
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') {
+      throw daemonRefusal('no-workspace-open', 'No workspace is open.');
+    }
+    throw new Error(`unexpected existing-project entry command: ${command}`);
+  };
+  globalThis.document = document;
+  globalThis.window = { __TAURI__: { core: { invoke } }, CustomEvent: FakeCustomEvent };
+  globalThis.confirm = () => { throw new Error('navigation must not request a destructive confirmation'); };
+  await import(`./app.js?existing-project-entry=${Date.now()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+
+  const staleGeneration = document.workspaceEntry.generation;
+  await document.emitWorkspaceEntryIntent({ type: 'retry' });
+  const callsBeforeNavigation = nativeCalls.length;
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' }, staleGeneration);
+  for (const intent of [
+    { type: 'show-existing-projects', path: '/forged-project' },
+    { type: 'show-existing-projects', start: true },
+    { type: 'SHOW-EXISTING-PROJECTS' },
+  ]) await document.emitWorkspaceEntryIntent(intent);
+  assert.deepEqual(requests, []);
+
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' });
+  assert.deepEqual(requests, [{ page: 'import', selector: '[data-mesh-attach-choose]' }]);
+  assert.equal(document.importWorkbench.import.phase, 'select');
+  assert.equal(document.workspaceEntry.entry.canShowProjects, true);
+  assert.equal(nativeCalls.length, callsBeforeNavigation, 'navigation invoked a picker, attachment or other native command');
+
+  await document.emitWorkspaceEntryIntent({ type: 'choose-folder' });
+  await waitFor(() => typeof releasePicker === 'function');
+  assert.equal(document.workspaceEntry.entry.canShowProjects, false);
+  const requestsWhilePicking = requests.length;
+  const callsWhilePicking = nativeCalls.length;
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' });
+  assert.equal(requests.length, requestsWhilePicking, 'navigation took over an active folder selection');
+  assert.equal(nativeCalls.length, callsWhilePicking);
+  releasePicker(null);
+  await waitFor(() => document.workspaceEntry.entry.canShowProjects === true);
+});
+
+test('opening existing-project choices revokes the previous working-copy preview and its confirmation', async () => {
+  const document = fakeDocument();
+  const nativeCalls = [];
+  const source = '/Users/person/previous-copy-source';
+  const invoke = async (command, parameters = {}) => {
+    nativeCalls.push(command);
+    if (command === 'recent_workspace_status') return JSON.stringify({ auto_opened: false });
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') {
+      throw daemonRefusal('no-workspace-open', 'No workspace is open.');
+    }
+    if (command === 'daemon_call' && parameters.method === 'folder.import.preview') {
+      assert.deepEqual(JSON.parse(parameters.paramsJson), { source });
+      return JSON.stringify(importPreview({ files: 1, directories: 0, bytes: 12, summary: 'previous-copy' }));
+    }
+    throw new Error(`unexpected existing-project preview command: ${command}`);
+  };
+  globalThis.document = document;
+  globalThis.window = { __TAURI__: { core: { invoke } }, CustomEvent: FakeCustomEvent };
+  globalThis.confirm = () => { throw new Error('navigation must not confirm or copy a project'); };
+  await import(`./app.js?existing-project-preview-revocation=${Date.now()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+  await document.emitImportWorkbenchIntent({ type: 'source-draft', path: source });
+  await document.emitImportWorkbenchIntent({ type: 'preview-path', path: source });
+  await waitFor(() => document.importWorkbench.import.phase === 'review');
+  assert.equal(document.importWorkbench.import.canConfirm, true);
+  const reviewGeneration = document.importWorkbench.generation;
+  const callsBeforeNavigation = nativeCalls.length;
+
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' });
+  assert.equal(document.importWorkbench.import.phase, 'select');
+  assert.equal(document.importWorkbench.import.canConfirm, false);
+  assert.equal(document.importWorkbench.import.destinationPath, '');
+  await document.emitImportWorkbenchIntent({ type: 'confirm-import' }, reviewGeneration);
+  await document.emitImportWorkbenchIntent({ type: 'confirm-import' });
+  assert.equal(nativeCalls.length, callsBeforeNavigation, 'an abandoned preview retained native import authority');
 });
 
 test('source-owned service state projects starting, ready, attention, and recovered ready through Workspaces Retry', async () => {
@@ -2589,6 +2681,15 @@ test('opening the working folder uses the exact verified workspace binding', asy
   const draftEditor = document.getElementById('file-editor');
   draftEditor.value = 'window-only work that the agent cannot see\n';
   await draftEditor.emit('input');
+
+  const currentFolderBeforeNavigation = document.workspaceCurrent.current.agentFolder;
+  const projectEntryRequests = [];
+  document.addEventListener('mesh:workspace-page-request', (event) => projectEntryRequests.push(event.detail));
+  await document.emitWorkspaceEntryIntent({ type: 'show-existing-projects' });
+  assert.deepEqual(projectEntryRequests, [{ page: 'import', selector: '[data-mesh-attach-choose]' }]);
+  assert.equal(draftEditor.value, 'window-only work that the agent cannot see\n');
+  assert.equal(document.getElementById('save-file').disabled, false, 'navigation lost the source-owned editor draft');
+  assert.equal(document.workspaceCurrent.current.agentFolder, currentFolderBeforeNavigation);
 
   assert.equal(!document.workspaceCurrentAction('start-codex')?.enabled, true);
   assert.equal(!document.workspaceCurrentAction('open-terminal')?.enabled, true);

@@ -15,6 +15,7 @@ export type WorkspaceEntryModel = Readonly<{
   disclosureOpen: boolean;
   chooseLabel: string;
   canChoose: boolean;
+  canShowProjects: boolean;
   canChooseManaged: boolean;
   retryLabel: string;
   canRetry: boolean;
@@ -34,6 +35,7 @@ export type WorkspaceEntryModel = Readonly<{
 export type WorkspaceEntryIntent =
   | Readonly<{ type: "choose-folder" }>
   | Readonly<{ type: "choose-managed-folder" }>
+  | Readonly<{ type: "show-existing-projects" }>
   | Readonly<{ type: "retry" }>
   | Readonly<{ type: "set-disclosure"; open: boolean }>
   | Readonly<{ type: "update-managed-path"; path: string }>
@@ -97,7 +99,7 @@ export function workspaceEntryEnvelope(value: unknown, previousGeneration: numbe
   }
   const entry = record(envelope.entry, "workspace entry");
   exactKeys(entry, [
-    "canChoose", "canChooseManaged", "canEditPath", "canForgetRecent", "canOpenPath",
+    "canChoose", "canShowProjects", "canChooseManaged", "canEditPath", "canForgetRecent", "canOpenPath",
     "canOpenRecent", "canSelectRecent", "chooseLabel", "description", "disclosureLabel", "disclosureOpen",
     "eyebrow", "forgetRecentTitle", "mode", "openPath", "recentHint", "recentOpenLabel",
     "recents", "retryLabel", "canRetry", "selectedRecentPath", "title",
@@ -124,6 +126,7 @@ export function workspaceEntryEnvelope(value: unknown, previousGeneration: numbe
       disclosureOpen: boolean(entry.disclosureOpen, "workspace entry disclosure state"),
       chooseLabel: safeText(entry.chooseLabel, "workspace entry choose label", 120),
       canChoose: boolean(entry.canChoose, "workspace entry choose availability"),
+      canShowProjects: boolean(entry.canShowProjects, "existing project entry availability"),
       canChooseManaged: boolean(entry.canChooseManaged, "managed picker availability"),
       retryLabel: safeText(entry.retryLabel, "workspace refresh label", 120),
       canRetry: boolean(entry.canRetry, "workspace refresh availability"),
@@ -144,7 +147,7 @@ export function workspaceEntryEnvelope(value: unknown, previousGeneration: numbe
 
 export function workspaceEntryIntent(value: unknown): WorkspaceEntryIntent {
   const intent = record(value, "workspace entry intent");
-  if (["choose-folder", "choose-managed-folder", "retry"].includes(intent.type as string)) {
+  if (["choose-folder", "choose-managed-folder", "show-existing-projects", "retry"].includes(intent.type as string)) {
     exactKeys(intent, ["type"], "workspace entry intent");
     return Object.freeze({ type: intent.type }) as WorkspaceEntryIntent;
   }

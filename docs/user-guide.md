@@ -57,9 +57,16 @@ proof and its limits.
 
 ## Inspect an attached project's saved files (development builds)
 
-The unmerged attachment increments in the [migration ledger](plan/fleet-migration.md) add this
-flow to development builds. This is not a claim that the downloadable alpha contains it or that
-its packaged UI acceptance is complete.
+The attachment flow is available in canonical development source; the
+[migration ledger](plan/fleet-migration.md) records delivery and evidence. This is not a claim
+that the downloadable alpha contains it or that its packaged UI acceptance is complete.
+
+From **Workspaces**, choose **Use your existing project** to open the attachment choices in
+**Import**. This navigation does not select or attach a folder, start an agent, or switch your
+current managed workspace. A previous working-copy import preview must be previewed again before
+it can be confirmed. Unsaved text in Mesh's editor stays available when you return to Changes.
+The existing **Choose a folder** / **Import another folder** option still previews a separate
+working copy; **Preview this folder** remains the primary action for a remembered unsaved folder.
 
 1. In the folder selection view, use **Choose project to attach**, or enter the existing project
    path and choose **Attach existing project**. Continue using the same folder in your editor,

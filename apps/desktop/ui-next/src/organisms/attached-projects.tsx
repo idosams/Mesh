@@ -65,7 +65,7 @@ export function AttachedProjects() {
       <h3 className="text-xl font-semibold">{t("Use your existing project")}</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{t("Keep your folder, editor, Git workflow and agent sessions where they are. Mesh saves history in separate storage while you work.")}</p>
     </div>
-    <Button disabled={projection.busy || !projection.available} onClick={() => send({ type: "choose" })}>{t("Choose project to attach")}</Button>
+    <Button data-mesh-attach-choose disabled={projection.busy || !projection.available} onClick={() => send({ type: "choose" })}>{t("Choose project to attach")}</Button>
     <label className="grid gap-2 text-sm font-medium">{t("Existing project path")}
       <input dir="ltr" className="min-h-11 rounded-md border border-border bg-background px-3" value={source}
         onChange={(event) => setSource(event.target.value)} placeholder="/Users/you/Project" autoComplete="off" />
