@@ -8518,3 +8518,41 @@ pending-full statements for this implementation. The explicit missing-enrollment
 failed before correction and passed afterward. Fresh hosted checks remain required before merge.
 Independent post-merge main validation of #370 also passed (run 38034837137). The fixed checkpoint
 is unchanged; no graphical acceptance or collection authority is claimed.
+
+
+## Refresh the clean selected native comparison (R195)
+
+The separate graphical copy of checkpoint b064029 reproduced a stale selected comparison after
+an ordinary TextEdit save: the queue reported a modified 155-byte file while its already-open
+comparison still showed the old 88-byte text. Reselecting the row recovered the correct comparison;
+saving privately then produced a second durable workspace point. The checkpoint itself is unchanged.
+
+This canonical increment starts at merged #372 / cfdd65c20fa8066b4ade08244fefceeeec86f0b3 and
+replaces no legacy commit. A successful scan retains only the already-selected file's inspection
+and refreshes it when the editor instance and selection are unchanged and no in-window draft is
+pending. It also refreshes a file that returned to saved bytes and no longer appears in Changes.
+New selections and drafts typed during the native read retain ownership of their presentation.
+An open comparison continues to pause automatic saving. Agent Finish preserves its previous editor
+presentation. No native authority, persisted format, credential or protected-main rule changes.
+
+The rendered regression failed before the fix: the selected comparison still contained
+`saved notes.txt` after an external change. A separate slow-read selection test passed on the old
+code. The first fixed run reached the new text but found a mistaken byte-count expectation in the
+new fixture (44 actual bytes, not 42); the fixture expectation is corrected. Final focused and full
+validation, hosted checks and merge remain pending. This source change does not establish packaged
+fleet acceptance, retention/collection completion, another provider/host or eligible signing.
+
+R195 focused rendered verification passed all three selected tests in 0.147s, including the
+existing draft-typed-during-read regression. The complete post-mutation rendered suite passed
+163 tests in 2.690s. The full repository gate and exact-head hosted checks remain required.
+
+R195 full `npm test` passed: 3,985 native tests in 374.079s (11 slow, 18 skipped),
+194 rendered tests, 674 desktop tests and all 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. The two added desktop regressions account for the increase from 672. Source
+and test assertions remain unchanged after this full pass; these final documentation receipts
+require a docs check. Exact final-head hosted validation and merge remain pending.
+
+Its parent R194 merged as #372 at cfdd65c20fa8066b4ade08244fefceeeec86f0b3 after all seven
+checks passed on 75cfbb871f3759977737797fd21bc495b423b9ce (run 38077176246). Independent
+post-merge main run 38088441941 was still running its macOS job when this receipt was recorded;
+its other six checks passed. Neither this receipt nor R194 grants collection authority.

@@ -16209,6 +16209,156 @@ test('returning from a native editor discovers changes without another scan comm
   assert.match(document.getElementById('notice').textContent, /Opened the stable native folder/);
 });
 
+async function cleanComparisonScanFixture() {
+  const document = fakeDocument();
+  document.visibilityState = 'visible';
+  const listeners = new Map();
+  const paths = ['other.txt', 'notes.txt'];
+  const workspace = {
+    root: '/managed/clean-comparison/mounts',
+    digest: 'clean-comparison-workspace',
+    installation: 'clean-comparison-installation',
+    records: 1,
+    reviews: 0,
+    review_items: [],
+    review_items_not_listed: 0,
+    private_version: { version: 'clean-comparison-version' },
+    shared_version: null,
+    entries: paths.map((path) => ({ path, type: 'file' })),
+    conditions: [],
+    not_yet: [],
+    native_untracked_files: [],
+    file_histories: paths.map((path) => ({
+      path,
+      object_id: `object-${path}`,
+      current: { version_id: `version-${path}`, manifest_id: `manifest-${path}` },
+      retained_versions: [{ version_id: `version-${path}`, manifest_id: `manifest-${path}` }],
+    })),
+    workspace_versions: [],
+  };
+  const nativeText = new Map(paths.map((path) => [path, `saved ${path}\n`]));
+  let pauseInspection = false;
+  let releaseInspection;
+  let saves = 0;
+  const invoke = async (command, parameters = {}) => {
+    if (command === 'native_capture_preference') return JSON.stringify({ enabled: true });
+    if (command === 'recent_workspace_status') return JSON.stringify({
+      remembered: workspace.root,
+      workspaces: [workspace.root],
+      auto_opened: false,
+      active_folder: '/application/native-workspace/current',
+      export_root: null,
+      warning: null,
+    });
+    if (command === 'managed_checkpoint_state') return JSON.stringify({
+      root: workspace.root,
+      workspace_digest: workspace.digest,
+      workspace_installation: workspace.installation,
+      working: false,
+    });
+    if (command === 'daemon_call' && parameters.method === 'workspace.state') return JSON.stringify(workspace);
+    if (command === 'discover_native_directories' || command === 'discover_native_missing_files') return '[]';
+    if (command === 'inspect_managed_file') {
+      const path = parameters.relativePath;
+      const text = nativeText.get(path);
+      if (pauseInspection && path === 'notes.txt') {
+        pauseInspection = false;
+        await new Promise((resolve) => { releaseInspection = resolve; });
+      }
+      return JSON.stringify({
+        path,
+        text,
+        baseline_text: `saved ${path}\n`,
+        text_editable: true,
+        native_untracked: false,
+        modified_from_current_version: text !== `saved ${path}\n`,
+        current_version: `version-${path}`,
+        byte_count: Buffer.byteLength(text),
+        content_digest: (text === `saved ${path}\n` ? '91' : '92').repeat(32),
+        executable: false,
+      });
+    }
+    if (command === 'save_managed_private') {
+      saves += 1;
+      throw new Error('refreshing an open comparison must not save it automatically');
+    }
+    throw new Error(`unexpected clean-comparison command: ${command}`);
+  };
+  const window = {
+    __TAURI__: { core: { invoke } },
+    addEventListener(name, listener) {
+      const named = listeners.get(name) || [];
+      named.push(listener);
+      listeners.set(name, named);
+    },
+    async emit(name) {
+      for (const listener of listeners.get(name) || []) await listener({});
+    },
+  };
+  globalThis.document = document;
+  globalThis.window = window;
+  globalThis.confirm = () => true;
+  await import(`./app.js?clean-comparison=${Date.now()}-${Math.random()}`);
+  await waitFor(() => document.serviceState.state === 'ready');
+  const select = async (path) => {
+    document.getElementById('edit-file').value = path;
+    await document.getElementById('edit-file').emit('change');
+    await document.getElementById('load-file').emit('click');
+  };
+  await select('notes.txt');
+  return {
+    document, window, nativeText, select,
+    saves: () => saves,
+    pauseNextInspection: () => { pauseInspection = true; },
+    waitForPausedInspection: () => waitFor(() => typeof releaseInspection === 'function'),
+    releaseInspection: () => releaseInspection(),
+  };
+}
+
+test('returning to Mesh refreshes the clean selected comparison without saving or choosing another change', async () => {
+  const { document, window, nativeText, saves } = await cleanComparisonScanFixture();
+  assert.equal(document.workspaceWork.workbench.changes.editorText, 'saved notes.txt\n');
+  assert.equal(document.getElementById('save-private').disabled, true);
+  nativeText.set('other.txt', 'another file changed first\n');
+  nativeText.set('notes.txt', 'a longer external edit to the selected file\n');
+  await window.emit('focus');
+  const changes = document.workspaceWork.workbench.changes;
+  assert.equal(changes.selectedFile, 'notes.txt');
+  assert.equal(changes.editorText, nativeText.get('notes.txt'));
+  assert.equal(changes.baselineText, 'saved notes.txt\n');
+  assert.match(changes.editVersion, /44 bytes/);
+  assert.equal(document.getElementById('save-private').disabled, false);
+  assert.equal(document.getElementById('save-file').disabled, true);
+  assert.equal(document.getElementById('folder-change-items').children.length, 2);
+  assert.equal(saves(), 0, 'a clean comparison refresh changed automatic-save behavior');
+
+  // Returning external bytes to their saved state must clear the previous comparison as well.
+  nativeText.set('notes.txt', 'saved notes.txt\n');
+  nativeText.set('other.txt', 'saved other.txt\n');
+  await window.emit('focus');
+  assert.equal(document.workspaceWork.workbench.changes.editorText, 'saved notes.txt\n');
+  assert.match(document.workspaceWork.workbench.changes.editVersion, /16 bytes/);
+  assert.equal(document.getElementById('save-private').disabled, true);
+  assert.equal(document.getElementById('folder-change-items').children.length, 0);
+  assert.equal(saves(), 0);
+});
+
+test('a late native scan preserves a comparison selected while inspection is pending', async () => {
+  const fixture = await cleanComparisonScanFixture();
+  fixture.nativeText.set('notes.txt', 'external change during a slow scan\n');
+  fixture.pauseNextInspection();
+  const scanning = fixture.window.emit('focus');
+  await fixture.waitForPausedInspection();
+  await fixture.select('other.txt');
+  fixture.releaseInspection();
+  await scanning;
+  assert.equal(fixture.document.workspaceWork.workbench.changes.selectedFile, 'other.txt');
+  assert.equal(fixture.document.workspaceWork.workbench.changes.editorText, 'saved other.txt\n');
+  assert.equal(fixture.document.getElementById('save-private').disabled, true);
+  assert.equal(fixture.document.getElementById('folder-change-items').children.length, 1);
+  assert.equal(fixture.saves(), 0);
+});
+
 test('a restored workspace surfaces tracked and new native work without a leave-and-return cycle', async () => {
   const document = fakeDocument();
   const workspace = {

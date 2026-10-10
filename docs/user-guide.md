@@ -162,7 +162,10 @@ The desktop app is a real Tauri surface for the local managed-folder journey. It
 folder, retain exact versions, recover across restart, work through ordinary native folders, open a
 pinned agent copy in Codex, inspect and explicitly or automatically save supported external changes,
 restore earlier versions,
-and exercise local review. A separately Apple-signed, identity-continuous build additionally
+and exercise local review. Returning to Mesh or finding folder changes refreshes an already-open,
+clean comparison of the selected file, including external edits that return it to its saved bytes.
+Text typed only inside Mesh and file selections made while inspection is running are preserved.
+Refreshing an open comparison does not automatically save it. A separately Apple-signed, identity-continuous build additionally
 enables macOS user-presence approval.
 
 ```bash
