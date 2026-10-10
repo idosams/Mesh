@@ -65,6 +65,22 @@ impl ProvisionedAttachment {
         &self,
         request: RecordDigest,
     ) -> io::Result<Json> {
+        self.inspect_pending_dependency_control_retention_with_context(request, |raw| {
+            let (configuration, proof) = self.attachment.read_decision_configuration(
+                self.metadata_path(),
+                &self.store,
+                Some(raw),
+            )?;
+            let proof = proof.ok_or_else(|| invalid("native control enrollment is missing"))?;
+            Ok((configuration, proof.private_evidence().clone()))
+        })
+    }
+
+    pub(in crate::project_attachment) fn inspect_pending_dependency_control_retention_with_context(
+        &self,
+        request: RecordDigest,
+        read: impl Fn(&str) -> io::Result<(String, crate::project_attachment::VerifiedPrivateHistory)>,
+    ) -> io::Result<Json> {
         if request == ZERO {
             return Err(invalid("missing native control request"));
         }
@@ -81,12 +97,8 @@ impl ProvisionedAttachment {
         if digest(text(&value, "request")?)? != request {
             return Err(invalid("another native control request owns this recovery"));
         }
-        let (configuration, proof) = self.attachment.read_decision_configuration(
-            self.metadata_path(),
-            &self.store,
-            Some(&raw),
-        )?;
-        let proof = proof.ok_or_else(|| invalid("native control enrollment is missing"))?;
+        let (configuration, proof) = read(&raw)?;
+        proof.verify_configuration(&configuration)?;
         let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
             self.metadata_path(),
             self.store.filesystem().read_only(),
@@ -120,6 +132,21 @@ impl ProvisionedAttachment {
             .map_err(error)?;
         payloads.extend(staged_policy.policy_payloads());
         payloads.extend([proof.binding().authority, record.payload]);
+        if payloads.len() > 65536 {
+            return Err(invalid("native control recovery roots exceed bound"));
+        }
+        if let Some(graph) = staged_policy.review_graph(record.payload) {
+            staged_policy
+                .verify_review_graph(record.payload, &read_payload(&cas, graph, 4 * 1024 * 1024)?)
+                .map_err(error)?;
+        }
+        let mut budget = 1024 * 1024 * 1024usize;
+        for payload in &payloads {
+            let bytes = read_payload(&cas, *payload, budget.min(64 * 1024 * 1024))?;
+            budget = budget
+                .checked_sub(bytes.len())
+                .ok_or_else(|| invalid("native control recovery payload budget exceeded"))?;
+        }
         let store = self.store.identity()?;
         let facts = Json::object([
             ("schema", Json::text("mesh.native-control-retention/v1")),
@@ -148,13 +175,9 @@ impl ProvisionedAttachment {
         if facts.encode().len() > 4 * 1024 * 1024 {
             return Err(invalid("native control recovery roots exceed bound"));
         }
-        let (current, current_proof) = self.attachment.read_decision_configuration(
-            self.metadata_path(),
-            &self.store,
-            Some(&raw),
-        )?;
+        let (current, current_proof) = read(&raw)?;
         if current != configuration
-            || current_proof.as_ref() != Some(&proof)
+            || current_proof != proof
             || read_private_in_store(&self.store, PENDING)? != raw
         {
             return Err(invalid("native control recovery evidence changed"));

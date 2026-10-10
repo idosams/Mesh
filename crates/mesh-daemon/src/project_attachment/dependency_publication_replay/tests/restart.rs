@@ -337,6 +337,171 @@ pub(super) fn interrupted_native_snapshot(
     )
 }
 
+fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDigest, phase: &str) {
+    use std::os::unix::fs::MetadataExt as _;
+    let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
+    let owner = storage
+        .reopen(&storage.candidate_owning_root(work).unwrap())
+        .unwrap();
+    let public = fs::read(root.join("restart-public-key")).unwrap();
+    let credential =
+        HumanApprovalCredential::from_public_key(public.as_slice().try_into().unwrap()).unwrap();
+    let trust = crate::TrustedReviewers::with_human_credentials([credential]);
+    let journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
+    let sidecar = owner.metadata_path().join("dependency-decision.pending");
+    let before = fs::read(&journal).unwrap();
+    let pending = fs::read(&sidecar).unwrap();
+    let note = fs::read(owner.project().root().join("note")).unwrap();
+    let intent = Json::parse(std::str::from_utf8(&pending).unwrap()).unwrap();
+    let facts = storage
+        .inspect_verified_dependency_control_retention(&owner, request, &trust)
+        .unwrap();
+    assert_eq!(
+        facts.get("schema"),
+        Some(&Json::text("mesh.trusted-native-control-retention/v1"))
+    );
+    assert_eq!(
+        facts.get("scope"),
+        Some(&Json::text("owner-store-control-recovery"))
+    );
+    assert_eq!(facts.get("collection_authority"), Some(&Json::Bool(false)));
+    let exact = facts.get("control").unwrap();
+    assert_eq!(exact.get("request"), Some(&Json::text(request.to_hex())));
+    assert_eq!(
+        exact.get("sidecar_digest"),
+        Some(&Json::text(
+            super::super::super::dependency_transaction::hash(&pending).to_hex()
+        ))
+    );
+    assert_eq!(
+        exact.get("journal_digest"),
+        Some(&Json::text(
+            super::super::super::dependency_transaction::hash(&before).to_hex()
+        ))
+    );
+    let physical = fs::metadata(owner.metadata_path()).unwrap();
+    for (name, value) in [("device", physical.dev()), ("inode", physical.ino())] {
+        assert_eq!(facts.get(name), Some(&Json::text(format!("{value:x}"))));
+        assert_eq!(facts.get(name), exact.get(name));
+    }
+    let written = exact
+        .get("written_frame_bytes")
+        .and_then(Json::as_u64)
+        .unwrap();
+    assert_eq!(written == 0, phase == "staged");
+    let Json::Array(payloads) = exact.get("payloads").unwrap() else {
+        panic!("control roots missing")
+    };
+    let payload = intent.get("payload").unwrap();
+    assert!(payloads.contains(payload));
+    let digest = RecordDigest::parse_hex(payload.as_text().unwrap()).unwrap();
+    let cas = Cas::<_, Blake3>::with_filesystem(
+        owner.metadata_path(),
+        owner.store.filesystem().read_only(),
+    )
+    .unwrap();
+    let path = owner.metadata_path().join(
+        cas.layout()
+            .chunk_path(&mesh_cas::Digest32::from_bytes(*digest.as_bytes())),
+    );
+    let original = fs::read(&path).unwrap();
+    let decoded = Json::parse(std::str::from_utf8(&original).unwrap()).unwrap();
+    let body = decoded.get("body").unwrap();
+    if let Some(graph) = body.get("graph") {
+        assert!(payloads.contains(graph));
+    }
+    for name in ["canonical", "bundle"] {
+        if let Some(identity) = body.get(name) {
+            assert!(!payloads.contains(identity));
+        }
+    }
+    assert!(
+        owner
+            .inspect_pending_dependency_control_retention(request)
+            .is_err(),
+        "ordinary reader admitted publication history"
+    );
+    assert!(storage
+        .inspect_native_history_retention(owner.id(), &trust)
+        .is_err());
+    assert!(storage
+        .inspect_verified_dependency_control_retention(
+            &owner,
+            RecordDigest::from_bytes([96; 32]),
+            &trust
+        )
+        .is_err());
+    assert!(storage
+        .inspect_verified_dependency_control_retention(
+            &owner,
+            request,
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    if work != owner.id() {
+        let child = storage.reopen(work).unwrap();
+        assert!(storage
+            .inspect_verified_dependency_control_retention(&child, request, &trust)
+            .is_err());
+    }
+    if phase == "staged" {
+        let foreign = std::str::from_utf8(&pending).unwrap().replacen(
+            &request.to_hex(),
+            &RecordDigest::from_bytes([96; 32]).to_hex(),
+            1,
+        );
+        assert_ne!(foreign.as_bytes(), pending.as_slice());
+        fs::write(&sidecar, foreign.as_bytes()).unwrap();
+        assert!(storage
+            .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert_eq!(fs::read(&sidecar).unwrap(), foreign.as_bytes());
+        fs::write(&sidecar, &pending).unwrap();
+        fs::write(&path, b"corrupt control payload").unwrap();
+        assert!(storage
+            .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"corrupt control payload");
+        fs::remove_file(&path).unwrap();
+        assert!(storage
+            .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert!(!path.exists());
+        fs::write(&path, &original).unwrap();
+        if let Some(graph) = body.get("graph").and_then(Json::as_text) {
+            let graph = RecordDigest::parse_hex(graph).unwrap();
+            let graph_path = owner.metadata_path().join(
+                cas.layout()
+                    .chunk_path(&mesh_cas::Digest32::from_bytes(*graph.as_bytes())),
+            );
+            let saved_graph = fs::read(&graph_path).unwrap();
+            fs::write(&graph_path, b"corrupt saved review graph").unwrap();
+            assert!(storage
+                .inspect_verified_dependency_control_retention(&owner, request, &trust)
+                .is_err());
+            assert_eq!(
+                fs::read(&graph_path).unwrap(),
+                b"corrupt saved review graph"
+            );
+            fs::remove_file(&graph_path).unwrap();
+            assert!(storage
+                .inspect_verified_dependency_control_retention(&owner, request, &trust)
+                .is_err());
+            assert!(!graph_path.exists());
+            fs::write(&graph_path, saved_graph).unwrap();
+        }
+        assert_eq!(
+            storage
+                .inspect_verified_dependency_control_retention(&owner, request, &trust)
+                .unwrap(),
+            facts
+        );
+    }
+    assert_eq!(fs::read(&journal).unwrap(), before);
+    assert_eq!(fs::read(&sidecar).unwrap(), pending);
+    assert_eq!(fs::read(owner.project().root().join("note")).unwrap(), note);
+}
+
 #[allow(clippy::too_many_arguments)]
 fn interrupted_native_control(
     root: &Path,
@@ -369,11 +534,17 @@ fn interrupted_native_control(
     run("staged", 85);
     assert_eq!(fs::read(journal).unwrap(), before);
     inspect_prefix("staged");
+    if published {
+        assert_trusted_control_inventory(root, work, request, "staged");
+    }
     assert_eq!(fs::read(journal).unwrap(), before);
     run("partial", 86);
     let torn = fs::read(journal).unwrap();
     assert!(torn.starts_with(&before) && torn.len() > before.len());
     inspect_prefix("partial");
+    if published {
+        assert_trusted_control_inventory(root, work, request, "partial");
+    }
     assert_eq!(fs::read(journal).unwrap(), torn);
     if published {
         run("missing-trust", 0);
@@ -384,6 +555,9 @@ fn interrupted_native_control(
     run("lost-ack", 87);
     let complete = fs::read(journal).unwrap();
     assert!(complete.starts_with(&torn) && complete.len() > torn.len());
+    if published {
+        assert_trusted_control_inventory(root, work, request, "lost-ack");
+    }
     run("retry", 0);
     assert_eq!(fs::read(journal).unwrap(), complete);
     let result = fs::read_to_string(root.join("decision-restart-result")).unwrap();
@@ -393,5 +567,23 @@ fn interrupted_native_control(
         fs::read_to_string(root.join("decision-restart-result")).unwrap(),
         result
     );
+    if published {
+        let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        let owner = storage
+            .reopen(&storage.candidate_owning_root(work).unwrap())
+            .unwrap();
+        let public = fs::read(root.join("restart-public-key")).unwrap();
+        let credential =
+            HumanApprovalCredential::from_public_key(public.as_slice().try_into().unwrap())
+                .unwrap();
+        let trust = crate::TrustedReviewers::with_human_credentials([credential]);
+        let sidecar = owner.metadata_path().join("dependency-decision.pending");
+        assert!(!sidecar.exists());
+        assert!(storage
+            .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert!(!sidecar.exists());
+        assert_eq!(fs::read(journal).unwrap(), complete);
+    }
     Json::parse(&result).unwrap()
 }

@@ -20,6 +20,26 @@ impl VerifiedControlPrefix {
         request: RecordDigest,
         kind: DependencyKind,
     ) -> io::Result<Option<Self>> {
+        Self::read_with_scope(owner, request, kind, false)
+    }
+
+    // Retention needs exact evidence even when the frame is staged or fully written.
+    // The ordinary writer's partial-only selection above remains unchanged.
+    pub(super) fn read_retention(
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        kind: DependencyKind,
+    ) -> io::Result<Self> {
+        Self::read_with_scope(owner, request, kind, true)?
+            .ok_or_else(|| invalid("native control retention intent missing"))
+    }
+
+    fn read_with_scope(
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        kind: DependencyKind,
+        include_complete: bool,
+    ) -> io::Result<Option<Self>> {
         let raw = match read_private_in_store(&owner.store, PENDING) {
             Ok(raw) => raw,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -56,7 +76,7 @@ impl VerifiedControlPrefix {
         }
         let frame = frame_record(&StoredRecord::Dependency(record));
         let written = &bytes[length..];
-        if written.is_empty() || written.starts_with(&frame) {
+        if !include_complete && (written.is_empty() || written.starts_with(&frame)) {
             // Staged-only and complete frames use the existing complete-history path.
             return Ok(None);
         }
@@ -75,6 +95,20 @@ impl VerifiedControlPrefix {
         };
         proof.verify(&owner.store, &journal, &bytes)?;
         Ok(Some(proof))
+    }
+
+    pub(super) fn raw_for(&self, owner: &ProvisionedAttachment) -> io::Result<&str> {
+        if owner.metadata_path() != self.metadata || owner.store.identity()? != self.store {
+            return Err(invalid("native control retention belongs to another store"));
+        }
+        let mut journal = owner
+            .store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(crate::RECORD_FILE_NAME))?;
+        let bytes = journal_bytes(&mut journal)?;
+        self.verify(&owner.store, &journal, &bytes)?;
+        Ok(&self.raw)
     }
 
     pub(in crate::project_attachment) fn verify(

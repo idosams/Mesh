@@ -8656,3 +8656,59 @@ checks, plus repository/docs/license/storage/fmt/clippy. This includes the final
 check and all added regressions. Source and assertions remain unchanged after that pass; only
 these delivery receipts changed and receive a final docs check. Exact-final-head hosted checks
 and merged delivery remain pending. The fixed checkpoints and installed app are unchanged.
+
+
+## Inspect exact native control recovery through publication trust (R198)
+
+[Issue #378](https://github.com/idosams/Mesh/issues/378) follows published R197
+[#377](https://github.com/idosams/Mesh/pull/377) at
+8fdd77c029065611fcdc4b1167cd987913c92815. This is new canonical implementation and replaces no
+preserved legacy commit. R197 remains fixed while hosted checks run; its full local gate passed.
+R196 #375's independent merged-main run 38093099662 also passed all seven jobs (macOS 19m13s,
+Linux 9m30s). Historical pending receipts above retain their original scope.
+
+The separate `inspect_verified_dependency_control_retention` API accepts an exact registered
+owning attachment, nonzero request and explicit publication trust. A child cannot silently select
+its owning store. Only Eligibility and ReviewSnapshot intents are supported. Exact existing prefix
+validation now has a retention-only entry for staged/partial/complete frames; the writer's existing
+partial-only entry keeps its behavior. Complete native discovery, deterministic custody, trusted
+publication replay, repeated raw sidecar/journal proof and registration checks precede return.
+
+The local inspector's shared proof callback is immutable and internal. Its original JSON shape and
+publication refusal are preserved. Completed and staged policy payloads, local enrollment and
+review graphs are verified in CAS under a 65,536-root/1 GiB aggregate bound, 64 MiB individual read
+limit and 4 MiB graph/encoding bounds. The separate new
+`mesh.trusted-native-control-retention/v1` wrapper uses scope `owner-store-control-recovery`, names
+work/installation/device/inode, nests exact control facts and reports collection_authority=false.
+It never recovers, repairs, pins, persists a decision, deletes, admits a workspace or approves main.
+No persisted-format change. Canonical-head and review-bundle identities are not local CAS roots.
+
+A temporary adapter to the existing local reader failed the real post-publication staged-decision
+fixture with "native publication receipt verification is unavailable" after 48.98s. Its source and
+failed log are retained; the adapter is absent from the final implementation. An earlier preparation
+script stopped at an ambiguous fixture anchor before writing tests; that script failure is retained.
+All three corrected separate-process campaigns passed in 119.469s: decision 119.462s, saved review
+78.697s and snapshot 87.561s. They retain existing exact recovery, retry, accepted-main and ordinary
+admission assertions, and add staged/partial/lost-ack payload/graph roots, physical identity,
+original source/journal/sidecar preservation, missing trust, wrong request, selected child, foreign
+sidecar and corrupt/missing payload refusal without repair. Final additional graph-corruption/
+absence and removed-intent assertions require the full gate. No assertion or deadline is weakened.
+
+Full repository verification and exact-final-head hosted checks remain required. This is a local
+control recovery inventory, not complete selected history or cross-store collection authority.
+Combined control/publication/consumption roots, unknown metadata classification, independent fresh
+deletion veto, bounded custody through unlink/arrival rewrite, concurrency/crash/storage-pressure
+tests, complete graphical/signing/provider/host routes and final fleet velocity acceptance remain.
+
+
+R198's final full `npm test` passed: 3,985 native tests in 649.498s (14 slow; 18 skipped), 194 rendered tests, 676 desktop tests and all 44 real-daemon checks,
+plus repository/docs/license/storage/fmt/clippy. It includes final missing/corrupt saved-graph and
+removed-intent refusals. All source and assertions stay byte-identical after the full pass; only
+delivery receipts change and receive a final docs check. Hosted checks and merge remain pending.
+
+Parent R197 merged as #377 at fdb3e41dd1b6ffb25ed9bb7bca535ea33811b104 after all seven checks
+passed on exact head 8fdd77c029065611fcdc4b1167cd987913c92815 (run 38093776932, macOS17m09s,
+Linux5m26s). R198 fast-forwarded to that main only after its full gate finished, with identical
+incoming source trees and before/after local patch bytes independently checked. The delivery base
+is canonical main; no unrelated history merge or published rewrite. Independent merged-main run
+38094899377 is tracked separately. The full fleet and collector acceptance remain unfinished.
