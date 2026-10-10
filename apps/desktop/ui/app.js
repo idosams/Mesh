@@ -7903,7 +7903,7 @@ async function inspectFolderCandidates(candidates, binding, missingByPath) {
 async function findFolderChanges(
   binding,
   candidates = folderCandidates(),
-  { discoverDirectories = true } = {},
+  { discoverDirectories = true, onInspection = null } = {},
 ) {
   if (model.workspace?.native_inventory_complete === false) {
     throw new Error('Mesh could not inspect every native folder entry. Fix folder access and retry Find folder changes before saving or review.');
@@ -7949,6 +7949,7 @@ async function findFolderChanges(
   ];
   const inspections = await inspectFolderCandidates(candidates, binding, missingByPath);
   for (const inspection of inspections) {
+    onInspection?.(inspection);
     // Missing paths were inserted from the complete metadata pass above. Do not duplicate one
     // merely because it also happened to fall inside this tick's content slice.
     if (!inspection.native_missing && (inspection.native_untracked || inspection.modified_from_current_version)) {
@@ -10942,6 +10943,14 @@ async function scanNativeFolder({
     return true;
   }
 
+  const editorAtScanStart = model.editor;
+  const selectedFileAtScanStart = workspaceChangesEditorState.selectedFile;
+  let inspectedOpenEditor = null;
+  const observeOpenEditor = (inspection) => {
+    if (editorAtScanStart && inspection.path === editorAtScanStart.path) {
+      inspectedOpenEditor = inspection;
+    }
+  };
   const priorLabel = workspaceChangesQueueState.scanLabel;
   let settleScan;
   let binding = null;
@@ -10981,13 +10990,14 @@ async function scanNativeFolder({
     const discoverDirectories = !periodic || periodicScanNeedsDirectoryDiscovery();
     let changes = await findFolderChanges(binding, candidates, {
       discoverDirectories,
+      onInspection: observeOpenEditor,
     });
     // The rotating periodic read is deliberately incomplete for large workspaces. It may wake the
     // automatic path, but it may never authorize a save by itself. Once it notices any work, pay
     // for one complete scan before constructing the queue that can be signed. This keeps the idle
     // no-change cost bounded without turning a 128-file slice into a dishonest whole-tree claim.
     if (periodic && model.nativeCaptureEnabled && changes.length > 0) {
-      changes = await findFolderChanges(binding);
+      changes = await findFolderChanges(binding, undefined, { onInspection: observeOpenEditor });
     }
     // Keep only review summaries in the queue. A scan may cover many text files, and batch save
     // deliberately re-inspects each exact file instead of retaining every file body in webview
@@ -10998,6 +11008,22 @@ async function scanNativeFolder({
     model.nativeInspectionFailed = false;
     if (changes.length > 0) workspaceChangesQueueState.scanState = 'changes';
     else if (!periodic) workspaceChangesQueueState.scanState = 'clean';
+    // Refresh only the same clean comparison that was open when this scan began. Retain one
+    // selected inspection, including a file that returned to its saved bytes, without keeping
+    // every scanned body. A new selection or an in-window draft still owns its presentation.
+    const editorSelectionUnchanged = model.editor === editorAtScanStart
+      && workspaceChangesEditorState.selectedFile === selectedFileAtScanStart;
+    const hadOpenEditor = Boolean(model.editor);
+    const refreshOpenEditor = !agentFinished
+      && editorSelectionUnchanged
+      && !editorDraftPending()
+      && inspectedOpenEditor
+      && !inspectedOpenEditor.native_missing;
+    if (refreshOpenEditor
+      && JSON.stringify(model.editor) !== JSON.stringify(inspectedOpenEditor)) {
+      installEditorInspection(inspectedOpenEditor);
+      editorPresentationChanged = true;
+    }
     if (!changes.length) {
       if (!automatic) {
         showNotice('No supported native changes were found. The native folder matches private history.');
@@ -11010,8 +11036,8 @@ async function scanNativeFolder({
     // Native inspection may take long enough for the person to open or edit another file after
     // this scan began. Keep the verified queue, but never let a late read replace editor state that
     // became active while the filesystem walk was in flight.
-    const keptOpenEditor = Boolean(model.editor);
-    if (editable && !keptOpenEditor) {
+    const keptOpenEditor = hadOpenEditor && !refreshOpenEditor;
+    if (editable && !hadOpenEditor && editorSelectionUnchanged) {
       installEditorInspection(editable);
       editorPresentationChanged = true;
     }
@@ -11026,7 +11052,9 @@ async function scanNativeFolder({
           : 'You returned to Mesh. '
       : '';
     const editorContext = keptOpenEditor
-      ? ' Mesh kept the file already open in its editor; preserve that draft before opening another change.'
+      ? editorDraftPending()
+        ? ' Mesh kept the file already open in its editor; preserve that draft before opening another change.'
+        : ' Mesh kept the file already open in its editor. Select a listed change to open it.'
       : '';
     const unsupportedContext = changes.some((change) => change.native_unsupported)
       ? changes.some((change) => change.unsupported_kind === 'excluded-ancestor')
@@ -11038,7 +11066,8 @@ async function scanNativeFolder({
       allowAutomaticSave
       && model.nativeCaptureEnabled
       && !workspaceInstallationMatchesHandoff()
-      && !keptOpenEditor
+      && !hadOpenEditor
+      && editorSelectionUnchanged
       && !changes.some((change) => change.native_missing || change.native_unsupported)
     ) {
       return saveAllPrivateChanges({

@@ -49,6 +49,16 @@ head 2b4c3e49bf845fce29ad4e2346fe0dd3a1538d9b (run 37821567718). Desktop/helper 
 remain unfinished; the passing service fixture does not establish those outcomes.
 Older dated observations below retain their historical scope.
 
+## External-editor comparison refresh (11 October 2026)
+
+A graphical test of the unchanged b064029 checkpoint reproduced a stale selected comparison:
+Mesh detected an externally edited file in Changes but retained its earlier clean text until the
+row was selected again. The canonical fix refreshes the same clean selected file after successful
+native inspection, including a file returned to saved bytes. In-window drafts and selections made
+during inspection remain protected; an open comparison still pauses automatic saving. Three focused rendered regressions and all 163 post-mutation tests passed. The full gate
+passed 3,985 native, 194 rendered, 674 desktop and 44 real-daemon checks; exact-head hosted
+checks and merge remain pending. This is not yet packaged proof of the fix. The fixed checkpoint remains unchanged, and the wider fleet acceptance remains open.
+
 ## Product direction
 
 Mesh provides the underlying files, saved versions and work correlation for an existing project.
