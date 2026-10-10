@@ -3,7 +3,8 @@ use super::*;
 use mesh_store::StoredRecord;
 
 /// Exact local recovery objects, not a whole-project collection plan or publication permission.
-/// The sidecar and journal remain required alongside these CAS roots. No durable pin is acquired.
+/// All verified completed capture receipts and their frame objects are included.
+/// The sidecars and journal remain required alongside these CAS roots. No durable pin is acquired.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeCaptureRetention {
     operation: RecordDigest,
@@ -14,6 +15,7 @@ pub struct NativeCaptureRetention {
     sidecar: String,
     sidecar_digest: RecordDigest,
     pending: bool,
+    receipt_sidecars: BTreeMap<String, RecordDigest>,
     payloads: BTreeSet<RecordDigest>,
     manifests: BTreeSet<RecordDigest>,
 }
@@ -39,6 +41,20 @@ impl NativeCaptureRetention {
             ("sidecar", Json::text(&self.sidecar)),
             ("sidecar_digest", Json::text(self.sidecar_digest.to_hex())),
             ("pending", Json::Bool(self.pending)),
+            (
+                "receipt_sidecars",
+                Json::Array(
+                    self.receipt_sidecars
+                        .iter()
+                        .map(|(name, digest)| {
+                            Json::object([
+                                ("name", Json::text(name)),
+                                ("digest", Json::text(digest.to_hex())),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
             (
                 "payloads",
                 Json::Array(
@@ -200,6 +216,19 @@ impl ProvisionedAttachment {
                 return Err(invalid("capture recovery roots exceed bound"));
             }
         }
+        // Every recorded version remains retained. Include older exact-retry frame objects,
+        // which do not appear as operation payloads or manifest chunks in the journal.
+        let receipts = self.capture_receipt_roots_with_context(
+            &operations,
+            &mut payload_budget,
+            &configuration,
+            &proof,
+            CaptureReceiptScope::AllCompleted,
+        )?;
+        payloads.extend(receipts.payloads);
+        if payloads.len() > 65536 {
+            return Err(invalid("capture recovery roots exceed bound"));
+        }
         let facts = NativeCaptureRetention {
             operation: intent.operation,
             request,
@@ -209,6 +238,7 @@ impl ProvisionedAttachment {
             sidecar: sidecar.clone(),
             sidecar_digest: hash(raw.as_bytes()),
             pending,
+            receipt_sidecars: receipts.sidecars,
             payloads,
             manifests: manifests.keys().copied().collect(),
         };
@@ -231,6 +261,12 @@ impl ProvisionedAttachment {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CaptureReceiptScope {
+    AllCompleted,
+    SelectedWithPending,
+}
+
 pub(in crate::project_attachment) struct CaptureReceiptRoots {
     pub(in crate::project_attachment) payloads: BTreeSet<RecordDigest>,
     pub(in crate::project_attachment) manifests: BTreeSet<RecordDigest>,
@@ -250,6 +286,35 @@ impl ProvisionedAttachment {
         self.check_dependency_registration()?;
         let (configuration, proof) = context.read(self)?;
         let proof = proof.ok_or_else(|| invalid("capture receipt enrollment missing"))?;
+        let result = self.capture_receipt_roots_with_context(
+            operations,
+            budget,
+            &configuration,
+            proof.private_evidence(),
+            CaptureReceiptScope::SelectedWithPending,
+        )?;
+        guard.ensure_current().map_err(error)?;
+        Ok(result)
+    }
+
+    // The selected-operation graph includes a fully committed pending capture. The complete
+    // capture inspector handles its own possibly torn pending frames and requires every receipt
+    // to name an operation in its reconstructed journal.
+    fn capture_receipt_roots_with_context(
+        &self,
+        operations: &BTreeSet<RecordDigest>,
+        budget: &mut usize,
+        configuration: &str,
+        proof: &crate::project_attachment::VerifiedPrivateHistory,
+        scope: CaptureReceiptScope,
+    ) -> io::Result<CaptureReceiptRoots> {
+        let guard =
+            crate::workspace_custody::lock_workspace_initialization(&self.store).map_err(error)?;
+        self.check_dependency_registration()?;
+        // The caller verifies configuration in its own context. Completed consumption may
+        // use the prospective configuration authenticated by its retained start while this
+        // journal proof still binds the original configuration. The capture inspector instead
+        // requires direct configuration equality before reaching this helper.
         let names = self
             .store
             .filesystem()
@@ -292,6 +357,11 @@ impl ProvisionedAttachment {
                 return Err(invalid("capture receipt request name changed"));
             }
             if !operations.contains(&intent.operation) {
+                if scope == CaptureReceiptScope::AllCompleted {
+                    return Err(invalid(
+                        "capture receipt operation missing from complete history",
+                    ));
+                }
                 continue;
             }
             if claimed.insert(intent.operation, intent.request).is_some() {
@@ -310,7 +380,7 @@ impl ProvisionedAttachment {
                 journal,
                 &bytes,
                 proof.binding().authority,
-                &configuration,
+                configuration,
             )?;
             if bytes.len() < intent.before_bytes.saturating_add(frames.len()) {
                 return Err(invalid("completed capture receipt is not fully journaled"));
@@ -320,46 +390,50 @@ impl ProvisionedAttachment {
                 .sidecars
                 .insert(name.to_owned(), hash(raw.as_bytes()));
         }
-        match read_private_in_store(&self.store, PENDING) {
-            Ok(raw) => {
-                let intent = CaptureIntent::parse(&raw)?;
-                let frames = validate_frames(&cas, &intent)?;
-                *budget = budget
-                    .checked_sub(intent.before_bytes)
-                    .and_then(|n| n.checked_sub(frames.len().saturating_mul(2)))
-                    .ok_or_else(|| invalid("pending capture verification exceeds bound"))?;
-                capture_prefix(
-                    &cas,
-                    &raw,
-                    journal,
-                    &bytes,
-                    proof.binding().authority,
-                    &configuration,
-                )?;
-                if bytes.len() < intent.before_bytes.saturating_add(frames.len()) {
-                    return Err(invalid(
-                        "pending capture needs exact recovery before graph inspection",
-                    ));
+        if scope == CaptureReceiptScope::SelectedWithPending {
+            match read_private_in_store(&self.store, PENDING) {
+                Ok(raw) => {
+                    let intent = CaptureIntent::parse(&raw)?;
+                    let frames = validate_frames(&cas, &intent)?;
+                    *budget = budget
+                        .checked_sub(intent.before_bytes)
+                        .and_then(|n| n.checked_sub(frames.len().saturating_mul(2)))
+                        .ok_or_else(|| invalid("pending capture verification exceeds bound"))?;
+                    capture_prefix(
+                        &cas,
+                        &raw,
+                        journal,
+                        &bytes,
+                        proof.binding().authority,
+                        configuration,
+                    )?;
+                    if bytes.len() < intent.before_bytes.saturating_add(frames.len()) {
+                        return Err(invalid(
+                            "pending capture needs exact recovery before graph inspection",
+                        ));
+                    }
+                    if claimed
+                        .get(&intent.operation)
+                        .is_some_and(|request| *request != intent.request)
+                    {
+                        return Err(invalid("pending capture conflicts with completed request"));
+                    }
+                    let pending = self.inspect_dependency_capture_retention(intent.request)?;
+                    if pending.journal != hash(&bytes)
+                        || pending.sidecar_digest != hash(raw.as_bytes())
+                    {
+                        return Err(invalid("pending capture retention snapshot changed"));
+                    }
+                    result.sidecars.extend(pending.receipt_sidecars);
+                    result.payloads.extend(pending.payloads);
+                    result.manifests.extend(pending.manifests);
+                    result
+                        .sidecars
+                        .insert(PENDING.to_owned(), pending.sidecar_digest);
                 }
-                if claimed
-                    .get(&intent.operation)
-                    .is_some_and(|request| *request != intent.request)
-                {
-                    return Err(invalid("pending capture conflicts with completed request"));
-                }
-                let pending = self.inspect_dependency_capture_retention(intent.request)?;
-                if pending.journal != hash(&bytes) || pending.sidecar_digest != hash(raw.as_bytes())
-                {
-                    return Err(invalid("pending capture retention snapshot changed"));
-                }
-                result.payloads.extend(pending.payloads);
-                result.manifests.extend(pending.manifests);
-                result
-                    .sidecars
-                    .insert(PENDING.to_owned(), pending.sidecar_digest);
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
             }
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e),
         }
         for (name, expected) in &result.sidecars {
             if hash(read_private_in_store(&self.store, name)?.as_bytes()) != *expected {

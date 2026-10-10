@@ -34,6 +34,13 @@ checks. Its reconciliation with merged background saving also passed the complet
 3,985 native, 194 rendered, 672 desktop and 44 daemon checks; fresh hosted checks and merge
 are pending. Complete cross-project retention
 and cleanup authority remain unfinished; local recovery facts cannot authorize collection.
+The capture inspector also verifies all completed historical capture receipts and retains their
+retry frame objects and sidecar digests. Focused root/consumed and ordinary capture tests cover
+successful inspection and historical missing/corrupt-object refusal without repair. Its corrected
+full gate passed 3,984 native, 194 rendered, 672 desktop and 44 real-daemon checks. Hosted validation
+and delivery of this extension remain pending. This still does not establish the complete store
+inventory or authorize collection.
+
 
 A separate native background-service increment now passes focused root and consumed-lane tests
 for explicitly trusted saves, unchanged observations and recovery before newer progress. Its full gate passed 3,985 native, 194 rendered, 672 desktop and 44 daemon checks. It merged as #368 at
