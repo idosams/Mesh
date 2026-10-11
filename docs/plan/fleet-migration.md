@@ -9786,3 +9786,93 @@ resolution are preserved; all four Rust implementation hashes still match the fr
 full gate. A fresh exact-head thirteen-check run is required on this updated branch. Product merge
 remains held until both that run and the independent repaired-main run succeed. The earlier
 cancelled completion-main run remains recorded as cancelled; no check or deadline was bypassed.
+
+
+## Configured-trust native saved history in desktop review (R215, in progress)
+
+[Issue #412](https://github.com/idosams/Mesh/issues/412) continues from published
+[PR #409](https://github.com/idosams/Mesh/pull/409), updated source
+`04923ae8a3db1b252a844570d2ebfd349af618b2`. Its original44df exact-head run38139053247 passed all
+thirteen. The CI-only [PR #411](https://github.com/idosams/Mesh/pull/411) merged normally as
+`a02f9cbeaa40cdf45ae7caa41bc8216ea5b10b4f`; independent main
+[38142803222](https://github.com/idosams/Mesh/actions/runs/38142803222) now passed all thirteen,
+complete3,573 Linux/4,011 macOS partition coverage, native renderers and real-daemon44. The original
+cancelled beec main is still recorded as cancelled. Refreshed409 run38143542753 is pending at this
+receipt, and product merge remains held for that exact-head proof. This increment replaces no
+legacy commit. Eight dirty paths advanced to the published updated parent by a normal verified
+fast-forward: bytes, inodes, modes, status and both patches stayed identical, with raw index,
+original snapshots and the stale-base refusal/resolution preserved.
+
+The old ordinary desktop readers refuse signed native publication, even though the explicit
+configured-trust completed-history APIs can verify it. Four new original-registration read APIs
+select the bounded recorded format and invoke its complete verifier. The marker is a format hint,
+not authority. Native replay uses configured public trust and the full bounded registration,
+source/ancestor/publication/private-history context. Failure never falls back to an ordinary reader.
+The closed adapter returns saved version IDs, bounded entries, text/binary/too-large facts or exact
+comparisons, with original registration/marker revalidation before acknowledgement. Existing schemas,
+200-entry pages and256 KiB text bounds are retained. No workspace accessor, persisted format,
+mutable admission, capture/run/main authority or writer is added.
+
+Desktop version listing, entries/text, comparison and selected comparison paths reload configured
+public trust for each call after releasing the registry mutex. Production uses its existing native
+credential loader, which does not prompt for main approval. Capture recovery deliberately retains
+its existing admission path; a successful history read cannot resume or authorize capture. The
+rendered Show latest versions control permits an explicit lookup without a capture latest-version
+pointer, while busy, unavailable or stale native sessions still block it. No automatic history
+replay is added to every status poll.
+
+The original baseline passed the actual root fixture while all four legacy desktop readers refused.
+The initial new native campaign passed three cases in261.061s. Expanded UI testing first refused
+before tests because the fresh worktree lacked esbuild; the locked dependency install resolved it.
+Workspace lint and two rendered UI cases passed. The first expanded selector ran only the process
+helper and the actual cold-host case, leaving native-parent coverage incomplete; that insufficient
+selection and log are preserved. The corrected selector ran both real root/consumed parents,
+three actual fresh child processes per parent, the helper and cold-host test with all nine source
+hashes unchanged:
+
+`PASS [   0.014s] (1/4) mesh-daemon project_attachment::dependency_publication_replay::tests::native_completed_history::completed_history_restart_child`
+`PASS [   0.355s] (2/4) mesh-desktop::bin/mesh-desktop attachment_host::tests::saved_review_reloads_configured_trust_outside_registry_lock_after_cold_reopen`
+`PASS [  51.903s] (3/4) mesh-daemon project_attachment::dependency_publication_replay::tests::native_completed_versions_after_root_publication`
+`PASS [ 381.553s] (4/4) mesh-daemon project_attachment::dependency_publication_replay::tests::native_completed_versions_after_consumed_publication`
+
+The actual signed histories exercise version list, entries, old/new immutable text, binary and
+262,145-byte metadata-only previews, ignored Git paths and selected comparisons after a separate
+native save. Unfinished completion, missing trust, foreign versions/cursors/paths, damaged completion,
+unknown format, a well-formed legacy downgrade and same-byte/same-mode substituted selected storage
+refuse without repair. Original source/editor/untracked/Git work and selected metadata bytes,
+inodes and modes are preserved across reads. Only fixture-owned corrupted bytes are restored.
+Cold desktop ordinary-history regression proves eight fresh loader calls, including refused reads,
+with the registry lock released, no resumed worker and unchanged journal/editor bytes. Rendered
+control regressions exercise missing capture readiness and all three native-session blockers.
+The long consumed completed-history campaign joins existing early priority scheduling; assertions,
+child processes, deadlines, all three workers and complete coverage requirements stay unchanged.
+
+Full frozen-source npm verification and fresh exact-head hosted proof are required. Actual graphical
+native review, configured OS credential availability/presence, authenticated controller/capture/run
+adoption, main integration/restore, exhaustive native prefixes and both-order concurrency, qualified
+collection, second provider/host and eligible packaged acceptance remain unfinished. Test fixture
+wall times are not production read-latency or velocity measurements. The
+[full fleet objective](https://github.com/idosams/Mesh/issues/345) remains open. The fixed user
+checkpoint and installed app are unchanged and do not contain this increment.
+
+
+R215 complete frozen-source npm verification passed with the isolated nextest0.9.145:
+`Summary [1180.248s] 4015 tests run: 4015 passed (29 slow), 18 skipped`
+Repository48, docs5/114-document audit, license/storage checks, fmt/full workspace clippy,
+renderer196, desktop676, two demo regressions and all44 real-daemon checks passed. Both actual
+new native parents, the cold-host trust-loader case, prior native completion/owner/checkpoint and
+both exhaustive shared byte-prefix campaigns passed. All thirteen frozen source/config/document
+hashes and the global/pinned/private dispatcher runtime bytes stayed unchanged. Only this final
+receipt changes afterward, with separate docs validation; all ten non-document hashes still match
+the full gate. Full logs, frozen source and runtime receipts are retained.
+
+Dependency409 refreshed run38143542753 ended cancelled at its20-minute worker-one job limit.
+All3,576 Linux/4,014 macOS native cases, real-daemon44, renderers4 and every individual worker-one
+step passed before job completion, but the overall job was cancelled and the aggregate correctly
+failed. This is not thirteen-check qualification. Full terminal logs, runner annotations, exact
+partition coverage and hashes are preserved before correction. Worker two's native547.188s versus
+worker one's852.195s supports a separate narrow relocation of existing daemon/renderer steps to
+worker two, retaining every check and deadline. No unchanged rerun or merge bypass is used.
+This increment publishes against that actual published parent; merge remains held for the
+corrected parent, fresh exact-head checks and independent main qualification. The fixed checkpoint
+and installed app remain unchanged. The complete objective stays open.

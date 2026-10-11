@@ -11,7 +11,7 @@ priority = 100
 [[profile.default.overrides]]
 # These complete consumed-native recovery campaigns dominate the macOS critical path.
 # Start them before short fixtures; keep every assertion, child boundary and deadline.
-filter = 'test(native_consumed_start_after_consumed_publication) | test(native_consumed_checkpoint_after_consumed_publication) | test(native_consumption_owner_after_consumed_publication) | test(native_consumption_completion_after_consumed_publication) | test(native_writer_commits_consumed_publications_and_recovers_completed_retries)'
+filter = 'test(native_consumed_start_after_consumed_publication) | test(native_consumed_checkpoint_after_consumed_publication) | test(native_consumption_owner_after_consumed_publication) | test(native_consumption_completion_after_consumed_publication) | test(native_writer_commits_consumed_publications_and_recovers_completed_retries) | test(native_completed_versions_after_consumed_publication)'
 priority = 100
 
 [[profile.default.overrides]]

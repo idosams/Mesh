@@ -179,7 +179,7 @@ pub(super) fn saved_operation(
     Ok(digest)
 }
 
-pub(super) fn compare_history(
+pub(crate) fn compare_history(
     workspace: &OpenWorkspace,
     base: &str,
     target: &str,
@@ -289,7 +289,7 @@ pub(super) fn compare_history(
     ]))
 }
 
-pub(super) fn entries_history(
+pub(crate) fn entries_history(
     workspace: &OpenWorkspace,
     operation: &str,
     after: Option<&str>,
@@ -360,7 +360,7 @@ pub(super) fn entries_history(
     ]))
 }
 
-pub(super) fn text_history(
+pub(crate) fn text_history(
     workspace: &OpenWorkspace,
     operation: &str,
     path: &str,

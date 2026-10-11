@@ -16,6 +16,7 @@ const MAX_PROJECTS: usize = 32;
 const UNAVAILABLE: &str = "Attachment storage is unavailable or needs reconciliation";
 
 pub struct AttachmentHost {
+    review_trust: fn() -> mesh_daemon::TrustedReviewers,
     storage_path: PathBuf,
     #[cfg(target_os = "macos")]
     fleet_path: PathBuf,
@@ -84,6 +85,7 @@ fn fleet_candidate_envelope(
 impl AttachmentHost {
     pub fn new(application_data: &Path) -> Self {
         Self {
+            review_trust: mesh_daemon::TrustedReviewers::default,
             storage_path: application_data.join("attached-projects"),
             #[cfg(target_os = "macos")]
             fleet_path: application_data.join("fleets"),
@@ -91,6 +93,16 @@ impl AttachmentHost {
             fleets: Mutex::new(None),
             state: Mutex::new(HostState::default()),
         }
+    }
+
+    /// Reload configured public native trust per read. This never prompts for main approval.
+    pub fn with_review_trust_loader(
+        application_data: &Path,
+        review_trust: fn() -> mesh_daemon::TrustedReviewers,
+    ) -> Self {
+        let mut host = Self::new(application_data);
+        host.review_trust = review_trust;
+        host
     }
 
     fn initialize(&self, state: &mut HostState, create: bool) -> Result<(), String> {
@@ -760,7 +772,7 @@ impl AttachmentHost {
         // Retain authority, then release the registry lock before journal verification or disk IO.
         let (storage, history) = self.registered_read_authority(id)?;
         let versions = storage
-            .registered_review_versions(&history)
+            .registered_review_versions_with_trust(&history, &(self.review_trust)())
             .map_err(|_| "Saved attachment history is unavailable")?;
         let end = match before {
             None => versions.len(),
@@ -808,8 +820,18 @@ impl AttachmentHost {
         }
         let (storage, history) = self.registered_read_authority(id)?;
         let inspection = match path {
-            Some(path) => storage.registered_review_text(&history, operation, path),
-            None => storage.registered_review_entries(&history, operation, after),
+            Some(path) => storage.registered_review_text_with_trust(
+                &history,
+                operation,
+                path,
+                &(self.review_trust)(),
+            ),
+            None => storage.registered_review_entries_with_trust(
+                &history,
+                operation,
+                after,
+                &(self.review_trust)(),
+            ),
         }
         .map_err(|_| "The exact saved version could not be inspected")?;
         Ok(Json::object([("project", Json::text(id)), ("inspection", inspection)]).encode())
@@ -824,7 +846,13 @@ impl AttachmentHost {
     ) -> Result<String, String> {
         let (storage, history) = self.registered_read_authority(id)?;
         let comparison = storage
-            .registered_review_comparison(&history, base, target, (after, None))
+            .registered_review_comparison_with_trust(
+                &history,
+                base,
+                target,
+                (after, None),
+                &(self.review_trust)(),
+            )
             .map_err(|_| "The exact saved versions could not be compared")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
@@ -1375,7 +1403,13 @@ impl AttachmentHost {
     ) -> Result<String, String> {
         let (storage, history) = self.registered_read_authority(id)?;
         let comparison = storage
-            .registered_review_comparison(&history, base, target, (None, Some(path)))
+            .registered_review_comparison_with_trust(
+                &history,
+                base,
+                target,
+                (None, Some(path)),
+                &(self.review_trust)(),
+            )
             .map_err(|_| "Saved comparison path is unavailable")?;
         Ok(Json::object([("project", Json::text(id)), ("comparison", comparison)]).encode())
     }
@@ -1980,6 +2014,112 @@ mod tests {
         drop(host);
         fs::remove_dir_all(root).unwrap();
     }
+    #[test]
+    fn saved_review_reloads_configured_trust_outside_registry_lock_after_cold_reopen() {
+        use mesh_daemon::project_attachment::ObservationLimits;
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, OnceLock, Weak,
+        };
+        static HOST: OnceLock<Weak<AttachmentHost>> = OnceLock::new();
+        static LOADS: AtomicUsize = AtomicUsize::new(0);
+        fn load() -> mesh_daemon::TrustedReviewers {
+            let host = HOST.get().unwrap().upgrade().unwrap();
+            assert!(
+                host.state.try_lock().is_ok(),
+                "trust lookup retained the registry lock"
+            );
+            LOADS.fetch_add(1, Ordering::SeqCst);
+            mesh_daemon::TrustedReviewers::default()
+        }
+        let root =
+            std::env::temp_dir().join(format!("mesh-desktop-review-trust-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("note"), b"first saved text").unwrap();
+        fs::create_dir(root.join("attached-projects")).unwrap();
+        let storage = AttachmentStorage::open(&root.join("attached-projects")).unwrap();
+        let history = storage.provision(&source).unwrap();
+        let signer = NativeCaptureSigner::generate().unwrap();
+        let save = || {
+            let input = history
+                .project()
+                .capture_inputs(ObservationLimits::default())
+                .unwrap();
+            history
+                .project()
+                .save_capture(
+                    history.metadata_path(),
+                    &input,
+                    signer.public_key(),
+                    |payload| signer.sign(payload),
+                )
+                .unwrap()
+                .operation()
+                .to_string()
+        };
+        let first = save();
+        fs::write(source.join("note"), b"second saved text").unwrap();
+        let second = save();
+        let records = history.metadata_path().join(mesh_daemon::RECORD_FILE_NAME);
+        let journal_before = fs::read(&records).unwrap();
+        let host = Arc::new(AttachmentHost::with_review_trust_loader(&root, load));
+        HOST.set(Arc::downgrade(&host)).unwrap();
+        host.projects().unwrap();
+        assert_eq!(
+            LOADS.load(Ordering::SeqCst),
+            0,
+            "capture recovery loaded review trust"
+        );
+        {
+            let state = host.state.lock().unwrap();
+            let project = &state.projects[history.id()];
+            assert!(project.service.is_none());
+            assert_eq!(project.recovery, Some("restored-stopped"));
+        }
+        assert!(host.versions(history.id(), None).unwrap().contains(&second));
+        assert!(host.versions(history.id(), None).unwrap().contains(&first));
+        assert!(host
+            .inspect(history.id(), &first, None, None)
+            .unwrap()
+            .contains("note"));
+        assert!(host
+            .inspect(history.id(), &first, Some("note"), None)
+            .unwrap()
+            .contains("first saved text"));
+        assert!(host
+            .compare(history.id(), &first, &second, None)
+            .unwrap()
+            .contains("modified"));
+        assert!(host
+            .comparison_path(history.id(), &first, &second, "note")
+            .unwrap()
+            .contains("modified"));
+        assert_eq!(LOADS.load(Ordering::SeqCst), 6);
+        assert!(host.versions("foreign-registration", None).is_err());
+        assert!(host
+            .inspect(history.id(), &first, Some("note"), Some("note"))
+            .is_err());
+        assert_eq!(LOADS.load(Ordering::SeqCst), 6);
+        assert!(host
+            .inspect(history.id(), &"f".repeat(64), Some("note"), None)
+            .is_err());
+        assert!(host.versions(history.id(), Some("foreign-cursor")).is_err());
+        assert_eq!(
+            LOADS.load(Ordering::SeqCst),
+            8,
+            "failed reads reused cached trust"
+        );
+        assert_eq!(fs::read(&records).unwrap(), journal_before);
+        assert_eq!(fs::read(source.join("note")).unwrap(), b"second saved text");
+        assert!(host.state.lock().unwrap().projects[history.id()]
+            .service
+            .is_none());
+        drop(host);
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn version_pages_are_exact_and_preserve_cursor_while_new_work_is_saved() {
         use mesh_daemon::project_attachment::ObservationLimits;
