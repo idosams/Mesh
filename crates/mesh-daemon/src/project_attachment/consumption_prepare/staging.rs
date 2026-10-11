@@ -44,7 +44,7 @@ static ATTEMPTS: AtomicU64 = AtomicU64::new(0);
 
 /// An exact durable private stage. This is not a saved version, consumption receipt or run permit.
 pub struct StagedNativeConsumedStart {
-    root: PinnedWorkspaceRoot,
+    pub(super) root: PinnedWorkspaceRoot,
     receipt: RecordDigest,
     request: RecordDigest,
 }
@@ -495,14 +495,9 @@ impl PreparedNativeConsumedStart {
         if graph.digest() != self.basis.graph {
             return Err(invalid("staging source closure changed"));
         }
-        let graph = Json::object([
-            ("closure", graph.to_json()),
-            ("retained", graph.retained_content_json()),
-        ]);
         let origin = storage
             .lane_origin_bound(&self.destination)?
             .ok_or_else(|| invalid("staging reservation missing"))?;
-        let target = format!("consumption-{}", self.request.to_hex());
         // Private immutable staging holds destination and allocation custody. It cannot extend
         // that set or call complete graph/grant revalidation until this guard has been released.
         let guard = crate::workspace_custody::lock_workspace_initialization_set(&[
@@ -511,7 +506,37 @@ impl PreparedNativeConsumedStart {
             origin.allocation.clone(),
         ])
         .map_err(error)?;
-        let root = match origin.allocation.open_child_directory(OsStr::new(&target)) {
+        let staged = self.stage_material_held(&graph, &origin.allocation, &guard, &mut hook)?;
+        drop(guard);
+        hook("custody-released", &staged.root)?;
+        // Recheck permission and the complete source basis after private work; this is not
+        // authority for a later installation. The consuming commit needs its own full barrier.
+        self.revalidate(storage)?;
+        Ok(staged)
+    }
+    pub(super) fn stage_material_held(
+        &self,
+        graph: &super::super::NativeDependencyGraph,
+        allocation: &PinnedWorkspaceRoot,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+        mut hook: impl FnMut(&str, &PinnedWorkspaceRoot) -> io::Result<()>,
+    ) -> io::Result<StagedNativeConsumedStart> {
+        guard
+            .require_roots(&[
+                self.destination.store.clone(),
+                self.destination.attachment.pinned.clone(),
+                allocation.clone(),
+            ])
+            .map_err(error)?;
+        if graph.digest() != self.basis.graph {
+            return Err(invalid("staging source closure changed"));
+        }
+        let graph = Json::object([
+            ("closure", graph.to_json()),
+            ("retained", graph.retained_content_json()),
+        ]);
+        let target = format!("consumption-{}", self.request.to_hex());
+        let root = match allocation.open_child_directory(OsStr::new(&target)) {
             Ok(root) => root,
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 let stamp = std::time::SystemTime::now()
@@ -524,19 +549,16 @@ impl PreparedNativeConsumedStart {
                     std::process::id(),
                     ATTEMPTS.fetch_add(1, Ordering::Relaxed)
                 );
-                let root = origin
-                    .allocation
-                    .create_child_directory(OsStr::new(&name))?;
+                let root = allocation.create_child_directory(OsStr::new(&name))?;
                 write(
                     &root,
                     "attempt.json",
                     self.attempt_manifest(&root)?.as_bytes(),
                 )?;
                 root.sync()?;
-                origin.allocation.sync()?;
+                allocation.sync()?;
                 hook("attempt-created", &root)?;
-                let receipts =
-                    self.entry_receipts(&root, true, false, &origin.allocation, &guard)?;
+                let receipts = self.entry_receipts(&root, true, false, allocation, guard)?;
                 hook("entries-staged", &root)?;
                 for bytes in &self.checkpoint.objects {
                     write(&root, &format!("object-{}", hash(bytes).to_hex()), bytes)?;
@@ -549,32 +571,47 @@ impl PreparedNativeConsumedStart {
                 write(&root, RECEIPT, manifest.as_bytes())?;
                 root.sync()?;
                 hook("bundle-synced", &root)?;
-                self.verify_stage(&root, &graph, &origin.allocation, &guard)?;
+                self.verify_stage(&root, &graph, allocation, guard)?;
                 guard.ensure_current().map_err(error)?;
-                origin.allocation.publish_child_directory(
+                allocation.publish_child_directory(
                     OsStr::new(&name),
                     &root,
-                    &origin.allocation,
+                    allocation,
                     OsStr::new(&target),
                 )?
             }
             Err(e) => return Err(e),
         };
         hook("published", &root)?;
-        let receipt = self.verify_stage(&root, &graph, &origin.allocation, &guard)?;
+        let receipt = self.verify_stage(&root, &graph, allocation, guard)?;
         root.sync()?;
-        origin.allocation.sync()?;
+        allocation.sync()?;
         guard.ensure_current().map_err(error)?;
-        drop(guard);
-        hook("custody-released", &root)?;
-        // Recheck permission and the complete source basis after private work; this is not
-        // authority for a later installation. The consuming commit needs its own full barrier.
-        self.revalidate(storage)?;
         Ok(StagedNativeConsumedStart {
             root,
             receipt,
             request: self.request,
         })
+    }
+    pub(super) fn verify_native_stage_held(
+        &self,
+        staged: &StagedNativeConsumedStart,
+        graph: &super::super::NativeDependencyGraph,
+        allocation: &PinnedWorkspaceRoot,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<()> {
+        let graph = Json::object([
+            ("closure", graph.to_json()),
+            ("retained", graph.retained_content_json()),
+        ]);
+        if self.verify_stage(&staged.root, &graph, allocation, guard)? != staged.receipt
+            || staged.request != self.request
+        {
+            return Err(invalid(
+                "native private staging changed before acknowledgement",
+            ));
+        }
+        Ok(())
     }
 }
 

@@ -1,6 +1,8 @@
 //! Signed consumption candidates. Preparation writes nothing and does not reserve a commit order.
 pub(super) mod source_verification;
 mod staging;
+mod trusted;
+pub use trusted::{NativeTrustedConsumedStartRequest, PreparedNativeTrustedConsumedStart};
 pub(super) const START_PENDING: &str = "consumption-start.pending";
 use super::{
     consumption_start::{prepare_initial_snapshot, InitialSnapshot},
@@ -42,12 +44,12 @@ pub struct NativeConsumedStartRequest<'a> {
     pub limits: ObservationLimits,
 }
 #[derive(PartialEq, Eq)]
-struct Basis {
-    configuration: String,
-    prospective: String,
-    graph: RecordDigest,
-    destination: NativeDependencyWorkBinding,
-    enrollment: crate::dependency_policy::NativeDependencyBinding,
+pub(super) struct Basis {
+    pub(super) configuration: String,
+    pub(super) prospective: String,
+    pub(super) graph: RecordDigest,
+    pub(super) destination: NativeDependencyWorkBinding,
+    pub(super) enrollment: crate::dependency_policy::NativeDependencyBinding,
 }
 /// An immutable authenticated candidate, not a saved version or continuing permission.
 /// A future consumption commit must retain custody through revalidation and durable completion.
@@ -82,6 +84,18 @@ impl PreparedNativeConsumedStart {
     pub fn revalidate(&self, storage: &AttachmentStorage) -> io::Result<()> {
         self.with_revalidated_start(storage, |_| Ok(()))
     }
+    fn verify_prepared_basis(&self, basis: &Basis) -> io::Result<()> {
+        if *basis != self.basis
+            || super::consumption_plan::InitialPlan::verify(
+                &self.checkpoint,
+                WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
+                self.limits,
+            )? != self.plan
+        {
+            return Err(invalid("consumption preparation basis changed"));
+        }
+        Ok(())
+    }
     // The transaction must perform its first mutation inside this callback. A successful return
     // is not continuing authority. Callbacks remain synchronous and may not extend the root set.
     fn with_revalidated_start<T>(
@@ -106,15 +120,7 @@ impl PreparedNativeConsumedStart {
             &request,
             self.actor,
             |basis, _, _, guard| {
-                if basis != self.basis
-                    || super::consumption_plan::InitialPlan::verify(
-                        &self.checkpoint,
-                        WorkspaceId::from_bytes(short_id(self.basis.prospective.as_bytes())),
-                        self.limits,
-                    )? != self.plan
-                {
-                    return Err(invalid("consumption preparation basis changed"));
-                }
+                self.verify_prepared_basis(&basis)?;
                 guard.ensure_current().map_err(error)?;
                 apply(guard)
             },
@@ -152,8 +158,21 @@ impl AttachmentStorage {
         F: FnOnce(&SigningPayload) -> Result<Signature, E>,
         E: std::fmt::Display,
     {
-        let (basis, snapshot, history) =
-            self.inspect_consumed_start_basis(owner, &request, actor)?;
+        let material = self.inspect_consumed_start_basis(owner, &request, actor)?;
+        self.sign_consumed_start_candidate(owner, request, actor, material, sign)
+    }
+    fn sign_consumed_start_candidate<F, E>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        actor: PublicKey,
+        (basis, snapshot, history): (Basis, InitialSnapshot, OpenWorkspace),
+        sign: F,
+    ) -> io::Result<PreparedNativeConsumedStart>
+    where
+        F: FnOnce(&SigningPayload) -> Result<Signature, E>,
+        E: std::fmt::Display,
+    {
         let make_request = |signature| {
             AuthenticatedOperationCheckpointRequest::new(
                 WorkspaceId::from_bytes(short_id(basis.prospective.as_bytes())),
@@ -313,29 +332,7 @@ impl AttachmentStorage {
         }
         let (prospective, snapshot) =
             self.with_input_grant_owner(&grant, &guard, &context, |input| {
-                let rules = input.starting_exclusion_rules()?;
-                let policy = super::observation::policy_digest(&rules);
-                let mut proposed = Json::parse(&configuration).map_err(error)?;
-                let Json::Object(fields) = &mut proposed else {
-                    return Err(invalid("invalid destination configuration"));
-                };
-                let field = fields
-                    .iter_mut()
-                    .find(|(name, _)| name == "exclusions")
-                    .ok_or_else(|| invalid("missing destination exclusions"))?;
-                field.1 = Json::text(policy.to_string());
-                let (prospective, _) = destination.project().history_configuration_with_previous(
-                    &destination.store,
-                    Some(policy),
-                    Some(proposed.encode()),
-                )?;
-                let snapshot = prepare_initial_snapshot(
-                    &input,
-                    WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
-                    ActorId::from_bytes(*actor.as_bytes()),
-                    request.limits,
-                )?;
-                Ok((prospective, snapshot))
+                starting_snapshot(destination, &configuration, &input, actor, request.limits)
             })?;
         let (current_configuration, current_proof) = destination
             .project()
@@ -366,6 +363,38 @@ impl AttachmentStorage {
             &guard,
         )
     }
+}
+
+pub(super) fn starting_snapshot(
+    destination: &ProvisionedAttachment,
+    configuration: &str,
+    input: &super::NativeGrantedInput<'_>,
+    actor: PublicKey,
+    limits: ObservationLimits,
+) -> io::Result<(String, InitialSnapshot)> {
+    let rules = input.starting_exclusion_rules()?;
+    let policy = super::observation::policy_digest(&rules);
+    let mut proposed = Json::parse(configuration).map_err(error)?;
+    let Json::Object(fields) = &mut proposed else {
+        return Err(invalid("invalid destination configuration"));
+    };
+    let field = fields
+        .iter_mut()
+        .find(|(name, _)| name == "exclusions")
+        .ok_or_else(|| invalid("missing destination exclusions"))?;
+    field.1 = Json::text(policy.to_string());
+    let (prospective, _) = destination.project().history_configuration_with_previous(
+        &destination.store,
+        Some(policy),
+        Some(proposed.encode()),
+    )?;
+    let snapshot = prepare_initial_snapshot(
+        input,
+        WorkspaceId::from_bytes(short_id(prospective.as_bytes())),
+        ActorId::from_bytes(*actor.as_bytes()),
+        limits,
+    )?;
+    Ok((prospective, snapshot))
 }
 
 /// Reconstruction hints only; the capture writer must authenticate the complete transaction.

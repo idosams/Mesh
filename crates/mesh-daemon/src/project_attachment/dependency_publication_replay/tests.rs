@@ -6,6 +6,8 @@ mod consumption_install_retention;
 mod consumption_owner_retention;
 #[path = "tests/consumption_retention.rs"]
 mod consumption_retention;
+#[path = "tests/native_consumption_start.rs"]
+mod native_consumption_start;
 #[path = "tests/native_grant.rs"]
 mod native_grant;
 #[path = "tests/native_reservation.rs"]
@@ -138,6 +140,10 @@ fn native_trusted_grants_after_root_publication() {
 #[test]
 fn native_reservations_after_root_publication() {
     root_publication_fixture(11);
+}
+#[test]
+fn native_consumed_start_after_root_publication() {
+    root_publication_fixture(12);
 }
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
@@ -408,6 +414,18 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if writer == 12 {
+        native_consumption_start::inspect(
+            &storage,
+            &owner,
+            &owner,
+            version,
+            &trust,
+            key.public_key().as_ref(),
+            b"first private version",
+        );
+        return;
     }
     if writer == 11 {
         native_reservation::inspect(
@@ -1570,6 +1588,10 @@ fn native_trusted_grants_after_consumed_publication() {
 fn native_reservations_after_consumed_publication() {
     consumed_publication_fixture(13);
 }
+#[test]
+fn native_consumed_start_after_consumed_publication() {
+    consumed_publication_fixture(14);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -2098,6 +2120,18 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if writer == 14 {
+        native_consumption_start::inspect(
+            &storage,
+            &owner,
+            &destination,
+            consumed,
+            &trust,
+            human_key.public_key().as_ref(),
+            b"exact native input",
+        );
+        return;
+    }
     if writer == 13 {
         native_reservation::inspect(
             &storage,

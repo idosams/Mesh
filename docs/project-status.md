@@ -3594,6 +3594,32 @@ run is historical source evidence, not a fresh full combined-head run. All ten f
 final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
 parents' original cancelled runs remain failed evidence.
 
+## Trusted consumed input preparation and private staging (11 October 2026)
+
+The native grant and empty-reservation dependencies are merged as #393 and #395 after all ten
+exact-head checks passed. Their independent main runs also passed all ten at 55485f8 and 29ddcaa. The migration ledger records their preserved source
+commits, exact final heads, merge revisions and complete verification evidence.
+
+A separate native-host path now prepares a signed initial snapshot and privately stages it after
+real root or consumed publication. It independently reconstructs the source through configured
+publication trust, binds the exact current grant to the original destination and rechecks complete
+source/destination/allocation custody. Signing occurs outside custody; every later phase and its
+acknowledgement revalidates the current basis. The ordinary admission path stays closed. Existing
+snapshot and staging formats are shared unchanged, and newer source/editor files and synthetic Git
+state are preserved. The destination remains empty: installation, consumption commit, runnable
+agents, protected-main approval and authenticated UI/harness/fleet routing remain unfinished.
+
+Expanded root/consumed preparation/staging campaigns passed in 301.337s, including actual child
+process exits at all five private staging boundaries, exact fresh-process retries, malformed/private/
+linked receipt refusal, source substitution and actual grant revocation during signing. These are
+software-credential and process-exit regressions. The final source adds cross-owner, unrelated owner
+progress and post-custody acknowledgement cases. Its complete repository gate passed 4,002 native
+tests in 796.881s (19 slow, 18 ignored unchanged), 194 rendered, 676 desktop and 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. Both new native cases passed in full
+(root 122.734s, consumed 620.387s) and all nine Rust source hashes stayed unchanged. Hosted
+publication and merged delivery remain pending. No graphical, power-loss, true concurrent writer, other-provider or second-host
+claim follows. The fixed checkpoint and installed app are unchanged.
+
 
 ## Complete Linux CI partitions (R210, 11 October 2026)
 
@@ -3635,3 +3661,45 @@ The complete actual macOS inventory covered all 3,999 selected cases once in 1,3
 partitions, with 18 ignored unchanged. Both used isolated nextest 0.9.145. Actual hosted Linux
 inventory/execution, all thirteen final-head jobs, ordinary authorized merge and independent
 merged-main verification remain required. No product source or fixed checkpoint changed.
+
+
+## Native staging reconciliation onto complete Linux CI (R208/R210)
+
+CI correction [#402](https://github.com/idosams/Mesh/pull/402) merged normally at
+`502cc9a030a22e123a7a20e6b887bb5a485f6bd9` from tested head
+`059f371220d090bc5fc1d9ef7e23b853e6964c4d`, after all thirteen jobs passed in run38123130355.
+Its complete hosted logs prove all 3,561 Linux cases covered once in 1,189/1,195/1,177
+partitions with seven ignored unchanged; all 3,999 macOS cases covered once in
+1,334/1,344/1,321 partitions with 18 ignored unchanged, plus daemon and all four native
+renderer checks. Independent merged-main run38124020266 remains in progress.
+
+The original #399 source `832dc32fb64a8aadc586302e7b7cb5a3fa7d36e7` and its full local
+4,002-test pass remain preserved. Its first hosted run passed nine jobs but timed out
+at the single Linux test-step deadline; complete logs and diagnosis were archived before
+reconciliation. A normal shared-history merge imports the separately tested CI correction,
+preserving both documentation histories and every original product byte. The guard stopped
+the stale base; actual canonical fetch/push identity, live main502, original832 and common
+ancestor29d were independently verified before resolving documentation conflicts. GitHub's
+historical PR base hash was not substituted for its verified live branch.
+
+This is local reconciliation pending combined-source checks, publication, all thirteen fresh
+exact-head results, ordinary authorized merge and independent main verification. Original full
+local results remain historical source evidence, not a new full combined-head run. The unfinished
+#400 source was separately preserved before any parent update. The
+[full objective](https://github.com/idosams/Mesh/issues/345) remains open; fixed checkpoints and
+the installed app are unchanged.
+
+
+Combined-source R208 revalidation passed both selected cases in 43.593s: real root native staging
+43.584s and ordinary post-custody revocation 2.476s. All 48 repository regressions, documentation
+and formatting passed. The initial full-workspace inventory exposed a stale shared build binary
+that omitted all three R208 tests; that invalid inventory, build log and binary digest are retained
+and are not counted as coverage. A byte-identical affected-crate rebuild produced the actual full
+4,002-test inventory, covered once in 1,336/1,345/1,321 partitions, with 18 ignored unchanged.
+All three named R208 tests were explicitly present. All thirteen checked source hashes remained
+unchanged; the timestamp refresh also preserved the rebuilt source file's bytes, inode and mode.
+Product Rust/UI/Cargo remains identical to the original full-tested832; imported CI code remains
+identical to fully tested059. Later work uses separate build output to avoid cross-checkout reuse.
+This focused/inventory proof is distinct from the original full 4,002-test pass. All thirteen
+fresh hosted checks, prior independent CI-main proof, ordinary merge and independent staging-main
+verification remain required before delivery.
