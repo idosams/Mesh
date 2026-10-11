@@ -3867,6 +3867,37 @@ This final documentation-only receipt follows frozen-source verification. Fresh 
 thirteen-job PR proof, ordinary authorized merge and independent merged-main proof remain required.
 
 
+## Native macOS auxiliary-check balance (R216, in progress)
+
+[Issue #414](https://github.com/idosams/Mesh/issues/414) corrects updated saved-history PR409
+source `04923ae8a3db1b252a844570d2ebfd349af618b2` run
+[38143542753](https://github.com/idosams/Mesh/actions/runs/38143542753). All3,576 Linux/4,014 macOS
+native cases passed in complete disjoint partitions. Worker one's real-daemon44, renderers4 and
+all individual steps, including cleanup, passed; the overall job was nevertheless cancelled at
+its20-minute limit during completion and the macOS aggregate correctly failed. That workflow is
+not qualified. Full terminal logs, API deadline annotations, inventories and SHA256 receipts were
+preserved before correction; no unchanged rerun or aggregate exception is used.
+
+Worker one's native partition took852.195s, worker two547.188s and worker three783.945s. Full
+macOS fmt/clippy, daemon and renderer checks also ran on worker one. Those four existing conditional
+steps now run on the measured shorter second partition. All three native workers and thirteen jobs,
+full macOS lint, exact fresh-binary inventory coverage, nextest0.9.145, all test bodies/assertions,
+process/crash boundaries and20-minute job deadlines remain mandatory. No production Rust/renderer
+source, package command, persisted format, repository setting or fixed app/checkpoint changes.
+
+This clean canonical increment starts from normally merged CI repair411/main
+`a02f9cbeaa40cdf45ae7caa41bc8216ea5b10b4f`. Independent main
+[38142803222](https://github.com/idosams/Mesh/actions/runs/38142803222) passed all thirteen checks,
+complete Linux3,573/macOS4,011 native coverage, native renderers and daemon44. This replaces no
+legacy implementation commit. The source is published with focused repository/docs checks;
+complete frozen-source npm verification, exact-head thirteen-check CI and normal merge remain
+pending at this receipt. The PR carries updated exact-revision evidence when those finish, followed
+by independent merged-main qualification. Then product PR409 and stacked desktop
+[PR #413](https://github.com/idosams/Mesh/pull/413) must reconcile and freshly qualify against it.
+Both original cancelled workflows stay recorded. The complete
+[fleet plan](plan/fleet-orchestration.md) and [open native acceptance scope](https://github.com/idosams/Mesh/issues/345)
+remain required. Local/publication evidence is not merged or packaged delivery.
+
 ## Native CI build reuse and recovery scheduling (R214, in progress)
 
 [Issue #410](https://github.com/idosams/Mesh/issues/410) corrects the independent main run for
