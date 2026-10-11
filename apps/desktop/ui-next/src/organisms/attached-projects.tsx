@@ -112,7 +112,7 @@ export function AttachedProjects() {
         <p className="text-xs text-muted-foreground">{project.captureAgeMs === null ? t("No complete capture in this session") : <>{t("Last complete capture started")} {Math.floor(project.captureAgeMs / 1000)} {t("seconds ago")}</>}. {t("Change author unknown.")}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" disabled={disabled} onClick={() => send({ type: "open-folder", id: project.id })}>{t("Open folder")}</Button>
-          <Button variant="secondary" disabled={disabled || !project.savedVersion}
+          <Button variant="secondary" disabled={disabled}
             onClick={() => send({ type: "versions", id: project.id, before: null })}>{t("Show latest versions")}</Button>
           <Button variant="secondary" disabled={disabled || !project.savedVersion}
             onClick={() => send({ type: "reviews", id: project.id })}>{t("Show review requests")}</Button>

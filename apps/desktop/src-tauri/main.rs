@@ -8510,7 +8510,9 @@ mod desktop {
                 let active_workspace = ActiveWorkspaceLink::new(&app_data_dir);
                 let version_workspaces = VersionWorkspaceDirectory::new(&app_data_dir);
                 let native_capture = NativeCapturePreference::new(&app_data_dir);
-                app.manage(Arc::new(AttachmentHost::new(&app_data_dir)));
+                app.manage(Arc::new(AttachmentHost::with_review_trust_loader(
+                    &app_data_dir, attachment_review_trust,
+                )));
                 app.manage(Arc::new(crate::fleet_host::FleetHosts::default()));
                 #[cfg(target_os = "macos")]
                 app.manage(Arc::new(crate::coordinator_observation::panel::RemotePanel::default()));

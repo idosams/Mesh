@@ -5,7 +5,7 @@ use crate::project_attachment::{
 };
 use std::{
     collections::BTreeMap,
-    os::unix::fs::MetadataExt as _,
+    os::unix::fs::{MetadataExt as _, PermissionsExt as _},
     path::Path,
     process::{Command, Stdio},
     time::{Duration, Instant},
@@ -64,6 +64,32 @@ fn preserved(
         destination_files: tree(destination.project().root()),
     }
 }
+// All four desktop-facing reads must refuse together; none may repair or switch to legacy.
+fn refuse_saved_reads(
+    storage: &AttachmentStorage,
+    selected: &ProvisionedAttachment,
+    operation: &str,
+    trusted: &crate::TrustedReviewers,
+) {
+    assert!(storage
+        .registered_review_versions_with_trust(selected, trusted)
+        .is_err());
+    assert!(storage
+        .registered_review_entries_with_trust(selected, operation, None, trusted)
+        .is_err());
+    assert!(storage
+        .registered_review_text_with_trust(selected, operation, "note", trusted)
+        .is_err());
+    assert!(storage
+        .registered_review_comparison_with_trust(
+            selected,
+            operation,
+            operation,
+            (None, None),
+            trusted
+        )
+        .is_err());
+}
 pub(super) fn inspect(
     storage: &AttachmentStorage,
     owner: &ProvisionedAttachment,
@@ -114,6 +140,12 @@ pub(super) fn inspect(
         limits: ObservationLimits::default(),
     };
     let pending = preserved(owner, source, &destination);
+    refuse_saved_reads(
+        storage,
+        &destination,
+        &prepared.operation().to_hex(),
+        trusted,
+    );
     assert!(storage
         .inspect_native_saved_versions(destination.id(), trusted)
         .is_err());
@@ -158,6 +190,103 @@ pub(super) fn inspect(
         .registered_dependency_versions(destination.id())
         .is_err());
     assert!(destination.saved_versions().is_err());
+    // Baseline: the old desktop-facing ordinary readers cannot reopen signed native history.
+    let legacy_preserved = preserved(owner, source, &destination);
+    let legacy_operation = saved.operation().to_hex();
+    assert!(storage.registered_review_versions(&destination).is_err());
+    assert!(storage
+        .registered_review_entries(&destination, &legacy_operation, None)
+        .is_err());
+    assert!(storage
+        .registered_review_text(&destination, &legacy_operation, "note")
+        .is_err());
+    assert!(storage
+        .registered_review_comparison(
+            &destination,
+            &legacy_operation,
+            &legacy_operation,
+            (None, None),
+        )
+        .is_err());
+    assert_eq!(preserved(owner, source, &destination), legacy_preserved);
+    assert_eq!(
+        storage
+            .registered_review_versions_with_trust(&destination, trusted)
+            .unwrap(),
+        vec![saved],
+    );
+    let entries = storage
+        .registered_review_entries_with_trust(&destination, &legacy_operation, None, trusted)
+        .unwrap();
+    assert_eq!(
+        entries.get("schema").and_then(Json::as_text),
+        Some("mesh.attachment-entries/v1")
+    );
+    assert_eq!(
+        entries.get("operation").and_then(Json::as_text),
+        Some(legacy_operation.as_str())
+    );
+    let text = storage
+        .registered_review_text_with_trust(&destination, &legacy_operation, "note", trusted)
+        .unwrap();
+    assert_eq!(text.get("state").and_then(Json::as_text), Some("text"));
+    assert_eq!(
+        text.get("text").and_then(Json::as_text),
+        Some(std::str::from_utf8(saved_note).unwrap())
+    );
+    let comparison = storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &legacy_operation,
+            (None, None),
+            trusted,
+        )
+        .unwrap();
+    assert_eq!(comparison.get("changes"), Some(&Json::Array(vec![])));
+    let missing_trust = crate::TrustedReviewers::default();
+    refuse_saved_reads(storage, &destination, &legacy_operation, &missing_trust);
+    assert!(storage
+        .registered_review_entries_with_trust(
+            &destination,
+            &legacy_operation,
+            Some("foreign-cursor"),
+            trusted
+        )
+        .is_err());
+    assert!(storage
+        .registered_review_text_with_trust(
+            &destination,
+            &version.operation().to_hex(),
+            "note",
+            trusted
+        )
+        .is_err());
+    assert!(storage
+        .registered_review_text_with_trust(&destination, &legacy_operation, "../note", trusted)
+        .is_err());
+    assert!(storage
+        .registered_review_entries_with_trust(&destination, "NONCANONICAL", None, trusted)
+        .is_err());
+    assert!(storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &version.operation().to_hex(),
+            (None, None),
+            trusted
+        )
+        .is_err());
+    assert!(storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &legacy_operation,
+            (None, Some("note")),
+            trusted
+        )
+        .is_err());
+    assert_eq!(preserved(owner, source, &destination), legacy_preserved);
     let owner_history = tree(owner.metadata_path());
     let source_history = tree(source.metadata_path());
     let publication = storage
@@ -187,6 +316,11 @@ pub(super) fn inspect(
     fs::write(
         destination.project().root().join("raw.bin"),
         [0, 255, 17, 0, 128],
+    )
+    .unwrap();
+    fs::write(
+        destination.project().root().join("large.txt"),
+        vec![b'x'; 262_145],
     )
     .unwrap();
     let initial = preserved(owner, source, &destination);
@@ -291,6 +425,7 @@ pub(super) fn inspect(
     let canonical = fs::read(&pending).unwrap();
     fs::write(&pending, b"foreign completion recovery evidence").unwrap();
     let damaged = preserved(owner, source, &destination);
+    refuse_saved_reads(storage, &destination, &legacy_operation, trusted);
     assert!(storage
         .inspect_native_saved_versions(destination.id(), trusted)
         .is_err());
@@ -357,6 +492,92 @@ pub(super) fn inspect(
             .unwrap(),
         None
     );
+    let newer_operation = newer.operation().to_hex();
+    assert_eq!(
+        storage
+            .registered_review_versions_with_trust(&destination, trusted)
+            .unwrap(),
+        vec![saved, newer]
+    );
+    let old_text = storage
+        .registered_review_text_with_trust(&destination, &legacy_operation, "note", trusted)
+        .unwrap();
+    assert_eq!(
+        old_text.get("text"),
+        Some(&Json::text(std::str::from_utf8(saved_note).unwrap()))
+    );
+    let new_text = storage
+        .registered_review_text_with_trust(&destination, &newer_operation, "note", trusted)
+        .unwrap();
+    assert_eq!(
+        new_text.get("text"),
+        Some(&Json::text("newer destination editor work"))
+    );
+    let binary = storage
+        .registered_review_text_with_trust(&destination, &newer_operation, "raw.bin", trusted)
+        .unwrap();
+    assert_eq!(binary.get("state"), Some(&Json::text("binary")));
+    assert_eq!(binary.get("text"), Some(&Json::Null));
+    assert_eq!(binary.get("bytes"), Some(&Json::Number(5)));
+    let large = storage
+        .registered_review_text_with_trust(&destination, &newer_operation, "large.txt", trusted)
+        .unwrap();
+    assert_eq!(large.get("state"), Some(&Json::text("too-large")));
+    assert_eq!(large.get("text"), Some(&Json::Null));
+    assert_eq!(large.get("bytes"), Some(&Json::Number(262_145)));
+    let entries = storage
+        .registered_review_entries_with_trust(&destination, &newer_operation, None, trusted)
+        .unwrap();
+    assert!(entries
+        .get("entries")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .all(|entry| !entry
+            .get("path")
+            .and_then(Json::as_text)
+            .unwrap()
+            .starts_with(".git")));
+    let changes = storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &newer_operation,
+            (None, None),
+            trusted,
+        )
+        .unwrap();
+    let paths: Vec<_> = changes
+        .get("changes")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .map(|entry| entry.get("path").and_then(Json::as_text).unwrap())
+        .collect();
+    assert_eq!(paths, vec!["large.txt", "note", "raw.bin", "untracked"]);
+    let selected = storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &newer_operation,
+            (None, Some("note")),
+            trusted,
+        )
+        .unwrap();
+    assert_eq!(selected.get("total"), Some(&Json::Number(1)));
+    assert_eq!(
+        selected.get("changes").and_then(Json::as_array).unwrap()[0].get("change"),
+        Some(&Json::text("modified"))
+    );
+    assert!(storage
+        .registered_review_comparison_with_trust(
+            &destination,
+            &legacy_operation,
+            &newer_operation,
+            (Some("foreign-cursor"), None),
+            trusted
+        )
+        .is_err());
     spawn(&[saved, newer], "read");
     assert_eq!(
         storage
@@ -376,6 +597,55 @@ pub(super) fn inspect(
         .registered_dependency_versions(destination.id())
         .is_err());
     assert!(destination.saved_versions().is_err());
+    // The marker selects a verifier; neither an unknown schema nor a legacy downgrade can
+    // turn signed native publication into ordinary history. Restore only fixture-owned bytes.
+    let marker = destination
+        .metadata_path()
+        .join(crate::project_attachment::history::HISTORY);
+    let canonical_marker = fs::read(&marker).unwrap();
+    let marker_json = Json::parse(std::str::from_utf8(&canonical_marker).unwrap()).unwrap();
+    let previous = marker_json
+        .get("previous_binding")
+        .and_then(Json::as_text)
+        .unwrap();
+    for bad in ["{\"schema\":\"mesh.attachment-history/unknown\"}", previous] {
+        fs::write(&marker, bad).unwrap();
+        let foreign = preserved(owner, source, &destination);
+        refuse_saved_reads(storage, &destination, &legacy_operation, trusted);
+        assert_eq!(preserved(owner, source, &destination), foreign);
+        fs::write(&marker, &canonical_marker).unwrap();
+        assert_eq!(preserved(owner, source, &destination), captured);
+    }
+    // A same-byte, same-mode copy at the selected pathname is still another native store.
+    let metadata = destination.metadata_path();
+    let original = metadata.with_extension("original-retained");
+    let original_tree = tree(metadata);
+    fs::rename(metadata, &original).unwrap();
+    for (relative, (_, _, mode, bytes)) in &original_tree {
+        let old = original.join(relative);
+        let new = metadata.join(relative);
+        if old.is_dir() {
+            fs::create_dir(&new).unwrap();
+        } else {
+            fs::write(&new, bytes).unwrap();
+        }
+        fs::set_permissions(&new, fs::Permissions::from_mode(*mode)).unwrap();
+    }
+    let substituted = tree(metadata);
+    refuse_saved_reads(storage, &destination, &legacy_operation, trusted);
+    assert_eq!(
+        tree(metadata),
+        substituted,
+        "read changed the substituted store"
+    );
+    assert_eq!(
+        tree(&original),
+        original_tree,
+        "read changed retained original history"
+    );
+    assert_eq!(tree(owner.metadata_path()), owner_history);
+    assert_eq!(tree(source.metadata_path()), source_history);
+    assert_eq!(tree(source.project().root()), original_files);
 }
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -399,16 +669,40 @@ fn completed_history_restart_child() {
     let trusted = crate::TrustedReviewers::with_human_credentials([
         HumanApprovalCredential::from_public_key(public.as_slice().try_into().unwrap()).unwrap(),
     ]);
+    let selected = storage.reopen(text("work")).unwrap();
     if text("mode") == "refuse" {
+        refuse_saved_reads(&storage, &selected, text("operation"), &trusted);
         assert!(storage
             .inspect_native_saved_versions(text("work"), &trusted)
             .is_err());
         return;
     }
     assert_eq!(text("mode"), "read");
+    let registered = storage
+        .registered_review_versions_with_trust(&selected, &trusted)
+        .unwrap();
+    let registered_text = storage
+        .registered_review_text_with_trust(&selected, text("operation"), "note", &trusted)
+        .unwrap();
+    assert_eq!(
+        registered_text.get("text"),
+        Some(&Json::text(
+            std::str::from_utf8(&unhex(text("note"))).unwrap()
+        ))
+    );
+    let entries = storage
+        .registered_review_entries_with_trust(&selected, text("operation"), None, &trusted)
+        .unwrap();
+    assert!(entries
+        .get("entries")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .any(|entry| entry.get("path") == Some(&Json::text("note"))));
     let versions = storage
         .inspect_native_saved_versions(text("work"), &trusted)
         .unwrap();
+    assert_eq!(registered, versions);
     let Json::Array(expected) = value.get("versions").unwrap() else {
         panic!("fixture version vector missing");
     };

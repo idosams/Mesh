@@ -71,11 +71,17 @@ working copy; **Preview this folder** remains the primary action for a remembere
 1. In the folder selection view, use **Choose project to attach**, or enter the existing project
    path and choose **Attach existing project**. Continue using the same folder in your editor,
    terminal or harness; Mesh keeps its history in separate storage.
-2. Once a version is saved, choose **Show latest versions**. Use **Older versions** to page back.
+2. Choose **Show latest versions** to look up saved history, including while capture is stopped or
+   its latest-version status is unavailable. Use **Older versions** to page back.
 3. Select a saved version identity to list its files and folders. **More files** opens the next page.
 4. Select a file to inspect its saved text. This preview stays on that exact version even when the
    live folder changes or capture saves a newer version. Refreshing capture status does not replace
    the preview; select another saved version or file to change it.
+
+Signed native histories require the configured local public approval credential and their complete
+recorded inputs to verify. A lookup can be retried after those become available; unavailable or
+conflicting history is retained without displaying unverified content. Looking up history leaves
+capture stopped and does not renew an input grant, start agents or apply changes to Mesh main.
 
 Text previews are read-only and limited to 256 KiB. Binary and larger files show why text is
 unavailable. To compare saved versions, choose **Use as base** on one version and **Compare with base** on

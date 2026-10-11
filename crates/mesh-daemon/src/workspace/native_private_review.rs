@@ -176,6 +176,47 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(result)
     }
 
+    // Bounded projections stay inside this closed adapter; no workspace capability escapes.
+    pub(crate) fn saved_entries(
+        &self,
+        operation: &str,
+        after: Option<&str>,
+    ) -> io::Result<crate::ipc::Json> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let result = crate::project_attachment::inspection::entries_history(
+            &self.history,
+            operation,
+            after,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
+    pub(crate) fn saved_text(&self, operation: &str, path: &str) -> io::Result<crate::ipc::Json> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let result =
+            crate::project_attachment::inspection::text_history(&self.history, operation, path)?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
+    pub(crate) fn saved_comparison(
+        &self,
+        base: &str,
+        target: &str,
+        selection: (Option<&str>, Option<&str>),
+    ) -> io::Result<crate::ipc::Json> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let result = crate::project_attachment::inspection::compare_history(
+            &self.history,
+            base,
+            target,
+            selection,
+        )?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
     pub(crate) fn unchanged_capture(
         &self,
         configuration: &str,
