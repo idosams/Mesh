@@ -116,11 +116,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
-      # Worker one and the aggregate still require the complete macOS format/lint checks.
+      # Worker two carries the auxiliary checks; the aggregate still requires every worker.
       # Repeating them in the other equivalent builds only consumes their test budget.
-      - if: matrix.shard == 1
+      - if: matrix.shard == 2
         run: cargo fmt --all --check
-      - if: matrix.shard == 1
+      - if: matrix.shard == 2
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Prove the partitions cover the complete native inventory
         shell: bash
@@ -144,10 +144,10 @@ jobs:
       - name: Run the complete selected native partition
         run: cargo nextest run --binaries-metadata "$RUNNER_TEMP/mesh-native-inventory/binaries.json" --no-fail-fast --partition hash:${{ matrix.shard }}/3
       # Every former macOS step remains required. The complete daemon and renderer
-      # checks run on worker one; no test assertion or deadline is relaxed.
-      - if: matrix.shard == 1
+      # checks share the shorter second partition; no test assertion or deadline is relaxed.
+      - if: matrix.shard == 2
         run: npm run verify:demo
-      - if: matrix.shard == 1
+      - if: matrix.shard == 2
         run: npm run test:macos-renderers
 
   test-macos:
