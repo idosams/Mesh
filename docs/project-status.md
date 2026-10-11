@@ -3688,3 +3688,18 @@ local results remain historical source evidence, not a new full combined-head ru
 #400 source was separately preserved before any parent update. The
 [full objective](https://github.com/idosams/Mesh/issues/345) remains open; fixed checkpoints and
 the installed app are unchanged.
+
+
+Combined-source R208 revalidation passed both selected cases in 43.593s: real root native staging
+43.584s and ordinary post-custody revocation 2.476s. All 48 repository regressions, documentation
+and formatting passed. The initial full-workspace inventory exposed a stale shared build binary
+that omitted all three R208 tests; that invalid inventory, build log and binary digest are retained
+and are not counted as coverage. A byte-identical affected-crate rebuild produced the actual full
+4,002-test inventory, covered once in 1,336/1,345/1,321 partitions, with 18 ignored unchanged.
+All three named R208 tests were explicitly present. All thirteen checked source hashes remained
+unchanged; the timestamp refresh also preserved the rebuilt source file's bytes, inode and mode.
+Product Rust/UI/Cargo remains identical to the original full-tested832; imported CI code remains
+identical to fully tested059. Later work uses separate build output to avoid cross-checkout reuse.
+This focused/inventory proof is distinct from the original full 4,002-test pass. All thirteen
+fresh hosted checks, prior independent CI-main proof, ordinary merge and independent staging-main
+verification remain required before delivery.
