@@ -111,3 +111,11 @@ debug = true
 opt-level = 3
 debug-assertions = true
 overflow-checks = true
+
+# Run the complete test build with modest optimization, preserving debug assertions
+# and checked arithmetic. This gives exhaustive native recovery campaigns CI
+# headroom without changing production profiles, test cases or their deadlines.
+[profile.test]
+opt-level = 1
+debug-assertions = true
+overflow-checks = true

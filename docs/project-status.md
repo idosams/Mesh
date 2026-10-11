@@ -3867,6 +3867,44 @@ This final documentation-only receipt follows frozen-source verification. Fresh 
 thirteen-job PR proof, ordinary authorized merge and independent merged-main proof remain required.
 
 
+## Measured native test-build headroom (R217, in progress)
+
+[Issue #416](https://github.com/idosams/Mesh/issues/416) addresses independent main
+[38148247418](https://github.com/idosams/Mesh/actions/runs/38148247418) at
+`da04b6266c5913c05a806b03e36ff65055933fa4`. PR415 passed complete local and all thirteen
+exact-head checks and merged normally, but independent main's macOS worker one was cancelled
+at its20-minute deadline during native execution after605/1,341 cases. Worker two/three passed;
+the aggregate correctly failed. The complete3,295,816-byte terminal log, metadata and deadline
+annotations are preserved. This main revision is not independently qualified. Last qualified
+maina02/run38142803222 remains recorded; no failed state is relabeled as success.
+
+A clean canonical worktree measured the same real native owner-publication regression twice:
+31.209s/31.049s on the unchanged test build. Optimizing only the existing ring backend did not
+help (32.087s/31.719s), so that trial was removed and its full evidence retained. A separate modest
+complete test-build optimization measured17.516s/17.296s:44.08% lower mean fixture time. Every
+measurement retained source/configuration, status, patch, exact head and runtime identity. The
+first two private result-collector format errors and their actual passing native logs are also
+preserved; no product assertion changed. This paired local fixture measurement does not establish
+overall hosted CI margin or packaged product velocity.
+
+Only the test profile gains optimization level one, with debug assertions and overflow checks
+explicitly enabled. A parsed manifest comparison confirms production profiles, algorithms,
+features, dependencies and the previous curve25519 test override are unchanged. Actual native
+compiler flags retain debug assertions; a separate executable probe with those observed flags
+confirms both debug-assertion and arithmetic-overflow panics remain active. All source test bodies,
+child/crash/byte boundaries, native partitions, thirteen required jobs and deadlines remain.
+
+Fresh repository/docs checks, complete frozen-source npm verification and exact-head hosted proof
+are required before this CI-only repair can merge normally. Independent repaired-main all-thirteen
+qualification then gates product delivery. Product409's refreshed sourcecaa5a6e passed its complete
+4,014-case local gate and all thirteen hosted checks38148463349, but its merge guard correctly
+stopped on failed independent prior main. Product413 remains preserved at77463f with its original
+full local pass and failed first hosted run. Both require reconciliation and fresh qualification
+on the actual repaired history. No legacy commit is replaced. The full everyday-work and fleet
+objective345 remains open, including native capture/harness adoption, graphical parallel review,
+protected-main integration/restore, additional providers/hosts and eligible packaged acceptance.
+The fixed user checkpoint and installed app are unchanged.
+
 ## Native macOS auxiliary-check balance (R216, in progress)
 
 [Issue #414](https://github.com/idosams/Mesh/issues/414) corrects updated saved-history PR409
