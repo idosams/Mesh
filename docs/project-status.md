@@ -4035,3 +4035,19 @@ or OS-presence qualification. Authenticated native controller/session adoption, 
 manual/harness/fleet journeys, qualified collection, second provider/host and eligible packaged
 acceptance remain unfinished. The [full objective](https://github.com/idosams/Mesh/issues/345) is
 open. The fixed user checkpoint and installed app stay unchanged and do not contain this increment.
+
+
+R213 original exact-head `44dfdbc726a1da65872b46174a51fb944a8c0985` run
+[38139053247](https://github.com/idosams/Mesh/actions/runs/38139053247) passed all thirteen checks:
+3,576 Linux and4,014 macOS native cases, complete disjoint partition coverage, all fifteen
+selected new/prior native cases once per platform, native renderers and real-daemon44. Full logs
+and exact-head inventory proof are retained. The CI-only repair [PR #411](https://github.com/idosams/Mesh/pull/411)
+then passed all thirteen and merged normally on11 October2026 at13:20:46 UTC as
+`a02f9cbeaa40cdf45ae7caa41bc8216ea5b10b4f`. Its independent main run
+[38142803222](https://github.com/idosams/Mesh/actions/runs/38142803222) is pending at this receipt.
+A normal branch merge brings that canonical repair into this PR without rewriting history. The
+original six source/document snapshots, raw index, patches, stale-base refusal and shared-ancestry
+resolution are preserved; all four Rust implementation hashes still match the frozen4,014-case
+full gate. A fresh exact-head thirteen-check run is required on this updated branch. Product merge
+remains held until both that run and the independent repaired-main run succeed. The earlier
+cancelled completion-main run remains recorded as cancelled; no check or deadline was bypassed.
