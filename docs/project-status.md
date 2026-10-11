@@ -4051,3 +4051,102 @@ frozen source/document hashes stayed unchanged; the final ten Rust hashes still 
 The private process-local shell selected the pinned runner without changing repository commands,
 timeouts, assertions or global tools. Its exact version, runtime bytes, full log and frozen source
 are retained. This final documentation-only receipt is checked separately before publication.
+
+
+## Trusted native saved-version listing and immutable files (R213, in progress)
+
+Current R213 delivery refresh: [PR #417](https://github.com/idosams/Mesh/pull/417)
+passed its complete frozen-source4,011-case local gate and all thirteen exact-head checks,
+then merged normally as `05bdb711b9d45abd2b302cdeef82a5ba32668166`. Its independent
+[main run](https://github.com/idosams/Mesh/actions/runs/38153213899) must independently pass all thirteen
+with complete Linux3,573/macOS4,011 partition coverage before product merge. The complete test build now uses modest
+optimization with debug assertions and checked arithmetic explicitly retained; production
+profiles, native cases, required checks and deadlines remain unchanged. The previous canonical
+main38148247418 was cancelled with605/1,341 worker-one native cases complete and stays failed.
+R213 sourcecaa5a6e passed all4,014 local native cases and all thirteen fresh hosted checks, but its
+merge correctly stopped because that prior main was unqualified. These failed and stopped
+receipts remain intact. This normal branch merge preserves all four original Rust implementation
+hashes, all eight prior frozen source files, raw index, patches and verified history bundles.
+No legacy commit is replaced. Fresh complete local and exact-head hosted checks are required on
+this reconciled branch before normal product merge. The full objective345 remains open and the
+fixed testing checkpoint is unchanged.
+
+Current R213 delivery refresh: [PR #415](https://github.com/idosams/Mesh/pull/415)
+passed all thirteen exact-head checks and its complete frozen-source4,011-case local gate, then
+merged normally as `da04b6266c5913c05a806b03e36ff65055933fa4` on11 October2026 at14:42:03 UTC.
+Its [independent main run](https://github.com/idosams/Mesh/actions/runs/38148247418) is running.
+Existing macOS format, full workspace lint, daemon and renderer checks now run on worker two;
+all native partitions, required checks and deadlines remain unchanged. R213's earlier updated
+run38143542753 completed all native, daemon and renderer checks but was cancelled at the worker-one
+job deadline during completion; its complete logs and annotations remain preserved as failed
+qualification. The current normal branch merge retains all four original Rust implementation
+hashes, both prior published heads, raw index, patches and verified bundles. Fresh complete local
+and exact-head hosted qualification are required on this reconciled branch. Product merge also
+waits for independent corrected-main qualification. No resolver, writer, test body or deadline
+changes here. The full objective345 stays open and the fixed testing checkpoint is unchanged.
+
+[Issue #408](https://github.com/idosams/Mesh/issues/408) continues from normally merged
+[PR #407](https://github.com/idosams/Mesh/pull/407): source
+`cb3a1e94936268a398bc50858ac8cbf9acdee16e`, main
+`beec7f4d2bdf03a376eb0de7ffaa679b2fa5295d`, merged 11 October 2026 at11:50:47 UTC.
+Exact-head run38135830001 passed all thirteen jobs, all3,573 Linux and4,011 macOS native cases,
+native renderers and real daemon. Full logs, exact six-worker inventory/partition accounting,
+new/prior native cases and the ordinary merge receipt are archived. Independent owner-main
+run38133970199 passed all thirteen before merge. Completion-main run38137055152 ended cancelled: macOS worker3 exceeded its20-minute job limit after1,323/1,324 selected tests passed. Its aggregate failed correctly. Full logs and API deadline annotations are preserved; this main revision is not qualified. A separate CI correction and complete corrected-main proof are required before this product increment merges.
+Only issue406 closed; the full objective345 stays open. This is new canonical work, replacing no
+legacy commit. The four dirty source paths moved from published cb3 to source-identical merged
+mainbeec by an ordinary verified forward. Bytes, inodes, modes, status and both patches stayed
+unchanged; original index/source and the stale-base guard refusal/resolution were preserved.
+
+The baseline executed actual root and consumed publication -> native checkpoint -> native owner
+receipt -> destination completion, then actual grant revocation. Existing configured-trust exact
+point inspection already succeeded in both parents (14.029s/114.975s). The ordinary registered
+version list refused native publication as designed. That successful baseline avoided a resolver
+rewrite; the existing full private context already reconstructs completed histories.
+
+New read-only `inspect_native_saved_versions` and `inspect_native_saved_file` APIs use that same
+complete bounded registration/source/ancestor/owning-history context and configured-trust replay
+of all required publications. The adapter returns only the recorded capture line or exact saved
+bytes, with native revalidation before acknowledgement. It exposes no workspace, mutable or
+ordinary-read capability. Missing files return None; editor files never supply a fallback.
+Historical completed receipts remain readable after later revocation without renewing input
+permission. Existing ordinary refusal, resolver, persistence formats and write contracts remain.
+
+The first compilation stopped before tests because two new helpers passed an error enum directly
+to an adapter requiring Error; complete source/logs are preserved. Only those error conversions
+were corrected. Lint and both initial API cases passed in137.131s (root16.943s, consumed137.123s).
+Expanded all-target daemon lint and all three cases passed in236.777s: root30.683s, consumed236.766s,
+helper0.014s. Both parents execute three actual fresh processes: saved reads before a later private
+save, refusal of damaged completion evidence, and old-version reads after the later save. The
+no-environment helper pass alone is not process proof.
+
+The campaign verifies unfinished-lane refusal, missing trust and foreign version/work refusal,
+original saved bytes despite newer editor/untracked/synthetic-Git work, and preserved selected
+metadata/file bytes, inodes and modes across reads. A later actual native capture produces a second
+version, including binary bytes, without rewinding the old saved file or advancing native main.
+Git files stay outside that capture. Damaged completion evidence refuses without repair; only
+fixture-owned bytes are restored. Source files/history and owner history remain unchanged by the
+private destination capture. Ordinary history and uncommitted native recovery remain refused.
+
+Complete frozen-source `npm test` passed with isolated nextest0.9.145: all4,014 native cases in1,177.750s,27 slow and18 ignored. The new root/consumed history parents passed in78.697s/658.524s; helper0.017s. Prior native completion, owner, checkpoint and both exhaustive shared byte-prefix campaigns passed. Repository48, docs5/114-document audit, license/storage mutation checks, fmt/workspace clippy, renderer194, desktop676, two demo regressions and all44 real-daemon checks passed. All six frozen source/document hashes and the global/pinned/private-dispatcher runtime bytes stayed unchanged. Only this final documentation receipt changes after the gate, with a separate docs recheck. Fresh thirteen-job exact-head PR proof, corrected independent prior-main proof, ordinary authorized merge and independent merged-main proof remain required.
+These read-only reopen cases do not add power-loss, exhaustive native prefix, concurrent-writer
+or OS-presence qualification. Authenticated native controller/session adoption, graphical
+manual/harness/fleet journeys, qualified collection, second provider/host and eligible packaged
+acceptance remain unfinished. The [full objective](https://github.com/idosams/Mesh/issues/345) is
+open. The fixed user checkpoint and installed app stay unchanged and do not contain this increment.
+
+
+R213 original exact-head `44dfdbc726a1da65872b46174a51fb944a8c0985` run
+[38139053247](https://github.com/idosams/Mesh/actions/runs/38139053247) passed all thirteen checks:
+3,576 Linux and4,014 macOS native cases, complete disjoint partition coverage, all fifteen
+selected new/prior native cases once per platform, native renderers and real-daemon44. Full logs
+and exact-head inventory proof are retained. The CI-only repair [PR #411](https://github.com/idosams/Mesh/pull/411)
+then passed all thirteen and merged normally on11 October2026 at13:20:46 UTC as
+`a02f9cbeaa40cdf45ae7caa41bc8216ea5b10b4f`. Its independent main run
+[38142803222](https://github.com/idosams/Mesh/actions/runs/38142803222) is pending at this receipt.
+A normal branch merge brings that canonical repair into this PR without rewriting history. The
+original six source/document snapshots, raw index, patches, stale-base refusal and shared-ancestry
+resolution are preserved; all four Rust implementation hashes still match the frozen4,014-case
+full gate. A fresh exact-head thirteen-check run is required on this updated branch. Product merge
+remains held until both that run and the independent repaired-main run succeed. The earlier
+cancelled completion-main run remains recorded as cancelled; no check or deadline was bypassed.
