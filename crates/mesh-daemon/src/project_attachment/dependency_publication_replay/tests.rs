@@ -1,3 +1,5 @@
+#[path = "tests/consumption_retention.rs"]
+mod consumption_retention;
 #[path = "tests/restart.rs"]
 mod restart;
 use super::*;
@@ -103,6 +105,10 @@ fn native_capture_after_publication_preserves_accepted_main() {
 fn registered_scheduler_capture_after_publication_saves_and_recognizes_unchanged() {
     root_publication_fixture(5);
 }
+#[test]
+fn native_consumption_start_retention_after_root_publication() {
+    root_publication_fixture(6);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -147,6 +153,8 @@ fn root_publication_fixture(writer: u8) {
         .unwrap()
         .commit()
         .unwrap();
+    let pending_consumption =
+        (writer == 6).then(|| consumption_retention::prepare(&storage, &owner, &owner, version));
     let snapshot = storage
         .save_dependency_review_snapshot(&owner, &owner, version, &[], id(2))
         .unwrap();
@@ -363,6 +371,10 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if let Some(pending) = pending_consumption {
+        consumption_retention::inspect(&storage, &owner, &owner, pending, &trust);
+        return;
     }
     if writer == 5 {
         let accepted = storage
@@ -1462,6 +1474,10 @@ fn native_snapshot_after_publication_preserves_graph_and_historical_decisions() 
 fn consumed_capture_after_publication_recovers_without_changing_owner() {
     consumed_publication_fixture(7);
 }
+#[test]
+fn native_consumption_start_retention_after_consumed_publication() {
+    consumed_publication_fixture(8);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -1557,6 +1573,8 @@ fn consumed_publication_fixture(writer: u8) {
     let consumed = storage
         .registered_dependency_versions(destination.id())
         .unwrap()[0];
+    let pending_consumption = (writer == 8)
+        .then(|| consumption_retention::prepare(&storage, &owner, &destination, consumed));
     let initial_decision = owner
         .decide_saved_input(
             version,
@@ -1631,7 +1649,7 @@ fn consumed_publication_fixture(writer: u8) {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
-        if matches!(writer, 6 | 7) {
+        if matches!(writer, 6..=8) {
             // Snapshot/capture fixtures use real publication; earlier writer fixtures retain
             // the complete publication fault/refusal campaign without repeating it here.
             let committed = storage
@@ -1981,6 +1999,10 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if let Some(pending) = pending_consumption {
+        consumption_retention::inspect(&storage, &owner, &destination, pending, &trust);
+        return;
+    }
     if writer == 7 {
         let owner_journal = owner.metadata_path().join(crate::RECORD_FILE_NAME);
         let child_journal = destination.metadata_path().join(crate::RECORD_FILE_NAME);
