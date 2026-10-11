@@ -5,13 +5,13 @@ use crate::project_attachment::{
 };
 use std::path::Path;
 pub(super) struct PendingInstalled {
-    destination: ProvisionedAttachment,
-    version: crate::project_attachment::SavedAttachmentVersion,
-    grant: RecordDigest,
-    journal: PathBuf,
-    before: Vec<u8>,
-    frame: Vec<u8>,
-    checkpoint: Vec<u8>,
+    pub(super) destination: ProvisionedAttachment,
+    pub(super) version: crate::project_attachment::SavedAttachmentVersion,
+    pub(super) grant: RecordDigest,
+    pub(super) journal: PathBuf,
+    pub(super) before: Vec<u8>,
+    pub(super) frame: Vec<u8>,
+    pub(super) checkpoint: Vec<u8>,
 }
 pub(super) fn prepare(
     storage: &AttachmentStorage,

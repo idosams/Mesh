@@ -6,6 +6,7 @@ mod reconstruction;
 
 #[derive(Clone, Copy)]
 pub(super) enum NativeHistoryRecovery<'a> {
+    Consumption(&'a VerifiedConsumptionOwnerPrefix),
     Capture(&'a crate::project_attachment::NativeCaptureRetention),
     Control(&'a super::control::recovery::VerifiedControlPrefix),
     Publication(&'a super::publication::recovery::VerifiedPublicationPrefix),
@@ -63,7 +64,8 @@ impl PrivateContext<'_> {
                 }
                 Some(
                     kind @ (NativeHistoryRecovery::Control(_)
-                    | NativeHistoryRecovery::Publication(_)),
+                    | NativeHistoryRecovery::Publication(_)
+                    | NativeHistoryRecovery::Consumption(_)),
                 ) => {
                     if work.id() != self.owner.id() {
                         return Err(invalid(
@@ -107,6 +109,9 @@ impl PrivateContext<'_> {
                             super::publication::PENDING,
                             prefix.retention_facts(work)?,
                         ),
+                        NativeHistoryRecovery::Consumption(prefix) => {
+                            ("consumption", prefix.name(), prefix.retention_facts(work)?)
+                        }
                         NativeHistoryRecovery::Capture(_) => {
                             return Err(invalid("unexpected capture reconstruction"))
                         }
@@ -199,6 +204,9 @@ impl PrivateContext<'_> {
                         Some(NativeHistoryRecovery::Publication(_)) => {
                             "mesh.native-history-publication-retention/v1"
                         }
+                        Some(NativeHistoryRecovery::Consumption(_)) => {
+                            "mesh.native-history-consumption-owner-retention/v1"
+                        }
                         None => "mesh.native-history-retention/v1",
                     }),
                 ),
@@ -211,6 +219,9 @@ impl PrivateContext<'_> {
                         Some(NativeHistoryRecovery::Control(_)) => "owner-store-control-recovery",
                         Some(NativeHistoryRecovery::Publication(_)) => {
                             "owner-store-publication-recovery"
+                        }
+                        Some(NativeHistoryRecovery::Consumption(_)) => {
+                            "owner-store-consumption-recovery"
                         }
                         None => "selected-store-completed-history",
                     }),

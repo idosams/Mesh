@@ -8946,3 +8946,60 @@ This establishes no collector, full cross-project reachability/concurrent cleanu
 recovery inventory, packaged/graphical approval/integration/restore, signing/provider/second-host or
 velocity acceptance. The [broader scope](https://github.com/idosams/Mesh/issues/345) stays open;
 fixed user checkpoints and the installed app remain unchanged.
+
+## Exact pending consumption owner retention (R203)
+
+Issue [#388](https://github.com/idosams/Mesh/issues/388) tracks a separate immutable
+`inspect_native_consumption_owner_retention` API. New canonical implementation replaces no legacy
+commit. PR #387 is merged as `73a43ded86361a2ff203da70a025209a6a99f404` after all seven checks
+passed on its reconciled published `764d0fe542d3f034a9b42c60633da86ade94daa5`; the merged main
+and published parent trees are identical. Its independent main checks are pending. PR #385's
+independent main checks also passed. After R203's full local verification ended, its unpublished
+baseline normally fast-forwarded to that source-identical merged main. All twelve changed file
+bytes/identities/modes, ten tested Rust hashes, stage state, diffs and untracked files were
+independently verified unchanged. The increment can target main initially, preserving its original
+tested source and parent provenance.
+
+A sealed Consumption-specific prefix verifies exactly one per-request private canonical owner
+intent, request/payload/schema, store/journal/sidecar identities and bounded exact frame prefix.
+It rejects ambiguous/foreign/missing/corrupt/replaced evidence and revalidates selection and CAS
+bytes on use. The typed native reader authenticates publication history without opening ordinary
+history or widening generic Eligibility/ReviewSnapshot control recovery. Complete historical
+operations/manifests/content, enrollment, policy and completed retry roots are reconstructed with
+the selected pending policy payload. Work, grant, correlation and cross-store operation identities
+are not treated as additional owner-local CAS objects.
+
+Full selected-source/owner/ancestor/historical-publication discovery, exact registrations and full
+deterministic custody are repeated. The pending owner body must equal the independently
+reconstructed installation intent; complete installation and checkpoint frames, the current exact
+bound grant and absence of destination completion remain mandatory. Separate qualified store
+inventories report the owner attempt's sidecar/journal/frame boundaries and destination roots with
+`collection_authority=false`. No writable workspace/CAS, recovery candidate, ordinary admission,
+run, main, signing or deletion capability escapes. Persisted formats and writer semantics are
+unchanged; existing start/install inspectors retain their narrower scopes.
+
+The semantic baseline failed in 2.946s because installed retention precedes any owner receipt
+attempt. The initial private type re-export compile error and its source/logs are preserved. The
+first owner positive passed in 3.516s. All six focused phase regressions then passed in 129.262s
+(new root 16.948s; consumed 100.432s). They compare exact original store/root/sidecar sets at
+zero/first/last/full owner-frame boundaries, repeat inspection, preserve source/installed files and
+identities, synthetic dirty Git/untracked work and private journals, and refuse wrong trust,
+selection/limits, ambiguous/malformed/missing/corrupt inputs, private-permission and journal
+substitution, incomplete checkpoint, destination completion/live editor work and revoked grants.
+The owner fixture uses actual native policy validation and canonical intent encoding after real
+publication, explicitly as test-native-policy staging: the ordinary product writer remains
+unsupported after publication. Truncations simulate boundaries, not separate-process kills;
+existing exhaustive process-restart campaigns remain unchanged.
+
+The final full `npm test` gate passed: 3,991 native tests in 527.237s (14 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/
+clippy. Both new cases passed in full (root 26.941s; consumed 225.136s), including additional
+noncanonical-intent, hardlink and missing historical-root refusals. All ten final Rust source hashes
+remain unchanged after verification and the source-identical main fast-forward; only validation
+documentation is finalized afterward. All seven exact final-head hosted checks, ordinary authorized
+merge and independent merged-main verification remain required. Historical owner-first recovery after later
+revocation/completion, all explicit-trust writable lane/grant/start/owner/completion routes, complete
+collector/all-store concurrency, packaged manual/harness/fleet approval/integration/restore, eligible
+signing, another authenticated provider/host and velocity acceptance remain required in the
+[broader scope](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed app
+remain unchanged.

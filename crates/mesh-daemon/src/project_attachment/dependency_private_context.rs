@@ -34,6 +34,7 @@ enum OwnerRecovery<'a> {
     Publication(&'a publication::recovery::VerifiedPublicationPrefix),
     Control(&'a control::recovery::VerifiedControlPrefix),
     Capture(&'a capture::recovery::VerifiedCapturePrefix),
+    Consumption(&'a VerifiedConsumptionOwnerPrefix),
 }
 struct PrivateContext<'a> {
     owner: &'a ProvisionedAttachment,
@@ -101,6 +102,13 @@ fn read_publication_owner(
         Some(OwnerRecovery::Capture(proof)) => owner
             .project()
             .read_native_capture_recovery_history(owner.metadata_path(), &owner.store, proof),
+        Some(OwnerRecovery::Consumption(proof)) => owner
+            .project()
+            .read_native_consumption_owner_recovery_history(
+                owner.metadata_path(),
+                &owner.store,
+                proof,
+            ),
         None => owner
             .project()
             .read_publication_private_history(owner.metadata_path(), &owner.store),
@@ -849,3 +857,4 @@ pub(super) mod capture;
 mod retention;
 
 mod consumption;
+pub(in crate::project_attachment) use consumption::VerifiedConsumptionOwnerPrefix;

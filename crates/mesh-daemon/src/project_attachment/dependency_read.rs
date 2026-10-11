@@ -217,6 +217,9 @@ enum RecoveryInspection<'a> {
     PublicationCaptureRecovery(
         &'a super::dependency_private_context::capture::recovery::VerifiedCapturePrefix,
     ),
+    PublicationConsumptionRecovery(
+        &'a super::dependency_private_context::VerifiedConsumptionOwnerPrefix,
+    ),
     PublicationControlRecovery(
         &'a super::dependency_private_context::control::recovery::VerifiedControlPrefix,
     ),
@@ -340,6 +343,26 @@ impl ProjectAttachment {
             RecoveryInspection::PublicationControlRecovery(recovery),
         )?;
         let facts = facts.ok_or_else(|| invalid("native control requires native enrollment"))?;
+        Ok((
+            configuration,
+            VerifiedPrivateHistory::from_independent_facts(facts)?,
+        ))
+    }
+
+    pub(super) fn read_native_consumption_owner_recovery_history(
+        &self,
+        metadata: &Path,
+        store: &PinnedWorkspaceRoot,
+        recovery: &super::dependency_private_context::VerifiedConsumptionOwnerPrefix,
+    ) -> io::Result<(String, VerifiedPrivateHistory)> {
+        let (configuration, facts) = self.read_native_facts_for(
+            metadata,
+            store,
+            None,
+            None,
+            RecoveryInspection::PublicationConsumptionRecovery(recovery),
+        )?;
+        let facts = facts.ok_or_else(|| invalid("consumption owner requires native enrollment"))?;
         Ok((
             configuration,
             VerifiedPrivateHistory::from_independent_facts(facts)?,
@@ -517,6 +540,7 @@ impl ProjectAttachment {
                 | RecoveryInspection::PublicationRecovery(_)
                 | RecoveryInspection::PublicationControlRecovery(_)
                 | RecoveryInspection::PublicationCaptureRecovery(_)
+                | RecoveryInspection::PublicationConsumptionRecovery(_)
         ) && base
             .records()
             .iter()
@@ -605,6 +629,12 @@ impl ProjectAttachment {
                 }
                 Some(proof.verify(store, &journal, &bytes)?)
             }
+            RecoveryInspection::PublicationConsumptionRecovery(proof) => {
+                if pending.is_some() || capture_prefix.is_some() {
+                    return Err(invalid("conflicting consumption owner recovery evidence"));
+                }
+                Some(proof.verify(store, &journal, &bytes)?)
+            }
             _ => None,
         };
         let prefix_end = publication_pending
@@ -641,6 +671,7 @@ impl ProjectAttachment {
                                 | RecoveryInspection::PublicationRecovery(_)
                                 | RecoveryInspection::PublicationControlRecovery(_)
                                 | RecoveryInspection::PublicationCaptureRecovery(_)
+                                | RecoveryInspection::PublicationConsumptionRecovery(_)
                         )
                     {
                         return Err(invalid(
