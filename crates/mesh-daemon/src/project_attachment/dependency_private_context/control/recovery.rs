@@ -3,8 +3,12 @@ use super::*;
 use crate::project_attachment::dependency_transaction::{read_payload, text};
 use crate::root_authority::PinnedWorkspaceRoot;
 
+#[path = "recovery/history_retention.rs"]
+mod history_retention;
+
 pub(in crate::project_attachment) struct VerifiedControlPrefix {
     raw: String,
+    request: RecordDigest,
     metadata: std::path::PathBuf,
     store: (u64, u64),
     journal: (u64, u64),
@@ -86,6 +90,7 @@ impl VerifiedControlPrefix {
         let proof = Self {
             metadata: owner.metadata_path().to_owned(),
             raw,
+            request,
             store: owner.store.identity()?,
             journal: identity,
             observed: hash(&bytes),
@@ -97,7 +102,16 @@ impl VerifiedControlPrefix {
         Ok(Some(proof))
     }
 
-    pub(super) fn raw_for(&self, owner: &ProvisionedAttachment) -> io::Result<&str> {
+    pub(in crate::project_attachment::dependency_private_context) fn request(
+        &self,
+    ) -> RecordDigest {
+        self.request
+    }
+
+    pub(in crate::project_attachment::dependency_private_context) fn raw_for(
+        &self,
+        owner: &ProvisionedAttachment,
+    ) -> io::Result<&str> {
         if owner.metadata_path() != self.metadata || owner.store.identity()? != self.store {
             return Err(invalid("native control retention belongs to another store"));
         }

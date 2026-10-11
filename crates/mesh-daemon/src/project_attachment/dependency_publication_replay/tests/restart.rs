@@ -337,7 +337,80 @@ pub(super) fn interrupted_native_snapshot(
     )
 }
 
-fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDigest, phase: &str) {
+fn assert_complete_control_inventory(
+    storage: &AttachmentStorage,
+    owner: &crate::project_attachment::ProvisionedAttachment,
+    request: RecordDigest,
+    trust: &crate::TrustedReviewers,
+    facts: &Json,
+    completed: &Json,
+) -> Json {
+    let inventory = storage
+        .inspect_native_history_retention_during_control(owner, request, trust)
+        .unwrap();
+    assert_eq!(
+        inventory.get("schema"),
+        Some(&Json::text("mesh.native-history-control-retention/v1"))
+    );
+    assert_eq!(
+        inventory.get("scope"),
+        Some(&Json::text("owner-store-control-recovery"))
+    );
+    assert_eq!(
+        inventory.get("collection_authority"),
+        Some(&Json::Bool(false))
+    );
+    assert_eq!(inventory.get("control"), facts.get("control"));
+    for name in ["work", "installation", "device", "inode"] {
+        assert_eq!(inventory.get(name), facts.get(name));
+    }
+    for name in ["operations", "manifests", "payloads", "sidecars"] {
+        let Json::Array(previous) = completed.get(name).unwrap() else {
+            panic!("completed roots missing")
+        };
+        let Json::Array(current) = inventory.get(name).unwrap() else {
+            panic!("control history roots missing")
+        };
+        assert!(
+            previous.iter().all(|r| current.contains(r)),
+            "completed {name} roots lost during control recovery"
+        );
+    }
+    for name in ["operations", "manifests"] {
+        assert_eq!(
+            inventory.get(name),
+            completed.get(name),
+            "a control frame cannot create authored versions"
+        );
+    }
+    let exact = facts.get("control").unwrap();
+    let Json::Array(current) = inventory.get("payloads").unwrap() else {
+        panic!("payload roots missing")
+    };
+    let Json::Array(recovery) = exact.get("payloads").unwrap() else {
+        panic!("control roots missing")
+    };
+    assert!(
+        recovery.iter().all(|r| current.contains(r)),
+        "exact control objects missing from history"
+    );
+    let Json::Array(sidecars) = inventory.get("sidecars").unwrap() else {
+        panic!("sidecar roots missing")
+    };
+    assert!(sidecars.contains(&Json::object([
+        ("name", exact.get("sidecar").unwrap().clone()),
+        ("digest", exact.get("sidecar_digest").unwrap().clone()),
+    ])));
+    inventory
+}
+
+fn assert_trusted_control_inventory(
+    root: &Path,
+    work: &str,
+    request: RecordDigest,
+    phase: &str,
+    completed: &Json,
+) {
     use std::os::unix::fs::MetadataExt as _;
     let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
     let owner = storage
@@ -365,6 +438,8 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
         Some(&Json::text("owner-store-control-recovery"))
     );
     assert_eq!(facts.get("collection_authority"), Some(&Json::Bool(false)));
+    let inventory =
+        assert_complete_control_inventory(&storage, &owner, request, &trust, &facts, completed);
     let exact = facts.get("control").unwrap();
     assert_eq!(exact.get("request"), Some(&Json::text(request.to_hex())));
     assert_eq!(
@@ -432,7 +507,21 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
         )
         .is_err());
     assert!(storage
+        .inspect_native_history_retention_during_control(
+            &owner,
+            RecordDigest::from_bytes([96; 32]),
+            &trust
+        )
+        .is_err());
+    assert!(storage
         .inspect_verified_dependency_control_retention(
+            &owner,
+            request,
+            &crate::TrustedReviewers::default()
+        )
+        .is_err());
+    assert!(storage
+        .inspect_native_history_retention_during_control(
             &owner,
             request,
             &crate::TrustedReviewers::default()
@@ -442,6 +531,9 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
         let child = storage.reopen(work).unwrap();
         assert!(storage
             .inspect_verified_dependency_control_retention(&child, request, &trust)
+            .is_err());
+        assert!(storage
+            .inspect_native_history_retention_during_control(&child, request, &trust)
             .is_err());
     }
     if phase == "staged" {
@@ -455,16 +547,25 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
         assert!(storage
             .inspect_verified_dependency_control_retention(&owner, request, &trust)
             .is_err());
+        assert!(storage
+            .inspect_native_history_retention_during_control(&owner, request, &trust)
+            .is_err());
         assert_eq!(fs::read(&sidecar).unwrap(), foreign.as_bytes());
         fs::write(&sidecar, &pending).unwrap();
         fs::write(&path, b"corrupt control payload").unwrap();
         assert!(storage
             .inspect_verified_dependency_control_retention(&owner, request, &trust)
             .is_err());
+        assert!(storage
+            .inspect_native_history_retention_during_control(&owner, request, &trust)
+            .is_err());
         assert_eq!(fs::read(&path).unwrap(), b"corrupt control payload");
         fs::remove_file(&path).unwrap();
         assert!(storage
             .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert!(storage
+            .inspect_native_history_retention_during_control(&owner, request, &trust)
             .is_err());
         assert!(!path.exists());
         fs::write(&path, &original).unwrap();
@@ -479,6 +580,9 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
             assert!(storage
                 .inspect_verified_dependency_control_retention(&owner, request, &trust)
                 .is_err());
+            assert!(storage
+                .inspect_native_history_retention_during_control(&owner, request, &trust)
+                .is_err());
             assert_eq!(
                 fs::read(&graph_path).unwrap(),
                 b"corrupt saved review graph"
@@ -486,6 +590,9 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
             fs::remove_file(&graph_path).unwrap();
             assert!(storage
                 .inspect_verified_dependency_control_retention(&owner, request, &trust)
+                .is_err());
+            assert!(storage
+                .inspect_native_history_retention_during_control(&owner, request, &trust)
                 .is_err());
             assert!(!graph_path.exists());
             fs::write(&graph_path, saved_graph).unwrap();
@@ -495,6 +602,71 @@ fn assert_trusted_control_inventory(root: &Path, work: &str, request: RecordDige
                 .inspect_verified_dependency_control_retention(&owner, request, &trust)
                 .unwrap(),
             facts
+        );
+        let Json::Array(previous_sidecars) = completed.get("sidecars").unwrap() else {
+            panic!("completed sidecars missing")
+        };
+        let receipt_name = previous_sidecars
+            .iter()
+            .find_map(|s| {
+                s.get("name")
+                    .and_then(Json::as_text)
+                    .filter(|name| name.starts_with("dependency-capture-"))
+            })
+            .unwrap();
+        let receipt =
+            Json::parse(&fs::read_to_string(owner.metadata_path().join(receipt_name)).unwrap())
+                .unwrap();
+        let frames =
+            RecordDigest::parse_hex(receipt.get("frames").and_then(Json::as_text).unwrap())
+                .unwrap();
+        let scan = mesh_store::scan_journal(&before).unwrap();
+        let old_operation = scan
+            .records()
+            .iter()
+            .find_map(|record| match record {
+                StoredRecord::Operation(operation) => Some(operation.payload_digest),
+                _ => None,
+            })
+            .unwrap();
+        let old_chunk = scan
+            .records()
+            .iter()
+            .find_map(|record| match record {
+                StoredRecord::Manifest(manifest) => manifest.chunks.first().map(|c| c.digest),
+                _ => None,
+            })
+            .unwrap();
+        let Json::Array(previous_payloads) = completed.get("payloads").unwrap() else {
+            panic!("completed payloads missing")
+        };
+        for digest in [frames, old_operation, old_chunk] {
+            assert!(previous_payloads.contains(&Json::text(digest.to_hex())));
+            let object_path = owner.metadata_path().join(
+                cas.layout()
+                    .chunk_path(&mesh_cas::Digest32::from_bytes(*digest.as_bytes())),
+            );
+            let original = fs::read(&object_path).unwrap();
+            fs::write(&object_path, b"corrupt retained history object").unwrap();
+            assert!(storage
+                .inspect_native_history_retention_during_control(&owner, request, &trust)
+                .is_err());
+            assert_eq!(
+                fs::read(&object_path).unwrap(),
+                b"corrupt retained history object"
+            );
+            fs::remove_file(&object_path).unwrap();
+            assert!(storage
+                .inspect_native_history_retention_during_control(&owner, request, &trust)
+                .is_err());
+            assert!(!object_path.exists());
+            fs::write(&object_path, original).unwrap();
+        }
+        assert_eq!(
+            storage
+                .inspect_native_history_retention_during_control(&owner, request, &trust)
+                .unwrap(),
+            inventory
         );
     }
     assert_eq!(fs::read(&journal).unwrap(), before);
@@ -530,12 +702,34 @@ fn interrupted_native_control(
         ]);
         run_child(root, mode, value, expected);
     };
+    let completed = if published {
+        let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
+        let owner = storage
+            .reopen(&storage.candidate_owning_root(work).unwrap())
+            .unwrap();
+        let credential =
+            HumanApprovalCredential::from_public_key(public.try_into().unwrap()).unwrap();
+        let trust = crate::TrustedReviewers::with_human_credentials([credential]);
+        Some(
+            storage
+                .inspect_native_history_retention(owner.id(), &trust)
+                .unwrap(),
+        )
+    } else {
+        None
+    };
     let before = fs::read(journal).unwrap();
     run("staged", 85);
     assert_eq!(fs::read(journal).unwrap(), before);
     inspect_prefix("staged");
     if published {
-        assert_trusted_control_inventory(root, work, request, "staged");
+        assert_trusted_control_inventory(
+            root,
+            work,
+            request,
+            "staged",
+            completed.as_ref().unwrap(),
+        );
     }
     assert_eq!(fs::read(journal).unwrap(), before);
     run("partial", 86);
@@ -543,7 +737,13 @@ fn interrupted_native_control(
     assert!(torn.starts_with(&before) && torn.len() > before.len());
     inspect_prefix("partial");
     if published {
-        assert_trusted_control_inventory(root, work, request, "partial");
+        assert_trusted_control_inventory(
+            root,
+            work,
+            request,
+            "partial",
+            completed.as_ref().unwrap(),
+        );
     }
     assert_eq!(fs::read(journal).unwrap(), torn);
     if published {
@@ -556,7 +756,13 @@ fn interrupted_native_control(
     let complete = fs::read(journal).unwrap();
     assert!(complete.starts_with(&torn) && complete.len() > torn.len());
     if published {
-        assert_trusted_control_inventory(root, work, request, "lost-ack");
+        assert_trusted_control_inventory(
+            root,
+            work,
+            request,
+            "lost-ack",
+            completed.as_ref().unwrap(),
+        );
     }
     run("retry", 0);
     assert_eq!(fs::read(journal).unwrap(), complete);
@@ -581,6 +787,9 @@ fn interrupted_native_control(
         assert!(!sidecar.exists());
         assert!(storage
             .inspect_verified_dependency_control_retention(&owner, request, &trust)
+            .is_err());
+        assert!(storage
+            .inspect_native_history_retention_during_control(&owner, request, &trust)
             .is_err());
         assert!(!sidecar.exists());
         assert_eq!(fs::read(journal).unwrap(), complete);

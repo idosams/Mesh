@@ -127,7 +127,13 @@ impl AttachmentStorage {
                         }
                         Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
                     })?;
-                    context.native_history_retention(self, work, trusted, guard, Some(&capture))
+                    context.native_history_retention(
+                        self,
+                        work,
+                        trusted,
+                        guard,
+                        Some(super::retention::NativeHistoryRecovery::Capture(&capture)),
+                    )
                 };
                 let inventory = inspect()?;
                 if inspect()? != inventory {
