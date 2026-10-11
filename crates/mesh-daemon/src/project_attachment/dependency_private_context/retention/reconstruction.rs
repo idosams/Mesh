@@ -16,6 +16,7 @@ pub(super) struct NativeRecoveryHistoryObjects {
 impl NativeHistoryRecovery<'_> {
     pub(super) fn raw_for(&self, owner: &ProvisionedAttachment) -> io::Result<&str> {
         match self {
+            Self::Consumption(prefix) => prefix.raw_for(owner),
             Self::Control(prefix) => prefix.raw_for(owner),
             Self::Publication(prefix) => prefix.raw_for(owner),
             Self::Capture(_) => Err(invalid("capture has no dependency-frame retention prefix")),
@@ -45,6 +46,7 @@ impl NativeHistoryRecovery<'_> {
             return Err(invalid("native recovery journal exceeds bound"));
         }
         let (length, record, pending_payload) = match self {
+            Self::Consumption(prefix) => prefix.verify(&owner.store, &file, &observed)?,
             Self::Control(prefix) => prefix.verify(&owner.store, &file, &observed)?,
             Self::Publication(prefix) => prefix.verify(&owner.store, &file, &observed)?,
             Self::Capture(_) => {

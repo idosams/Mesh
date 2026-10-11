@@ -5,9 +5,18 @@ Mesh is an early functional local alpha. Its canonical product and development r
 destination. The [delivery ledger](plan/fleet-migration.md) records exact revisions, source mappings,
 PR checks and merge status; this page describes capability and acceptance boundaries.
 
-## Current acceptance observation — 5 October 2026
+## Current checkpoint — 11 October 2026
 
-The fixed user checkpoint is now `b064029`, from canonical merged PR #349, with its
+The latest fixed user checkpoint is `4083648`, from merged PR #375, with its isolated-data
+launcher, sample project and guide. Exact revision, executable checksum and bundle seal were
+verified around its packaged native fleet bridge run; that run was non-graphical. PR #375 and its
+independent merged-main checks passed. The checkpoint remains fixed and excludes the later native
+retention increments. Its graphical/provider and protected-main acceptance remain unverified.
+Older checkpoint copies and the installed app are preserved.
+
+## Earlier acceptance observation — 5 October 2026
+
+The fixed user checkpoint at that observation was `b064029`, from canonical merged PR #349, with its
 separate-data launcher and sample project. Its executable checksum and strict signature check
 passed again, and its post-merge CI completed successfully. Its native packaged bridge test passed;
 its graphical fleet journey and protected-main approval remain unverified. Earlier checkpoint
@@ -3410,3 +3419,29 @@ This establishes no collector, full cross-project reachability/concurrent cleanu
 recovery inventory, packaged/graphical approval/integration/restore, signing/provider/second-host or
 velocity acceptance. The [broader scope](https://github.com/idosams/Mesh/issues/345) stays open;
 fixed user checkpoints and the installed app remain unchanged.
+
+## Exact pending consumption owner inventory (R203)
+
+A separate native `inspect_native_consumption_owner_retention` path now inspects one exact
+staged/partial/full owner Consumption receipt before destination completion, using configured
+publication trust and its current bound grant. The sealed prefix binds one private canonical
+per-request sidecar, its identity, exact owner journal and pending payload. Complete authenticated
+owner/source/ancestor/publication history is retained separately from the destination installation
+and complete starting checkpoint. Results remain bounded and store-qualified with
+`collection_authority=false`; ordinary reads, recovery/runtime admission and protected main remain
+fenced. Existing start and installed-phase scopes, persisted formats and writers are unchanged.
+
+All six focused start/install/owner regressions pass for root and consumed source histories.
+The new fixture explicitly stages native-policy bytes after real publication; it does not claim
+that the ordinary product owner writer can yet operate after publication. Prefix truncations
+simulate interruption boundaries. The final full gate passed 3,991 native tests in 527.237s
+(14 slow; 18 skipped), 194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/
+license/storage/fmt/clippy. Both new cases passed in full (root 26.941s; consumed 225.136s),
+including noncanonical-intent, hardlink and missing historical-root refusals. All ten Rust hashes
+remain unchanged after verification and a source-identical fast-forward to merged PR #387 at
+`73a43ded86361a2ff203da70a025209a6a99f404`; changed file bytes/identities/modes, stage state and
+untracked files were preserved. Exact final-head hosted validation and merge remain pending. This does
+not establish historical owner-first recovery after later revocation/completion, writable native
+reservation/grant/start/completion routes, collector/all-store concurrent cleanup or packaged
+manual/harness/fleet approval, integration, restore, signing, another provider/host or velocity
+acceptance. Fixed user checkpoints and the installed app remain unchanged.

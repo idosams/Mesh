@@ -15,7 +15,7 @@ impl PreparedNativeConsumedStart {
         graph: &crate::project_attachment::NativeDependencyGraph,
         guard: &WorkspaceInitializationGuard,
     ) -> io::Result<Json> {
-        self.retained_recovery_roots(storage, staged, graph, guard, false)
+        self.retained_recovery_roots(storage, staged, graph, guard, false, None)
     }
     pub(in crate::project_attachment) fn retained_installed_roots(
         &self,
@@ -24,7 +24,17 @@ impl PreparedNativeConsumedStart {
         graph: &crate::project_attachment::NativeDependencyGraph,
         guard: &WorkspaceInitializationGuard,
     ) -> io::Result<Json> {
-        self.retained_recovery_roots(storage, staged, graph, guard, true)
+        self.retained_recovery_roots(storage, staged, graph, guard, true, None)
+    }
+    pub(in crate::project_attachment) fn retained_owner_roots(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+        body: &Json,
+    ) -> io::Result<Json> {
+        self.retained_recovery_roots(storage, staged, graph, guard, true, Some(body))
     }
     fn retained_recovery_roots(
         &self,
@@ -33,6 +43,7 @@ impl PreparedNativeConsumedStart {
         graph: &crate::project_attachment::NativeDependencyGraph,
         guard: &WorkspaceInitializationGuard,
         installed: bool,
+        owner_body: Option<&Json>,
     ) -> io::Result<Json> {
         guard
             .require_roots(&[
@@ -92,6 +103,13 @@ impl PreparedNativeConsumedStart {
             if owner_raw != self.owner_consumption_intent(graph, record.payload) {
                 return Err(invalid("retention installation intent differs"));
             }
+            if let Some(expected) = owner_body {
+                if Json::parse(&owner_raw).map_err(error)?.get("body") != Some(expected) {
+                    return Err(invalid(
+                        "owner receipt differs from reconstructed installation",
+                    ));
+                }
+            }
             sidecars.push((super::installation::OWNER_INTENT, owner_raw));
             self.verify_install_names()?;
             self.entry_receipts(&staged.root, false, true, &origin.allocation, guard)?;
@@ -125,6 +143,9 @@ impl PreparedNativeConsumedStart {
                     let begin = length
                         .checked_add(frame_record(&StoredRecord::Dependency(record)).len())
                         .ok_or_else(|| invalid("checkpoint boundary overflow"))?;
+                    if owner_body.is_some() && observed.get(begin..) != Some(frames.as_slice()) {
+                        return Err(invalid("owner receipt requires complete checkpoint frames"));
+                    }
                     checkpoint_facts = Some(Json::object([
                         ("frames", Json::text(hash(&frames).to_hex())),
                         ("frame_bytes", Json::Number(frames.len() as u64)),
@@ -136,7 +157,7 @@ impl PreparedNativeConsumedStart {
                     frames_root = Some(hash(&frames));
                     sidecars.push((consumption_history::PENDING, history_raw));
                 }
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) if e.kind() == io::ErrorKind::NotFound && owner_body.is_none() => {}
                 Err(e) => return Err(e),
             }
             Some(count)
