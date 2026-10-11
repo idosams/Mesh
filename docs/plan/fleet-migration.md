@@ -9291,3 +9291,66 @@ to the original full-tested c233 source; only six CI/docs paths differ. The orig
 run is historical source evidence, not a fresh full combined-head run. All ten fresh
 final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
 parents' original cancelled runs remain failed evidence.
+
+## Native delivery and privately staged consumed input (R208)
+
+Canonical dependency delivery is reconciled without discarding any original implementation:
+R204 #391 final head `34f3439fad62e5014f1df632f7553a92033f2cd9` merged at
+`e6863da072ab9e30fa9f30bce7941bd74082c71c`; R205 #393 head
+`046624f659e524d1fb299d87bb155d7460dce781` merged at
+`55485f8319fc24f0bc1d59fc78dac4fba7954309`; R206 #395 head
+`6a7602c4373b7117d203d625f07c74e1a8539b35` merged at
+`29ddcaaf8e73059ae615d875b8b654e6e408cfc9`. All ten exact-head checks passed for each.
+Independent main runs 38115792099 and 38116935359 passed all ten for R204 and R205;
+R206 main run 38118442653 also passed all ten at merged main 29ddcaa. Each original source commit,
+failed/cancelled verification log, merge receipt and final Git bundle is preserved. The full
+[objective](https://github.com/idosams/Mesh/issues/345) remains open.
+
+[Issue #398](https://github.com/idosams/Mesh/issues/398) adds a separate native-host raw-selector
+preparation capability and a closed prepared wrapper for private staging after real root or
+consumed publication. This is new canonical implementation, replacing no legacy source commit.
+It builds on the actual merged R205/R206 history. The unfinished edits were preserved before a
+true fast-forward from 6a7602c to the source-identical merged main 29ddcaa; every changed file's
+bytes, inode and mode and all staged/unstaged/untracked states remained identical. The original
+Mesh-internal checkout, preserved history, installed app and fixed user checkpoint are untouched.
+
+Preparation reconstructs complete configured-trust native history and the current exact bound
+grant. It checks original owner/source/destination/available handles, provenance and historical
+publication outputs under the complete bounded custody set, including the private allocation.
+Catalog discovery precedes the initial owner-only lock. The empty destination cannot supply source
+history. Limits remain 256 candidate works, 256 inherited operations and 32 physical custody roots.
+The signer runs after custody release; complete fresh revalidation precedes returning a candidate.
+Unrelated valid owner records can advance between phases while the exact selection remains valid.
+No complete owner prefix is pinned as continuing permission.
+
+The native wrapper keeps its shared candidate private. Both admission paths reuse the existing
+snapshot, signed checkpoint, exclusion-policy and private staging encoders, preserving the current
+formats and field ordering. Native staging never calls the ordinary history/grant inspector. It
+holds source, destination and allocation custody through immutable private publication, rechecks
+source/trust/grant after the writer and freshly verifies all staged bytes before acknowledgement.
+The ordinary preparation path remains closed to native publication history. No files are installed,
+no consumption record is appended, no destination becomes runnable and no main authority is granted.
+Private stage evidence is retained; this does not qualify a collector or completed consumption.
+
+The original semantic baseline executed the existing ordinary writer and refused native publication
+history. The first positive root case passed in 3.616s. Expanded real root/consumed campaigns passed
+all three tests in 301.337s (root 41.480s, consumed 301.328s), including separate-process exits at
+attempt-created, entries-staged, bundle-synced, published and custody-released; exact retries retain
+incomplete attempts and reuse published physical evidence without duplicate registration. Missing
+trust, foreign operations/grants, pending transactions, invalid bounds, folder substitution,
+corrupt/private/linked receipts and signing-time revocation refuse without repairing foreign bytes.
+Expected saved bytes are bound to the original fixture snapshots, not later editor content. The
+initial compiler mistakes and failed mutable-content fixture oracle are retained as failed evidence.
+The final source includes additional cross-owner, unrelated-owner-record and post-custody
+acknowledgement regressions. Its complete `npm test` gate passed: 4,002 native tests in 796.881s
+(19 slow, 18 ignored unchanged), 194 rendered, 676 desktop and 44 real-daemon checks, plus all
+32 repository tests and documentation/license/storage/fmt/clippy gates. Both new cases passed
+in full (root 122.734s, consumed 620.387s); all nine tested Rust hashes remained unchanged.
+The environment used isolated nextest 0.9.145, verified separately from the untouched older
+global tool. Full successful and failed logs/source receipts are preserved. Final edits only
+record these results in documentation; hosted publication and merged delivery remain pending.
+
+Software-held human credentials and process exits are not OS presence, power-loss, true concurrent
+writer or packaged/provider/remote acceptance. Native fencing, installation, checkpoint/owner/
+completion and recovery remain later increments, followed by authenticated manual/harness/fleet
+routing and the complete acceptance map. The fixed 4083648 checkpoint excludes these new foundations.

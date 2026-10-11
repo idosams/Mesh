@@ -3593,3 +3593,29 @@ to the original full-tested c233 source; only six CI/docs paths differ. The orig
 run is historical source evidence, not a fresh full combined-head run. All ten fresh
 final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
 parents' original cancelled runs remain failed evidence.
+
+## Trusted consumed input preparation and private staging (11 October 2026)
+
+The native grant and empty-reservation dependencies are merged as #393 and #395 after all ten
+exact-head checks passed. Their independent main runs also passed all ten at 55485f8 and 29ddcaa. The migration ledger records their preserved source
+commits, exact final heads, merge revisions and complete verification evidence.
+
+A separate native-host path now prepares a signed initial snapshot and privately stages it after
+real root or consumed publication. It independently reconstructs the source through configured
+publication trust, binds the exact current grant to the original destination and rechecks complete
+source/destination/allocation custody. Signing occurs outside custody; every later phase and its
+acknowledgement revalidates the current basis. The ordinary admission path stays closed. Existing
+snapshot and staging formats are shared unchanged, and newer source/editor files and synthetic Git
+state are preserved. The destination remains empty: installation, consumption commit, runnable
+agents, protected-main approval and authenticated UI/harness/fleet routing remain unfinished.
+
+Expanded root/consumed preparation/staging campaigns passed in 301.337s, including actual child
+process exits at all five private staging boundaries, exact fresh-process retries, malformed/private/
+linked receipt refusal, source substitution and actual grant revocation during signing. These are
+software-credential and process-exit regressions. The final source adds cross-owner, unrelated owner
+progress and post-custody acknowledgement cases. Its complete repository gate passed 4,002 native
+tests in 796.881s (19 slow, 18 ignored unchanged), 194 rendered, 676 desktop and 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. Both new native cases passed in full
+(root 122.734s, consumed 620.387s) and all nine Rust source hashes stayed unchanged. Hosted
+publication and merged delivery remain pending. No graphical, power-loss, true concurrent writer, other-provider or second-host
+claim follows. The fixed checkpoint and installed app are unchanged.

@@ -857,6 +857,8 @@ pub(super) mod capture;
 mod retention;
 
 mod consumption;
-pub(in crate::project_attachment) use consumption::VerifiedConsumptionOwnerPrefix;
+pub(in crate::project_attachment) use consumption::{
+    NativeConsumedStartBasis, VerifiedConsumptionOwnerPrefix,
+};
 
 mod reservation;

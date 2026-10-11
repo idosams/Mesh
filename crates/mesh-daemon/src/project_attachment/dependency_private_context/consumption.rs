@@ -1,6 +1,8 @@
 //! Exact uncommitted consumption inventories. No recovery or admission escapes.
 use super::*;
 mod committed_owner;
+mod preparation;
+pub(in crate::project_attachment) use preparation::NativeConsumedStartBasis;
 mod owner_recovery;
 pub(in crate::project_attachment) use owner_recovery::VerifiedConsumptionOwnerPrefix;
 

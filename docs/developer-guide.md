@@ -72,18 +72,21 @@ checks local Markdown file destinations and literal npm script examples against 
 It checks neither external URLs nor heading fragments and does not execute examples. Rendered HTML
 and packaged text guides still need the desktop guide tests and visual verification.
 
-Pull requests and main pushes distribute the complete `npm test` gate across the seven required
-jobs. The macOS test job runs `verify:rust`, `verify:demo` and the additional native renderer checks.
+Pull requests and main pushes distribute the complete `npm test` gate across ten required jobs:
+`fmt`, `clippy`, `test-linux`, `deny`, `license`, `desktop-and-docs`, the three
+`test-macos-native (1/3)` through `(3/3)` workers, and the stable `test-macos` aggregate.
+Every worker first proves that its actual inventory participates in an exact, disjoint cover of
+all selected native tests; missing, duplicate, ignored or mismatched cases refuse the preflight.
+Each worker runs its complete hash partition with pinned nextest 0.9.145. Worker one also runs
+the real-daemon demonstration and all four native renderer checks. The aggregate succeeds only
+when the complete worker group succeeds; missing, failed, cancelled or skipped workers refuse it.
 The desktop-and-docs job runs `verify:repository`, `verify:docs`, `verify:storage` and `verify:desktop`;
-the license job runs both commands in `verify:license`. The independent fmt, clippy, Linux Rust and
-dependency-policy jobs remain. All seven must pass: a passing macOS Rust job alone is insufficient.
-Desktop installation, build and tests run once in their own required job, leaving the macOS Rust
-job's unchanged 20-minute limit for native tests, the real daemon and renderers. No tests, Rust
-per-test deadlines or job time limits are relaxed. Rust test failures do not stop the remaining
-Rust cases; the command still fails, and later gate stages require success. Contributors still run
-the unchanged complete `npm test` command locally. The nightly job also runs that complete command
-plus dependency policy. A configured workflow is not evidence of a successful hosted run;
-inspect the exact revision's results before release.
+the license job runs both commands in `verify:license`. All ten exact-revision results must pass.
+No tests, per-test deadlines, native permissions or job time limits are relaxed. Independent
+workers retain their 20-minute limit and continue reporting failures without cancelling siblings.
+Contributors still run the unchanged complete `npm test` command locally. The nightly job also
+runs that complete command plus dependency policy. A configured workflow is not proof of a
+successful hosted run; inspect the actual revision's results before delivery.
 
 On macOS, `npm run test:macos-renderers` runs all four PDFKit and Office integration cases using checked-in synthetic fixtures.
 It is also a separate macOS CI step. Other measurement and helper cases remain explicitly ignored in the ordinary Rust suite. Run those separately

@@ -67,7 +67,8 @@ mod consumption_plan;
 mod consumption_prepare;
 mod consumption_start;
 pub use consumption_prepare::{
-    NativeConsumedStartRequest, PreparedNativeConsumedStart, StagedNativeConsumedStart,
+    NativeConsumedStartRequest, NativeTrustedConsumedStartRequest, PreparedNativeConsumedStart,
+    PreparedNativeTrustedConsumedStart, StagedNativeConsumedStart,
 };
 mod dependency_decision;
 mod dependency_grant;
