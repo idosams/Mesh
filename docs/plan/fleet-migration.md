@@ -9602,6 +9602,43 @@ This final documentation-only receipt follows frozen-source verification. Fresh 
 thirteen-job PR proof, ordinary authorized merge and independent merged-main proof remain required.
 
 
+## Native CI build reuse and recovery scheduling (R214, in progress)
+
+[Issue #410](https://github.com/idosams/Mesh/issues/410) corrects the independent main run for
+[PR #407](https://github.com/idosams/Mesh/pull/407), source cb3a1e9 and merged main
+`beec7f4d2bdf03a376eb0de7ffaa679b2fa5295d`. Exact-head PR run38135830001 passed all thirteen;
+independent main38137055152 did not. GitHub annotations confirm macOS worker3 exceeded its existing
+20-minute job deadline after1,323/1,324 selected cases passed. Its aggregate correctly failed.
+All original logs, terminal metadata, deadline annotations and hash receipts are preserved before
+correction. No unchanged rerun or broader deadline is used. The failed run remains recorded.
+
+Each native worker now builds fresh job-local binary metadata once, derives the full and all three
+partition inventories from those exact binaries, then executes its selected partition from the
+same metadata. Linux still excludes the unsupported desktop package at the actual build. All
+three workers, complete inventory coverage, nextest0.9.145, no-fail-fast and existing job/execution
+deadlines remain. Required full macOS format/clippy runs once on worker1, whose success remains
+mandatory for the aggregate. The five measured long consumed-native recovery campaigns receive
+early scheduling priority only; no test body, assertion, child/crash or byte boundary changes.
+
+On this clean worktree and fresh dedicated target, the ordinary and reused full inventories are
+exactly equal:4,029 total,4,011 selected,18 ignored, disjoint partitions1,341/1,346/1,324. The reused
+full list took1.09s and partition lists0.56s/0.54s/0.54s locally, without a repeat build. These are
+local enumeration measurements, not hosted or product-velocity guarantees. The formerly cancelled
+case actually passed through the exact binary-metadata execution route:
+
+`PASS [ 438.140s] (1/1) mesh-daemon project_attachment::dependency_publication_replay::tests::native_consumed_checkpoint_after_consumed_publication`
+
+Both frozen CI/configuration hashes stayed unchanged during this proof. A one-second read-only
+parent sample showed the test waiting for its controlled recovery child; it does not establish
+a production bottleneck, and focused fixture time is not a performance claim.
+
+Full frozen-source `npm test` passed: all4,011 native tests in1059.825s (26 slow,18 ignored), repository48, docs5/114-document audit, license/storage mutation checks, fmt/full workspace clippy, renderer194, desktop676, two demo regressions and all44 real-daemon checks. Prior native completion/owner/checkpoint and both exhaustive shared byte-prefix campaigns passed. All four frozen source/document hashes and global/pinned/private-dispatcher runtime bytes stayed unchanged. Only this final docs receipt changes after the gate; both CI/configuration hashes still match that gate and docs are checked separately. Fresh thirteen-job exact-head hosted proof and independent corrected-main proof remain required.
+A correction-only normal merge requires all its own required checks, then an independent corrected
+main run must qualify the combined history before pending product PR409 merges. This replaces no
+legacy implementation commit and changes no production Rust/renderer code, persisted format,
+repository setting, installed app or fixed checkpoint. The full
+[fleet objective](https://github.com/idosams/Mesh/issues/345) remains open.
+
 ## Native destination completion after the owner receipt (R212, in progress)
 
 [Issue #406](https://github.com/idosams/Mesh/issues/406) continues from normally merged
