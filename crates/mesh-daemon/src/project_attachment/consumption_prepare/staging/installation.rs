@@ -31,11 +31,11 @@ impl PreparedNativeConsumedStart {
         Ok(())
     }
 
-    pub(super) fn retain_owner_consumption_intent(
+    pub(super) fn owner_consumption_intent(
         &self,
         graph: &crate::project_attachment::NativeDependencyGraph,
         start: RecordDigest,
-    ) -> io::Result<String> {
+    ) -> String {
         let j = |d: RecordDigest| Json::text(d.to_hex());
         let body = Json::object([
             ("request", j(self.request)),
@@ -52,7 +52,7 @@ impl PreparedNativeConsumedStart {
             ),
             ("inputs", graph.consumption_inputs_json()),
         ]);
-        let intent = Json::object([
+        Json::object([
             (
                 "schema",
                 Json::text("mesh.native-consumption-owner-intent/v1"),
@@ -61,7 +61,14 @@ impl PreparedNativeConsumedStart {
             ("closure", j(graph.digest())),
             ("body", body),
         ])
-        .encode();
+        .encode()
+    }
+    pub(super) fn retain_owner_consumption_intent(
+        &self,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        start: RecordDigest,
+    ) -> io::Result<String> {
+        let intent = self.owner_consumption_intent(graph, start);
         match read_private_in_store(&self.destination.store, OWNER_INTENT) {
             Ok(current) if current == intent => {}
             Ok(_) => return Err(invalid("owner consumption intent differs")),

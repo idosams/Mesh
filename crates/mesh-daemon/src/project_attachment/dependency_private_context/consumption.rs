@@ -1,10 +1,18 @@
-//! Exact empty-destination consumption-start inventory. No recovery or admission escapes.
+//! Exact uncommitted consumption inventories. No recovery or admission escapes.
 use super::*;
 
-fn ensure_start_retention_available(
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RetentionPhase {
+    Start,
+    Installed,
+}
+
+fn ensure_consumption_retention_available(
     owner: &ProvisionedAttachment,
     destination: &ProvisionedAttachment,
     works: &[ProvisionedAttachment],
+    phase: RetentionPhase,
+    request: RecordDigest,
 ) -> io::Result<()> {
     for work in works.iter().chain([owner, destination]) {
         super::super::detachment::ensure_attached(&work.store)?;
@@ -16,11 +24,31 @@ fn ensure_start_retention_available(
             super::super::history::dependency_capture::absent(&work.store, pending)?;
         }
     }
-    for pending in [
-        super::super::consumption_history::PENDING,
-        super::super::consumption_complete::PENDING,
-        "consumption-owner.pending",
-    ] {
+    let pending = if phase == RetentionPhase::Start {
+        vec![
+            super::super::consumption_history::PENDING,
+            "consumption-owner.pending",
+        ]
+    } else {
+        let prefix = format!("consumption-owner-{}-", request.to_hex());
+        use std::os::unix::ffi::OsStrExt as _;
+        if owner
+            .store
+            .filesystem()
+            .read_directory_names_bounded(std::path::Path::new(""), 16384)?
+            .iter()
+            .any(|name| name.as_bytes().starts_with(prefix.as_bytes()))
+        {
+            return Err(invalid(
+                "installed retention precedes any owner receipt attempt",
+            ));
+        }
+        vec![]
+    };
+    for pending in pending
+        .into_iter()
+        .chain([super::super::consumption_complete::PENDING])
+    {
         super::super::history::dependency_capture::absent(&destination.store, pending)?;
     }
     Ok(())
@@ -34,6 +62,33 @@ impl AttachmentStorage {
         owner: &ProvisionedAttachment,
         request: NativeConsumedStartRequest<'_>,
         trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.inspect_native_consumption_retention(owner, request, trusted, RetentionPhase::Start)
+    }
+
+    /// Inspect retained installation and checkpoint bytes before any owner receipt attempt.
+    /// Explicit publication trust and the current exact grant remain required. No candidate,
+    /// history/runtime admission, recovery, protected-main or deletion authority is returned.
+    pub fn inspect_native_consumption_install_retention(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.inspect_native_consumption_retention(
+            owner,
+            request,
+            trusted,
+            RetentionPhase::Installed,
+        )
+    }
+
+    fn inspect_native_consumption_retention(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        trusted: &crate::TrustedReviewers,
+        phase: RetentionPhase,
     ) -> io::Result<Json> {
         request.limits.validate()?;
         let source = request.input.source;
@@ -114,10 +169,16 @@ impl AttachmentStorage {
         if rediscover()? != discovery {
             return Err(invalid("consumption retention discovery changed"));
         }
-        ensure_start_retention_available(owner, destination, &works)?;
+        ensure_consumption_retention_available(owner, destination, &works, phase, request.request)?;
         let context = PrivateContext::resolve(self, owner, &works, &guard)?;
         let inspect = || -> io::Result<Json> {
-            ensure_start_retention_available(owner, destination, &works)?;
+            ensure_consumption_retention_available(
+                owner,
+                destination,
+                &works,
+                phase,
+                request.request,
+            )?;
             for work in works.iter().chain(std::iter::once(destination)) {
                 self.exact_registered_work(work)?;
             }
@@ -180,7 +241,7 @@ impl AttachmentStorage {
                     owner, request: NativeConsumedStartRequest {
                         input: NativeGrantInspection {source, version: request.input.version, destination, grant: request.input.grant},
                         available: request.available, request: request.request, limits: request.limits,
-                    }, phase: RecoveryPhase::Start, graph: &graph, source_binding: &source_binding,
+                    }, phase: if phase == RetentionPhase::Start { RecoveryPhase::Start } else { RecoveryPhase::Installed }, graph: &graph, source_binding: &source_binding,
                     destination_binding: &destination_binding, owner_binding: owner_snapshot.proof.binding(),
                 }, &guard,
                 |operation, expected| {
@@ -189,7 +250,7 @@ impl AttachmentStorage {
                         super::super::consumption_prepare::source_verification::verify_starting_source(destination, &input, &guard, expected)
                     }))
                 }, verify_source,
-                |candidate, staged, graph, held| candidate.retained_start_roots(self, &staged, graph, held),
+                |candidate, staged, graph, held| match phase { RetentionPhase::Start => candidate.retained_start_roots(self, &staged, graph, held), RetentionPhase::Installed => candidate.retained_installed_roots(self, &staged, graph, held) },
             )?;
             if context.graph(self, source, request.input.version.operation(), &guard)? != graph
                 || context.binding(self, source, &guard)? != source_binding
@@ -199,9 +260,18 @@ impl AttachmentStorage {
             let result = Json::object([
                 (
                     "schema",
-                    Json::text("mesh.native-consumption-start-retention/v1"),
+                    Json::text(match phase {
+                        RetentionPhase::Start => "mesh.native-consumption-start-retention/v1",
+                        RetentionPhase::Installed => "mesh.native-consumption-install-retention/v1",
+                    }),
                 ),
-                ("scope", Json::text("empty-destination-start-recovery")),
+                (
+                    "scope",
+                    Json::text(match phase {
+                        RetentionPhase::Start => "empty-destination-start-recovery",
+                        RetentionPhase::Installed => "installation-checkpoint-before-owner",
+                    }),
+                ),
                 ("collection_authority", Json::Bool(false)),
                 ("request", Json::text(request.request.to_hex())),
                 (
@@ -226,14 +296,20 @@ impl AttachmentStorage {
             if result.encode().len() > 4 * 1024 * 1024 {
                 return Err(invalid("consumption retention encoding exceeds bound"));
             }
-            ensure_start_retention_available(owner, destination, &works)?;
+            ensure_consumption_retention_available(
+                owner,
+                destination,
+                &works,
+                phase,
+                request.request,
+            )?;
             Ok(result)
         };
         let result = inspect()?;
         if inspect()? != result || rediscover()? != discovery {
             return Err(invalid("consumption retention changed during inspection"));
         }
-        ensure_start_retention_available(owner, destination, &works)?;
+        ensure_consumption_retention_available(owner, destination, &works, phase, request.request)?;
         self.exact_registered_work(owner)?;
         self.exact_registered_work(destination)?;
         guard.ensure_current().map_err(error)?;

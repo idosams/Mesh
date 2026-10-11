@@ -3362,3 +3362,51 @@ semantic failure and corrected fixture failures are retained in the delivery led
 Hosted validation and merge remain pending. Installation/checkpoint/owner/completion consumption
 recovery, cross-store cleanup, concurrency/crash/storage pressure and the full signed graphical
 manual/harness/fleet acceptance remain unfinished. Fixed user checkpoints remain unchanged.
+
+## Installed consumption and checkpoint retention (R202)
+
+Issue [#386](https://github.com/idosams/Mesh/issues/386) adds a separate immutable
+`inspect_native_consumption_install_retention` API for an exact uncommitted lane after partial
+installation or a partial/full starting checkpoint. It depends on #385's published
+`11c1ea933803a6744de24b9bb2f542eebcccc41d`; this is new canonical implementation and replaces no
+legacy commit. The stricter empty-destination inspector retains its original scope.
+
+Configured publication trust, registered source/owner/ancestor/history discovery, an exact current
+bound grant and full deterministic custody remain mandatory. The inspector authenticates the
+original signed stage, installed entry identities/content and the destination installation intent.
+That intent is separate from the owner-store Consumption receipt; a selected owner receipt attempt,
+committed receipt or destination completion is refused. Checkpoint intent requires complete
+installation, its exact native journal prefix and independently matching promoted signed frames.
+Frames are a destination-local CAS root only in that verified checkpoint phase. Physical enrollment
+configuration and prospective consumed configuration remain distinct.
+
+The bounded `mesh.native-consumption-install-retention/v1` result reports separately qualified
+source/owner stores and destination roots, installed-entry count, exact sidecar hashes, journal,
+checkpoint and allocation/stage identities, with `collection_authority=false`. No candidate,
+writable workspace/CAS, recovery, ordinary saved-history/runtime admission, grant renewal,
+protected main, signing or deletion authority escapes. Persisted formats and writer semantics are
+unchanged; only the deterministic owner-intent encoder is shared with the existing writer.
+
+Regression fixtures prepare real signed installation/checkpoint material before root or consumed
+publication, then inspect after publication at zero/first/last/full checkpoint prefixes. Physical
+entry exchange and byte truncation cases simulate interruption boundaries; they are not claimed
+as separate-process kill evidence. Existing exhaustive process-restart campaigns are unchanged.
+The fixtures assert exact retained store/root/sidecar/identity sets, repeatability, no repair,
+source notes/synthetic dirty Git/private journals and installed-file preservation, wrong selection,
+trust/limits/current-grant refusal, missing/corrupt/foreign inputs, private permissions and owner/
+completion-phase rejection. Native policy fixtures independently validate real committed
+consumption and grant-revocation records before asserting refusal.
+
+The corrected root focused regression passed in 10.272s. R202's final full `npm test` passed:
+3,989 native tests in 501.720s (13 slow; 18 skipped), 194 rendered, 676 desktop and 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. Both new cases passed in that full run
+(root 27.446s; consumed 245.834s), including the pre-installation intent, committed-owner and
+revoked-grant boundaries. All five final Rust source hashes are unchanged afterward; only this
+validation documentation is finalized. The initial fixture compile, private-permission, read-fence
+and bound-grant encoding failures, semantic baseline and source/logs remain preserved. No check,
+assertion, deadline or native policy/read boundary was weakened. All seven exact final-head hosted
+checks, normal authorized merge and independent merged-main verification remain required.
+This establishes no collector, full cross-project reachability/concurrent cleanup, owner/completion
+recovery inventory, packaged/graphical approval/integration/restore, signing/provider/second-host or
+velocity acceptance. The [broader scope](https://github.com/idosams/Mesh/issues/345) stays open;
+fixed user checkpoints and the installed app remain unchanged.
