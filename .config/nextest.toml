@@ -9,6 +9,12 @@ filter = 'test(saved_ignore_rules_bind_candidate_without_changing_empty_reservat
 priority = 100
 
 [[profile.default.overrides]]
+# These complete consumed-native recovery campaigns dominate the macOS critical path.
+# Start them before short fixtures; keep every assertion, child boundary and deadline.
+filter = 'test(native_consumed_start_after_consumed_publication) | test(native_consumed_checkpoint_after_consumed_publication) | test(native_consumption_owner_after_consumed_publication) | test(native_consumption_completion_after_consumed_publication) | test(native_writer_commits_consumed_publications_and_recovers_completed_retries)'
+priority = 100
+
+[[profile.default.overrides]]
 # Build the bounded overview fixture early instead of after the recovery campaigns.
 filter = 'test(an_attached_review_outside_the_overview_bound_remains_directly_reviewable)'
 priority = 90
