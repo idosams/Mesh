@@ -22,7 +22,7 @@ on macOS when concurrently started tests inherit sibling output pipes; see the
 `cargo nextest --version` and the repository requirement with `cargo nextest show-config version`.
 Update with `cargo install cargo-nextest --locked --version 0.9.145`, or use a newer supported
 release. Do not bypass the version check or change leak thresholds to make a validation pass.
-The hosted workflow installs current nextest and reads the same repository configuration.
+The hosted workflow pins nextest 0.9.145 on both platforms and reads the same repository configuration.
 
 ## Verify a checkout
 
@@ -72,18 +72,24 @@ checks local Markdown file destinations and literal npm script examples against 
 It checks neither external URLs nor heading fragments and does not execute examples. Rendered HTML
 and packaged text guides still need the desktop guide tests and visual verification.
 
-Pull requests and main pushes distribute the complete `npm test` gate across the seven required
-jobs. The macOS test job runs `verify:rust`, `verify:demo` and the additional native renderer checks.
+Pull requests and main pushes distribute the complete `npm test` gate across thirteen jobs:
+`fmt`, `clippy`, `deny`, `license`, `desktop-and-docs`, three `test-linux-native (1/3)` through
+`(3/3)` workers, three `test-macos-native (1/3)` through `(3/3)` workers, and stable `test-linux`
+and `test-macos` aggregates. Linux preserves its existing `--exclude mesh-desktop` scope; macOS
+runs the complete workspace. Every worker first proves that its actual platform inventory
+participates in an exact, disjoint cover of all selected tests; missing, duplicate, changed ignored
+states or mismatched cases refuse the preflight. Each worker runs its complete hash partition with
+pinned nextest 0.9.145. macOS worker one also runs the real-daemon demonstration and all four native
+renderer checks. Each aggregate accepts only its actual complete successful platform worker group;
+missing, failed, cancelled, skipped or substituted platform groups refuse it.
 The desktop-and-docs job runs `verify:repository`, `verify:docs`, `verify:storage` and `verify:desktop`;
-the license job runs both commands in `verify:license`. The independent fmt, clippy, Linux Rust and
-dependency-policy jobs remain. All seven must pass: a passing macOS Rust job alone is insufficient.
-Desktop installation, build and tests run once in their own required job, leaving the macOS Rust
-job's unchanged 20-minute limit for native tests, the real daemon and renderers. No tests, Rust
-per-test deadlines or job time limits are relaxed. Rust test failures do not stop the remaining
-Rust cases; the command still fails, and later gate stages require success. Contributors still run
-the unchanged complete `npm test` command locally. The nightly job also runs that complete command
-plus dependency policy. A configured workflow is not evidence of a successful hosted run;
-inspect the exact revision's results before release.
+the license job runs both commands in `verify:license`. All thirteen exact-revision results must pass.
+No tests, per-test deadlines, native permissions or job time limits are relaxed. Native workers retain
+their 20-minute job limit; Linux retains its separate 15-minute test execution limit. Workers continue
+reporting failures without cancelling siblings. Contributors still run the unchanged complete
+`npm test` command locally. The nightly job also runs that complete command plus dependency policy.
+A configured workflow is not proof of a successful hosted run; inspect the actual revision's results
+before delivery.
 
 On macOS, `npm run test:macos-renderers` runs all four PDFKit and Office integration cases using checked-in synthetic fixtures.
 It is also a separate macOS CI step. Other measurement and helper cases remain explicitly ignored in the ordinary Rust suite. Run those separately

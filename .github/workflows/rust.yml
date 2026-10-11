@@ -38,20 +38,61 @@ jobs:
       # mandatory in the macOS job below.
       - run: cargo clippy --workspace --exclude mesh-desktop --all-targets -- -D warnings
 
-  test-linux:
+  test-linux-native:
+    name: test-linux-native (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # Keep test execution bounded separately from checkout, cache restore and compilation.
-    # The growing recovery campaign must not lose its execution budget to a cold build.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@nextest
-      - name: Build Linux test binaries
-        run: cargo nextest run --workspace --exclude mesh-desktop --no-run
-      - name: Run Linux tests
+        with:
+          shared-key: test-linux
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.145
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Prove the partitions cover the complete Linux inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory_dir="$RUNNER_TEMP/mesh-linux-inventory"
+          mkdir -p "$inventory_dir"
+          runner_version="$(cargo nextest --version)"
+          if [[ "$runner_version" != 'cargo-nextest 0.9.145 ('* ]]; then
+            printf 'Unexpected nextest version: %s\n' "$runner_version" >&2
+            exit 1
+          fi
+          printf '%s\n' "$runner_version"
+          cargo nextest list --workspace --exclude mesh-desktop --message-format json > "$inventory_dir/full.json"
+          for partition in 1 2 3; do
+            cargo nextest list --workspace --exclude mesh-desktop --message-format json --partition "hash:$partition/3" > "$inventory_dir/part-$partition.json"
+          done
+          node tools/program/macos-test-coverage.mjs --platform linux "$inventory_dir/full.json" "$inventory_dir/part-1.json" "$inventory_dir/part-2.json" "$inventory_dir/part-3.json"
+      - name: Run the complete selected Linux partition
+        # Preserve the former execution deadline separately from inventory compilation.
         timeout-minutes: 15
-        run: cargo nextest run --workspace --exclude mesh-desktop
+        run: cargo nextest run --workspace --exclude mesh-desktop --no-fail-fast --partition hash:${{ matrix.shard }}/3
+
+  test-linux:
+    needs: [test-linux-native]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Require every Linux partition to succeed
+        env:
+          MESH_LINUX_PARTITION_RESULTS: ${{ toJSON(needs) }}
+        run: node tools/program/macos-test-coverage.mjs --platform linux --result
 
   test-macos-native:
     name: test-macos-native (${{ matrix.shard }}/3)
