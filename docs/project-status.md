@@ -3469,6 +3469,39 @@ fleet routes, qualified cleanup/concurrency, packaged graphical approval/integra
 signing, another provider/host and velocity acceptance remain unfinished. Fixed checkpoints and
 the installed app remain unchanged.
 
+
+## Complete macOS CI partitions (11 October 2026)
+
+Repeated 20-minute macOS job cancellations prevented otherwise locally tested native increments
+from becoming merged delivery. A separate CI change partitions the complete native inventory across
+three macOS workers, preserving every test, fmt/clippy, real-daemon and native-renderer checks and
+the existing job deadlines. Each worker first verifies that all three inventories form an exact
+disjoint cover of the full test inventory, with ignored tests unchanged. The stable `test-macos`
+aggregate requires successful matrix completion; skipped, cancelled, failed or missing results
+refuse. All three additional worker results also require independent inspection before merging.
+This adds no product capability or packaged acceptance. Initial checker and actual published-source
+inventory validation passed. The full local gate passed 3,991 native tests in 527.954s,
+194 rendered, 676 desktop and 44 daemon checks, plus repository/docs/license/storage/fmt/clippy.
+The final installer pins the same tested nextest 0.9.145 on every worker and checks its version
+before inventory selection. The exact final preflight passed on the real 3,991-test inventory; four
+wrong-version cases refused before any test inventory was selected. An explicit exit preserves
+that refusal on the local macOS Bash 3.2 shell. All ten hosted checks remain required; delivery is
+pending.
+
+## Owner-retention delivery reconciliation (11 October 2026)
+
+Published R204 source `e05cda32519255d28a50e1ab05acb42451ce16c3` is preserved. A normal
+shared-history merge brings in CI PR [#397](https://github.com/idosams/Mesh/pull/397),
+`f58f66cb96880028e5d25198daac8c53ce5f8289`, without changing any of its five Rust files.
+Both append-only status histories are retained. The combined full `caffeinate -i npm test` gate
+passed: 3,993 native tests in 552.653s (15 slow; 18 skipped), 194 rendered, 676 desktop and
+44 real-daemon checks, plus all 32 repository tests and docs/license/storage/fmt/clippy. All nine
+non-document source hashes stayed unchanged. Both new cases passed (root 24.147s; consumed
+201.610s). The two previous cancelled macOS runs remain failed evidence. Final reconciliation
+with merged canonical main, all ten fresh hosted checks and independent merged-main proof
+remain required.
+
+
 ## Trusted bound grants after native publication (R205)
 
 `grant_native_saved_input` now records or revokes permission for an exact source operation and
@@ -3501,3 +3534,15 @@ campaigns and authenticated controller/harness/fleet routes remain unfinished. T
 cannot create a runnable agent lane. Packaged graphical approval/integration/restore, eligible
 signing, another provider/host and measured fleet velocity acceptance remain required. Fixed user
 checkpoints and the installed app remain unchanged.
+
+## Trusted input grant delivery reconciliation (11 October 2026)
+
+Original published R205 source `af5d8339bc75ef0a85d3926646a88878aacffa10` is preserved.
+A normal shared-history merge joins its published canonical parent PR #391 at
+`34f3439fad62e5014f1df632f7553a92033f2cd9`, including the separately tested CI PR #397.
+All six original Rust files and the exact published CI utility/package/workflow bytes are
+unchanged. Both documentation histories are retained. The original full local gate passed
+3,996 native tests, 194 rendered, 676 desktop and 44 real-daemon checks before initial
+publication. Focused revalidation on the combined sources and complete real inventory proof
+remain pending; final main ancestry, all ten fresh hosted checks and independent merged-main
+proof remain required. The original cancelled macOS job remains failed evidence.

@@ -16,7 +16,7 @@
     "verify:demo": "node --test examples/local-daemon-demo.test.mjs && node examples/local-daemon-demo.mjs",
     "test:macos-renderers": "PATH=\"$HOME/.cargo/bin:$PATH\" cargo nextest run -p mesh-desktop --run-ignored only",
     "repo:target": "node tools/program/repository-target.mjs",
-    "verify:repository": "node --test tools/program/repository-target.test.mjs"
+    "verify:repository": "node --test tools/program/repository-target.test.mjs tools/program/macos-test-coverage.test.mjs"
   },
   "engines": {
     "node": ">=22.18.0"
