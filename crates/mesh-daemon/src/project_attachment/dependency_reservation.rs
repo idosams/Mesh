@@ -189,7 +189,7 @@ impl AttachmentStorage {
         version: SavedAttachmentVersion,
         request: RecordDigest,
         available: &[&ProvisionedAttachment],
-        mut hook: impl FnMut(&str) -> io::Result<()>,
+        hook: impl FnMut(&str) -> io::Result<()>,
     ) -> io::Result<ProvisionedAttachment> {
         if request == RecordDigest::from_bytes([0; 32]) {
             return Err(invalid("missing reservation request"));
@@ -211,12 +211,53 @@ impl AttachmentStorage {
                 super::dependency_owner_context::OwnerHistoryContext::current(owner),
             )
         };
+        self.reserve_verified_with_hook(
+            owner,
+            parent,
+            version.operation(),
+            request,
+            graph.roots,
+            |guard| {
+                let context = resolve(guard)?;
+                let binding = context.validate(self, &prepared, guard)?;
+                verify_input(&context, parent, version)?;
+                Ok(binding)
+            },
+            |work, guard| {
+                let context = resolve(guard)?;
+                let selected = self.prepare_dependency_work(owner, work)?;
+                context.validate(self, &selected, guard).map(|_| ())
+            },
+            hook,
+        )
+    }
+
+    // One allocation transaction for both explicitly verified source contexts. Callbacks remain
+    // private native implementation details; callers cannot supply a history-admission flag.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn reserve_verified_with_hook(
+        &self,
+        owner: &ProvisionedAttachment,
+        parent: &ProvisionedAttachment,
+        operation: RecordDigest,
+        request: RecordDigest,
+        source_roots: Vec<PinnedWorkspaceRoot>,
+        verify_source: impl Fn(
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<super::NativeDependencyWorkBinding>,
+        verify_child: impl Fn(
+            &ProvisionedAttachment,
+            &crate::workspace_custody::WorkspaceInitializationGuard,
+        ) -> io::Result<()>,
+        mut hook: impl FnMut(&str) -> io::Result<()>,
+    ) -> io::Result<ProvisionedAttachment> {
+        if request == RecordDigest::from_bytes([0; 32]) || source_roots.len() + 5 > 32 {
+            return Err(invalid("invalid reservation request or custody bound"));
+        }
         let binding = {
-            let guard = crate::workspace_custody::lock_workspace_initialization_set(&graph.roots)
+            let guard = crate::workspace_custody::lock_workspace_initialization_set(&source_roots)
                 .map_err(error)?;
-            let context = resolve(&guard)?;
-            let binding = context.validate(self, &prepared, &guard)?;
-            verify_input(&context, parent, version)?;
+            let binding = verify_source(&guard)?;
             guard.ensure_current().map_err(error)?;
             binding
         };
@@ -243,7 +284,7 @@ impl AttachmentStorage {
                 ("authority", Json::text(binding.authority().to_hex())),
                 ("parent_binding", Json::text(binding.correlation.to_hex())),
                 ("source_project", Json::text(parent.id())),
-                ("source_version", Json::text(version.operation().to_hex())),
+                ("source_version", Json::text(operation.to_hex())),
                 ("request", Json::text(request.to_hex())),
                 ("allocation", identity(&allocation)?),
                 ("catalog", identity(&self.pinned)?),
@@ -274,17 +315,14 @@ impl AttachmentStorage {
             if record != reserved(&work, &intent)? {
                 return Err(invalid("reserved destination changed"));
             }
-            let selected = self.prepare_dependency_work(owner, &work)?;
-            let mut roots = graph.roots.clone();
+            let mut roots = source_roots.clone();
             roots.extend([allocation.clone(), files.clone(), work.store.clone()]);
             let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
                 .map_err(error)?;
-            let context = resolve(&guard)?;
-            if context.validate(self, &prepared, &guard)? != binding {
+            if verify_source(&guard)? != binding {
                 return Err(invalid("reservation parent changed during retry"));
             }
-            context.validate(self, &selected, &guard)?;
-            verify_input(&context, parent, version)?;
+            verify_child(&work, &guard)?;
             verify_enrolled(&work)?;
             allocation.filesystem().sync_file(Path::new(RESERVED))?;
             allocation.sync()?;
@@ -333,7 +371,7 @@ impl AttachmentStorage {
         {
             return Err(invalid("reserved files binding changed"));
         }
-        let mut roots = graph.roots.clone();
+        let mut roots = source_roots.clone();
         roots.extend([
             allocation.clone(),
             files.clone(),
@@ -343,11 +381,9 @@ impl AttachmentStorage {
         {
             let guard = crate::workspace_custody::lock_workspace_initialization_set(&roots)
                 .map_err(error)?;
-            let context = resolve(&guard)?;
-            if context.validate(self, &prepared, &guard)? != binding {
+            if verify_source(&guard)? != binding {
                 return Err(invalid("reservation parent changed"));
             }
-            verify_input(&context, parent, version)?;
             exact(&allocation, INTENT, &intent)?;
             exact(&allocation, FILES, &identity(&files)?)?;
             exact(&allocation, STORE, &store_receipt(&work)?)?;
@@ -390,6 +426,9 @@ impl AttachmentStorage {
                 return Err(invalid("reservation already contains private progress"));
             }
             hook("fenced")?;
+            if verify_source(&guard)? != binding {
+                return Err(invalid("reservation parent changed before publication"));
+            }
             guard.ensure_current().map_err(error)?;
             if work.metadata_path().parent() == Some(stage_path.as_path()) {
                 let entry = format!("project-{}", work.id());
@@ -406,12 +445,11 @@ impl AttachmentStorage {
         hook("published")?;
         let published = self.reopen(work.id())?;
         exact(&allocation, STORE, &store_receipt(&published)?)?;
-        let mut roots = graph.roots.clone();
+        let mut roots = source_roots.clone();
         roots.extend([allocation.clone(), files, staging, published.store.clone()]);
         let guard =
             crate::workspace_custody::lock_workspace_initialization_set(&roots).map_err(error)?;
-        let context = resolve(&guard)?;
-        if context.validate(self, &prepared, &guard)? != binding {
+        if verify_source(&guard)? != binding {
             return Err(invalid("reservation parent changed after publication"));
         }
         if !published
@@ -427,10 +465,16 @@ impl AttachmentStorage {
             return Err(invalid("unacknowledged reservation history changed"));
         }
         exact(&allocation, INTENT, &intent)?;
-        verify_input(&context, parent, version)?;
         verify_enrolled(&published)?;
         write(&allocation, RESERVED, &reserved(&published, &intent)?)?;
         hook("recorded")?;
+        if verify_source(&guard)? != binding {
+            return Err(invalid("reservation parent changed before acknowledgment"));
+        }
+        verify_child(&published, &guard)?;
+        exact(&allocation, INTENT, &intent)?;
+        exact(&allocation, STORE, &store_receipt(&published)?)?;
+        exact(&allocation, RESERVED, &reserved(&published, &intent)?)?;
         guard.ensure_current().map_err(error)?;
         Ok(published)
     }

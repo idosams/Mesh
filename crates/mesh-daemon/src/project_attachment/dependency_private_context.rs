@@ -858,3 +858,5 @@ mod retention;
 
 mod consumption;
 pub(in crate::project_attachment) use consumption::VerifiedConsumptionOwnerPrefix;
+
+mod reservation;

@@ -3501,3 +3501,25 @@ campaigns and authenticated controller/harness/fleet routes remain unfinished. T
 cannot create a runnable agent lane. Packaged graphical approval/integration/restore, eligible
 signing, another provider/host and measured fleet velocity acceptance remain required. Fixed user
 checkpoints and the installed app remain unchanged.
+
+## Trusted native destination reservation (11 October 2026)
+
+A native-host reservation path now creates an empty, fenced destination after real root or
+consumed native publication. It independently reconstructs the exact source operation through
+configured publication trust and the complete bounded source/ancestor/historical-publication
+context. The existing ordinary writer and native path share one allocation/recovery transaction;
+reservation formats, field ordering, depth and custody bounds remain unchanged. Correlation alone
+provides no grant, installed input, running lane or protected-main permission.
+
+All nine focused cases passed in 90.323s, including seven existing ordinary reservation cases.
+The two native cases use real publication and actual process exits at initialized, fenced,
+published and recorded boundaries. Exact restarts reuse the physical destination without duplicate
+registration. Missing trust, wrong selection, pending transactions, substituted folders and
+malformed/private/ambiguous receipts refuse while preserving editor and synthetic staged/untracked
+Git work. Source replacement immediately before publication refuses; retry after a later native
+grant still returns the original destination. The full repository gate passed 3,999 native tests in 632.673s,
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+All five tested Rust hashes remained unchanged; hosted validation and merged delivery remain pending. These are software-credential/process-exit tests, not graphical, power-loss or real concurrent
+acceptance. The fixed checkpoint and installed app remain unchanged; authenticated manual/harness/
+fleet routing and native writable consumption, retention/collection and full packaged acceptance
+remain unfinished.
