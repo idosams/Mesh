@@ -3445,3 +3445,26 @@ not establish historical owner-first recovery after later revocation/completion,
 reservation/grant/start/completion routes, collector/all-store concurrent cleanup or packaged
 manual/harness/fleet approval, integration, restore, signing, another provider/host or velocity
 acceptance. Fixed user checkpoints and the installed app remain unchanged.
+
+## Historical owner receipt retention before completion (R204)
+
+A separate `inspect_native_consumption_committed_owner_retention` path now inspects a fully
+written historical owner Consumption record even after valid later grant revocation. It verifies
+complete native owner history, the exact original canonical intent and full record boundary, and
+all historical source/owner/publication roots using configured trust. The historical body must
+match independently reconstructed signed installation material, with complete installation and
+checkpoint and no destination completion. The earlier pending-owner/current-grant path remains
+unchanged. These are immutable local facts, not a new durability acknowledgment, input permission,
+recovery/runtime admission, protected-main or deletion capability.
+
+All eight focused start/install/pending-owner/historical-owner cases passed in 144.191s for root
+and consumed sources. Full `caffeinate -i npm test` passed: 3,993 native tests in 545.712s (15 slow;
+18 skipped), 194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. Both new cases passed in full (root 24.122s; consumed 201.392s). All five Rust
+source hashes remained unchanged afterward and through the source-identical normal main
+fast-forward. Fixtures explicitly stage native-policy bytes after real publication; byte
+truncations simulate boundaries. Hosted checks remain pending. Destination completion recovery,
+explicit-trust writable reservation/grant/start/owner/completion and native manual/harness/
+fleet routes, qualified cleanup/concurrency, packaged graphical approval/integration/restore,
+signing, another provider/host and velocity acceptance remain unfinished. Fixed checkpoints and
+the installed app remain unchanged.

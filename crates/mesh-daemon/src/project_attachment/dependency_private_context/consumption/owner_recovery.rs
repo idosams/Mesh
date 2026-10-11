@@ -29,7 +29,7 @@ pub(in crate::project_attachment) struct VerifiedConsumptionOwnerPrefix {
     record: DependencyRecord,
     payload: Vec<u8>,
 }
-fn exact_name(store: &PinnedWorkspaceRoot, request: RecordDigest) -> io::Result<String> {
+pub(super) fn exact_name(store: &PinnedWorkspaceRoot, request: RecordDigest) -> io::Result<String> {
     let prefix = format!("consumption-owner-{}-", request.to_hex());
     let names = store
         .filesystem()
@@ -45,7 +45,7 @@ fn exact_name(store: &PinnedWorkspaceRoot, request: RecordDigest) -> io::Result<
         .map(str::to_owned)
         .ok_or_else(|| invalid("invalid consumption owner attempt name"))
 }
-fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
+pub(super) fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     file.take((MAX_JOURNAL + 1) as u64)
         .read_to_end(&mut bytes)?;

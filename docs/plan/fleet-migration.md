@@ -9003,3 +9003,61 @@ collector/all-store concurrency, packaged manual/harness/fleet approval/integrat
 signing, another authenticated provider/host and velocity acceptance remain required in the
 [broader scope](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed app
 remain unchanged.
+
+## Historical consumption owner retention (R204)
+
+Issue [#390](https://github.com/idosams/Mesh/issues/390) adds a separate immutable historical
+owner-receipt inspector before destination completion. New canonical implementation replaces no
+legacy commit and depends on merged PR #389 at
+`4b21c36bc0137161314ce1856863e51f74d09bc3`. Its complete tree matches the published parent
+`804c11cf59638d26f5aa652a545c9a57d6875ca5`. After full verification ended, a normal source-identical
+fast-forward preserved all seven changed file bytes/identities/modes, all five tested Rust hashes,
+staged/unstaged/index state and untracked files. This PR targets main initially. All seven exact
+final-head checks and normal authorized merge remain delivery prerequisites.
+
+The sealed historical receipt proof requires complete explicit-publication native owner history,
+the exact `native_request` Consumption record and one private canonical per-request sidecar.
+It independently verifies the original complete journal boundary and prefix/full frame against
+that record before allowing later valid policy records. Store/journal/sidecar identity, selection,
+raw intent, current complete proof and CAS payload are reverified on use. Configured trust still
+verifies every historical publication before facts return. A matching filename or a partial frame
+cannot establish a historical receipt. Ordinary reads and generic control recovery are unchanged.
+
+Complete authenticated owner/source/ancestor/publication history roots remain separately qualified
+from the destination signed installation and checkpoint roots. The selected owner inventory adds
+the verified historical sidecar, original prefix and record, current journal and later byte count.
+The owner body must match independently reconstructed original installation material under full
+custody, with complete installed entries/checkpoint and no destination completion. Only this typed
+historical branch uses the existing exact receipt instead of today's grant; the start/install/
+pending-owner current-grant checks are unchanged. Results are bounded with
+`collection_authority=false`. No new durability acknowledgment, input permission, writable/recovery
+candidate, ordinary admission, run, main, signing or deletion capability escapes. Writer formats
+and semantics are unchanged.
+
+The semantic baseline failed in 2.967s: the pending-owner inspector refuses a valid later
+revocation as foreign bytes after its exact frame prefix. The initial historical positive passed
+in 3.505s. All eight focused phase regressions passed in 144.191s (four slow), including the new
+root case in 19.884s and consumed case in 106.031s. They compare exact old store/root/sidecar sets
+plus actual owner/later local policy payloads, original prefix and current journal facts, complete
+owner records with and without later revocation, repeated inspection and unchanged destination
+facts. Partial owner records refuse as historical receipts while the original pending-phase
+inspector remains usable. Wrong trust/request/grant/limits, ambiguous or corrupt/missing/noncanonical/
+private/hardlinked evidence, missing old roots, foreign suffix or replaced journal, incomplete
+checkpoint, completion and live editor work refuse without repair. Source/installed file bytes and
+identities, synthetic dirty Git/untracked work and private journals are preserved.
+
+Fixtures independently validate native Consumption and subsequent v2 grant-revocation policy
+records after real native publication, explicitly as test-native-policy staging; this does not
+establish the ordinary product writer after publication. Prefix truncations are simulations, not
+process-kill or true concurrency claims. Existing exhaustive restart campaigns are unchanged.
+Full `caffeinate -i npm test` passed: 3,993 native tests in 545.712s (15 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new cases passed in full (root 24.122s; consumed 201.392s). All five final Rust source hashes
+remained unchanged afterward and through the source-identical normal main fast-forward; only
+validation documentation was finalized. All seven exact final-head hosted checks, normal authorized
+merge and independent merged-main verification remain required. Destination completion joins, actual
+concurrent both-order recovery, explicit-trust writable/native manual/harness/fleet routes,
+qualified collector/all-store concurrency, packaged graphical human approval/integration/restore,
+eligible signing, another authenticated provider/host and velocity acceptance remain in the
+[broader objective](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed
+app remain unchanged.
