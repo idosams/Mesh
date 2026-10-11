@@ -3,6 +3,7 @@
 mod chained_tests;
 mod checkpoint;
 mod complete;
+pub(in crate::project_attachment) use complete::NativeCompletionMaterial;
 mod completed_graph;
 mod completed_read;
 pub(in crate::project_attachment) use completed_read::VerifiedConsumedHistory;

@@ -34,9 +34,34 @@ impl PreparedNativeConsumedStart {
         journal: &mut fs::File,
         start_intent: &str,
         selection: CompletionSelection,
-        mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
-        mut sync: impl FnMut(&fs::File) -> io::Result<()>,
+        hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
+        self.append_completion_held(
+            journal,
+            start_intent,
+            selection,
+            (|| Ok(()), |_| Ok(())),
+            (hook, sync),
+        )
+    }
+    fn append_completion_held(
+        &self,
+        journal: &mut fs::File,
+        start_intent: &str,
+        selection: CompletionSelection,
+        verify: (
+            impl Fn() -> io::Result<()>,
+            impl Fn(DependencyRecord) -> io::Result<()>,
+        ),
+        io: (
+            impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+            impl FnMut(&fs::File) -> io::Result<()>,
+        ),
+    ) -> io::Result<RecordDigest> {
+        let (verify_before, verify_after) = verify;
+        let (mut hook, mut sync) = io;
+        verify_before()?;
         let read_journal = |file: &mut fs::File| -> io::Result<Vec<u8>> {
             file.rewind()?;
             let mut bytes = Vec::new();
@@ -107,7 +132,28 @@ impl PreparedNativeConsumedStart {
             .filesystem()
             .sync_file(Path::new(consumption_complete::PENDING))?;
         self.destination.store.sync()?;
+        let pending_metadata = self
+            .destination
+            .store
+            .filesystem()
+            .inspect_entry(Path::new(consumption_complete::PENDING))?
+            .metadata()?;
+        let pending_identity = (pending_metadata.dev(), pending_metadata.ino());
+        let verify_pending = || -> io::Result<()> {
+            let current = self
+                .destination
+                .store
+                .filesystem()
+                .inspect_entry(Path::new(consumption_complete::PENDING))?
+                .metadata()?;
+            if (current.dev(), current.ino()) != pending_identity {
+                return Err(invalid("completion pending file identity changed"));
+            }
+            Ok(())
+        };
         hook("complete-staged", journal, &frame)?;
+        verify_before()?;
+        verify_pending()?;
         let current = read_journal(journal)?;
         facts.verify(&self.destination.store, journal, &current)?;
         if current != observed
@@ -122,6 +168,8 @@ impl PreparedNativeConsumedStart {
         sync(journal)?;
         self.destination.store.sync()?;
         hook("complete-synced", journal, &frame)?;
+        verify_after(record)?;
+        verify_pending()?;
         let current = read_journal(journal)?;
         let (after_configuration, after) = self.destination.project().read_native_facts(
             self.destination.metadata_path(),
@@ -144,6 +192,241 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("completion did not replay exactly"));
         }
         Ok(record.payload)
+    }
+}
+
+// Immutable local facts only. The native proof independently joins the committed owner receipt
+// and complete configured-trust source history; these facts cannot grant ordinary admission.
+#[derive(Clone, PartialEq, Eq)]
+pub(in crate::project_attachment) struct NativeCompletionMaterial {
+    pub(in crate::project_attachment) start: DependencyRecord,
+    pub(in crate::project_attachment) owner: RecordDigest,
+    pub(in crate::project_attachment) prefix: usize,
+    pub(in crate::project_attachment) start_intent: String,
+    history_intent: String,
+    owner_intent: String,
+    journal: (u64, u64),
+    sidecars: [(u64, u64); 3],
+    completion: Option<(String, (u64, u64))>,
+    pub(in crate::project_attachment) receipt: Option<RecordDigest>,
+}
+impl NativeCompletionMaterial {
+    pub(in crate::project_attachment) fn same_origin(&self, other: &Self) -> bool {
+        self.start == other.start
+            && self.owner == other.owner
+            && self.prefix == other.prefix
+            && self.start_intent == other.start_intent
+            && self.history_intent == other.history_intent
+            && self.owner_intent == other.owner_intent
+            && self.journal == other.journal
+            && self.sidecars == other.sidecars
+            && self
+                .completion
+                .as_ref()
+                .is_none_or(|selected| other.completion.as_ref() == Some(selected))
+    }
+}
+impl PreparedNativeConsumedStart {
+    pub(in crate::project_attachment) fn native_completion_material_held(
+        &self,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        owner_receipt: RecordDigest,
+        owner_body: &Json,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<NativeCompletionMaterial> {
+        use crate::project_attachment::consumption_history;
+        guard
+            .require_roots(&[
+                self.owner.store.clone(),
+                self.destination.store.clone(),
+                self.destination.project().pinned.clone(),
+            ])
+            .map_err(error)?;
+        let start_intent =
+            read_private_in_store(&self.destination.store, super::super::START_PENDING)?;
+        let history_intent =
+            read_private_in_store(&self.destination.store, consumption_history::PENDING)?;
+        let owner_intent =
+            read_private_in_store(&self.destination.store, super::installation::OWNER_INTENT)?;
+        let (configuration, facts) = self.destination.project().read_native_facts(
+            self.destination.metadata_path(),
+            &self.destination.store,
+            Some(&start_intent),
+            None,
+        )?;
+        let facts = facts.ok_or_else(|| invalid("native completion enrollment missing"))?;
+        let (prefix, start) = facts
+            .pending()
+            .ok_or_else(|| invalid("native completion original start missing"))?;
+        if configuration != self.basis.configuration
+            || facts.binding() != self.basis.enrollment
+            || start.kind != mesh_store::DependencyKind::ConsumptionStart
+            || start.revision != 2
+            || graph.digest() != self.basis.graph
+            || owner_intent != self.owner_consumption_intent(graph, start.payload)
+            || Json::parse(&owner_intent).map_err(error)?.get("body") != Some(owner_body)
+        {
+            return Err(invalid("native completion original selection differs"));
+        }
+        let mut file = self
+            .destination
+            .store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(crate::RECORD_FILE_NAME))?;
+        let mut observed = Vec::new();
+        (&mut file)
+            .take(80 * 1024 * 1024 + 1)
+            .read_to_end(&mut observed)?;
+        if observed.len() > 80 * 1024 * 1024 {
+            return Err(invalid("native completion journal exceeds bound"));
+        }
+        facts.verify(&self.destination.store, &file, &observed)?;
+        let metadata = file.metadata()?;
+        let journal = (metadata.dev(), metadata.ino());
+        let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
+            self.destination.metadata_path(),
+            self.destination.store.filesystem().read_only(),
+        )
+        .map_err(error)?;
+        let frames = self.frames();
+        let end = prefix
+            .checked_add(frame_record(&StoredRecord::Dependency(start)).len())
+            .and_then(|begin| begin.checked_add(frames.len()))
+            .filter(|end| *end <= observed.len())
+            .ok_or_else(|| invalid("native completion checkpoint missing"))?;
+        let begin = end - frames.len();
+        if observed[begin..end] != frames
+            || read_payload(&cas, hash(&frames), frames.len())? != frames
+        {
+            return Err(invalid("native completion signed checkpoint differs"));
+        }
+        for object in &self.checkpoint.objects {
+            if read_payload(&cas, hash(object), object.len())? != *object {
+                return Err(invalid(
+                    "native completion retained checkpoint object differs",
+                ));
+            }
+        }
+        let sidecar_identity = |name: &str| -> io::Result<(u64, u64)> {
+            let metadata = self
+                .destination
+                .store
+                .filesystem()
+                .inspect_entry(Path::new(name))?
+                .metadata()?;
+            Ok((metadata.dev(), metadata.ino()))
+        };
+        let sidecars = [
+            sidecar_identity(super::super::START_PENDING)?,
+            sidecar_identity(consumption_history::PENDING)?,
+            sidecar_identity(super::installation::OWNER_INTENT)?,
+        ];
+        let (record, _) = consumption_complete::payload(start, owner_receipt)?;
+        let frame = frame_record(&StoredRecord::Dependency(record));
+        let completion =
+            match read_private_in_store(&self.destination.store, consumption_complete::PENDING) {
+                Ok(raw) => {
+                    if raw
+                        != consumption_complete::intent(
+                            self.request,
+                            journal,
+                            &observed[..end],
+                            record.payload,
+                        )
+                        || consumption_complete::verify_prefix(
+                            &cas,
+                            self.request,
+                            journal,
+                            &observed,
+                            end,
+                            start,
+                            &raw,
+                        )? != record
+                    {
+                        return Err(invalid(
+                            "native completion differs from its committed owner receipt",
+                        ));
+                    }
+                    Some((raw, sidecar_identity(consumption_complete::PENDING)?))
+                }
+                Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                Err(e) => return Err(e),
+            };
+        if consumption_history::pending_prefix(
+            &cas,
+            &start_intent,
+            &history_intent,
+            journal,
+            &observed,
+            completion.as_ref().map(|(raw, _)| raw.as_str()),
+        )?
+        .0 != prefix
+            || (completion.is_none() && observed.len() != end)
+            || !frame.starts_with(&observed[end..])
+        {
+            return Err(invalid("native completion has a foreign journal suffix"));
+        }
+        let receipt = (observed.len() == end + frame.len()).then_some(record.payload);
+        if receipt.is_some() {
+            let (full_configuration, full) = self.destination.project().read_native_facts(
+                self.destination.metadata_path(),
+                &self.destination.store,
+                None,
+                None,
+            )?;
+            let full = full.ok_or_else(|| invalid("native completion full history missing"))?;
+            full.verify(&self.destination.store, &file, &observed)?;
+            if full_configuration != configuration
+                || full.policy().completed_consumption_records()
+                    != Some((start, record, owner_receipt))
+            {
+                return Err(invalid("native completion owner join differs"));
+            }
+        }
+        guard.ensure_current().map_err(error)?;
+        Ok(NativeCompletionMaterial {
+            start,
+            owner: owner_receipt,
+            prefix: end,
+            start_intent,
+            history_intent,
+            owner_intent,
+            journal,
+            sidecars,
+            completion,
+            receipt,
+        })
+    }
+    pub(in crate::project_attachment) fn commit_native_completion_material_held(
+        &self,
+        proof: &crate::project_attachment::dependency_private_context::NativeCompletionConsumptionProof<'_>,
+        io: (
+            impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+            impl FnMut(&fs::File) -> io::Result<()>,
+        ),
+    ) -> io::Result<RecordDigest> {
+        proof.verify_candidate(self)?;
+        proof.verify_before()?;
+        let material = proof.material();
+        let mut journal = self
+            .destination
+            .store
+            .open_existing_record_file(Path::new(crate::RECORD_FILE_NAME))?;
+        self.append_completion_held(
+            &mut journal,
+            &material.start_intent,
+            CompletionSelection {
+                start: material.start,
+                owner: material.owner,
+                prefix: material.prefix,
+            },
+            (
+                || proof.verify_before(),
+                |record| proof.verify_after(record),
+            ),
+            io,
+        )
     }
 }
 

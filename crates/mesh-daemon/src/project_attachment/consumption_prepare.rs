@@ -28,6 +28,7 @@ use mesh_operations::{
 };
 use mesh_store::RecordDigest;
 use mesh_types::{PublicKey, Signature};
+pub(in crate::project_attachment) use staging::NativeCompletionMaterial;
 pub use staging::StagedNativeConsumedStart;
 pub(super) use staging::VerifiedConsumedHistory;
 pub(super) use staging::{ConsumedHistorySelection, RecoveryMaterial, RecoveryPhase};

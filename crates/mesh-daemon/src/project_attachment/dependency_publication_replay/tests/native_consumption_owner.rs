@@ -15,7 +15,7 @@ const CHILD: &str = "project_attachment::dependency_publication_replay::tests::n
 fn id(n: u8) -> RecordDigest {
     RecordDigest::from_bytes([n; 32])
 }
-fn prepare_checkpoint(
+pub(super) fn prepare_checkpoint(
     storage: &AttachmentStorage,
     owner: &ProvisionedAttachment,
     source: &ProvisionedAttachment,

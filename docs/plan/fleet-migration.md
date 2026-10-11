@@ -9600,3 +9600,83 @@ retained. A private process-local script shell dispatched only nextest to the ex
 and global tools were unchanged; the exact runner bytes/version and dispatcher are retained.
 This final documentation-only receipt follows frozen-source verification. Fresh exact-head
 thirteen-job PR proof, ordinary authorized merge and independent merged-main proof remain required.
+
+
+## Native destination completion after the owner receipt (R212, in progress)
+
+[Issue #406](https://github.com/idosams/Mesh/issues/406) continues from normally merged
+[PR #405](https://github.com/idosams/Mesh/pull/405), exact source
+`e63b1868bcce1126d616d0f7571887f785b02ffd`, main
+`982846c6c23f963a7c62f20ce0a6e6fef7efb010`, merged 11 October 2026 at 11:00:13 UTC.
+Owner exact-head run38132589795 passed all thirteen jobs, including all 3,570 Linux and 4,008
+macOS native cases, native renderers and real daemon. The six partition inventories cover each
+selected case once; full logs, source bundle and failure history are preserved. Prior main2acf
+also passed all thirteen independently. Independent owner-main run38133970199 subsequently passed
+all thirteen, including all 3,570 Linux and 4,008 macOS native cases. Full merged-main logs and
+exact partition/case accounting are archived. Only issue404 closed; the full objective345 remains open. This is new canonical source, replacing no legacy commit.
+
+A separate sealed completion proof verifies the internally authenticated saved operation, complete
+configured-trust owner/source/ancestor/publication history, original roots/allocation, signed
+retained stage, exact installed checkpoint, canonical owner intent and independently committed
+owner receipt. Uncommitted or partial owner attempts cannot authorize completion. A historical
+committed owner receipt survives later grant revocation without renewing input permission.
+Limits remain 256 discovered works, 256 inherited operations and 32 roots. The unfinished
+destination cannot supply source history. R209/R211 current-grant proofs remain separately closed.
+
+Both ordinary and native paths share the existing canonical completion payload, pending intent,
+frame and exact-prefix writer. Ordinary admission remains in its original caller; no persisted
+format change or private-to-ordinary conversion was added. Native raw-selector completion returns
+only the exact digest, invokes no signer and never reinstalls or repairs unrelated editor files.
+Fresh full custody verifies the owner join and original material before acknowledgement. Original
+owner-attempt, destination intent, completion-pending, stage and journal identities are pinned
+through the call. Fresh-process recovery does not invent durable sidecar-inode fields in old formats.
+Ordinary history, capture/controller routing, execution, main and collection remain closed.
+
+The semantic baseline executed real root publication -> native preparation/install/checkpoint ->
+actual native owner commit, then the ordinary completion writer refused in 9.595s because native
+publication verification was unavailable. Its source/logs are retained. The separate native writer
+and exact retry passed the first root case in 12.050s with all daemon targets lint-clean. An expanded
+fixture initially failed compilation on two wrong local variable names; that exact source/log is
+preserved, and only its fixture selectors were corrected. The corrected campaign passed all three
+cases in 301.753s: root37.193s, consumed301.745s, helper0.015s, with clippy clean.
+
+Both parents execute actual root/consumed publication, native checkpoint and owner commit, then
+actually revoke the grant before completion. Nine real child exits per parent cover staged/synced
+completion, three representative partial-frame writes followed by fresh-process recovery, and
+custody release. Exact canonical bytes and no duplicate append are checked. Six fresh-process
+missing-trust/foreign operation/grant/request/source/limits cases refuse without metadata/file
+repair. Ambiguous committed-owner evidence, damaged completion intent, same-byte/same-mode pending
+substitution, replaced journal and late editor arrival refuse while preserving foreign evidence.
+A second real checkpoint cannot complete with no owner receipt or with a merely staged owner
+attempt. Original saved input, newer editor/untracked/synthetic-Git bytes, source history and owner
+history are checked. The no-environment helper pass alone is not process proof.
+
+The final source additionally checks same-byte/same-mode substitution of the original owner
+attempt and all three destination intents after custody release. The complete frozen-source gate
+qualified these final oracles; the earlier focused campaign precedes their addition. The dirty source moved
+from published e63 to source-identical normally merged main982 through a verified ordinary
+fast-forward. All ten paths' bytes, inodes, modes, status and staged/unstaged patches stayed unchanged;
+raw index and source snapshots were retained. No stash, reset, fake ref or history discard was used.
+
+Complete frozen-source `npm test` passed. Fresh thirteen-job exact-head PR proof, ordinary
+authorized merge after independent prior-main thirteen, and independent merged-main proof remain
+required. Representative
+native prefixes are not exhaustive native byte-prefix, actual both-order concurrent-writer or
+power-loss qualification. Software credentials and process exits do not prove OS presence. Native
+completed histories, authenticated controller/session adoption, manual/harness/fleet graphical
+journeys, qualified collection, second provider/host and eligible packaged acceptance remain
+unfinished. The [full objective](https://github.com/idosams/Mesh/issues/345) remains open. The fixed
+user checkpoint and installed app remain unchanged and do not contain this increment.
+
+
+R212 frozen-source `npm test` exited0 on macOS26.6.1 arm64, Rust1.97.1, Node24.7.0 and the
+required isolated nextest0.9.145. All 4,011 native cases passed in 1104.730s (26 slow, 18 ignored),
+including the final replacement-identity oracles. Root completion passed in126.301s, consumed
+completion in811.500s and the child helper in0.020s. Prior native root/consumed owner and checkpoint
+cases, and both exhaustive shared checkpoint/completion byte-prefix campaigns, passed.
+Repository48, docs5/114-document audit, license/storage mutation checks, fmt/workspace clippy,
+renderer194, desktop676, two demo regressions and all44 real-daemon checks passed. All twelve
+frozen source/document hashes stayed unchanged; the final ten Rust hashes still match that gate.
+The private process-local shell selected the pinned runner without changing repository commands,
+timeouts, assertions or global tools. Its exact version, runtime bytes, full log and frozen source
+are retained. This final documentation-only receipt is checked separately before publication.

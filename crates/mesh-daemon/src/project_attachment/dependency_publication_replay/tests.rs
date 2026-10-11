@@ -8,6 +8,8 @@ mod consumption_owner_retention;
 mod consumption_retention;
 #[path = "tests/native_consumption_checkpoint.rs"]
 mod native_consumption_checkpoint;
+#[path = "tests/native_consumption_completion.rs"]
+mod native_consumption_completion;
 #[path = "tests/native_consumption_owner.rs"]
 mod native_consumption_owner;
 #[path = "tests/native_consumption_start.rs"]
@@ -156,6 +158,10 @@ fn native_consumed_checkpoint_after_root_publication() {
 #[test]
 fn native_consumption_owner_after_root_publication() {
     root_publication_fixture(14);
+}
+#[test]
+fn native_consumption_completion_after_root_publication() {
+    root_publication_fixture(15);
 }
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
@@ -426,6 +432,18 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if writer == 15 {
+        native_consumption_completion::inspect(
+            &storage,
+            &owner,
+            &owner,
+            version,
+            &trust,
+            key.public_key().as_ref(),
+            b"first private version",
+        );
+        return;
     }
     if writer == 14 {
         native_consumption_owner::inspect(
@@ -1636,6 +1654,10 @@ fn native_consumed_checkpoint_after_consumed_publication() {
 fn native_consumption_owner_after_consumed_publication() {
     consumed_publication_fixture(16);
 }
+#[test]
+fn native_consumption_completion_after_consumed_publication() {
+    consumed_publication_fixture(17);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -2164,6 +2186,18 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if writer == 17 {
+        native_consumption_completion::inspect(
+            &storage,
+            &owner,
+            &destination,
+            consumed,
+            &trust,
+            human_key.public_key().as_ref(),
+            b"exact native input",
+        );
+        return;
+    }
     if writer == 16 {
         native_consumption_owner::inspect(
             &storage,
