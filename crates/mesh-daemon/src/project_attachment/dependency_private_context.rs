@@ -13,6 +13,7 @@ use crate::{
     ipc::Json, workspace::NativePrivateReviewHistory,
     workspace_custody::WorkspaceInitializationGuard,
 };
+pub(in crate::project_attachment) use consumption::NativeConsumptionWriteProof;
 use mesh_store::RecordDigest;
 use std::{
     collections::{BTreeMap, BTreeSet},

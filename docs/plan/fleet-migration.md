@@ -9438,3 +9438,77 @@ identical to fully tested059. Later work uses separate build output to avoid cro
 This focused/inventory proof is distinct from the original full 4,002-test pass. All thirteen
 fresh hosted checks, prior independent CI-main proof, ordinary merge and independent staging-main
 verification remain required before delivery.
+
+
+## Native fenced installation and destination checkpoint (R209)
+
+[Issue #400](https://github.com/idosams/Mesh/issues/400) continues from the actual normally merged
+native preparation/staging #399, main `cd412b017516562799900eea91b3749953f7b783`. Its reconciled head
+`e1084ee8c295ec48333aeaeb557a444c154f7f18` passed all thirteen jobs in run38124747343, including all
+3,564 Linux and 4,002 macOS cases, daemon and native renderers. Complete logs/source bundles and
+original832 source are preserved. Independent staging-main run38125953052 remains in progress.
+The preceding CI #402 main502 already passed all thirteen independently in run38124020266.
+
+This is new canonical implementation, replacing no legacy source commit. A separate sealed native
+write proof reconstructs complete configured-trust owner/source/ancestor/publication history and
+original registered handles, reservation allocation and current exact bound grant under the full
+bounded custody set. Limits remain 256 discovered works, 256 inherited operations and 32 roots.
+The source context excludes the unfinished destination. Empty preparation remains separately closed;
+no ordinary-context override or admission boolean opens native publication history.
+
+The native wrapper now fences the original signed start, installs exact retained input and durably
+appends the destination checkpoint. Both admission paths share the existing held writer and all
+start/transaction/checkpoint encoders and field ordering. Ordinary owner/completion continuation
+retains its original context and formats. Native callers cannot select those phases. Every native
+mutation and acknowledgement rechecks current source/grant/trust; fresh complete post-release
+recovery verifies signed stage bytes and the original physical namespace before acknowledgement.
+A separate raw-selector recovery reconstructs the closed native wrapper without a signer, verifies
+again under fresh custody and grants no ordinary history, owner completion, execution or main.
+
+The semantic baseline ran the existing real ordinary writer and refused native publication.
+The first native root positive passed in 9.880s; expanded independent-reopen/input-preservation
+cases passed in 137.716s (root15.832s, consumed137.708s). The subsequent real process-exit campaign
+passed all three tests in 440.131s (root51.508s, consumed440.122s, helper0.013s). Both use actual
+publication -> native reservation/grant -> native prepare/stage -> actual native writers. Seven
+child exits cover staged/synced start, installed-entry/installed, checkpoint-staged/synced and
+custody-released. Fresh children invoke no signer. Representative start/checkpoint byte prefixes
+recover exact canonical frames without duplicate append; these are not exhaustive native prefix
+or power-loss claims. Existing exhaustive shared-writer regressions remain required in the full gate.
+
+Missing trust, foreign operation/grant/request, late editor arrival, foreign journal suffix and
+substituted installed files refuse while preserving evidence. Current grant revocation after custody
+release prevents acknowledgement and blocks uncommitted recovery. Original saved bytes, newer
+editor/untracked/synthetic-Git bytes, owner/source histories and exact retained identities are checked.
+Compiler/lint/selector mistakes and successful logs are retained. The final substitution oracle also
+preserves the foreign file's original mode, ensuring inode substitution cannot hide behind a mode
+mismatch. Full validation of that final source remains required; focused passes precede this edit.
+
+Both dirty ancestry transitions preserved all eight Rust paths' bytes, inodes, modes, status and
+staged/unstaged patches: original832 to actual published e108, then source-identical merged maincd412.
+The guards stopped stale bases before independent canonical identity/ancestry verification and normal
+fast-forwards; no stash, reset, fake ref, history rewrite or source discard was used. Verification now
+uses dedicated build output to avoid the stale cross-checkout binary found and rejected during R208.
+
+Complete `npm test`, all thirteen exact-head hosted jobs, ordinary authorized merge after the prior
+independent-main thirteen pass, and independent merged-main proof remain required. Destination owner
+receipt/completion and historical-grant joins, exhaustive native qualification and actual concurrent
+both-order conflicts remain later work. Software credentials/process exits do not prove OS presence,
+power-loss, concurrent writers, qualified collection or packaged/provider/remote acceptance. The
+[complete objective](https://github.com/idosams/Mesh/issues/345) remains open. The fixed user checkpoint
+and installed app remain unchanged and do not contain this increment.
+
+R209 frozen-source full gate subsequently passed with isolated nextest0.9.145 and dedicated build
+output: `npm test` exited0; 4,005 native tests passed in 953.409s (21 slow, 18 ignored), including
+root checkpoint135.846s, consumed checkpoint779.462s and both prior native staging cases. Repository
+48, docs5/114-document audit, license/storage self-tests, fmt/clippy, renderer194, desktop676 and
+the real-daemon44 checks passed. All ten frozen Rust/document hashes remained unchanged throughout
+the gate, including both new source files and the strengthened same-mode inode-substitution oracle.
+The final documentation-only receipt follows that frozen verification. A Python reporting typo
+failed before executing any statement after the successful gate; corrected reporting preserved the
+same source and original gate result. It was not a product/test failure.
+
+Independent prior staging-main run38125953052 on exact maincd412 completed all thirteen jobs
+successfully. Its full 3,460,752-byte log, job metadata and explicit native staging-case presence are
+preserved separately from the earlier exact-head PR proof. The original staged/reconciled/merged
+source histories and all failed verification remain recoverable. Fresh thirteen-job PR verification,
+ordinary merge and independent new-main verification still remain before this increment is delivered.

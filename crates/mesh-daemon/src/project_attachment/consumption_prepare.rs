@@ -2,6 +2,7 @@
 pub(super) mod source_verification;
 mod staging;
 mod trusted;
+pub(in crate::project_attachment) use trusted::NativeConsumedCommitPhase;
 pub use trusted::{NativeTrustedConsumedStartRequest, PreparedNativeTrustedConsumedStart};
 pub(super) const START_PENDING: &str = "consumption-start.pending";
 use super::{
@@ -146,7 +147,8 @@ fn absent(work: &ProvisionedAttachment, name: &str) -> io::Result<()> {
 impl AttachmentStorage {
     /// Prepare one authenticated initial tree from exact granted saved bytes. Native custody is
     /// released before invoking the signer. No destination files, history or policy are changed.
-    /// This development API has no commit method and cannot make the destination runnable.
+    /// Preparation alone cannot make the destination runnable. Later mutation APIs require
+    /// their own complete revalidation.
     pub fn prepare_consumed_start<F, E>(
         &self,
         owner: &ProvisionedAttachment,
