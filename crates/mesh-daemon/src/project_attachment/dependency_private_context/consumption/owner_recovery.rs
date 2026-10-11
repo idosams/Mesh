@@ -55,6 +55,11 @@ pub(super) fn journal_bytes(file: &mut File) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 impl VerifiedConsumptionOwnerPrefix {
+    pub(super) fn sidecar_identity(&self, owner: &ProvisionedAttachment) -> io::Result<(u64, u64)> {
+        self.raw_for(owner)?;
+        Ok(self.sidecar)
+    }
+
     pub(super) fn read(owner: &ProvisionedAttachment, request: RecordDigest) -> io::Result<Self> {
         let name = exact_name(&owner.store, request)?;
         let raw = read_private_in_store(&owner.store, &name)?;

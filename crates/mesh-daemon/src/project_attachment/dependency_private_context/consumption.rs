@@ -5,6 +5,8 @@ mod preparation;
 mod write;
 pub(in crate::project_attachment) use preparation::NativeConsumedStartBasis;
 pub(in crate::project_attachment) use write::NativeConsumptionWriteProof;
+mod owner_write;
+pub(in crate::project_attachment) use owner_write::NativeOwnerConsumptionProof;
 mod owner_recovery;
 pub(in crate::project_attachment) use owner_recovery::VerifiedConsumptionOwnerPrefix;
 

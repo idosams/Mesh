@@ -295,6 +295,14 @@ impl PreparedNativeTrustedConsumedStart {
         Ok(result)
     }
     #[cfg(test)]
+    pub(in crate::project_attachment) fn try_ordinary_owner_for_test(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+    ) -> io::Result<RecordDigest> {
+        self.inner.commit_fenced_owner_receipt(storage, staged)
+    }
+    #[cfg(test)]
     pub(in crate::project_attachment) fn try_ordinary_fence_for_test(
         &self,
         storage: &AttachmentStorage,

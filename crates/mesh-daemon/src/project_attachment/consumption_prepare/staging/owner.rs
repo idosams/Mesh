@@ -9,6 +9,13 @@ use crate::root_authority::PinnedRootFs;
 use mesh_cas::{Blake3, Cas};
 use mesh_store::{frame_record, DependencyKind, DependencyRecord, StoredRecord};
 use std::io::{Seek as _, Write as _};
+impl StagedNativeConsumedStart {
+    pub(in crate::project_attachment) fn retained_namespace_identity(
+        &self,
+    ) -> io::Result<(u64, u64)> {
+        self.root.identity()
+    }
+}
 impl PreparedNativeConsumedStart {
     /// Durably commit the exact owner consumption receipt after the signed destination checkpoint.
     /// This historical receipt is not local completion, ordinary history or run permission.
@@ -30,15 +37,126 @@ impl PreparedNativeConsumedStart {
         &self,
         context: &OwnerHistoryContext<'_>,
         stable_intent: &str,
-        mut hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
-        mut sync: impl FnMut(&fs::File) -> io::Result<()>,
+        hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
     ) -> io::Result<RecordDigest> {
+        let (configuration, proof) = context.read(&self.owner)?;
+        let proof = proof.ok_or_else(|| invalid("owner enrollment missing"))?;
+        self.commit_owner_receipt_held(
+            stable_intent,
+            (configuration, proof.private_evidence().clone()),
+            (
+                || context.read(&self.owner).map(|_| ()),
+                |_| {
+                    let (configuration, proof) = self
+                        .owner
+                        .project()
+                        .read_configuration(self.owner.metadata_path(), &self.owner.store)?;
+                    let proof = proof.ok_or_else(|| invalid("owner enrollment disappeared"))?;
+                    Ok((configuration, proof.private_evidence().clone()))
+                },
+            ),
+            (hook, sync),
+        )
+    }
+    pub(in crate::project_attachment) fn native_owner_intent_held(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        guard: &crate::workspace_custody::WorkspaceInitializationGuard,
+    ) -> io::Result<String> {
+        let raw =
+            read_private_in_store(&self.destination.store, super::installation::OWNER_INTENT)?;
+        let value = Json::parse(&raw).map_err(error)?;
+        let body = value
+            .get("body")
+            .ok_or_else(|| invalid("native owner intent body missing"))?;
+        self.retained_owner_roots(storage, staged, graph, guard, body)?;
+        Ok(raw)
+    }
+    pub(in crate::project_attachment) fn commit_native_owner_material_held(
+        &self,
+        proof: &crate::project_attachment::dependency_private_context::NativeOwnerConsumptionProof<
+            '_,
+        >,
+        io: (
+            impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+            impl FnMut(&fs::File) -> io::Result<()>,
+        ),
+    ) -> io::Result<RecordDigest> {
+        proof.verify_candidate(self)?;
+        proof.verify_before()?;
+        self.commit_owner_receipt_held(
+            proof.intent(),
+            proof.owner_snapshot(),
+            (
+                || proof.verify_before(),
+                |record| proof.verify_after(record),
+            ),
+            io,
+        )
+    }
+    pub(in crate::project_attachment) fn verify_native_owner_selection(
+        &self,
+        other: &Self,
+    ) -> io::Result<()> {
+        self.verify_prepared_basis(&other.basis)?;
+        if self.operation() != other.operation()
+            || self.request != other.request
+            || self.version != other.version
+            || self.grant != other.grant
+            || (
+                self.limits.entries,
+                self.limits.bytes,
+                self.limits.file_bytes,
+            ) != (
+                other.limits.entries,
+                other.limits.bytes,
+                other.limits.file_bytes,
+            )
+            || self.actor != other.actor
+        {
+            return Err(invalid("native owner candidate selection differs"));
+        }
+        for (selected, expected) in [
+            (&self.owner, &other.owner),
+            (&self.source, &other.source),
+            (&self.destination, &other.destination),
+        ] {
+            if selected.id() != expected.id()
+                || selected.store.identity()? != expected.store.identity()?
+                || selected.project().receipt()? != expected.project().receipt()?
+                || selected.project().pinned.identity()? != expected.project().pinned.identity()?
+            {
+                return Err(invalid("native owner candidate namespace differs"));
+            }
+        }
+        Ok(())
+    }
+    fn commit_owner_receipt_held(
+        &self,
+        stable_intent: &str,
+        material: (String, crate::project_attachment::VerifiedPrivateHistory),
+        verify: (
+            impl Fn() -> io::Result<()>,
+            impl Fn(
+                DependencyRecord,
+            )
+                -> io::Result<(String, crate::project_attachment::VerifiedPrivateHistory)>,
+        ),
+        io: (
+            impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+            impl FnMut(&fs::File) -> io::Result<()>,
+        ),
+    ) -> io::Result<RecordDigest> {
+        let (configuration, proof) = material;
+        let (verify_before, verify_after) = verify;
+        let (mut hook, mut sync) = io;
         let value = Json::parse(stable_intent).map_err(error)?;
         let body = value
             .get("body")
             .ok_or_else(|| invalid("owner consumption body missing"))?;
-        let (configuration, proof) = context.read(&self.owner)?;
-        let proof = proof.ok_or_else(|| invalid("owner enrollment missing"))?;
         let cas = Cas::<PinnedRootFs, Blake3>::with_filesystem(
             self.owner.metadata_path(),
             self.owner.store.filesystem(),
@@ -68,10 +186,20 @@ impl PreparedNativeConsumedStart {
             if record.kind != DependencyKind::Consumption || existing.get("body") != Some(body) {
                 return Err(invalid("owner receipt request was reused"));
             }
+            verify_before()?;
             sync(&journal)?;
             self.owner.store.sync()?;
             let current = read_journal(&mut journal)?;
             proof.verify(&self.owner.store, &journal, &current)?;
+            let (after_configuration, after) = verify_after(record)?;
+            after.verify(&self.owner.store, &journal, &current)?;
+            if after_configuration != configuration
+                || after.policy().native_request(self.request) != Some(record)
+            {
+                return Err(invalid(
+                    "owner receipt retry configuration or selection changed",
+                ));
+            }
             return Ok(record.payload);
         }
         let prefix = proof.pending().map_or(observed.len(), |(n, _)| n);
@@ -138,7 +266,28 @@ impl PreparedNativeConsumedStart {
         }
         self.owner.store.filesystem().sync_file(Path::new(&name))?;
         self.owner.store.sync()?;
+        let pending_metadata = self
+            .owner
+            .store
+            .filesystem()
+            .inspect_entry(Path::new(&name))?
+            .metadata()?;
+        let pending_identity = (pending_metadata.dev(), pending_metadata.ino());
+        let verify_pending_identity = || -> io::Result<()> {
+            let current = self
+                .owner
+                .store
+                .filesystem()
+                .inspect_entry(Path::new(&name))?
+                .metadata()?;
+            if (current.dev(), current.ino()) != pending_identity {
+                return Err(invalid("owner receipt pending file identity changed"));
+            }
+            Ok(())
+        };
         hook("owner-staged", &mut journal, &frame)?;
+        verify_before()?;
+        verify_pending_identity()?;
         let current = read_journal(&mut journal)?;
         proof.verify(&self.owner.store, &journal, &current)?;
         if current != observed || read_private_in_store(&self.owner.store, &name)? != intent {
@@ -149,12 +298,9 @@ impl PreparedNativeConsumedStart {
         self.owner.store.sync()?;
         hook("owner-synced", &mut journal, &frame)?;
         let current = read_journal(&mut journal)?;
-        let (after_configuration, after) = self
-            .owner
-            .project()
-            .read_configuration(self.owner.metadata_path(), &self.owner.store)?;
-        let after = after.ok_or_else(|| invalid("owner enrollment disappeared"))?;
+        let (after_configuration, after) = verify_after(record)?;
         after.verify(&self.owner.store, &journal, &current)?;
+        verify_pending_identity()?;
         if current.len() != prefix + frame.len()
             || current[..prefix] != *before
             || current[prefix..] != frame
