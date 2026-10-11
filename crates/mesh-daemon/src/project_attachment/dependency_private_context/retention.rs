@@ -1,6 +1,12 @@
-//! Store-qualified completed or exact capture-recovery history facts. No durable pin or collection permission.
+//! Store-qualified completed or exact recovery history facts. No durable pin or collection permission.
 use super::*;
 use mesh_cas::{Blake3, Cas};
+
+#[derive(Clone, Copy)]
+pub(super) enum NativeHistoryRecovery<'a> {
+    Capture(&'a crate::project_attachment::NativeCaptureRetention),
+    Control(&'a super::control::recovery::VerifiedControlPrefix),
+}
 
 impl AttachmentStorage {
     /// Inspect all authored versions and known completed transaction roots in one physical store.
@@ -34,39 +40,81 @@ impl PrivateContext<'_> {
         work: &ProvisionedAttachment,
         trusted: &crate::TrustedReviewers,
         guard: &WorkspaceInitializationGuard,
-        capture: Option<&crate::project_attachment::NativeCaptureRetention>,
+        recovery: Option<NativeHistoryRecovery<'_>>,
     ) -> io::Result<Json> {
         let snapshot = self.read(work, guard)?;
         self.with_replayed_history(storage, work, trusted, guard, |history, _| {
             let mut payload_budget = 1024 * 1024 * 1024usize;
             let mut content_budget = 1024 * 1024 * 1024u64;
-            let (operations, manifests, mut payloads, captures) = if let Some(capture) = capture {
-                // The physical journal may end inside a capture frame. Its exact inspector has
-                // already verified the complete reconstruction, every signed operation and all
-                // manifest contents. Do not admit that torn journal to ordinary history scanning.
-                let roots = capture.local_roots(work.store.identity()?)?;
-                (
-                    capture.retained_operations().clone(),
-                    roots.manifests.clone(),
-                    BTreeSet::new(),
-                    roots,
-                )
-            } else {
-                let authored = history
-                    .retained_authoring_objects(&mut payload_budget, &mut content_budget)
-                    .map_err(error)?;
-                let captures = work.all_completed_capture_receipt_roots(
-                    &authored.operations,
-                    &mut payload_budget,
-                    &snapshot.configuration,
-                    &snapshot.proof,
-                )?;
-                (
-                    authored.operations,
-                    authored.manifests,
-                    authored.payloads,
-                    captures,
-                )
+            let (operations, manifests, mut payloads, captures, control) = match recovery {
+                Some(NativeHistoryRecovery::Capture(capture)) => {
+                    // Only this exact authenticated reconstruction may inspect a torn capture.
+                    let roots = capture.local_roots(work.store.identity()?)?;
+                    (
+                        capture.retained_operations().clone(),
+                        roots.manifests.clone(),
+                        BTreeSet::new(),
+                        roots,
+                        None,
+                    )
+                }
+                Some(NativeHistoryRecovery::Control(prefix)) => {
+                    if work.id() != self.owner.id() {
+                        return Err(invalid("control history requires the exact owning store"));
+                    }
+                    let authored = prefix.history_roots(
+                        work,
+                        &snapshot.configuration,
+                        &snapshot.proof,
+                        &mut payload_budget,
+                        &mut content_budget,
+                    )?;
+                    let mut captures = work.all_completed_capture_receipt_roots(
+                        &authored.operations,
+                        &mut payload_budget,
+                        &snapshot.configuration,
+                        &snapshot.proof,
+                    )?;
+                    let control = work.inspect_pending_dependency_control_retention_with_context(
+                        prefix.request(),
+                        |raw| {
+                            if raw != prefix.raw_for(work)? {
+                                return Err(invalid("control history intent changed"));
+                            }
+                            let current = self.read(work, guard)?;
+                            Ok((current.configuration.clone(), current.proof.clone()))
+                        },
+                    )?;
+                    captures.sidecars.insert(
+                        super::super::dependency_decision::PENDING.to_owned(),
+                        hash(prefix.raw_for(work)?.as_bytes()),
+                    );
+                    (
+                        authored.operations,
+                        authored.manifests,
+                        authored.payloads,
+                        captures,
+                        Some(control),
+                    )
+                }
+                None => {
+                    let authored = history
+                        .retained_authoring_objects(&mut payload_budget, &mut content_budget)
+                        .map_err(error)?;
+                    let captures = work.all_completed_capture_receipt_roots(
+                        &authored.operations,
+                        &mut payload_budget,
+                        &snapshot.configuration,
+                        &snapshot.proof,
+                    )?;
+                    (
+                        authored.operations,
+                        authored.manifests,
+                        authored.payloads,
+                        captures,
+                        None,
+                    )
+                }
             };
             if operations.len() > 4096 || manifests.len() > 65536 {
                 return Err(invalid("retention history bound exceeded"));
@@ -112,18 +160,24 @@ impl PrivateContext<'_> {
             let mut fields = vec![
                 (
                     "schema",
-                    Json::text(if capture.is_some() {
-                        "mesh.native-history-capture-retention/v1"
-                    } else {
-                        "mesh.native-history-retention/v1"
+                    Json::text(match recovery {
+                        Some(NativeHistoryRecovery::Capture(_)) => {
+                            "mesh.native-history-capture-retention/v1"
+                        }
+                        Some(NativeHistoryRecovery::Control(_)) => {
+                            "mesh.native-history-control-retention/v1"
+                        }
+                        None => "mesh.native-history-retention/v1",
                     }),
                 ),
                 (
                     "scope",
-                    Json::text(if capture.is_some() {
-                        "selected-store-capture-recovery"
-                    } else {
-                        "selected-store-completed-history"
+                    Json::text(match recovery {
+                        Some(NativeHistoryRecovery::Capture(_)) => {
+                            "selected-store-capture-recovery"
+                        }
+                        Some(NativeHistoryRecovery::Control(_)) => "owner-store-control-recovery",
+                        None => "selected-store-completed-history",
                     }),
                 ),
                 ("collection_authority", Json::Bool(false)),
@@ -149,8 +203,11 @@ impl PrivateContext<'_> {
                     ),
                 ),
             ];
-            if let Some(capture) = capture {
+            if let Some(NativeHistoryRecovery::Capture(capture)) = recovery {
                 fields.push(("capture", capture.to_json()));
+            }
+            if let Some(control) = control {
+                fields.push(("control", control));
             }
             let result = Json::object(fields);
             if result.encode().len() > 4 * 1024 * 1024 {

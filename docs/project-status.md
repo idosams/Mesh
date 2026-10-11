@@ -3225,3 +3225,56 @@ Linux5m26s). R198 fast-forwarded to that main only after its full gate finished,
 incoming source trees and before/after local patch bytes independently checked. The delivery base
 is canonical main; no unrelated history merge or published rewrite. Independent merged-main run
 38094899377 is tracked separately. The full fleet and collector acceptance remain unfinished.
+
+
+## Complete owner history during exact control recovery (R199)
+
+[Issue #380](https://github.com/idosams/Mesh/issues/380) follows merged
+[#379](https://github.com/idosams/Mesh/pull/379) at
+9e89e62b14513213e1489bab8bac65bde23e7288 (published source
+140d6627fde650499041c27abca98392d0c7fac1). This is new canonical implementation; it replaces no
+preserved legacy commit. The parent's independent main run 38096647678 passed all seven jobs.
+
+The separate `inspect_native_history_retention_during_control` API takes an exact registered
+owning attachment, request and explicit publication trust. Under full deterministic native custody
+and repeated trusted replay, it reconstructs the exact staged/partial/lost-ack control frame in
+memory, independently folds the journal, verifies every signed authored operation, causal parent,
+manifest and file object, and retains local enrollment/policy objects, completed consumption roots,
+historical capture retry objects and the exact observed control sidecar. A selected child, unknown
+control kind, foreign or incomplete history and missing/corrupt objects refuse without repair.
+
+The result uses `mesh.native-history-control-retention/v1`, scope `owner-store-control-recovery`,
+physical work/installation/device/inode qualifiers, operation/manifest/payload/sidecar inventories
+and nested exact control facts. It reports collection_authority=false. Limits remain 4,096
+operations, 65,536 manifests/payloads, a 64 MiB reconstructed journal, shared 1 GiB payload and
+1 GiB content budgets, 16 MiB signed-operation reads and 4 MiB result encoding. Original completed and
+capture-recovery JSON shapes, control-only results, ordinary pending/torn refusals, writer behavior
+and persisted formats are unchanged. It performs no recovery, pinning, deletion, admission or
+protected-main approval.
+
+The temporary adapter to the completed-only reader failed the real staged-decision fixture after
+60.80s. The first new implementation failed compilation due to a closure error-type inference and
+private accessor visibility; both are corrected without widening the sealed proof beyond its
+private context. All failed sources/logs are retained. Final test and delivery results follow below.
+
+Pending publication/consumption inventory, unknown metadata classification, qualified cross-store
+reachability, independent deletion veto and custody through bounded cleanup still require work.
+Concurrent promotion, crash/storage-pressure acceptance, signed graphical manual/harness/fleet
+journeys, another provider/host and final velocity evidence remain open under #345. This selected
+store inventory cannot authorize collection. Fixed user checkpoints and installed app stay unchanged.
+
+
+R199's final full `npm test` passed on canonical main plus this increment: 3,985 native tests in
+436.548s (11 slow; 18 skipped), 194 rendered tests, 676 desktop tests and all 44 real-daemon
+checks, plus repository/docs/license/storage/fmt/clippy. This includes direct missing/corrupt old
+signed-operation, file-content and capture-retry objects, exact inventory restoration, pending
+control payload/graph refusals and exact later recovery. All six source files remain byte-identical
+after that pass; only these delivery receipts change and receive a final docs check. Exact-final-head
+hosted checks and merged delivery remain pending.
+
+Tracking correction: #377 accidentally completed #345 because GitHub interpreted its negated
+closing phrase as a closing directive. Its merged PR text now links the broader scope without that
+directive; closing references name only #376. Issue #345 is reopened with the remaining acceptance
+scope retained. Future delivery verifies the PR's closing references separately. The machine still
+has zero valid code-signing identities; signed graphical acceptance is unfinished, and this does
+not prevent continued native delivery. Fixed checkpoints and the installed app remain unchanged.

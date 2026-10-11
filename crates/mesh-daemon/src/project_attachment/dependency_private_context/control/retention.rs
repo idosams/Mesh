@@ -3,6 +3,27 @@ use super::*;
 use crate::project_attachment::dependency_transaction::text;
 
 impl AttachmentStorage {
+    /// Inspect complete owning-store history during one exact control recovery.
+    /// The ordinary completed reader stays fenced; no recovery, pin or deletion occurs.
+    pub fn inspect_native_history_retention_during_control(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.with_control_retention(owner, request, trusted, |context, guard, prefix| {
+            context.native_history_retention(
+                self,
+                owner,
+                trusted,
+                guard,
+                Some(super::super::retention::NativeHistoryRecovery::Control(
+                    prefix,
+                )),
+            )
+        })
+    }
+
     /// Inspect one exact owning-store control recovery through configured publication trust.
     /// These bounded local policy roots are neither complete history nor collection permission.
     pub fn inspect_verified_dependency_control_retention(
@@ -11,6 +32,50 @@ impl AttachmentStorage {
         request: RecordDigest,
         trusted: &TrustedReviewers,
     ) -> io::Result<Json> {
+        self.with_control_retention(owner, request, trusted, |context, guard, recovery| {
+            let control = owner.inspect_pending_dependency_control_retention_with_context(
+                request,
+                |raw| {
+                    if raw != recovery.raw_for(owner)? {
+                        return Err(invalid("native control retention intent changed"));
+                    }
+                    let snapshot = context.read(owner, guard)?;
+                    Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
+                },
+            )?;
+            let binding = context.binding(self, owner, guard)?;
+            let identity = owner.store.identity()?;
+            let result = Json::object([
+                (
+                    "schema",
+                    Json::text("mesh.trusted-native-control-retention/v1"),
+                ),
+                ("scope", Json::text("owner-store-control-recovery")),
+                ("collection_authority", Json::Bool(false)),
+                ("work", Json::text(binding.work().to_hex())),
+                ("installation", Json::text(binding.installation().to_hex())),
+                ("device", Json::text(format!("{:x}", identity.0))),
+                ("inode", Json::text(format!("{:x}", identity.1))),
+                ("control", control),
+            ]);
+            if result.encode().len() > 4 * 1024 * 1024 {
+                return Err(invalid("native control retention encoding exceeds bound"));
+            }
+            Ok(result)
+        })
+    }
+
+    fn with_control_retention<T: PartialEq>(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        trusted: &TrustedReviewers,
+        read: impl Fn(
+            &PrivateContext<'_>,
+            &WorkspaceInitializationGuard,
+            &recovery::VerifiedControlPrefix,
+        ) -> io::Result<T>,
+    ) -> io::Result<T> {
         if request == ZERO {
             return Err(invalid("missing native control retention request"));
         }
@@ -73,37 +138,10 @@ impl AttachmentStorage {
             &guard,
             Some(OwnerRecovery::Control(&recovery)),
         )?;
-        let inspect = || {
+        let inspect = || -> io::Result<T> {
             self.exact_registered_work(owner)?;
             context.with_replayed_history(self, owner, trusted, &guard, |_, _| Ok(()))?;
-            let control = owner.inspect_pending_dependency_control_retention_with_context(
-                request,
-                |raw| {
-                    if raw != recovery.raw_for(owner)? {
-                        return Err(invalid("native control retention intent changed"));
-                    }
-                    let snapshot = context.read(owner, &guard)?;
-                    Ok((snapshot.configuration.clone(), snapshot.proof.clone()))
-                },
-            )?;
-            let binding = context.binding(self, owner, &guard)?;
-            let identity = owner.store.identity()?;
-            let result = Json::object([
-                (
-                    "schema",
-                    Json::text("mesh.trusted-native-control-retention/v1"),
-                ),
-                ("scope", Json::text("owner-store-control-recovery")),
-                ("collection_authority", Json::Bool(false)),
-                ("work", Json::text(binding.work().to_hex())),
-                ("installation", Json::text(binding.installation().to_hex())),
-                ("device", Json::text(format!("{:x}", identity.0))),
-                ("inode", Json::text(format!("{:x}", identity.1))),
-                ("control", control),
-            ]);
-            if result.encode().len() > 4 * 1024 * 1024 {
-                return Err(invalid("native control retention encoding exceeds bound"));
-            }
+            let result = read(&context, &guard, &recovery)?;
             context.read(owner, &guard)?;
             Ok(result)
         };
