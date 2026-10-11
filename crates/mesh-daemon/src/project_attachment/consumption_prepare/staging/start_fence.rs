@@ -13,6 +13,20 @@ fn j(value: RecordDigest) -> Json {
 fn work(value: &NativeDependencyWorkBinding) -> Json {
     Json::Array(vec![j(value.work()), j(value.installation())])
 }
+struct ConsumptionWriteMaterial<'a> {
+    graph: &'a crate::project_attachment::NativeDependencyGraph,
+    source: &'a NativeDependencyWorkBinding,
+    destination: &'a NativeDependencyWorkBinding,
+    owner: crate::dependency_policy::NativeDependencyBinding,
+    guard: &'a crate::workspace_custody::WorkspaceInitializationGuard,
+}
+struct FencedCommit {
+    journal: fs::File,
+    intent: String,
+    record: DependencyRecord,
+    prefix: usize,
+    owner_intent: Option<String>,
+}
 impl PreparedNativeConsumedStart {
     pub(super) fn start_body(
         &self,
@@ -159,6 +173,132 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("consumption fence selection changed"));
         }
         storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
+        let (_, owner) = context.read(&self.owner)?;
+        let owner = owner
+            .ok_or_else(|| invalid("owner enrollment missing"))?
+            .binding();
+        let FencedCommit {
+            mut journal,
+            intent,
+            record,
+            prefix,
+            owner_intent,
+        } = self.commit_start_material_held(
+            storage,
+            staged,
+            (install, phase),
+            ConsumptionWriteMaterial {
+                graph: &current_graph,
+                source: &source,
+                destination: &destination,
+                owner,
+                guard: &guard,
+            },
+            || storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(())),
+            (&mut hook, &mut sync),
+        )?;
+        if matches!(phase, CommitPhase::Owner | CommitPhase::Complete) {
+            let receipt = self.commit_owner_receipt(
+                &context,
+                owner_intent
+                    .as_ref()
+                    .ok_or_else(|| invalid("owner intent missing"))?,
+                |step, file, frame| hook(step, file, frame),
+                |file| sync(file),
+            )?;
+            let result = if phase == CommitPhase::Complete {
+                self.append_completion(
+                    &mut journal,
+                    &intent,
+                    super::complete::CompletionSelection {
+                        start: record,
+                        owner: receipt,
+                        prefix: prefix + self.frames().len(),
+                    },
+                    |step, file, frame| hook(step, file, frame),
+                    |file| sync(file),
+                )?
+            } else {
+                receipt
+            };
+            guard.ensure_current().map_err(error)?;
+            return Ok(result);
+        }
+        Ok(record.payload)
+    }
+    pub(in crate::project_attachment::consumption_prepare) fn commit_native_material_held(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        phase: super::super::NativeConsumedCommitPhase,
+        proof: &crate::project_attachment::dependency_private_context::NativeConsumptionWriteProof<
+            '_,
+        >,
+        hook: impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&fs::File) -> io::Result<()>,
+    ) -> io::Result<RecordDigest> {
+        use super::super::NativeConsumedCommitPhase as NativePhase;
+        let (install, phase) = match phase {
+            NativePhase::Fence => (false, CommitPhase::Start),
+            NativePhase::Install => (true, CommitPhase::Start),
+            NativePhase::Checkpoint => (true, CommitPhase::Checkpoint),
+        };
+        absent(
+            &self.destination,
+            crate::project_attachment::consumption_complete::PENDING,
+        )?;
+        if phase == CommitPhase::Start {
+            absent(
+                &self.destination,
+                crate::project_attachment::consumption_history::PENDING,
+            )?;
+        }
+        if proof.version() != self.version
+            || proof.destination() != &self.basis.destination
+            || proof.graph().digest() != self.basis.graph
+            || staged.request != self.request
+        {
+            return Err(invalid("native consumption fence selection changed"));
+        }
+        proof.verify()?;
+        let committed = self.commit_start_material_held(
+            storage,
+            staged,
+            (install, phase),
+            ConsumptionWriteMaterial {
+                graph: proof.graph(),
+                source: proof.source(),
+                destination: proof.destination(),
+                owner: proof.owner(),
+                guard: proof.guard(),
+            },
+            || proof.verify(),
+            (hook, sync),
+        )?;
+        proof.verify()?;
+        Ok(committed.record.payload)
+    }
+    fn commit_start_material_held(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        phase: (bool, CommitPhase),
+        material: ConsumptionWriteMaterial<'_>,
+        verify_source: impl Fn() -> io::Result<()>,
+        io: (
+            impl FnMut(&str, &mut fs::File, &[u8]) -> io::Result<()>,
+            impl FnMut(&fs::File) -> io::Result<()>,
+        ),
+    ) -> io::Result<FencedCommit> {
+        let (mut hook, mut sync) = io;
+        let (install, phase) = phase;
+        let ConsumptionWriteMaterial {
+            graph: current_graph,
+            source,
+            destination,
+            owner,
+            guard,
+        } = material;
         let origin = storage
             .lane_origin_bound(&self.destination)?
             .ok_or_else(|| invalid("reservation missing"))?;
@@ -198,7 +338,7 @@ impl PreparedNativeConsumedStart {
                 &staged.root,
                 original_graph,
                 &origin.allocation,
-                &guard,
+                guard,
                 install,
             )? != staged.receipt
             || super::super::super::consumption_plan::InitialPlan::verify(
@@ -209,10 +349,6 @@ impl PreparedNativeConsumedStart {
         {
             return Err(invalid("staged consumption material changed"));
         }
-        let (_, owner) = context.read(&self.owner)?;
-        let owner = owner
-            .ok_or_else(|| invalid("owner enrollment missing"))?
-            .binding();
         let descriptor = Json::object([
             (
                 "schema",
@@ -231,7 +367,7 @@ impl PreparedNativeConsumedStart {
         ])
         .encode()
         .into_bytes();
-        let body = self.start_body(owner, &source, &destination, hash(&descriptor));
+        let body = self.start_body(owner, source, destination, hash(&descriptor));
         let pending = match read_private_in_store(&self.destination.store, PENDING) {
             Ok(raw) => Some(raw),
             Err(e) if e.kind() == io::ErrorKind::NotFound => None,
@@ -329,7 +465,7 @@ impl PreparedNativeConsumedStart {
             if occupied && (pending.is_none() || observed.len() < before.len() + frame.len()) {
                 return Err(invalid("installed entries lack a complete durable start"));
             }
-            Some(self.retain_owner_consumption_intent(&current_graph, record.payload)?)
+            Some(self.retain_owner_consumption_intent(current_graph, record.payload)?)
         } else {
             None
         };
@@ -359,7 +495,7 @@ impl PreparedNativeConsumedStart {
         self.destination.store.sync()?;
         hook("staged", &mut journal, &frame)?;
         empty()?;
-        storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
+        verify_source()?;
         guard.ensure_current().map_err(error)?;
         if read_private_in_store(&self.destination.store, PENDING)? != intent {
             return Err(invalid("consumption intent changed"));
@@ -402,14 +538,14 @@ impl PreparedNativeConsumedStart {
         }
         guard.ensure_current().map_err(error)?;
         if install {
-            self.install_entries(staged, &origin.allocation, &guard, |step| {
+            self.install_entries(staged, &origin.allocation, guard, |step| {
                 hook(step, &mut journal, &frame)
             })?;
             if self.verify_stage_state(
                 &staged.root,
                 original_graph,
                 &origin.allocation,
-                &guard,
+                guard,
                 true,
             )? != staged.receipt
                 || read_private_in_store(
@@ -432,7 +568,7 @@ impl PreparedNativeConsumedStart {
             if current_configuration != configuration || current_facts.as_ref() != Some(&after) {
                 return Err(invalid("consumption journal changed during installation"));
             }
-            storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
+            verify_source()?;
             guard.ensure_current().map_err(error)?;
         }
         if phase != CommitPhase::Start {
@@ -448,7 +584,7 @@ impl PreparedNativeConsumedStart {
                 &staged.root,
                 original_graph,
                 &origin.allocation,
-                &guard,
+                guard,
                 true,
             )? != staged.receipt
                 || read_private_in_store(
@@ -460,37 +596,16 @@ impl PreparedNativeConsumedStart {
             {
                 return Err(invalid("checkpoint installation evidence changed"));
             }
-            storage.with_input_grant_owner(&grant, &guard, &context, |_| Ok(()))?;
+            verify_source()?;
             guard.ensure_current().map_err(error)?;
         }
-        if matches!(phase, CommitPhase::Owner | CommitPhase::Complete) {
-            let receipt = self.commit_owner_receipt(
-                &context,
-                owner_intent
-                    .as_ref()
-                    .ok_or_else(|| invalid("owner intent missing"))?,
-                |step, file, frame| hook(step, file, frame),
-                |file| sync(file),
-            )?;
-            let result = if phase == CommitPhase::Complete {
-                self.append_completion(
-                    &mut journal,
-                    &intent,
-                    super::complete::CompletionSelection {
-                        start: record,
-                        owner: receipt,
-                        prefix: before.len() + frame.len() + self.frames().len(),
-                    },
-                    |step, file, frame| hook(step, file, frame),
-                    |file| sync(file),
-                )?
-            } else {
-                receipt
-            };
-            guard.ensure_current().map_err(error)?;
-            return Ok(result);
-        }
-        Ok(record.payload)
+        Ok(FencedCommit {
+            journal,
+            intent,
+            record,
+            prefix: before.len() + frame.len(),
+            owner_intent,
+        })
     }
 }
 
