@@ -3945,3 +3945,56 @@ frozen source/document hashes stayed unchanged; the final ten Rust hashes still 
 The private process-local shell selected the pinned runner without changing repository commands,
 timeouts, assertions or global tools. Its exact version, runtime bytes, full log and frozen source
 are retained. This final documentation-only receipt is checked separately before publication.
+
+
+## Trusted native saved-version listing and immutable files (R213, in progress)
+
+[Issue #408](https://github.com/idosams/Mesh/issues/408) continues from normally merged
+[PR #407](https://github.com/idosams/Mesh/pull/407): source
+`cb3a1e94936268a398bc50858ac8cbf9acdee16e`, main
+`beec7f4d2bdf03a376eb0de7ffaa679b2fa5295d`, merged 11 October 2026 at11:50:47 UTC.
+Exact-head run38135830001 passed all thirteen jobs, all3,573 Linux and4,011 macOS native cases,
+native renderers and real daemon. Full logs, exact six-worker inventory/partition accounting,
+new/prior native cases and the ordinary merge receipt are archived. Independent owner-main
+run38133970199 passed all thirteen before merge. Completion-main run38137055152 ended cancelled: macOS worker3 exceeded its20-minute job limit after1,323/1,324 selected tests passed. Its aggregate failed correctly. Full logs and API deadline annotations are preserved; this main revision is not qualified. A separate CI correction and complete corrected-main proof are required before this product increment merges.
+Only issue406 closed; the full objective345 stays open. This is new canonical work, replacing no
+legacy commit. The four dirty source paths moved from published cb3 to source-identical merged
+mainbeec by an ordinary verified forward. Bytes, inodes, modes, status and both patches stayed
+unchanged; original index/source and the stale-base guard refusal/resolution were preserved.
+
+The baseline executed actual root and consumed publication -> native checkpoint -> native owner
+receipt -> destination completion, then actual grant revocation. Existing configured-trust exact
+point inspection already succeeded in both parents (14.029s/114.975s). The ordinary registered
+version list refused native publication as designed. That successful baseline avoided a resolver
+rewrite; the existing full private context already reconstructs completed histories.
+
+New read-only `inspect_native_saved_versions` and `inspect_native_saved_file` APIs use that same
+complete bounded registration/source/ancestor/owning-history context and configured-trust replay
+of all required publications. The adapter returns only the recorded capture line or exact saved
+bytes, with native revalidation before acknowledgement. It exposes no workspace, mutable or
+ordinary-read capability. Missing files return None; editor files never supply a fallback.
+Historical completed receipts remain readable after later revocation without renewing input
+permission. Existing ordinary refusal, resolver, persistence formats and write contracts remain.
+
+The first compilation stopped before tests because two new helpers passed an error enum directly
+to an adapter requiring Error; complete source/logs are preserved. Only those error conversions
+were corrected. Lint and both initial API cases passed in137.131s (root16.943s, consumed137.123s).
+Expanded all-target daemon lint and all three cases passed in236.777s: root30.683s, consumed236.766s,
+helper0.014s. Both parents execute three actual fresh processes: saved reads before a later private
+save, refusal of damaged completion evidence, and old-version reads after the later save. The
+no-environment helper pass alone is not process proof.
+
+The campaign verifies unfinished-lane refusal, missing trust and foreign version/work refusal,
+original saved bytes despite newer editor/untracked/synthetic-Git work, and preserved selected
+metadata/file bytes, inodes and modes across reads. A later actual native capture produces a second
+version, including binary bytes, without rewinding the old saved file or advancing native main.
+Git files stay outside that capture. Damaged completion evidence refuses without repair; only
+fixture-owned bytes are restored. Source files/history and owner history remain unchanged by the
+private destination capture. Ordinary history and uncommitted native recovery remain refused.
+
+Complete frozen-source `npm test` passed with isolated nextest0.9.145: all4,014 native cases in1,177.750s,27 slow and18 ignored. The new root/consumed history parents passed in78.697s/658.524s; helper0.017s. Prior native completion, owner, checkpoint and both exhaustive shared byte-prefix campaigns passed. Repository48, docs5/114-document audit, license/storage mutation checks, fmt/workspace clippy, renderer194, desktop676, two demo regressions and all44 real-daemon checks passed. All six frozen source/document hashes and the global/pinned/private-dispatcher runtime bytes stayed unchanged. Only this final documentation receipt changes after the gate, with a separate docs recheck. Fresh thirteen-job exact-head PR proof, corrected independent prior-main proof, ordinary authorized merge and independent merged-main proof remain required.
+These read-only reopen cases do not add power-loss, exhaustive native prefix, concurrent-writer
+or OS-presence qualification. Authenticated native controller/session adoption, graphical
+manual/harness/fleet journeys, qualified collection, second provider/host and eligible packaged
+acceptance remain unfinished. The [full objective](https://github.com/idosams/Mesh/issues/345) is
+open. The fixed user checkpoint and installed app stay unchanged and do not contain this increment.

@@ -767,6 +767,36 @@ impl AttachmentStorage {
         })
     }
 
+    /// List the recorded saved capture line with complete configured-trust native history.
+    /// Completed consumed lanes remain historical facts after grant revocation; this grants no
+    /// ordinary workspace admission, current input permission, capture, execution or main authority.
+    pub fn inspect_native_saved_versions(
+        &self,
+        work_id: &str,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Vec<super::SavedAttachmentVersion>> {
+        self.with_private_inspection(work_id, |context, work, guard| {
+            let snapshot = context.read(work, guard)?;
+            context.with_replayed_history(self, work, trusted, guard, |history, _| {
+                history.saved_versions(&snapshot.configuration)
+            })
+        })
+    }
+
+    /// Read an exact immutable saved file after complete native history and publication replay.
+    /// Unknown files return None. There is no editor-file fallback, signer or writable capability.
+    pub fn inspect_native_saved_file(
+        &self,
+        work_id: &str,
+        version: super::SavedAttachmentVersion,
+        relative: &str,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Option<Vec<u8>>> {
+        self.with_native_publication_history(work_id, trusted, |history, _| {
+            history.saved_file(version, relative)
+        })
+    }
+
     pub(super) fn with_native_publication_history<T: PartialEq>(
         &self,
         work_id: &str,

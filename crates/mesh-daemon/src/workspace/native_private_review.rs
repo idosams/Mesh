@@ -134,6 +134,48 @@ impl<'a> NativePrivateReviewHistory<'a> {
         Ok(version)
     }
 
+    // Return only the persisted capture line, never an arbitrary journal tip or live files.
+    pub(crate) fn saved_versions(
+        &self,
+        configuration: &str,
+    ) -> io::Result<Vec<crate::project_attachment::SavedAttachmentVersion>> {
+        self.ensure_current().map_err(io::Error::other)?;
+        let line = crate::project_attachment::NativeCaptureLine::load(
+            &self.pinned,
+            &self.history,
+            configuration,
+        )?;
+        let result = self
+            .history
+            .linear_history(line.head)
+            .map_err(|e| io::Error::other(e.to_string()))?
+            .into_iter()
+            .map(|operation| {
+                crate::project_attachment::SavedAttachmentVersion::from_verified_private_history(
+                    self, operation,
+                )
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
+    pub(crate) fn saved_file(
+        &self,
+        version: crate::project_attachment::SavedAttachmentVersion,
+        relative: &str,
+    ) -> io::Result<Option<Vec<u8>>> {
+        self.ensure_current().map_err(io::Error::other)?;
+        self.saved_version(version.operation())?;
+        let result = self
+            .history
+            .historical_workspace_file(version.operation(), relative)
+            .map_err(|e| io::Error::other(e.to_string()))?
+            .map(|file| file.bytes);
+        self.ensure_current().map_err(io::Error::other)?;
+        Ok(result)
+    }
+
     pub(crate) fn unchanged_capture(
         &self,
         configuration: &str,
