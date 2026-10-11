@@ -3543,6 +3543,12 @@ A normal shared-history merge joins its published canonical parent PR #391 at
 All six original Rust files and the exact published CI utility/package/workflow bytes are
 unchanged. Both documentation histories are retained. The original full local gate passed
 3,996 native tests, 194 rendered, 676 desktop and 44 real-daemon checks before initial
-publication. Focused revalidation on the combined sources and complete real inventory proof
-remain pending; final main ancestry, all ten fresh hosted checks and independent merged-main
+publication. Combined-source revalidation passed all nine focused native/ordinary grant cases
+in 83.028s (2 slow), all 32 repository tests, documentation and formatting. The real full
+inventory proved all 3,996 selected native tests covered once in 1,334/1,342/1,320 partitions,
+with 18 ignored tests unchanged. All ten checked source hashes stayed unchanged. The entire
+Rust, UI and Cargo source remains byte-identical to the original full-tested published source;
+only CI workflow/package/checker files and delivery documentation differ. The original full
+run is historical evidence on that source; this is focused/inventory revalidation of the
+combined tree. Final main ancestry, all ten fresh hosted checks and independent merged-main
 proof remain required. The original cancelled macOS job remains failed evidence.
