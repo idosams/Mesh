@@ -3777,3 +3777,91 @@ successfully. Its full 3,460,752-byte log, job metadata and explicit native stag
 preserved separately from the earlier exact-head PR proof. The original staged/reconciled/merged
 source histories and all failed verification remain recoverable. Fresh thirteen-job PR verification,
 ordinary merge and independent new-main verification still remain before this increment is delivered.
+
+
+R209 was subsequently published and normally merged as [PR #403](https://github.com/idosams/Mesh/pull/403)
+on 11 October 2026 at 09:35 UTC, main `2acf2ea8d233d174541567c02082cc35d5d50316`, from
+`7da098a20d5c10b41a8e801bab38bb4faad0f5ed`. All thirteen exact-head jobs passed in run38127840174
+after prior staging-main thirteen passed. Independent new-main run38128888416 also passed all
+thirteen, including 3,567 Linux and 4,005 macOS native cases, the real daemon and native renderers.
+Its full 3,470,005-byte log and exact once-per-platform new-case proof are preserved. Only its own
+issue #400 closed; the full objective #345 remains open. No self-approval or required-check bypass
+was used. The fixed user checkpoint and installed app remain unchanged.
+
+
+## Native owner receipt after the destination checkpoint (R211, in progress)
+
+[Issue #404](https://github.com/idosams/Mesh/issues/404) adds the actual owner consumption receipt
+after native root or consumed publication, reservation, grant, preparation, installation and signed
+destination checkpoint. It continues from normally merged [PR #403](https://github.com/idosams/Mesh/pull/403),
+main `2acf2ea8d233d174541567c02082cc35d5d50316`. That PR passed all thirteen exact-head jobs in
+run38127840174; independent merged-main run38128888416 also passed all thirteen. Its complete
+3,470,005-byte log and source/evidence bundles are preserved. Prior staging #399 and CI #402
+also passed their independent thirteen-job main checks. This is new canonical implementation,
+replacing no legacy source commit. The original source on the published parent and the later
+source-identical main fast-forward are preserved.
+
+A separate sealed native owner proof reconstructs complete configured-trust source, owner, ancestor
+and publication history, authenticates the saved operation internally, and verifies original
+registered roots, reservation allocation, signed installed checkpoint, canonical owner intent and
+all retained physical identities under complete custody. Limits remain 256 discovered works,
+256 inherited operations and 32 roots. The unfinished destination cannot supply source history.
+Ordinary admission stays in its existing caller. Both callers share the original held owner writer,
+transaction body, CAS payload, frame, sidecar names and exact prefix recovery formats. No persisted
+format changes or private-to-ordinary conversion were added.
+
+Uncommitted and partial owner attempts require the exact current bound grant. Only the matching
+verified Consumption prefix may recover. Fully committed historical owner receipts can be verified
+and retried after later revocation without creating new permission. A fresh custody pass checks the
+complete committed result and captured stage/sidecar identities before acknowledgement. Fresh-process
+reconstruction invokes no signer, never reinstalls files and returns only the exact receipt digest.
+Same-byte/same-mode pending-file substitution during append and after release refuses; original
+journal inode substitution also refuses. The old format does not claim a durable sidecar-inode field.
+Destination completion, ordinary native-history admission, execution, main and collection remain closed.
+
+The real ordinary writer baseline refused native publication before implementation. Initial root
+and consumed owner cases exposed a genuine discovery-order defect: recomputing catalog hints under
+owner-only custody omitted a consumed source requiring another short guard. Hints are now collected
+before owner-only discovery, while full-custody selections still recompute and verify the complete
+closure. The failed source/logs, all compiler/lint mistakes, partial edit-script failures and original
+dirty ancestry are preserved. The corrected basic pair passed in 93.274s before the later identity
+and process-exit campaign; those results are not substituted for final-source validation.
+
+The native process campaign passed all three tests in 267.687s (root33.644s, consumed267.678s,
+helper0.015s). Each parent executes nine actual child exits: staged owner intent, synced owner
+receipt, three representative partial-frame writes followed by fresh-process completion, and
+custody release. Exact canonical bytes and no duplicate append are checked after every retry. The
+no-environment helper pass alone is not process proof. Missing trust and foreign operation, grant,
+request, source or limits refuse without changing metadata/files. Same-mode inode substitutions,
+late editor arrival and actual grant withdrawal are checked. Historical retry after actual later
+revocation returns the old receipt without append, while a second uncommitted attempt after actual
+revocation refuses. Saved input, newer editor/untracked/synthetic-Git bytes, source history, physical
+identities and the destination checkpoint are retained. The final campaign added explicit ambiguous and corrupt retained-attempt refusals and passed
+all three cases in 267.715s (root34.034s, consumed267.707s, helper0.013s), with clippy clean.
+
+Complete `npm test`, all thirteen fresh exact-head hosted jobs, ordinary authorized merge after
+independent prior-main proof, and independent merged-main verification remain required. Representative
+native prefixes are not exhaustive native byte-prefix, power-loss or actual both-order concurrent
+writer qualification. Software credentials/process exits do not prove OS presence. Native completion,
+completed-history/controller/session routing, manual/harness/fleet acceptance, qualified collection,
+second provider/host, graphical and eligible packaged proof remain unfinished. The
+[full objective](https://github.com/idosams/Mesh/issues/345) remains open. The user's fixed checkpoint
+and installed app stay unchanged and do not contain this increment.
+
+
+R211 frozen-source `npm test` subsequently exited0 on macOS26.6.1 arm64, Rust1.97.1, Node24.7.0
+and isolated required nextest0.9.145: all 4,008 native cases passed in 1017.608s (23 slow,
+18 ignored). The actual new root owner case passed in 92.004s, consumed owner in 595.724s
+and helper in 0.049s. The prior root/consumed checkpoint cases and exhaustive shared checkpoint
+and completion prefix campaigns also passed. Repository48, docs5/114-document audit,
+license/storage self-tests, fmt/workspace clippy, renderer194, desktop676 and real-daemon44
+checks passed. All eleven frozen Rust/document hashes remained unchanged. The built inventory
+contained all 4,008 cases, covered exactly once in 1,339/1,346/1,323 partitions with 18 ignored.
+
+The first full invocation stopped at the required-version check before native tests because its
+nested script selected global nextest0.9.143. Its log and all eleven unchanged source hashes are
+retained. A private process-local script shell dispatched only nextest to the existing required
+0.9.145 executable for the successful complete gate. Repository commands, assertions, timeouts
+and global tools were unchanged; the exact runner bytes/version and dispatcher are retained.
+This final documentation-only receipt follows frozen-source verification. Fresh exact-head
+thirteen-job PR proof, ordinary authorized merge and independent merged-main proof remain required.
