@@ -13,6 +13,7 @@ pub(in crate::project_attachment) use recovery::{RecoveryMaterial, RecoveryPhase
 mod resolver;
 pub(in crate::project_attachment) use resolver::Selection as ConsumedHistorySelection;
 mod start_fence;
+mod start_retention;
 use super::*;
 use crate::{
     managed_file::retained_replacement::{

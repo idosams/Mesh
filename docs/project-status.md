@@ -3342,3 +3342,23 @@ the full gate finished, the branch fast-forwarded to that main with independentl
 incoming trees, unchanged before/after patch bytes and all source hashes/deleted-path state intact.
 Delivery targets canonical main; no unrelated history merge or published rewrite. Independent
 merged-main run 38099505900 is tracked separately. Broader acceptance #345 remains open.
+
+
+## Exact empty-destination consumption-start retention (11 October 2026)
+
+A separate native inspector verifies one retained consumption start while its reserved destination
+remains empty, using configured reviewer trust for every historical source publication and the
+exact current bound grant. Complete source/owner histories and destination-local transaction roots
+remain physically qualified. Staged, torn and complete start frames produce bounded immutable
+facts with no collection, install, recovery, runtime or approval authority. The inspector repeats
+complete discovery/material verification under the same deterministic custody set; ordinary
+default-trust published recovery still refuses. Existing staged-only empty history admits no start
+version, and journaled unfinished starts remain fenced. No persisted-format or writer change.
+
+Root and consumed-source fixtures pass exact root-set, signature/object/sidecar/suffix refusals,
+wrong trust/request/grant/limits/ownership and source/Git/journal preservation checks. Their initial
+semantic failure and corrected fixture failures are retained in the delivery ledger. The corrected full gate passed 3,987 native tests (475.278s), 194 rendered,
+676 desktop and 44 real-daemon checks, plus the repository/docs/license/storage/compiler gates.
+Hosted validation and merge remain pending. Installation/checkpoint/owner/completion consumption
+recovery, cross-store cleanup, concurrency/crash/storage pressure and the full signed graphical
+manual/harness/fleet acceptance remain unfinished. Fixed user checkpoints remain unchanged.

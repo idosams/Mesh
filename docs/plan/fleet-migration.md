@@ -8829,3 +8829,72 @@ the full gate finished, the branch fast-forwarded to that main with independentl
 incoming trees, unchanged before/after patch bytes and all source hashes/deleted-path state intact.
 Delivery targets canonical main; no unrelated history merge or published rewrite. Independent
 merged-main run 38099505900 is tracked separately. Broader acceptance #345 remains open.
+
+
+## Exact empty-destination consumption-start retention (R201)
+
+Provenance: new canonical implementation; no preserved legacy commit is replaced. The dependency
+is publication-history retention #383, source 24bb6560d688847d0cd78db1656c00ab13241a1f. This increment
+covers only the exact retained start while its destination remains empty. Installation/checkpoint,
+owner and completion recovery are explicit follow-on increments of the full fleet/native plan.
+
+The separate `inspect_native_consumption_start_retention` API accepts a registered owner, exact
+`NativeConsumedStartRequest` and configured reviewer trust. Native catalog discovery includes every
+required source, consumed ancestor and historical publication output, then acquires the complete
+deterministic source/destination/allocation custody set and repeats discovery. All source and owner
+histories replay historical publication with the supplied trust. Exact current bound grant, signed
+saved source, original limits, correlation and retained start material are checked through the
+private lower recovery boundary. No candidate, workspace or writable CAS escapes the inspector.
+
+The destination must remain an empty native reservation with only its enrolled prefix and the
+exact staged, partial or complete start frame. Checkpoint/completion/owner intents, competing
+capture/control/publication, unexpected live destination files and foreign journal suffixes refuse.
+Its initial physical configuration remains distinct from the prospective consumed configuration.
+The bounded `mesh.native-consumption-start-retention/v1` result has scope
+`empty-destination-start-recovery`, `collection_authority=false`, independent complete source/owner
+store inventories and a physically qualified destination inventory. The latter names verified
+local enrollment, policy, signed checkpoint objects, start/descriptor/stage, configuration and
+source-closure CAS payloads, plus staged operation/manifest identities, exact observed journal,
+sidecar and allocation/stage facts. Staged frames stay qualified allocation facts; they are not
+invented CAS roots. Foreign work, source, bundle, credential and challenge identities never become
+local object roots merely by appearing in the transaction.
+
+No writer, recovery/admission, runtime, receipt, signing, persisted-format, approval or deletion
+behavior changes. Existing staged-only empty history remains empty; partially/full journaled
+unfinished starts remain fenced. Ordinary/default-trust recovery still refuses published history.
+Every successful inventory is repeated under the same custody set and revalidates registrations,
+source graph/bindings, all retained material and root discovery before returning immutable facts.
+
+New root and consumed-source fixtures retain a real signed start before native publication, then
+inspect it after exact publication at staged, first-byte, last-byte and full-frame boundaries.
+They compare complete source/owner inventories, exact destination payload sets and physical/journal
+identities; preserve original notes, synthetic dirty Git metadata and private journals; retain
+ordinary read/recovery fences; and refuse wrong trust/request/grant/limits/owner/destination,
+missing/corrupt local/staged/historical objects, foreign intent/control/suffix and live editor work
+without repair. Existing exhaustive start/checkpoint/owner/completion recovery campaigns remain
+unchanged. Baseline ordinary recovery failed in 1.938s with publication receipt verification
+unavailable. Two new-fixture assumptions failed and were retained: staged-only empty history is
+permitted without admitting a version, and physical enrollment payload is distinct from authority.
+
+R201's final full `npm test` passed: 3,987 native tests in 475.278s (12 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new fixtures passed in the complete run (root 33.118s; consumed source 249.236s). All six
+changed Rust files retain their exact pre-gate SHA-256 identities. Initial full-gate style failures
+(cloned-reference slice, iter-cloned-collect and manual range pattern) were retained and corrected
+idiomatically without changing behavior, assertions or deadlines. Only these delivery docs changed
+after the passing full gate; final docs and hosted delivery remain pending.
+
+Parent #381's independent main run 38099505900 passed all seven checks at
+`da4b6f6afadb336a55a0d506ac1897606a558748`. Parent #383's unchanged exact head `24bb6560`
+passed six checks, but its first macOS job hit the 20-minute deadline after 3,586/3,985 native tests
+passed with no observed assertion failure; demo/renderers were skipped by cancellation. The full
+raw log, terminal status and diagnosis were retained before one unchanged-head macOS-only retry
+(run 38099985422 attempt 2). That retry and the parent's merge remain pending; cancellation is
+not counted as success. No check, assertion, required job or deadline was weakened.
+
+This is not cleanup authority or full consumption/fleet acceptance. Installed/checkpoint and
+owner/completion/revocation/lost-ack inventories, unknown metadata/all-store reachability,
+independent fresh deletion veto and custody through bounded collection, concurrent promotion and
+crash/storage pressure, native manual/harness/graphical integration and restore, eligible signing,
+another provider/host and velocity proof remain required. Fixed user checkpoints, installed app
+and preserved legacy history are unchanged. The broader scope remains tracked in issue #345.
