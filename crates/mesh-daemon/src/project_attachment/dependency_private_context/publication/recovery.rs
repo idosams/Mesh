@@ -5,6 +5,8 @@ use crate::root_authority::PinnedWorkspaceRoot;
 
 pub(in crate::project_attachment) struct VerifiedPublicationPrefix {
     raw: String,
+    request: RecordDigest,
+    review: RecordDigest,
     metadata: std::path::PathBuf,
     store: (u64, u64),
     journal: (u64, u64),
@@ -21,6 +23,29 @@ impl VerifiedPublicationPrefix {
         request: RecordDigest,
         review: RecordDigest,
         receipt: &[u8],
+    ) -> io::Result<Option<Self>> {
+        Self::read_with_scope(owner, request, review, receipt, false)
+    }
+
+    pub(super) fn read_retention(
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        review: RecordDigest,
+        receipt: &[u8],
+    ) -> io::Result<Self> {
+        if request == ZERO || review == ZERO || receipt.is_empty() || receipt.len() > 65536 {
+            return Err(invalid("invalid publication retention ceremony"));
+        }
+        Self::read_with_scope(owner, request, review, receipt, true)?
+            .ok_or_else(|| invalid("publication retention intent missing"))
+    }
+
+    fn read_with_scope(
+        owner: &ProvisionedAttachment,
+        request: RecordDigest,
+        review: RecordDigest,
+        receipt: &[u8],
+        include_complete: bool,
     ) -> io::Result<Option<Self>> {
         let raw = match read_private_in_store(&owner.store, PENDING) {
             Ok(raw) => raw,
@@ -46,7 +71,7 @@ impl VerifiedPublicationPrefix {
         let (length, record) = decode(&raw, identity, &bytes, &payload, request, review, receipt)?;
         let frame = frame_record(&StoredRecord::Dependency(record));
         let written = &bytes[length..];
-        if written.is_empty() || written.starts_with(&frame) {
+        if !include_complete && (written.is_empty() || written.starts_with(&frame)) {
             // Staged-only and complete frames use the existing complete-history path.
             return Ok(None);
         }
@@ -56,6 +81,8 @@ impl VerifiedPublicationPrefix {
         let proof = Self {
             metadata: owner.metadata_path().to_owned(),
             raw,
+            request,
+            review,
             store: owner.store.identity()?,
             journal: identity,
             observed: hash(&bytes),
@@ -66,6 +93,62 @@ impl VerifiedPublicationPrefix {
         };
         proof.verify(&owner.store, &journal, &bytes)?;
         Ok(Some(proof))
+    }
+
+    pub(in crate::project_attachment::dependency_private_context) fn raw_for(
+        &self,
+        owner: &ProvisionedAttachment,
+    ) -> io::Result<&str> {
+        if owner.metadata_path() != self.metadata || owner.store.identity()? != self.store {
+            return Err(invalid("publication retention belongs to another store"));
+        }
+        let mut file = owner
+            .store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(crate::RECORD_FILE_NAME))?;
+        let observed = journal_bytes(&mut file)?;
+        self.verify(&owner.store, &file, &observed)?;
+        Ok(&self.raw)
+    }
+
+    pub(in crate::project_attachment::dependency_private_context) fn retention_facts(
+        &self,
+        owner: &ProvisionedAttachment,
+    ) -> io::Result<Json> {
+        self.raw_for(owner)?;
+        let mut file = owner
+            .store
+            .filesystem()
+            .read_only()
+            .read_file(Path::new(crate::RECORD_FILE_NAME))?;
+        let observed = journal_bytes(&mut file)?;
+        self.verify(&owner.store, &file, &observed)?;
+        let frame = frame_record(&StoredRecord::Dependency(self.record));
+        Ok(Json::object([
+            ("schema", Json::text("mesh.native-publication-retention/v1")),
+            ("request", Json::text(self.request.to_hex())),
+            ("review", Json::text(self.review.to_hex())),
+            ("payload", Json::text(self.record.payload.to_hex())),
+            ("receipt", Json::text(hash(&self.receipt).to_hex())),
+            ("sidecar", Json::text(PENDING)),
+            (
+                "sidecar_digest",
+                Json::text(hash(self.raw.as_bytes()).to_hex()),
+            ),
+            (
+                "journal_device",
+                Json::text(format!("{:x}", self.journal.0)),
+            ),
+            ("journal_inode", Json::text(format!("{:x}", self.journal.1))),
+            ("journal_digest", Json::text(self.observed.to_hex())),
+            ("prefix_bytes", Json::Number(self.length as u64)),
+            (
+                "written_frame_bytes",
+                Json::Number((observed.len() - self.length) as u64),
+            ),
+            ("frame_bytes", Json::Number(frame.len() as u64)),
+        ]))
     }
 
     pub(in crate::project_attachment) fn verify(

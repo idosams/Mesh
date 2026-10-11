@@ -3,9 +3,6 @@ use super::*;
 use crate::project_attachment::dependency_transaction::{read_payload, text};
 use crate::root_authority::PinnedWorkspaceRoot;
 
-#[path = "recovery/history_retention.rs"]
-mod history_retention;
-
 pub(in crate::project_attachment) struct VerifiedControlPrefix {
     raw: String,
     request: RecordDigest,

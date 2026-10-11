@@ -1,11 +1,14 @@
 //! Store-qualified completed or exact recovery history facts. No durable pin or collection permission.
 use super::*;
 use mesh_cas::{Blake3, Cas};
+#[path = "retention/reconstruction.rs"]
+mod reconstruction;
 
 #[derive(Clone, Copy)]
 pub(super) enum NativeHistoryRecovery<'a> {
     Capture(&'a crate::project_attachment::NativeCaptureRetention),
     Control(&'a super::control::recovery::VerifiedControlPrefix),
+    Publication(&'a super::publication::recovery::VerifiedPublicationPrefix),
 }
 
 impl AttachmentStorage {
@@ -46,7 +49,7 @@ impl PrivateContext<'_> {
         self.with_replayed_history(storage, work, trusted, guard, |history, _| {
             let mut payload_budget = 1024 * 1024 * 1024usize;
             let mut content_budget = 1024 * 1024 * 1024u64;
-            let (operations, manifests, mut payloads, captures, control) = match recovery {
+            let (operations, manifests, mut payloads, captures, recovery_facts) = match recovery {
                 Some(NativeHistoryRecovery::Capture(capture)) => {
                     // Only this exact authenticated reconstruction may inspect a torn capture.
                     let roots = capture.local_roots(work.store.identity()?)?;
@@ -58,11 +61,16 @@ impl PrivateContext<'_> {
                         None,
                     )
                 }
-                Some(NativeHistoryRecovery::Control(prefix)) => {
+                Some(
+                    kind @ (NativeHistoryRecovery::Control(_)
+                    | NativeHistoryRecovery::Publication(_)),
+                ) => {
                     if work.id() != self.owner.id() {
-                        return Err(invalid("control history requires the exact owning store"));
+                        return Err(invalid(
+                            "dependency recovery history requires the exact owning store",
+                        ));
                     }
-                    let authored = prefix.history_roots(
+                    let authored = kind.history_roots(
                         work,
                         &snapshot.configuration,
                         &snapshot.proof,
@@ -75,26 +83,47 @@ impl PrivateContext<'_> {
                         &snapshot.configuration,
                         &snapshot.proof,
                     )?;
-                    let control = work.inspect_pending_dependency_control_retention_with_context(
-                        prefix.request(),
-                        |raw| {
-                            if raw != prefix.raw_for(work)? {
-                                return Err(invalid("control history intent changed"));
-                            }
-                            let current = self.read(work, guard)?;
-                            Ok((current.configuration.clone(), current.proof.clone()))
-                        },
-                    )?;
-                    captures.sidecars.insert(
-                        super::super::dependency_decision::PENDING.to_owned(),
-                        hash(prefix.raw_for(work)?.as_bytes()),
-                    );
+                    let (name, sidecar, facts) = match kind {
+                        NativeHistoryRecovery::Control(prefix) => {
+                            let control = work
+                                .inspect_pending_dependency_control_retention_with_context(
+                                    prefix.request(),
+                                    |raw| {
+                                        if raw != prefix.raw_for(work)? {
+                                            return Err(invalid("control history intent changed"));
+                                        }
+                                        let current = self.read(work, guard)?;
+                                        Ok((current.configuration.clone(), current.proof.clone()))
+                                    },
+                                )?;
+                            (
+                                "control",
+                                super::super::dependency_decision::PENDING,
+                                control,
+                            )
+                        }
+                        NativeHistoryRecovery::Publication(prefix) => (
+                            "publication",
+                            super::publication::PENDING,
+                            prefix.retention_facts(work)?,
+                        ),
+                        NativeHistoryRecovery::Capture(_) => {
+                            return Err(invalid("unexpected capture reconstruction"))
+                        }
+                    };
+                    if captures
+                        .sidecars
+                        .insert(sidecar.to_owned(), hash(kind.raw_for(work)?.as_bytes()))
+                        .is_some()
+                    {
+                        return Err(invalid("recovery sidecar conflicts with capture receipt"));
+                    }
                     (
                         authored.operations,
                         authored.manifests,
                         authored.payloads,
                         captures,
-                        Some(control),
+                        Some((name, facts)),
                     )
                 }
                 None => {
@@ -167,6 +196,9 @@ impl PrivateContext<'_> {
                         Some(NativeHistoryRecovery::Control(_)) => {
                             "mesh.native-history-control-retention/v1"
                         }
+                        Some(NativeHistoryRecovery::Publication(_)) => {
+                            "mesh.native-history-publication-retention/v1"
+                        }
                         None => "mesh.native-history-retention/v1",
                     }),
                 ),
@@ -177,6 +209,9 @@ impl PrivateContext<'_> {
                             "selected-store-capture-recovery"
                         }
                         Some(NativeHistoryRecovery::Control(_)) => "owner-store-control-recovery",
+                        Some(NativeHistoryRecovery::Publication(_)) => {
+                            "owner-store-publication-recovery"
+                        }
                         None => "selected-store-completed-history",
                     }),
                 ),
@@ -206,8 +241,8 @@ impl PrivateContext<'_> {
             if let Some(NativeHistoryRecovery::Capture(capture)) = recovery {
                 fields.push(("capture", capture.to_json()));
             }
-            if let Some(control) = control {
-                fields.push(("control", control));
+            if let Some((name, facts)) = recovery_facts {
+                fields.push((name, facts));
             }
             let result = Json::object(fields);
             if result.encode().len() > 4 * 1024 * 1024 {

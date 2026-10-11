@@ -1,6 +1,8 @@
 //! Native publication commit. Human presence is completed before entering this module.
 use super::*;
 pub(in crate::project_attachment) mod recovery;
+#[path = "publication/retention.rs"]
+mod retention;
 use crate::{dependency_policy::NativePublicationClaim, TrustedReviewers};
 use mesh_cas::{Blake3, Cas, DurableFs as _};
 use mesh_store::{frame_record, DependencyKind, DependencyRecord, StoredRecord};
