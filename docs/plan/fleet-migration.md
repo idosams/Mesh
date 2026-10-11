@@ -8765,3 +8765,67 @@ directive; closing references name only #376. Issue #345 is reopened with the re
 scope retained. Future delivery verifies the PR's closing references separately. The machine still
 has zero valid code-signing identities; signed graphical acceptance is unfinished, and this does
 not prevent continued native delivery. Fixed checkpoints and the installed app remain unchanged.
+
+
+## Complete owner history during exact publication recovery (R200)
+
+[Issue #382](https://github.com/idosams/Mesh/issues/382) follows merged
+[#381](https://github.com/idosams/Mesh/pull/381) at
+da4b6f6afadb336a55a0d506ac1897606a558748 (published source
+3953968ec8aab3e6e35ff8593d54d05b602e629e). This is new canonical implementation and replaces no
+preserved legacy commit. The parent passed all seven exact-head checks.
+
+The separate `inspect_native_history_retention_during_publication` API takes selected output work,
+exact request and saved review, a bounded signed human receipt and explicit reviewer trust. It
+verifies the same complete native graph, decision vector, prior main and exact ceremony as the
+publication writer under full deterministic custody. It independently matches that selection to
+the exact observed pending frame, reconstructs the frame in memory, verifies every owner-store
+signed operation, causal parent, manifest and file object, and retains enrollment/policy objects,
+completed consumption and historical capture retry roots plus the pending receipt and payload.
+The physical owner-store identity is separate from the selected output work/installation/operation.
+
+Its bounded `mesh.native-history-publication-retention/v1` result uses scope
+`owner-store-publication-recovery`, contains operation/manifest/payload/sidecar inventories, exact
+`mesh.native-publication-retention/v1` journal/intent facts and a verified `output` identity. It
+reports collection_authority=false. Limits remain 4,096 operation rows, 65,536 manifest rows and
+payload roots, a 64 MiB journal/reconstruction, shared 1 GiB payload and 1 GiB content budgets,
+16 MiB signed-operation reads and 4 MiB encoded result. Saved-review/output/credential/challenge
+identities do not become CAS roots merely because a publication references them; actual signed
+operation payloads and local policy/graph/receipt objects remain independently verified roots.
+
+The sealed publication prefix has a separate retention-only constructor for staged/partial/exact
+complete frames. The existing writer's partial-only selection and completed-retry behavior stay
+unchanged, including refusal of foreign suffixes by the retention entry. Immutable reconstruction
+now serves only the closed control/publication variants; capture retains its own authenticated
+reconstruction. Original completed, capture and control JSON shapes and ordinary unfinished-history
+refusals remain. No persisted-format, writer, human approval, runtime admission or recovery change;
+no repair, pin, deletion or human/provider wait under custody.
+
+The first new fixture failed because its structural baseline read omitted native custody (0.82s).
+After correcting that fixture, the temporary adapter to the completed-only reader failed the actual
+staged-publication case with "pending native work requires exact recovery" (0.96s). The first shared
+helper compile failed for a missing Path import; that import is corrected. All failed source/log
+snapshots are retained. Final native and repository results follow below; no assertion, ordinary
+refusal or deadline was weakened.
+
+Pending consumption inventory, unknown metadata classification, complete qualified cross-store
+reachability, independent deletion veto and custody through bounded cleanup remain required.
+Concurrent promotion/crash/storage-pressure evidence, all native approval/integration/recovery
+routes, signed graphical manual/harness/fleet acceptance, another provider/host and final velocity
+measurements remain incomplete in the broader [native acceptance scope](https://github.com/idosams/Mesh/issues/345).
+This owner-store inventory grants no collection authority. Fixed checkpoints and installed app stay unchanged.
+
+
+R200's final full `npm test` passed: 3,985 native tests in 449.852s (11 slow; 18 skipped),
+194 rendered tests, 676 desktop tests and all 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. It includes final zero request/review, empty/oversized receipt refusals and all
+pending and historical object faults. All eight focused campaigns had passed in 179.184s. Every
+source byte and the one deleted-path state remain identical after the full pass; only delivery
+receipts change and receive a final docs check. Exact-final-head hosted checks and merge remain pending.
+
+Parent #381 merged as da4b6f6afadb336a55a0d506ac1897606a558748 after all seven checks passed on
+3953968ec8aab3e6e35ff8593d54d05b602e629e (run 38098414067; macOS17m43s, Linux6m10s). Only after
+the full gate finished, the branch fast-forwarded to that main with independently verified identical
+incoming trees, unchanged before/after patch bytes and all source hashes/deleted-path state intact.
+Delivery targets canonical main; no unrelated history merge or published rewrite. Independent
+merged-main run 38099505900 is tracked separately. Broader acceptance #345 remains open.

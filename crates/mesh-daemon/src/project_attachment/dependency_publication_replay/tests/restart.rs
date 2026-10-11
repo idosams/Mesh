@@ -1,5 +1,7 @@
 //! Separate-process publication crash fixtures. Software credentials are test data only.
 use super::super::super::dependency_private_context::publication::Step;
+#[path = "restart/publication_retention.rs"]
+mod publication_retention;
 use super::*;
 use std::{
     path::Path,
@@ -200,14 +202,17 @@ pub(super) fn interrupted_publication(
         ]);
         run_child(root, mode, value, expected);
     };
+    let baseline = publication_retention::baseline(root, work, review);
     let before = fs::read(journal).unwrap();
     run("staged", 75);
     assert_eq!(fs::read(journal).unwrap(), before);
+    publication_retention::inspect(root, work, request, review, receipt, &baseline, "staged");
     after_staging();
     assert_eq!(fs::read(journal).unwrap(), before);
     run("partial", 76);
     let torn = fs::read(journal).unwrap();
     assert!(torn.starts_with(&before) && torn.len() > before.len());
+    publication_retention::inspect(root, work, request, review, receipt, &baseline, "partial");
     run("missing-trust", 0);
     assert_eq!(fs::read(journal).unwrap(), torn);
     run("foreign-request", 0);
@@ -215,8 +220,10 @@ pub(super) fn interrupted_publication(
     run("lost-ack", 77);
     let complete = fs::read(journal).unwrap();
     assert!(complete.starts_with(&torn) && complete.len() > torn.len());
+    publication_retention::inspect(root, work, request, review, receipt, &baseline, "lost-ack");
     run("retry", 0);
     assert_eq!(fs::read(journal).unwrap(), complete);
+    publication_retention::finished(root, work, request, review, receipt);
     let result = fs::read_to_string(root.join("restart-result")).unwrap();
     run("retry", 0);
     assert_eq!(fs::read(journal).unwrap(), complete);
