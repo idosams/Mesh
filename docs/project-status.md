@@ -3445,3 +3445,21 @@ not establish historical owner-first recovery after later revocation/completion,
 reservation/grant/start/completion routes, collector/all-store concurrent cleanup or packaged
 manual/harness/fleet approval, integration, restore, signing, another provider/host or velocity
 acceptance. Fixed user checkpoints and the installed app remain unchanged.
+
+## Complete macOS CI partitions (11 October 2026)
+
+Repeated 20-minute macOS job cancellations prevented otherwise locally tested native increments
+from becoming merged delivery. A separate CI change partitions the complete native inventory across
+three macOS workers, preserving every test, fmt/clippy, real-daemon and native-renderer checks and
+the existing job deadlines. Each worker first verifies that all three inventories form an exact
+disjoint cover of the full test inventory, with ignored tests unchanged. The stable `test-macos`
+aggregate requires successful matrix completion; skipped, cancelled, failed or missing results
+refuse. All three additional worker results also require independent inspection before merging.
+This adds no product capability or packaged acceptance. Initial checker and actual published-source
+inventory validation passed. The full local gate passed 3,991 native tests in 527.954s,
+194 rendered, 676 desktop and 44 daemon checks, plus repository/docs/license/storage/fmt/clippy.
+The final installer pins the same tested nextest 0.9.145 on every worker and checks its version
+before inventory selection. The exact final preflight passed on the real 3,991-test inventory; four
+wrong-version cases refused before any test inventory was selected. An explicit exit preserves
+that refusal on the local macOS Bash 3.2 shell. All ten hosted checks remain required; delivery is
+pending.
