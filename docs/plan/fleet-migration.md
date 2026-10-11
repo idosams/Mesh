@@ -9003,3 +9003,60 @@ collector/all-store concurrency, packaged manual/harness/fleet approval/integrat
 signing, another authenticated provider/host and velocity acceptance remain required in the
 [broader scope](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed app
 remain unchanged.
+
+## Complete macOS CI partitions (R207)
+
+Issue [#396](https://github.com/idosams/Mesh/issues/396) addresses repeated full-suite execution-budget
+cancellations separately from feature work. New canonical infrastructure replaces no legacy commit
+and starts from merged main `4b21c36bc0137161314ce1856863e51f74d09bc3`. PR #391's exact unchanged head
+hit the 20-minute macOS limit twice; PR #393's initial head also hit it. The complete raw failed
+logs, terminal job/run metadata and explicit GitHub deadline annotations were retained before any
+further action. Each had six other successful checks, but no complete macOS native suite result;
+those cancellations remain failed delivery evidence. Neither parent is merged. Reservation PR #395
+was published after its full local gate passed and before this separate increment began. Its
+initial unchanged head subsequently passed all seven hosted checks, but remains stacked and
+unmerged until its dependencies have passed and merged.
+
+Three fixed hashed nextest partitions run on separate macOS workers. Each verifies its actual full
+inventory against all three partition inventories before running its selected tests. Binary/test
+identity, complete counts, exact ignored state and match reasons are checked; duplicate or missing
+selection, incomplete inventories and unexpected filters refuse. All original fmt/clippy/native
+assertions remain; worker one also performs every real-daemon and ignored native-renderer check.
+The existing 20-minute worker deadlines remain. The old macOS cache key is shared across equivalent
+builds. No dependency, product/runtime format, permission or repository setting changes.
+
+The existing `test-macos` name remains as a fail-closed aggregate requiring successful completion of
+its entire matrix. No continue-on-error or automatic test retry is introduced. Its six original
+peer checks and all three new `test-macos-native (1/3)`, `(2/3)`, `(3/3)` checks must also be successful
+on the exact final head before an ordinary authorized merge: ten successful hosted job results,
+including the seven existing gate names. A green aggregate never substitutes for checking all worker
+results. Cancelled, skipped, missing or failed matrix completion is refused by the same tested native
+inventory utility. Independent merged-main validation remains required before dependent delivery.
+
+Initial focused repository verification passed all 32 tests, including coverage/refusal and aggregate
+result cases. The checker also verified a real inventory generated from unchanged published R206
+`c2333ef8966fd69d5705ba9930b0ed56906926b4`: all 3,999 selected tests appeared exactly once across
+1,334/1,344/1,321 partitions, with 18 ignored tests unchanged. This is an inventory proof, not test
+execution on R207 or hosted proof of the new workflow. Actual R207 inventory then verified all 3,991 selected tests in
+1,332/1,340/1,319 partitions with 18 ignored tests unchanged. Full `caffeinate -i npm test` passed:
+3,991 native tests in 527.954s (14 slow; 18 skipped), 194 rendered, 676 desktop and 44 real-daemon
+checks, plus all 32 repository tests and docs/license/storage/fmt/clippy. All four non-document source
+hashes were unchanged through that run. Final review then pinned the macOS installer to the same
+nextest 0.9.145 used by that run and all actual inventories, with a version assertion before selection
+to prevent workers using different partition implementations. The utility/package bytes remain
+unchanged; only that installer/preflight metadata and validation documentation were finalized.
+The exact final workflow preflight passed again against the real inventory. Four wrong-version
+cases (0.9.144, 0.9.146, 0.9.1450 and unrecognized) each exited before the first test-list call.
+The first refusal experiment exposed that a bare failed conditional did not exit under the local
+macOS Bash 3.2 despite `set -e`; its complete trace is preserved. An explicit conditional exit
+fixed that behavior, and all four refusal cases then passed. Final focused repository and
+documentation checks passed. All ten exact-head hosted results remain required. After this infrastructure increment passes hosted validation and merges,
+PR #391/#393/#395 must reconcile normally with canonical main and pass every fresh final-head check;
+their source/history and failed logs remain preserved. The
+[full fleet objective](https://github.com/idosams/Mesh/issues/345) remains open, and fixed checkpoints
+and the installed app are unchanged.
+
+Primary workflow/partition references: [GitHub job dependencies](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-jobs),
+[GitHub needs results](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts),
+[nextest partitioning](https://nexte.st/docs/ci-features/partitioning/) and
+[nextest machine-readable inventory](https://nexte.st/docs/machine-readable/list/).
