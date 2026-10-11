@@ -9215,3 +9215,79 @@ only CI workflow/package/checker files and delivery documentation differ. The or
 run is historical evidence on that source; this is focused/inventory revalidation of the
 combined tree. Final main ancestry, all ten fresh hosted checks and independent merged-main
 proof remain required. The original cancelled macOS job remains failed evidence.
+
+
+## Trusted native destination reservation (R206)
+
+Issue [#394](https://github.com/idosams/Mesh/issues/394) adds empty destination reservation after
+real native root and consumed publication. New canonical implementation replaces no legacy commit
+and depends on PR #393's published `af5d8339bc75ef0a85d3926646a88878aacffa10`. PR #391's unchanged
+macOS head hit its 20-minute job deadline twice; complete logs, job/check annotations and diagnosis
+were preserved. It remains unmerged with six other checks successful. PR #393's initial macOS job also hit its unchanged 20-minute limit; its other six checks passed
+and full failed-run evidence was preserved. Neither parent has merged. A separate complete-suite CI
+execution increment and eventual main reconciliation remain delivery prerequisites. PR #389 merged at
+`4b21c36bc0137161314ce1856863e51f74d09bc3`, whose independent main checks all passed.
+
+`reserve_native_dependency_lane` accepts an operation selector rather than a forged saved-history
+capability. It discovers source plus supplied contexts, consumed ancestry and every historical
+publication output before full custody; every source verification independently reconstructs the
+exact saved content through configured trust. Original handles, registration, owning-root ancestry,
+complete private graph and discovery are rechecked at each custody phase. Catalog candidates are
+pinned before the owner-only discovery lock, and consumed-handle verification requires the complete
+source root set. Active capture/control/publication intents refuse; retained completed consumption
+receipts remain historical evidence. Native child retry uses verified saved-parent bindings while
+its empty pending history remains unadmitted. The ordinary wrapper retains its typed saved-version
+verification. Both use one private allocation engine with unchanged canonical reservation fields,
+filenames, enrollment, staging/catalog publication, exact retries, depth, 256-work and source-roots
+plus five at most 32 bounds. Source and receipts are also rechecked immediately before publication
+and final acknowledgment. No input copying, grant, installation, start or main authority is created.
+
+The semantic baseline failed in 0.922s with native-publication verification unavailable. The first
+positive root case passed while consumed selection caught different-custody authority. Moving
+catalog discovery before the initial lock was insufficient: original consumed-handle checks also
+needed the complete root set. Both positives then passed in 9.895s. An expanded attempt passed all
+seven ordinary cases and caught a fixture filename typo; it was corrected to the actual
+`dependency-capture.pending` without changing assertions, admission or custody rules. The expanded
+nine cases passed in 79.714s, then final additional source-replacement and historical-grant retry
+coverage passed in 90.323s (root 11.845s; consumed 90.315s). Failed source/patch/log evidence is
+preserved; no check, deadline or assertion was weakened.
+
+Separate processes actually exit at initialized, fenced, published and recorded boundaries.
+Missing trust and a foreign operation preserve staged evidence; exact restart and repeat return the
+same work/store with no duplicate registration. Missing store receipts, unfinished editor bytes,
+noncanonical/nonprivate/hardlinked receipts and replaced destination folders refuse without repair.
+Original source-folder replacement at the fenced hook refuses before publication; restoration of
+its identity permits exact recovery. The actual trusted grant writer binds a destination reserved
+after publication, and subsequent reservation retry preserves that destination. Owner/source
+journals remain unchanged by reservation, alongside editor files and synthetic Git HEAD/index/
+untracked bytes. These are process-exit and software-human-fixture tests, not power-loss, real
+concurrent conflict, OS human-presence or packaged graphical evidence.
+
+Full `caffeinate -i npm test` passed: 3,999 native tests in 632.673s (17 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new cases passed in full (root 25.532s; consumed 248.767s). All five final Rust hashes remained
+unchanged afterward; only validation documentation was finalized. All exact final-head hosted
+checks, normal main reconciliation/authorized merge and independent merged-main verification remain required. The
+[broader objective](https://github.com/idosams/Mesh/issues/345) remains open: native writable consumed
+prepare/stage/install/checkpoint/owner/completion, destination-completion and grant-retention joins,
+true concurrent both-order recovery, authenticated manual/harness/fleet routes, qualified collector/
+all-store concurrency, packaged graphical approval/integration/restore, eligible signing, another
+provider/host and measured velocity acceptance. Fixed checkpoints and the installed app are preserved.
+
+## Native reservation delivery reconciliation (11 October 2026)
+
+Original published R206 source `c2333ef8966fd69d5705ba9930b0ed56906926b4` is preserved.
+A normal shared-history merge prepares it against the validated local R205 parent
+`2052516573c58d20b6f81f57a2e0ae89c704a3a6`, without changing any product code. The full parent documentation
+history and complete R206 additions are retained. This is local preparation; publication and
+merging must wait for the actual parent deliveries and normal final main reconciliation.
+The original full local gate passed 3,999 native tests, 194 rendered, 676 desktop and
+44 real-daemon checks before initial publication. Combined-source focused revalidation passed
+all ten native/ordinary reservation cases in 90.582s (1 slow), all 32 repository tests,
+documentation and formatting. The actual full inventory proved all 3,999 selected tests
+covered once in 1,334/1,344/1,321 partitions with 18 ignored tests unchanged. All nine checked
+source hashes stayed unchanged. The complete Rust, UI and Cargo source remains identical
+to the original full-tested c233 source; only six CI/docs paths differ. The original full
+run is historical source evidence, not a fresh full combined-head run. All ten fresh
+final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
+parents' original cancelled runs remain failed evidence.

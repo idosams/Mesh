@@ -3552,3 +3552,44 @@ only CI workflow/package/checker files and delivery documentation differ. The or
 run is historical evidence on that source; this is focused/inventory revalidation of the
 combined tree. Final main ancestry, all ten fresh hosted checks and independent merged-main
 proof remain required. The original cancelled macOS job remains failed evidence.
+
+
+## Trusted native destination reservation (11 October 2026)
+
+A native-host reservation path now creates an empty, fenced destination after real root or
+consumed native publication. It independently reconstructs the exact source operation through
+configured publication trust and the complete bounded source/ancestor/historical-publication
+context. The existing ordinary writer and native path share one allocation/recovery transaction;
+reservation formats, field ordering, depth and custody bounds remain unchanged. Correlation alone
+provides no grant, installed input, running lane or protected-main permission.
+
+All nine focused cases passed in 90.323s, including seven existing ordinary reservation cases.
+The two native cases use real publication and actual process exits at initialized, fenced,
+published and recorded boundaries. Exact restarts reuse the physical destination without duplicate
+registration. Missing trust, wrong selection, pending transactions, substituted folders and
+malformed/private/ambiguous receipts refuse while preserving editor and synthetic staged/untracked
+Git work. Source replacement immediately before publication refuses; retry after a later native
+grant still returns the original destination. The full repository gate passed 3,999 native tests in 632.673s,
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+All five tested Rust hashes remained unchanged; hosted validation and merged delivery remain pending. These are software-credential/process-exit tests, not graphical, power-loss or real concurrent
+acceptance. The fixed checkpoint and installed app remain unchanged; authenticated manual/harness/
+fleet routing and native writable consumption, retention/collection and full packaged acceptance
+remain unfinished.
+
+## Native reservation delivery reconciliation (11 October 2026)
+
+Original published R206 source `c2333ef8966fd69d5705ba9930b0ed56906926b4` is preserved.
+A normal shared-history merge prepares it against the validated local R205 parent
+`2052516573c58d20b6f81f57a2e0ae89c704a3a6`, without changing any product code. The full parent documentation
+history and complete R206 additions are retained. This is local preparation; publication and
+merging must wait for the actual parent deliveries and normal final main reconciliation.
+The original full local gate passed 3,999 native tests, 194 rendered, 676 desktop and
+44 real-daemon checks before initial publication. Combined-source focused revalidation passed
+all ten native/ordinary reservation cases in 90.582s (1 slow), all 32 repository tests,
+documentation and formatting. The actual full inventory proved all 3,999 selected tests
+covered once in 1,334/1,344/1,321 partitions with 18 ignored tests unchanged. All nine checked
+source hashes stayed unchanged. The complete Rust, UI and Cargo source remains identical
+to the original full-tested c233 source; only six CI/docs paths differ. The original full
+run is historical source evidence, not a fresh full combined-head run. All ten fresh
+final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
+parents' original cancelled runs remain failed evidence.
