@@ -53,23 +53,68 @@ jobs:
         timeout-minutes: 15
         run: cargo nextest run --workspace --exclude mesh-desktop
 
-  test-macos:
+  test-macos-native:
+    name: test-macos-native (${{ matrix.shard }}/3)
     runs-on: macos-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@nextest
+        with:
+          # Reuse the prior macOS job cache across all three equivalent builds.
+          shared-key: test-macos
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.145
       - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
-      # Keep all macOS Rust, real-daemon and native-renderer checks here. The separately
-      # required desktop-and-docs job runs repository/docs/storage/desktop verification;
-      # license runs both license checks. Together the seven jobs cover the full npm test
-      # gate without repeating the desktop install/build/tests on this critical path.
-      - run: npm run verify:rust
-      - run: npm run verify:demo
-      - run: npm run test:macos-renderers
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Prove the partitions cover the complete native inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory_dir="$RUNNER_TEMP/mesh-native-inventory"
+          mkdir -p "$inventory_dir"
+          runner_version="$(cargo nextest --version)"
+          if [[ "$runner_version" != 'cargo-nextest 0.9.145 ('* ]]; then
+            printf 'Unexpected nextest version: %s\n' "$runner_version" >&2
+            exit 1
+          fi
+          printf '%s\n' "$runner_version"
+          cargo nextest list --workspace --message-format json > "$inventory_dir/full.json"
+          for partition in 1 2 3; do
+            cargo nextest list --workspace --message-format json --partition "hash:$partition/3" > "$inventory_dir/part-$partition.json"
+          done
+          node tools/program/macos-test-coverage.mjs "$inventory_dir/full.json" "$inventory_dir/part-1.json" "$inventory_dir/part-2.json" "$inventory_dir/part-3.json"
+      - name: Run the complete selected native partition
+        run: cargo nextest run --workspace --no-fail-fast --partition hash:${{ matrix.shard }}/3
+      # Every former macOS step remains required. The complete daemon and renderer
+      # checks run on worker one; no test assertion or deadline is relaxed.
+      - if: matrix.shard == 1
+        run: npm run verify:demo
+      - if: matrix.shard == 1
+        run: npm run test:macos-renderers
+
+  test-macos:
+    needs: [test-macos-native]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Require every macOS partition to succeed
+        env:
+          MESH_MACOS_PARTITION_RESULTS: ${{ toJSON(needs) }}
+        run: node tools/program/macos-test-coverage.mjs --result
 
   deny:
     runs-on: ubuntu-latest
