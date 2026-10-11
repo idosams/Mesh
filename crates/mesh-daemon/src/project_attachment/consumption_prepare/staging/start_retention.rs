@@ -1,5 +1,6 @@
-//! Local CAS and allocation roots for an exact start, with no installed destination entries.
+//! Local CAS and allocation roots for exact start or installed/checkpoint recovery.
 use super::*;
+use crate::project_attachment::consumption_history;
 use crate::project_attachment::dependency_transaction::{digest, read_payload, text};
 use crate::workspace_custody::WorkspaceInitializationGuard;
 use mesh_cas::{Blake3, Cas};
@@ -13,6 +14,25 @@ impl PreparedNativeConsumedStart {
         staged: &StagedNativeConsumedStart,
         graph: &crate::project_attachment::NativeDependencyGraph,
         guard: &WorkspaceInitializationGuard,
+    ) -> io::Result<Json> {
+        self.retained_recovery_roots(storage, staged, graph, guard, false)
+    }
+    pub(in crate::project_attachment) fn retained_installed_roots(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+    ) -> io::Result<Json> {
+        self.retained_recovery_roots(storage, staged, graph, guard, true)
+    }
+    fn retained_recovery_roots(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+        graph: &crate::project_attachment::NativeDependencyGraph,
+        guard: &WorkspaceInitializationGuard,
+        installed: bool,
     ) -> io::Result<Json> {
         guard
             .require_roots(&[
@@ -52,10 +72,82 @@ impl PreparedNativeConsumedStart {
             return Err(invalid("retention start journal exceeds bound"));
         }
         facts.verify(&self.destination.store, &file, &observed)?;
+        let cas = Cas::<_, Blake3>::with_filesystem(
+            self.destination.metadata_path(),
+            self.destination.store.filesystem().read_only(),
+        )
+        .map_err(error)?;
+        let mut sidecars = vec![(super::super::START_PENDING, raw.clone())];
+        let mut checkpoint_facts = None;
+        let mut frames_root = None;
+        let origin = storage
+            .lane_origin_bound(&self.destination)?
+            .ok_or_else(|| invalid("retention allocation missing"))?;
+        guard
+            .require_roots(std::slice::from_ref(&origin.allocation))
+            .map_err(error)?;
+        let installed_count = if installed {
+            let owner_raw =
+                read_private_in_store(&self.destination.store, super::installation::OWNER_INTENT)?;
+            if owner_raw != self.owner_consumption_intent(graph, record.payload) {
+                return Err(invalid("retention installation intent differs"));
+            }
+            sidecars.push((super::installation::OWNER_INTENT, owner_raw));
+            self.verify_install_names()?;
+            self.entry_receipts(&staged.root, false, true, &origin.allocation, guard)?;
+            let count = self
+                .destination
+                .project()
+                .pinned
+                .filesystem()
+                .read_directory_names_bounded(Path::new(""), self.top_entries().len())?
+                .len();
+            match read_private_in_store(&self.destination.store, consumption_history::PENDING) {
+                Ok(history_raw) => {
+                    if count != self.top_entries().len() {
+                        return Err(invalid("checkpoint intent requires complete installation"));
+                    }
+                    let (prefix, selected, _) = consumption_history::pending_prefix(
+                        &cas,
+                        &raw,
+                        &history_raw,
+                        (file.metadata()?.dev(), file.metadata()?.ino()),
+                        &observed,
+                        None,
+                    )?;
+                    if prefix != length || selected != record {
+                        return Err(invalid("retention checkpoint start differs"));
+                    }
+                    let frames = self.frames();
+                    if read_payload(&cas, hash(&frames), 80 * 1024 * 1024)? != frames {
+                        return Err(invalid("retention checkpoint frames differ"));
+                    }
+                    let begin = length
+                        .checked_add(frame_record(&StoredRecord::Dependency(record)).len())
+                        .ok_or_else(|| invalid("checkpoint boundary overflow"))?;
+                    checkpoint_facts = Some(Json::object([
+                        ("frames", Json::text(hash(&frames).to_hex())),
+                        ("frame_bytes", Json::Number(frames.len() as u64)),
+                        (
+                            "written_frame_bytes",
+                            Json::Number((observed.len() - begin) as u64),
+                        ),
+                    ]));
+                    frames_root = Some(hash(&frames));
+                    sidecars.push((consumption_history::PENDING, history_raw));
+                }
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
+            }
+            Some(count)
+        } else {
+            None
+        };
         let frame = frame_record(&StoredRecord::Dependency(record));
-        if length > observed.len()
-            || observed.len() - length > frame.len()
-            || !frame.starts_with(&observed[length..])
+        if checkpoint_facts.is_none()
+            && (length > observed.len()
+                || observed.len() - length > frame.len()
+                || !frame.starts_with(&observed[length..]))
         {
             return Err(invalid("retention start has a foreign journal suffix"));
         }
@@ -68,11 +160,6 @@ impl PreparedNativeConsumedStart {
                 "retention start requires only its physical enrollment prefix",
             ));
         }
-        let cas = Cas::<_, Blake3>::with_filesystem(
-            self.destination.metadata_path(),
-            self.destination.store.filesystem().read_only(),
-        )
-        .map_err(error)?;
         let payload = read_payload(&cas, record.payload, 65536)?;
         let value = Json::parse(std::str::from_utf8(&payload).map_err(error)?).map_err(error)?;
         let body = value
@@ -88,6 +175,9 @@ impl PreparedNativeConsumedStart {
         let closure = graph.to_json().encode();
         let mut payloads = facts.policy().policy_payloads().collect::<BTreeSet<_>>();
         payloads.insert(facts.binding().authority);
+        if let Some(frames) = frames_root {
+            payloads.insert(frames);
+        }
         let mut budget = 1024 * 1024 * 1024usize;
         for bytes in self.checkpoint.objects.iter().map(Vec::as_slice).chain([
             payload.as_slice(),
@@ -125,8 +215,15 @@ impl PreparedNativeConsumedStart {
         let array = |ids: BTreeSet<RecordDigest>| {
             Json::Array(ids.into_iter().map(|id| Json::text(id.to_hex())).collect())
         };
-        let result = Json::object([
-            ("scope", Json::text("destination-store-start-recovery")),
+        let mut result = Json::object([
+            (
+                "scope",
+                Json::text(if installed {
+                    "destination-store-install-recovery"
+                } else {
+                    "destination-store-start-recovery"
+                }),
+            ),
             ("collection_authority", Json::Bool(false)),
             ("work", Json::text(self.basis.destination.work().to_hex())),
             (
@@ -153,10 +250,17 @@ impl PreparedNativeConsumedStart {
             ("payloads", array(payloads)),
             (
                 "sidecars",
-                Json::Array(vec![Json::object([
-                    ("name", Json::text(super::super::START_PENDING)),
-                    ("digest", Json::text(hash(raw.as_bytes()).to_hex())),
-                ])]),
+                Json::Array(
+                    sidecars
+                        .iter()
+                        .map(|(name, raw)| {
+                            Json::object([
+                                ("name", Json::text(*name)),
+                                ("digest", Json::text(hash(raw.as_bytes()).to_hex())),
+                            ])
+                        })
+                        .collect(),
+                ),
             ),
             (
                 "journal",
@@ -170,7 +274,7 @@ impl PreparedNativeConsumedStart {
                     ("prefix_bytes", Json::Number(length as u64)),
                     (
                         "written_frame_bytes",
-                        Json::Number((observed.len() - length) as u64),
+                        Json::Number((observed.len() - length).min(frame.len()) as u64),
                     ),
                     ("frame_bytes", Json::Number(frame.len() as u64)),
                 ]),
@@ -188,8 +292,18 @@ impl PreparedNativeConsumedStart {
                 ]),
             ),
         ]);
-        if read_private_in_store(&self.destination.store, super::super::START_PENDING)? != raw {
-            return Err(invalid("retention start sidecar changed"));
+        if let Json::Object(fields) = &mut result {
+            if let Some(count) = installed_count {
+                fields.push(("installed_entries".to_owned(), Json::Number(count as u64)));
+            }
+            if let Some(facts) = checkpoint_facts {
+                fields.push(("checkpoint".to_owned(), facts));
+            }
+        }
+        for (name, original) in sidecars {
+            if read_private_in_store(&self.destination.store, name)? != original {
+                return Err(invalid("retention consumption sidecar changed"));
+            }
         }
         guard.ensure_current().map_err(error)?;
         Ok(result)
