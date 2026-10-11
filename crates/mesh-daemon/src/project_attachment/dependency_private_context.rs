@@ -14,7 +14,7 @@ use crate::{
     workspace_custody::WorkspaceInitializationGuard,
 };
 pub(in crate::project_attachment) use consumption::{
-    NativeConsumptionWriteProof, NativeOwnerConsumptionProof,
+    NativeCompletionConsumptionProof, NativeConsumptionWriteProof, NativeOwnerConsumptionProof,
 };
 use mesh_store::RecordDigest;
 use std::{

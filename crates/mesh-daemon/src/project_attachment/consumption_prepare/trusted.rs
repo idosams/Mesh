@@ -295,6 +295,14 @@ impl PreparedNativeTrustedConsumedStart {
         Ok(result)
     }
     #[cfg(test)]
+    pub(in crate::project_attachment) fn try_ordinary_complete_for_test(
+        &self,
+        storage: &AttachmentStorage,
+        staged: &StagedNativeConsumedStart,
+    ) -> io::Result<RecordDigest> {
+        self.inner.complete_fenced_consumption(storage, staged)
+    }
+    #[cfg(test)]
     pub(in crate::project_attachment) fn try_ordinary_owner_for_test(
         &self,
         storage: &AttachmentStorage,
