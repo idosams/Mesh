@@ -1,4 +1,4 @@
-// Complete nextest inventory proof for the three macOS workers; no test execution is skipped here.
+// Complete nextest inventory proof for three native workers on either platform; no test execution is skipped here.
 import { readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const fail = message => { throw new Error(message); };
@@ -27,14 +27,14 @@ function inventory(value) {
   return { tests, suites };
 }
 export function verifyPartitionCoverage(fullValue, partitionValues) {
-  if (!Array.isArray(partitionValues) || partitionValues.length !== 3) fail('Exactly three macOS partitions are required');
+  if (!Array.isArray(partitionValues) || partitionValues.length !== 3) fail('Exactly three native partitions are required');
   const full = inventory(fullValue);
   const expected = new Set();
   for (const [id, test] of full.tests) {
     if (test.ignored ? test.selected || test.reason !== 'ignored' : !test.selected) fail('Full inventory filters changed');
     if (!test.ignored) expected.add(id);
   }
-  if (!expected.size) fail('Empty macOS execution inventory');
+  if (!expected.size) fail('Empty native execution inventory');
   const seen = new Set();
   const counts = partitionValues.map(value => {
     const partition = inventory(value);
@@ -51,14 +51,23 @@ export function verifyPartitionCoverage(fullValue, partitionValues) {
         seen.add(id); count++;
       } else if (test.reason !== 'partition') fail('Partition introduced another filter');
     }
-    if (!count) fail('Empty macOS partition');
+    if (!count) fail('Empty native partition');
     return count;
   });
   if (seen.size !== expected.size || [...expected].some(id => !seen.has(id))) fail('Partitions omit required tests');
   return { total: full.tests.size, selected: expected.size, ignored: full.tests.size - expected.size, partitions: counts };
 }
-export function requireSuccessfulPartitions(needs) {
-  if (!object(needs) || Object.keys(needs).length !== 1 || !object(needs['test-macos-native']) || needs['test-macos-native'].result !== 'success') fail('Every macOS partition must succeed');
+const platforms = {
+  macos: { label: 'macOS', group: 'test-macos-native', environment: 'MESH_MACOS_PARTITION_RESULTS' },
+  linux: { label: 'Linux', group: 'test-linux-native', environment: 'MESH_LINUX_PARTITION_RESULTS' },
+};
+function platformConfiguration(platform) {
+  if (!Object.hasOwn(platforms, platform)) fail('Select the linux or macos platform');
+  return platforms[platform];
+}
+export function requireSuccessfulPartitions(needs, platform = 'macos') {
+  const { label, group } = platformConfiguration(platform);
+  if (!object(needs) || Object.keys(needs).length !== 1 || !object(needs[group]) || needs[group].result !== 'success') fail(`Every ${label} partition must succeed`);
 }
 function readInventory(path) {
   const stat = statSync(path);
@@ -68,16 +77,22 @@ function readInventory(path) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const args = process.argv.slice(2);
+    let platform = 'macos';
+    if (args[0] === '--platform') {
+      args.shift();
+      platform = args.shift();
+    }
+    const { label, environment } = platformConfiguration(platform);
     if (args.length === 1 && args[0] === '--result') {
-      requireSuccessfulPartitions(JSON.parse(process.env.MESH_MACOS_PARTITION_RESULTS ?? 'null'));
-      console.log('All macOS partitions succeeded, including daemon and native-renderer checks.');
+      requireSuccessfulPartitions(JSON.parse(process.env[environment] ?? 'null'), platform);
+      console.log(`All ${label} partitions succeeded.`);
     } else {
       if (args.length !== 4) fail('Provide the full inventory and all three partition inventories');
       const [full, ...partitions] = args.map(readInventory);
-      console.log(`macOS complete test coverage: ${JSON.stringify(verifyPartitionCoverage(full, partitions))}`);
+      console.log(`${label} complete test coverage: ${JSON.stringify(verifyPartitionCoverage(full, partitions))}`);
     }
   } catch (error) {
-    console.error(`macOS test coverage refused: ${error.message}`);
+    console.error(`Native test coverage refused: ${error.message}`);
     process.exitCode = 1;
   }
 }
