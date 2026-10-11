@@ -1,3 +1,5 @@
+#[path = "tests/consumption_committed_owner_retention.rs"]
+mod consumption_committed_owner_retention;
 #[path = "tests/consumption_install_retention.rs"]
 mod consumption_install_retention;
 #[path = "tests/consumption_owner_retention.rs"]
@@ -121,6 +123,10 @@ fn native_consumption_install_retention_after_root_publication() {
 fn native_consumption_owner_retention_after_root_publication() {
     root_publication_fixture(8);
 }
+#[test]
+fn native_consumption_committed_owner_retention_after_root_publication() {
+    root_publication_fixture(9);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -137,7 +143,7 @@ fn root_publication_fixture(writer: u8) {
     fs::create_dir(root.join("source")).unwrap();
     fs::create_dir(root.join("metadata")).unwrap();
     fs::write(root.join("source/note"), b"first private version").unwrap();
-    if matches!(writer, 7 | 8) {
+    if matches!(writer, 7..=9) {
         consumption_install_retention::add_source_entries(&root);
     }
     let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
@@ -170,7 +176,7 @@ fn root_publication_fixture(writer: u8) {
         .unwrap();
     let pending_consumption =
         (writer == 6).then(|| consumption_retention::prepare(&storage, &owner, &owner, version));
-    let installing = matches!(writer, 7 | 8)
+    let installing = matches!(writer, 7..=9)
         .then(|| consumption_install_retention::prepare(&storage, &owner, &owner, version));
     let snapshot = storage
         .save_dependency_review_snapshot(&owner, &owner, version, &[], id(2))
@@ -390,7 +396,11 @@ fn root_publication_fixture(writer: u8) {
         file.sync_all().unwrap();
     }
     if let Some(pending) = installing {
-        if writer == 8 {
+        if writer == 9 {
+            consumption_committed_owner_retention::inspect(
+                &storage, &owner, &owner, pending, &trust,
+            );
+        } else if writer == 8 {
             consumption_owner_retention::inspect(&storage, &owner, &owner, pending, &trust);
         } else {
             consumption_install_retention::inspect(&storage, &owner, &owner, pending, &trust);
@@ -1511,6 +1521,10 @@ fn native_consumption_install_retention_after_consumed_publication() {
 fn native_consumption_owner_retention_after_consumed_publication() {
     consumed_publication_fixture(10);
 }
+#[test]
+fn native_consumption_committed_owner_retention_after_consumed_publication() {
+    consumed_publication_fixture(11);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -1537,7 +1551,7 @@ fn consumed_publication_fixture(writer: u8) {
     fs::create_dir(root.join("source")).unwrap();
     fs::create_dir(root.join("metadata")).unwrap();
     fs::write(root.join("source/note"), b"exact native input").unwrap();
-    if matches!(writer, 9 | 10) {
+    if matches!(writer, 9..=11) {
         consumption_install_retention::add_source_entries(&root);
     }
     let storage = AttachmentStorage::open(&root.join("metadata")).unwrap();
@@ -1611,7 +1625,7 @@ fn consumed_publication_fixture(writer: u8) {
         .unwrap()[0];
     let pending_consumption = (writer == 8)
         .then(|| consumption_retention::prepare(&storage, &owner, &destination, consumed));
-    let installing = matches!(writer, 9 | 10)
+    let installing = matches!(writer, 9..=11)
         .then(|| consumption_install_retention::prepare(&storage, &owner, &destination, consumed));
     let initial_decision = owner
         .decide_saved_input(
@@ -1687,7 +1701,7 @@ fn consumed_publication_fixture(writer: u8) {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
-        if matches!(writer, 6..=10) {
+        if matches!(writer, 6..=11) {
             // Snapshot/capture fixtures use real publication; earlier writer fixtures retain
             // the complete publication fault/refusal campaign without repeating it here.
             let committed = storage
@@ -2038,7 +2052,15 @@ fn consumed_publication_fixture(writer: u8) {
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
     if let Some(pending) = installing {
-        if writer == 10 {
+        if writer == 11 {
+            consumption_committed_owner_retention::inspect(
+                &storage,
+                &owner,
+                &destination,
+                pending,
+                &trust,
+            );
+        } else if writer == 10 {
             consumption_owner_retention::inspect(&storage, &owner, &destination, pending, &trust);
         } else {
             consumption_install_retention::inspect(&storage, &owner, &destination, pending, &trust);

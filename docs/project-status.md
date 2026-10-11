@@ -3446,6 +3446,30 @@ reservation/grant/start/completion routes, collector/all-store concurrent cleanu
 manual/harness/fleet approval, integration, restore, signing, another provider/host or velocity
 acceptance. Fixed user checkpoints and the installed app remain unchanged.
 
+## Historical owner receipt retention before completion (R204)
+
+A separate `inspect_native_consumption_committed_owner_retention` path now inspects a fully
+written historical owner Consumption record even after valid later grant revocation. It verifies
+complete native owner history, the exact original canonical intent and full record boundary, and
+all historical source/owner/publication roots using configured trust. The historical body must
+match independently reconstructed signed installation material, with complete installation and
+checkpoint and no destination completion. The earlier pending-owner/current-grant path remains
+unchanged. These are immutable local facts, not a new durability acknowledgment, input permission,
+recovery/runtime admission, protected-main or deletion capability.
+
+All eight focused start/install/pending-owner/historical-owner cases passed in 144.191s for root
+and consumed sources. Full `caffeinate -i npm test` passed: 3,993 native tests in 545.712s (15 slow;
+18 skipped), 194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/
+storage/fmt/clippy. Both new cases passed in full (root 24.122s; consumed 201.392s). All five Rust
+source hashes remained unchanged afterward and through the source-identical normal main
+fast-forward. Fixtures explicitly stage native-policy bytes after real publication; byte
+truncations simulate boundaries. Hosted checks remain pending. Destination completion recovery,
+explicit-trust writable reservation/grant/start/owner/completion and native manual/harness/
+fleet routes, qualified cleanup/concurrency, packaged graphical approval/integration/restore,
+signing, another provider/host and velocity acceptance remain unfinished. Fixed checkpoints and
+the installed app remain unchanged.
+
+
 ## Complete macOS CI partitions (11 October 2026)
 
 Repeated 20-minute macOS job cancellations prevented otherwise locally tested native increments
@@ -3463,3 +3487,16 @@ before inventory selection. The exact final preflight passed on the real 3,991-t
 wrong-version cases refused before any test inventory was selected. An explicit exit preserves
 that refusal on the local macOS Bash 3.2 shell. All ten hosted checks remain required; delivery is
 pending.
+
+## Owner-retention delivery reconciliation (11 October 2026)
+
+Published R204 source `e05cda32519255d28a50e1ab05acb42451ce16c3` is preserved. A normal
+shared-history merge brings in CI PR [#397](https://github.com/idosams/Mesh/pull/397),
+`f58f66cb96880028e5d25198daac8c53ce5f8289`, without changing any of its five Rust files.
+Both append-only status histories are retained. The combined full `caffeinate -i npm test` gate
+passed: 3,993 native tests in 552.653s (15 slow; 18 skipped), 194 rendered, 676 desktop and
+44 real-daemon checks, plus all 32 repository tests and docs/license/storage/fmt/clippy. All nine
+non-document source hashes stayed unchanged. Both new cases passed (root 24.147s; consumed
+201.610s). The two previous cancelled macOS runs remain failed evidence. Final reconciliation
+with merged canonical main, all ten fresh hosted checks and independent merged-main proof
+remain required.

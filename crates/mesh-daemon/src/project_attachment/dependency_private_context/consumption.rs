@@ -1,5 +1,6 @@
 //! Exact uncommitted consumption inventories. No recovery or admission escapes.
 use super::*;
+mod committed_owner;
 mod owner_recovery;
 pub(in crate::project_attachment) use owner_recovery::VerifiedConsumptionOwnerPrefix;
 
@@ -8,6 +9,7 @@ enum RetentionPhase {
     Start,
     Installed,
     Owner,
+    CommittedOwner,
 }
 
 fn ensure_consumption_retention_available(
@@ -100,6 +102,23 @@ impl AttachmentStorage {
         self.inspect_native_consumption_retention(owner, request, trusted, RetentionPhase::Owner)
     }
 
+    /// Inspect an exact historical owner receipt before destination completion, including
+    /// after later grant revocation. The original receipt and signed material are verified;
+    /// no new input permission, writable/recovery candidate, admission or collection is granted.
+    pub fn inspect_native_consumption_committed_owner_retention(
+        &self,
+        owner: &ProvisionedAttachment,
+        request: NativeConsumedStartRequest<'_>,
+        trusted: &crate::TrustedReviewers,
+    ) -> io::Result<Json> {
+        self.inspect_native_consumption_retention(
+            owner,
+            request,
+            trusted,
+            RetentionPhase::CommittedOwner,
+        )
+    }
+
     fn inspect_native_consumption_retention(
         &self,
         owner: &ProvisionedAttachment,
@@ -138,12 +157,20 @@ impl AttachmentStorage {
         // Catalog pinning precedes owner custody; the complete discovered set is acquired below.
         let hints = self.catalog_discovery_hints(owner)?;
         let owner_selection = self.prepare_dependency_work(owner, owner)?;
-        let (discovery, recovery) = {
+        let (discovery, recovery, receipt) = {
             let guard =
                 crate::workspace_custody::lock_workspace_initialization_set(&owner_selection.roots)
                     .map_err(error)?;
             let recovery = if phase == RetentionPhase::Owner {
                 Some(VerifiedConsumptionOwnerPrefix::read(
+                    owner,
+                    request.request,
+                )?)
+            } else {
+                None
+            };
+            let receipt = if phase == RetentionPhase::CommittedOwner {
+                Some(committed_owner::VerifiedConsumptionOwnerReceipt::read(
                     owner,
                     request.request,
                 )?)
@@ -157,7 +184,12 @@ impl AttachmentStorage {
                     self.private_discovery_with_recovery(owner, id, &guard, hints.clone(), selected)
                 })
                 .collect::<io::Result<Vec<_>>>()?;
-            (discovery, recovery)
+            if let Some(receipt) = &receipt {
+                for selected in &discovery {
+                    receipt.verify_context(owner, &selected.owner)?;
+                }
+            }
+            (discovery, recovery, receipt)
         };
         let ids = discovery
             .iter()
@@ -226,7 +258,7 @@ impl AttachmentStorage {
             let stores = works
                 .iter()
                 .map(|work| {
-                    context.native_history_retention(
+                    let history = context.native_history_retention(
                         self,
                         work,
                         trusted,
@@ -235,7 +267,12 @@ impl AttachmentStorage {
                             .as_ref()
                             .filter(|_| work.id() == owner.id())
                             .map(super::retention::NativeHistoryRecovery::Consumption),
-                    )
+                    )?;
+                    if let Some(receipt) = receipt.as_ref().filter(|_| work.id() == owner.id()) {
+                        receipt.qualify_history(owner, &context.read(owner, &guard)?.proof, history)
+                    } else {
+                        Ok(history)
+                    }
                 })
                 .collect::<io::Result<Vec<_>>>()?;
             let graph = context.graph(self, source, request.input.version.operation(), &guard)?;
@@ -259,7 +296,14 @@ impl AttachmentStorage {
             )?;
             let verify_source = |_operation| -> io::Result<()> {
                 let current = context.read(owner, &guard)?;
-                if current
+                if let Some(receipt) = &receipt {
+                    receipt.verify_context(owner, &current.proof)?;
+                    if current.proof.policy().native_request(request.request)
+                        != Some(receipt.record())
+                    {
+                        return Err(invalid("historical owner receipt selection changed"));
+                    }
+                } else if current
                     .proof
                     .policy()
                     .native_request(request.request)
@@ -303,6 +347,9 @@ impl AttachmentStorage {
                 |candidate, staged, graph, held| match phase { RetentionPhase::Start => candidate.retained_start_roots(self, &staged, graph, held), RetentionPhase::Installed => candidate.retained_installed_roots(self, &staged, graph, held), RetentionPhase::Owner => {
                     let prefix = recovery.as_ref().ok_or_else(||invalid("owner recovery proof missing"))?;
                     candidate.retained_owner_roots(self,&staged,graph,held,&prefix.body_for(owner)?)
+                }, RetentionPhase::CommittedOwner => {
+                    let receipt=receipt.as_ref().ok_or_else(||invalid("historical owner receipt missing"))?;
+                    candidate.retained_owner_roots(self,&staged,graph,held,&receipt.body_for(owner)?)
                 } },
             )?;
             if context.graph(self, source, request.input.version.operation(), &guard)? != graph
@@ -317,6 +364,9 @@ impl AttachmentStorage {
                         RetentionPhase::Start => "mesh.native-consumption-start-retention/v1",
                         RetentionPhase::Installed => "mesh.native-consumption-install-retention/v1",
                         RetentionPhase::Owner => "mesh.native-consumption-owner-retention/v1",
+                        RetentionPhase::CommittedOwner => {
+                            "mesh.native-consumption-committed-owner-retention/v1"
+                        }
                     }),
                 ),
                 (
@@ -325,6 +375,9 @@ impl AttachmentStorage {
                         RetentionPhase::Start => "empty-destination-start-recovery",
                         RetentionPhase::Installed => "installation-checkpoint-before-owner",
                         RetentionPhase::Owner => "owner-receipt-before-destination-completion",
+                        RetentionPhase::CommittedOwner => {
+                            "historical-owner-receipt-before-destination-completion"
+                        }
                     }),
                 ),
                 ("collection_authority", Json::Bool(false)),
