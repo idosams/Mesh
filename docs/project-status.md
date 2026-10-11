@@ -3500,3 +3500,55 @@ non-document source hashes stayed unchanged. Both new cases passed (root 24.147s
 201.610s). The two previous cancelled macOS runs remain failed evidence. Final reconciliation
 with merged canonical main, all ten fresh hosted checks and independent merged-main proof
 remain required.
+
+
+## Trusted bound grants after native publication (R205)
+
+`grant_native_saved_input` now records or revokes permission for an exact source operation and
+native destination through configured publication trust. `NativeTrustedInputGrantRequest` carries
+an operation selector that is independently reconstructed from complete verified history inside
+the writer, including fresh-process retries with a partial owner control frame. The original
+owner/source/destination handles and registrations are rechecked throughout the transaction.
+Complete source/ancestor/historical-publication discovery includes destination provenance parents;
+the pending destination is held and bound separately from readable source history. Exact current
+correlations, v2 grant generation, prior grant and request remain mandatory. Existing ordinary
+writer formats/behavior are retained. The native-host method grants no agent self-authorization,
+run or protected-main approval capability.
+
+Both focused root and consumed publication cases passed in 78.008s (11.013s/77.998s). They cover
+actual grant/revocation/regrant and historical retries, missing trust/stale or conflicting requests,
+bounds, missing retained payload/noncanonical intent refusal, real separate-process exits after
+staging, first/last frame bytes and durable append before reply, exact restart without duplication,
+failed sync acknowledgment and destination substitution after staging. The latter preserves foreign
+editor work while refusing append, then retries after the original destination is restored. Source/
+destination journals, editor files and synthetic dirty Git/untracked work stay intact where the
+operation must not write. Software human credentials in fixtures do not prove OS human presence.
+Full `caffeinate -i npm test` passed: 3,996 native tests in 599.484s (16 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new cases passed in full (27.825s/213.539s). All six Rust source hashes remained unchanged
+afterward; only validation documentation was finalized. Hosted checks remain pending.
+
+Reservation and consumed start/install/owner/completion after native publication, destination
+completion retention joins, grant-recovery collection qualification, true concurrent conflict
+campaigns and authenticated controller/harness/fleet routes remain unfinished. This method alone
+cannot create a runnable agent lane. Packaged graphical approval/integration/restore, eligible
+signing, another provider/host and measured fleet velocity acceptance remain required. Fixed user
+checkpoints and the installed app remain unchanged.
+
+## Trusted input grant delivery reconciliation (11 October 2026)
+
+Original published R205 source `af5d8339bc75ef0a85d3926646a88878aacffa10` is preserved.
+A normal shared-history merge joins its published canonical parent PR #391 at
+`34f3439fad62e5014f1df632f7553a92033f2cd9`, including the separately tested CI PR #397.
+All six original Rust files and the exact published CI utility/package/workflow bytes are
+unchanged. Both documentation histories are retained. The original full local gate passed
+3,996 native tests, 194 rendered, 676 desktop and 44 real-daemon checks before initial
+publication. Combined-source revalidation passed all nine focused native/ordinary grant cases
+in 83.028s (2 slow), all 32 repository tests, documentation and formatting. The real full
+inventory proved all 3,996 selected native tests covered once in 1,334/1,342/1,320 partitions,
+with 18 ignored tests unchanged. All ten checked source hashes stayed unchanged. The entire
+Rust, UI and Cargo source remains byte-identical to the original full-tested published source;
+only CI workflow/package/checker files and delivery documentation differ. The original full
+run is historical evidence on that source; this is focused/inventory revalidation of the
+combined tree. Final main ancestry, all ten fresh hosted checks and independent merged-main
+proof remain required. The original cancelled macOS job remains failed evidence.

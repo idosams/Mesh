@@ -1,7 +1,8 @@
 //! Explicit native-host grants. No actor, renderer or CLI route can issue these records.
 use super::{
     dependency_decision::{NativeControlInput, Step},
-    invalid, AttachmentStorage, ProvisionedAttachment, SavedAttachmentVersion,
+    invalid, AttachmentStorage, NativeDependencyWorkBinding, ProvisionedAttachment,
+    SavedAttachmentVersion,
 };
 use crate::ipc::Json;
 use mesh_store::{DependencyKind, RecordDigest};
@@ -32,6 +33,9 @@ pub struct NativeInputGrant {
     generation: u64,
 }
 impl NativeInputGrant {
+    pub(super) fn from_verified_record(record: RecordDigest, generation: u64) -> Self {
+        Self { record, generation }
+    }
     /// Exact immutable grant payload retained by the owning authority.
     pub fn record(&self) -> RecordDigest {
         self.record
@@ -48,6 +52,39 @@ fn work(id: RecordDigest, installation: RecordDigest) -> Json {
     Json::Array(vec![
         Json::text(id.to_hex()),
         Json::text(installation.to_hex()),
+    ])
+}
+pub(super) fn grant_body(
+    source: &NativeDependencyWorkBinding,
+    version: SavedAttachmentVersion,
+    destination: &NativeDependencyWorkBinding,
+    allowed: bool,
+    previous: Option<RecordDigest>,
+    request: RecordDigest,
+) -> Json {
+    Json::object([
+        ("request", Json::text(request.to_hex())),
+        (
+            "source",
+            Json::Array(vec![
+                work(source.work(), source.installation()),
+                Json::text(version.operation().to_hex()),
+            ]),
+        ),
+        (
+            "destination",
+            work(destination.work(), destination.installation()),
+        ),
+        ("generation", Json::Number(0)),
+        ("previous", Json::text(previous.unwrap_or(ZERO).to_hex())),
+        ("allowed", Json::Bool(allowed)),
+        (
+            "bindings",
+            Json::Array(vec![
+                Json::text(source.correlation.to_hex()),
+                Json::text(destination.correlation.to_hex()),
+            ]),
+        ),
     ])
 }
 impl AttachmentStorage {
@@ -171,33 +208,14 @@ impl AttachmentStorage {
                 Ok(NativeControlInput {
                     kind: DependencyKind::Grant,
                     revision_field: "generation",
-                    body: Json::object([
-                        ("request", Json::text(request.request.to_hex())),
-                        (
-                            "source",
-                            Json::Array(vec![
-                                work(source.work(), source.installation()),
-                                Json::text(request.version.operation().to_hex()),
-                            ]),
-                        ),
-                        (
-                            "destination",
-                            work(destination.work(), destination.installation()),
-                        ),
-                        ("generation", Json::Number(0)),
-                        (
-                            "previous",
-                            Json::text(request.expected_previous.unwrap_or(ZERO).to_hex()),
-                        ),
-                        ("allowed", Json::Bool(request.allowed)),
-                        (
-                            "bindings",
-                            Json::Array(vec![
-                                Json::text(source.correlation.to_hex()),
-                                Json::text(destination.correlation.to_hex()),
-                            ]),
-                        ),
-                    ]),
+                    body: grant_body(
+                        &source,
+                        request.version,
+                        &destination,
+                        request.allowed,
+                        request.expected_previous,
+                        request.request,
+                    ),
                     prior: proof.policy().native_grant(
                         (
                             source.work(),

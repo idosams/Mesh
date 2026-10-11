@@ -1,7 +1,9 @@
 //! Trusted native input decisions and saved reviews through complete publication history.
 use super::*;
 use crate::{
-    project_attachment::{NativeInputDecision, SavedAttachmentVersion, SavedInputDecision},
+    project_attachment::{
+        NativeInputDecision, NativeInputGrant, SavedAttachmentVersion, SavedInputDecision,
+    },
     TrustedReviewers,
 };
 use mesh_cas::{Blake3, Cas, DurableFs as _};
@@ -29,8 +31,30 @@ pub enum NativeSavedInputDecision {
     Replaced(RecordDigest),
 }
 
+/// Exact native-host grant intent. An operation ID is a selector, never verified history or permission.
+/// The writer reconstructs the selected source through complete configured-trust history, including
+/// on fresh-process retries while an identical owner control frame is incomplete.
+pub struct NativeTrustedInputGrantRequest<'a> {
+    /// Original native source handle; replacements are refused throughout the transaction.
+    pub source: &'a ProvisionedAttachment,
+    /// Exact saved source operation, independently reconstructed before any grant append.
+    pub operation: RecordDigest,
+    /// Original native destination handle, bound independently from source history.
+    pub destination: &'a ProvisionedAttachment,
+    /// Permit the exact input/destination pair or revoke future consumption.
+    pub allowed: bool,
+    /// Exact prior grant/revocation, or None for generation one.
+    pub expected_previous: Option<RecordDigest>,
+    /// Stable nonzero request; historical retries must preserve the original intent.
+    pub request: RecordDigest,
+}
 #[derive(Clone, Copy)]
-enum ControlRequest {
+enum ControlRequest<'a> {
+    Grant {
+        owner: &'a ProvisionedAttachment,
+        input: &'a NativeTrustedInputGrantRequest<'a>,
+        available: &'a [&'a ProvisionedAttachment],
+    },
     Input {
         version: RecordDigest,
         decision: NativeSavedInputDecision,
@@ -44,27 +68,115 @@ enum ControlRequest {
         opener: RecordDigest,
     },
 }
-impl ControlRequest {
+impl<'a> ControlRequest<'a> {
     fn kind(self) -> DependencyKind {
         match self {
+            Self::Grant { .. } => DependencyKind::Grant,
             Self::Input { .. } => DependencyKind::Eligibility,
             Self::Review { .. } | Self::Snapshot { .. } => DependencyKind::ReviewSnapshot,
         }
     }
     fn previous(self) -> Option<RecordDigest> {
         match self {
+            Self::Grant { input, .. } => input.expected_previous,
             Self::Input { previous, .. } => previous,
             Self::Review { .. } | Self::Snapshot { .. } => None,
         }
     }
     fn valid(self) -> bool {
         match self {
+            Self::Grant {
+                input, available, ..
+            } => {
+                input.operation != ZERO
+                    && input.expected_previous != Some(ZERO)
+                    && available.len() <= 256
+            }
             Self::Input {
                 version, previous, ..
             } => version != ZERO && previous != Some(ZERO),
             Self::Review { snapshot, opener } => snapshot != ZERO && opener != ZERO,
             Self::Snapshot { operation } => operation != ZERO,
         }
+    }
+
+    fn destination(self) -> Option<&'a ProvisionedAttachment> {
+        match self {
+            Self::Grant { input, .. } => Some(input.destination),
+            _ => None,
+        }
+    }
+    fn verify_handles(
+        self,
+        storage: &AttachmentStorage,
+        owner: &ProvisionedAttachment,
+        work: &ProvisionedAttachment,
+    ) -> io::Result<()> {
+        if let Self::Grant {
+            owner: original,
+            input,
+            available,
+        } = self
+        {
+            if original.id() != owner.id()
+                || input.source.id() != work.id()
+                || input.source.id() == input.destination.id()
+                || original.id() == input.destination.id()
+                || original.store.identity()? != owner.store.identity()?
+                || input.source.store.identity()? != work.store.identity()?
+            {
+                return Err(invalid("native grant original selection differs"));
+            }
+            for selected in [original, input.source, input.destination]
+                .into_iter()
+                .chain(available.iter().copied())
+            {
+                storage.exact_registered_work(selected)?;
+                if storage.candidate_owning_root(selected.id())? != original.id() {
+                    return Err(invalid("native grant crosses registered ownership"));
+                }
+            }
+        }
+        Ok(())
+    }
+    fn discover(
+        self,
+        storage: &AttachmentStorage,
+        owner: &ProvisionedAttachment,
+        work_id: &str,
+        guard: &WorkspaceInitializationGuard,
+        hints: super::super::dependency_catalog_discovery::CatalogHints,
+        recovery: Option<OwnerRecovery<'_>>,
+    ) -> io::Result<Vec<Discovery>> {
+        let mut ids = BTreeSet::from([work_id.to_owned()]);
+        if let Self::Grant {
+            input, available, ..
+        } = self
+        {
+            ids.extend(available.iter().map(|work| work.id().to_owned()));
+            let (_, parents) = hints
+                .0
+                .get(input.destination.id())
+                .ok_or_else(|| invalid("native grant destination registration unavailable"))?;
+            // Catalog chains include the selected work itself. Only its provenance ancestors
+            // supply source history; the exact destination is held and bound separately.
+            ids.extend(
+                parents
+                    .iter()
+                    .filter(|id| id.as_str() != input.destination.id())
+                    .cloned(),
+            );
+            if ids.len() > 256 || ids.contains(input.destination.id()) {
+                return Err(invalid(
+                    "native grant destination cannot supply source history",
+                ));
+            }
+        }
+        ids.iter()
+            .map(|id| {
+                storage.private_discovery_with_recovery(owner, id, guard, hints.clone(), recovery)
+            })
+            .collect()
     }
 }
 
@@ -132,13 +244,44 @@ impl PrivateContext<'_> {
         storage: &AttachmentStorage,
         work: &ProvisionedAttachment,
         guard: &WorkspaceInitializationGuard,
-        command: ControlRequest,
+        command: ControlRequest<'_>,
         request: RecordDigest,
         trusted: &TrustedReviewers,
     ) -> io::Result<Selection> {
         self.with_replayed_history(storage, work, trusted, guard, |history, owner| {
+            command.verify_handles(storage, self.owner, work)?;
             let mut retained_graph = None;
             let selected = match command {
+                ControlRequest::Grant { input, .. } => {
+                    let source = self.binding(storage, work, guard)?;
+                    let destination = self.binding(storage, input.destination, guard)?;
+                    if source.authority() != destination.authority()
+                        || source.project() != destination.project()
+                    {
+                        return Err(invalid("native grant crosses native project authority"));
+                    }
+                    self.graph(storage, work, input.operation, guard)?;
+                    let version = SavedAttachmentVersion::from_verified_private_history(
+                        history,
+                        input.operation,
+                    )?;
+                    NativeControlInput {
+                        kind: DependencyKind::Grant,
+                        revision_field: "generation",
+                        body: super::super::dependency_grant::grant_body(
+                            &source,
+                            version,
+                            &destination,
+                            input.allowed,
+                            input.expected_previous,
+                            request,
+                        ),
+                        prior: owner.policy().native_grant(
+                            (source.work(), source.installation(), version.operation()),
+                            (destination.work(), destination.installation()),
+                        ),
+                    }
+                }
                 ControlRequest::Input {
                     version,
                     decision,
@@ -267,7 +410,7 @@ impl PrivateContext<'_> {
                     Json::parse(std::str::from_utf8(&payload).map_err(error)?).map_err(error)?;
                 let revision = value
                     .get("body")
-                    .and_then(|v| v.get("revision"))
+                    .and_then(|v| v.get(selected.revision_field))
                     .and_then(Json::as_u64)
                     .ok_or_else(|| invalid("request is not an input decision"))?;
                 if record.kind != selected.kind
@@ -303,6 +446,7 @@ impl PrivateContext<'_> {
                 (
                     "schema",
                     Json::text(match command {
+                        ControlRequest::Grant { .. } => "mesh.dependency-policy/v2",
                         ControlRequest::Input { .. } => "mesh.dependency-policy/v1",
                         ControlRequest::Snapshot { .. } => "mesh.dependency-policy/v3",
                         ControlRequest::Review { .. } => "mesh.dependency-policy/v4",
@@ -336,6 +480,52 @@ impl PrivateContext<'_> {
     }
 }
 impl AttachmentStorage {
+    /// Grant or revoke an exact saved input through configured native publication trust.
+    /// This native-host method grants no agent self-authorization, run or protected-main authority.
+    pub fn grant_native_saved_input(
+        &self,
+        owner: &ProvisionedAttachment,
+        input: NativeTrustedInputGrantRequest<'_>,
+        available: &[&ProvisionedAttachment],
+        trusted: &TrustedReviewers,
+    ) -> io::Result<NativeInputGrant> {
+        self.grant_native_saved_input_with_io(
+            owner,
+            input,
+            available,
+            trusted,
+            |_, _, _| Ok(()),
+            |file| file.sync_all(),
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::project_attachment) fn grant_native_saved_input_with_io(
+        &self,
+        owner: &ProvisionedAttachment,
+        input: NativeTrustedInputGrantRequest<'_>,
+        available: &[&ProvisionedAttachment],
+        trusted: &TrustedReviewers,
+        hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
+        sync: impl FnMut(&File) -> io::Result<()>,
+    ) -> io::Result<NativeInputGrant> {
+        let selected = self.write_native_control(
+            input.source.id(),
+            ControlRequest::Grant {
+                owner,
+                input: &input,
+                available,
+            },
+            input.request,
+            trusted,
+            hook,
+            sync,
+        )?;
+        Ok(NativeInputGrant::from_verified_record(
+            selected.record.payload,
+            selected.revision,
+        ))
+    }
+
     /// Record an exact native-host eligibility decision after verifying complete accepted history.
     /// This grants no execution, input access or publication authority and has no runtime endpoint.
     /// No caller should wait for a person or provider inside this call. This development API
@@ -497,7 +687,7 @@ impl AttachmentStorage {
     fn write_native_control(
         &self,
         work_id: &str,
-        command: ControlRequest,
+        command: ControlRequest<'_>,
         request: RecordDigest,
         trusted: &TrustedReviewers,
         mut hook: impl FnMut(Step, &mut File, &[u8]) -> io::Result<()>,
@@ -508,6 +698,7 @@ impl AttachmentStorage {
         }
         let owner = self.reopen(&self.candidate_owning_root(work_id)?)?;
         let work = self.reopen(work_id)?;
+        command.verify_handles(self, &owner, &work)?;
         let owner_selection = self.prepare_dependency_work(&owner, &owner)?;
         let hints = self.catalog_discovery_hints(&owner)?;
         let (discovery, recovery) = {
@@ -515,7 +706,8 @@ impl AttachmentStorage {
                 crate::workspace_custody::lock_workspace_initialization_set(&owner_selection.roots)
                     .map_err(error)?;
             let recovery = recovery::VerifiedControlPrefix::read(&owner, request, command.kind())?;
-            let discovery = self.private_discovery_with_recovery(
+            let discovery = command.discover(
+                self,
                 &owner,
                 work_id,
                 &guard,
@@ -524,17 +716,34 @@ impl AttachmentStorage {
             )?;
             (discovery, recovery)
         };
-        let works = discovery
-            .works
-            .keys()
+        let ids = discovery
+            .iter()
+            .flat_map(|entry| entry.works.keys().cloned())
+            .collect::<BTreeSet<_>>();
+        if ids.len() > 256
+            || command
+                .destination()
+                .is_some_and(|destination| ids.contains(destination.id()))
+        {
+            return Err(invalid(
+                "native control source set is incomplete or exceeds bound",
+            ));
+        }
+        let works = ids
+            .iter()
             .map(|id| self.reopen(id))
             .collect::<io::Result<Vec<_>>>()?;
-        let available = works.iter().collect::<Vec<_>>();
+        let available = works
+            .iter()
+            .chain(command.destination())
+            .collect::<Vec<_>>();
         let prepared = self.prepare_dependency_graph(&owner, &work, ZERO, &available)?;
         let guard = crate::workspace_custody::lock_workspace_initialization_set(&prepared.roots)
             .map_err(error)?;
         let rediscover = || {
-            self.private_discovery_with_recovery(
+            command.verify_handles(self, &owner, &work)?;
+            command.discover(
+                self,
                 &owner,
                 work_id,
                 &guard,
@@ -606,6 +815,7 @@ impl AttachmentStorage {
                 }
             }
             sync(&journal)?;
+            command.verify_handles(self, &owner, &work)?;
             if rediscover()? != discovery {
                 return Err(invalid("native decision retry roots changed"));
             }
@@ -622,6 +832,7 @@ impl AttachmentStorage {
                 owner.store.filesystem().remove_file(Path::new(PENDING))?;
             }
             owner.store.sync()?;
+            command.verify_handles(self, &owner, &work)?;
             guard.ensure_current().map_err(error)?;
             return Ok(selected);
         }
@@ -718,6 +929,7 @@ impl AttachmentStorage {
         }
         owner.store.filesystem().remove_file(Path::new(PENDING))?;
         owner.store.sync()?;
+        command.verify_handles(self, &owner, &work)?;
         guard.ensure_current().map_err(error)?;
         Ok(selected)
     }

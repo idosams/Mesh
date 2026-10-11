@@ -66,7 +66,7 @@ impl VerifiedControlPrefix {
             super::super::super::dependency_decision::pending_prefix(&cas, &raw, identity, &bytes)?;
         if !matches!(
             kind,
-            DependencyKind::Eligibility | DependencyKind::ReviewSnapshot
+            DependencyKind::Grant | DependencyKind::Eligibility | DependencyKind::ReviewSnapshot
         ) || record.kind != kind
             || digest(text(&value, "request")?)? != request
             || decoded_payload != payload
