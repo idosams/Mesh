@@ -6,6 +6,8 @@ mod consumption_install_retention;
 mod consumption_owner_retention;
 #[path = "tests/consumption_retention.rs"]
 mod consumption_retention;
+#[path = "tests/native_grant.rs"]
+mod native_grant;
 #[path = "tests/restart.rs"]
 mod restart;
 use super::*;
@@ -127,6 +129,10 @@ fn native_consumption_owner_retention_after_root_publication() {
 fn native_consumption_committed_owner_retention_after_root_publication() {
     root_publication_fixture(9);
 }
+#[test]
+fn native_trusted_grants_after_root_publication() {
+    root_publication_fixture(10);
+}
 fn root_publication_fixture(writer: u8) {
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -174,6 +180,8 @@ fn root_publication_fixture(writer: u8) {
         .unwrap()
         .commit()
         .unwrap();
+    let native_grant_destination =
+        (writer == 10).then(|| native_grant::prepare(&storage, &owner, &owner, version));
     let pending_consumption =
         (writer == 6).then(|| consumption_retention::prepare(&storage, &owner, &owner, version));
     let installing = matches!(writer, 7..=9)
@@ -394,6 +402,18 @@ fn root_publication_fixture(writer: u8) {
         file.write_all(&mesh_store::frame_record(&StoredRecord::Dependency(record)))
             .unwrap();
         file.sync_all().unwrap();
+    }
+    if let Some(destination) = native_grant_destination {
+        native_grant::inspect(
+            &storage,
+            &owner,
+            &owner,
+            version,
+            &destination,
+            &trust,
+            key.public_key().as_ref(),
+        );
+        return;
     }
     if let Some(pending) = installing {
         if writer == 9 {
@@ -1525,6 +1545,10 @@ fn native_consumption_owner_retention_after_consumed_publication() {
 fn native_consumption_committed_owner_retention_after_consumed_publication() {
     consumed_publication_fixture(11);
 }
+#[test]
+fn native_trusted_grants_after_consumed_publication() {
+    consumed_publication_fixture(12);
+}
 fn consumed_publication_fixture(writer: u8) {
     use crate::project_attachment::{
         NativeConsumedStartRequest, NativeGrantInspection, NativeInputGrantRequest,
@@ -1623,6 +1647,8 @@ fn consumed_publication_fixture(writer: u8) {
     let consumed = storage
         .registered_dependency_versions(destination.id())
         .unwrap()[0];
+    let native_grant_destination =
+        (writer == 12).then(|| native_grant::prepare(&storage, &owner, &destination, consumed));
     let pending_consumption = (writer == 8)
         .then(|| consumption_retention::prepare(&storage, &owner, &destination, consumed));
     let installing = matches!(writer, 9..=11)
@@ -1701,7 +1727,7 @@ fn consumed_publication_fixture(writer: u8) {
             .with_signature(signature.as_ref().to_vec())
             .unwrap()
             .canonical_bytes();
-        if matches!(writer, 6..=11) {
+        if matches!(writer, 6..=12) {
             // Snapshot/capture fixtures use real publication; earlier writer fixtures retain
             // the complete publication fault/refusal campaign without repeating it here.
             let committed = storage
@@ -2051,6 +2077,18 @@ fn consumed_publication_fixture(writer: u8) {
     };
     let first_record =
         append_publication(first_review.record(), 1, id(0), first_context.clone(), 71);
+    if let Some(grant_destination) = native_grant_destination {
+        native_grant::inspect(
+            &storage,
+            &owner,
+            &destination,
+            consumed,
+            &grant_destination,
+            &trust,
+            human_key.public_key().as_ref(),
+        );
+        return;
+    }
     if let Some(pending) = installing {
         if writer == 11 {
             consumption_committed_owner_retention::inspect(

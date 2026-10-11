@@ -9061,3 +9061,67 @@ qualified collector/all-store concurrency, packaged graphical human approval/int
 eligible signing, another authenticated provider/host and velocity acceptance remain in the
 [broader objective](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed
 app remain unchanged.
+
+## Writable trusted input grants (R205)
+
+Issue [#392](https://github.com/idosams/Mesh/issues/392) adds the configured-trust native-host grant/
+revocation writer after native publication. New canonical implementation replaces no legacy commit
+and depends on PR #391's published `e05cda32519255d28a50e1ab05acb42451ce16c3`. Final main ancestry,
+all seven exact final-head checks and ordinary authorized merge remain delivery prerequisites.
+
+The raw operation in `NativeTrustedInputGrantRequest` is a selector, independently reconstructed
+as a verified saved source inside complete configured-trust history. This lets fresh-process
+retries resolve the identical partial grant frame without treating a serialized operation ID as a
+saved-history capability. Original owner/source/destination/available handles, native registrations
+and owning-root ancestry are rechecked before discovery, under complete custody, on each selection,
+before append and after durable replay/historical retry. Source plus supplied inputs, destination
+provenance ancestors and every historical publication output are discovered before the complete
+bounded custody set is acquired. Catalog chains include the selected destination itself; only that
+self-entry is excluded, and an explicitly supplied destination source context refuses. Destination
+binding uses independently verified parent histories while its pending history remains unadmitted.
+The existing 256-work and 32-custody-root bounds remain unchanged.
+
+The common control writer has a closed Grant variant using policy/v2, exact native correlations,
+per-input/destination generation and expected prior grant. Retry matches the selected generation
+field rather than assuming an eligibility revision. The existing ordinary grant body encoder is
+shared without changing its fields or order. The sealed control-prefix proof admits exact canonical
+grant-intent frames in addition to its prior two kinds; generic read permission is unchanged.
+The selected exact owner/source/destination identities, source graph, prior grant, intent, payload,
+journal and durable replay remain mandatory. Historical results convey no new consumption or run
+permission. Agents cannot issue their own grants or advance protected main. The existing control
+retention inspector still explicitly refuses grant intents; this adds no collector qualification.
+
+The semantic baseline failed in 1.140s with native-publication receipt verification unavailable.
+Initial compilation exposed a missing reference lifetime and an extra test-setup argument; both
+were corrected. The first runtime attempt exposed the selected destination's self-entry in catalog
+ancestry, corrected while retaining all actual provenance parents and destination-source refusal.
+The initial two positives passed in 11.237s. Expanded consumed recovery passed in 71.793s while
+the root case caught an invalid refusal fixture: when source equals owner, that request is valid.
+The fixture now exercises wrong ownership only for a child source. Final focused cases passed in
+78.008s (root 11.013s; consumed 77.998s), with actual product writer calls after real publication.
+All failed sources/patches/logs are preserved; no assertion, policy/read boundary, check or deadline
+was weakened.
+
+The final focused cases verify grant/revoke/regrant generations and exact historical retries after
+later updates; missing trust, stale/foreign/conflicting requests, unavailable operation, wrong
+owner/self destination, supplied pending destination and excess input bound refusal; noncanonical
+staged intent and missing payload preservation without repair. Separate processes exit after real
+staging, first/last frame prefixes and durable append before acknowledgment. Missing trust and
+foreign requests preserve both staged and partial evidence; exact restart finishes once and
+repeated retry leaves the journal unchanged. Failed sync acknowledgment requires exact retry.
+Destination replacement after staging refuses before append and preserves foreign editor work;
+restoring the original identity lets the exact staged request recover. Source/destination journals,
+editor bytes and synthetic staged/untracked Git work are preserved. These are process-exit and
+lost-reply tests, not power-loss, OS human-presence or true concurrent conflict evidence.
+
+Full `caffeinate -i npm test` passed: 3,996 native tests in 599.484s (16 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new cases passed in full (root 27.825s; consumed 213.539s). All six final Rust hashes remained
+unchanged afterward; only validation documentation was finalized. All seven exact final-head hosted
+checks, normal main reconciliation/authorized merge and independent merged-main verification remain
+required. Native writable reservation/start/install/owner/completion,
+destination completion and grant-retention joins, true concurrent both-order recovery, authenticated
+manual/harness/fleet routing, qualified collector/all-store concurrency and packaged graphical
+approval/integration/restore/signing/provider/host/velocity acceptance remain in the
+[broader objective](https://github.com/idosams/Mesh/issues/345). Fixed checkpoints and the installed
+app remain unchanged.

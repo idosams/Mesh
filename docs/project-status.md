@@ -3468,3 +3468,36 @@ explicit-trust writable reservation/grant/start/owner/completion and native manu
 fleet routes, qualified cleanup/concurrency, packaged graphical approval/integration/restore,
 signing, another provider/host and velocity acceptance remain unfinished. Fixed checkpoints and
 the installed app remain unchanged.
+
+## Trusted bound grants after native publication (R205)
+
+`grant_native_saved_input` now records or revokes permission for an exact source operation and
+native destination through configured publication trust. `NativeTrustedInputGrantRequest` carries
+an operation selector that is independently reconstructed from complete verified history inside
+the writer, including fresh-process retries with a partial owner control frame. The original
+owner/source/destination handles and registrations are rechecked throughout the transaction.
+Complete source/ancestor/historical-publication discovery includes destination provenance parents;
+the pending destination is held and bound separately from readable source history. Exact current
+correlations, v2 grant generation, prior grant and request remain mandatory. Existing ordinary
+writer formats/behavior are retained. The native-host method grants no agent self-authorization,
+run or protected-main approval capability.
+
+Both focused root and consumed publication cases passed in 78.008s (11.013s/77.998s). They cover
+actual grant/revocation/regrant and historical retries, missing trust/stale or conflicting requests,
+bounds, missing retained payload/noncanonical intent refusal, real separate-process exits after
+staging, first/last frame bytes and durable append before reply, exact restart without duplication,
+failed sync acknowledgment and destination substitution after staging. The latter preserves foreign
+editor work while refusing append, then retries after the original destination is restored. Source/
+destination journals, editor files and synthetic dirty Git/untracked work stay intact where the
+operation must not write. Software human credentials in fixtures do not prove OS human presence.
+Full `caffeinate -i npm test` passed: 3,996 native tests in 599.484s (16 slow; 18 skipped),
+194 rendered, 676 desktop and 44 real-daemon checks, plus repository/docs/license/storage/fmt/clippy.
+Both new cases passed in full (27.825s/213.539s). All six Rust source hashes remained unchanged
+afterward; only validation documentation was finalized. Hosted checks remain pending.
+
+Reservation and consumed start/install/owner/completion after native publication, destination
+completion retention joins, grant-recovery collection qualification, true concurrent conflict
+campaigns and authenticated controller/harness/fleet routes remain unfinished. This method alone
+cannot create a runnable agent lane. Packaged graphical approval/integration/restore, eligible
+signing, another provider/host and measured fleet velocity acceptance remain required. Fixed user
+checkpoints and the installed app remain unchanged.
