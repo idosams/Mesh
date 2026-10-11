@@ -3593,3 +3593,45 @@ to the original full-tested c233 source; only six CI/docs paths differ. The orig
 run is historical source evidence, not a fresh full combined-head run. All ten fresh
 final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
 parents' original cancelled runs remain failed evidence.
+
+
+## Complete Linux CI partitions (R210, 11 October 2026)
+
+[Issue #401](https://github.com/idosams/Mesh/issues/401) is a separate CI correction from canonical
+main `29ddcaaf8e73059ae615d875b8b654e6e408cfc9`, after merged #395 and its independent ten-job main run
+38118442653 succeeded. It replaces no legacy product commit. The original #399 source
+`832dc32fb64a8aadc586302e7b7cb5a3fa7d36e7`, its complete failed Linux log and terminal metadata,
+and the unfinished #400 baseline are preserved before any reconciliation.
+
+Run 38120206390 passed nine jobs, but its single Linux execution step reached the existing
+15-minute deadline. Both new staging cases passed (78.988s root; 618.234s consumed); 2,019 of
+3,564 selected tests reported passing before termination. The remaining cases are unverified on
+that run. The previous merged-main Linux suite took 798.788s for 3,561 tests. This correction
+splits the same complete Linux inventory into three hash workers, retaining the desktop exclusion,
+ignored cases, assertions, per-test deadlines, 20-minute job and 15-minute test-step limits.
+
+Every worker verifies the actual full inventory and all three partitions form an exact cover.
+The existing checker now selects an explicit validated platform; its default macOS CLI remains
+compatible. The stable Linux aggregate accepts only the actual successful Linux matrix result,
+refusing missing, failed, cancelled, skipped or foreign-platform groups. macOS coverage, daemon,
+renderer and other checks remain required. All thirteen exact-head checks and independent main
+verification are required before delivery. This is CI implementation pending validation and
+publication; it does not advance native consumption, agent execution or protected-main authority.
+The [full objective](https://github.com/idosams/Mesh/issues/345) remains open, and fixed checkpoints
+and the installed app are untouched.
+
+
+R210's complete local `caffeinate -i npm test` passed: 3,999 native tests in 637.498s
+(17 slow; 18 ignored unchanged), 194 rendered UI tests, 676 desktop tests, 48 repository
+regressions, five documentation regressions and 114 audited documents, license/storage/fmt/clippy,
+and all 44 real-daemon checks. Three new regression cases first failed against the unchanged
+macOS-only checker; the baseline and subsequent full passing output are retained. All six changed
+file hashes stayed unchanged during the full gate; final edits only record validation evidence.
+
+The exact new Linux preflight script also passed against locally compiled macOS binaries with the
+non-desktop exclusion: all 3,754 selected cases covered once in 1,257/1,252/1,245 partitions,
+with 14 ignored unchanged. This is local scope/CLI compatibility evidence, not Linux runtime proof.
+The complete actual macOS inventory covered all 3,999 selected cases once in 1,334/1,344/1,321
+partitions, with 18 ignored unchanged. Both used isolated nextest 0.9.145. Actual hosted Linux
+inventory/execution, all thirteen final-head jobs, ordinary authorized merge and independent
+merged-main verification remain required. No product source or fixed checkpoint changed.
