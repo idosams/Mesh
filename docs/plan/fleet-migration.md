@@ -9752,6 +9752,20 @@ are retained. This final documentation-only receipt is checked separately before
 
 ## Trusted native saved-version listing and immutable files (R213, in progress)
 
+Current R213 delivery refresh: [PR #415](https://github.com/idosams/Mesh/pull/415)
+passed all thirteen exact-head checks and its complete frozen-source4,011-case local gate, then
+merged normally as `da04b6266c5913c05a806b03e36ff65055933fa4` on11 October2026 at14:42:03 UTC.
+Its [independent main run](https://github.com/idosams/Mesh/actions/runs/38148247418) is running.
+Existing macOS format, full workspace lint, daemon and renderer checks now run on worker two;
+all native partitions, required checks and deadlines remain unchanged. R213's earlier updated
+run38143542753 completed all native, daemon and renderer checks but was cancelled at the worker-one
+job deadline during completion; its complete logs and annotations remain preserved as failed
+qualification. The current normal branch merge retains all four original Rust implementation
+hashes, both prior published heads, raw index, patches and verified bundles. Fresh complete local
+and exact-head hosted qualification are required on this reconciled branch. Product merge also
+waits for independent corrected-main qualification. No resolver, writer, test body or deadline
+changes here. The full objective345 stays open and the fixed testing checkpoint is unchanged.
+
 [Issue #408](https://github.com/idosams/Mesh/issues/408) continues from normally merged
 [PR #407](https://github.com/idosams/Mesh/pull/407): source
 `cb3a1e94936268a398bc50858ac8cbf9acdee16e`, main
