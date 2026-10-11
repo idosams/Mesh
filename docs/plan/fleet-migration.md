@@ -9282,7 +9282,12 @@ A normal shared-history merge prepares it against the validated local R205 paren
 history and complete R206 additions are retained. This is local preparation; publication and
 merging must wait for the actual parent deliveries and normal final main reconciliation.
 The original full local gate passed 3,999 native tests, 194 rendered, 676 desktop and
-44 real-daemon checks before initial publication. Focused/inventory revalidation of the
-combined tree remains pending; all ten fresh final-head hosted checks and independent
-merged-main proof remain required. Its original seven-job hosted run passed, while its
+44 real-daemon checks before initial publication. Combined-source focused revalidation passed
+all ten native/ordinary reservation cases in 90.582s (1 slow), all 32 repository tests,
+documentation and formatting. The actual full inventory proved all 3,999 selected tests
+covered once in 1,334/1,344/1,321 partitions with 18 ignored tests unchanged. All nine checked
+source hashes stayed unchanged. The complete Rust, UI and Cargo source remains identical
+to the original full-tested c233 source; only six CI/docs paths differ. The original full
+run is historical source evidence, not a fresh full combined-head run. All ten fresh
+final-head hosted checks and independent merged-main proof remain required. Its original seven-job hosted run passed, while its
 parents' original cancelled runs remain failed evidence.
